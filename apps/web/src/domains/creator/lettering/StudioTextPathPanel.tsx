@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Text Path Panel
  * 곡선 텍스트(Path) 인스펙터 — 모양 프리셋 칩 + 경로 모양 셀렉터 + 휘어짐(curve) 슬라이더.
@@ -60,20 +56,21 @@ export function StudioTextPathPanel({
     <div className="space-y-2">
       {/* 헤더 + 직선 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.lettering.StudioTextPathPanel", "ko", "곡선 텍스트 (Path)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">곡선 텍스트 (Path)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={flat}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.lettering.StudioTextPathPanel", "ko", "경로 효과를 제거하고 직선 텍스트로 되돌립니다.")}
+          title="경로 효과를 제거하고 직선 텍스트로 되돌립니다."
           // 고급 조판 디스클로저 안에서만 보이므로 advanced. 비활성일 때도 title 이 이유를
           // 말하므로 밀도 감사의 disabled-without-reason 을 통과한다.
           data-inspector-control-id="typography.path.reset"
           data-inspector-priority="advanced"
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.lettering.StudioTextPathPanel", "ko", "직선으로")}</button>
+          직선으로
+        </button>
       </div>
 
       {/* 모양 프리셋 칩 — 모양+휘어짐을 절대값으로 한 번에 덮어쓴다(누적 아님). "직선"은 평탄일 때 활성. */}
@@ -86,7 +83,7 @@ export function StudioTextPathPanel({
               type="button"
               onClick={() => onApplyPreset(preset.value)}
               title={preset.tip}
-              data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioTextPathPanel", "en", "typography.path.preset.{v0}"), { v0: String(preset.id) })}
+              data-inspector-control-id={`typography.path.preset.${preset.id}`}
               data-inspector-priority="advanced"
               className={cn(CHIP_CLASS, active && "border-accent bg-raised text-fg")}
             >
@@ -105,7 +102,7 @@ export function StudioTextPathPanel({
               key={s.id}
               type="button"
               onClick={() => onPatch({ shape: s.id })}
-              data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioTextPathPanel", "en", "typography.path.shape.{v0}"), { v0: String(s.id) })}
+              data-inspector-control-id={`typography.path.shape.${s.id}`}
               data-inspector-priority="advanced"
               className={cn(SHAPE_BTN_CLASS, active && "border-accent bg-raised text-fg")}
             >
@@ -117,7 +114,8 @@ export function StudioTextPathPanel({
 
       {/* 휘어짐 강도 — 0(평탄)..100(최대 휨). 직선(none)이면 잠근다. */}
       <label className={LABEL_ROW}>
-        {translateCurrentStaticSourceText("domains.creator.lettering.StudioTextPathPanel", "ko", "휘어짐")}<span className="flex items-center gap-1.5">
+        휘어짐
+        <span className="flex items-center gap-1.5">
           <input
             type="range"
             min={TEXT_PATH_CURVE_RANGE.min}

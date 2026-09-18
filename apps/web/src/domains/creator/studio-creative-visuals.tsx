@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Creative-feature visual glyphs — AutoDraw / CSP / Canva / Concepts style
  * mini illustrations for tools, not brand clones. Pure presentation.
@@ -225,7 +221,7 @@ export function StudioShapePickerGrid({
     <div
       data-studio-shape-picker="true"
       role="listbox"
-      aria-label={translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "ko", "도형 종류")}
+      aria-label="도형 종류"
       className={cn(
         showLabels ? "grid grid-cols-4 gap-1.5" : "grid grid-cols-4 gap-1 sm:grid-cols-7",
         className
@@ -308,7 +304,7 @@ export function StudioShapePickerStrip({
     <div
       data-studio-shape-strip="true"
       role="listbox"
-      aria-label={translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "ko", "도형 모양")}
+      aria-label="도형 모양"
       className={cn(
         "flex max-w-full items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className
@@ -552,7 +548,7 @@ export function StudioPressureHudMeter({
         "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap [word-break:keep-all] rounded-full border border-line/70 bg-card/80 px-1.5 py-0.5",
         className
       )}
-      aria-label={translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "ko", "실시간 필압")}
+      aria-label="실시간 필압"
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={pct}
@@ -644,7 +640,7 @@ export function StudioSymmetryGlyph({
               stroke="currentColor"
               strokeWidth={1.15}
               strokeLinecap="round"
-              transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "en", "rotate({v0} 7 7)"), { v0: String(deg) })}
+              transform={`rotate(${deg} 7 7)`}
             />
           ))}
         </>
@@ -658,7 +654,7 @@ export function StudioSymmetryGlyph({
               d="M7 7 6.05 2.15 7.95 2.15Z"
               fill="currentColor"
               opacity={deg === 0 ? 0.95 : 0.62}
-              transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "en", "rotate({v0} 7 7)"), { v0: String(deg) })}
+              transform={`rotate(${deg} 7 7)`}
             />
           ))}
           <circle cx={7} cy={7} r={4.85} fill="none" stroke="currentColor" strokeWidth={0.75} opacity={0.45} />
@@ -864,7 +860,7 @@ export function StudioSmartShapeKindRow({
       data-studio-smart-shape-kinds="true"
       data-studio-smart-shape-match={highlightKind ?? undefined}
       role="list"
-      aria-label={translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "ko", "인식 가능한 도형")}
+      aria-label="인식 가능한 도형"
       className={cn(
         "grid grid-cols-5 gap-1 rounded-xl border border-line/45 bg-canvas/35 p-1.5",
         className
@@ -878,7 +874,7 @@ export function StudioSmartShapeKindRow({
             key={kind}
             role="listitem"
             data-studio-smart-shape-kind={kind}
-            data-active={active ? translateCurrentStaticSourceText("domains.creator.studio.creative.visuals", "en", "true") : undefined}
+            data-active={active ? "true" : undefined}
             className={cn(
               "flex flex-col items-center gap-0.5 rounded-lg px-0.5 py-1.5 ring-1 transition-[background,box-shadow,transform,color] duration-200 ease-out",
               active

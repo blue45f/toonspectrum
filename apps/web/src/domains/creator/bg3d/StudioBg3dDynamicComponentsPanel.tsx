@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { DoorOpen, ToggleLeft, ToggleRight, Sparkles, Sliders } from "lucide-react";
 import React, { useState } from "react";
 
@@ -52,7 +48,7 @@ export function StudioBg3dDynamicComponentsPanel({
       <div className="flex items-center justify-between border-b border-line pb-2">
         <div className="flex items-center gap-1.5 font-bold text-fg">
           <DoorOpen className="size-4 text-accent" />
-          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "다이나믹 인터랙션 컴포넌트")}</span>
+          <span>다이나믹 인터랙션 컴포넌트</span>
         </div>
         <span className="rounded bg-accent/15 px-1.5 py-0.5 font-mono text-[0.68rem] text-accent font-semibold">
           {currentTransform.stateLabel}
@@ -66,13 +62,15 @@ export function StudioBg3dDynamicComponentsPanel({
             key={preset.kind}
             type="button"
             onClick={() => handleKindSelect(preset.kind)}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "en", "flex flex-col items-start rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(selectedKind === preset.kind
+            className={`flex flex-col items-start rounded-lg border p-2 text-left transition-all ${
+              selectedKind === preset.kind
                 ? "border-accent bg-accent/10 font-bold text-accent shadow-sm"
-                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg") })}
+                : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
+            }`}
           >
             <span className="text-[0.72rem] leading-tight">{preset.label}</span>
             <span className="mt-0.5 text-[0.62rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "최대 범위: ")}{preset.defaultMaxRange}
+              최대 범위: {preset.defaultMaxRange}
               {preset.kind.includes("door") || preset.kind.includes("chest") || preset.kind.includes("book") || preset.kind.includes("wheel") ? "°" : "m"}
             </span>
           </button>
@@ -82,23 +80,25 @@ export function StudioBg3dDynamicComponentsPanel({
       {/* Direct Quick Toggle & Slider Controls */}
       <div className="flex flex-col gap-2 rounded-lg border border-line bg-card p-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[0.7rem] font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "원클릭 열기 / 닫기")}</span>
+          <span className="text-[0.7rem] font-medium text-fg-2">원클릭 열기 / 닫기</span>
           <button
             type="button"
             onClick={handleToggle}
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "en", "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-all {v0}"), { v0: String(componentState.isOpen
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-all ${
+              componentState.isOpen
                 ? "bg-accent text-accent-fg shadow-sm"
-                : "border border-line bg-raised text-fg-2 hover:text-fg") })}
+                : "border border-line bg-raised text-fg-2 hover:text-fg"
+            }`}
           >
             {componentState.isOpen ? (
               <>
                 <ToggleRight className="size-4" />
-                <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "열림 (Open)")}</span>
+                <span>열림 (Open)</span>
               </>
             ) : (
               <>
                 <ToggleLeft className="size-4" />
-                <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "닫힘 (Closed)")}</span>
+                <span>닫힘 (Closed)</span>
               </>
             )}
           </button>
@@ -107,7 +107,7 @@ export function StudioBg3dDynamicComponentsPanel({
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1 text-[0.7rem] text-fg-2">
             <Sliders className="size-3 text-fg-3" />
-            <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "개방 각도 / 슬라이드 미세 조절:")}</span>
+            <span>개방 각도 / 슬라이드 미세 조절:</span>
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -132,7 +132,7 @@ export function StudioBg3dDynamicComponentsPanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
-        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dDynamicComponentsPanel", "ko", "3D 장면에 인터랙션 상태 적용")}</span>
+        <span>3D 장면에 인터랙션 상태 적용</span>
       </button>
     </div>
   );

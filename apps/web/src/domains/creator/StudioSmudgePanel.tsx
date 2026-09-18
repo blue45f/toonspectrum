@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Smudge Panel
  * 문지르기 브러시 컨트롤 — 켜면 메인 캔버스에서 선택된 이미지 위 드래그가 문지르기 스트로크로
@@ -83,28 +79,28 @@ export function StudioSmudgePanel({
         title={
           busy
             ? help.busyMessage
-            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmudgePanel", "ko", "{v0} 결과는 손을 뗄 때 한 획으로 반영됩니다."), { v0: String(help.summary) })
+            : `${help.summary} 결과는 손을 뗄 때 한 획으로 반영됩니다.`
         }
       >
         <span className="inline-flex items-center gap-1">
           <Blend className="size-3" aria-hidden />
-          {active ? translateCurrentStaticSourceText("domains.creator.StudioSmudgePanel", "ko", "색 밀기 끝내기") : translateCurrentStaticSourceText("domains.creator.StudioSmudgePanel", "ko", "색 밀기 시작")}
+          {active ? "색 밀기 끝내기" : "색 밀기 시작"}
         </span>
       </StudioToggleChip>
 
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioSmudgePanel", "ko", "브러시 크기")}
+        label="브러시 크기"
         min={SMUDGE_RADIUS_RANGE.min}
         max={SMUDGE_RADIUS_RANGE.max}
         step={SMUDGE_RADIUS_RANGE.step}
         value={radius}
         disabled={locked}
         onChange={onRadiusChange}
-        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSmudgePanel", "en", "{v0}px"), { v0: String(radius) })}
+        readout={`${radius}px`}
       />
 
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioSmudgePanel", "ko", "밀기 강도")}
+        label="밀기 강도"
         min={SMUDGE_STRENGTH_RANGE.min}
         max={SMUDGE_STRENGTH_RANGE.max}
         step={SMUDGE_STRENGTH_RANGE.step}

@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useLayoutEffect, useRef, useState } from "react";
 
 import {
@@ -272,7 +269,7 @@ export default function StudioTextEditOverlay({
       ref={textareaRef}
       // eslint-disable-next-line jsx-a11y/no-autofocus -- 더블클릭/더블탭으로만 열리는 인라인 편집 서페이스이며, 열릴 때 바로 타이핑 가능해야 하는 것이 올바른 동작이다
       autoFocus
-      aria-label={el.type === "bubble" ? translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEditOverlay", "ko", "말풍선 대사 편집") : translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEditOverlay", "ko", "캔버스 글자 편집")}
+      aria-label={el.type === "bubble" ? "말풍선 대사 편집" : "캔버스 글자 편집"}
       aria-keyshortcuts="Control+Enter Meta+Enter Escape"
       spellCheck
       value={value}
@@ -348,7 +345,7 @@ export function StudioTextEditFallbackModal({
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-6">
       <div className="w-full max-w-sm rounded-2xl border border-line bg-panel p-4">
-        <p className="mb-2 text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEditOverlay", "ko", "텍스트 편집")}</p>
+        <p className="mb-2 text-sm font-medium text-fg">텍스트 편집</p>
         <textarea
           // eslint-disable-next-line jsx-a11y/no-autofocus -- 더블클릭/더블탭으로만 열리는 모달이며, 열릴 때 입력란에 포커스를 주는 것이 올바른 모달 a11y 패턴
           autoFocus
@@ -373,13 +370,15 @@ export function StudioTextEditFallbackModal({
         />
         <div className="mt-2 flex justify-end gap-2">
           <button type="button" onClick={onCancel} className={buttonClass({ size: "sm", variant: "quiet" })}>
-            {translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEditOverlay", "ko", "취소")}</button>
+            취소
+          </button>
           <button
             type="button"
             onClick={() => onCommit(value)}
             className={buttonClass({ size: "sm", variant: "solid" })}
           >
-            {translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEditOverlay", "ko", "적용")}</button>
+            적용
+          </button>
         </div>
       </div>
     </div>

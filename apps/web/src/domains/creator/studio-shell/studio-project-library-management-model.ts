@@ -1,10 +1,4 @@
 import {
-  getCurrentUiLocale,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   studioSaveProfileNeedsDestination,
   type StudioSaveProfile,
 } from "../save-first/studio-save-profile";
@@ -20,13 +14,12 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("studio-project-library-management-model", ko, en);
 
-export type StudioProjectLibraryLocale = string;
-type StudioProjectLibraryAuthoredLocale = "ko" | "en";
+export type StudioProjectLibraryLocale = "ko" | "en";
 export type StudioProjectLibraryManagementView = "active" | "archived" | "trash";
 export type StudioProjectLibrarySortMode = "recent" | "name" | "created";
 
 export const STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS: Readonly<
-  Record<StudioProjectLibraryManagementView, Readonly<Record<StudioProjectLibraryAuthoredLocale, string>>>
+  Record<StudioProjectLibraryManagementView, Readonly<Record<StudioProjectLibraryLocale, string>>>
 > = {
   active: { ko: "내 작업", en: "My work" },
   archived: { ko: "보관함", en: "Archive" },
@@ -34,7 +27,7 @@ export const STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS: Readonly<
 };
 
 export const STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS: Readonly<
-  Record<StudioProjectLibraryManagementView, Readonly<Record<StudioProjectLibraryAuthoredLocale, string>>>
+  Record<StudioProjectLibraryManagementView, Readonly<Record<StudioProjectLibraryLocale, string>>>
 > = {
   active: {
     ko: "임시 자동저장 작업과 정식 저장한 프로젝트를 한곳에서 이어서 관리합니다.",
@@ -51,7 +44,7 @@ export const STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS: Readonly<
 };
 
 export const STUDIO_PROJECT_KIND_LABELS: Readonly<
-  Record<StudioProjectKind, Readonly<Record<StudioProjectLibraryAuthoredLocale, string>>>
+  Record<StudioProjectKind, Readonly<Record<StudioProjectLibraryLocale, string>>>
 > = {
   webtoon: { ko: "웹툰", en: "Webtoon" },
   illustration: { ko: "일러스트", en: "Illustration" },

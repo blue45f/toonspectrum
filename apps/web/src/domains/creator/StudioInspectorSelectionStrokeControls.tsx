@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /** Selection stroke properties for freehand and shape elements. */
 import { useEffect, useSyncExternalStore } from "react";
 
@@ -149,14 +145,14 @@ export function StudioInspectorSelectionStrokeControls({
   return (
     <div className="space-y-3" data-testid="studio-inspector-selection-stroke-controls">
       <StudioColorField
-        label={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 색상")}
+        label="선 색상"
         value={strokeDisabled ? null : activeColor}
         fallbackColor={lastVisibleStroke}
         purpose="stroke"
         recentColors={availableRecentColors}
         documentColors={documentColors}
         allowNone
-        noneLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 없음")}
+        noneLabel="선 없음"
         onChange={patchStroke}
         onPreview={previewStroke}
         onUseColor={rememberStroke}
@@ -180,8 +176,8 @@ export function StudioInspectorSelectionStrokeControls({
         role="img"
         aria-label={
           strokeDisabled
-            ? translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 미리보기: 선 없음")
-            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 미리보기: {v0}, {v1}px, {v2}%"), { v0: String(activeColor), v1: String(strokeWidth), v2: String(Math.round(opacity * 100)) })
+            ? "선 미리보기: 선 없음"
+            : `선 미리보기: ${activeColor}, ${strokeWidth}px, ${Math.round(opacity * 100)}%`
         }
       >
         <span className="absolute inset-y-0 left-0 w-1/2 bg-[#f7f5f1]" aria-hidden />
@@ -192,7 +188,7 @@ export function StudioInspectorSelectionStrokeControls({
             y1="20"
             x2="224"
             y2="20"
-            stroke={strokeDisabled ? translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "en", "transparent") : activeColor}
+            stroke={strokeDisabled ? "transparent" : activeColor}
             strokeWidth={previewWidth}
             strokeLinecap="round"
             opacity={opacity}
@@ -200,18 +196,20 @@ export function StudioInspectorSelectionStrokeControls({
         </svg>
         {strokeDisabled ? (
           <span className="absolute inset-0 grid place-items-center text-[0.62rem] font-semibold text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 없음")}</span>
+            선 없음
+          </span>
         ) : null}
       </div>
 
       <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-        {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 두께")}<span className="flex items-center gap-1.5">
+        선 두께
+        <span className="flex items-center gap-1.5">
           <input
             type="range"
             min={1}
             max={48}
             value={strokeWidth}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "선 두께")}
+            aria-label="선 두께"
             disabled={strokeDisabled}
             onChange={(event) =>
               patchEl(selected.id, {
@@ -227,8 +225,8 @@ export function StudioInspectorSelectionStrokeControls({
       </label>
       <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
         <span>
-          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "불투명도")}</span>
-          <span aria-hidden>{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "전체 불투명도")}</span>
+          <span className="sr-only">불투명도</span>
+          <span aria-hidden>전체 불투명도</span>
         </span>
         <span className="flex items-center gap-1.5">
           <input
@@ -237,7 +235,7 @@ export function StudioInspectorSelectionStrokeControls({
             max={1}
             step={0.05}
             value={opacity}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionStrokeControls", "ko", "불투명도")}
+            aria-label="불투명도"
             onChange={(event) =>
               patchEl(selected.id, {
                 opacity: Number(event.currentTarget.value),

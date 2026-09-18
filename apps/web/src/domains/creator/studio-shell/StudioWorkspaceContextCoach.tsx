@@ -1,7 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, CheckCircle2, Move3d, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
@@ -105,7 +101,7 @@ export function StudioWorkspaceContextCoach({ surface }: { readonly surface: Coa
             <img src={surface === "bg3d" ? "/brand/production-os-workspace.svg" : surface === "poser" ? "/brand/theme-scenes/graphite-studio.svg" : "/brand/theme-scenes/blossom-studio.svg"} alt="" />
           </div>
           <div className="studio-context-coach__body">
-            <p><Sparkles size={13} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWorkspaceContextCoach", "en", "JUST-IN-TIME GUIDE")}</p>
+            <p><Sparkles size={13} aria-hidden="true" /> JUST-IN-TIME GUIDE</p>
             <strong>{content.title}</strong>
             <span>{content.body}</span>
             <ol>

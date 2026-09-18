@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /** Preset discovery shares the existing catalog/commit authority; favorites are UI preferences. */
 import { Search, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -188,14 +184,14 @@ function CharacterShaperShelfContent({
             {meta?.hint ? <p className="mt-0.5 line-clamp-1 text-[0.7rem] leading-snug text-fg-3">{meta.hint}</p> : null}
           </div>
           <span role="status" className="shrink-0 rounded-md border border-line/70 bg-card px-1.5 py-0.5 text-[0.66rem] font-semibold tabular-nums text-fg-3">
-            {filtering ? `${visible.length}/${slotEntries.length}` : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "{v0}개"), { v0: String(slotEntries.length) })}
+            {filtering ? `${visible.length}/${slotEntries.length}` : `${slotEntries.length}개`}
           </span>
         </div>
         <div className="relative mt-2">
           <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
           <input ref={searchRef} id={searchId} type="search" value={draft} maxLength={512}
-            autoComplete="off" spellCheck={false} enterKeyHint="search" placeholder={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "이름·키워드·초성 검색")}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "{v0} 프리셋 검색"), { v0: String(slotLabel) })} data-character-shaper-search="true"
+            autoComplete="off" spellCheck={false} enterKeyHint="search" placeholder="이름·키워드·초성 검색"
+            aria-label={`${slotLabel} 프리셋 검색`} data-character-shaper-search="true"
             onChange={(event) => setDraft(event.currentTarget.value)}
             onCompositionStart={() => setComposing(true)}
             onCompositionEnd={(event) => { setDraft(event.currentTarget.value); setComposing(false); }}
@@ -206,7 +202,7 @@ function CharacterShaperShelfContent({
               }
             }}
             className={cn("h-11 w-full rounded-xl border border-line bg-card pl-8 pr-12 text-[0.8rem] text-fg placeholder:text-fg-3", "[&::-webkit-search-cancel-button]:hidden", STUDIO_FOCUS_RING)} />
-          {draft.length > 0 ? <button type="button" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "검색 지우기")} onClick={clearSearch}
+          {draft.length > 0 ? <button type="button" aria-label="검색 지우기" onClick={clearSearch}
             className={cn("absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg", STUDIO_FOCUS_RING)}><X size={14} aria-hidden /></button> : null}
         </div>
 
@@ -215,13 +211,13 @@ function CharacterShaperShelfContent({
         <div className="px-3 pb-2">
         {hasExperimentalGarments ? (
           <div className="mt-2 rounded-xl border border-line bg-card p-2">
-            <p className="text-[0.68rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "원본 의상을 기본으로 사용합니다. 실험 의상은 체형과 포즈에 따라 연결부나 관통 문제가 남아 있습니다.")}</p>
+            <p className="text-[0.68rem] leading-relaxed text-fg-3">원본 의상을 기본으로 사용합니다. 실험 의상은 체형과 포즈에 따라 연결부나 관통 문제가 남아 있습니다.</p>
             <button type="button" aria-pressed={showExperimentalGarments}
               onClick={() => { clearAuditionTimer(); activeAuditionRef.current = null; binding.cancelPreview?.(); setShowExperimentalGarments((value) => !value); }}
-              className={cn(studioSegmentChipClass(showExperimentalGarments), "mt-1 min-h-11 w-full")}>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "실험 의상 표시")}</button>
+              className={cn(studioSegmentChipClass(showExperimentalGarments), "mt-1 min-h-11 w-full")}>실험 의상 표시</button>
           </div>
         ) : null}
-        <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "프리셋 모아보기")} className="mt-2 grid grid-cols-3 gap-1">
+        <div role="group" aria-label="프리셋 모아보기" className="mt-2 grid grid-cols-3 gap-1">
           {COLLECTIONS.map((item) => <button key={item.id} type="button" aria-pressed={collection === item.id}
             onClick={() => setCollection(item.id)} className={cn(studioSegmentChipClass(collection === item.id), "min-h-11 min-w-0 px-1")}>
             {item.label}
@@ -229,20 +225,20 @@ function CharacterShaperShelfContent({
         </div>
         <button type="button" aria-pressed={onlyAvailable} onClick={() => setOnlyAvailable((current) => !current)}
           className={cn(studioSegmentChipClass(onlyAvailable), "mt-1 min-h-11 w-full justify-between gap-1")}
-          title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "부분 적용과 적용 불가 항목을 제외합니다. 모델이 바뀌면 다시 계산합니다.")}>
-          <span>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "완전 지원만")}</span><span className="text-[0.65rem] tabular-nums">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "지원 ")}{counts.available}{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "개")}</span>
+          title="부분 적용과 적용 불가 항목을 제외합니다. 모델이 바뀌면 다시 계산합니다.">
+          <span>완전 지원만</span><span className="text-[0.65rem] tabular-nums">지원 {counts.available}개</span>
         </button>
         <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3" data-character-capability-counts="true">
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "완전 지원 ")}{counts.available} {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "· 일부 적용 ")}{counts.partial} {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "· 적용 불가 ")}{counts.unavailable}
+          완전 지원 {counts.available} · 일부 적용 {counts.partial} · 적용 불가 {counts.unavailable}
         </p>
         {tags.length > 0 ? (
-          <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "장르 필터")} className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <button type="button" aria-pressed={tag === null} onClick={() => onTagChange(null)} className={cn(studioSegmentChipClass(tag === null), "shrink-0")}>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "전체")}</button>
+          <div role="group" aria-label="장르 필터" className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button type="button" aria-pressed={tag === null} onClick={() => onTagChange(null)} className={cn(studioSegmentChipClass(tag === null), "shrink-0")}>전체</button>
             {tags.map((genre) => <button key={genre} type="button" aria-pressed={tag === genre} onClick={() => onTagChange(tag === genre ? null : genre)} className={cn(studioSegmentChipClass(tag === genre), "shrink-0")}>{tagLabel(genre)}</button>)}
           </div>
         ) : null}
         {slot === "hand-pose" ? (
-          <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "적용할 손")} className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
+          <div role="group" aria-label="적용할 손" className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
             {CHARACTER_HAND_SIDE_OPTIONS.map((option) => <button key={option.value} type="button" disabled={lockReason !== null}
               aria-pressed={binding.handSide === option.value} onClick={() => binding.setHandSide(option.value)}
               className={cn("min-h-11 rounded-lg text-[0.74rem] font-semibold transition-colors disabled:opacity-45 motion-reduce:transition-none", STUDIO_FOCUS_RING, binding.handSide === option.value ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg")}>{option.label}</button>)}
@@ -252,26 +248,28 @@ function CharacterShaperShelfContent({
         {lockReason ? <p role="status" className="m-3 rounded-lg border border-warn/45 bg-warn/10 p-2 text-[0.7rem] text-warn">{lockReason}</p> : null}
         {binding.previewEntryId ? (
           <p role="status" className="mx-3 mt-2 rounded-xl border border-accent/45 bg-accent-soft px-3 py-2 text-[0.7rem] font-semibold text-accent">
-            {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "실제 3D 화면에서 후보를 미리 보는 중입니다. 클릭하면 한 번만 기록되고, Esc로 원래 상태로 돌아갑니다.")}</p>
+            실제 3D 화면에서 후보를 미리 보는 중입니다. 클릭하면 한 번만 기록되고, Esc로 원래 상태로 돌아갑니다.
+          </p>
         ) : null}
         {favorites.notice ? (
           <div className="mx-3 mt-2 space-y-1.5">
             <p role="status" className="text-[0.65rem] text-warn">{favorites.notice}</p>
             {favorites.hasPendingChanges ? (
               <button type="button" onClick={favorites.retrySave}
-                aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "즐겨찾기 저장 다시 시도")}
+                aria-label="즐겨찾기 저장 다시 시도"
                 className={cn("min-h-11 w-full rounded-lg border border-line bg-card px-3 text-[0.72rem] font-semibold text-fg-2 hover:bg-raised", STUDIO_FOCUS_RING)}>
-                {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "저장 다시 시도")}</button>
+                저장 다시 시도
+              </button>
             ) : null}
           </div>
         ) : null}
         {multi && equipped.length > 0 ? (
-          <section aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "장착 중")} className="border-b border-line/70 px-3 py-2.5">
-            <p className="mb-1.5 text-[0.66rem] font-semibold tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "장착 중 · ")}{equipped.length}</p>
+          <section aria-label="장착 중" className="border-b border-line/70 px-3 py-2.5">
+            <p className="mb-1.5 text-[0.66rem] font-semibold tracking-wide text-fg-3">장착 중 · {equipped.length}</p>
             <ul className="flex flex-wrap gap-1.5">
               {equipped.map((entry) => <li key={entry.id} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-accent/45 bg-accent-soft pl-3 pr-1 text-[0.72rem] font-semibold text-fg">
                 <span className="max-w-[9rem] truncate">{entry.label}</span>
-                <button type="button" disabled={lockReason !== null} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "{v0} 해제"), { v0: String(entry.label) })}
+                <button type="button" disabled={lockReason !== null} aria-label={`${entry.label} 해제`}
                   onClick={() => { if (!lockReason) binding.remove(slot, entry.id); }}
                   className={cn("grid size-11 place-items-center rounded-full text-fg-2 hover:bg-raised hover:text-fg disabled:opacity-45", STUDIO_FOCUS_RING)}><X size={13} aria-hidden /></button>
               </li>)}
@@ -279,8 +277,8 @@ function CharacterShaperShelfContent({
           </section>
         ) : null}
         {!filtering && featured.length > 0 ? (
-          <section aria-label={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "추천")} className="border-b border-line/70 px-3 py-2.5">
-            <p className="mb-1.5 inline-flex items-center gap-1 text-[0.66rem] font-semibold tracking-wide text-fg-3"><Sparkles size={12} aria-hidden className="text-accent" />{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "추천")}</p>
+          <section aria-label="추천" className="border-b border-line/70 px-3 py-2.5">
+            <p className="mb-1.5 inline-flex items-center gap-1 text-[0.66rem] font-semibold tracking-wide text-fg-3"><Sparkles size={12} aria-hidden className="text-accent" />추천</p>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {featured.map((entry) => {
                 const status = presentAvailability(entry);
@@ -299,14 +297,14 @@ function CharacterShaperShelfContent({
             </div>
           </section>
         ) : null}
-        {slotEntries.length === 0 ? <div className="p-3"><StudioEmptyState icon={<Sparkles size={18} aria-hidden />} title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "이 슬롯에는 아직 프리셋이 없습니다")} description={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "카탈로그가 준비되면 여기에 카드가 나타납니다.")} /></div>
+        {slotEntries.length === 0 ? <div className="p-3"><StudioEmptyState icon={<Sparkles size={18} aria-hidden />} title="이 슬롯에는 아직 프리셋이 없습니다" description="카탈로그가 준비되면 여기에 카드가 나타납니다." /></div>
           : visible.length === 0 ? <div className="p-3"><StudioEmptyState icon={<Search size={18} aria-hidden />} title={emptyTitle}
-            description={collection === "favorites" ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "모두에서 카드 아래 별을 눌러 추가하거나 다른 필터를 해제해 보세요.") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "다른 검색어를 입력하거나 필터를 해제해 보세요.")}
-            action={<button type="button" onClick={clearFilters} className={cn("inline-flex min-h-11 items-center rounded-lg border border-line bg-card px-3 text-[0.75rem] font-semibold text-fg-2 hover:bg-raised hover:text-fg", STUDIO_FOCUS_RING)}>{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "검색·필터 지우기")}</button>} /></div>
-          : <div ref={gridRef} role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "{v0} 프리셋"), { v0: String(slotLabel) })} data-character-shaper-grid="true" className="grid grid-cols-2 items-start gap-2 p-3">
+            description={collection === "favorites" ? "모두에서 카드 아래 별을 눌러 추가하거나 다른 필터를 해제해 보세요." : "다른 검색어를 입력하거나 필터를 해제해 보세요."}
+            action={<button type="button" onClick={clearFilters} className={cn("inline-flex min-h-11 items-center rounded-lg border border-line bg-card px-3 text-[0.75rem] font-semibold text-fg-2 hover:bg-raised hover:text-fg", STUDIO_FOCUS_RING)}>검색·필터 지우기</button>} /></div>
+          : <div ref={gridRef} role="group" aria-label={`${slotLabel} 프리셋`} data-character-shaper-grid="true" className="grid grid-cols-2 items-start gap-2 p-3">
             {visible.map((entry, index) => (
               <div key={entry.id} className="min-w-0">
-                {entry.apply.kind === "wardrobe" ? <p className="mb-1 text-[0.62rem] font-semibold text-warn">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "실험 의상 · 원고 적용 전 형태 확인")}</p> : null}
+                {entry.apply.kind === "wardrobe" ? <p className="mb-1 text-[0.62rem] font-semibold text-warn">실험 의상 · 원고 적용 전 형태 확인</p> : null}
                 <CharacterSlotCard entry={entry} availability={presentAvailability(entry)} selected={isCharacterEntrySelected(binding.recipe, entry)}
                   previewed={binding.previewEntryId === entry.id}
                   tabIndex={index === rovingIndex ? 0 : -1} onCommit={commitEntry} onHover={onHoverEntry}
@@ -314,7 +312,7 @@ function CharacterShaperShelfContent({
                   onPreviewStart={startAudition} onPreviewEnd={endAudition}
                   onKeyNavigate={(direction) => navigateFrom(index, direction)} />
                 <button type="button" tabIndex={index === rovingIndex ? 0 : -1} aria-pressed={favoriteSet.has(entry.id)}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "{v0} 즐겨찾기 {v1}"), { v0: String(entry.label), v1: String(favoriteSet.has(entry.id) ? "해제" : "추가") })}
+                  aria-label={`${entry.label} 즐겨찾기 ${favoriteSet.has(entry.id) ? "해제" : "추가"}`}
                   onFocus={() => setFocusedId(entry.id)}
                   onClick={() => {
                     const enabled = !favoriteSet.has(entry.id);
@@ -322,12 +320,14 @@ function CharacterShaperShelfContent({
                     favorites.setFavorite(entry.id, enabled);
                   }}
                   className={cn("mt-1 flex min-h-11 w-full items-center justify-center gap-1 rounded-lg border border-line bg-card text-[0.68rem] hover:bg-raised", STUDIO_FOCUS_RING, favoriteSet.has(entry.id) ? "text-accent" : "text-fg-3")}>
-                  <Star size={13} aria-hidden fill={favoriteSet.has(entry.id) ? translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "en", "none")} />{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "즐겨찾기")}</button>
+                  <Star size={13} aria-hidden fill={favoriteSet.has(entry.id) ? "currentColor" : "none"} />즐겨찾기
+                </button>
               </div>
             ))}
           </div>}
         <p className="px-3 pb-3 text-[0.62rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperShelf", "ko", "카드의 모양 도해는 실제 모델 이미지와 다릅니다. 잠시 머물면 3D 화면에서 후보를 시험할 수 있고, 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.")}</p>
+          카드의 모양 도해는 실제 모델 이미지와 다릅니다. 잠시 머물면 3D 화면에서 후보를 시험할 수 있고, 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.
+        </p>
       </div>
     </div>
   );

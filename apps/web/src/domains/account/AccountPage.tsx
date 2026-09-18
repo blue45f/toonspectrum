@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   Bookmark,
@@ -86,7 +85,7 @@ function SignInPrompt() {
 function PostCard({ work }: { work: WorkSummary }) {
   return (
     <Link
-      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.account.AccountPage", "en", "/create/{v0}"), { v0: String(work.id) })}
+      href={`/create/${work.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/30 transition-colors hover:border-line-strong"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">
@@ -295,7 +294,7 @@ function ActivityTab() {
             {recentReviews.map((review) => (
               <li key={review.titleId}>
                 <Link
-                  href={formatI18nTemplate(translateCurrentStaticSourceText("domains.account.AccountPage", "en", "/title/{v0}"), { v0: String(review.titleId) })}
+                  href={`/title/${review.titleId}`}
                   className="flex items-start gap-3 rounded-xl border border-line bg-panel/30 p-3 transition-colors hover:border-line-strong"
                 >
                   <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">

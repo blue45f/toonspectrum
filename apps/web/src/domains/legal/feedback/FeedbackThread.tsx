@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Reply as ReplyIcon, Send, ShieldCheck, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -109,8 +105,8 @@ function ReplyComposer({
 
   return (
     <form
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "en", "fb-form fb-reply-form{v0}"), { v0: String(compact ? " fb-inline-reply-form" : "") })}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "{v0} 작성"), { v0: String(label) })}
+      className={`fb-form fb-reply-form${compact ? " fb-inline-reply-form" : ""}`}
+      aria-label={`${label} 작성`}
       aria-busy={sending}
       onSubmit={submit}
     >
@@ -124,15 +120,15 @@ function ReplyComposer({
         maxLength={MAX_REPLY_LENGTH}
         disabled={sending}
         placeholder={compact
-          ? translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "상대의 의견에 이어질 답글을 남겨 주세요.")
-          : translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "같은 증상, 추가 정보, 해결 방법을 공유해 주세요.")}
+          ? "상대의 의견에 이어질 답글을 남겨 주세요."
+          : "같은 증상, 추가 정보, 해결 방법을 공유해 주세요."}
       />
       {readOnly ? (
-        <p className="fb-caption">{translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "입력 내용은 유지됩니다. 목록을 다시 확인한 뒤 등록해 주세요.")}</p>
+        <p className="fb-caption">입력 내용은 유지됩니다. 목록을 다시 확인한 뒤 등록해 주세요.</p>
       ) : null}
       <div className="fb-row">
         <span className="fb-caption">
-          {translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "개인정보는 남기지 마세요. · ")}{value.length}/{MAX_REPLY_LENGTH}
+          개인정보는 남기지 마세요. · {value.length}/{MAX_REPLY_LENGTH}
         </span>
         <span className="fb-reply-submit-actions">
           {onCancel ? (
@@ -143,7 +139,8 @@ function ReplyComposer({
               disabled={sending}
             >
               <X size={12} aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "취소")}</button>
+              취소
+            </button>
           ) : null}
           <button
             type="submit"
@@ -151,12 +148,12 @@ function ReplyComposer({
             disabled={sending || readOnly || !value.trim()}
           >
             <Send size={13} aria-hidden="true" />
-            {sending ? translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "등록 중…") : compact ? translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "답글 등록") : translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "댓글 등록")}
+            {sending ? "등록 중…" : compact ? "답글 등록" : "댓글 등록"}
           </button>
         </span>
       </div>
       <p className="fb-caption">
-        {onCancel ? translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "⌘/Ctrl + Enter로 등록 · Esc로 답글 닫기") : translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "⌘/Ctrl + Enter로 등록")}
+        {onCancel ? "⌘/Ctrl + Enter로 등록 · Esc로 답글 닫기" : "⌘/Ctrl + Enter로 등록"}
       </p>
     </form>
   );
@@ -199,7 +196,8 @@ function ReplyItem({
         <strong>{reply.author.name}</strong>
         {reply.isOfficial ? (
           <span className="fb-official">
-            <ShieldCheck size={13} aria-hidden="true" />{translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "운영자")}</span>
+            <ShieldCheck size={13} aria-hidden="true" />운영자
+          </span>
         ) : null}
         <time dateTime={reply.createdAt}>{feedbackTimeLabel(reply.createdAt)}</time>
       </div>
@@ -214,13 +212,14 @@ function ReplyItem({
             onClick={() => replyOpen ? onCancelReply() : onOpenReply(reply)}
           >
             <ReplyIcon size={12} aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "답글")}</button>
+            답글
+          </button>
         </div>
       ) : null}
       {replyOpen ? (
         <ReplyComposer
           id={composerId}
-          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "{v0}님에게 답글"), { v0: String(reply.author.name) })}
+          label={`${reply.author.name}님에게 답글`}
           value={drafts[replyDraftKey(reply.id)] ?? ""}
           sending={sendingKey === replyDraftKey(reply.id)}
           readOnly={readOnly}
@@ -383,10 +382,10 @@ export function FeedbackThread({
   }
 
   return (
-    <section className="fb-thread" aria-label={translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "댓글과 운영자 답변")}>
-      <h4>{translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "함께 나누는 의견")}</h4>
+    <section className="fb-thread" aria-label="댓글과 운영자 답변">
+      <h4>함께 나누는 의견</h4>
       {loading ? (
-        <p role="status" className="fb-caption">{translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "댓글을 불러오고 있어요.")}</p>
+        <p role="status" className="fb-caption">댓글을 불러오고 있어요.</p>
       ) : loadError ? (
         <div className="fb-error" role="alert">
           <p>{loadError}</p>
@@ -395,7 +394,8 @@ export function FeedbackThread({
             type="button"
             onClick={() => setTick((value) => value + 1)}
           >
-            {translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "댓글 다시 불러오기")}</button>
+            댓글 다시 불러오기
+          </button>
         </div>
       ) : replies.length ? (
         <ul className="fb-replies">
@@ -421,13 +421,13 @@ export function FeedbackThread({
           ))}
         </ul>
       ) : (
-        <p className="fb-caption">{translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "아직 댓글이 없어요. 같은 경험이나 도움이 되는 정보를 남겨주세요.")}</p>
+        <p className="fb-caption">아직 댓글이 없어요. 같은 경험이나 도움이 되는 정보를 남겨주세요.</p>
       )}
 
       {userId ? (
         <ReplyComposer
-          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "en", "{v0}-reply"), { v0: String(id) })}
-          label={translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "공개 댓글")}
+          id={`${id}-reply`}
+          label="공개 댓글"
           value={drafts[ROOT_DRAFT] ?? ""}
           sending={sendingKey === ROOT_DRAFT}
           readOnly={readOnly}
@@ -435,7 +435,7 @@ export function FeedbackThread({
           onSubmit={() => void send(null)}
         />
       ) : (
-        <p className="fb-notice">{translateCurrentStaticSourceText("domains.legal.feedback.FeedbackThread", "ko", "로그인하면 댓글과 답글을 남길 수 있어요.")}</p>
+        <p className="fb-notice">로그인하면 댓글과 답글을 남길 수 있어요.</p>
       )}
       {sendError ? <p className="fb-error" role="alert">{sendError}</p> : null}
       <p className="fb-success" role="status">{success}</p>

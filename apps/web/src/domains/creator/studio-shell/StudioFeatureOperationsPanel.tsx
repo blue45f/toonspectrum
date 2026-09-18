@@ -1,8 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Archive,
   BadgeCheck,
   Blocks,
@@ -78,7 +74,8 @@ export function StudioFeatureOperationsPanel({
         </span>
         <div>
           <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-accent">
-            {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioFeatureOperationsPanel", "en", "CAPABILITY OPERATIONS")}</p>
+            CAPABILITY OPERATIONS
+          </p>
           <h2
             id="studio-feature-operations-title"
             className="mt-1 text-xl font-black tracking-tight text-fg"

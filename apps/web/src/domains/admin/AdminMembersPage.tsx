@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowLeft,
   Ban,
   ChevronLeft,
@@ -638,7 +634,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
               </label>
 
               <label>
-                <span className="sr-only">{translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Sort")}</span>
+                <span className="sr-only">Sort</span>
                 <select
                   value={sort}
                   onChange={(event) => {
@@ -895,11 +891,11 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                           {copy.members.details}
                         </button>
 
-                        <label className="sr-only" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "role-{v0}"), { v0: String(member.id) })}>
+                        <label className="sr-only" htmlFor={`role-${member.id}`}>
                           {t("admin.members.colRole")}
                         </label>
                         <select
-                          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "role-{v0}"), { v0: String(member.id) })}
+                          id={`role-${member.id}`}
                           value={member.role}
                           disabled={!canManageMembers || actionBusy || refreshing || isSelf || member.status === "deleted" || member.status === "merged"}
                           onChange={(event) =>
@@ -1132,7 +1128,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                   <dd className="mt-1 text-fg">{detail.user.role}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Email")}</dt>
+                  <dt className="text-xs text-fg-3">Email</dt>
                   <dd className="mt-1 break-all text-fg">
                     {detail.user.email ?? "—"}
                   </dd>
@@ -1154,7 +1150,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.admin.AdminMembersPage", "en", "Bio")}</dt>
+                  <dt className="text-xs text-fg-3">Bio</dt>
                   <dd className="mt-1 whitespace-pre-wrap text-fg">
                     {detail.user.bio ?? "—"}
                   </dd>

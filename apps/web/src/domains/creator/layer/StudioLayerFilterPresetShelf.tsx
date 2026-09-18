@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { BookmarkPlus, Trash2 } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
@@ -111,13 +107,13 @@ export function StudioLayerFilterPresetShelf({
   return (
     <section
       className="mt-3 rounded-lg border border-line bg-card/60 p-2.5"
-      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "en", "{v0}-title"), { v0: String(inputId) })}
+      aria-labelledby={`${inputId}-title`}
       data-studio-layer-filter-presets="true"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h4 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "en", "{v0}-title"), { v0: String(inputId) })} className="text-[0.65rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "조건 프리셋")}</h4>
-          <p className="text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "현재 구조 필터와 스마트 보기를 브라우저에 저장합니다.")}</p>
+          <h4 id={`${inputId}-title`} className="text-[0.65rem] font-bold text-fg-2">조건 프리셋</h4>
+          <p className="text-[0.58rem] text-fg-3">현재 구조 필터와 스마트 보기를 브라우저에 저장합니다.</p>
         </div>
         <span className="shrink-0 rounded-full bg-raised px-1.5 py-0.5 text-[0.55rem] tabular-nums text-fg-3">
           {presets.length}/{STUDIO_LAYER_FILTER_PRESET_LIMIT}
@@ -132,13 +128,13 @@ export function StudioLayerFilterPresetShelf({
           savePreset();
         }}
       >
-        <label htmlFor={inputId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "새 레이어 조건 프리셋 이름")}</label>
+        <label htmlFor={inputId} className="sr-only">새 레이어 조건 프리셋 이름</label>
         <input
           id={inputId}
           value={name}
           maxLength={40}
           onChange={(event: ChangeEvent<HTMLInputElement>) => setName(event.target.value)}
-          placeholder={activeFilterCount > 0 ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "예: 선화 검수") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "먼저 필터를 선택하세요")}
+          placeholder={activeFilterCount > 0 ? "예: 선화 검수" : "먼저 필터를 선택하세요"}
           className={cn(
             "min-h-9 min-w-0 flex-1 rounded-md border border-line bg-panel px-2 text-xs text-fg placeholder:text-fg-3 max-lg:min-h-11 pointer-coarse:min-h-11",
             focusRing
@@ -152,15 +148,15 @@ export function StudioLayerFilterPresetShelf({
             coarseTarget,
             focusRing
           )}
-          aria-label={matchingPreset ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "{v0} 조건 프리셋 덮어쓰기"), { v0: String(matchingPreset.name) }) : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "현재 레이어 필터 조건 저장")}
+          aria-label={matchingPreset ? `${matchingPreset.name} 조건 프리셋 덮어쓰기` : "현재 레이어 필터 조건 저장"}
         >
           <BookmarkPlus size={12} />
-          {matchingPreset ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "갱신") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "저장")}
+          {matchingPreset ? "갱신" : "저장"}
         </button>
       </form>
 
       {presets.length > 0 ? (
-        <ul className="mt-2 grid gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "저장된 레이어 조건 프리셋")}>
+        <ul className="mt-2 grid gap-1" aria-label="저장된 레이어 조건 프리셋">
           {presets.map((preset) => (
             <li key={preset.id} className="flex min-w-0 items-center gap-1 rounded-md border border-line/70 bg-panel/70 p-1">
               <button
@@ -172,7 +168,7 @@ export function StudioLayerFilterPresetShelf({
                   coarseTarget,
                   focusRing
                 )}
-                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "{v0} 적용"), { v0: String(preset.name) })}
+                title={`${preset.name} 적용`}
               >
                 {preset.name}
               </button>
@@ -184,7 +180,7 @@ export function StudioLayerFilterPresetShelf({
                   coarseTarget,
                   focusRing
                 )}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "{v0} 조건 프리셋 삭제"), { v0: String(preset.name) })}
+                aria-label={`${preset.name} 조건 프리셋 삭제`}
               >
                 <Trash2 size={12} />
               </button>
@@ -193,7 +189,8 @@ export function StudioLayerFilterPresetShelf({
         </ul>
       ) : (
         <p className="mt-2 rounded-md border border-dashed border-line px-2 py-1.5 text-[0.58rem] text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "반복 작업용 조건을 최대 ")}{STUDIO_LAYER_FILTER_PRESET_LIMIT}{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerFilterPresetShelf", "ko", "개 저장할 수 있습니다. 검색 문구는 저장하지 않습니다.")}</p>
+          반복 작업용 조건을 최대 {STUDIO_LAYER_FILTER_PRESET_LIMIT}개 저장할 수 있습니다. 검색 문구는 저장하지 않습니다.
+        </p>
       )}
 
       <span className="sr-only" role="status" aria-live="polite">{announcement}</span>

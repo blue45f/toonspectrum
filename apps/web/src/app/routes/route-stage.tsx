@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, Home, RefreshCw, Rows3 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 
@@ -110,7 +106,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
       ref={stageRef}
       key={stageKey}
       data-route-stage-key={stageKey}
-      data-route-state={routeState === "empty" ? translateCurrentStaticSourceText("app.routes.route.stage", "en", "pending") : routeState}
+      data-route-state={routeState === "empty" ? "pending" : routeState}
       data-route-readiness-source={readinessSource}
       data-route-surface-identity={surfaceIdentity}
       aria-busy={routeState === "pending" || routeState === "empty"}

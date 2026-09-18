@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 import { cn } from "@/shared/lib/utils";
 import { useInView } from "@/hooks/use-in-view";
@@ -114,7 +113,7 @@ function GroupHead({
       </div>
       <div className={cn("flex items-baseline gap-1", align === "right" && "flex-row-reverse")}>
         <span className="numeral text-2xl text-fg">{count}</span>
-        <span className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.insights.components.compare.split", "ko", "작품")}</span>
+        <span className="text-xs text-fg-3">작품</span>
       </div>
     </div>
   );

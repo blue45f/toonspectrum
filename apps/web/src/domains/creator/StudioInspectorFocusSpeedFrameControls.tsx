@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import {
@@ -56,10 +52,10 @@ export function StudioInspectorFocusSpeedFrameControls({
       {/* 집중선 및 속도선 선 효과 설정 */}
       {selected.type === "focusLines" && (
         <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "집중선 설정")}</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">집중선 설정</p>
 
           <div className="space-y-1 rounded-lg border border-line bg-card/45 p-2">
-            <p className="text-[0.66rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "집중선 프리셋")}</p>
+            <p className="text-[0.66rem] font-semibold text-fg-3">집중선 프리셋</p>
             <div className="mt-1 grid grid-cols-2 gap-1.5">
               {[
                 { label: "기본 집중선", config: { lineCount: 80, innerRadius: 100, outerRadius: 400, noise: 20, strokeWidth: 2.5 } },
@@ -80,7 +76,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </div>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "선 개수")}<span className="flex items-center gap-2">
+            선 개수
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={10}
@@ -95,7 +92,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "내부 반경")}<span className="flex items-center gap-2">
+            내부 반경
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={0}
@@ -110,7 +108,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "외부 반경")}<span className="flex items-center gap-2">
+            외부 반경
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={100}
@@ -125,7 +124,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "지터 노이즈")}<span className="flex items-center gap-2">
+            지터 노이즈
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={0}
@@ -140,7 +140,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "선 색상")}<input
+            선 색상
+            <input
               type="color"
               value={selected.stroke ?? "#000000"}
               onChange={(e) => onPatch({ stroke: e.target.value } as Partial<El>)}
@@ -149,7 +150,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "선 두께")}<span className="flex items-center gap-2">
+            선 두께
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={0.5}
@@ -164,7 +166,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "초점 가로 위치")}<span className="flex items-center gap-2">
+            초점 가로 위치
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={0}
@@ -179,7 +182,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "초점 세로 위치")}<span className="flex items-center gap-2">
+            초점 세로 위치
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={0}
@@ -197,10 +201,10 @@ export function StudioInspectorFocusSpeedFrameControls({
 
       {selected.type === "speedLines" && (
         <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "속도선 설정")}</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">속도선 설정</p>
 
           <div className="space-y-1 rounded-lg border border-line bg-card/45 p-2">
-            <p className="text-[0.66rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "속도선 프리셋")}</p>
+            <p className="text-[0.66rem] font-semibold text-fg-3">속도선 프리셋</p>
             <div className="mt-1 grid grid-cols-2 gap-1.5">
               {[
                 { label: "가로 질주", config: { direction: "horizontal", lineCount: 50, strokeWidth: 2.5 } },
@@ -221,7 +225,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </div>
 
           <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "방향")}<div className="flex gap-1">
+            방향
+            <div className="flex gap-1">
               {[
                 { label: "가로", v: "horizontal" },
                 { label: "세로", v: "vertical" },
@@ -244,7 +249,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </div>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "선 개수")}<span className="flex items-center gap-2">
+            선 개수
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={10}
@@ -259,7 +265,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "선 색상")}<input
+            선 색상
+            <input
               type="color"
               value={selected.stroke ?? "#000000"}
               onChange={(e) => onPatch({ stroke: e.target.value } as Partial<El>)}
@@ -268,7 +275,8 @@ export function StudioInspectorFocusSpeedFrameControls({
           </label>
 
           <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "선 두께")}<span className="flex items-center gap-2">
+            선 두께
+            <span className="flex items-center gap-2">
               <input
                 type="range"
                 min={0.5}
@@ -288,21 +296,23 @@ export function StudioInspectorFocusSpeedFrameControls({
         <div className="mt-3 space-y-3 border-t border-line/50 pt-3">
           <div className="space-y-2.5">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "이야기 비트·연속성")}</p>
+              <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">이야기 비트·연속성</p>
               {selected.storyBeat ? (
                 <button
                   type="button"
                   onClick={() => onPatch({ storyBeat: undefined } as Partial<El>)}
                   className="text-[0.65rem] font-semibold text-fg-3 hover:text-bad"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "메타 제거")}</button>
+                  메타 제거
+                </button>
               ) : null}
             </div>
             {selected.storyBeat ? (
               <>
                 <div className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
                   <label className="text-[0.68rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "서사 역할")}<select
+                    서사 역할
+                    <select
                       value={selected.storyBeat.type}
                       onChange={(event) =>
                         onPatch({
@@ -320,7 +330,8 @@ export function StudioInspectorFocusSpeedFrameControls({
                     </select>
                   </label>
                   <label className="text-[0.68rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "장면 변화 요약")}<textarea
+                    장면 변화 요약
+                    <textarea
                       value={selected.storyBeat.summary}
                       onChange={(event) =>
                         onPatch({
@@ -337,21 +348,22 @@ export function StudioInspectorFocusSpeedFrameControls({
                 </div>
                 {selected.storyBeat.textAiProvenance ? (
                   <div className="rounded-lg border border-line bg-card/60 px-2.5 py-2 text-[0.65rem] leading-relaxed text-fg-3">
-                    <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "텍스트 생성 이력")}</span>
+                    <span className="font-semibold text-fg-2">텍스트 생성 이력</span>
                     <span className="mt-0.5 block break-all">
                       {selected.storyBeat.textAiProvenance.provider} / {selected.storyBeat.textAiProvenance.model}
-                      {formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", " · 프롬프트 v{v0}"), { v0: String(selected.storyBeat.textAiProvenance.promptVersion) })}
+                      {` · 프롬프트 v${selected.storyBeat.textAiProvenance.promptVersion}`}
                       {selected.storyBeat.textAiProvenance.usage?.totalTokens !== undefined
-                        ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "en", " · {v0} tokens"), { v0: String(selected.storyBeat.textAiProvenance.usage.totalTokens.toLocaleString("ko-KR")) })
+                        ? ` · ${selected.storyBeat.textAiProvenance.usage.totalTokens.toLocaleString("ko-KR")} tokens`
                         : ""}
                     </span>
                     {selected.storyBeat.textAiProvenance.failover ? (
                       <span className="mt-1 block rounded-md border border-warn/35 bg-warn/10 px-2 py-1 text-warn">
-                        {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.attemptedProvider)} {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "무료 한도·요청 제한으로 ")}{studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.actualProvider)}{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "에 자동 전환")}</span>
+                        {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.attemptedProvider)} 무료 한도·요청 제한으로 {studioServerAiProviderLabel(selected.storyBeat.textAiProvenance.failover.actualProvider)}에 자동 전환
+                      </span>
                     ) : null}
                   </div>
                 ) : null}
-                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "연속성 메타 편집기를 여는 중...")} />}>
+                <Suspense fallback={<StudioPanelLoading label="연속성 메타 편집기를 여는 중..." />}>
                   <StudioContinuityMetadataEditor
                     value={selected.storyBeat.continuity ?? {}}
                     onChange={(continuity) =>
@@ -373,19 +385,20 @@ export function StudioInspectorFocusSpeedFrameControls({
                 }
                 className={cn(buttonClass({ size: "sm", variant: "quiet" }), "w-full justify-center text-xs")}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "이 컷에 이야기 메타 추가")}</button>
+                이 컷에 이야기 메타 추가
+              </button>
             )}
           </div>
           <div className="border-t border-line/40" />
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "패널 컷 분할")}</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">패널 컷 분할</p>
           <label className="block">
             <span className="flex items-center justify-between text-xs text-fg-2 mb-1.5">
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "분할 비율")}</span>
+              <span>분할 비율</span>
               <span className="numeral text-fg-3">{panelSplitRatio}% / {100 - panelSplitRatio}%</span>
             </span>
             <input
               type="range"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "분할 비율")}
+              aria-label="분할 비율"
               min={20}
               max={80}
               step={5}
@@ -400,16 +413,18 @@ export function StudioInspectorFocusSpeedFrameControls({
               onClick={() => onSplitFrame("vertical")}
               className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-9 w-full justify-center text-xs")}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "세로로 분할")}</button>
+              세로로 분할
+            </button>
             <button
               type="button"
               onClick={() => onSplitFrame("horizontal")}
               className={cn(buttonClass({ size: "sm", variant: "solid" }), "min-h-9 w-full justify-center text-xs")}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "가로로 분할")}</button>
+              가로로 분할
+            </button>
           </div>
 
-          <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "컷 분할 도구를 여는 중...")} />}>
+          <Suspense fallback={<StudioPanelLoading label="컷 분할 도구를 여는 중..." />}>
             <StudioPanelSplitPanel
               active={panelSplitActive}
               gutterPx={panelGutter}
@@ -420,22 +435,24 @@ export function StudioInspectorFocusSpeedFrameControls({
           </Suspense>
 
           <div className="mt-3.5 border-t border-line/40 pt-2.5 space-y-2.5">
-            <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "패널 배경 및 테두리")}</p>
+            <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">패널 배경 및 테두리</p>
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "배경색")}<input
+              배경색
+              <input
                 type="color"
-                value={selected.bgColor || translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "en", "#ffffff")}
+                value={selected.bgColor || "#ffffff"}
                 onChange={(e) => onPatch({ bgColor: e.target.value } as Partial<El>)}
                 className="h-7 w-7 cursor-pointer rounded border border-line bg-transparent"
               />
             </label>
 
             <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "테두리 커스텀")}<input
+              테두리 커스텀
+              <input
                 type="checkbox"
                 checked={!!selected.stroke}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "패널 테두리 커스텀")}
+                aria-label="패널 테두리 커스텀"
                 onChange={(e) => {
                   const hasStroke = e.target.checked;
                   onPatch({
@@ -450,7 +467,8 @@ export function StudioInspectorFocusSpeedFrameControls({
             {!!selected.stroke && (
               <>
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "테두리 색상")}<input
+                  테두리 색상
+                  <input
                     type="color"
                     value={selected.stroke || "#16100c"}
                     onChange={(e) => onPatch({ stroke: e.target.value } as Partial<El>)}
@@ -459,7 +477,8 @@ export function StudioInspectorFocusSpeedFrameControls({
                 </label>
 
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "테두리 두께")}<span className="flex items-center gap-2">
+                  테두리 두께
+                  <span className="flex items-center gap-2">
                     <input
                       type="range"
                       min={0}
@@ -474,7 +493,7 @@ export function StudioInspectorFocusSpeedFrameControls({
                 </label>
 
                 <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  <span>{translateCurrentStaticSourceText("domains.creator.StudioInspectorFocusSpeedFrameControls", "ko", "테두리 스타일")}</span>
+                  <span>테두리 스타일</span>
                   <div className="flex gap-1 bg-card rounded-lg p-0.5 border border-line w-28">
                     {[
                       { label: "실선", v: "solid" },

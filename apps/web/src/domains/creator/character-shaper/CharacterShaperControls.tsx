@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /** Precision controls shared by the inspector, paint HUD and output dock. */
 import { Check, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -268,14 +264,14 @@ export function CharacterRangeControl({
           onLostPointerCapture={() => { pointerRef.current = null; commitDraft(); }}
           onKeyDown={onRangeKeyDown} onKeyUp={onKeyUp} onBlur={commitDraft}
         />
-        <span aria-hidden title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "기본값 {v0}"), { v0: String(defaultReadout) })} className="pointer-events-none absolute bottom-1 h-1.5 w-px -translate-x-1/2 rounded-full bg-fg-3/70" style={{ left: `${markerPercent}%` }} />
+        <span aria-hidden title={`기본값 ${defaultReadout}`} className="pointer-events-none absolute bottom-1 h-1.5 w-px -translate-x-1/2 rounded-full bg-fg-3/70" style={{ left: `${markerPercent}%` }} />
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        <label htmlFor={numberId} className="shrink-0 text-[0.62rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "값")}</label>
+        <label htmlFor={numberId} className="shrink-0 text-[0.62rem] font-semibold text-fg-3">값</label>
         <input
           id={numberId} type="text" inputMode="decimal" autoComplete="off" spellCheck={false}
           value={text ?? formatCharacterNumber(shown, spec.step)} disabled={disabled}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 값 입력"), { v0: String(label) })} aria-invalid={error ? true : undefined} aria-describedby={description}
+          aria-label={`${label} 값 입력`} aria-invalid={error ? true : undefined} aria-describedby={description}
           className={cn("min-h-11 w-20 min-w-0 rounded-lg border border-line bg-panel px-2 text-right text-[0.7rem] font-semibold tabular-nums text-fg", STUDIO_FOCUS_RING, "disabled:cursor-not-allowed disabled:opacity-45")}
           onCompositionStart={() => { composingRef.current = true; }}
           onCompositionEnd={() => { composingRef.current = false; }}
@@ -297,7 +293,7 @@ export function CharacterRangeControl({
         {([-1, 1] as const).map((direction) => (
           <button
             key={direction} type="button" disabled={disabled || (direction < 0 ? shown <= spec.min : shown >= spec.max)}
-            aria-label={`${label} ${direction < 0 ? "줄이기" : "늘리기"}`} title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "Shift: 10배 · Alt: 0.1배 미세 조절")}
+            aria-label={`${label} ${direction < 0 ? "줄이기" : "늘리기"}`} title="Shift: 10배 · Alt: 0.1배 미세 조절"
             onPointerDown={(event) => event.preventDefault()}
             onClick={(event) => {
               const current = currentEditValue();
@@ -307,13 +303,13 @@ export function CharacterRangeControl({
           >{direction < 0 ? <Minus size={13} aria-hidden /> : <Plus size={13} aria-hidden />}</button>
         ))}
         {changed ? (
-          <button type="button" disabled={disabled} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 기본값 {v1}(으)로 되돌리기"), { v0: String(label), v1: String(defaultReadout) })} title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "기본값 {v0}(으)로 되돌리기"), { v0: String(defaultReadout) })}
+          <button type="button" disabled={disabled} aria-label={`${label} 기본값 ${defaultReadout}(으)로 되돌리기`} title={`기본값 ${defaultReadout}(으)로 되돌리기`}
             onPointerDown={(event) => event.preventDefault()} onClick={() => commit(normalizedDefault)} className={ACTION_BUTTON}>
             <RotateCcw size={14} aria-hidden />
           </button>
         ) : null}
       </div>
-      <p className="mt-1 text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "기본 ")}{defaultReadout} {translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "· Shift 10배 · Alt 미세 조절")}</p>
+      <p className="mt-1 text-[0.6rem] text-fg-3">기본 {defaultReadout} · Shift 10배 · Alt 미세 조절</p>
       {error ? <p id={errorId} role="status" className="mt-1 text-[0.64rem] text-warn">{error}</p> : null}
     </div>
   );
@@ -432,34 +428,34 @@ export function CharacterColorControl({
       }}>
       <div className="flex items-center justify-between gap-2">
         <label htmlFor={pickerId} className="text-[0.72rem] font-bold text-fg-2">{label}</label>
-        <span className="text-[0.62rem] text-fg-3">{previewColor ? previewColor.toUpperCase() : translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "모델 원본 색")}</span>
+        <span className="text-[0.62rem] text-fg-3">{previewColor ? previewColor.toUpperCase() : "모델 원본 색"}</span>
       </div>
       {hint ? <p className="mt-0.5 text-[0.62rem] leading-relaxed text-fg-3">{hint}</p> : null}
       <div className="mt-1.5 flex items-center gap-1.5">
         <input id={pickerId} type="color" value={previewColor ?? current ?? "#8a6257"} disabled={disabled}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 색 선택"), { v0: String(label) })} className={cn("size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-panel p-1 disabled:cursor-not-allowed disabled:opacity-45", STUDIO_FOCUS_RING)}
+          aria-label={`${label} 색 선택`} className={cn("size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-panel p-1 disabled:cursor-not-allowed disabled:opacity-45", STUDIO_FOCUS_RING)}
           onChange={(event) => preview(event.currentTarget.value)} onKeyDown={onInputKeyDown} />
         <input id={hexId} type="text" value={draft ?? (current?.toUpperCase() ?? "")} disabled={disabled}
-          maxLength={7} placeholder={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "en", "#RRGGBB")} autoComplete="off" autoCapitalize="characters" spellCheck={false}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} HEX 값"), { v0: String(label) })} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}
+          maxLength={7} placeholder="#RRGGBB" autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          aria-label={`${label} HEX 값`} aria-invalid={error ? true : undefined} aria-describedby={error ? errorId : undefined}
           className={cn("min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-panel px-2 text-[0.7rem] font-semibold uppercase tabular-nums text-fg", STUDIO_FOCUS_RING, "disabled:cursor-not-allowed disabled:opacity-45")}
           onChange={(event) => preview(event.currentTarget.value)} onKeyDown={onInputKeyDown}
           onCompositionStart={() => { composingRef.current = true; }} onCompositionEnd={() => { composingRef.current = false; }} />
         {allowClear ? (
-          <button type="button" disabled={disabled || current === null} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 모델 원본 색으로 되돌리기"), { v0: String(label) })} title={translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "모델 원본 색으로 되돌리기")}
+          <button type="button" disabled={disabled || current === null} aria-label={`${label} 모델 원본 색으로 되돌리기`} title="모델 원본 색으로 되돌리기"
             onClick={() => commit(null)} className={ACTION_BUTTON}><RotateCcw size={14} aria-hidden /></button>
         ) : null}
       </div>
       {draft !== null ? (
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <span className="min-w-0 flex-1 text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "색을 확인한 뒤 적용하세요.")}</span>
-          <button type="button" disabled={disabled} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 색 적용"), { v0: String(label) })} onClick={commitDraft} className={ACTION_BUTTON}><Check size={14} aria-hidden /></button>
-          <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 색 변경 취소"), { v0: String(label) })} onClick={cancel} className={ACTION_BUTTON}><X size={14} aria-hidden /></button>
+          <span className="min-w-0 flex-1 text-[0.62rem] text-fg-3">색을 확인한 뒤 적용하세요.</span>
+          <button type="button" disabled={disabled} aria-label={`${label} 색 적용`} onClick={commitDraft} className={ACTION_BUTTON}><Check size={14} aria-hidden /></button>
+          <button type="button" aria-label={`${label} 색 변경 취소`} onClick={cancel} className={ACTION_BUTTON}><X size={14} aria-hidden /></button>
         </div>
       ) : null}
       {error ? <p id={errorId} role="status" className="mt-1 text-[0.64rem] text-warn">{error}</p> : null}
       {swatches.length > 0 ? (
-        <div role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.character.shaper.CharacterShaperControls", "ko", "{v0} 추천 색"), { v0: String(label) })} className="mt-1.5 flex flex-wrap gap-1">
+        <div role="group" aria-label={`${label} 추천 색`} className="mt-1.5 flex flex-wrap gap-1">
           {swatches.map((swatch) => {
             const hex = normalizeCharacterHex(swatch.color);
             const active = current !== null && current === hex;

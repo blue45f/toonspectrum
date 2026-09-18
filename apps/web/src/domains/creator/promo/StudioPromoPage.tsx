@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
@@ -169,56 +165,56 @@ export function StudioPromoPage() {
   return (
     <div className="promo-studio" aria-labelledby="promo-title">
       <header className="promo-header">
-        <div><a href="/studio" className="promo-back">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "← 툰스튜디오")}</a><p className="promo-eyebrow">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "en", "TOONSTUDIO · MOTION COMIC")}</p><h1 id="promo-title">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "당신의 웹툰을, 움직이는 예고편으로.")}</h1><p>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "애니 오프닝 스타일 · 모션툰 · 예고편 · 쇼츠를 브라우저에서 직접 만드세요.")}</p></div>
-        <span className="promo-badge">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "15 / 30 / 60초")}</span>
+        <div><a href="/studio" className="promo-back">← 툰스튜디오</a><p className="promo-eyebrow">TOONSTUDIO · MOTION COMIC</p><h1 id="promo-title">당신의 웹툰을, 움직이는 예고편으로.</h1><p>애니 오프닝 스타일 · 모션툰 · 예고편 · 쇼츠를 브라우저에서 직접 만드세요.</p></div>
+        <span className="promo-badge">15 / 30 / 60초</span>
       </header>
       <p className="promo-draft-status" role="status">{draft.status}</p>
       <div className="promo-workspace">
         <div className="promo-editing">
           <fieldset className="promo-card" disabled={busy}>
-            <legend>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "01 · 영상 기획")}</legend>
-            <label htmlFor="promo-work-title">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "작품 제목")}</label><input id="promo-work-title" value={project.title} maxLength={80} onChange={(event) => patch({ title: event.target.value })} />
-            <label htmlFor="promo-synopsis">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "줄거리와 홍보 방향")}</label><textarea id="promo-synopsis" value={project.synopsis} maxLength={2000} rows={3} placeholder={translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "어떤 독자에게, 어떤 매력을 보여주고 싶나요? 스포일러 제외 범위도 적어주세요.")} onChange={(event) => patch({ synopsis: event.target.value })} />
-            <label htmlFor="promo-cta">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "마지막 2초의 안내 문구")}</label><input id="promo-cta" value={project.cta} maxLength={80} onChange={(event) => patch({ cta: event.target.value })} />
+            <legend>01 · 영상 기획</legend>
+            <label htmlFor="promo-work-title">작품 제목</label><input id="promo-work-title" value={project.title} maxLength={80} onChange={(event) => patch({ title: event.target.value })} />
+            <label htmlFor="promo-synopsis">줄거리와 홍보 방향</label><textarea id="promo-synopsis" value={project.synopsis} maxLength={2000} rows={3} placeholder="어떤 독자에게, 어떤 매력을 보여주고 싶나요? 스포일러 제외 범위도 적어주세요." onChange={(event) => patch({ synopsis: event.target.value })} />
+            <label htmlFor="promo-cta">마지막 2초의 안내 문구</label><input id="promo-cta" value={project.cta} maxLength={80} onChange={(event) => patch({ cta: event.target.value })} />
             <div className="promo-inline-grid">
-              <label htmlFor="promo-ratio">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "화면 비율")}<select id="promo-ratio" value={project.ratio} onChange={(event) => patch({ ratio: event.target.value as PromoProject["ratio"] })}><option value="9:16">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "세로 9:16 · 쇼츠/릴스")}</option><option value="16:9">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "가로 16:9 · 예고편")}</option><option value="1:1">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "정사각형 1:1 · 피드")}</option></select></label>
-              <label htmlFor="promo-seconds">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "전체 길이")}<select id="promo-seconds" value={project.seconds} onChange={(event) => patch({ seconds: Number(event.target.value) as PromoProject["seconds"] })}>{[15, 30, 60].map((seconds) => <option key={seconds} value={seconds}>{seconds}{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "초")}</option>)}</select></label>
-              <label htmlFor="promo-style">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "연출 분위기")}<select id="promo-style" value={project.style} onChange={(event) => patch({ style: event.target.value as PromoProject["style"] })}>{PROMO_STYLES.map((style) => <option key={style} value={style}>{PROMO_STYLE_LABELS[style]}</option>)}</select></label>
+              <label htmlFor="promo-ratio">화면 비율<select id="promo-ratio" value={project.ratio} onChange={(event) => patch({ ratio: event.target.value as PromoProject["ratio"] })}><option value="9:16">세로 9:16 · 쇼츠/릴스</option><option value="16:9">가로 16:9 · 예고편</option><option value="1:1">정사각형 1:1 · 피드</option></select></label>
+              <label htmlFor="promo-seconds">전체 길이<select id="promo-seconds" value={project.seconds} onChange={(event) => patch({ seconds: Number(event.target.value) as PromoProject["seconds"] })}>{[15, 30, 60].map((seconds) => <option key={seconds} value={seconds}>{seconds}초</option>)}</select></label>
+              <label htmlFor="promo-style">연출 분위기<select id="promo-style" value={project.style} onChange={(event) => patch({ style: event.target.value as PromoProject["style"] })}>{PROMO_STYLES.map((style) => <option key={style} value={style}>{PROMO_STYLE_LABELS[style]}</option>)}</select></label>
             </div>
           </fieldset>
           <PromoDirectorControls project={project} disabled={busy} onApply={(next) => { apply(next); setError(""); setMessage("연출 프리셋을 적용했어요. 컷별 카메라·자막·효과를 추가로 조절할 수 있어요."); }} onPatch={patch} />
           <section className="promo-card" aria-labelledby="promo-cuts-title">
-            <div className="promo-section-head"><h2 id="promo-cuts-title">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "02 · 컷과 장면 구성")}</h2><span>{project.panels.length} / {PROMO_MAX_PANELS}{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "컷")}</span></div>
-            <label htmlFor="promo-split">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "세로 원고 분할")}<select id="promo-split" value={splitParts} disabled={busy} onChange={(event) => setSplitParts(event.target.value === "auto" ? "auto" : Number(event.target.value))}><option value="auto">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "흰 여백 자동 감지 · 원본 보존")}</option>{[1, 2, 3, 4, 6, 12].map((parts) => <option value={parts} key={parts}>{parts === 1 ? translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "파일 1개 = 컷 1개") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "파일마다 세로 {v0}등분"), { v0: String(parts) })}</option>)}</select></label>
-            <label htmlFor="promo-panels" className="promo-upload-label">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "웹툰 컷 추가 · PNG, JPEG, WebP · 컷당 10MB 이하")}</label>
+            <div className="promo-section-head"><h2 id="promo-cuts-title">02 · 컷과 장면 구성</h2><span>{project.panels.length} / {PROMO_MAX_PANELS}컷</span></div>
+            <label htmlFor="promo-split">세로 원고 분할<select id="promo-split" value={splitParts} disabled={busy} onChange={(event) => setSplitParts(event.target.value === "auto" ? "auto" : Number(event.target.value))}><option value="auto">흰 여백 자동 감지 · 원본 보존</option>{[1, 2, 3, 4, 6, 12].map((parts) => <option value={parts} key={parts}>{parts === 1 ? "파일 1개 = 컷 1개" : `파일마다 세로 ${parts}등분`}</option>)}</select></label>
+            <label htmlFor="promo-panels" className="promo-upload-label">웹툰 컷 추가 · PNG, JPEG, WebP · 컷당 10MB 이하</label>
             <input id="promo-panels" type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={busy} onChange={(event) => { void uploadPanels(event.target.files); event.target.value = ""; }} />
-            <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "자동 감지는 가로로 이어진 흰색·투명 여백을 기준으로 분할합니다. 경계가 불확실하면 원고를 한 컷으로 유지합니다. 균등 분할도 선택할 수 있으며 말풍선 경계는 직접 확인하세요. 원본 파일은 수정하지 않습니다.")}</p>
+            <p className="promo-muted">자동 감지는 가로로 이어진 흰색·투명 여백을 기준으로 분할합니다. 경계가 불확실하면 원고를 한 컷으로 유지합니다. 균등 분할도 선택할 수 있으며 말풍선 경계는 직접 확인하세요. 원본 파일은 수정하지 않습니다.</p>
             <div className="promo-button-row">
-              <button type="button" className="promo-primary" disabled={busy || !project.panels.length} onClick={() => void generate()}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "자동 무료 AI로 홍보 콘티 구성")}</button>
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => { patch({ panels: localPromoPlan(project) }); setMessage("로컬 연출 템플릿을 적용했어요. AI 생성 결과가 아니며 네트워크 요청 없이 동작해요."); }}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "로컬 연출 템플릿")}</button>
-              <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "실행 취소")}</button>
-              <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "다시 실행")}</button>
+              <button type="button" className="promo-primary" disabled={busy || !project.panels.length} onClick={() => void generate()}>자동 무료 AI로 홍보 콘티 구성</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => { patch({ panels: localPromoPlan(project) }); setMessage("로컬 연출 템플릿을 적용했어요. AI 생성 결과가 아니며 네트워크 요청 없이 동작해요."); }}>로컬 연출 템플릿</button>
+              <button type="button" disabled={busy || !undo.length} onClick={() => stepHistory("undo")}>실행 취소</button>
+              <button type="button" disabled={busy || !redo.length} onClick={() => stepHistory("redo")}>다시 실행</button>
             </div>
-            <p className="promo-muted">{aiStatus}{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", ". 무료 전용 AI 연결에는 제목·줄거리·컷 설명·자막만 전송합니다. 운영측 유료 AI로 자동 전환하지 않습니다.")}</p>
-            {!project.panels.length ? <div className="promo-empty">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.")}</div> : null}
+            <p className="promo-muted">{aiStatus}. 무료 전용 AI 연결에는 제목·줄거리·컷 설명·자막만 전송합니다. 운영측 유료 AI로 자동 전환하지 않습니다.</p>
+            {!project.panels.length ? <div className="promo-empty">아직 컷이 없어요. 3~6컷으로 첫 번째 예고편을 만들어보세요.</div> : null}
             <div className="promo-shots">{promoTimeline(project).map((scene, index) => <PromoPanelEditor key={scene.panel.id} scene={scene} index={index} count={project.panels.length} disabled={busy} onSeekFrame={(frame) => setSeekRequest({ frame, token: Date.now() })} onSeek={() => setSeekRequest({ frame: scene.from + Math.floor(scene.duration / 2), token: Date.now() })} onForeground={(file) => { void uploadForeground(scene.panel.id, file); }} onDuplicate={() => {
               if (project.panels.length >= PROMO_MAX_PANELS) return;
               const panels = [...project.panels]; panels.splice(index + 1, 0, { ...scene.panel, id: crypto.randomUUID() }); patch({ panels });
             }} onChange={(value) => patch({ panels: project.panels.map((panel) => panel.id === scene.panel.id ? { ...panel, ...value } : panel) })} onMove={(direction) => movePanel(index, direction)} onRemove={() => patch({ panels: project.panels.filter((panel) => panel.id !== scene.panel.id) })} />)}</div>
           </section>
           <fieldset className="promo-card" disabled={busy}>
-            <legend>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "03 · 배경음악과 내레이션")}</legend>
-            <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "외부 음원 없이 만드는 로컬 합성 BGM · 기존 BGM을 교체하며 실행 취소할 수 있어요.")}</p>
-            <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "앰비언트 생성")}</button><button type="button" onClick={() => addSoundtrack("pulse")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "펄스 생성")}</button><button type="button" onClick={() => addSoundtrack("suspense")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "서스펜스 생성")}</button></div>
-            <label htmlFor="promo-audio">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "BGM 파일 · 20MB / 3분 이하 · 사용 권한을 확보한 음원")}</label><input id="promo-audio" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadAudio(event.target.files?.[0]); event.target.value = ""; }} />
-            {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "BGM 음량 ")}{Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "BGM 제거")}</button></div> : <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.")}</p>}
-            <label htmlFor="promo-voice">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "내레이션 파일 · 20MB / 3분 이하")}<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
+            <legend>03 · 배경음악과 내레이션</legend>
+            <p className="promo-muted">외부 음원 없이 만드는 로컬 합성 BGM · 기존 BGM을 교체하며 실행 취소할 수 있어요.</p>
+            <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>앰비언트 생성</button><button type="button" onClick={() => addSoundtrack("pulse")}>펄스 생성</button><button type="button" onClick={() => addSoundtrack("suspense")}>서스펜스 생성</button></div>
+            <label htmlFor="promo-audio">BGM 파일 · 20MB / 3분 이하 · 사용 권한을 확보한 음원</label><input id="promo-audio" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadAudio(event.target.files?.[0]); event.target.value = ""; }} />
+            {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.</p>}
+            <label htmlFor="promo-voice">내레이션 파일 · 20MB / 3분 이하<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
             {project.voiceover ? <>
-              <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "음성 ")}{project.voiceover.durationSec.toFixed(1)}{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "초 · 반복하지 않고 영상 끝에서 종료 · 내레이션 재생 구간 BGM 자동 감쇠")}</p>
-              <label htmlFor="promo-voice-start">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "내레이션 시작 ")}{project.voiceover.startSec.toFixed(1)}{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "초")}<input id="promo-voice-start" type="range" min={0} max={project.seconds - 1} step={0.1} value={Math.min(project.seconds - 1, project.voiceover.startSec)} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, startSec: Number(event.target.value) } }); }} /></label>
-              <label htmlFor="promo-voice-volume">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "음성 음량 ")}{Math.round(project.voiceover.volume * 100)}%<input id="promo-voice-volume" type="range" min={0} max={1} step={0.05} value={project.voiceover.volume} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, volume: Number(event.target.value) } }); }} /></label>
-              {project.voiceover.startSec >= project.seconds ? <p className="promo-error">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "음성 시작점이 영상 밖에 있어요. 시작 시간을 줄여 주세요.")}</p> : null}
-              <button type="button" onClick={() => patch({ voiceover: null })}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "내레이션 제거")}</button>
+              <p className="promo-muted">음성 {project.voiceover.durationSec.toFixed(1)}초 · 반복하지 않고 영상 끝에서 종료 · 내레이션 재생 구간 BGM 자동 감쇠</p>
+              <label htmlFor="promo-voice-start">내레이션 시작 {project.voiceover.startSec.toFixed(1)}초<input id="promo-voice-start" type="range" min={0} max={project.seconds - 1} step={0.1} value={Math.min(project.seconds - 1, project.voiceover.startSec)} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, startSec: Number(event.target.value) } }); }} /></label>
+              <label htmlFor="promo-voice-volume">음성 음량 {Math.round(project.voiceover.volume * 100)}%<input id="promo-voice-volume" type="range" min={0} max={1} step={0.05} value={project.voiceover.volume} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, volume: Number(event.target.value) } }); }} /></label>
+              {project.voiceover.startSec >= project.seconds ? <p className="promo-error">음성 시작점이 영상 밖에 있어요. 시작 시간을 줄여 주세요.</p> : null}
+              <button type="button" onClick={() => patch({ voiceover: null })}>내레이션 제거</button>
             </> : null}
           </fieldset>
         </div>
@@ -226,29 +222,29 @@ export function StudioPromoPage() {
           <PromoPreview project={project} disabled={busy} seekRequest={seekRequest} />
           <PromoPreflight project={project} disabled={busy} onSeek={(frame) => setSeekRequest({ frame, token: Date.now() })} />
           <section className="promo-card" aria-labelledby="promo-export-title">
-            <h2 id="promo-export-title">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "04 · 내보내기")}</h2>
-            <label htmlFor="promo-quality">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "브라우저 영상 해상도")}<select id="promo-quality" value={quality} disabled={busy} onChange={(event) => setQuality(Number(event.target.value) as 720 | 1080)}><option value={720}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "720p · 빠른 저장")}</option><option value={1080}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "1080p · 높은 해상도")}</option></select></label>
-            <button type="button" className="promo-primary promo-full" disabled={busy || !project.panels.length || !mime} onClick={() => void exportVideo()}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "영상 저장 · ")}{mime?.includes("mp4") ? "MP4" : "WebM"}</button>
-            <p className="promo-muted">{mime ? translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "실시간 녹화 중 이 탭을 유지해 주세요. 다른 탭으로 이동하면 취소합니다. 정확한 프레임 렌더링·H.264 MP4는 Remotion을 사용하세요.") : translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "이 브라우저는 영상 녹화를 지원하지 않아요. Remotion 프로젝트로 내보낼 수 있어요.")}</p>
-            <button type="button" className="promo-full" disabled={busy || !project.panels.length} onClick={exportRemotion}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "Remotion 프로젝트 ZIP")}</button>
-            <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "원본 컷·BGM·자막·렌더 코드가 포함됩니다. 별도 Node.js 환경에서 MP4로 렌더링하며, 클라우드 서버나 유료 라이선스 구매는 자동 실행하지 않습니다.")}</p>
+            <h2 id="promo-export-title">04 · 내보내기</h2>
+            <label htmlFor="promo-quality">브라우저 영상 해상도<select id="promo-quality" value={quality} disabled={busy} onChange={(event) => setQuality(Number(event.target.value) as 720 | 1080)}><option value={720}>720p · 빠른 저장</option><option value={1080}>1080p · 높은 해상도</option></select></label>
+            <button type="button" className="promo-primary promo-full" disabled={busy || !project.panels.length || !mime} onClick={() => void exportVideo()}>영상 저장 · {mime?.includes("mp4") ? "MP4" : "WebM"}</button>
+            <p className="promo-muted">{mime ? "실시간 녹화 중 이 탭을 유지해 주세요. 다른 탭으로 이동하면 취소합니다. 정확한 프레임 렌더링·H.264 MP4는 Remotion을 사용하세요." : "이 브라우저는 영상 녹화를 지원하지 않아요. Remotion 프로젝트로 내보낼 수 있어요."}</p>
+            <button type="button" className="promo-full" disabled={busy || !project.panels.length} onClick={exportRemotion}>Remotion 프로젝트 ZIP</button>
+            <p className="promo-muted">원본 컷·BGM·자막·렌더 코드가 포함됩니다. 별도 Node.js 환경에서 MP4로 렌더링하며, 클라우드 서버나 유료 라이선스 구매는 자동 실행하지 않습니다.</p>
             <div className="promo-button-row">
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoSrt(project)], { type: "text/plain;charset=utf-8" }), "toonstudio-captions.srt")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "자막 SRT")}</button>
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoVtt(project)], { type: "text/vtt;charset=utf-8" }), "toonstudio-captions.vtt")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "자막 VTT")}</button>
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoShotList(project)], { type: "application/json" }), "toonstudio-shot-list.json")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "장면 타임코드 JSON")}</button>
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(false)}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "홍보 썸네일 PNG")}</button>
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(true)}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "콘티 시트 PNG")}</button>
-              <button type="button" disabled={busy} onClick={() => downloadPromoBlob(new Blob([JSON.stringify(project)], { type: "application/json" }), "toonstudio-promo.json")}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "프로젝트 JSON 저장")}</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoSrt(project)], { type: "text/plain;charset=utf-8" }), "toonstudio-captions.srt")}>자막 SRT</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoVtt(project)], { type: "text/vtt;charset=utf-8" }), "toonstudio-captions.vtt")}>자막 VTT</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoShotList(project)], { type: "application/json" }), "toonstudio-shot-list.json")}>장면 타임코드 JSON</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(false)}>홍보 썸네일 PNG</button>
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(true)}>콘티 시트 PNG</button>
+              <button type="button" disabled={busy} onClick={() => downloadPromoBlob(new Blob([JSON.stringify(project)], { type: "application/json" }), "toonstudio-promo.json")}>프로젝트 JSON 저장</button>
             </div>
-            <label htmlFor="promo-import">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "프로젝트 JSON 불러오기 (현재 구성 교체)")}</label><input id="promo-import" type="file" accept="application/json,.json" disabled={busy} onChange={(event) => { void importProject(event.target.files?.[0]); event.target.value = ""; }} />
-            <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "초안은 이 브라우저에 자동 저장합니다. 브라우저 데이터 삭제·저장 공간 부족에 대비해 프로젝트 JSON도 백업하세요. 미디어가 포함되므로 공유 대상을 확인하세요.")}</p>
+            <label htmlFor="promo-import">프로젝트 JSON 불러오기 (현재 구성 교체)</label><input id="promo-import" type="file" accept="application/json,.json" disabled={busy} onChange={(event) => { void importProject(event.target.files?.[0]); event.target.value = ""; }} />
+            <p className="promo-muted">초안은 이 브라우저에 자동 저장합니다. 브라우저 데이터 삭제·저장 공간 부족에 대비해 프로젝트 JSON도 백업하세요. 미디어가 포함되므로 공유 대상을 확인하세요.</p>
           </section>
           <div className="promo-feedback" aria-live="polite" aria-atomic="true">
-            {phase === "ai" ? <p>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "AI가 홍보 문구와 컷 순서를 구성하고 있어요.")}</p> : null}
-            {phase === "poster" ? <p>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "썸네일과 콘티를 렌더링하고 있어요.")}</p> : null}
-            {phase === "import" ? <p>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "파일을 검사하고 불러오는 중이에요.")}</p> : null}
-            {phase === "record" ? <><p>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "영상 저장 중 · ")}{Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label={translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "영상 저장 진행률")} /></> : null}
-            {!busy ? <p>{message}</p> : <button type="button" onClick={() => operation.current?.abort()}>{translateCurrentStaticSourceText("domains.creator.promo.StudioPromoPage", "ko", "작업 취소")}</button>}
+            {phase === "ai" ? <p>AI가 홍보 문구와 컷 순서를 구성하고 있어요.</p> : null}
+            {phase === "poster" ? <p>썸네일과 콘티를 렌더링하고 있어요.</p> : null}
+            {phase === "import" ? <p>파일을 검사하고 불러오는 중이에요.</p> : null}
+            {phase === "record" ? <><p>영상 저장 중 · {Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label="영상 저장 진행률" /></> : null}
+            {!busy ? <p>{message}</p> : <button type="button" onClick={() => operation.current?.abort()}>작업 취소</button>}
           </div>
           {error ? <p className="promo-error" role="alert">{error}</p> : null}
         </aside>

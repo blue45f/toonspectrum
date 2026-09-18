@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
@@ -188,7 +187,7 @@ export function VrmPoseBoneMarker({
     >
       <sphereGeometry args={[1, 16, 12]} />
       <meshBasicMaterial
-        color={selected ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseBoneOverlay", "en", "#ff5a36") : locked ? "#f2a93b" : draggable ? "#32c48d" : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoseBoneOverlay", "en", "#39a9ff")}
+        color={selected ? "#ff5a36" : locked ? "#f2a93b" : draggable ? "#32c48d" : "#39a9ff"}
         transparent
         opacity={selected ? 1 : 0.82}
         depthTest={false}

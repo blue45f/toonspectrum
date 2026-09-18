@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useState } from "react";
 
 import { CANVAS_W } from "./studio-assets";
@@ -48,12 +44,15 @@ export function StudioPercentGuideControls({
       className="space-y-2 rounded-lg border border-line bg-card/30 p-2.5 disabled:opacity-50"
     >
       <legend className="px-1 text-[0.65rem] font-bold text-fg-2">
-        {translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "퍼센트로 가이드 추가")}</legend>
+        퍼센트로 가이드 추가
+      </legend>
       <p id={helpId} className="text-[0.62rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "세로 가이드는 캔버스 너비, 가로 가이드는 캔버스 높이를 기준으로 즉시 px 위치로 변환합니다. 0보다 크고 100보다 작은 값을 입력하세요.")}</p>
+        세로 가이드는 캔버스 너비, 가로 가이드는 캔버스 높이를 기준으로 즉시 px 위치로
+        변환합니다. 0보다 크고 100보다 작은 값을 입력하세요.
+      </p>
       <div
         role="radiogroup"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "퍼센트 가이드 방향")}
+        aria-label="퍼센트 가이드 방향"
         className="grid grid-cols-2 gap-1 rounded-md bg-panel/60 p-1"
       >
         {(["v", "h"] as const).map((type) => (
@@ -69,7 +68,7 @@ export function StudioPercentGuideControls({
           >
             <input
               type="radio"
-              name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "en", "{v0}-direction"), { v0: String(helpId) })}
+              name={`${helpId}-direction`}
               value={type}
               checked={guideType === type}
               disabled={disabled}
@@ -81,21 +80,21 @@ export function StudioPercentGuideControls({
               className="pointer-events-none absolute inset-0 rounded-md peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
             />
             <span>
-              {type === "v" ? translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "세로 · 너비 기준") : translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "가로 · 높이 기준")}
+              {type === "v" ? "세로 · 너비 기준" : "가로 · 높이 기준"}
             </span>
           </label>
         ))}
       </div>
       <div
         role="group"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "{v0} 가이드 퍼센트 프리셋"), { v0: String(guideType === "v" ? "세로" : "가로") })}
+        aria-label={`${guideType === "v" ? "세로" : "가로"} 가이드 퍼센트 프리셋`}
         className="grid grid-cols-5 gap-1"
       >
         {STUDIO_GUIDE_PERCENT_PRESETS.map((percent) => (
           <button
             key={percent}
             type="button"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "{v0} 가이드 {v1}% 추가"), { v0: String(guideType === "v" ? "세로" : "가로"), v1: String(percent) })}
+            aria-label={`${guideType === "v" ? "세로" : "가로"} 가이드 ${percent}% 추가`}
             disabled={disabled}
             onClick={() => addGuide(guideType, percent)}
             className="min-h-11 rounded-md border border-line bg-card px-1 text-[0.62rem] font-semibold tabular-nums text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -112,7 +111,8 @@ export function StudioPercentGuideControls({
         }}
       >
         <label className="min-w-0 flex-1 text-[0.62rem] font-semibold text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "직접 입력")}<span className="mt-1 flex min-h-11 items-center rounded-md border border-line bg-card px-2 focus-within:border-accent">
+          직접 입력
+          <span className="mt-1 flex min-h-11 items-center rounded-md border border-line bg-card px-2 focus-within:border-accent">
             <input
               type="text"
               inputMode="decimal"
@@ -132,11 +132,13 @@ export function StudioPercentGuideControls({
           disabled={disabled || directPosition === null}
           className="min-h-11 shrink-0 rounded-md bg-accent px-3 text-[0.68rem] font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "추가")}</button>
+          추가
+        </button>
       </form>
       {input.length > 0 && parsedPercent === null ? (
         <p role="alert" className="text-[0.62rem] leading-relaxed text-bad">
-          {translateCurrentStaticSourceText("domains.creator.StudioPercentGuideControls", "ko", "0보다 크고 100보다 작은 퍼센트를 입력해 주세요.")}</p>
+          0보다 크고 100보다 작은 퍼센트를 입력해 주세요.
+        </p>
       ) : directPosition !== null ? (
         <p role="status" className="text-[0.62rem] tabular-nums text-fg-3">
           {parsedPercent}% → {Math.round(directPosition)}px

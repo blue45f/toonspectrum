@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, CircleDashed, RefreshCw } from "lucide-react";
 
 import type { MarketDeviceInstallSnapshot } from "../hooks/use-market-device-install";
@@ -68,7 +67,8 @@ export function MarketDeviceInstallStatus({
       </p>
       {!compact ? (
         <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-          {explanation} {translateCurrentStaticSourceText("domains.market.components.MarketDeviceInstallStatus", "ko", "이 표시는 현재 브라우저의 로컬 설치 증거이며 계정 소장·클라우드 확인 이력과는 별개입니다.")}</p>
+          {explanation} 이 표시는 현재 브라우저의 로컬 설치 증거이며 계정 소장·클라우드 확인 이력과는 별개입니다.
+        </p>
       ) : null}
     </div>
   );

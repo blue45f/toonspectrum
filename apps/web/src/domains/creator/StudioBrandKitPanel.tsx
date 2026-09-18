@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 브랜드 킷 패널 — "스타일" 툴바 그룹 팝오버 안에 서브탭 콘텐츠로 얹히는 컴포넌트.
 // 팔레트(참조)·제목/본문 글꼴·로고를 하나의 이름 붙은 킷으로 저장·이름변경·삭제하고,
 // 스와치/글꼴/로고를 각각 개별적으로 적용한다. StudioPaletteLibraryPanel과 동일한
@@ -133,7 +129,7 @@ function GoogleFontPickerGrid({ value, onPick }: GoogleFontPickerGridProps) {
 
   return (
     <div className="mt-1.5 rounded-lg border border-line/70 bg-panel/60 p-1.5">
-      <p className="mb-1 text-[0.6rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "Google Fonts (한글 지원 ")}{STUDIO_GOOGLE_FONTS.length}{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "종)")}</p>
+      <p className="mb-1 text-[0.6rem] font-medium text-fg-3">Google Fonts (한글 지원 {STUDIO_GOOGLE_FONTS.length}종)</p>
       <div className="mb-1 flex flex-wrap gap-0.5">
         {GOOGLE_FONT_CATEGORIES.map((c) => (
           <button
@@ -153,13 +149,13 @@ function GoogleFontPickerGrid({ value, onPick }: GoogleFontPickerGridProps) {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "폰트 이름 검색…")}
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "Google Fonts 검색")}
+        placeholder="폰트 이름 검색…"
+        aria-label="Google Fonts 검색"
         className="mb-1 h-6 w-full rounded border border-line bg-panel px-1.5 text-[0.65rem] text-fg outline-none focus:border-accent"
       />
       <div className="grid max-h-24 grid-cols-2 gap-1 overflow-y-auto pr-0.5">
         {filtered.length === 0 ? (
-          <p className="col-span-2 py-1 text-center text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "일치하는 폰트가 없어요.")}</p>
+          <p className="col-span-2 py-1 text-center text-[0.58rem] text-fg-3">일치하는 폰트가 없어요.</p>
         ) : (
           filtered.map((font) => {
             const cssValue = studioGoogleFontCssValue(font);
@@ -504,18 +500,18 @@ export function StudioBrandKitPanel({
       data-studio-brand-kit-authority={storageState}
       aria-busy={mutationBusy || storageState === "loading"}
     >
-      <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "내 브랜드 킷 — 팔레트·글꼴·로고 묶음")}</p>
+      <p className="mb-1.5 text-[0.66rem] font-medium text-fg-3">내 브랜드 킷 — 팔레트·글꼴·로고 묶음</p>
 
       <p className="mb-1.5 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
         {storageState === "loading"
-          ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "SQLite/OPFS 브랜드 킷 확인 중")
+          ? "SQLite/OPFS 브랜드 킷 확인 중"
           : storageState === "sqlite"
-            ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "이 기기 SQLite/OPFS 저장")
+            ? "이 기기 SQLite/OPFS 저장"
             : storageState === "memory"
-              ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "현재 탭 메모리 임시 · 새로고침 시 사라짐")
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
               : storageState === "unavailable"
-                ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "SQLite/OPFS 사용 불가 · 저장되지 않음")
-                : translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "주입 저장소")}
+                ? "SQLite/OPFS 사용 불가 · 저장되지 않음"
+                : "주입 저장소"}
       </p>
 
       {error && (
@@ -538,7 +534,8 @@ export function StudioBrandKitPanel({
           creatorOpen ? "bg-raised text-fg-2" : "text-fg-3 hover:text-fg-2"
         )}
       >
-        <Plus size={11} /> {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "새 브랜드 킷")}</button>
+        <Plus size={11} /> 새 브랜드 킷
+      </button>
 
       {creatorOpen && (
         <div className="mb-2 flex flex-col gap-1.5 rounded-lg border border-line bg-card p-2">
@@ -546,32 +543,34 @@ export function StudioBrandKitPanel({
             type="text"
             value={draftName}
             onChange={(e) => setDraftName(e.target.value)}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "브랜드 킷 이름")}
+            placeholder="브랜드 킷 이름"
             className="h-7 rounded border border-line bg-panel px-2 text-xs text-fg outline-none focus:border-accent"
           />
 
           <div>
-            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "팔레트")}</p>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">팔레트</p>
             <select
               value={draftPaletteId}
               onChange={(e) => setDraftPaletteId(e.target.value)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "팔레트")}
+              aria-label="팔레트"
               className="h-7 w-full rounded border border-line bg-panel px-1.5 text-xs text-fg outline-none focus:border-accent"
             >
-              <option value="">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "없음")}</option>
+              <option value="">없음</option>
               {palettes.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.colors.length}{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "색)")}</option>
+                  {p.name} ({p.colors.length}색)
+                </option>
               ))}
             </select>
             {palettes.length === 0 && (
               <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "저장된 팔레트가 없어요. 먼저 팔레트 탭에서 만들어보세요.")}</p>
+                저장된 팔레트가 없어요. 먼저 팔레트 탭에서 만들어보세요.
+              </p>
             )}
           </div>
 
           <div>
-            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "제목 글꼴")}</p>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">제목 글꼴</p>
             <div className="grid grid-cols-3 gap-1">
               {BRAND_KIT_FONTS.map((f) => (
                 <button
@@ -594,7 +593,7 @@ export function StudioBrandKitPanel({
           </div>
 
           <div>
-            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "본문 글꼴")}</p>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">본문 글꼴</p>
             <div className="grid grid-cols-3 gap-1">
               {BRAND_KIT_FONTS.map((f) => (
                 <button
@@ -617,12 +616,12 @@ export function StudioBrandKitPanel({
           </div>
 
           <div>
-            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고")}</p>
+            <p className="mb-1 text-[0.66rem] font-medium text-fg-3">로고</p>
             {draftLogo ? (
               <div className="flex items-center gap-2">
                 <img
                   src={draftLogo.dataUrl}
-                  alt={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고 미리보기")}
+                  alt="로고 미리보기"
                   className="h-10 w-10 rounded border border-line bg-panel object-contain"
                 />
                 <button
@@ -630,11 +629,12 @@ export function StudioBrandKitPanel({
                   onClick={() => setDraftLogo(null)}
                   className="text-[0.66rem] font-medium text-fg-3 transition-colors hover:text-bad"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "제거")}</button>
+                  제거
+                </button>
               </div>
             ) : (
               <label className="flex cursor-pointer items-center justify-center gap-1 rounded-lg border border-line bg-panel py-1.5 text-[0.66rem] font-semibold text-fg-2 transition-colors hover:bg-raised">
-                <ImagePlus size={11} /> {draftLogoBusy ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "불러오는 중…") : translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고 이미지 선택")}
+                <ImagePlus size={11} /> {draftLogoBusy ? "불러오는 중…" : "로고 이미지 선택"}
                 <input
                   type="file"
                   accept="image/*"
@@ -650,17 +650,18 @@ export function StudioBrandKitPanel({
             type="button"
             onClick={handleCreate}
             disabled={draftLogoBusy || mutationBusy || storageState === "loading"}
-            title={draftLogoBusy ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고를 불러오는 중이에요. 잠시만 기다려주세요.") : undefined}
+            title={draftLogoBusy ? "로고를 불러오는 중이에요. 잠시만 기다려주세요." : undefined}
             className="rounded-lg bg-accent py-1.5 text-[0.66rem] font-semibold text-on-accent transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {draftLogoBusy ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고 불러오는 중…") : translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "브랜드 킷 만들기")}
+            {draftLogoBusy ? "로고 불러오는 중…" : "브랜드 킷 만들기"}
           </button>
         </div>
       )}
 
       {kits.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line px-2 py-4 text-center text-[0.66rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "저장된 브랜드 킷이 없어요. 이름과 팔레트·글꼴·로고를 골라 새로 만들어보세요.")}</p>
+          저장된 브랜드 킷이 없어요. 이름과 팔레트·글꼴·로고를 골라 새로 만들어보세요.
+        </p>
       ) : (
         <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
           {kits.map((k) => {
@@ -687,8 +688,8 @@ export function StudioBrandKitPanel({
                   <button
                     type="button"
                     onClick={() => startRename(k)}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "{v0} 이름 변경"), { v0: String(k.name) })}
-                    title={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "이름 변경")}
+                    aria-label={`${k.name} 이름 변경`}
+                    title="이름 변경"
                     className="shrink-0 text-fg-3 transition-colors hover:text-accent"
                   >
                     <Pencil size={11} />
@@ -696,8 +697,8 @@ export function StudioBrandKitPanel({
                   <button
                     type="button"
                     onClick={() => handleDelete(k.id)}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "{v0} 브랜드 킷 삭제"), { v0: String(k.name) })}
-                    title={translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "삭제")}
+                    aria-label={`${k.name} 브랜드 킷 삭제`}
+                    title="삭제"
                     className="shrink-0 text-fg-3 transition-colors hover:text-bad"
                   >
                     <X size={11} />
@@ -706,7 +707,7 @@ export function StudioBrandKitPanel({
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-1">
                   {k.paletteId === null ? (
-                    <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "팔레트 없음")}</span>
+                    <span className="text-[0.6rem] text-fg-3">팔레트 없음</span>
                   ) : resolvedPalette ? (
                     <>
                       {resolvedPalette.colors.slice(0, SWATCH_PREVIEW_COUNT).map((hex, idx) => (
@@ -726,7 +727,7 @@ export function StudioBrandKitPanel({
                       )}
                     </>
                   ) : (
-                    <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "삭제된 팔레트")}</span>
+                    <span className="text-[0.6rem] text-fg-3">삭제된 팔레트</span>
                   )}
                 </div>
 
@@ -738,11 +739,12 @@ export function StudioBrandKitPanel({
                       onApplyFont(k.headingFont);
                     }}
                     disabled={!canApplyFont}
-                    title={canApplyFont ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "선택한 텍스트/말풍선에 적용") : translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "먼저 텍스트나 말풍선 요소를 선택하세요")}
+                    title={canApplyFont ? "선택한 텍스트/말풍선에 적용" : "먼저 텍스트나 말풍선 요소를 선택하세요"}
                     style={{ fontFamily: k.headingFont }}
                     className="flex-1 truncate rounded border border-line bg-panel px-1.5 py-1 text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "제목 글꼴 적용")}</button>
+                    제목 글꼴 적용
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -750,11 +752,12 @@ export function StudioBrandKitPanel({
                       onApplyFont(k.bodyFont);
                     }}
                     disabled={!canApplyFont}
-                    title={canApplyFont ? translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "선택한 텍스트/말풍선에 적용") : translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "먼저 텍스트나 말풍선 요소를 선택하세요")}
+                    title={canApplyFont ? "선택한 텍스트/말풍선에 적용" : "먼저 텍스트나 말풍선 요소를 선택하세요"}
                     style={{ fontFamily: k.bodyFont }}
                     className="flex-1 truncate rounded border border-line bg-panel px-1.5 py-1 text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "본문 글꼴 적용")}</button>
+                    본문 글꼴 적용
+                  </button>
                 </div>
 
                 <div className="mt-1.5 flex items-center gap-2">
@@ -770,10 +773,11 @@ export function StudioBrandKitPanel({
                         onClick={() => handleApplyLogo(k)}
                         className="flex-1 rounded border border-line bg-panel px-1.5 py-1 text-[0.6rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                       >
-                        {translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고를 마스터에 적용")}</button>
+                        로고를 마스터에 적용
+                      </button>
                     </>
                   ) : (
-                    <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고 없음")}</span>
+                    <span className="text-[0.6rem] text-fg-3">로고 없음</span>
                   )}
                 </div>
               </div>
@@ -783,10 +787,10 @@ export function StudioBrandKitPanel({
       )}
 
       <div className="mt-2 space-y-0.5 border-t border-line/60 pt-1.5 text-[0.6rem] leading-snug text-fg-3">
-        <p>{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "브랜드 킷은 이 기기의 SQLite/OPFS에 저장돼요(다른 기기·계정과 공유되지 않아요).")}</p>
-        <p>{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "로고 적용은 문서 마스터에 저장되고, 실행취소(⌘Z)가 지원되지 않아요.")}</p>
-        <p>{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "팔레트가 삭제되면 이 킷의 팔레트 연결도 함께 끊겨요(로고·글꼴은 영향 없어요).")}</p>
-        <p>{translateCurrentStaticSourceText("domains.creator.StudioBrandKitPanel", "ko", "Google Fonts는 처음 고를 때만 구글 서버에서 내려받아요(API 키·별도 비용 없음, 완전 오프라인은 아니에요).")}</p>
+        <p>브랜드 킷은 이 기기의 SQLite/OPFS에 저장돼요(다른 기기·계정과 공유되지 않아요).</p>
+        <p>로고 적용은 문서 마스터에 저장되고, 실행취소(⌘Z)가 지원되지 않아요.</p>
+        <p>팔레트가 삭제되면 이 킷의 팔레트 연결도 함께 끊겨요(로고·글꼴은 영향 없어요).</p>
+        <p>Google Fonts는 처음 고를 때만 구글 서버에서 내려받아요(API 키·별도 비용 없음, 완전 오프라인은 아니에요).</p>
       </div>
     </div>
   );

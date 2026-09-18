@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioPressureCurveGraph } from "../StudioPressureCurveGraph";
 
 import { cx } from "@/shared/lib/cx";
@@ -29,7 +28,7 @@ export function StudioBrushInputControls({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "필압 입력")}
+      aria-label="필압 입력"
       className={cx("border-t border-line/35", touch ? "mt-2.5 space-y-2.5 pt-2.5" : "space-y-2 pt-2")}
     >
       <label
@@ -39,10 +38,11 @@ export function StudioBrushInputControls({
         )}
       >
         <span>
-          <span className="block font-medium">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "마우스·터치 속도 필압")}</span>
+          <span className="block font-medium">마우스·터치 속도 필압</span>
           {touch ? (
             <span className="block text-[0.62rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "스타일러스 필압이 없을 때 CSS 화면 속도로 굵기를 보완")}</span>
+              스타일러스 필압이 없을 때 CSS 화면 속도로 굵기를 보완
+            </span>
           ) : null}
         </span>
         <input
@@ -55,7 +55,7 @@ export function StudioBrushInputControls({
 
       {useVelocityPressure ? (
         <label className={cx("flex items-center justify-between gap-2 text-fg-3", touch ? "text-[0.7rem]" : "text-xs")}>
-          <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "속도 감도")}</span>
+          <span>속도 감도</span>
           <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
             <input
               type="range"
@@ -64,7 +64,7 @@ export function StudioBrushInputControls({
               step={0.05}
               value={velocitySensitivity}
               onChange={(event) => onVelocitySensitivityChange(Number(event.target.value))}
-              aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "마우스와 터치 속도 필압 감도")}
+              aria-label="마우스와 터치 속도 필압 감도"
               className={cx("cursor-pointer accent-accent", touch ? "h-10 w-full max-w-52" : "w-20")}
             />
             <span className="w-9 text-right tabular-nums">{Math.round(velocitySensitivity * 100)}%</span>
@@ -81,7 +81,7 @@ export function StudioBrushInputControls({
 
       <div className={cx("space-y-1.5", touch ? "pt-0.5" : "")}>
         <label className={cx("flex items-center justify-between gap-2 text-fg-3", touch ? "text-[0.7rem]" : "text-xs")}>
-          <span className="font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "최소 굵기")}</span>
+          <span className="font-medium text-fg-2">최소 굵기</span>
           <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
             <input
               type="range"
@@ -90,14 +90,15 @@ export function StudioBrushInputControls({
               step={0.05}
               value={pressureMinSize}
               onChange={(event) => onPressureMinSizeChange?.(Number(event.target.value))}
-              aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "필압 최소 굵기 비율")}
+              aria-label="필압 최소 굵기 비율"
               className={cx("cursor-pointer accent-accent", touch ? "h-10 w-full max-w-52" : "w-24")}
             />
             <span className="w-9 text-right tabular-nums">{Math.round(pressureMinSize * 100)}%</span>
           </span>
         </label>
         <p className={cx("leading-relaxed text-fg-3", touch ? "text-[0.62rem]" : "text-[0.65rem]")}>
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushInputControls", "ko", "필압 0에서도 남는 굵기 비율입니다. 0%면 아주 약한 필압은 거의 안 그려지고, CSP의 Size Min과 같은 역할입니다.")}</p>
+          필압 0에서도 남는 굵기 비율입니다. 0%면 아주 약한 필압은 거의 안 그려지고, CSP의 Size Min과 같은 역할입니다.
+        </p>
         <div className="flex flex-wrap gap-1">
           {[0, 0.1, 0.25, 0.5].map((value) => (
             <button

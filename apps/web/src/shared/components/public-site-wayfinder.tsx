@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, ArrowUpRight, BookOpen, Compass, Images, Store } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";

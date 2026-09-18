@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useMemo } from "react";
 
 import { hasCustomBubbleShape } from "./lettering/studio-bubble-custom-shape";
@@ -169,20 +165,21 @@ export function StudioInspectorSelectionSection({
               {paperVectorRefinementBusy && inspectorInteractionPolicy.selection.disabled ? (
                 <button
                   type="button"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "잠긴 경로 정리 취소")}
+                  aria-label="잠긴 경로 정리 취소"
                   onClick={cancelPaperVectorRefinement}
                   className="mb-3 min-h-11 w-full rounded-lg border border-danger/35 bg-danger/10 px-3 py-2 text-xs font-semibold text-danger"
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "경로 정리 취소")}</button>
+                  경로 정리 취소
+                </button>
               ) : null}
               <fieldset
                 disabled={inspectorInteractionPolicy.selection.disabled}
                 title={inspectorInteractionPolicy.selection.reason}
                 className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50 disabled:[&_input]:cursor-not-allowed disabled:[&_input]:opacity-55 disabled:[&_select]:cursor-not-allowed disabled:[&_select]:opacity-55 disabled:[&_textarea]:cursor-not-allowed disabled:[&_textarea]:opacity-55"
               >
-                <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "선택 요소 편집 설정")}</legend>
-                <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "작업 패널을 여는 중...")} />}>
-                <p className="mb-2 text-xs font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "선택한 요소")}</p>
+                <legend className="sr-only">선택 요소 편집 설정</legend>
+                <Suspense fallback={<StudioPanelLoading label="작업 패널을 여는 중..." />}>
+                <p className="mb-2 text-xs font-semibold text-fg-3">선택한 요소</p>
 
               {selected.type === "draw" && (
                 <StudioInspectorShapeSection
@@ -220,7 +217,7 @@ export function StudioInspectorSelectionSection({
 
               {(selected.type === "text" || selected.type === "bubble") && (
                 <StudioColorField
-                  label={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "글자색")}
+                  label="글자색"
                   value={selected.type === "text" ? selected.fill : selected.textFill}
                   purpose="text"
                   recentColors={recentColors}
@@ -267,7 +264,7 @@ export function StudioInspectorSelectionSection({
                 />
               )}
               {selected.type === "bubble" && (
-                <StudioInspectorSection sectionId="element.bubble" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "말풍선 설정을 여는 중...")}>
+                <StudioInspectorSection sectionId="element.bubble" loadingLabel="말풍선 설정을 여는 중...">
               {selected.type === "bubble" && (
                 <StudioInspectorBubbleAppearanceControls
                   recentColors={recentColors}
@@ -306,8 +303,8 @@ export function StudioInspectorSelectionSection({
                 !hasCustomBubbleShape(selected.customShapePoints) && (
                 <Suspense fallback={null}>
                   <StudioBubbleTailControls
-                    tail={selected.tail ?? translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "en", "left")}
-                    direction={selected.tailDirection ?? translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "en", "bottom")}
+                    tail={selected.tail ?? "left"}
+                    direction={selected.tailDirection ?? "bottom"}
                     ratio={selected.tailXRatio ?? 0.35}
                     length={selected.tailHeight ?? 30}
                     base={selectedBubbleTailGeometry?.tailSpec?.base ?? selected.tailBase ?? 18}
@@ -367,10 +364,11 @@ export function StudioInspectorSelectionSection({
                 (selected.type === "image" ||
                   selected.type === "bubble" ||
                   containingPanel(selected, elements)) && (
-              <StudioInspectorSection sectionId="element.constraints" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "배치 제약을 여는 중...")}>
+              <StudioInspectorSection sectionId="element.constraints" loadingLabel="배치 제약을 여는 중...">
               {containingPanel(selected, elements) && (
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "패널 안에 가두기")}<input
+                  패널 안에 가두기
+                  <input
                     type="checkbox"
                     checked={!selected.noClip}
                     onChange={(e) => patchEl(selected.id, { noClip: !e.target.checked } as Partial<El>)}
@@ -383,14 +381,15 @@ export function StudioInspectorSelectionSection({
                   type="button"
                   onClick={() => void fitSelectedToFrame()}
                   className="mt-2 w-full rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
-                  title={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "이미지를 패널(없으면 캔버스)에 비율 유지하며 꽉 채웁니다")}
+                  title="이미지를 패널(없으면 캔버스)에 비율 유지하며 꽉 채웁니다"
                 >
-                  {containingPanel(selected, elements) ? translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "패널에 꽉 채우기") : translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "캔버스에 꽉 채우기")}
+                  {containingPanel(selected, elements) ? "패널에 꽉 채우기" : "캔버스에 꽉 채우기"}
                 </button>
               )}
               {(selected.type === "image" || selected.type === "bubble") && (
                 <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "비율 잠금 (변형 시 종횡비 유지)")}<input
+                  비율 잠금 (변형 시 종횡비 유지)
+                  <input
                     type="checkbox"
                     checked={!!selected.lockAspect}
                     onChange={(e) => patchEl(selected.id, { lockAspect: e.target.checked } as Partial<El>)}
@@ -403,10 +402,11 @@ export function StudioInspectorSelectionSection({
               {(selected.type === "text" || selected.type === "bubble") && (
                 /* 문단 — 정렬·세로 쓰기·자간·행간·높이 맞춤. 정렬은 예전에 타이포그래피 섹션에도
                    한 번 더 있었다(같은 속성 두 번 노출, 감사 §5.4). 이제 여기 한 곳뿐이다. */
-                <StudioInspectorSection sectionId="element.text-align" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "문단 설정을 여는 중...")}>
+                <StudioInspectorSection sectionId="element.text-align" loadingLabel="문단 설정을 여는 중...">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "글자 정렬")}<div className="flex gap-1">
+                    글자 정렬
+                    <div className="flex gap-1">
                       {[
                         { label: "왼쪽", v: "left" },
                         { label: "가운데", v: "center" },
@@ -418,7 +418,7 @@ export function StudioInspectorSelectionSection({
                           onClick={() => patchEl(selected.id, { align: a.v } as Partial<El>)}
                           aria-pressed={(selected.align ?? "center") === a.v}
                           data-inspector-priority="advanced"
-                          data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "en", "paragraph.align.{v0}"), { v0: String(a.v) })}
+                          data-inspector-control-id={`paragraph.align.${a.v}`}
                           className={cn(
                             "rounded-md border px-2.5 py-0.5 text-xs",
                             (selected.align ?? "center") === a.v
@@ -433,7 +433,8 @@ export function StudioInspectorSelectionSection({
                   </div>
 
                   <label className="flex items-center justify-between gap-2 text-sm text-fg-2 cursor-pointer">
-                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "세로 쓰기 (세로 연출)")}<input
+                    세로 쓰기 (세로 연출)
+                    <input
                       type="checkbox"
                       checked={!!selected.vertical}
                       data-inspector-priority="advanced"
@@ -445,7 +446,8 @@ export function StudioInspectorSelectionSection({
                   {selected.type === "text" && (
                     <>
                       <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "자간")}<span className="flex items-center gap-2">
+                        자간
+                        <span className="flex items-center gap-2">
                           <input
                             type="range"
                             min={-2}
@@ -461,7 +463,8 @@ export function StudioInspectorSelectionSection({
                         </span>
                       </label>
                       <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "행간")}<span className="flex items-center gap-2">
+                        행간
+                        <span className="flex items-center gap-2">
                           <input
                             type="range"
                             min={0.8}
@@ -483,16 +486,18 @@ export function StudioInspectorSelectionSection({
                       type="button"
                       onClick={() => void fitBubbleToText()}
                       className="w-full rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised"
-                      title={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "말풍선 높이를 대사 길이에 맞춥니다")}
+                      title="말풍선 높이를 대사 길이에 맞춥니다"
                     >
-                      {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "높이를 텍스트에 맞춤")}</button>
+                      높이를 텍스트에 맞춤
+                    </button>
                   )}
                 </div>
                 </StudioInspectorSection>
               )}
 
-              <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2" title={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "바로 아래 레이어의 영역 안으로만 보이게 잘라냅니다(채색·톤 가두기).")}>
-                {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "아래 레이어에 클리핑")}<input
+              <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2" title="바로 아래 레이어의 영역 안으로만 보이게 잘라냅니다(채색·톤 가두기).">
+                아래 레이어에 클리핑
+                <input
                   type="checkbox"
                   checked={!!selected.clipBelow}
                   onChange={(e) => patchEl(selected.id, { clipBelow: e.target.checked } as Partial<El>)}
@@ -501,7 +506,8 @@ export function StudioInspectorSelectionSection({
               </label>
 
               <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "그룹")}<select
+                그룹
+                <select
                   value={groupOfItem(selected, groups)?.id ?? ""}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -510,43 +516,44 @@ export function StudioInspectorSelectionSection({
                   }}
                   className="rounded border border-line bg-card px-2 py-1 text-xs text-fg focus-visible:outline focus-visible:outline-accent cursor-pointer max-w-[8.5rem] truncate"
                 >
-                  <option value="">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "그룹 없음")}</option>
+                  <option value="">그룹 없음</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
-                  <option value="__new__">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "+ 새 그룹")}</option>
+                  <option value="__new__">+ 새 그룹</option>
                 </select>
               </label>
 
               {selected.type !== "frame" && (
                 <label className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "혼합 모드 (Blend)")}<select
-                    value={selected.blendMode || translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "en", "source-over")}
+                  혼합 모드 (Blend)
+                  <select
+                    value={selected.blendMode || "source-over"}
                     onChange={(e) => patchEl(selected.id, { blendMode: e.target.value } as Partial<El>)}
                     className="rounded border border-line bg-card px-2 py-1 text-xs text-fg focus-visible:outline focus-visible:outline-accent cursor-pointer"
                   >
-                    <option value="source-over">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "보통 (Normal)")}</option>
-                    <option value="multiply">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "곱하기 (Multiply)")}</option>
-                    <option value="screen">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "스크린 (Screen)")}</option>
-                    <option value="overlay">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "오버레이 (Overlay)")}</option>
-                    <option value="darken">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "어둡게 (Darken)")}</option>
-                    <option value="lighten">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "밝게 (Lighten)")}</option>
-                    <option value="color-dodge">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "색상 닷지 (Color Dodge)")}</option>
-                    <option value="color-burn">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "색상 번 (Color Burn)")}</option>
-                    <option value="hard-light">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "하드 라이트 (Hard Light)")}</option>
-                    <option value="soft-light">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "소프트 라이트 (Soft Light)")}</option>
-                    <option value="difference">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "차이 (Difference)")}</option>
-                    <option value="exclusion">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "제외 (Exclusion)")}</option>
-                    <option value="hue">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "색조 (Hue)")}</option>
-                    <option value="saturation">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "채도 (Saturation)")}</option>
-                    <option value="color">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "색상 (Color)")}</option>
-                    <option value="luminosity">{translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "광도 (Luminosity)")}</option>
+                    <option value="source-over">보통 (Normal)</option>
+                    <option value="multiply">곱하기 (Multiply)</option>
+                    <option value="screen">스크린 (Screen)</option>
+                    <option value="overlay">오버레이 (Overlay)</option>
+                    <option value="darken">어둡게 (Darken)</option>
+                    <option value="lighten">밝게 (Lighten)</option>
+                    <option value="color-dodge">색상 닷지 (Color Dodge)</option>
+                    <option value="color-burn">색상 번 (Color Burn)</option>
+                    <option value="hard-light">하드 라이트 (Hard Light)</option>
+                    <option value="soft-light">소프트 라이트 (Soft Light)</option>
+                    <option value="difference">차이 (Difference)</option>
+                    <option value="exclusion">제외 (Exclusion)</option>
+                    <option value="hue">색조 (Hue)</option>
+                    <option value="saturation">채도 (Saturation)</option>
+                    <option value="color">색상 (Color)</option>
+                    <option value="luminosity">광도 (Luminosity)</option>
                   </select>
                 </label>
               )}
 
               {selected.type === "image" && (
-                <StudioInspectorSection sectionId="element.blend-extended" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "확장 블렌드를 여는 중...")}>
+                <StudioInspectorSection sectionId="element.blend-extended" loadingLabel="확장 블렌드를 여는 중...">
                 <Suspense fallback={null}>
                   <StudioExtendedBlendPanel
                     mode={extendedBlendMode}
@@ -570,7 +577,7 @@ export function StudioInspectorSelectionSection({
               {(selected.type === "image" || selected.type === "text" || selected.type === "sticker") && (
                 <StudioInspectorSection
                   sectionId="element.layout"
-                  loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "기울이기를 여는 중...")}
+                  loadingLabel="기울이기를 여는 중..."
                 >
                     <StudioSkewPanel
                       value={{ skewX: selected.skewX, skewY: selected.skewY }}
@@ -583,7 +590,7 @@ export function StudioInspectorSelectionSection({
               {(selected.type === "focusLines"
                 || selected.type === "speedLines"
                 || selected.type === "frame") ? (
-                <StudioInspectorSection sectionId="element.effect-lines" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorSelectionSection", "ko", "집중선·속도선을 여는 중...")}>
+                <StudioInspectorSection sectionId="element.effect-lines" loadingLabel="집중선·속도선을 여는 중...">
                 <StudioInspectorFocusSpeedFrameControls
                   selected={selected}
                   panelGutter={panelGutter}

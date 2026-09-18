@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   CheckCircle2,
   Download,
@@ -230,12 +226,12 @@ export function MarketAcquisitionModal({
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 id="market-acquire-title" className="flex items-center gap-2 text-base font-bold text-fg">
             <Sparkles className="size-4 text-accent" aria-hidden="true" />
-            <span>{completed ? translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "내 에셋에 추가 완료") : translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "내 에셋에 추가")}</span>
+            <span>{completed ? "내 에셋에 추가 완료" : "내 에셋에 추가"}</span>
           </h2>
           <button
             type="button"
             onClick={closeModal}
-            aria-label={translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "닫기")}
+            aria-label="닫기"
             className="rounded-lg p-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
             <X className="size-4" aria-hidden="true" />
@@ -248,15 +244,16 @@ export function MarketAcquisitionModal({
               <CheckCircle2 className="size-8" aria-hidden="true" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "내 에셋에 안전하게 보관했습니다")}</h3>
+              <h3 className="text-lg font-bold text-fg">내 에셋에 안전하게 보관했습니다</h3>
               <p className="mt-1 text-xs leading-relaxed text-fg-2">
-                {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "계정 보관과 현재 기기 설치·적용은 서로 다른 단계입니다. ")}{studioHandoff.summary}
+                계정 보관과 현재 기기 설치·적용은 서로 다른 단계입니다. {studioHandoff.summary}
               </p>
             </div>
 
             {redirectedToCurrentHead ? (
               <div className="rounded-xl border border-accent/35 bg-accent/10 p-3 text-left text-xs leading-relaxed text-fg-2">
-                {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "상세에서 본 v")}{record.resourceVersion}{translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "은 이전 릴리스입니다. 같은 제작자·패키지·종류임을 확인한 뒤 현재 공개 버전 v")}{activeRecord.resourceVersion}{translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "을 내 에셋에 추가했습니다.")}</div>
+                상세에서 본 v{record.resourceVersion}은 이전 릴리스입니다. 같은 제작자·패키지·종류임을 확인한 뒤 현재 공개 버전 v{activeRecord.resourceVersion}을 내 에셋에 추가했습니다.
+              </div>
             ) : null}
 
             <div className="space-y-2 rounded-xl border border-line bg-panel p-3.5 text-left text-xs">
@@ -267,11 +264,11 @@ export function MarketAcquisitionModal({
               <p className="text-[0.68rem] leading-relaxed text-fg-3">{license.summary}</p>
               {activeRecord.attributionText ? (
                 <p className="text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "출처 표기: ")}{activeRecord.attributionText}
+                  출처 표기: {activeRecord.attributionText}
                 </p>
               ) : null}
               <p className="border-t border-line pt-2 text-[0.68rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "설치 대상: v")}{activeRecord.resourceVersion} {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "· 무결성 ")}{activeRecord.manifestHash.slice(0, 12)}…
+                설치 대상: v{activeRecord.resourceVersion} · 무결성 {activeRecord.manifestHash.slice(0, 12)}…
               </p>
             </div>
 
@@ -289,7 +286,8 @@ export function MarketAcquisitionModal({
                 onClick={handleGoToLibrary}
                 className={buttonClass({ variant: "outline", size: "sm", className: "w-full" })}
               >
-                {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "내 에셋 관리로 이동")}</button>
+                내 에셋 관리로 이동
+              </button>
             </div>
           </div>
         ) : (
@@ -304,16 +302,16 @@ export function MarketAcquisitionModal({
                 </span>
                 <h3 className="truncate text-sm font-bold leading-snug text-fg">{activeRecord.name}</h3>
                 <p className="text-[0.68rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "제작자: ")}{activeRecord.publisher.name} {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "· 설치 대상 v")}{activeRecord.resourceVersion}
+                  제작자: {activeRecord.publisher.name} · 설치 대상 v{activeRecord.resourceVersion}
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-xl border border-line bg-panel/60 p-3 text-[0.7rem] leading-relaxed text-fg-2">
               <span className="flex size-5 items-center justify-center rounded-full bg-accent text-[0.62rem] font-bold text-on-accent">1</span>
-              <span>{translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "서버에서 같은 패키지의 현재 공개 릴리스와 제작자·종류·안정 식별자를 확인합니다.")}</span>
+              <span>서버에서 같은 패키지의 현재 공개 릴리스와 제작자·종류·안정 식별자를 확인합니다.</span>
               <span className="flex size-5 items-center justify-center rounded-full bg-raised text-[0.62rem] font-bold text-fg">2</span>
-              <span>{translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "현재 릴리스를 내 계정에 보관한 뒤, Studio에서 그 정확한 버전을 설치합니다.")}</span>
+              <span>현재 릴리스를 내 계정에 보관한 뒤, Studio에서 그 정확한 버전을 설치합니다.</span>
             </div>
 
             <div className="space-y-2 rounded-xl border border-good/40 bg-good/10 p-3.5">
@@ -338,7 +336,7 @@ export function MarketAcquisitionModal({
                 <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">{license.summary}</p>
                 {activeRecord.attributionText ? (
                   <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "출처 표기: ")}{activeRecord.attributionText}
+                    출처 표기: {activeRecord.attributionText}
                   </p>
                 ) : null}
               </div>
@@ -359,7 +357,8 @@ export function MarketAcquisitionModal({
                 className="mt-0.5 rounded border-line text-accent focus:ring-accent"
               />
               <span className="text-[0.72rem] leading-relaxed">
-                {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "표시된 라이선스와 출처 조건을 확인했습니다. 이 에셋을 내 계정에 보관하고 필요할 때 기기에 설치하겠습니다.")}</span>
+                표시된 라이선스와 출처 조건을 확인했습니다. 이 에셋을 내 계정에 보관하고 필요할 때 기기에 설치하겠습니다.
+              </span>
             </label>
 
             {error ? (
@@ -375,7 +374,8 @@ export function MarketAcquisitionModal({
                 onClick={closeModal}
                 className={buttonClass({ variant: "ghost", size: "sm" })}
               >
-                {translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "취소")}</button>
+                취소
+              </button>
               <button
                 type="button"
                 onClick={() => void handleAcquire()}
@@ -386,7 +386,7 @@ export function MarketAcquisitionModal({
                   || Boolean(quote?.checkoutRequired && !quote.checkoutEnabled)
                 }
                 aria-busy={submitting || undefined}
-                title={!agreed ? translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "라이선스와 출처 조건을 확인하면 추가할 수 있습니다.") : undefined}
+                title={!agreed ? "라이선스와 출처 조건을 확인하면 추가할 수 있습니다." : undefined}
                 className={buttonClass({
                   variant: "solid",
                   size: "md",
@@ -395,7 +395,7 @@ export function MarketAcquisitionModal({
               >
                 <Download className="size-4" aria-hidden="true" />
                 <span>{submitting
-                  ? translateCurrentStaticSourceText("domains.market.components.MarketAcquisitionModal", "ko", "현재 버전 확인 중…")
+                  ? "현재 버전 확인 중…"
                   : versionNotice
                     ? `현재 v${activeRecord.resourceVersion} 조건 확인 후 추가`
                     : quote?.checkoutRequired

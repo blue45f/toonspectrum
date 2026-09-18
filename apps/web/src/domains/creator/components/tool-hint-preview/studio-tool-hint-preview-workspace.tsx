@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { COLOR, previewVariantMatches } from "./studio-tool-hint-preview-shared";
 
 import type { ReactElement } from "react";
@@ -15,11 +14,11 @@ export function CommentPreview({ animate }: { animate: boolean }): ReactElement 
     <>
       <rect x="43" y="18" width="78" height="68" rx="6" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
       <path d="m49 76 19-20 15 13 11-10 21 17" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(91 48)")}>
+      <g transform={animate ? undefined : "translate(91 48)"}>
         <path d="M0-9a9 9 0 1 1 0 18 9 9 0 0 1 0-18Zm0 18v13" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2" />
         {animate ? <animateMotion dur="2.7s" path="M91 28V48" keyPoints="0;1;1" keyTimes="0;.38;1" repeatCount="indefinite" /> : null}
       </g>
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(0 0)")}>
+      <g transform={animate ? undefined : "translate(0 0)"}>
         <path d="M126 29h48c7 0 12 5 12 12v22c0 7-5 12-12 12h-26l-10 9 2-9h-14c-7 0-12-5-12-12V41c0-7 5-12 12-12Z" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="2" />
         <path d="M127 44h43M127 54h34M127 64h24" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
         {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="10 0;0 0;0 0;10 0" keyTimes="0;.38;.78;1" repeatCount="indefinite" /> : null}
@@ -131,7 +130,7 @@ export function WorkspaceActionPreview({ animate, kind, variant = "" }: { animat
         {[0, 1, 2].map((index) => <rect key={index} x={38 + index * 38} y="25" width="29" height="29" rx="5" fill={index === 1 ? COLOR.accentSoft : COLOR.raised} stroke={index === 1 ? COLOR.accent : COLOR.lineStrong} />)}
         <rect x="151" y="42" width="31" height="31" rx="6" fill={COLOR.canvas} stroke={COLOR.fg2} />
         <path d="m157 66 8-9 5 5 6-7" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" />
-        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(76 37)")}>
+        <g transform={animate ? undefined : "translate(76 37)"}>
           <rect x="-10" y="-10" width="20" height="20" rx="4" fill={COLOR.accent} />
           {animate ? <animateMotion dur="2.8s" path="M76 37C104 18 137 30 166 57" keyPoints="0;1;1" keyTimes="0;.62;1" repeatCount="indefinite" /> : null}
         </g>
@@ -146,7 +145,7 @@ export function WorkspaceActionPreview({ animate, kind, variant = "" }: { animat
       <path d="M57 18h65l25 25v43H57Z" fill={COLOR.canvas} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
       <path d="M122 18v25h25M72 56h57M72 67h45" fill="none" stroke={COLOR.lineStrong} strokeLinecap="round" strokeWidth="2" />
       {kind === "project" ? <path d="M42 37h45l8 9h52v39H42Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" /> : null}
-      <g transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate({v0} {v1})"), { v0: String(isPublish ? 164 : 160), v1: String(isSave ? 70 : 58) })}>
+      <g transform={animate ? undefined : `translate(${isPublish ? 164 : 160} ${isSave ? 70 : 58})`}>
         {isSave ? <path d="M-13-12h26v24h-26Zm5 0v9H7v-9M-7 5H7" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinejoin="round" strokeWidth="2" /> : isPublish ? <path d="M0-17 13 8 3 5 0 17-3 5-13 8Z" fill={COLOR.accent} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" /> : kind === "project" ? <path d="M-14-9h11l4 4h15V12h-30Zm5 9h18M0-5V9" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" /> : <path d="M0-15v25m0 0-9-9m9 9 9-9M-13 15h26" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />}
         {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values={`${isExport ? 145 : 160} 48;${isPublish ? 164 : 160} ${isSave ? 70 : 58};${isPublish ? 164 : 160} ${isSave ? 70 : 58};${isExport ? 145 : 160} 48`} keyTimes="0;.42;.75;1" repeatCount="indefinite" /> : null}
       </g>
@@ -176,7 +175,7 @@ export function EditWorkflowPreview({ animate }: { animate: boolean }): ReactEle
       <circle cx="57" cy="44" r="6" fill={COLOR.accent} />
       <path d="m47 59 11-10 8 7 7-6 8 9" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
       <path d="M48 74h32" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(43 9)")}>
+      <g transform={animate ? undefined : "translate(43 9)"}>
         <rect x="52" y="31" width="42" height="34" rx="5" fill={COLOR.raised} stroke={COLOR.cool} strokeWidth="2" />
         <circle cx="66" cy="44" r="6" fill={COLOR.cool} />
         <path d="m56 59 11-10 8 7 7-6 8 9" fill="none" stroke={COLOR.fg} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
@@ -203,7 +202,7 @@ export function InsertContentPreview({ animate }: { animate: boolean }): ReactEl
       <rect x="83" y="31" width="48" height="39" rx="5" fill={COLOR.raised} stroke={COLOR.cool} />
       <path d="m87 65 12-13 9 8 7-6 12 11" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeWidth="2" />
       <path d="M50 62h23v15H50Z" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="1.8" />
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(-24 22)")}>
+      <g transform={animate ? undefined : "translate(-24 22)"}>
         <rect x="157" y="17" width="28" height="28" rx="5" fill={COLOR.accent} />
         <path d="M171 24v14M164 31h14" stroke={COLOR.canvas} strokeLinecap="round" strokeWidth="2.5" />
         {animate ? <animateTransform attributeName="transform" type="translate" dur="2.8s" values="0 0;-24 22;-24 22;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
@@ -216,7 +215,7 @@ export function CommentInboxPreview({ animate }: { animate: boolean }): ReactEle
   return (
     <>
       {[0, 1, 2].map((index) => (
-        <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate({v0} {v1})"), { v0: String(46 + index * 18), v1: String(17 + index * 17) })} opacity={index === 2 ? "1" : ".55"}>
+        <g key={index} transform={`translate(${46 + index * 18} ${17 + index * 17})`} opacity={index === 2 ? "1" : ".55"}>
           <path d="M0 0h91v42H24L13 52V42H0Z" fill={index === 2 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 2 ? COLOR.accent : COLOR.lineStrong} strokeLinejoin="round" strokeWidth="1.8" />
           <circle cx="16" cy="15" r="5" fill={index === 2 ? COLOR.accent : COLOR.fg3} />
           <path d="M28 13h46M28 24h34" stroke={COLOR.fg2} strokeLinecap="round" strokeWidth="2" />
@@ -265,7 +264,7 @@ export function ViewWorkflowPreview({ animate }: { animate: boolean }): ReactEle
       <path d="M174 29h11M174 39h11M174 49h11" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="2" />
       <g transform="translate(108 52)">
         <rect x="-53" y="-32" width="106" height="64" rx="6" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
-        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "scale(-1 1)")}>
+        <g transform={animate ? undefined : "scale(-1 1)"}>
           <circle cx="-25" cy="-12" r="8" fill={COLOR.accent} />
           <path d="m-43 21 25-24L0 13l13-12 31 20" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
           {animate ? <animateTransform attributeName="transform" type="scale" dur="3.2s" values="1 1;1 1;-1 1;-1 1;1 1" keyTimes="0;.3;.48;.75;1" repeatCount="indefinite" /> : null}
@@ -297,7 +296,7 @@ export function PanelLayoutPreview({
       {add ? (
         <>
           <rect x="45" y="24" width="72" height="56" rx="5" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
-          <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(-27 27)")}>
+          <g transform={animate ? undefined : "translate(-27 27)"}>
             <rect x="140" y="18" width="38" height="38" rx="7" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="2" />
             <path d="M159 28v18m-9-9h18" stroke={COLOR.accent} strokeLinecap="round" strokeWidth="2.5" />
             {animate ? <animateTransform attributeName="transform" type="translate" dur="2.6s" values="0 0;-27 27;-27 27;0 0" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
@@ -313,7 +312,7 @@ export function PanelLayoutPreview({
         </>
       ) : (
         <>
-          <path d={diagonal && !straighten ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "M44 23h72l-20 58H44ZM121 23h51v58H101Z") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "M44 23h60v58H44ZM109 23h63v58h-63Z")} fill={COLOR.accentSoft} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
+          <path d={diagonal && !straighten ? "M44 23h72l-20 58H44ZM121 23h51v58H101Z" : "M44 23h60v58H44ZM109 23h63v58h-63Z"} fill={COLOR.accentSoft} stroke={COLOR.fg2} strokeLinejoin="round" strokeWidth="2" />
           <path d={straighten ? "M104 23v58" : "M116 23 96 81"} stroke={COLOR.accent} strokeWidth="3">
             {animate ? <animate attributeName="stroke-dasharray" dur="1.5s" values="2 5;18 2;2 5" repeatCount="indefinite" /> : null}
           </path>
@@ -332,7 +331,7 @@ export function CharacterBuilderPreview({ animate }: { animate: boolean }): Reac
         <circle cx="0" cy="17" r="12" fill={COLOR.accentSoft} stroke={COLOR.accent} strokeWidth="2" />
         <path d="M-11 15c5-13 17-13 23-2M-14 47c2-12 8-17 14-17s12 5 14 17v18H-14ZM-13 44l-18 14M13 44l18 14M-8 65l-8 19M8 65l8 19" stroke={COLOR.fg2} strokeWidth="3" />
         <path d="M-7 18h3m8 0h3M-4 24c3 2 5 2 8 0" stroke={COLOR.fg} strokeWidth="1.5" />
-        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "rotate(12 13 44)")}>
+        <g transform={animate ? undefined : "rotate(12 13 44)"}>
           <path d="M13 44 31 58" stroke={COLOR.accent} strokeWidth="3" />
           {animate ? <animateTransform attributeName="transform" type="rotate" dur="2.4s" values="-10 13 44;16 13 44;16 13 44;-10 13 44" keyTimes="0;.42;.72;1" repeatCount="indefinite" /> : null}
         </g>
@@ -355,7 +354,7 @@ export function MannequinPoserPreview({ animate }: { animate: boolean }): ReactE
         <circle cx="0" cy="12" r="9" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="2.5" />
         <path d="M0 21v22M0 43l-10 22M0 43l10 22M-10 65l-2 12M10 65l2 12" stroke={COLOR.fg2} strokeWidth="3.5" />
         <path d="M0 26l-13 8M-13 34l-7 12" stroke={COLOR.fg2} strokeWidth="3.5" />
-        <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "rotate(-24 0 26)")}>
+        <g transform={animate ? undefined : "rotate(-24 0 26)"}>
           <path d="M0 26l14 6M14 32l11-9" stroke={COLOR.accent} strokeWidth="3.5" />
           <circle cx="25" cy="23" r="3" fill={COLOR.accent} />
           {animate ? <animateTransform attributeName="transform" type="rotate" dur="2.6s" values="0 0 26;-30 0 26;-30 0 26;0 0 26" keyTimes="0;.4;.7;1" repeatCount="indefinite" /> : null}
@@ -367,7 +366,7 @@ export function MannequinPoserPreview({ animate }: { animate: boolean }): ReactE
       {/* 체형 슬라이더 열 — 프리셋 목록(3D 캐릭터)과 구별되는 파라메트릭 조절 UI. */}
       <g transform="translate(148 22)">
         {[0, 1, 2].map((index) => (
-          <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(0 {v0})"), { v0: String(index * 21) })}>
+          <g key={index} transform={`translate(0 ${index * 21})`}>
             <path d="M0 6h40" stroke={COLOR.lineStrong} strokeLinecap="round" strokeWidth="3" />
             <circle cx={[26, 12, 33][index]} cy="6" r="5" fill={index === 0 ? COLOR.accent : COLOR.raised} stroke={index === 0 ? COLOR.accent : COLOR.fg3} strokeWidth="1.5" />
           </g>
@@ -383,14 +382,14 @@ export function BackgroundLibraryPreview({ animate }: { animate: boolean }): Rea
     <>
       <rect x="29" y="14" width="83" height="77" rx="7" fill={COLOR.raised} stroke={COLOR.lineStrong} />
       {[0, 1, 2].map((index) => (
-        <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate({v0} {v1})"), { v0: String(37 + (index % 2) * 35), v1: String(22 + Math.floor(index / 2) * 32) })}>
+        <g key={index} transform={`translate(${37 + (index % 2) * 35} ${22 + Math.floor(index / 2) * 32})`}>
           <rect width="29" height="25" rx="4" fill={index === 1 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 1 ? COLOR.accent : COLOR.fg3} />
           <path d="M3 21 10 13l6 5 4-4 6 7" fill="none" stroke={index === 1 ? COLOR.accent : COLOR.cool} strokeLinecap="round" strokeWidth="1.7" />
         </g>
       ))}
       <rect x="120" y="18" width="67" height="69" rx="7" fill={COLOR.canvas} stroke={COLOR.fg2} strokeWidth="2" />
       <path d="m126 78 18-22 13 12 9-10 15 20" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(76 38)")}>
+      <g transform={animate ? undefined : "translate(76 38)"}>
         <rect x="-12" y="-10" width="24" height="20" rx="4" fill={COLOR.accent} stroke={COLOR.canvas} strokeWidth="2" />
         {animate ? <animateMotion dur="2.8s" path="M77 38C104 28 126 39 150 53" keyPoints="0;1;1" keyTimes="0;.66;1" repeatCount="indefinite" /> : null}
       </g>
@@ -408,7 +407,7 @@ export function StyleLibraryPreview({ animate }: { animate: boolean }): ReactEle
         </circle>
       ))}
       <rect x="117" y="16" width="66" height="72" rx="8" fill={COLOR.raised} stroke={COLOR.fg2} />
-      <text x="128" y="41" fill={COLOR.fg} fontSize="18" fontWeight="800">{translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "Aa")}</text>
+      <text x="128" y="41" fill={COLOR.fg} fontSize="18" fontWeight="800">Aa</text>
       <path d="M128 54h42M128 64h29" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="3" />
       <path d="M123 78c14-17 29 9 47-10" fill="none" stroke={COLOR.accent} strokeDasharray={animate ? "62" : undefined} strokeDashoffset={animate ? "62" : undefined} strokeLinecap="round" strokeWidth="4">
         {animate ? <animate attributeName="stroke-dashoffset" dur="2.5s" values="62;0;0" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}
@@ -424,7 +423,7 @@ export function StoryboardGridPreview({ animate }: { animate: boolean }): ReactE
         const x = 41 + (index % 3) * 47;
         const y = 18 + Math.floor(index / 3) * 39;
         return (
-          <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate({v0} {v1})"), { v0: String(x), v1: String(y) })}>
+          <g key={index} transform={`translate(${x} ${y})`}>
             <rect width="39" height="31" rx="4" fill={index === 4 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 4 ? COLOR.accent : COLOR.lineStrong} strokeWidth={index === 4 ? "2" : "1.3"} />
             <circle cx="11" cy="10" r="4" fill={index % 2 ? COLOR.cool : COLOR.accent} opacity=".72" />
             <path d="M5 25 14 17l7 5 6-6 7 9" fill="none" stroke={COLOR.fg3} strokeLinecap="round" strokeWidth="1.4" />
@@ -444,7 +443,7 @@ export function ReviewWorkflowPreview({ animate }: { animate: boolean }): ReactE
       <rect x="35" y="15" width="118" height="76" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="2" />
       <path d="M45 76 68 49l18 16 13-13 43 24" fill="none" stroke={COLOR.cool} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
       <circle cx="73" cy="40" r="8" fill={COLOR.accent} />
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(-8 14)")}>
+      <g transform={animate ? undefined : "translate(-8 14)"}>
         <path d="M165 18c10 0 18 7 18 16 0 8-7 14-14 15l-7 9v-10c-8-2-13-7-13-14 0-9 7-16 16-16Z" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="2" />
         <path d="m157 34 6 6 11-13" fill="none" stroke={COLOR.accent} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" />
         {animate ? <animateTransform attributeName="transform" type="translate" dur="2.7s" values="5 -4;-8 14;-8 14;5 -4" keyTimes="0;.42;.74;1" repeatCount="indefinite" /> : null}
@@ -464,7 +463,7 @@ export function TeamCollaborationPreview({ animate }: { animate: boolean }): Rea
         { x: 64, y: 36, color: COLOR.accent, path: "M64 36C91 23 113 33 132 53" },
         { x: 145, y: 69, color: COLOR.cool, path: "M145 69C127 80 103 74 92 57" },
       ].map((cursor, index) => (
-        <g key={cursor.color} transform={animate ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate({v0} {v1})"), { v0: String(index ? 92 : 132), v1: String(index ? 57 : 53) })}>
+        <g key={cursor.color} transform={animate ? undefined : `translate(${index ? 92 : 132} ${index ? 57 : 53})`}>
           <path d="m0 0 7 18 4-7 7 6 4-4-7-6 7-4Z" fill={cursor.color} stroke={COLOR.canvas} strokeLinejoin="round" strokeWidth="2" />
           {animate ? <animateMotion dur={index ? "3.1s" : "2.8s"} path={cursor.path} keyPoints="0;1;1" keyTimes="0;.7;1" repeatCount="indefinite" /> : null}
         </g>
@@ -479,7 +478,7 @@ export function ContinuityCheckPreview({ animate }: { animate: boolean }): React
   return (
     <>
       {[42, 119].map((x, index) => (
-        <g key={x} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate({v0} 19)"), { v0: String(x) })}>
+        <g key={x} transform={`translate(${x} 19)`}>
           <rect width="59" height="68" rx="7" fill={COLOR.canvas} stroke={index === 0 ? COLOR.lineStrong : COLOR.accent} strokeWidth="2" />
           <circle cx="29" cy="21" r="10" fill={index === 0 ? COLOR.fg3 : COLOR.accentSoft} stroke={index === 0 ? COLOR.fg2 : COLOR.accent} />
           <path d="M15 56c3-15 9-22 14-22s12 7 15 22" fill={index === 0 ? COLOR.cool : COLOR.accentSoft} stroke={index === 0 ? COLOR.cool : COLOR.accent} strokeWidth="2" />
@@ -500,9 +499,9 @@ export function VerticalPreviewPreview({ animate }: { animate: boolean }): React
     <>
       <rect x="73" y="8" width="70" height="90" rx="13" fill={COLOR.raised} stroke={COLOR.fg2} strokeWidth="2" />
       <rect x="80" y="17" width="56" height="72" rx="5" fill={COLOR.canvas} stroke={COLOR.lineStrong} />
-      <g transform={animate ? undefined : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(0 -20)")}>
+      <g transform={animate ? undefined : "translate(0 -20)"}>
         {[0, 1, 2].map((index) => (
-          <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "translate(85 {v0})"), { v0: String(24 + index * 25) })}>
+          <g key={index} transform={`translate(85 ${24 + index * 25})`}>
             <rect width="46" height="20" rx="4" fill={index === 1 ? COLOR.accentSoft : COLOR.canvas} stroke={index === 1 ? COLOR.accent : COLOR.fg3} />
             <path d="M4 16 13 8l7 6 6-7 16 9" fill="none" stroke={index === 1 ? COLOR.accent : COLOR.cool} strokeLinecap="round" strokeWidth="1.6" />
           </g>
@@ -530,7 +529,7 @@ export function WorkspaceFocusPreview({
   const canvasStartWidth = restore ? 138 : 88;
   const canvasEndWidth = restore ? 88 : 138;
   return (
-    <g data-preview-operation={restore ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "restore-panels") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "focus-canvas")}>
+    <g data-preview-operation={restore ? "restore-panels" : "focus-canvas"}>
       <rect x="27" y="13" width="162" height="79" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="2" />
       <rect x="34" y="20" width="23" height="65" rx="4" fill={COLOR.raised} stroke={COLOR.fg3} opacity={animate ? panelStartOpacity : panelEndOpacity}>
         {animate ? <animate attributeName="opacity" dur="2.7s" values={`${panelStartOpacity};${panelEndOpacity};${panelEndOpacity};${panelStartOpacity}`} keyTimes="0;.4;.74;1" repeatCount="indefinite" /> : null}
@@ -567,7 +566,7 @@ export function SettingsSlidersPreview({
     const detailStart = collapse ? ".9" : ".12";
     const detailEnd = collapse ? ".12" : ".9";
     return (
-      <g data-preview-operation={collapse ? translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "collapse-draw-settings") : translateCurrentStaticSourceText("domains.creator.components.tool.hint.preview.studio.tool.hint.preview.workspace", "en", "expand-draw-settings")}>
+      <g data-preview-operation={collapse ? "collapse-draw-settings" : "expand-draw-settings"}>
         <rect x="40" y="18" width="136" height="68" rx="8" fill={COLOR.canvas} stroke={COLOR.lineStrong} strokeWidth="2" />
         <rect x="48" y={animate ? startY : endY} width="120" height={animate ? startHeight : endHeight} rx="6" fill={COLOR.raised} stroke={COLOR.accent} strokeWidth="2">
           {animate ? <><animate attributeName="y" dur="2.7s" values={`${startY};${endY};${endY};${startY}`} keyTimes="0;.42;.74;1" repeatCount="indefinite" /><animate attributeName="height" dur="2.7s" values={`${startHeight};${endHeight};${endHeight};${startHeight}`} keyTimes="0;.42;.74;1" repeatCount="indefinite" /></> : null}

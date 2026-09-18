@@ -1,9 +1,3 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Layers, Scale, Sparkles, Wrench } from "lucide-react";
 
 import Link from "@/compat/router-link";
@@ -97,7 +91,7 @@ export function AboutSectionNav({ className }: AboutSectionNavProps) {
             <Link
               key={item.href}
               href={item.href}
-              aria-current={exact ? translateCurrentStaticSourceText("domains.legal.AboutSectionNav", "en", "page") : descendant ? translateCurrentStaticSourceText("domains.legal.AboutSectionNav", "en", "location") : undefined}
+              aria-current={exact ? "page" : descendant ? "location" : undefined}
               className={cx(
                 "group flex min-h-20 items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-all duration-200",
                 active

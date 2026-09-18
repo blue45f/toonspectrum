@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -147,7 +146,7 @@ export function AdminPlans({ uid }: { uid: string }) {
         >
           <div className="flex items-center justify-between sm:col-span-2">
             <h3 className="text-sm font-semibold text-fg">{editing.id ? t("admin.plans.edit") : t("admin.plans.new")}</h3>
-            <button type="button" aria-label={translateCurrentStaticSourceText("domains.admin.components.AdminPlans", "en", "Close")} className="text-fg-3 hover:text-fg" onClick={close}>
+            <button type="button" aria-label="Close" className="text-fg-3 hover:text-fg" onClick={close}>
               <X size={16} />
             </button>
           </div>
@@ -218,7 +217,7 @@ export function AdminPlans({ uid }: { uid: string }) {
                 </td>
                 <td className="px-4 py-3 text-fg-3">{(plan.perks ?? []).length}</td>
                 <td className="px-4 py-3">
-                  <span className={plan.isActive ? translateCurrentStaticSourceText("domains.admin.components.AdminPlans", "en", "text-good") : translateCurrentStaticSourceText("domains.admin.components.AdminPlans", "en", "text-fg-3")}>
+                  <span className={plan.isActive ? "text-good" : "text-fg-3"}>
                     {plan.isActive ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")}
                   </span>
                 </td>

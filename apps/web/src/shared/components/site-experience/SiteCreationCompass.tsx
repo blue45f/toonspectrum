@@ -1,9 +1,3 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, ChevronDown, PenTool } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";

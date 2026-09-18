@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 
 import { HEX_COLOR_PATTERN } from "./StudioVrmPoserTypes";
@@ -30,9 +26,9 @@ export function VrmColorControl({
     <div className="flex min-w-0 items-center gap-1.5">
       <input
         type="color"
-        value={HEX_COLOR_PATTERN.test(value) ? value : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmColorControl", "en", "#ffffff")}
+        value={HEX_COLOR_PATTERN.test(value) ? value : "#ffffff"}
         disabled={disabled}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmColorControl", "ko", "{v0} 색상 선택"), { v0: String(label) })}
+        aria-label={`${label} 색상 선택`}
         onChange={(event) => onChange(event.target.value)}
         className="size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-0 disabled:cursor-not-allowed"
       />
@@ -40,7 +36,7 @@ export function VrmColorControl({
         type="text"
         value={draft}
         disabled={disabled}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmColorControl", "ko", "{v0} HEX 색상"), { v0: String(label) })}
+        aria-label={`${label} HEX 색상`}
         aria-invalid={!HEX_COLOR_PATTERN.test(draft)}
         autoCapitalize="none"
         autoCorrect="off"

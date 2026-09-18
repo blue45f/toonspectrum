@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
@@ -192,7 +188,7 @@ export function MarketPublishPage() {
         className="inline-flex min-h-11 items-center gap-1.5 text-xs text-fg-2 hover:text-fg"
       >
         <ArrowLeft className="size-3.5" />
-        <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "내 등록 에셋 목록으로")}</span>
+        <span>내 등록 에셋 목록으로</span>
       </Link>
 
       {publishedRecord ? (
@@ -201,19 +197,20 @@ export function MarketPublishPage() {
           <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-good/20 text-good">
             <CheckCircle2 className="size-10" />
           </div>
-          <h2 className="text-xl font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "에셋이 성공적으로 등록되었습니다!")}</h2>
+          <h2 className="text-xl font-bold text-fg">에셋이 성공적으로 등록되었습니다!</h2>
           <p className="text-xs text-fg-2 leading-relaxed">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "방금 등록하신 에셋이 마켓 카탈로그에 반영되었으며, 이제 모든 작가들이 검색 및 스튜디오에서 활용할 수 있습니다.")}</p>
+            방금 등록하신 에셋이 마켓 카탈로그에 반영되었으며, 이제 모든 작가들이 검색 및 스튜디오에서 활용할 수 있습니다.
+          </p>
 
           <div className="rounded-xl border border-line bg-panel p-4 text-left text-xs space-y-1">
             <p className="font-bold text-fg">{publishedRecord.name}</p>
-            <p className="text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "종류: ")}{marketKindMeta(publishedRecord.kind).label} {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "· 버전: v")}{publishedRecord.resourceVersion}</p>
-            <p className="text-good font-medium">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "사용권: ")}{marketLicenseMeta(publishedRecord.license).label}</p>
+            <p className="text-fg-3">종류: {marketKindMeta(publishedRecord.kind).label} · 버전: v{publishedRecord.resourceVersion}</p>
+            <p className="text-good font-medium">사용권: {marketLicenseMeta(publishedRecord.license).label}</p>
           </div>
 
           <div className="flex flex-col gap-2.5 pt-2">
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "/market/resource/{v0}"), { v0: String(publishedRecord.id) })}
+              href={`/market/resource/${publishedRecord.id}`}
               className={buttonClass({
                 variant: "solid",
                 size: "md",
@@ -221,10 +218,10 @@ export function MarketPublishPage() {
               })}
             >
               <Sparkles className="size-4" />
-              <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "등록된 에셋 상세 페이지 보기")}</span>
+              <span>등록된 에셋 상세 페이지 보기</span>
             </Link>
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "/studio?installMarketResource={v0}&assetMarket=community"), { v0: String(publishedRecord.id) })}
+              href={`/studio?installMarketResource=${publishedRecord.id}&assetMarket=community`}
               className={buttonClass({
                 variant: "outline",
                 size: "md",
@@ -232,7 +229,7 @@ export function MarketPublishPage() {
               })}
             >
               <Palette className="size-4" />
-              <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "스튜디오에서 바로 열기 및 테스트")}</span>
+              <span>스튜디오에서 바로 열기 및 테스트</span>
             </Link>
             <Link
               href="/market/manage"
@@ -241,7 +238,8 @@ export function MarketPublishPage() {
                 size: "sm",
               })}
             >
-              {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "내 등록 에셋 관리로 이동")}</Link>
+              내 등록 에셋 관리로 이동
+            </Link>
           </div>
         </div>
       ) : (
@@ -252,10 +250,11 @@ export function MarketPublishPage() {
             <div className="min-w-0 rounded-xl border border-line bg-card p-6 shadow-sm">
               <div className="flex items-center gap-2">
                 <PackagePlus className="size-5 text-accent" />
-                <h1 className="text-xl font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "새 창작 에셋 등록")}</h1>
+                <h1 className="text-xl font-bold text-fg">새 창작 에셋 등록</h1>
               </div>
               <p className="mt-1 text-xs text-fg-3">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "스튜디오에서 제작한 브러시, 3D 소품, 팔레트, 연출 템플릿을 등록하세요.")}</p>
+                스튜디오에서 제작한 브러시, 3D 소품, 팔레트, 연출 템플릿을 등록하세요.
+              </p>
 
               {/* Step indicator */}
               <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line/60 pt-4 text-xs font-semibold">
@@ -267,7 +266,7 @@ export function MarketPublishPage() {
                 >
                   1
                 </span>
-                <span className={step === 1 ? translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "text-fg") : translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "text-fg-3")}>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "에셋 종류")}</span>
+                <span className={step === 1 ? "text-fg" : "text-fg-3"}>에셋 종류</span>
                 <ArrowRight className="size-3 text-line-strong" />
 
                 <span
@@ -278,7 +277,7 @@ export function MarketPublishPage() {
                 >
                   2
                 </span>
-                <span className={step === 2 ? translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "text-fg") : translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "text-fg-3")}>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "기본 정보 & 설정")}</span>
+                <span className={step === 2 ? "text-fg" : "text-fg-3"}>기본 정보 & 설정</span>
                 <ArrowRight className="size-3 text-line-strong" />
 
                 <span
@@ -289,14 +288,14 @@ export function MarketPublishPage() {
                 >
                   3
                 </span>
-                <span className={step === 3 ? translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "text-fg") : translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "text-fg-3")}>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "라이선스 & 배포")}</span>
+                <span className={step === 3 ? "text-fg" : "text-fg-3"}>라이선스 & 배포</span>
               </div>
             </div>
 
             <form onSubmit={handleSubmit} className="min-w-0 space-y-6">
               {step === 1 && (
                 <div className="min-w-0 rounded-xl border border-line bg-card p-6 space-y-4">
-                  <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "어떤 종류의 창작 리소스인가요?")}</h2>
+                  <h2 className="text-sm font-bold text-fg">어떤 종류의 창작 리소스인가요?</h2>
                   <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {MARKET_KINDS.map((k) => {
                       const Icon = k.icon;
@@ -331,7 +330,7 @@ export function MarketPublishPage() {
                       onClick={() => setStep(2)}
                       className={buttonClass({ variant: "solid", size: "md", className: "gap-1.5" })}
                     >
-                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "다음: 기본 정보 입력")}</span>
+                      <span>다음: 기본 정보 입력</span>
                       <ArrowRight className="size-4" />
                     </button>
                   </div>
@@ -340,16 +339,16 @@ export function MarketPublishPage() {
 
               {step === 2 && (
                 <div className="min-w-0 rounded-xl border border-line bg-card p-6 space-y-5">
-                  <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "에셋 기본 정보 & 상세 스펙")}</h2>
+                  <h2 className="text-sm font-bold text-fg">에셋 기본 정보 & 상세 스펙</h2>
 
                   <div>
-                    <label htmlFor="publish-asset-name" className="block text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "에셋명 *")}</label>
+                    <label htmlFor="publish-asset-name" className="block text-xs font-semibold text-fg">에셋명 *</label>
                     <input
                       id="publish-asset-name"
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "예: 초정밀 G펜 선화 브러시 세트")}
+                      placeholder="예: 초정밀 G펜 선화 브러시 세트"
                       maxLength={80}
                       required
                       className="mt-1 h-9 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg focus:border-accent focus:outline-none"
@@ -357,13 +356,13 @@ export function MarketPublishPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="publish-asset-desc" className="block text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "소개 및 활용 팁")}</label>
+                    <label htmlFor="publish-asset-desc" className="block text-xs font-semibold text-fg">소개 및 활용 팁</label>
                     <textarea
                       id="publish-asset-desc"
                       rows={4}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "에셋의 특징, 웹툰 컷 작업 시 추천 설정(손떨림 보정, 레이어 모드 등)을 상세히 적어주세요.")}
+                      placeholder="에셋의 특징, 웹툰 컷 작업 시 추천 설정(손떨림 보정, 레이어 모드 등)을 상세히 적어주세요."
                       maxLength={1000}
                       className="mt-1 w-full rounded-xl border border-line bg-panel p-3 text-xs leading-relaxed text-fg focus:border-accent focus:outline-none"
                     />
@@ -371,13 +370,14 @@ export function MarketPublishPage() {
 
                   <div>
                     <label htmlFor="publish-asset-tags" className="block text-xs font-semibold text-fg">
-                      {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "검색 태그 (쉼표로 구분, 최대 8개)")}</label>
+                      검색 태그 (쉼표로 구분, 최대 8개)
+                    </label>
                     <input
                       id="publish-asset-tags"
                       type="text"
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
-                      placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "선화, G펜, 액션, 로판, 3D, 소체")}
+                      placeholder="선화, G펜, 액션, 로판, 3D, 소체"
                       className="mt-1 h-9 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg focus:border-accent focus:outline-none"
                     />
                   </div>
@@ -386,13 +386,13 @@ export function MarketPublishPage() {
                   <div className="min-w-0 rounded-xl border border-line/70 bg-panel/40 p-4 space-y-3">
                     <p className="text-xs font-bold text-fg flex items-center gap-1.5">
                       <Layers className="size-3.5 text-accent" />
-                      <span>{marketKindMeta(kind).label} {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "세부 파라미터 프리셋")}</span>
+                      <span>{marketKindMeta(kind).label} 세부 파라미터 프리셋</span>
                     </p>
 
                     {kind === "brush" ? (
                       <div className="grid min-w-0 gap-3 sm:grid-cols-3">
                         <div className="min-w-0">
-                          <label htmlFor="publish-brush-size" className="block text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "기본 크기 (px)")}</label>
+                          <label htmlFor="publish-brush-size" className="block text-[0.7rem] text-fg-3">기본 크기 (px)</label>
                           <input
                             id="publish-brush-size"
                             type="number"
@@ -404,7 +404,7 @@ export function MarketPublishPage() {
                           />
                         </div>
                         <div className="min-w-0">
-                          <label htmlFor="publish-brush-opacity" className="block text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "불투명도 (%)")}</label>
+                          <label htmlFor="publish-brush-opacity" className="block text-[0.7rem] text-fg-3">불투명도 (%)</label>
                           <input
                             id="publish-brush-opacity"
                             type="number"
@@ -416,22 +416,22 @@ export function MarketPublishPage() {
                           />
                         </div>
                         <div className="min-w-0">
-                          <label htmlFor="publish-brush-blending" className="block text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "블렌딩 모드")}</label>
+                          <label htmlFor="publish-brush-blending" className="block text-[0.7rem] text-fg-3">블렌딩 모드</label>
                           <select
                             id="publish-brush-blending"
                             value={brushBlending}
                             onChange={(e) => setBrushBlending(e.target.value)}
                             className="mt-1 h-8 w-full rounded-lg border border-line bg-card px-2 text-xs text-fg"
                           >
-                            <option value="normal">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "표준 (Normal)")}</option>
-                            <option value="multiply">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "곱하기 (Multiply)")}</option>
-                            <option value="overlay">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "오버레이 (Overlay)")}</option>
+                            <option value="normal">표준 (Normal)</option>
+                            <option value="multiply">곱하기 (Multiply)</option>
+                            <option value="overlay">오버레이 (Overlay)</option>
                           </select>
                         </div>
                       </div>
                     ) : kind === "palette" ? (
                       <div className="min-w-0">
-                        <label htmlFor="publish-palette-hexes" className="block text-[0.7rem] text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "HEX 색상 목록 (쉼표 구분)")}</label>
+                        <label htmlFor="publish-palette-hexes" className="block text-[0.7rem] text-fg-3">HEX 색상 목록 (쉼표 구분)</label>
                         <input
                           id="publish-palette-hexes"
                           type="text"
@@ -451,7 +451,8 @@ export function MarketPublishPage() {
                       </div>
                     ) : (
                       <p className="text-xs text-fg-3">
-                        {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "Studio 캔버스 규격과 100% 호환되는 최적화 파라미터가 자동 적용됩니다.")}</p>
+                        Studio 캔버스 규격과 100% 호환되는 최적화 파라미터가 자동 적용됩니다.
+                      </p>
                     )}
                   </div>
 
@@ -461,7 +462,8 @@ export function MarketPublishPage() {
                       onClick={() => setStep(1)}
                       className={buttonClass({ variant: "ghost", size: "sm" })}
                     >
-                      {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "이전 단계")}</button>
+                      이전 단계
+                    </button>
                     <button
                       type="button"
                       onClick={() => setStep(3)}
@@ -472,7 +474,7 @@ export function MarketPublishPage() {
                         className: "gap-1.5 disabled:opacity-40",
                       })}
                     >
-                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "다음: 라이선스 & 배포 확인")}</span>
+                      <span>다음: 라이선스 & 배포 확인</span>
                       <ArrowRight className="size-4" />
                     </button>
                   </div>
@@ -481,10 +483,10 @@ export function MarketPublishPage() {
 
               {step === 3 && (
                 <div className="min-w-0 rounded-xl border border-line bg-card p-6 space-y-5">
-                  <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "사용권 라이선스 & 배포 확인")}</h2>
+                  <h2 className="text-sm font-bold text-fg">사용권 라이선스 & 배포 확인</h2>
 
                   <div>
-                    <label htmlFor="publish-version" className="block text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "배포 버전 (SemVer)")}</label>
+                    <label htmlFor="publish-version" className="block text-xs font-semibold text-fg">배포 버전 (SemVer)</label>
                     <input
                       id="publish-version"
                       type="text"
@@ -496,19 +498,19 @@ export function MarketPublishPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="publish-release-notes" className="block text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "초기 릴리즈 노트")}</label>
+                    <label htmlFor="publish-release-notes" className="block text-xs font-semibold text-fg">초기 릴리즈 노트</label>
                     <input
                       id="publish-release-notes"
                       type="text"
                       value={releaseNotes}
                       onChange={(e) => setReleaseNotes(e.target.value)}
-                      placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "예: 최초 버전 공개 및 스튜디오 호환성 완료")}
+                      placeholder="예: 최초 버전 공개 및 스튜디오 호환성 완료"
                       className="mt-1 h-8 w-full rounded-lg border border-line bg-panel px-2.5 text-xs text-fg"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="publish-license" className="block text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "사용권 라이선스 *")}</label>
+                    <label htmlFor="publish-license" className="block text-xs font-semibold text-fg">사용권 라이선스 *</label>
                     <select
                       id="publish-license"
                       value={license}
@@ -528,10 +530,11 @@ export function MarketPublishPage() {
                   <div className="rounded-xl border border-good/40 bg-good/10 p-3.5 space-y-2">
                     <p className="text-xs font-bold text-good flex items-center gap-1.5">
                       <ShieldCheck className="size-4" />
-                      <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "창작자 안심 배포 보증")}</span>
+                      <span>창작자 안심 배포 보증</span>
                     </p>
                     <p className="text-[0.68rem] text-fg-2 leading-relaxed">
-                      {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "등록하신 에셋은 AI 모델 무단 크롤링이 차단되며, 상업용 웹툰 연재 작가들에게 안전하게 제공됩니다.")}</p>
+                      등록하신 에셋은 AI 모델 무단 크롤링이 차단되며, 상업용 웹툰 연재 작가들에게 안전하게 제공됩니다.
+                    </p>
                   </div>
 
                   <label className="flex items-center gap-2 text-xs text-fg-2 cursor-pointer select-none">
@@ -541,7 +544,7 @@ export function MarketPublishPage() {
                       onChange={(e) => setContainsAi(e.target.checked)}
                       className="rounded border-line text-accent"
                     />
-                    <span>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "제작 과정에 생성형 AI 보조 도구를 일부 사용했습니다.")}</span>
+                    <span>제작 과정에 생성형 AI 보조 도구를 일부 사용했습니다.</span>
                   </label>
 
                   <label className="flex items-start gap-2 text-xs text-fg-2 cursor-pointer select-none">
@@ -553,7 +556,8 @@ export function MarketPublishPage() {
                       className="mt-0.5 rounded border-line text-accent"
                     />
                     <span className="text-[0.72rem] leading-relaxed">
-                      {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "본인이 직접 제작하였거나 적법한 배포 권리를 보유하고 있음을 확인합니다.")}</span>
+                      본인이 직접 제작하였거나 적법한 배포 권리를 보유하고 있음을 확인합니다.
+                    </span>
                   </label>
 
                   {publishError ? (
@@ -571,7 +575,8 @@ export function MarketPublishPage() {
                       onClick={() => setStep(2)}
                       className={buttonClass({ variant: "ghost", size: "sm" })}
                     >
-                      {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "이전 단계")}</button>
+                      이전 단계
+                    </button>
                     <button
                       type="submit"
                       disabled={submitting || !rightsConfirmed}
@@ -583,7 +588,7 @@ export function MarketPublishPage() {
                       })}
                     >
                       <PackageCheck className="size-4" />
-                      <span>{submitting ? translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "등록 중...") : translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "에셋 마켓에 배포하기")}</span>
+                      <span>{submitting ? "등록 중..." : "에셋 마켓에 배포하기"}</span>
                     </button>
                   </div>
                 </div>
@@ -594,19 +599,20 @@ export function MarketPublishPage() {
           {/* Right Live Preview Column */}
           <div className="min-w-0 space-y-4">
             <div className="sticky top-[var(--site-header-sticky-offset,5rem)] min-w-0 overflow-hidden rounded-xl border border-line bg-card p-4">
-              <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "en", "Live Preview")}</p>
-              <h3 className="mt-1 text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "실시간 마켓 카드 미리보기")}</h3>
+              <p className="eyebrow text-accent">Live Preview</p>
+              <h3 className="mt-1 text-sm font-bold text-fg">실시간 마켓 카드 미리보기</h3>
               <p className="mt-0.5 text-xs text-fg-3">
-                {translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "마켓 둘러보기 및 검색 화면에 표시되는 형태입니다.")}</p>
+                마켓 둘러보기 및 검색 화면에 표시되는 형태입니다.
+              </p>
 
               <div className="mt-4 min-w-0 pointer-events-none">
                 <MarketResourceCard record={livePreviewRecord} className="min-w-0" />
               </div>
 
               <div className="mt-4 min-w-0 rounded-lg bg-panel p-3 text-xs text-fg-3 space-y-1">
-                <p className="break-words">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "· 등록자: ")}{publisherName}</p>
-                <p>{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "· 종류: ")}{marketKindMeta(kind).label}</p>
-                <p className="break-words">{translateCurrentStaticSourceText("domains.market.pages.MarketPublishPage", "ko", "· 라이선스: ")}{marketLicenseMeta(license).label}</p>
+                <p className="break-words">· 등록자: {publisherName}</p>
+                <p>· 종류: {marketKindMeta(kind).label}</p>
+                <p className="break-words">· 라이선스: {marketLicenseMeta(license).label}</p>
               </div>
             </div>
           </div>

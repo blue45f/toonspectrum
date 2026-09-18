@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   BadgeCheck,
   CircleAlert,
@@ -247,7 +242,8 @@ export function StudioAssetGovernancePanel({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <ShieldCheck size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetGovernancePanel", "en", "ASSET SAFETY")}</p>
+            <ShieldCheck size={14} aria-hidden="true" /> ASSET SAFETY
+          </p>
           <h2 id="asset-governance-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("어디에 사용할지만 알려 주세요", "Tell us where the asset will be used")}
           </h2>

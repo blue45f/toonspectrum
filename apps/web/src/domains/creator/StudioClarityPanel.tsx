@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Clarity Panel
  * 선택된 이미지의 선명도·안개 제거(Clarity/Dehaze) 보정 인스펙터 — 원클릭 선명도 프리셋 +
@@ -45,16 +44,17 @@ export function StudioClarityPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioClarityPanel", "ko", "선명도/디테일 (Clarity)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">선명도/디테일 (Clarity)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioClarityPanel", "ko", "선명도 보정을 제거하고 원본 디테일로 되돌립니다.")}
+          title="선명도 보정을 제거하고 원본 디테일로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioClarityPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 선명도 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}

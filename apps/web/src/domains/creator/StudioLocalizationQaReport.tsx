@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 현지화 QA 리포트 — 대사 번역 패널 안에서 열리는 회차 단위 품질 보고서.
 //
 // 계산은 하나도 하지 않는다. `studio-localization-qa.runStudioLocalizationQa()`가 낸
@@ -102,7 +98,7 @@ export function StudioLocalizationQaReport({
               {score.qualityScore === null ? "—" : score.qualityScore}
             </span>
             <span className="text-[0.62rem] font-medium text-fg-4">
-              {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "/ 100 · 합격선 ")}{score.passThreshold}
+              / 100 · 합격선 {score.passThreshold}
             </span>
           </p>
           <span
@@ -122,28 +118,28 @@ export function StudioLocalizationQaReport({
         )}
         <dl className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[0.62rem] text-fg-3">
           <div className="flex justify-between gap-1">
-            <dt>{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "검사한 대사")}</dt>
-            <dd className="tabular-nums text-fg-2">{report.checkedCueCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개")}</dd>
+            <dt>검사한 대사</dt>
+            <dd className="tabular-nums text-fg-2">{report.checkedCueCount}개</dd>
           </div>
           <div className="flex justify-between gap-1">
-            <dt>{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "넘침 판정")}</dt>
-            <dd className="tabular-nums text-fg-2">{report.overflowCheckedCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개")}</dd>
+            <dt>넘침 판정</dt>
+            <dd className="tabular-nums text-fg-2">{report.overflowCheckedCount}개</dd>
           </div>
           <div className="flex justify-between gap-1">
-            <dt>{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "사람 검토 필요")}</dt>
-            <dd className="tabular-nums text-fg-2">{report.overflow.humanReviewCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개")}</dd>
+            <dt>사람 검토 필요</dt>
+            <dd className="tabular-nums text-fg-2">{report.overflow.humanReviewCount}개</dd>
           </div>
           <div className="flex justify-between gap-1">
-            <dt>{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "실행한 문체 규칙")}</dt>
-            <dd className="tabular-nums text-fg-2">{report.style.checkedRuleCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개")}</dd>
+            <dt>실행한 문체 규칙</dt>
+            <dd className="tabular-nums text-fg-2">{report.style.checkedRuleCount}개</dd>
           </div>
           <div className="flex justify-between gap-1">
-            <dt>{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "대비 판정")}</dt>
-            <dd className="tabular-nums text-fg-2">{report.legibilityCheckedCueCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개")}</dd>
+            <dt>대비 판정</dt>
+            <dd className="tabular-nums text-fg-2">{report.legibilityCheckedCueCount}개</dd>
           </div>
           <div className="flex justify-between gap-1">
-            <dt>{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "대비 미달")}</dt>
-            <dd className="tabular-nums text-fg-2">{report.legibilityFailCueCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개")}</dd>
+            <dt>대비 미달</dt>
+            <dd className="tabular-nums text-fg-2">{report.legibilityFailCueCount}개</dd>
           </div>
         </dl>
         {/*
@@ -152,20 +148,28 @@ export function StudioLocalizationQaReport({
         */}
         {report.legibilityFailCueCount > 0 && (
           <p className="mt-1.5 rounded-lg border border-warn/35 bg-warn/10 px-1.5 py-1 text-[0.58rem] leading-relaxed text-warn">
-            {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "대사 ")}{report.legibilityFailCueCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개가 말풍선 바탕과의 명도 대비(WCAG)를 밑돕니다. 글자색이나 말풍선 색을 조정하세요. 이 항목은 위 번역 품질 점수에는 포함되지 않습니다.")}</p>
+            대사 {report.legibilityFailCueCount}개가 말풍선 바탕과의 명도 대비(WCAG)를 밑돕니다.
+            글자색이나 말풍선 색을 조정하세요. 이 항목은 위 번역 품질 점수에는 포함되지 않습니다.
+          </p>
         )}
         {report.legibilityCheckedCueCount === 0 && report.checkedCueCount > 0 && (
           <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-4">
-            {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "명도 대비를 판정한 대사가 없습니다(반투명·그라데이션 채우기이거나 색을 읽지 못했습니다). 대비 미달 0개를 \"통과\"로 읽지 마세요.")}</p>
+            명도 대비를 판정한 대사가 없습니다(반투명·그라데이션 채우기이거나 색을 읽지
+            못했습니다). 대비 미달 0개를 "통과"로 읽지 마세요.
+          </p>
         )}
         {/* 점수의 한계를 화면이 직접 말한다 — 임계값 99는 단어 분모로만 교정돼 있다. */}
         {!score.denominator.thresholdCalibrated && (
           <p className="mt-1.5 rounded-lg border border-line bg-panel px-1.5 py-1 text-[0.58rem] leading-relaxed text-fg-4">
-            {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "분모가 글자 수(")}{score.denominator.count}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "자)입니다. 합격선 ")}{score.passThreshold}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "은 단어 분모 기준으로만 교정된 값이라, 여기서는 상대 비교용으로만 읽으세요.")}</p>
+            분모가 글자 수({score.denominator.count}자)입니다. 합격선 {score.passThreshold}은
+            단어 분모 기준으로만 교정된 값이라, 여기서는 상대 비교용으로만 읽으세요.
+          </p>
         )}
         {report.style.skippedUnitCount > 0 && (
           <p className="mt-1.5 text-[0.58rem] leading-relaxed text-fg-4">
-            {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "문체 규칙표는 영문 대사 전용입니다 — ")}{report.style.skippedUnitCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "개 대사는 문체 검사를 건너뛰었어요(넘침은 그대로 검사했습니다).")}</p>
+            문체 규칙표는 영문 대사 전용입니다 — {report.style.skippedUnitCount}개 대사는 문체
+            검사를 건너뛰었어요(넘침은 그대로 검사했습니다).
+          </p>
         )}
       </div>
 
@@ -175,7 +179,8 @@ export function StudioLocalizationQaReport({
           className="flex items-center gap-1.5 rounded-lg border border-warn/35 bg-warn/10 px-2 py-1.5 text-[0.62rem] leading-relaxed text-warn"
         >
           <AlertTriangle size={11} aria-hidden className="shrink-0" />
-          {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "검사 뒤 대사가 바뀌었어요. 다시 검사해 주세요.")}</p>
+          검사 뒤 대사가 바뀌었어요. 다시 검사해 주세요.
+        </p>
       )}
 
       <button
@@ -187,23 +192,24 @@ export function StudioLocalizationQaReport({
           STUDIO_TOUCH_TARGET
         )}
       >
-        {translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "다시 검사")}</button>
+        다시 검사
+      </button>
 
       {/* ── 차원별 발견 ── */}
       {sections.length === 0 ? (
         <StudioEmptyState
           icon={<CheckCircle2 size={20} aria-hidden />}
-          title={translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "지적할 곳이 없어요")}
-          description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "{v0}개 대사에서 문체·넘침 문제를 찾지 못했습니다."), { v0: String(report.checkedCueCount) })}
+          title="지적할 곳이 없어요"
+          description={`${report.checkedCueCount}개 대사에서 문체·넘침 문제를 찾지 못했습니다.`}
         />
       ) : (
         <div className="space-y-2.5">
           {sections.map((section) => (
-            <section key={section.dimension} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "{v0} 발견"), { v0: String(section.label) })}>
+            <section key={section.dimension} aria-label={`${section.label} 발견`}>
               <p className="mb-1 flex items-baseline justify-between gap-2">
                 <span className="text-[0.66rem] font-bold text-fg">{section.label}</span>
                 <span className="text-[0.58rem] tabular-nums text-fg-4">
-                  {section.errorCount}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "건 · 감점 ")}{section.penalty}
+                  {section.errorCount}건 · 감점 {section.penalty}
                 </span>
               </p>
               <ul className="space-y-1.5">
@@ -222,7 +228,7 @@ export function StudioLocalizationQaReport({
                           className="mt-1 truncate text-[0.6rem] text-fg-4"
                           title={cue.text}
                         >
-                          {cue.pageIndex + 1}{translateCurrentStaticSourceText("domains.creator.StudioLocalizationQaReport", "ko", "페이지 · ")}{cue.text}
+                          {cue.pageIndex + 1}페이지 · {cue.text}
                         </p>
                       )}
                       {cue && onSelectCue && (

@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowRight,
   BookOpen,
@@ -183,7 +178,7 @@ export function EngineeringReferencesPage() {
       <section className="mt-9" aria-labelledby="reference-products-title">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringReferencesPage", "en", "USED · EVALUATED · INSPIRED · ALTERNATIVE")}</p>
+            <p className="eyebrow text-accent">USED · EVALUATED · INSPIRED · ALTERNATIVE</p>
             <h2 id="reference-products-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
               {bi("기술·제품·자료 참고 지도", "Technology, product and source-reference map")}
             </h2>
@@ -266,7 +261,7 @@ export function EngineeringReferencesPage() {
       <section className="py-14 sm:py-20" aria-labelledby="troubleshooting-title">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="eyebrow text-danger">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringReferencesPage", "en", "FAILURE → CAUSE → FIX → REGRESSION")}</p>
+            <p className="eyebrow text-danger">FAILURE → CAUSE → FIX → REGRESSION</p>
             <h2 id="troubleshooting-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
               {bi("재현 가능한 트러블슈팅 아카이브", "Reproducible troubleshooting archive")}
             </h2>

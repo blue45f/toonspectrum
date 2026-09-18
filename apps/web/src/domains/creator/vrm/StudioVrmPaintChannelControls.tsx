@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   STUDIO_VRM_TEXTURE_PAINT_CHANNELS,
   canonicalizeStudioVrmTexturePaintChannel,
   isStudioVrmTexturePaintScalarChannel,
@@ -25,22 +21,22 @@ export function StudioVrmPaintChannelControls({ channel, supportedChannels, colo
   const value = /^#[0-9a-f]{6}$/iu.test(color) ? parseInt(color.slice(3, 5), 16) : 128;
   return <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
     <label className="flex min-w-0 items-center gap-2 text-xs font-semibold">
-      <span>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPaintChannelControls", "ko", "페인트 채널")}</span>
-      <select aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPaintChannelControls", "ko", "표면 페인트 채널")} value={channel} disabled={disabled}
+      <span>페인트 채널</span>
+      <select aria-label="표면 페인트 채널" value={channel} disabled={disabled}
         className="min-h-11 min-w-0 rounded-lg border border-line bg-card px-2 text-fg focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
         onChange={(event) => {
           const next = canonicalizeStudioVrmTexturePaintChannel(event.currentTarget.value);
           if (next && supportedChannels.includes(next)) onChannelChange(next);
         }}>
         {STUDIO_VRM_TEXTURE_PAINT_CHANNELS.map((entry) => <option key={entry} value={entry} disabled={!supportedChannels.includes(entry)}>
-          {LABELS[entry]}{supportedChannels.includes(entry) ? "" : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPaintChannelControls", "ko", " (재질 미지원)")}
+          {LABELS[entry]}{supportedChannels.includes(entry) ? "" : " (재질 미지원)"}
         </option>)}
       </select>
     </label>
     {scalar ? <label className="flex min-w-0 items-center gap-2 text-xs font-semibold">
-      <span>{LABELS[channel]} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPaintChannelControls", "ko", "값")}</span>
+      <span>{LABELS[channel]} 값</span>
       <input type="range" min={0} max={255} step={1} value={value} disabled={disabled}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPaintChannelControls", "ko", "표면 {v0} 값"), { v0: String(LABELS[channel]) })} aria-valuetext={`${Math.round(value / 255 * 100)}%`}
+        aria-label={`표면 ${LABELS[channel]} 값`} aria-valuetext={`${Math.round(value / 255 * 100)}%`}
         className="h-11 w-24 min-w-0 accent-accent disabled:opacity-50"
         onChange={(event) => {
           const hex = Number(event.currentTarget.value).toString(16).padStart(2, "0");

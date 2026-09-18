@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 // 캐릭터 셰이퍼 랜딩(/shaper) 전용 인라인 SVG 일러스트.
@@ -63,7 +59,7 @@ function SlotChip({ label, x, y, to, active = false }: SlotChipSpec) {
         strokeDasharray={active ? undefined : "2 4"}
         opacity={active ? 0.9 : 0.8}
       />
-      <g transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingArt", "en", "translate({v0} {v1})"), { v0: String(x), v1: String(y) })}>
+      <g transform={`translate(${x} ${y})`}>
         <rect
           width={CHIP_W}
           height={CHIP_H}
@@ -104,7 +100,7 @@ export function ShaperHeroArt({ className }: ArtProps) {
     <svg
       viewBox="0 0 360 420"
       role="img"
-      aria-label={translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingArt", "ko", "얼굴형·눈·표정·포즈·헤어·손 포즈·상의·신발 슬롯 카드에 둘러싸인 3D 캐릭터")}
+      aria-label="얼굴형·눈·표정·포즈·헤어·손 포즈·상의·신발 슬롯 카드에 둘러싸인 3D 캐릭터"
       fill="none"
       className={cn("font-sans", className)}
     >
@@ -194,7 +190,7 @@ export function PresetSlotsArt({ className }: ArtProps) {
         />
       ))}
       {PRESET_CARDS.map((card) => (
-        <g key={`${card.x}-${card.y}`} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingArt", "en", "translate({v0} {v1})"), { v0: String(card.x), v1: String(card.y) })}>
+        <g key={`${card.x}-${card.y}`} transform={`translate(${card.x} ${card.y})`}>
           <rect
             width="46"
             height="46"
@@ -257,7 +253,8 @@ export function SurfacePaintArt({ className }: ArtProps) {
       {/* UV 아틀라스 미니맵 — 같은 획이 텍스처에도 남는다 */}
       <g transform="translate(146 66)">
         <text x="23" y="-4" textAnchor="middle" fontSize="7" fontWeight="600" fill={FG_3}>
-          {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingArt", "en", "UV")}</text>
+          UV
+        </text>
         <rect width="46" height="46" rx="6" fill={PANEL} stroke={LINE} />
         <path d="M0 15.5 H46 M0 31 H46 M15.5 0 V46 M31 0 V46" stroke={LINE} />
         <path d="M8 30 C16 38 30 38 40 28" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />
@@ -324,7 +321,8 @@ export function AiAssistArt({ className }: ArtProps) {
         <rect width="66" height="12" rx="6" fill={PANEL} stroke={LINE} />
         <circle cx="8" cy="6" r="2.5" fill={ACCENT} />
         <text x="14" y="8.6" fontSize="6.5" fontWeight="600" fill={FG_2}>
-          {translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingArt", "ko", "기기 내 처리")}</text>
+          기기 내 처리
+        </text>
       </g>
     </svg>
   );
@@ -363,7 +361,7 @@ export function OutputLayersArt({ className }: ArtProps) {
         </text>
       </g>
       {PSD_LAYER_LABELS.map((label, index) => (
-        <g key={label} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CharacterShaperLandingArt", "en", "translate(96 {v0})"), { v0: String(16 + index * 18) })}>
+        <g key={label} transform={`translate(96 ${16 + index * 18})`}>
           <path
             d="M10 0 H50 L40 12 H0 Z"
             fill={index === PSD_LAYER_LABELS.length - 1 ? ACCENT_SOFT : CARD}

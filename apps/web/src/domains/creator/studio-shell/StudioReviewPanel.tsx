@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   CheckCircle2,
   MessageSquarePlus,
@@ -298,7 +293,8 @@ export function StudioReviewPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            <ShieldCheck size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioReviewPanel", "en", "REVIEW")}</p>
+            <ShieldCheck size={14} aria-hidden="true" /> REVIEW
+          </p>
           <h2 id="review-workspace-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("댓글·수정·승인을 한 흐름으로", "Comments, changes and approval in one flow")}
           </h2>

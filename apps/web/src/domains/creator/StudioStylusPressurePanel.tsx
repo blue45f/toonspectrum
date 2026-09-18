@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   useMemo,
   useRef,
   useState,
@@ -500,19 +496,22 @@ export function StudioStylusPressurePanel({
           touch ? "min-h-11" : "min-h-9",
         )}
       >
-        <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 프로필 · 입력 진단")}</span>
+        <span>장치 필압 프로필 · 입력 진단</span>
         <span className="text-[0.54rem] font-semibold text-fg-3 group-open:hidden">
-          {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "다중 제어점 · 데드존 · 포화점")}</span>
+          다중 제어점 · 데드존 · 포화점
+        </span>
         <span className="hidden text-[0.54rem] font-semibold text-fg-3 group-open:inline">
-          {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "접기")}</span>
+          접기
+        </span>
       </summary>
 
       <div className="mt-2 border-t border-line/45 pt-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 전처리")}</p>
+            <p className="text-[0.62rem] font-bold text-fg-2">장치 전처리</p>
             <p className="mt-0.5 text-[0.54rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "브러시별 감마 전에 적용하며, 작품에는 보정된 샘플만 기록합니다.")}</p>
+              브러시별 감마 전에 적용하며, 작품에는 보정된 샘플만 기록합니다.
+            </p>
           </div>
           <button
             type="button"
@@ -527,11 +526,11 @@ export function StudioStylusPressurePanel({
                 : "border-line/70 bg-raised text-fg-3",
             )}
           >
-            {profile.enabled ? translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "사용 중") : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "사용 안 함")}
+            {profile.enabled ? "사용 중" : "사용 안 함"}
           </button>
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 프리셋")}>
+        <div className="mt-2 grid grid-cols-2 gap-1.5" aria-label="장치 필압 프리셋">
           {PRESETS.map((preset) => (
             <button
               key={preset.id}
@@ -554,7 +553,7 @@ export function StudioStylusPressurePanel({
 
         <svg
           role="group"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 다중 제어점 곡선")}
+          aria-label="장치 필압 다중 제어점 곡선"
           viewBox={`0 0 ${CURVE_W} ${CURVE_H}`}
           data-studio-stylus-pressure-curve="true"
           className={cn(
@@ -623,24 +622,24 @@ export function StudioStylusPressurePanel({
             return (
               <g
                 key={`${index}-${point.input.toFixed(4)}-${point.output.toFixed(4)}`}
-                role={endpoint ? undefined : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "slider")}
+                role={endpoint ? undefined : "slider"}
                 tabIndex={endpoint ? -1 : 0}
-                aria-label={endpoint ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 제어점 {v0}"), { v0: String(index) })}
+                aria-label={endpoint ? undefined : `장치 필압 제어점 ${index}`}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={Math.round(point.output * 100)}
-                aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "입력 {v0}, 출력 {v1}"), { v0: String(pressurePercent(rawInput)), v1: String(pressurePercent(point.output)) })}
-                data-studio-stylus-pressure-point={endpoint ? translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "endpoint") : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "control")}
+                aria-valuetext={`입력 ${pressurePercent(rawInput)}, 출력 ${pressurePercent(point.output)}`}
+                data-studio-stylus-pressure-point={endpoint ? "endpoint" : "control"}
                 onFocus={() => !endpoint && setSelectedPointIndex(index)}
                 onPointerDown={(event) => onCurvePointPointerDown(event, index)}
                 onKeyDown={(event) => onPointKeyDown(event, index)}
-                className={endpoint ? translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "pointer-events-none") : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "cursor-grab outline-none")}
+                className={endpoint ? "pointer-events-none" : "cursor-grab outline-none"}
               >
                 <circle
                   cx={graphX(rawInput)}
                   cy={graphY(point.output)}
                   r={selected ? 6 : endpoint ? 3.5 : 4.8}
-                  fill={selected ? translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "var(--color-card, currentColor)")}
+                  fill={selected ? "currentColor" : "var(--color-card, currentColor)"}
                   stroke="currentColor"
                   strokeWidth={selected ? 2.5 : 2}
                 />
@@ -649,17 +648,18 @@ export function StudioStylusPressurePanel({
           })}
         </svg>
         <p className="mt-1 text-[0.52rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "점을 끌어 조정 · 빈 곡선을 더블클릭해 추가 · Delete로 삭제 · 화살표로 미세 조정")}</p>
+          점을 끌어 조정 · 빈 곡선을 더블클릭해 추가 · Delete로 삭제 · 화살표로 미세 조정
+        </p>
 
         <div className="mt-2 grid grid-cols-2 gap-2">
           <label className="text-[0.56rem] font-semibold text-fg-3">
             <span className="mb-1 flex justify-between gap-2">
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "데드존")}</span>
+              <span>데드존</span>
               <span className="tabular-nums">{pressurePercent(profile.deadZone)}</span>
             </span>
             <input
               type="range"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 데드존")}
+              aria-label="장치 필압 데드존"
               min={0}
               max={20}
               step={0.5}
@@ -673,12 +673,12 @@ export function StudioStylusPressurePanel({
           </label>
           <label className="text-[0.56rem] font-semibold text-fg-3">
             <span className="mb-1 flex justify-between gap-2">
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "포화점")}</span>
+              <span>포화점</span>
               <span className="tabular-nums">{pressurePercent(profile.saturation)}</span>
             </span>
             <input
               type="range"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 포화점")}
+              aria-label="장치 필압 포화점"
               min={70}
               max={100}
               step={0.5}
@@ -694,7 +694,8 @@ export function StudioStylusPressurePanel({
 
         <div className="mt-2 flex items-center justify-between gap-2">
           <p className="text-[0.54rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "내부 제어점 ")}{Math.max(0, profile.points.length - 2)}{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "개 / 최대 ")}{STUDIO_STYLUS_PRESSURE_PROFILE_POINT_LIMIT - 2}{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "개")}</p>
+            내부 제어점 {Math.max(0, profile.points.length - 2)}개 / 최대 {STUDIO_STYLUS_PRESSURE_PROFILE_POINT_LIMIT - 2}개
+          </p>
           <div className="flex gap-1">
             <button
               type="button"
@@ -709,7 +710,8 @@ export function StudioStylusPressurePanel({
                 touch ? "min-h-11" : "min-h-8",
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "선택 점 삭제")}</button>
+              선택 점 삭제
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -721,7 +723,8 @@ export function StudioStylusPressurePanel({
                 touch ? "min-h-11" : "min-h-8",
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "초기화")}</button>
+              초기화
+            </button>
           </div>
         </div>
 
@@ -731,14 +734,15 @@ export function StudioStylusPressurePanel({
         >
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "펜 뒤집기 · 배럴 버튼")}</p>
+              <p className="text-[0.62rem] font-bold text-fg-2">펜 뒤집기 · 배럴 버튼</p>
               <p className="mt-0.5 text-[0.52rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "스트로크 시작 시 도구를 고정해 획 중간의 버튼 변화가 잉크를 섞지 않습니다.")}</p>
+                스트로크 시작 시 도구를 고정해 획 중간의 버튼 변화가 잉크를 섞지 않습니다.
+              </p>
             </div>
             <button
               type="button"
               role="switch"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "펜 뒤집기 지우개")}
+              aria-label="펜 뒤집기 지우개"
               aria-checked={penButtonPolicy.eraserTipEnabled}
               onClick={() => setStudioPenButtonPolicy({
                 ...penButtonPolicy,
@@ -752,14 +756,14 @@ export function StudioStylusPressurePanel({
                   : "border-line/70 bg-raised text-fg-3",
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "뒤집기 ")}{penButtonPolicy.eraserTipEnabled ? translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "지우개") : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "끔")}
+              뒤집기 {penButtonPolicy.eraserTipEnabled ? "지우개" : "끔"}
             </button>
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <label className="text-[0.56rem] font-semibold text-fg-3">
-              <span className="mb-1 block">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "배럴 버튼")}</span>
+              <span className="mb-1 block">배럴 버튼</span>
               <select
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "펜 배럴 버튼 동작")}
+                aria-label="펜 배럴 버튼 동작"
                 value={penButtonPolicy.barrelAction}
                 onChange={(event) => setStudioPenButtonPolicy({
                   ...penButtonPolicy,
@@ -770,18 +774,18 @@ export function StudioStylusPressurePanel({
                   touch ? "min-h-11" : "h-8",
                 )}
               >
-                <option value="context-menu">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "컨텍스트 메뉴 유지")}</option>
-                <option value="eraser">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "누르는 동안 지우개")}</option>
+                <option value="context-menu">컨텍스트 메뉴 유지</option>
+                <option value="eraser">누르는 동안 지우개</option>
               </select>
             </label>
             <label className="text-[0.56rem] font-semibold text-fg-3">
               <span className="mb-1 flex justify-between gap-2">
-                <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "순간 지우개 크기")}</span>
+                <span>순간 지우개 크기</span>
                 <span className="tabular-nums">{penButtonPolicy.eraserWidthScale.toFixed(1)}×</span>
               </span>
               <input
                 type="range"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "순간 지우개 크기 배율")}
+                aria-label="순간 지우개 크기 배율"
                 min={1}
                 max={4}
                 step={0.25}
@@ -795,23 +799,25 @@ export function StudioStylusPressurePanel({
             </label>
           </div>
           <p className="mt-1.5 text-[0.52rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "Pointer Events 표준의 배럴(button 2)·지우개 팁(button 5)을 사용합니다. 배럴 기본값은 우클릭 호환을 위해 컨텍스트 메뉴입니다.")}</p>
+            Pointer Events 표준의 배럴(button 2)·지우개 팁(button 5)을 사용합니다. 배럴 기본값은 우클릭 호환을 위해 컨텍스트 메뉴입니다.
+          </p>
         </div>
 
         <div className="mt-3 border-t border-line/45 pt-2">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <div>
-              <p className="text-[0.62rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "실제 펜 시험선")}</p>
+              <p className="text-[0.62rem] font-bold text-fg-2">실제 펜 시험선</p>
               <p className="mt-0.5 text-[0.52rem] text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "약하게→강하게 한 번에 그리면 다중점 프로필을 자동 맞춤합니다.")}</p>
+                약하게→강하게 한 번에 그리면 다중점 프로필을 자동 맞춤합니다.
+              </p>
             </div>
             <span className="tabular-nums text-[0.56rem] font-semibold text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "입력 ")}{pressurePercent(latest?.rawPressure ?? 0)} {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "→ 장치 ")}{pressurePercent(latest?.mappedPressure ?? 0)}
+              입력 {pressurePercent(latest?.rawPressure ?? 0)} → 장치 {pressurePercent(latest?.mappedPressure ?? 0)}
             </span>
           </div>
           <svg
             role="group"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "장치 필압 시험선 입력 영역")}
+            aria-label="장치 필압 시험선 입력 영역"
             viewBox={`0 0 ${TEST_W} ${TEST_H}`}
             data-studio-stylus-pressure-test-pad="true"
             className={cn(
@@ -839,7 +845,8 @@ export function StudioStylusPressurePanel({
                 className="text-fg-3 text-[10px]"
                 aria-hidden="true"
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "펜을 약하게→강하게 눌러 한 획을 그리세요")}</text>
+                펜을 약하게→강하게 눌러 한 획을 그리세요
+              </text>
             ) : null}
             <g className="text-fg-3" aria-hidden="true">
               {testPoints.slice(1).map((point, index) => {
@@ -847,7 +854,7 @@ export function StudioStylusPressurePanel({
                 const pressure = (previous.rawPressure + point.rawPressure) / 2;
                 return (
                   <line
-                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "raw-{v0}-{v1}-{v2}"), { v0: String(index), v1: String(point.x.toFixed(2)), v2: String(point.y.toFixed(2)) })}
+                    key={`raw-${index}-${point.x.toFixed(2)}-${point.y.toFixed(2)}`}
                     x1={previous.x}
                     y1={previous.y}
                     x2={point.x}
@@ -866,7 +873,7 @@ export function StudioStylusPressurePanel({
                 const pressure = (previous.mappedPressure + point.mappedPressure) / 2;
                 return (
                   <line
-                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "en", "mapped-{v0}-{v1}-{v2}"), { v0: String(index), v1: String(point.x.toFixed(2)), v2: String(point.y.toFixed(2)) })}
+                    key={`mapped-${index}-${point.x.toFixed(2)}-${point.y.toFixed(2)}`}
                     x1={previous.x}
                     y1={previous.y}
                     x2={point.x}
@@ -886,25 +893,26 @@ export function StudioStylusPressurePanel({
             className="mt-2 rounded-md border border-line/45 bg-card/45 p-2"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[0.58rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "입력 건강도")}</span>
+              <span className="text-[0.58rem] font-bold text-fg-2">입력 건강도</span>
               <span className="text-[0.58rem] font-extrabold text-accent" aria-live="polite">
                 {grade.label}
               </span>
             </div>
             <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.52rem] text-fg-3">
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "포인터 ")}<b className="text-fg-2">{inputHealth.pointerType}</b></span>
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "샘플 ")}<b className="tabular-nums text-fg-2">{inputHealth.sampleCount}</b></span>
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "전달당 코얼레싱 ")}<b className="tabular-nums text-fg-2">{averageCoalesced.toFixed(1)}</b></span>
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "최대 간격 ")}<b className="tabular-nums text-fg-2">{inputHealth.maximumGapPx.toFixed(1)}px</b></span>
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "평균 이벤트 지연 ")}<b className="tabular-nums text-fg-2">{averageDelay.toFixed(1)}ms</b></span>
-              <span>{translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "중복/시간 역행 ")}<b className="tabular-nums text-fg-2">{inputHealth.duplicateCount}/{inputHealth.timeRegressionCount}</b></span>
+              <span>포인터 <b className="text-fg-2">{inputHealth.pointerType}</b></span>
+              <span>샘플 <b className="tabular-nums text-fg-2">{inputHealth.sampleCount}</b></span>
+              <span>전달당 코얼레싱 <b className="tabular-nums text-fg-2">{averageCoalesced.toFixed(1)}</b></span>
+              <span>최대 간격 <b className="tabular-nums text-fg-2">{inputHealth.maximumGapPx.toFixed(1)}px</b></span>
+              <span>평균 이벤트 지연 <b className="tabular-nums text-fg-2">{averageDelay.toFixed(1)}ms</b></span>
+              <span>중복/시간 역행 <b className="tabular-nums text-fg-2">{inputHealth.duplicateCount}/{inputHealth.timeRegressionCount}</b></span>
             </div>
             <p className="mt-1.5 text-[0.52rem] leading-relaxed text-fg-3">{grade.detail}</p>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5">
             <p className="min-w-0 flex-1 text-[0.54rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "원시 입력은 회색, 실제 장치 프로필 출력은 강조선으로 겹쳐 표시합니다.")}</p>
+              원시 입력은 회색, 실제 장치 프로필 출력은 강조선으로 겹쳐 표시합니다.
+            </p>
             <div className="flex shrink-0 gap-1">
               <button
                 type="button"
@@ -915,11 +923,12 @@ export function StudioStylusPressurePanel({
                   touch ? "min-h-11" : "min-h-8",
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "지우기")}</button>
+                지우기
+              </button>
               <button
                 type="button"
                 disabled={fittedProfile === null}
-                title={fittedProfile ? translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "시험선 분포로 다중 제어점 프로필 적용") : translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "서로 다른 필압 샘플이 12개 이상 필요합니다")}
+                title={fittedProfile ? "시험선 분포로 다중 제어점 프로필 적용" : "서로 다른 필압 샘플이 12개 이상 필요합니다"}
                 onClick={() => {
                   if (fittedProfile) updateProfile(fittedProfile);
                 }}
@@ -928,7 +937,8 @@ export function StudioStylusPressurePanel({
                   touch ? "min-h-11" : "min-h-8",
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioStylusPressurePanel", "ko", "다중점 자동 맞춤")}</button>
+                다중점 자동 맞춤
+              </button>
             </div>
           </div>
         </div>

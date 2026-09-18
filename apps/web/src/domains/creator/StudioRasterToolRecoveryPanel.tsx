@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Circle,
   CheckCircle2,
   ChevronRight,
@@ -131,7 +127,7 @@ export function StudioRasterToolRecoveryPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "픽셀 편집 준비")}
+      aria-label="픽셀 편집 준비"
       aria-busy={busy}
       data-studio-raster-tool-recovery="true"
       className="overflow-hidden rounded-xl border border-line bg-card/50"
@@ -146,15 +142,16 @@ export function StudioRasterToolRecoveryPanel({
         </span>
         <span className="min-w-0">
           <span className="block text-xs font-semibold tracking-tight text-fg">
-            {translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "픽셀 편집 대상")}</span>
+            픽셀 편집 대상
+          </span>
           <span
             role="status"
             aria-live="polite"
             className="mt-0.5 block text-[0.68rem] leading-relaxed text-fg-3"
           >
             {busy
-              ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "편집용 래스터 복사본을 준비 중입니다. Esc를 누르면 준비를 취소할 수 있습니다.")
-              : translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "원본 레이어를 유지하면서 필요한 대상만 안전하게 준비합니다.")}
+              ? "편집용 래스터 복사본을 준비 중입니다. Esc를 누르면 준비를 취소할 수 있습니다."
+              : "원본 레이어를 유지하면서 필요한 대상만 안전하게 준비합니다."}
           </span>
         </span>
       </header>
@@ -189,7 +186,7 @@ export function StudioRasterToolRecoveryPanel({
               {entry.entry.reason ? (
                 <p
                   id={reasonId}
-                  role={entry.entry.enabled ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "status") : undefined}
+                  role={entry.entry.enabled ? "status" : undefined}
                   className="text-[0.68rem] leading-relaxed text-fg-3"
                 >
                   {entry.entry.reason}
@@ -245,10 +242,10 @@ export function StudioRasterToolRecoveryPanel({
             })}
           >
             <span>
-              {entries.length}{translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "개 도구용 ·")}{" "}
+              {entries.length}개 도구용 ·{" "}
               {resolveStudioInspectorRasterToolPolicy(entries[0]!).state ===
               "prepare-page-composite"
-                ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "페이지 합성본 준비 후 실행")
+                ? "페이지 합성본 준비 후 실행"
                 : sharedRecovery.label}
             </span>
             <ChevronRight className="size-3.5 shrink-0" aria-hidden />
@@ -395,12 +392,12 @@ export function StudioInspectorPixelSelectionLauncher({
         <StudioContextPill
           tone={
             policy.state === "ready"
-              ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "good")
+              ? "good"
               : policy.selectable
-                ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "accent")
+                ? "accent"
                 : availability.entry.action
-                  ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "warn")
-                  : translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "neutral")
+                  ? "warn"
+                  : "neutral"
           }
         >
           {policy.statusLabel}
@@ -409,7 +406,7 @@ export function StudioInspectorPixelSelectionLauncher({
 
       <div
         role="toolbar"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "픽셀 선택 도구")}
+        aria-label="픽셀 선택 도구"
         aria-describedby={descriptionId}
         className="grid grid-cols-2 gap-1.5"
       >
@@ -452,7 +449,7 @@ export function StudioInspectorPixelSelectionLauncher({
                 <span className="truncate">{tool.label}</span>
               </span>
               <span className="mt-0.5 block truncate pl-5 text-[0.58rem] font-medium text-fg-3">
-                {active ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "선택됨") : tool.shortDescription}
+                {active ? "선택됨" : tool.shortDescription}
               </span>
             </button>
           );
@@ -462,7 +459,7 @@ export function StudioInspectorPixelSelectionLauncher({
       <p className="rounded-lg border border-line/70 bg-canvas/45 px-2.5 py-2 text-[0.68rem] leading-relaxed text-fg-3">
         <span className="font-semibold text-fg-2">{policy.actionLabel}</span>
         {policy.selectable && policy.state !== "ready"
-          ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", " · 원본 레이어는 그대로 보존됩니다.")
+          ? " · 원본 레이어는 그대로 보존됩니다."
           : null}
       </p>
 
@@ -531,7 +528,7 @@ export function StudioInspectorFilterLauncher({
 
   return (
     <section
-      aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "{v0}-title"), { v0: String(descriptionId) })}
+      aria-labelledby={`${descriptionId}-title`}
       aria-busy={busy}
       data-studio-inspector-filter-launcher="true"
       data-studio-raster-entry-state={policy.state}
@@ -540,11 +537,12 @@ export function StudioInspectorFilterLauncher({
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "{v0}-title"), { v0: String(descriptionId) })}
+            id={`${descriptionId}-title`}
             className="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-fg"
           >
             <WandSparkles className="size-3.5 text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "필터 갤러리")}</h3>
+            필터 갤러리
+          </h3>
           <p id={descriptionId} className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
             {description}
           </p>
@@ -552,43 +550,49 @@ export function StudioInspectorFilterLauncher({
         <StudioContextPill
           tone={
             policy.state === "ready"
-              ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "good")
+              ? "good"
               : policy.selectable
-                ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "accent")
+                ? "accent"
                 : recovery
-                  ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "warn")
-                  : translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "en", "neutral")
+                  ? "warn"
+                  : "neutral"
           }
         >
-          {preparesEffectCopy ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "자동 준비") : policy.statusLabel}
+          {preparesEffectCopy ? "자동 준비" : policy.statusLabel}
         </StudioContextPill>
       </header>
 
       {preparesEffectCopy ? (
         <div
           role="note"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과 적용 안내")}
+          aria-label="효과 적용 안내"
           className="space-y-2 rounded-xl border border-accent/30 bg-accent-soft/45 px-2.5 py-2.5"
         >
           <div className="flex items-start gap-2">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-good" aria-hidden />
             <div className="min-w-0">
               <p className="text-[0.72rem] font-semibold text-fg">
-                {translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "선·도형 원본은 그대로 유지됩니다")}</p>
+                선·도형 원본은 그대로 유지됩니다
+              </p>
               <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "필요한 경우 현재 화면을 새 이미지(래스터) 레이어로 준비합니다. 원본을 덮어쓰거나 삭제하지 않아 나중에 선을 다시 수정할 수 있어요.")}</p>
+                필요한 경우 현재 화면을 새 이미지(래스터) 레이어로 준비합니다. 원본을 덮어쓰거나
+                삭제하지 않아 나중에 선을 다시 수정할 수 있어요.
+              </p>
             </div>
           </div>
           <ol
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과 적용 단계")}
+            aria-label="효과 적용 단계"
             className="grid grid-cols-3 gap-1.5 text-center text-[0.58rem] font-semibold text-fg-2"
           >
             <li className="rounded-md border border-line/70 bg-canvas/65 px-1.5 py-1.5">
-              <span className="mr-1 text-accent">1</span>{translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과 선택")}</li>
+              <span className="mr-1 text-accent">1</span>효과 선택
+            </li>
             <li className="rounded-md border border-line/70 bg-canvas/65 px-1.5 py-1.5">
-              <span className="mr-1 text-accent">2</span>{translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "복사본 준비")}</li>
+              <span className="mr-1 text-accent">2</span>복사본 준비
+            </li>
             <li className="rounded-md border border-line/70 bg-canvas/65 px-1.5 py-1.5">
-              <span className="mr-1 text-accent">3</span>{translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "미리보기 조절")}</li>
+              <span className="mr-1 text-accent">3</span>미리보기 조절
+            </li>
           </ol>
         </div>
       ) : null}
@@ -597,7 +601,7 @@ export function StudioInspectorFilterLauncher({
         title={
           policy.selectable
             ? preparesEffectCopy
-              ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과를 고르면 이미지 복사본을 자동으로 준비하고 미리보기를 엽니다.")
+              ? "효과를 고르면 이미지 복사본을 자동으로 준비하고 미리보기를 엽니다."
               : policy.actionLabel
             : policy.unavailableReason ?? undefined
         }
@@ -615,7 +619,7 @@ export function StudioInspectorFilterLauncher({
         )}
         <select
           aria-describedby={descriptionId}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "{v0} 필터 선택"), { v0: String(targetLabel) })}
+          aria-label={`${targetLabel} 필터 선택`}
           defaultValue=""
           disabled={disabled}
           onFocus={disabled ? undefined : preloadStudioFilterDialog}
@@ -634,10 +638,10 @@ export function StudioInspectorFilterLauncher({
         >
           <option value="" disabled>
             {busy
-              ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "미리보기 준비 중…")
+              ? "미리보기 준비 중…"
               : preparesEffectCopy
-                ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과 선택 — 복사본은 자동으로 준비돼요")
-                : translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "필터 선택…")}
+                ? "효과 선택 — 복사본은 자동으로 준비돼요"
+                : "필터 선택…"}
           </option>
           {STUDIO_FILTER_ALL_KINDS.map((kind) => (
             <option key={kind} value={kind}>
@@ -663,7 +667,7 @@ export function StudioInspectorFilterLauncher({
             type="button"
             disabled={busy}
             aria-describedby={descriptionId}
-            title={translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과를 고르기 전에 이미지(래스터) 복사본을 직접 준비합니다.")}
+            title="효과를 고르기 전에 이미지(래스터) 복사본을 직접 준비합니다."
             {...recoveryIntentProps({ toolId: availability.tool.id, action: recovery })}
             onClick={() => onRecover({ toolId: availability.tool.id, action: recovery })}
             className={cn(
@@ -682,13 +686,14 @@ export function StudioInspectorFilterLauncher({
                 <ImagePlus className="size-3.5 shrink-0" aria-hidden />
               )}
               <span className="truncate">
-                {busy ? translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과용 이미지 복사본 준비 중…") : translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "효과용 이미지 복사본 먼저 만들기")}
+                {busy ? "효과용 이미지 복사본 준비 중…" : "효과용 이미지 복사본 먼저 만들기"}
               </span>
             </span>
             <ChevronRight className="size-3.5 shrink-0" aria-hidden />
           </button>
           <p className="px-1 text-[0.62rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioRasterToolRecoveryPanel", "ko", "‘래스터 변환’이 필요한 경우 사용하는 안전한 방식입니다. 새 레이어만 만들고 원본은 유지합니다.")}</p>
+            ‘래스터 변환’이 필요한 경우 사용하는 안전한 방식입니다. 새 레이어만 만들고 원본은 유지합니다.
+          </p>
         </div>
       ) : !policy.selectable && recovery ? (
         <button

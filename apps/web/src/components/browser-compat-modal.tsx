@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { lazyRetry } from "../shared/lib/lazy-retry";
@@ -22,7 +21,7 @@ const BrowserCompatModalContent = lazyRetry(
 export function BrowserCompatModal(props: BrowserCompatModalProps) {
   if (!props.isOpen) return null;
   return (
-    <Suspense fallback={<p role="status" className="fixed bottom-4 left-4 z-[9999] rounded-xl bg-panel p-4 text-fg">{translateCurrentStaticSourceText("components.browser.compat.modal", "ko", "브라우저 호환성 안내를 불러오는 중…")}</p>}>
+    <Suspense fallback={<p role="status" className="fixed bottom-4 left-4 z-[9999] rounded-xl bg-panel p-4 text-fg">브라우저 호환성 안내를 불러오는 중…</p>}>
       <BrowserCompatModalContent {...props} />
     </Suspense>
   );

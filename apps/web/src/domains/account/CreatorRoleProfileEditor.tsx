@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BriefcaseBusiness,
   Check,
   Eye,
@@ -136,7 +131,7 @@ export function CreatorRoleProfileEditor({
         <div>
           <div className="flex items-center gap-2 text-accent">
             <BriefcaseBusiness size={16} aria-hidden="true" />
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.14em]">{translateCurrentStaticSourceText("domains.account.CreatorRoleProfileEditor", "en", "Creator role")}</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.14em]">Creator role</p>
           </div>
           <h2 id="creator-role-profile-title" className="mt-2 text-base font-black text-fg">
             {localized(locale, "어떤 직무로 활동하나요?", "What role do you work in?")}

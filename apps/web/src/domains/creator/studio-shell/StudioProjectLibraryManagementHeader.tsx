@@ -1,8 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 
@@ -42,7 +37,7 @@ export function StudioProjectLibraryManagementHeader({
     <>
       <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementHeader", "en", "TOONSTUDIO")}</p>
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
             {bi((STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).ko, (STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).en)}
           </h1>
@@ -71,7 +66,7 @@ export function StudioProjectLibraryManagementHeader({
               <Link
                 key={candidate}
                 href={studioProjectLibraryManagementViewHref(candidate)}
-                aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementHeader", "en", "page") : undefined}
+                aria-current={candidate === view ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
                   candidate === view

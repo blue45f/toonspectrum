@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   CircleDot,
   Copy,
@@ -240,7 +236,7 @@ export function StudioPaletteWorkbench({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "색상 작업실")}
+      aria-label="색상 작업실"
       data-studio-palette-workbench="true"
       className="space-y-3 pb-1"
     >
@@ -253,19 +249,20 @@ export function StudioPaletteWorkbench({
           />
           <div className="min-w-0 flex-1">
             <p className="text-[0.62rem] font-bold uppercase tracking-[0.16em] text-accent">
-              {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "현재 작업 색")}</p>
+              현재 작업 색
+            </p>
             <p className="mt-0.5 truncate text-sm font-black text-fg">
               {friendlyName}
             </p>
             <div className="mt-2 flex items-center gap-1.5">
               <label className="min-w-0 flex-1">
-                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "현재 색상 코드")}</span>
+                <span className="sr-only">현재 색상 코드</span>
                 <input
                   type="text"
                   value={hexDraft}
                   spellCheck={false}
                   inputMode="text"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "현재 색상 코드")}
+                  aria-label="현재 색상 코드"
                   onChange={(event) => {
                     const next = event.currentTarget.value;
                     setHexDraft(next);
@@ -288,7 +285,7 @@ export function StudioPaletteWorkbench({
               <button
                 type="button"
                 onClick={copyCurrentColor}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "현재 색상 코드 복사")}
+                aria-label="현재 색상 코드 복사"
                 className={cn(
                   "grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors hover:border-accent/50 hover:text-accent pointer-coarse:size-11",
                   FOCUS,
@@ -314,7 +311,7 @@ export function StudioPaletteWorkbench({
           )}
         >
           <Palette size={15} aria-hidden />
-          {saving ? translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "팔레트 저장 중…") : translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "현재 흐름을 내 팔레트로 저장")}
+          {saving ? "팔레트 저장 중…" : "현재 흐름을 내 팔레트로 저장"}
         </button>
       </div>
 
@@ -322,18 +319,19 @@ export function StudioPaletteWorkbench({
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 id="studio-palette-recent-title" className="inline-flex items-center gap-1.5 text-xs font-bold text-fg-2">
             <History size={14} className="text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "최근 사용 색")}</h3>
-          <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "모든 모드에서 바로 적용")}</span>
+            최근 사용 색
+          </h3>
+          <span className="text-[0.62rem] text-fg-3">모든 모드에서 바로 적용</span>
         </div>
         {normalizedRecentColors.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "최근 사용 색상")}>
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="최근 사용 색상">
             {normalizedRecentColors.map((color) => (
               <button
                 key={color}
                 type="button"
                 role="radio"
                 aria-checked={color === currentColor}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "최근 색상 {v0} 선택"), { v0: String(color) })}
+                aria-label={`최근 색상 ${color} 선택`}
                 onClick={() => commitColor(color)}
                 className={cn(
                   "relative size-10 rounded-xl border border-white/20 shadow-sm transition-transform hover:-translate-y-0.5 active:scale-95 pointer-coarse:size-11",
@@ -354,13 +352,14 @@ export function StudioPaletteWorkbench({
           </div>
         ) : (
           <p className="rounded-lg border border-dashed border-line px-3 py-2 text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "색을 선택하면 최근 사용 색이 이곳에 쌓입니다.")}</p>
+            색을 선택하면 최근 사용 색이 이곳에 쌓입니다.
+          </p>
         )}
       </section>
 
       <div
         role="tablist"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "색상 작업 방식")}
+        aria-label="색상 작업 방식"
         className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-raised/60 p-1"
       >
         {VIEW_OPTIONS.map((option) => {
@@ -393,9 +392,10 @@ export function StudioPaletteWorkbench({
         {activeView === "quick" ? (
           <div className="space-y-3" data-studio-palette-view="quick">
             <div>
-              <h3 className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "빠른 색상 선택")}</h3>
+              <h3 className="text-xs font-black text-fg">빠른 색상 선택</h3>
               <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "넓은 영역에서 채도·명도를 고르고 아래 막대에서 색조를 조절합니다.")}</p>
+                넓은 영역에서 채도·명도를 고르고 아래 막대에서 색조를 조절합니다.
+              </p>
             </div>
             <StudioColorQuickPicker
               value={currentColor}
@@ -404,17 +404,17 @@ export function StudioPaletteWorkbench({
             />
             <div className="border-t border-line pt-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "밝기·음영 9단계")}</span>
-                <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "하이라이트 → 딥음영")}</span>
+                <span className="text-xs font-bold text-fg-2">밝기·음영 9단계</span>
+                <span className="text-[0.62rem] text-fg-3">하이라이트 → 딥음영</span>
               </div>
-              <div className="flex h-10 overflow-hidden rounded-xl border border-white/15 shadow-inner" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "밝기와 음영 단계")}>
+              <div className="flex h-10 overflow-hidden rounded-xl border border-white/15 shadow-inner" role="radiogroup" aria-label="밝기와 음영 단계">
                 {tintsAndShades.map((color, index) => (
                   <button
                     key={`${color}-${index}`}
                     type="button"
                     role="radio"
                     aria-checked={color === currentColor}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "밝기 음영 {v0}단계 {v1} 선택"), { v0: String(index + 1), v1: String(color) })}
+                    aria-label={`밝기 음영 ${index + 1}단계 ${color} 선택`}
                     onClick={() => commitColor(color)}
                     className={cn(
                       "relative min-w-7 flex-1 transition-transform hover:z-10 hover:scale-105 active:scale-95",
@@ -435,9 +435,10 @@ export function StudioPaletteWorkbench({
         {activeView === "wheel" ? (
           <div className="space-y-3" data-studio-palette-view="wheel">
             <div>
-              <h3 className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "색상환")}</h3>
+              <h3 className="text-xs font-black text-fg">색상환</h3>
               <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "원하는 색조 방향과 채도를 한 번에 탐색합니다.")}</p>
+                원하는 색조 방향과 채도를 한 번에 탐색합니다.
+              </p>
             </div>
             <div className="flex justify-center rounded-xl bg-card/55 p-2">
               <StudioColorDiscPicker
@@ -455,7 +456,8 @@ export function StudioPaletteWorkbench({
               )}
             >
               <Check size={15} aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "이 색을 최근 사용 색에 추가")}</button>
+              이 색을 최근 사용 색에 추가
+            </button>
           </div>
         ) : null}
 
@@ -463,7 +465,7 @@ export function StudioPaletteWorkbench({
           <div className="space-y-3" data-studio-palette-view="studio">
             <div
               role="tablist"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "전문 배색 방식")}
+              aria-label="전문 배색 방식"
               className="grid grid-cols-2 gap-1 rounded-xl border border-line bg-card p-1"
             >
               <button
@@ -477,7 +479,8 @@ export function StudioPaletteWorkbench({
                   FOCUS,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "조화 배색")}</button>
+                조화 배색
+              </button>
               <button
                 type="button"
                 role="tab"
@@ -489,7 +492,8 @@ export function StudioPaletteWorkbench({
                   FOCUS,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "웹툰 음영")}</button>
+                웹툰 음영
+              </button>
             </div>
             {studioView === "harmony" ? (
               <StudioColorHarmoniesPanel
@@ -512,9 +516,10 @@ export function StudioPaletteWorkbench({
         {activeView === "library" ? (
           <div data-studio-palette-view="library">
             <div className="mb-3">
-              <h3 className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "내 팔레트 라이브러리")}</h3>
+              <h3 className="text-xs font-black text-fg">내 팔레트 라이브러리</h3>
               <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "ko", "저장한 팔레트를 검색·편집하고 GPL 파일로 가져오거나 내보냅니다.")}</p>
+                저장한 팔레트를 검색·편집하고 GPL 파일로 가져오거나 내보냅니다.
+              </p>
             </div>
             {libraryContent}
           </div>
@@ -523,7 +528,7 @@ export function StudioPaletteWorkbench({
 
       {feedback ? (
         <p
-          role={feedback.tone === "error" ? translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioPaletteWorkbench", "en", "status")}
+          role={feedback.tone === "error" ? "alert" : "status"}
           aria-live="polite"
           className={cn(
             "rounded-xl border px-3 py-2.5 text-xs font-semibold leading-relaxed",

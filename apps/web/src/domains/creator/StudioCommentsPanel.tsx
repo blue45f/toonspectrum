@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowDownWideNarrow,
   CheckCircle2,
   CheckCheck,
@@ -1043,47 +1039,47 @@ export function StudioCommentsPanel({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 id={titleId} className="text-sm font-bold text-fg">
-              {composerExpanded ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "새 댓글") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "검토 댓글")}
+              {composerExpanded ? "새 댓글" : "검토 댓글"}
             </h2>
-            <span className="inline-flex items-center gap-1 rounded-md border border-cool/30 bg-cool/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-cool" title={storageMode === "team" ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 서버에 안전하게 동기화됩니다.") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "프로젝트 파일에 댓글이 함께 저장됩니다.")}>
+            <span className="inline-flex items-center gap-1 rounded-md border border-cool/30 bg-cool/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-cool" title={storageMode === "team" ? "팀 댓글 서버에 안전하게 동기화됩니다." : "프로젝트 파일에 댓글이 함께 저장됩니다."}>
               <HardDrive size={10} aria-hidden />
-              {storageMode === "team" ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 동기화") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "문서 저장")}
+              {storageMode === "team" ? "팀 동기화" : "문서 저장"}
             </span>
             {unreadCount > 0 ? (
-              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold tabular-nums text-on-accent" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "읽지 않은 댓글 {v0}개"), { v0: String(unreadCount) })}>
-                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "새 글 ")}{unreadCount}
+              <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold tabular-nums text-on-accent" aria-label={`읽지 않은 댓글 ${unreadCount}개`}>
+                새 글 {unreadCount}
               </span>
             ) : null}
           </div>
           <p id={descriptionId} className="mt-0.5 truncate text-xs leading-relaxed text-fg-3">
             {composerExpanded
-              ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "클릭한 위치에 바로 피드백을 남겨요.")
-              : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "캔버스를 보며 위치별 피드백을 검토하세요.")}
+              ? "클릭한 위치에 바로 피드백을 남겨요."
+              : "캔버스를 보며 위치별 피드백을 검토하세요."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {!composerExpanded ? <span className="rounded-md bg-raised px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-2" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "열린 댓글 {v0}개"), { v0: String(openCount) })}>
-            {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "열림 ")}{openCount}
+          {!composerExpanded ? <span className="rounded-md bg-raised px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-2" aria-label={`열린 댓글 ${openCount}개`}>
+            열림 {openCount}
           </span> : null}
           {onRefresh && !composerExpanded ? (
             <button
               type="button"
               onClick={onRefresh}
               disabled={syncing}
-              aria-label={syncing ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 동기화 중") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 새로고침")}
-              title={syncing ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 동기화 중") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 새로고침")}
+              aria-label={syncing ? "팀 댓글 동기화 중" : "팀 댓글 새로고침"}
+              title={syncing ? "팀 댓글 동기화 중" : "팀 댓글 새로고침"}
               className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 sm:size-9"
             >
-              <RotateCw size={15} className={syncing ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "animate-spin motion-reduce:animate-none") : undefined} aria-hidden />
+              <RotateCw size={15} className={syncing ? "animate-spin motion-reduce:animate-none" : undefined} aria-hidden />
             </button>
           ) : null}
           <button
             type="button"
             onClick={onClose}
-            aria-label={composerExpanded ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 작성 닫기") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "검토 댓글 닫기")}
+            aria-label={composerExpanded ? "댓글 작성 닫기" : "검토 댓글 닫기"}
             title={ownedReplyThreadId && ownedReplyBody.trim()
-              ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "닫기 · 작성 중인 답글은 유지됩니다")
-              : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "닫기 (Esc)")}
+              ? "닫기 · 작성 중인 답글은 유지됩니다"
+              : "닫기 (Esc)"}
             className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9"
           >
             <X size={16} aria-hidden />
@@ -1100,7 +1096,8 @@ export function StudioCommentsPanel({
                 </span>
                 <div className="min-w-0 flex-1">
                   <span className="block text-[0.68rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 위치")}</span>
+                    댓글 위치
+                  </span>
                   <p className="mt-0.5 truncate text-xs font-semibold text-fg" title={composerAnchorLabel}>
                     {composerAnchorLabel}
                   </p>
@@ -1112,7 +1109,8 @@ export function StudioCommentsPanel({
                     onClick={() => setComposerLocationPickerOpen((current) => !current)}
                     className={QUIET_BUTTON_CLASS}
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "위치 변경")}</button>
+                    위치 변경
+                  </button>
                 ) : null}
                 <button
                   type="button"
@@ -1128,19 +1126,21 @@ export function StudioCommentsPanel({
                   }}
                   className={QUIET_BUTTON_CLASS}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "취소")}</button>
+                  취소
+                </button>
               </div>
               {composerAnchor && !composerAnchorValid ? (
                 <p role="status" className="mt-2 rounded-lg border border-warn/35 bg-warn/10 px-2.5 py-2 text-[0.7rem] font-semibold text-warn">
-                  {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "연결 위치가 삭제되었어요. 아래에서 새 위치를 선택해 주세요.")}</p>
+                  연결 위치가 삭제되었어요. 아래에서 새 위치를 선택해 주세요.
+                </p>
               ) : null}
               {(composerLocationPickerOpen || !composerAnchorValid)
                 && selectableAnchorOptions.length > 0
                 && onSelectAnchor ? (
                   <div className="mt-2 min-w-0">
-                    <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-anchor"), { v0: String(titleId) })} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 연결 위치")}</label>
+                    <label htmlFor={`${titleId}-anchor`} className="sr-only">댓글 연결 위치</label>
                     <select
-                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-anchor"), { v0: String(titleId) })}
+                      id={`${titleId}-anchor`}
                       value={composerAnchor ? canonicalStudioCommentAnchorKey(composerAnchor) : ""}
                       onChange={(event) => {
                         const option = selectableAnchorOptions.find(
@@ -1155,7 +1155,7 @@ export function StudioCommentsPanel({
                       }}
                       className={FIELD_CLASS}
                     >
-                      <option value="">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "위치를 선택하세요")}</option>
+                      <option value="">위치를 선택하세요</option>
                       {selectableAnchorOptions.map((option) => (
                         <option key={canonicalStudioCommentAnchorKey(option.anchor)} value={canonicalStudioCommentAnchorKey(option.anchor)}>
                           {option.label}
@@ -1164,19 +1164,19 @@ export function StudioCommentsPanel({
                     </select>
                   </div>
                 ) : null}
-              <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-body"), { v0: String(titleId) })} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 내용")}</label>
+              <label htmlFor={`${titleId}-body`} className="sr-only">댓글 내용</label>
               <textarea
                 ref={composerRef}
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-body"), { v0: String(titleId) })}
+                id={`${titleId}-body`}
                 value={newComment}
                 maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
                 rows={4}
                 disabled={!composerAnchorValid || !canAddThread || saving}
                 placeholder={!composerAnchor
-                  ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "먼저 페이지, 컷 또는 요소를 선택해 주세요.")
+                  ? "먼저 페이지, 컷 또는 요소를 선택해 주세요."
                   : !composerAnchorValid
-                    ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "삭제되지 않은 페이지, 컷 또는 요소를 다시 선택해 주세요.")
-                    : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "수정할 점이나 확인이 필요한 내용을 남겨 주세요.")}
+                    ? "삭제되지 않은 페이지, 컷 또는 요소를 다시 선택해 주세요."
+                    : "수정할 점이나 확인이 필요한 내용을 남겨 주세요."}
                 aria-keyshortcuts="Control+Enter Meta+Enter"
                 onChange={(event) =>
                   setNewComment(event.target.value.slice(0, STUDIO_COMMENTS_MAX_BODY_LENGTH))
@@ -1191,11 +1191,11 @@ export function StudioCommentsPanel({
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} mt-2 min-h-28 resize-y text-sm leading-relaxed"), { v0: String(FIELD_CLASS) })}
+                className={`${FIELD_CLASS} mt-2 min-h-28 resize-y text-sm leading-relaxed`}
               />
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[0.7rem] text-fg-3">
-                  {canAddThread ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "⌘/Ctrl + Enter로 등록") : newThreadDisabledReason}
+                  {canAddThread ? "⌘/Ctrl + Enter로 등록" : newThreadDisabledReason}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[0.7rem] tabular-nums text-fg-3">
@@ -1207,14 +1207,15 @@ export function StudioCommentsPanel({
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                   >
                     <Send size={13} aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "등록")}</button>
+                    등록
+                  </button>
                 </div>
               </div>
             </form>
           ) : (
             <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card/20 px-4 py-2.5">
               <div className="min-w-0 flex-1 basis-40">
-                <p className="text-[0.68rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "선택한 피드백 위치")}</p>
+                <p className="text-[0.68rem] font-semibold text-fg-3">선택한 피드백 위치</p>
                 <p className="mt-0.5 truncate text-xs font-semibold text-fg" title={activeAnchorLabel}>
                   {activeAnchorLabel}
                 </p>
@@ -1227,10 +1228,11 @@ export function StudioCommentsPanel({
                     onArmPinPlacement();
                   }}
                   className={QUIET_BUTTON_CLASS}
-                  title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "캔버스를 한 번 클릭한 뒤 그 자리에서 바로 댓글을 작성합니다")}
+                  title="캔버스를 한 번 클릭한 뒤 그 자리에서 바로 댓글을 작성합니다"
                 >
                   <MapPin size={13} aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "위치 찍고 댓글")}</button>
+                  위치 찍고 댓글
+                </button>
               ) : null}
               <button
                 type="button"
@@ -1239,7 +1241,7 @@ export function StudioCommentsPanel({
                   ? newThreadDisabledReasonId
                   : undefined}
                 title={currentSelectionCommentDisabledReason
-                  ?? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "현재 선택한 페이지, 컷 또는 요소에 댓글을 남깁니다")}
+                  ?? "현재 선택한 페이지, 컷 또는 요소에 댓글을 남깁니다"}
                 onClick={() => {
                   if (!closeReplyEditor({ protectDraft: true })) return;
                   setComposerAnchor(activeAnchor);
@@ -1253,7 +1255,8 @@ export function StudioCommentsPanel({
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
               >
                 <Plus size={13} aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "현재 선택에 댓글")}</button>
+                현재 선택에 댓글
+              </button>
               {currentSelectionCommentDisabledReason ? (
                 <p
                   id={newThreadDisabledReasonId}
@@ -1273,7 +1276,7 @@ export function StudioCommentsPanel({
             >
               <CircleDot size={14} className="mt-0.5 shrink-0" aria-hidden />
               <p className="min-w-0 flex-1">
-                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 동기화 지연 · ")}{syncError}
+                팀 댓글 동기화 지연 · {syncError}
               </p>
             </div>
           ) : null}
@@ -1285,7 +1288,7 @@ export function StudioCommentsPanel({
               <button
                 type="button"
                 onClick={() => setError(null)}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "오류 메시지 닫기")}
+                aria-label="오류 메시지 닫기"
                 className="grid size-11 shrink-0 place-items-center rounded-md hover:bg-bad/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-7"
               >
                 <X size={13} aria-hidden />
@@ -1299,7 +1302,7 @@ export function StudioCommentsPanel({
             <div className="flex min-w-0 items-center gap-1.5">
               <div className="relative min-w-0 flex-1">
                 <label className="block">
-                  <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 검색")}</span>
+                  <span className="sr-only">댓글 검색</span>
                   <Search size={13} aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3" />
                   <input
                     ref={searchInputRef}
@@ -1307,15 +1310,15 @@ export function StudioCommentsPanel({
                     value={query}
                     aria-keyshortcuts="/"
                     onChange={(event) => setQuery(event.target.value.slice(0, 120))}
-                    placeholder={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글·작성자·멘션 검색 (/)")}
+                    placeholder="댓글·작성자·멘션 검색 (/)"
                     className="h-11 w-full rounded-lg border border-line bg-card pl-8 pr-10 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-9 [&::-webkit-search-cancel-button]:appearance-none"
                   />
                 </label>
                 {query ? (
                   <button
                     type="button"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 검색 지우기")}
-                    title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "검색 지우기 (Esc)")}
+                    aria-label="댓글 검색 지우기"
+                    title="검색 지우기 (Esc)"
                     onClick={() => {
                       setQuery("");
                       globalThis.requestAnimationFrame(() => searchInputRef.current?.focus());
@@ -1330,37 +1333,37 @@ export function StudioCommentsPanel({
                 <button
                   type="button"
                   aria-pressed={!pinsHidden}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "캔버스 열린 댓글 핀 표시")}
+                  aria-label="캔버스 열린 댓글 핀 표시"
                   onClick={onTogglePinsHidden}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} shrink-0 px-3 sm:px-2.5"), { v0: String(QUIET_BUTTON_CLASS) })}
-                  title={pinsHidden ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "캔버스 댓글 핀을 다시 표시합니다 (Shift+C)") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "캔버스 댓글 핀을 숨깁니다 (Shift+C)")}
+                  className={`${QUIET_BUTTON_CLASS} shrink-0 px-3 sm:px-2.5`}
+                  title={pinsHidden ? "캔버스 댓글 핀을 다시 표시합니다 (Shift+C)" : "캔버스 댓글 핀을 숨깁니다 (Shift+C)"}
                 >
                   {pinsHidden ? <Eye size={13} aria-hidden /> : <EyeOff size={13} aria-hidden />}
-                  <span className="sr-only sm:not-sr-only">{pinsHidden ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "핀 표시") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "핀 숨김")}</span>
+                  <span className="sr-only sm:not-sr-only">{pinsHidden ? "핀 표시" : "핀 숨김"}</span>
                 </button>
               ) : null}
               {onMarkAllRead && storageMode === "team" ? (
                 <button
                   type="button"
                   disabled={unreadCount === 0 || readMutation !== null}
-                  aria-label={readMutation === "all" ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "모든 댓글 읽음 처리 중") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "모든 댓글 읽음 처리")}
+                  aria-label={readMutation === "all" ? "모든 댓글 읽음 처리 중" : "모든 댓글 읽음 처리"}
                   onClick={() => void markAllRead()}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} shrink-0 px-3 sm:px-2.5"), { v0: String(QUIET_BUTTON_CLASS) })}
-                  title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "현재 읽지 않은 팀 댓글을 모두 읽음 처리합니다")}
+                  className={`${QUIET_BUTTON_CLASS} shrink-0 px-3 sm:px-2.5`}
+                  title="현재 읽지 않은 팀 댓글을 모두 읽음 처리합니다"
                 >
                   <CheckCheck size={13} aria-hidden />
-                  <span className="sr-only sm:not-sr-only">{readMutation === "all" ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "처리 중") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "모두 읽음")}</span>
+                  <span className="sr-only sm:not-sr-only">{readMutation === "all" ? "처리 중" : "모두 읽음"}</span>
                 </button>
               ) : null}
               <label className="relative size-11 shrink-0 sm:h-8 sm:w-auto sm:min-w-32">
-                <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 정렬")}</span>
+                <span className="sr-only">댓글 정렬</span>
                 <ArrowDownWideNarrow
                   size={13}
                   aria-hidden
                   className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-fg-2 sm:left-2 sm:translate-x-0 sm:text-fg-3"
                 />
                 <select
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 정렬")}
+                  aria-label="댓글 정렬"
                   value={sort}
                   onChange={(event) => setSort(event.target.value as CommentSort)}
                   className="h-11 w-11 appearance-none rounded-lg border border-line bg-card px-0 text-transparent outline-none transition-colors hover:border-line-strong hover:bg-raised focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&>option]:text-fg-2 sm:h-8 sm:w-full sm:pl-7 sm:pr-7 sm:text-[0.7rem] sm:font-semibold sm:text-fg-2"
@@ -1377,7 +1380,7 @@ export function StudioCommentsPanel({
               </label>
             </div>
             <div className="-mx-4 flex min-w-0 items-center gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
-              <span className="mr-1 shrink-0 text-[0.68rem] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "필터")}</span>
+              <span className="mr-1 shrink-0 text-[0.68rem] font-semibold text-fg-3">필터</span>
               {FILTERS.filter((item) => storageMode === "team" || item.value !== "unread").map((item) => {
                 const active = filter === item.value;
                 return (
@@ -1387,9 +1390,11 @@ export function StudioCommentsPanel({
                     aria-pressed={active}
                     disabled={item.value === "current" && !activeAnchor}
                     onClick={() => setFilter(item.value)}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[0.7rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8 {v0}"), { v0: String(active
+                    className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg border px-2.5 text-[0.7rem] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8 ${
+                      active
                         ? "border-accent/45 bg-accent-soft text-accent"
-                        : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg") })}
+                        : "border-line bg-card text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
+                    }`}
                   >
                     {item.label}
                     <span className="tabular-nums text-[0.65rem] opacity-75">{filterCounts[item.value]}</span>
@@ -1397,42 +1402,45 @@ export function StudioCommentsPanel({
                 );
               })}
               <span className="ml-auto hidden text-[0.68rem] tabular-nums text-fg-3 sm:block">
-                {normalizedQuery ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "검색 {v0} · "), { v0: String(visibleThreads.length) }) : ""}
+                {normalizedQuery ? `검색 ${visibleThreads.length} · ` : ""}
                 {storageMode === "team" && readOnlyMessageCount > 0
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 메시지 {v0}/{v1} · 보관 {v2}"), { v0: String(mutableTotalMessages), v1: String(STUDIO_COMMENTS_MAX_TOTAL_MESSAGES), v2: String(readOnlyMessageCount) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "메시지 {v0}/{v1}"), { v0: String(totalMessages), v1: String(STUDIO_COMMENTS_MAX_TOTAL_MESSAGES) })}
+                  ? `팀 메시지 ${mutableTotalMessages}/${STUDIO_COMMENTS_MAX_TOTAL_MESSAGES} · 보관 ${readOnlyMessageCount}`
+                  : `메시지 ${totalMessages}/${STUDIO_COMMENTS_MAX_TOTAL_MESSAGES}`}
               </span>
             </div>
             {visibleThreads.length > 1 ? (
               <div className="flex min-w-0 items-center justify-between gap-2 border-t border-line/70 pt-1.5">
                 <p className="min-w-0 truncate text-[0.68rem] font-semibold text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "순차 검토")}<span className="ml-1 tabular-nums text-fg-2">
+                  순차 검토
+                  <span className="ml-1 tabular-nums text-fg-2">
                     {Math.max(1, activeReviewThreadIndex + 1).toLocaleString("ko-KR")}
                     <span className="px-1 text-fg-3">/</span>
                     {visibleThreads.length.toLocaleString("ko-KR")}
                   </span>
-                  <span className="ml-2 hidden font-normal sm:inline">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "J/K로 이동")}</span>
+                  <span className="ml-2 hidden font-normal sm:inline">J/K로 이동</span>
                 </p>
                 <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     disabled={reviewNavigationBlocked || activeReviewThreadIndex <= 0}
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "이전 댓글로 이동")}
-                    title={reviewNavigationBlocked ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "작성 중인 작업을 먼저 마무리해 주세요.") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "이전 댓글 (K)")}
+                    aria-label="이전 댓글로 이동"
+                    title={reviewNavigationBlocked ? "작성 중인 작업을 먼저 마무리해 주세요." : "이전 댓글 (K)"}
                     onClick={() => moveReviewFocus(-1)}
                     className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8"
                   >
                     <ChevronUp size={13} aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "이전")}</button>
+                    이전
+                  </button>
                   <button
                     type="button"
                     disabled={reviewNavigationBlocked || activeReviewThreadIndex >= visibleThreads.length - 1}
-                    aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "다음 댓글로 이동")}
-                    title={reviewNavigationBlocked ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "작성 중인 작업을 먼저 마무리해 주세요.") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "다음 댓글 (J)")}
+                    aria-label="다음 댓글로 이동"
+                    title={reviewNavigationBlocked ? "작성 중인 작업을 먼저 마무리해 주세요." : "다음 댓글 (J)"}
                     onClick={() => moveReviewFocus(1)}
                     className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-35 sm:min-h-8"
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "다음")}<ChevronDown size={13} aria-hidden />
+                    다음
+                    <ChevronDown size={13} aria-hidden />
                   </button>
                 </div>
               </div>
@@ -1449,14 +1457,15 @@ export function StudioCommentsPanel({
                   <button
                     type="button"
                     onClick={() => setFilter("all")}
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} mt-4"), { v0: String(QUIET_BUTTON_CLASS) })}
+                    className={`${QUIET_BUTTON_CLASS} mt-4`}
                   >
-                    {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "전체 댓글 보기")}</button>
+                    전체 댓글 보기
+                  </button>
                 )}
               </div>
             </div>
           ) : (
-            <ol aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0} 댓글"), { v0: String(FILTERS.find((item) => item.value === filter)?.label ?? "전체") })}>
+            <ol aria-label={`${FILTERS.find((item) => item.value === filter)?.label ?? "전체"} 댓글`}>
               {visibleThreads.map((thread) => {
                 const isReadOnlyArchive = readOnlyThreadIds.has(thread.id);
                 const canReply =
@@ -1509,11 +1518,11 @@ export function StudioCommentsPanel({
                 return (
                   <li key={thread.id} className="border-b border-line last:border-b-0">
                     <article
-                      id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-thread-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
+                      id={`${titleId}-thread-${thread.id}`}
                       data-studio-comment-thread-id={thread.id}
                       tabIndex={activeReviewThreadId === thread.id ? 0 : -1}
                       onFocusCapture={() => setFocusedThreadId(thread.id)}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "relative px-4 py-4 outline-none transition-colors focus-visible:bg-accent-soft/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent sm:px-5 {v0}"), { v0: String(unreadThreadIds.has(thread.id) ? "bg-accent-soft/15 before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r before:bg-accent" : "") })}
+                      className={`relative px-4 py-4 outline-none transition-colors focus-visible:bg-accent-soft/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent sm:px-5 ${unreadThreadIds.has(thread.id) ? "bg-accent-soft/15 before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-r before:bg-accent" : ""}`}
                     >
                       <div className="flex min-w-0 items-start gap-3">
                         <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full border border-line bg-raised text-xs font-bold text-fg-2">
@@ -1525,13 +1534,15 @@ export function StudioCommentsPanel({
                             <time dateTime={thread.createdAt} className="text-[0.68rem] text-fg-3">
                               {formatDate(thread.createdAt)}
                             </time>
-                            <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.62rem] font-semibold {v0}"), { v0: String(thread.resolved
+                            <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[0.62rem] font-semibold ${
+                              thread.resolved
                                 ? "border-good/35 bg-good/10 text-good"
-                                : "border-warn/35 bg-warn/10 text-warn") })}>
+                                : "border-warn/35 bg-warn/10 text-warn"
+                            }`}>
                               {thread.resolved
                                 ? <CheckCircle2 size={10} aria-hidden />
                                 : <CircleDot size={10} aria-hidden />}
-                              {thread.resolved ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "해결됨") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "열림")}
+                              {thread.resolved ? "해결됨" : "열림"}
                             </span>
                             {filter === "mine" && currentActorRelationLabel ? (
                               <span className="inline-flex items-center rounded-md border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-[0.62rem] font-semibold text-accent">
@@ -1540,15 +1551,17 @@ export function StudioCommentsPanel({
                             ) : null}
                             {unreadThreadIds.has(thread.id) ? (
                               <span className="inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-[0.62rem] font-bold text-on-accent">
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "새 피드백")}</span>
+                                새 피드백
+                              </span>
                             ) : null}
                             {isReadOnlyArchive ? (
                               <span
                                 className="inline-flex items-center gap-1 rounded-md border border-line bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold text-fg-2"
-                                title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "팀 댓글 도입 전에 문서에 저장된 댓글입니다. 내용과 위치만 보존됩니다.")}
+                                title="팀 댓글 도입 전에 문서에 저장된 댓글입니다. 내용과 위치만 보존됩니다."
                               >
                                 <HardDrive size={10} aria-hidden />
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "로컬 보관본 · 읽기 전용")}</span>
+                                로컬 보관본 · 읽기 전용
+                              </span>
                             ) : null}
                           </div>
                           {onSelectAnchor ? (
@@ -1558,7 +1571,7 @@ export function StudioCommentsPanel({
                                 navigateToAnchor(thread.anchor);
                                 void markThreadRead(thread.id);
                               }}
-                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0} 위치로 이동"), { v0: String(locationLabel) })}
+                              aria-label={`${locationLabel} 위치로 이동`}
                               className="mt-1 inline-flex min-h-11 max-w-full items-center gap-1 rounded-md py-1 text-[0.68rem] font-semibold text-cool hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-7"
                             >
                               <MapPin size={11} className="shrink-0" aria-hidden />
@@ -1577,8 +1590,8 @@ export function StudioCommentsPanel({
                             <button
                               type="button"
                               onClick={() => beginEditing(threadTarget, thread.body)}
-                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0}의 댓글 수정"), { v0: String(thread.author.displayName) })}
-                              title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 수정")}
+                              aria-label={`${thread.author.displayName}의 댓글 수정`}
+                              title="댓글 수정"
                               className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
                             >
                               <Edit3 size={12} aria-hidden />
@@ -1589,11 +1602,12 @@ export function StudioCommentsPanel({
 
                       {isEditingThread ? (
                         <form onSubmit={(event) => submitEdit(event, threadTarget)} className="mt-3 rounded-xl bg-raised/35 p-3">
-                          <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-edit-{v1}"), { v0: String(titleId), v1: String(thread.id) })} className="block text-[0.7rem] font-semibold text-fg-2">
-                            {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 수정")}</label>
+                          <label htmlFor={`${titleId}-edit-${thread.id}`} className="block text-[0.7rem] font-semibold text-fg-2">
+                            댓글 수정
+                          </label>
                           <textarea
                             ref={editEditorRef}
-                            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-edit-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
+                            id={`${titleId}-edit-${thread.id}`}
                             value={editBody}
                             maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
                             rows={3}
@@ -1608,18 +1622,19 @@ export function StudioCommentsPanel({
                                 event.currentTarget.form?.requestSubmit();
                               }
                             }}
-                            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} mt-1.5 resize-y"), { v0: String(FIELD_CLASS) })}
+                            className={`${FIELD_CLASS} mt-1.5 resize-y`}
                           />
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <span className="text-[0.65rem] tabular-nums text-fg-3">{editBody.length}/{STUDIO_COMMENTS_MAX_BODY_LENGTH}</span>
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={cancelEditing} className={QUIET_BUTTON_CLASS}>{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "취소")}</button>
+                              <button type="button" onClick={cancelEditing} className={QUIET_BUTTON_CLASS}>취소</button>
                               <button
                                 type="submit"
                                 disabled={!editBody.trim() || editBody.trim() === thread.body}
                                 className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                               >
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "저장")}</button>
+                                저장
+                              </button>
                             </div>
                           </div>
                         </form>
@@ -1627,22 +1642,23 @@ export function StudioCommentsPanel({
                         <button
                           type="button"
                           aria-expanded={isReplying}
-                          aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-reply-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
-                          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0}의 댓글에 빠르게 답글"), { v0: String(thread.author.displayName) })}
+                          aria-controls={`${titleId}-reply-${thread.id}`}
+                          aria-label={`${thread.author.displayName}의 댓글에 빠르게 답글`}
                           data-studio-comment-quick-reply="true"
                           onClick={() => {
                             beginQuickReply(thread.id);
                             void markThreadRead(thread.id);
                           }}
                           className="group mt-2 block min-h-11 w-full rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-raised/65 focus-visible:bg-raised/65 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                          title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "클릭해 바로 답글을 작성합니다")}
+                          title="클릭해 바로 답글을 작성합니다"
                         >
                           <span className="block whitespace-pre-wrap break-words text-sm leading-6 text-fg">
                             {thread.body}
                           </span>
                           <span className="mt-1 flex items-center gap-1 text-[0.68rem] font-semibold text-fg-3 transition-colors group-hover:text-accent group-focus-visible:text-accent sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100">
                             <Reply size={11} aria-hidden />
-                            {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "클릭해 답글 쓰기")}</span>
+                            클릭해 답글 쓰기
+                          </span>
                         </button>
                       ) : (
                         <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-fg">
@@ -1651,7 +1667,7 @@ export function StudioCommentsPanel({
                       )}
 
                       {thread.replies.length > 0 && (
-                        <ol aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0} 댓글의 답글"), { v0: String(thread.author.displayName) })} className="mt-3">
+                        <ol aria-label={`${thread.author.displayName} 댓글의 답글`} className="mt-3">
                           {thread.replies.map((reply) => {
                             const replyTarget: CommentMessageTarget = {
                               threadId: thread.id,
@@ -1674,15 +1690,15 @@ export function StudioCommentsPanel({
                                         {formatDate(reply.createdAt)}
                                       </time>
                                       {reply.updatedAt !== reply.createdAt && (
-                                        <span className="text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "수정됨")}</span>
+                                        <span className="text-[0.62rem] text-fg-3">수정됨</span>
                                       )}
                                       {canEditReply && !isEditingReply && (
                                         <span className="ml-auto inline-flex items-center gap-1">
                                           <button
                                             type="button"
                                             onClick={() => beginEditing(replyTarget, reply.body)}
-                                            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0}의 답글 수정"), { v0: String(reply.author.displayName) })}
-                                            title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "답글 수정")}
+                                            aria-label={`${reply.author.displayName}의 답글 수정`}
+                                            title="답글 수정"
                                             className="grid size-11 place-items-center rounded-md text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-8"
                                           >
                                             <Edit3 size={12} aria-hidden />
@@ -1692,10 +1708,10 @@ export function StudioCommentsPanel({
                                     </div>
                                     {isEditingReply ? (
                                       <form onSubmit={(event) => submitEdit(event, replyTarget)} className="mt-2 rounded-xl bg-raised/35 p-2.5">
-                                        <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-edit-{v1}"), { v0: String(titleId), v1: String(reply.id) })} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "답글 수정")}</label>
+                                        <label htmlFor={`${titleId}-edit-${reply.id}`} className="sr-only">답글 수정</label>
                                         <textarea
                                           ref={editEditorRef}
-                                          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-edit-{v1}"), { v0: String(titleId), v1: String(reply.id) })}
+                                          id={`${titleId}-edit-${reply.id}`}
                                           value={editBody}
                                           maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
                                           rows={2}
@@ -1710,16 +1726,17 @@ export function StudioCommentsPanel({
                                               event.currentTarget.form?.requestSubmit();
                                             }
                                           }}
-                                          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} resize-y"), { v0: String(FIELD_CLASS) })}
+                                          className={`${FIELD_CLASS} resize-y`}
                                         />
                                         <div className="mt-2 flex justify-end gap-2">
-                                          <button type="button" onClick={cancelEditing} className={QUIET_BUTTON_CLASS}>{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "취소")}</button>
+                                          <button type="button" onClick={cancelEditing} className={QUIET_BUTTON_CLASS}>취소</button>
                                           <button
                                             type="submit"
                                             disabled={!editBody.trim() || editBody.trim() === reply.body}
                                             className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                                           >
-                                            {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "저장")}</button>
+                                            저장
+                                          </button>
                                         </div>
                                       </form>
                                     ) : (
@@ -1729,7 +1746,7 @@ export function StudioCommentsPanel({
                                     )}
                                     {isDeletingReply && (
                                       <div role="alert" className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-bad/30 bg-bad/10 px-2.5 py-2 text-[0.68rem] text-fg-2">
-                                        <span className="min-w-0 flex-1">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "이 답글을 삭제할까요?")}</span>
+                                        <span className="min-w-0 flex-1">이 답글을 삭제할까요?</span>
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -1738,14 +1755,16 @@ export function StudioCommentsPanel({
                                           }}
                                           className={QUIET_BUTTON_CLASS}
                                         >
-                                          {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "취소")}</button>
+                                          취소
+                                        </button>
                                         <button
                                           ref={deleteConfirmRef}
                                           type="button"
                                           onClick={() => void confirmDelete(replyTarget)}
                                           className="inline-flex min-h-11 items-center rounded-lg bg-bad px-3 text-xs font-bold text-on-accent transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bad sm:min-h-9"
                                         >
-                                          {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "삭제")}</button>
+                                          삭제
+                                        </button>
                                       </div>
                                     )}
                                   </div>
@@ -1765,7 +1784,7 @@ export function StudioCommentsPanel({
                             className={QUIET_BUTTON_CLASS}
                           >
                             <CheckCheck size={13} aria-hidden />
-                            {readMutation === thread.id ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "읽음 처리 중") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "읽음으로 표시")}
+                            {readMutation === thread.id ? "읽음 처리 중" : "읽음으로 표시"}
                           </button>
                         ) : null}
                         <button
@@ -1781,9 +1800,12 @@ export function StudioCommentsPanel({
                           }`}
                         >
                           <ClipboardList size={13} aria-hidden />
-                          {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "작업 제안")}<ChevronDown
+                          작업 제안
+                          <ChevronDown
                             size={13}
-                            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "transition-transform duration-150 motion-reduce:transition-none {v0}"), { v0: String(taskExpanded ? "rotate-180" : "") })}
+                            className={`transition-transform duration-150 motion-reduce:transition-none ${
+                              taskExpanded ? "rotate-180" : ""
+                            }`}
                             aria-hidden
                           />
                         </button>
@@ -1802,15 +1824,15 @@ export function StudioCommentsPanel({
                           className={QUIET_BUTTON_CLASS}
                         >
                           <UserRoundCheck size={13} aria-hidden />
-                          {thread.assignee ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "담당 · {v0}"), { v0: String(thread.assignee.displayName) }) : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "담당자 지정")}
+                          {thread.assignee ? `담당 · ${thread.assignee.displayName}` : "담당자 지정"}
                         </button> : null}
                         {!isReadOnlyArchive && capabilities.resolve ? <button
                           type="button"
                           disabled={saving}
                           aria-pressed={thread.resolved}
                           aria-label={thread.resolved
-                            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0}의 댓글 다시 열기"), { v0: String(thread.author.displayName) })
-                            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0}의 댓글 해결 처리"), { v0: String(thread.author.displayName) })}
+                            ? `${thread.author.displayName}의 댓글 다시 열기`
+                            : `${thread.author.displayName}의 댓글 해결 처리`}
                           onClick={() => {
                             if (
                               !thread.resolved
@@ -1835,7 +1857,7 @@ export function StudioCommentsPanel({
                           {thread.resolved
                             ? <RotateCcw size={13} aria-hidden />
                             : <CheckCircle2 size={13} aria-hidden />}
-                          {thread.resolved ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "다시 열기") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "해결")}
+                          {thread.resolved ? "다시 열기" : "해결"}
                         </button> : null}
                       </div>
 
@@ -1843,7 +1865,7 @@ export function StudioCommentsPanel({
                         <section
                           id={taskProposalId}
                           data-studio-review-task="true"
-                          aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-title"), { v0: String(taskProposalId) })}
+                          aria-labelledby={`${taskProposalId}-title`}
                           className="mt-3 border-y border-line/70 py-3"
                         >
                           <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
@@ -1853,13 +1875,13 @@ export function StudioCommentsPanel({
                                   {taskSuggestion.kindLabel}
                                 </span>
                                 <span
-                                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "inline-flex min-h-6 items-center rounded-md border px-2 text-[0.65rem] font-bold {v0}"), { v0: String(reviewTaskPriorityClass(taskSuggestion.priority)) })}
+                                  className={`inline-flex min-h-6 items-center rounded-md border px-2 text-[0.65rem] font-bold ${reviewTaskPriorityClass(taskSuggestion.priority)}`}
                                 >
-                                  {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "우선순위 ")}{taskSuggestion.priorityLabel}
+                                  우선순위 {taskSuggestion.priorityLabel}
                                 </span>
                               </div>
                               <h3
-                                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-title"), { v0: String(taskProposalId) })}
+                                id={`${taskProposalId}-title`}
                                 className="mt-2 text-sm font-bold leading-5 text-fg text-pretty"
                               >
                                 {taskSuggestion.title}
@@ -1867,21 +1889,22 @@ export function StudioCommentsPanel({
                             </div>
                             <span
                               className="inline-flex min-h-7 shrink-0 items-center gap-1 rounded-md border border-good/30 bg-good/10 px-2 text-[0.62rem] font-semibold text-good"
-                              title={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "댓글 내용은 서버나 외부 AI로 전송되지 않습니다.")}
+                              title="댓글 내용은 서버나 외부 AI로 전송되지 않습니다."
                             >
                               <ShieldCheck size={11} aria-hidden />
-                              {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "로컬 규칙 기반")}</span>
+                              로컬 규칙 기반
+                            </span>
                           </div>
 
                           <dl className="mt-3 space-y-2 text-xs leading-relaxed">
                             <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
-                              <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "대상 범위")}</dt>
+                              <dt className="font-semibold text-fg-3">대상 범위</dt>
                               <dd className="min-w-0 break-words font-semibold text-fg-2">
                                 {taskSuggestion.targetScope}
                               </dd>
                             </div>
                             <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
-                              <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "제안 근거")}</dt>
+                              <dt className="font-semibold text-fg-3">제안 근거</dt>
                               <dd className="min-w-0">
                                 <ul className="space-y-1 text-fg-2">
                                   {taskSuggestion.rationale.map((item) => (
@@ -1900,7 +1923,7 @@ export function StudioCommentsPanel({
                           </dl>
 
                           <div className="mt-3">
-                            <p className="text-[0.7rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "완료 조건")}</p>
+                            <p className="text-[0.7rem] font-bold text-fg-2">완료 조건</p>
                             <ul className="mt-1.5 space-y-1.5">
                               {taskSuggestion.completionChecklist.map((item) => (
                                 <li
@@ -1921,12 +1944,12 @@ export function StudioCommentsPanel({
                             <p
                               id={taskConversionHelpId}
                               className="min-w-0 flex-1 text-[0.68rem] leading-relaxed text-fg-3"
-                              role={taskConversionDisabledReason ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "status") : undefined}
+                              role={taskConversionDisabledReason ? "status" : undefined}
                             >
                               {taskConversionDisabledReason
                                 ?? (thread.assignee
-                                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "현재 담당자 {v0}에서 {v1}(으)로 변경합니다."), { v0: String(thread.assignee.displayName), v1: String(currentActor.displayName) })
-                                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "{v0}을(를) 이 댓글의 담당자로 지정합니다."), { v0: String(currentActor.displayName) }))}
+                                  ? `현재 담당자 ${thread.assignee.displayName}에서 ${currentActor.displayName}(으)로 변경합니다.`
+                                  : `${currentActor.displayName}을(를) 이 댓글의 담당자로 지정합니다.`)}
                             </p>
                             <button
                               type="button"
@@ -1937,7 +1960,7 @@ export function StudioCommentsPanel({
                               className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:bg-raised disabled:text-fg-3 disabled:opacity-55 sm:min-h-9 pointer-coarse:min-h-11"
                             >
                               <UserRoundCheck size={13} aria-hidden />
-                              {assignedToCurrentActor ? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "내 작업으로 지정됨") : translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "내 작업으로 전환")}
+                              {assignedToCurrentActor ? "내 작업으로 지정됨" : "내 작업으로 전환"}
                             </button>
                           </div>
                         </section>
@@ -1945,21 +1968,22 @@ export function StudioCommentsPanel({
 
                       {isReplying && (
                         <form
-                          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-reply-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
-                          aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-reply-label-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
+                          id={`${titleId}-reply-${thread.id}`}
+                          aria-labelledby={`${titleId}-reply-label-${thread.id}`}
                           data-studio-comment-inline-reply="true"
                           onSubmit={(event) => submitReply(event, thread.id)}
                           className="mt-3 rounded-lg border border-accent/35 bg-accent-soft/10 p-3 transition-colors focus-within:border-accent/65 focus-within:bg-accent-soft/15"
                         >
                           <label
-                            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-reply-label-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
-                            htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-reply-editor-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
+                            id={`${titleId}-reply-label-${thread.id}`}
+                            htmlFor={`${titleId}-reply-editor-${thread.id}`}
                             className="block text-[0.7rem] font-semibold text-fg-2"
                           >
-                            {thread.author.displayName}{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "에게 답글")}</label>
+                            {thread.author.displayName}에게 답글
+                          </label>
                           <textarea
                             ref={replyEditorRef}
-                            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-reply-editor-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
+                            id={`${titleId}-reply-editor-${thread.id}`}
                             value={activeReplyBody}
                             maxLength={STUDIO_COMMENTS_MAX_BODY_LENGTH}
                             rows={2}
@@ -1980,12 +2004,12 @@ export function StudioCommentsPanel({
                                 event.currentTarget.form?.requestSubmit();
                               }
                             }}
-                            placeholder={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "답글을 입력하세요.")}
-                            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} mt-1.5 resize-y"), { v0: String(FIELD_CLASS) })}
+                            placeholder="답글을 입력하세요."
+                            className={`${FIELD_CLASS} mt-1.5 resize-y`}
                           />
                           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                             <span className="text-[0.65rem] text-fg-3">
-                              <span className="hidden sm:inline">{translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "⌘/Ctrl + Enter 등록 · Esc 취소 · ")}</span>
+                              <span className="hidden sm:inline">⌘/Ctrl + Enter 등록 · Esc 취소 · </span>
                               <span className="tabular-nums">
                                 {activeReplyBody.length.toLocaleString("ko-KR")}/{STUDIO_COMMENTS_MAX_BODY_LENGTH.toLocaleString("ko-KR")}
                               </span>
@@ -1998,16 +2022,18 @@ export function StudioCommentsPanel({
                                   focusReviewRail();
                                   closeReplyEditor();
                                 }}
-                                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} disabled:cursor-wait disabled:opacity-40"), { v0: String(QUIET_BUTTON_CLASS) })}
+                                className={`${QUIET_BUTTON_CLASS} disabled:cursor-wait disabled:opacity-40`}
                               >
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "취소")}</button>
+                                취소
+                              </button>
                               <button
                                 type="submit"
                                 disabled={!canReply || !activeReplyBody.trim()}
                                 className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                               >
                                 <Send size={12} aria-hidden />
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "답글 등록")}</button>
+                                답글 등록
+                              </button>
                             </div>
                           </div>
                         </form>
@@ -2015,44 +2041,50 @@ export function StudioCommentsPanel({
 
                       {isAssigning && (
                         <form onSubmit={(event) => submitAssignee(event, thread.id)} className="mt-3 bg-raised/25 p-3">
-                          <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-assignee-{v1}"), { v0: String(titleId), v1: String(thread.id) })} className="block text-[0.7rem] font-semibold text-fg-2">
-                            {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "담당자")}</label>
+                          <label htmlFor={`${titleId}-assignee-${thread.id}`} className="block text-[0.7rem] font-semibold text-fg-2">
+                            담당자
+                          </label>
                           <div className="mt-1.5 flex min-w-0 flex-col gap-2 sm:flex-row">
                             <input
                               ref={assigneeEditorRef}
-                              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0}-assignee-{v1}"), { v0: String(titleId), v1: String(thread.id) })}
+                              id={`${titleId}-assignee-${thread.id}`}
                               type="text"
                               value={assigneeName}
                               maxLength={STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH}
                               onChange={(event) =>
                                 setAssigneeName(event.target.value.slice(0, STUDIO_COMMENTS_MAX_DISPLAY_NAME_LENGTH))
                               }
-                              placeholder={translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "담당자 표시 이름")}
-                              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "en", "{v0} min-w-0 flex-1"), { v0: String(FIELD_CLASS) })}
+                              placeholder="담당자 표시 이름"
+                              className={`${FIELD_CLASS} min-w-0 flex-1`}
                             />
                             <div className="flex flex-wrap items-center gap-2">
                               <button type="button" onClick={() => void assignToCurrentActor(thread.id)} className={QUIET_BUTTON_CLASS}>
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "나에게")}</button>
+                                나에게
+                              </button>
                               {thread.assignee && (
                                 <button type="button" onClick={() => void clearAssignee(thread.id)} className={QUIET_BUTTON_CLASS}>
-                                  {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "배정 해제")}</button>
+                                  배정 해제
+                                </button>
                               )}
                               <button
                                 type="submit"
                                 disabled={!assigneeName.trim()}
                                 className="inline-flex min-h-11 items-center rounded-lg bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-9"
                               >
-                                {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "지정")}</button>
+                                지정
+                              </button>
                             </div>
                           </div>
                           <p className="mt-2 text-[0.65rem] leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "표시 이름만 문서에 저장됩니다. 계정 조회나 서버 권한 부여는 하지 않아요.")}</p>
+                            표시 이름만 문서에 저장됩니다. 계정 조회나 서버 권한 부여는 하지 않아요.
+                          </p>
                         </form>
                       )}
 
                       {thread.resolved && thread.resolvedAt && (
                         <p className="mt-3 text-[0.65rem] leading-relaxed text-fg-3">
-                          {thread.resolvedBy?.displayName ?? translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "작성자 미상")} · {formatDate(thread.resolvedAt)} {translateCurrentStaticSourceText("domains.creator.StudioCommentsPanel", "ko", "해결 처리")}</p>
+                          {thread.resolvedBy?.displayName ?? "작성자 미상"} · {formatDate(thread.resolvedAt)} 해결 처리
+                        </p>
                       )}
                     </article>
                   </li>

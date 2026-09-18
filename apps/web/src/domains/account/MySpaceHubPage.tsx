@@ -1,10 +1,4 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   BellRing,
   BookOpen,
@@ -165,8 +159,8 @@ export function MySpaceHubPage() {
                 href={href}
                 className={
                   primary
-                    ? translateCurrentStaticSourceText("domains.account.MySpaceHubPage", "en", "group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70")
-                    : translateCurrentStaticSourceText("domains.account.MySpaceHubPage", "en", "group flex min-h-32 flex-col rounded-2xl border border-line/80 bg-panel/45 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70")
+                    ? "group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-card p-4 transition-all hover:-translate-y-1 hover:border-accent/40 hover:bg-raised hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                    : "group flex min-h-32 flex-col rounded-2xl border border-line/80 bg-panel/45 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/35 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                 }
               >
                 {primary ? <span aria-hidden="true" className="absolute -right-8 -top-8 size-24 rounded-full bg-accent/0 blur-2xl transition-colors group-hover:bg-accent/15" /> : null}

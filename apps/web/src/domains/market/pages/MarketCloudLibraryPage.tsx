@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Archive,
   ArchiveRestore,
   ArrowRight,
@@ -275,32 +272,36 @@ export function MarketLibraryPage() {
 
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line pb-6">
         <div>
-          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "en", "Account library")}</p>
+          <p className="eyebrow text-accent">Account library</p>
           <div className="mt-1 flex items-center gap-2">
             <Cloud className="size-5 text-accent" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-fg sm:text-2xl">{translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "내 에셋")}</h1>
+            <h1 className="text-xl font-bold text-fg sm:text-2xl">내 에셋</h1>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "서버 계정 라이브러리를 소장 권한의 기준으로 사용합니다. 계정 설치 확인은 현재 기기 설치와 다르며, 어느 기기에서든 정확한 릴리스를 설치한 증거입니다.")}</p>
+            서버 계정 라이브러리를 소장 권한의 기준으로 사용합니다. 계정 설치 확인은
+            현재 기기 설치와 다르며, 어느 기기에서든 정확한 릴리스를 설치한 증거입니다.
+          </p>
         </div>
         <Link href="/market/browse" className={buttonClass({ variant: "outline", size: "sm" })}>
-          {translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "에셋 더 찾기")}<ArrowRight className="size-3.5" aria-hidden="true" />
+          에셋 더 찾기
+          <ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </header>
 
       {!ready ? (
-        <StatusCard icon={LoaderCircle} spin text={translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "로그인 세션 확인 중")} />
+        <StatusCard icon={LoaderCircle} spin text="로그인 세션 확인 중" />
       ) : !userId ? (
         <section className="mt-8 rounded-2xl border border-line bg-card p-8 text-center">
           <Cloud className="mx-auto size-10 text-fg-3" aria-hidden="true" />
-          <h2 className="mt-3 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "로그인 후 계정 라이브러리를 사용할 수 있어요")}</h2>
+          <h2 className="mt-3 text-base font-bold text-fg">로그인 후 계정 라이브러리를 사용할 수 있어요</h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "브라우저 저장소는 소장 권한을 만들지 않습니다. 로그인 계정에 서버가 기록한 항목만 표시됩니다.")}</p>
+            브라우저 저장소는 소장 권한을 만들지 않습니다. 로그인 계정에 서버가 기록한 항목만 표시됩니다.
+          </p>
         </section>
       ) : (
         <>
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "내 에셋 보기")} className="flex items-center gap-1 rounded-xl border border-line bg-panel p-1">
+            <div role="tablist" aria-label="내 에셋 보기" className="flex items-center gap-1 rounded-xl border border-line bg-panel p-1">
               {(["active", "archived"] as const).map((candidate) => (
                 <button
                   key={candidate}
@@ -315,7 +316,7 @@ export function MarketLibraryPage() {
                       : "text-fg-2 hover:bg-raised hover:text-fg",
                   )}
                 >
-                  {candidate === "active" ? translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "소장") : translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "보관됨")}
+                  {candidate === "active" ? "소장" : "보관됨"}
                 </button>
               ))}
             </div>
@@ -326,7 +327,8 @@ export function MarketLibraryPage() {
               className={buttonClass({ variant: "outline", size: "sm" })}
             >
               <RefreshCw className={cn("size-3.5", visibleLoadState === "loading" && "animate-spin")} aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "새로고침")}</button>
+              새로고침
+            </button>
           </div>
 
           {message ? <p role="status" className="mt-4 rounded-xl border border-good/40 bg-good/10 px-4 py-3 text-sm text-good">{message}</p> : null}
@@ -335,17 +337,17 @@ export function MarketLibraryPage() {
           {visibleLoadState === "loading" ? (
             <LibrarySkeleton />
           ) : visibleLoadState === "error" ? (
-            <RetryCard title={translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "계정 라이브러리를 확인할 수 없어요")} onRetry={() => setReloadToken((value) => value + 1)} />
+            <RetryCard title="계정 라이브러리를 확인할 수 없어요" onRetry={() => setReloadToken((value) => value + 1)} />
           ) : visibleItems.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel/50 p-10 text-center">
               <FolderOpen className="mx-auto size-10 text-fg-3" aria-hidden="true" />
               <h2 className="mt-3 text-base font-bold text-fg">
-                {view === "active" ? translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "소장한 에셋이 없어요") : translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "보관된 에셋이 없어요")}
+                {view === "active" ? "소장한 에셋이 없어요" : "보관된 에셋이 없어요"}
               </h2>
               <p className="mx-auto mt-2 max-w-md text-sm text-fg-2">
                 {view === "active"
-                  ? translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "마켓 상세에서 계정 라이브러리에 추가한 에셋이 여기에 표시됩니다.")
-                  : translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다.")}
+                  ? "마켓 상세에서 계정 라이브러리에 추가한 에셋이 여기에 표시됩니다."
+                  : "숨긴 에셋은 소장 권한을 유지한 채 이곳에서 복원할 수 있습니다."}
               </p>
             </div>
           ) : (
@@ -370,17 +372,17 @@ export function MarketLibraryPage() {
                         "shrink-0 rounded-full px-2 py-1 text-[0.62rem] font-bold",
                         head ? "bg-good/15 text-good" : "bg-warn/15 text-warn",
                       )}>
-                        {head ? translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "사용 가능") : translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "사용 불가")}
+                        {head ? "사용 가능" : "사용 불가"}
                       </span>
                     </div>
 
                     <dl className="mt-4 space-y-2 border-t border-line pt-3 text-xs">
                       <div className="flex justify-between gap-3">
-                        <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "추가한 버전")}</dt>
+                        <dt className="text-fg-3">추가한 버전</dt>
                         <dd className="numeral tnum text-right font-medium text-fg">v{item.addedFrom.resourceVersion}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "현재 상태")}</dt>
+                        <dt className="text-fg-3">현재 상태</dt>
                         <dd className="text-right font-medium text-fg">{catalogMessage(item)}</dd>
                       </div>
                     </dl>
@@ -409,7 +411,7 @@ export function MarketLibraryPage() {
                         ) : (
                           <ArchiveRestore className="size-3.5" aria-hidden="true" />
                         )}
-                        {view === "active" ? translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "목록에서 보관") : translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "소장 목록으로 복원")}
+                        {view === "active" ? "목록에서 보관" : "소장 목록으로 복원"}
                       </button>
                     </div>
                   </li>
@@ -422,7 +424,7 @@ export function MarketLibraryPage() {
             <div className="mt-8 text-center">
               <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className={buttonClass({ variant: "outline", size: "md" })}>
                 {loadingMore ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
-                {loadingMore ? translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "불러오는 중") : translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "더 보기")}
+                {loadingMore ? "불러오는 중" : "더 보기"}
               </button>
             </div>
           ) : null}
@@ -456,7 +458,8 @@ function RetryCard({ title, onRetry }: { title: string; onRetry: () => void }) {
       <ShieldAlert className="mx-auto size-10 text-bad" aria-hidden="true" />
       <h2 className="mt-3 text-base font-bold text-fg">{title}</h2>
       <button type="button" onClick={onRetry} className={buttonClass({ variant: "solid", size: "sm", className: "mt-4" })}>
-        {translateCurrentStaticSourceText("domains.market.pages.MarketCloudLibraryPage", "ko", "다시 시도")}</button>
+        다시 시도
+      </button>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { GitBranch, Plus, Spline, Trash2 } from "lucide-react";
 
 import type { BubbleTailDirection, BubbleTailSide, BubbleTailSpec } from "./studio-bubble-path";
@@ -65,7 +64,7 @@ function RangeRow({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleTailControls", "en", "block {v0}"), { v0: String(disabled ? "opacity-45" : "") })}>
+    <label className={`block ${disabled ? "opacity-45" : ""}`}>
       <span className="flex items-center justify-between gap-3 text-xs text-fg-2">
         <span>{label}</span>
         <output className="min-w-16 text-right font-display text-[0.68rem] tabular-nums text-fg-3">
@@ -185,7 +184,7 @@ export function StudioBubbleTailControls({
                   aria-pressed={direction === option.value}
                   disabled={anchored}
                   onClick={() => onPatchPrimary({ tailDirection: option.value })}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleTailControls", "en", "{v0} disabled:cursor-not-allowed disabled:opacity-45"), { v0: String(segmentClass(direction === option.value)) })}
+                  className={`${segmentClass(direction === option.value)} disabled:cursor-not-allowed disabled:opacity-45`}
                 >
                   {option.label}
                 </button>
@@ -220,7 +219,7 @@ export function StudioBubbleTailControls({
               min={8}
               max={120}
               step={1}
-              valueLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleTailControls", "en", "{v0}px"), { v0: String(Math.round(length)) })}
+              valueLabel={`${Math.round(length)}px`}
               disabled={anchored}
               onChange={(value) => onPatchPrimary({ tailHeight: value })}
             />
@@ -230,7 +229,7 @@ export function StudioBubbleTailControls({
               min={6}
               max={120}
               step={1}
-              valueLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleTailControls", "en", "{v0}px"), { v0: String(Math.round(base)) })}
+              valueLabel={`${Math.round(base)}px`}
               onChange={(value) => onPatchPrimary({ tailBase: value })}
             />
             <RangeRow
@@ -357,7 +356,7 @@ export function StudioBubbleTailControls({
                         min={4}
                         max={160}
                         step={1}
-                        valueLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleTailControls", "en", "{v0}px"), { v0: String(Math.round(extraTail.length)) })}
+                        valueLabel={`${Math.round(extraTail.length)}px`}
                         onChange={(value) => onChangeExtraTails(updateTail(extraTails, index, { length: value }))}
                       />
                       <RangeRow
@@ -366,7 +365,7 @@ export function StudioBubbleTailControls({
                         min={4}
                         max={120}
                         step={1}
-                        valueLabel={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleTailControls", "en", "{v0}px"), { v0: String(Math.round(extraTail.base)) })}
+                        valueLabel={`${Math.round(extraTail.base)}px`}
                         onChange={(value) => onChangeExtraTails(updateTail(extraTails, index, { base: value }))}
                       />
                       <RangeRow

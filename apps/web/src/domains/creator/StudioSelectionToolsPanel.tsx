@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Selection Tools Panel
  * 픽셀 선택 — 사각/타원/자유 올가미/다각형 올가미/브러시 + 합치기/빼기/교집합 +
@@ -487,13 +483,13 @@ export function StudioSelectionToolsPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 선택")}
+      aria-label="픽셀 선택"
       aria-busy={busy}
       className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
       data-studio-pixel-selection="true"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 선택")}</p>
+        <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">픽셀 선택</p>
         <div className="flex items-center gap-1">
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.selectAll}
@@ -506,9 +502,10 @@ export function StudioSelectionToolsPanel({
               onClick={onSelectAll}
               disabled={busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "전체 픽셀 선택")}
+              aria-label="전체 픽셀 선택"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "전체")}</button>
+              전체
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.clear}
@@ -521,15 +518,16 @@ export function StudioSelectionToolsPanel({
               onClick={onClearSelection}
               disabled={!selection || busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 해제")}
+              aria-label="선택 해제"
             >
               <RotateCcw className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "해제")}</button>
+              해제
+            </button>
           </StudioToolHintTarget>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 도구")}>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="선택 도구">
         {tools.map((tool) => {
           const Icon = TOOL_ICONS[tool.id];
           const active = activeTool === tool.id;
@@ -557,11 +555,11 @@ export function StudioSelectionToolsPanel({
                   active={active}
                   disabled={toolDisabled}
                   onClick={() => onPickTool(active ? null : tool.id)}
-                  aria-label={active ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "{v0} 종료"), { v0: String(tool.label) }) : tool.label}
+                  aria-label={active ? `${tool.label} 종료` : tool.label}
                 >
                   <span className="inline-flex items-center gap-1">
                     <Icon className="size-3" aria-hidden />
-                    {active ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "{v0} 종료"), { v0: String(tool.label) }) : tool.label}
+                    {active ? `${tool.label} 종료` : tool.label}
                   </span>
                 </StudioToggleChip>
               </span>
@@ -572,43 +570,45 @@ export function StudioSelectionToolsPanel({
 
       {activeTool === "brush" && onBrushRadiusChange ? (
         <StudioSliderRow
-          label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "반경")}
+          label="반경"
           min={SELECTION_BRUSH_RADIUS_RANGE.min}
           max={SELECTION_BRUSH_RADIUS_RANGE.max}
           step={SELECTION_BRUSH_RADIUS_RANGE.step}
           value={brushRadius}
           onChange={onBrushRadiusChange}
           disabled={busy}
-          readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "en", "{v0}px"), { v0: String(brushRadius) })}
+          readout={`${brushRadius}px`}
         />
       ) : null}
 
       {(activeTool === "lasso" || activeTool === "poly-lasso") && onToggleMagnetic ? (
         <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
           <span>
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "자석 올가미")}<span className="ml-1 text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "경계에 달라붙기")}</span>
+            자석 올가미
+            <span className="ml-1 text-fg-3">경계에 달라붙기</span>
           </span>
           <StudioToggleChip
             active={magneticLasso}
             disabled={busy}
             onClick={onToggleMagnetic}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "자석 올가미")}
+            aria-label="자석 올가미"
           >
-            {magneticLasso ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "꺼짐")}
+            {magneticLasso ? "켜짐" : "꺼짐"}
           </StudioToggleChip>
         </div>
       ) : null}
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "다음 선택")}</span>
+          <span className="text-xs font-medium text-fg-2">다음 선택</span>
           <span className="text-[0.66rem] text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "Shift 추가 · Alt 빼기")}</span>
+            Shift 추가 · Alt 빼기
+          </span>
         </div>
         <div
           className="grid grid-cols-2 gap-1 rounded-lg border border-line/45 bg-bg/35 p-1"
           role="group"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "다음 선택 작업")}
+          aria-label="다음 선택 작업"
         >
           {SELECTION_OPERATION_MODES.map((mode) => (
             <StudioToolHintTarget
@@ -650,14 +650,14 @@ export function StudioSelectionToolsPanel({
       </div>
 
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "페더")}
+        label="페더"
         min={SELECTION_FEATHER_RANGE.min}
         max={SELECTION_FEATHER_RANGE.max}
         step={SELECTION_FEATHER_RANGE.step}
         value={selection?.featherPx ?? 0}
         onChange={onFeatherChange}
         disabled={busy}
-        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "en", "{v0}px"), { v0: String(selection?.featherPx ?? 0) })}
+        readout={`${selection?.featherPx ?? 0}px`}
       />
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -672,9 +672,10 @@ export function StudioSelectionToolsPanel({
               active={!!selection?.invert}
               disabled={busy}
               onClick={onToggleInvert}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 반전")}
+              aria-label="선택 반전"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "반전")}</StudioToggleChip>
+              반전
+            </StudioToggleChip>
           </span>
         </StudioToolHintTarget>
         <StudioToolHintTarget
@@ -688,19 +689,20 @@ export function StudioSelectionToolsPanel({
             onClick={onUndoSubpath}
             disabled={!selection || subpathCount === 0 || busy}
             className={buttonClass({ size: "sm", variant: "quiet" })}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "마지막 선택 영역 제거")}
+            aria-label="마지막 선택 영역 제거"
           >
             <Undo2 className="size-3.5" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "마지막 영역 제거")}</button>
+            마지막 영역 제거
+          </button>
         </StudioToolHintTarget>
       </div>
 
       <div
         className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line/40 bg-bg/35 p-1.5"
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 선택 기록")}
+        aria-label="픽셀 선택 기록"
       >
-        <span className="mr-auto text-[0.66rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 기록")}</span>
+        <span className="mr-auto text-[0.66rem] font-medium text-fg-3">선택 기록</span>
         <StudioToolHintTarget
           hint={SELECTION_ACTION_HINTS.undo}
           disabled={Boolean(undoUnavailableReason)}
@@ -712,10 +714,11 @@ export function StudioSelectionToolsPanel({
             onClick={onUndoSelection}
             disabled={!canUndoSelection || busy}
             className={buttonClass({ size: "sm", variant: "quiet" })}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 작업 실행 취소")}
+            aria-label="선택 작업 실행 취소"
           >
             <Undo2 className="size-3.5" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "실행 취소")}</button>
+            실행 취소
+          </button>
         </StudioToolHintTarget>
         <StudioToolHintTarget
           hint={SELECTION_ACTION_HINTS.redo}
@@ -728,10 +731,11 @@ export function StudioSelectionToolsPanel({
             onClick={onRedoSelection}
             disabled={!canRedoSelection || busy}
             className={buttonClass({ size: "sm", variant: "quiet" })}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 작업 다시 실행")}
+            aria-label="선택 작업 다시 실행"
           >
             <Redo2 className="size-3.5" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "다시 실행")}</button>
+            다시 실행
+          </button>
         </StudioToolHintTarget>
       </div>
 
@@ -742,13 +746,14 @@ export function StudioSelectionToolsPanel({
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
               <Pipette className="size-3" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위")}</p>
+              색상 범위
+            </p>
             <StudioToolHintTarget
               hint={COLOR_RANGE_HINTS.clearSamples}
               disabled={Boolean(busyUnavailableReason ?? colorRangeNoSamplesReason)}
               unavailableReason={
                 busyUnavailableReason
-                ?? (colorRangeSamples.length === 0 ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "지울 색 샘플이 없습니다.") : undefined)
+                ?? (colorRangeSamples.length === 0 ? "지울 색 샘플이 없습니다." : undefined)
               }
               preferredSide="left"
             >
@@ -757,15 +762,16 @@ export function StudioSelectionToolsPanel({
                 onClick={() => onColorRangeClearSamples?.()}
                 disabled={busy || colorRangeSamples.length === 0}
                 className={buttonClass({ size: "sm", variant: "quiet" })}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 샘플 모두 지우기")}
+                aria-label="색상 샘플 모두 지우기"
               >
                 <Eraser className="size-3.5" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "지우기")}</button>
+                지우기
+              </button>
             </StudioToolHintTarget>
           </div>
 
           {colorRangeSamples.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "추출한 색상 샘플")}>
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="추출한 색상 샘플">
               {colorRangeSamples.map((sample, index) => {
                 const hex = colorRangeSampleHex(sample);
                 return (
@@ -785,7 +791,7 @@ export function StudioSelectionToolsPanel({
                       onClick={() => onColorRangeRemoveSample?.(index)}
                       disabled={busy}
                       className={cn(buttonClass({ size: "sm", variant: "quiet" }), "gap-1")}
-                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 샘플 {v0} ({v1}) 제거"), { v0: String(index + 1), v1: String(hex) })}
+                      aria-label={`색상 샘플 ${index + 1} (${hex}) 제거`}
                     >
                       <span
                         className="size-3 rounded-full border border-line/60"
@@ -801,7 +807,8 @@ export function StudioSelectionToolsPanel({
             </div>
           ) : (
             <p className="text-[0.68rem] leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "아직 추출한 색이 없습니다. 아래 버튼을 켜고 이미지에서 색을 클릭하세요.")}</p>
+              아직 추출한 색이 없습니다. 아래 버튼을 켜고 이미지에서 색을 클릭하세요.
+            </p>
           )}
 
           <div className="flex flex-wrap items-center gap-1.5">
@@ -817,12 +824,12 @@ export function StudioSelectionToolsPanel({
                   disabled={colorRangePickDisabled}
                   onClick={() => onColorRangeTogglePick?.()}
                   aria-label={
-                    colorRangePickArmed ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "캔버스 색 추출 종료") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "캔버스에서 색 추출")
+                    colorRangePickArmed ? "캔버스 색 추출 종료" : "캔버스에서 색 추출"
                   }
                 >
                   <span className="inline-flex items-center gap-1">
                     <Pipette className="size-3" aria-hidden />
-                    {colorRangePickArmed ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색 추출 종료") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "캔버스에서 색 추출")}
+                    {colorRangePickArmed ? "색 추출 종료" : "캔버스에서 색 추출"}
                   </span>
                 </StudioToggleChip>
               </span>
@@ -844,13 +851,13 @@ export function StudioSelectionToolsPanel({
                   onClick={() => onColorRangeTogglePreview?.()}
                   aria-label={
                     colorRangePreviewEnabled
-                      ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위 미리보기 종료")
-                      : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위 미리보기")
+                      ? "색상 범위 미리보기 종료"
+                      : "색상 범위 미리보기"
                   }
                 >
                   <span className="inline-flex items-center gap-1">
                     <Eye className="size-3" aria-hidden />
-                    {colorRangePreviewEnabled ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "미리보기 종료") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "미리보기")}
+                    {colorRangePreviewEnabled ? "미리보기 종료" : "미리보기"}
                   </span>
                 </StudioToggleChip>
               </span>
@@ -858,7 +865,7 @@ export function StudioSelectionToolsPanel({
           </div>
 
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "허용량")}
+            label="허용량"
             min={COLOR_RANGE_FUZZINESS_RANGE.min}
             max={COLOR_RANGE_FUZZINESS_RANGE.max}
             step={COLOR_RANGE_FUZZINESS_RANGE.step}
@@ -888,23 +895,23 @@ export function StudioSelectionToolsPanel({
               onClick={() => onColorRangeApply?.()}
               disabled={busy || colorRangeSamples.length === 0}
               className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위로 선택")}
+              aria-label="색상 범위로 선택"
             >
               <WandSparkles className="size-3.5" aria-hidden />
-              {busy ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "적용 중...") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위로 선택 ({v0})"), { v0: String(combineLabel) })}
+              {busy ? "적용 중..." : `색상 범위로 선택 (${combineLabel})`}
             </button>
           </StudioToolHintTarget>
 
           <p className="text-[0.68rem] leading-relaxed text-fg-3" role="status">
             {busy
               ? colorRangePickArmed
-                ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위를 계산 중입니다. 색 추출 도구는 지금 종료할 수 있습니다.")
-                : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색상 범위를 계산 중입니다. 완료될 때까지 설정 변경은 잠시 기다려 주세요.")
+                ? "색상 범위를 계산 중입니다. 색 추출 도구는 지금 종료할 수 있습니다."
+                : "색상 범위를 계산 중입니다. 완료될 때까지 설정 변경은 잠시 기다려 주세요."
               : colorRangePickArmed
-                ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다.")
+                ? "이미지 위를 클릭하면 그 지점의 색이 샘플로 추가됩니다."
                 : colorRangeSamples.length > 0
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "샘플 {v0}개 · 허용량 {v1} · 마술봉과 달리 떨어져 있는 같은 색도 한 번에 선택됩니다."), { v0: String(colorRangeSamples.length), v1: String(colorRangeFuzziness) })
-                  : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색을 추출한 뒤 적용하면 이미지 전체에서 비슷한 색이 모두 선택됩니다.")}
+                  ? `샘플 ${colorRangeSamples.length}개 · 허용량 ${colorRangeFuzziness} · 마술봉과 달리 떨어져 있는 같은 색도 한 번에 선택됩니다.`
+                  : "색을 추출한 뒤 적용하면 이미지 전체에서 비슷한 색이 모두 선택됩니다."}
           </p>
         </div>
       ) : null}
@@ -912,7 +919,7 @@ export function StudioSelectionToolsPanel({
       {/* 확장 / 축소 */}
       <div className="flex flex-wrap items-center gap-1.5 border-t border-line/40 pt-2">
         <StudioSliderRow
-          label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "확장량")}
+          label="확장량"
           min={SELECTION_EXPAND_RANGE.min}
           max={SELECTION_EXPAND_RANGE.max}
           step={SELECTION_EXPAND_RANGE.step}
@@ -932,10 +939,11 @@ export function StudioSelectionToolsPanel({
             disabled={Boolean(boundaryUnavailableReason)}
             className={buttonClass({ size: "sm", variant: "outline" })}
             onClick={() => onExpand(expandAmount)}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 확장")}
+            aria-label="선택 경계 확장"
           >
             <Maximize2 className="size-3.5" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "확장")}</button>
+            확장
+          </button>
         </StudioToolHintTarget>
         <StudioToolHintTarget
           hint={SELECTION_ACTION_HINTS.contract}
@@ -948,17 +956,18 @@ export function StudioSelectionToolsPanel({
             disabled={Boolean(boundaryUnavailableReason)}
             className={buttonClass({ size: "sm", variant: "outline" })}
             onClick={() => onContract(expandAmount)}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 축소")}
+            aria-label="선택 경계 축소"
           >
             <Minimize2 className="size-3.5" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "축소")}</button>
+            축소
+          </button>
         </StudioToolHintTarget>
       </div>
 
       {/* 선택 마퀴 회전 / 뒤집기 — 픽셀 내용은 그대로, 경계만 변형(Transform Selection). */}
       <div className="space-y-1.5 border-t border-line/40 pt-2">
         <StudioSliderRow
-          label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "회전")}
+          label="회전"
           min={SELECTION_ROTATE_RANGE.min}
           max={SELECTION_ROTATE_RANGE.max}
           step={SELECTION_ROTATE_RANGE.step}
@@ -973,7 +982,7 @@ export function StudioSelectionToolsPanel({
             disabled={Boolean(boundaryUnavailableReason) || rotateAmount === 0}
             unavailableReason={
               boundaryUnavailableReason
-              ?? (rotateAmount === 0 ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "회전 각도를 0°가 아닌 값으로 설정하세요.") : undefined)
+              ?? (rotateAmount === 0 ? "회전 각도를 0°가 아닌 값으로 설정하세요." : undefined)
             }
             preferredSide="left"
           >
@@ -982,10 +991,11 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason) || rotateAmount === 0}
               className={buttonClass({ size: "sm", variant: "outline" })}
               onClick={() => onRotate(rotateAmount)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 회전 적용")}
+              aria-label="선택 경계 회전 적용"
             >
               <RotateCw className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "적용")}</button>
+              적용
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.marqueeRotateClockwise90}
@@ -998,7 +1008,7 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onRotate(90)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 시계 방향 90도 회전")}
+              aria-label="선택 경계 시계 방향 90도 회전"
             >
               <RotateCw className="size-3.5" aria-hidden />
               90°
@@ -1015,7 +1025,7 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onRotate(-90)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 반시계 방향 90도 회전")}
+              aria-label="선택 경계 반시계 방향 90도 회전"
             >
               <RotateCcw className="size-3.5" aria-hidden />
               -90°
@@ -1032,7 +1042,7 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onRotate(180)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 180도 회전")}
+              aria-label="선택 경계 180도 회전"
             >
               180°
             </button>
@@ -1048,10 +1058,11 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onFlip("x")}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 좌우 반전")}
+              aria-label="선택 경계 좌우 반전"
             >
               <FlipHorizontal2 className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "좌우")}</button>
+              좌우
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.marqueeFlipY}
@@ -1064,16 +1075,18 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onFlip("y")}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 상하 반전")}
+              aria-label="선택 경계 상하 반전"
             >
               <FlipVertical2 className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "상하")}</button>
+              상하
+            </button>
           </StudioToolHintTarget>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="inline-flex items-center gap-1 text-[0.66rem] text-fg-3">
             <Move className="size-3" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "마퀴 이동")}</span>
+            마퀴 이동
+          </span>
           {(
             [
               { dx: -MARQUEE_NUDGE, dy: 0, label: "왼쪽", variant: "translate-left", Icon: ArrowLeft },
@@ -1100,7 +1113,7 @@ export function StudioSelectionToolsPanel({
                 disabled={Boolean(boundaryUnavailableReason)}
                 className={buttonClass({ size: "sm", variant: "quiet" })}
                 onClick={() => onTranslate(dx, dy)}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 {v0} 이동"), { v0: String(label) })}
+                aria-label={`선택 경계 ${label} 이동`}
               >
                 <Icon className="size-3.5" aria-hidden />
               </button>
@@ -1117,9 +1130,10 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onScale(1.1)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 1.1배 확대")}
+              aria-label="선택 경계 1.1배 확대"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "확대")}</button>
+              확대
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.marqueeScaleDown}
@@ -1132,9 +1146,10 @@ export function StudioSelectionToolsPanel({
               disabled={Boolean(boundaryUnavailableReason)}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onScale(0.9)}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 경계 0.9배 축소")}
+              aria-label="선택 경계 0.9배 축소"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "축소")}</button>
+              축소
+            </button>
           </StudioToolHintTarget>
         </div>
       </div>
@@ -1142,9 +1157,10 @@ export function StudioSelectionToolsPanel({
       {/* 내용 변형(Transform) — 선택 안 픽셀 내용 변형(굽기). 마퀴 회전/이동과 구분. */}
       <div className="space-y-1.5 border-t border-line/40 pt-2">
         <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 변형 (Transform)")}</p>
+          내용 변형 (Transform)
+        </p>
         <StudioSliderRow
-          label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 스케일")}
+          label="내용 스케일"
           min={0.25}
           max={2}
           step={0.05}
@@ -1154,7 +1170,7 @@ export function StudioSelectionToolsPanel({
           readout={`×${contentScale.toFixed(2)}`}
         />
         <StudioSliderRow
-          label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 회전")}
+          label="내용 회전"
           min={SELECTION_ROTATE_RANGE.min}
           max={SELECTION_ROTATE_RANGE.max}
           step={SELECTION_ROTATE_RANGE.step}
@@ -1180,9 +1196,9 @@ export function StudioSelectionToolsPanel({
                   rotateDeg: contentRotate === 0 ? undefined : contentRotate,
                 })
               }
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 내용 변형 적용")}
+              aria-label="픽셀 내용 변형 적용"
             >
-              {busy ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "적용 중...") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 적용")}
+              {busy ? "적용 중..." : "내용 적용"}
             </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
@@ -1196,10 +1212,11 @@ export function StudioSelectionToolsPanel({
               disabled={!usable || busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onContentTransform({ rotateDeg: 90 })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 내용 시계 방향 90도 회전")}
+              aria-label="픽셀 내용 시계 방향 90도 회전"
             >
               <RotateCw className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 90°")}</button>
+              내용 90°
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.contentFlipX}
@@ -1212,10 +1229,11 @@ export function StudioSelectionToolsPanel({
               disabled={!usable || busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onContentTransform({ flipX: true })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 내용 좌우 반전")}
+              aria-label="픽셀 내용 좌우 반전"
             >
               <FlipHorizontal2 className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 좌우")}</button>
+              내용 좌우
+            </button>
           </StudioToolHintTarget>
           <StudioToolHintTarget
             hint={SELECTION_ACTION_HINTS.contentFlipY}
@@ -1228,40 +1246,43 @@ export function StudioSelectionToolsPanel({
               disabled={!usable || busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
               onClick={() => onContentTransform({ flipY: true })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 내용 상하 반전")}
+              aria-label="픽셀 내용 상하 반전"
             >
               <FlipVertical2 className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "내용 상하")}</button>
+              내용 상하
+            </button>
           </StudioToolHintTarget>
         </div>
         <p className="text-[0.68rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "마퀴만 바꾸려면 위 회전·이동을, 그림 자체를 옮기려면 내용 변형을 쓰세요. ⌘⇧I 반전 · 픽셀 선택 중 ⌘D 해제도 지원합니다.")}</p>
+          마퀴만 바꾸려면 위 회전·이동을, 그림 자체를 옮기려면 내용 변형을 쓰세요. ⌘⇧I 반전 ·
+          픽셀 선택 중 ⌘D 해제도 지원합니다.
+        </p>
       </div>
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
         {busy
           ? activeTool
-            ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 작업을 적용하는 중이에요. 새 작업은 잠겼지만 현재 선택 도구는 종료할 수 있습니다.")
-            : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "픽셀 작업을 적용하는 중이에요. 완료될 때까지 다른 선택 작업은 잠시 기다려 주세요.")
+            ? "픽셀 작업을 적용하는 중이에요. 새 작업은 잠겼지만 현재 선택 도구는 종료할 수 있습니다."
+            : "픽셀 작업을 적용하는 중이에요. 완료될 때까지 다른 선택 작업은 잠시 기다려 주세요."
           : usable
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "영역 {v0}개 · 페더 {v1}px{v2}"), { v0: String(subpathCount), v1: String(selection!.featherPx), v2: String(selection!.invert ? " · 반전" : "") })
+            ? `영역 ${subpathCount}개 · 페더 ${selection!.featherPx}px${selection!.invert ? " · 반전" : ""}`
             : activeTool === "poly-lasso"
               ? polyLassoPointCount > 0
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "꼭짓점 {v0}개 · 더블클릭 또는 Enter로 닫기 · Esc 취소"), { v0: String(polyLassoPointCount) })
-                : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "이미지 위를 클릭해 꼭짓점을 찍으세요. 더블클릭/Enter로 닫습니다.")
+                ? `꼭짓점 ${polyLassoPointCount}개 · 더블클릭 또는 Enter로 닫기 · Esc 취소`
+                : "이미지 위를 클릭해 꼭짓점을 찍으세요. 더블클릭/Enter로 닫습니다."
               : activeTool === "brush"
-                ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "이미지 위를 붓으로 칠하면 칠한 자리가 선택됩니다.")
+                ? "이미지 위를 붓으로 칠하면 칠한 자리가 선택됩니다."
                 : activeTool === "lasso"
-                  ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "이미지 위에서 드래그해 자유 올가미로 감싸세요. 손을 떼면 자동으로 닫힙니다.")
+                  ? "이미지 위에서 드래그해 자유 올가미로 감싸세요. 손을 떼면 자동으로 닫힙니다."
                   : activeTool
-                    ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "이미지 위에서 드래그해 영역을 그리세요. 점선 선택 경계가 영역을 표시합니다.")
-                    : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "도구를 켜고 이미지 위에서 드래그(또는 다각형 올가미는 클릭)하면 픽셀을 선택할 수 있습니다.")}
+                    ? "이미지 위에서 드래그해 영역을 그리세요. 점선 선택 경계가 영역을 표시합니다."
+                    : "도구를 켜고 이미지 위에서 드래그(또는 다각형 올가미는 클릭)하면 픽셀을 선택할 수 있습니다."}
       </p>
 
       <div className="space-y-1.5 border-t border-line/40 pt-2">
         <div className="flex items-center gap-1.5">
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "밝기")}
+            label="밝기"
             min={SELECTION_BRIGHTNESS_RANGE.min}
             max={SELECTION_BRIGHTNESS_RANGE.max}
             step={SELECTION_BRIGHTNESS_RANGE.step}
@@ -1286,14 +1307,15 @@ export function StudioSelectionToolsPanel({
               }
               disabled={!canAdjust || brightness === 0}
               className={buttonClass({ size: "sm", variant: "outline" })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 영역 밝기 적용")}
+              aria-label="선택 영역 밝기 적용"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "적용")}</button>
+              적용
+            </button>
           </StudioToolHintTarget>
         </div>
         <div className="flex items-center gap-1.5">
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "색조")}
+            label="색조"
             min={SELECTION_HUE_RANGE.min}
             max={SELECTION_HUE_RANGE.max}
             step={SELECTION_HUE_RANGE.step}
@@ -1315,9 +1337,10 @@ export function StudioSelectionToolsPanel({
               }
               disabled={!canAdjust || hue === 0}
               className={buttonClass({ size: "sm", variant: "outline" })}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 영역 색조 적용")}
+              aria-label="선택 영역 색조 적용"
             >
-              {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "적용")}</button>
+              적용
+            </button>
           </StudioToolHintTarget>
         </div>
         <StudioToolHintTarget
@@ -1335,10 +1358,10 @@ export function StudioSelectionToolsPanel({
               buttonClass({ size: "sm", variant: "quiet" }),
               "w-full gap-1 text-bad"
             )}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 영역 삭제")}
+            aria-label="선택 영역 삭제"
           >
             <Eraser className="size-3.5" aria-hidden />
-            {busy ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "적용 중...") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 영역 삭제")}
+            {busy ? "적용 중..." : "선택 영역 삭제"}
           </button>
         </StudioToolHintTarget>
         <StudioToolHintTarget
@@ -1353,10 +1376,10 @@ export function StudioSelectionToolsPanel({
             onClick={onContentAwareFill}
             disabled={!canAdjust}
             className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "콘텐츠 인식으로 채우기")}
+            aria-label="콘텐츠 인식으로 채우기"
           >
             <WandSparkles className="size-3.5" aria-hidden />
-            {busy ? translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "채우는 중...") : translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "콘텐츠 인식으로 채우기")}
+            {busy ? "채우는 중..." : "콘텐츠 인식으로 채우기"}
           </button>
         </StudioToolHintTarget>
         {onCopyToNewLayer && onCutToNewLayer ? (
@@ -1373,10 +1396,11 @@ export function StudioSelectionToolsPanel({
                 onClick={onCopyToNewLayer}
                 disabled={!canAdjust}
                 className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 영역을 새 레이어로 복사")}
+                aria-label="선택 영역을 새 레이어로 복사"
               >
                 <Copy className="size-3.5" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "새 레이어로 복사")}</button>
+                새 레이어로 복사
+              </button>
             </StudioToolHintTarget>
             <StudioToolHintTarget
               hint={SELECTION_ACTION_HINTS.cutToNewLayer}
@@ -1390,10 +1414,11 @@ export function StudioSelectionToolsPanel({
                 onClick={onCutToNewLayer}
                 disabled={!canAdjust}
                 className={cn(buttonClass({ size: "sm", variant: "outline" }), "w-full gap-1")}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "선택 영역을 새 레이어로 오려내기")}
+                aria-label="선택 영역을 새 레이어로 오려내기"
               >
                 <Scissors className="size-3.5" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioSelectionToolsPanel", "ko", "새 레이어로 오려내기")}</button>
+                새 레이어로 오려내기
+              </button>
             </StudioToolHintTarget>
           </div>
         ) : null}

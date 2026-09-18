@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 
 import {
@@ -100,34 +96,40 @@ export function Studio3dAssetQualityPanel({
 
   return (
     <section aria-labelledby={headingId} className="mb-4 space-y-2 rounded-xl border border-line bg-raised/60 p-3" data-studio-3d-asset-quality={mode}>
-      <h3 id={headingId} className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "3D 모델 메모리 모드")}</h3>
+      <h3 id={headingId} className="text-sm font-bold text-fg">3D 모델 메모리 모드</h3>
       <p className="text-xs leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "기본은 자동 모드입니다. 고품질은 모바일 모델별 텍스처 예상 용량을 128MiB에서 최대 256MiB로 완화합니다. 더 엄격한 문서 한도와 파일·메시·형식 검사는 유지하며, 화면 해상도·그림자나 기기의 실제 메모리 한도는 바꾸지 않습니다.")}</p>
-      <div className="flex flex-wrap gap-2" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "3D 모델 메모리 모드 선택")}>
+        기본은 자동 모드입니다. 고품질은 모바일 모델별 텍스처 예상 용량을 128MiB에서 최대 256MiB로 완화합니다.
+        더 엄격한 문서 한도와 파일·메시·형식 검사는 유지하며, 화면 해상도·그림자나 기기의 실제 메모리 한도는 바꾸지 않습니다.
+      </p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="3D 모델 메모리 모드 선택">
         <button type="button" className={BUTTON} aria-pressed={mode === "auto"} disabled={saving} onClick={() => {
           resetStudio3dAssetQualityMode("자동 모드로 돌아왔습니다. 다음 모델 불러오기부터 안전 한도를 적용합니다.");
           setConfirming(false); setAcknowledged(false); setError(null);
-        }}>{translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "자동 · 기본")}</button>
+        }}>자동 · 기본</button>
         <button type="button" className={BUTTON} aria-pressed={mode === "high"} disabled={!active || disabled || saving || Boolean(deviceLostMessage) || mode === "high"} onClick={() => {
           setConfirming(true); setAcknowledged(false); setError(null);
-        }}>{translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "고품질 · 현재 실행만")}</button>
+        }}>고품질 · 현재 실행만</button>
       </div>
       {confirming && mode === "auto" && <div className="space-y-2 rounded-lg border border-line bg-card p-3">
         <p className="text-xs leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "고품질 원본은 느려짐·발열·페이지 재로딩을 유발할 수 있습니다.")}{emptyScene ? translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", " 현재 배경 장면이 비어 있어 사본 저장은 생략합니다.") : translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", " 전환 전에 현재 배경 장면을 이 기기의 템플릿 라이브러리에 사본으로 저장합니다.")}
-          {translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "이는 전체 작품의 백업을 대신하지 않습니다.")}</p>
+          고품질 원본은 느려짐·발열·페이지 재로딩을 유발할 수 있습니다.
+          {emptyScene ? " 현재 배경 장면이 비어 있어 사본 저장은 생략합니다." : " 전환 전에 현재 배경 장면을 이 기기의 템플릿 라이브러리에 사본으로 저장합니다."}
+          이는 전체 작품의 백업을 대신하지 않습니다.
+        </p>
         <label className="flex min-h-11 items-start gap-2 text-xs leading-relaxed text-fg-2">
           <input type="checkbox" className="mt-1" checked={acknowledged} disabled={saving} onChange={event => setAcknowledged(event.target.checked)} />
-          <span>{translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "기기 메모리 부족으로 페이지가 종료될 수 있으며, 새로고침 후 자동 모드로 시작한다는 점을 확인했습니다.")}</span>
+          <span>기기 메모리 부족으로 페이지가 종료될 수 있으며, 새로고침 후 자동 모드로 시작한다는 점을 확인했습니다.</span>
         </label>
-        <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "en", "{v0} w-full"), { v0: String(BUTTON) })} disabled={!acknowledged || disabled || saving || !active || Boolean(deviceLostMessage)} onClick={() => { void enableAfterCheckpoint(); }}>
-          {saving ? translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "장면 사본 저장 중") : emptyScene ? translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "확인 후 고품질 사용") : translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "장면 사본 저장 후 고품질 사용")}
+        <button type="button" className={`${BUTTON} w-full`} disabled={!acknowledged || disabled || saving || !active || Boolean(deviceLostMessage)} onClick={() => { void enableAfterCheckpoint(); }}>
+          {saving ? "장면 사본 저장 중" : emptyScene ? "확인 후 고품질 사용" : "장면 사본 저장 후 고품질 사용"}
         </button>
       </div>}
       {error && <p role="alert" className="text-xs leading-relaxed text-fg-2">{error}</p>}
       {notice && <p role="status" className="text-xs leading-relaxed text-fg-2">{notice}</p>}
       <p className="text-[0.65rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.Studio3dAssetQualityPanel", "ko", "새로 불러오는 배경 3D 모델부터 적용합니다. 이미 배치한 원본을 자동 삭제·교체하지 않으며, 자동 모드 전환만으로 현재 메모리가 즉시 줄어들지는 않습니다. CC0 라이브러리에서 원본 또는 텍스처 메모리 절약본을 선택해 가져오세요.")}</p>
+        새로 불러오는 배경 3D 모델부터 적용합니다. 이미 배치한 원본을 자동 삭제·교체하지 않으며, 자동 모드 전환만으로 현재 메모리가 즉시 줄어들지는 않습니다.
+        CC0 라이브러리에서 원본 또는 텍스처 메모리 절약본을 선택해 가져오세요.
+      </p>
     </section>
   );
 }

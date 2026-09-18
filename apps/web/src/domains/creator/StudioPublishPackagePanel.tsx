@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   Check,
   CheckCircle2,
@@ -236,7 +232,7 @@ function StatusBadge({ state }: { state: StudioPublishArtifactState }) {
   const meta = ARTIFACT_STATE_META[state];
   return (
     <span
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "inline-flex min-h-7 items-center rounded-full border px-2 text-[0.65rem] font-semibold {v0}"), { v0: String(meta.className) })}
+      className={`inline-flex min-h-7 items-center rounded-full border px-2 text-[0.65rem] font-semibold ${meta.className}`}
     >
       {meta.label}
     </span>
@@ -258,7 +254,9 @@ function SettingToggle({
 }) {
   return (
     <label
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "flex min-h-14 cursor-pointer items-start gap-3 px-3 py-3 transition-colors hover:bg-raised/45 {v0}"), { v0: String(disabled ? "cursor-not-allowed opacity-55" : "") })}
+      className={`flex min-h-14 cursor-pointer items-start gap-3 px-3 py-3 transition-colors hover:bg-raised/45 ${
+        disabled ? "cursor-not-allowed opacity-55" : ""
+      }`}
     >
       <span className="relative mt-0.5 grid size-6 shrink-0 place-items-center">
         <input
@@ -307,19 +305,21 @@ function IssueLedger({
   const isError = tone === "error";
   const Icon = isError ? XCircle : AlertTriangle;
   return (
-    <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "publish-package-{v0}-title"), { v0: String(tone) })}>
+    <section aria-labelledby={`publish-package-${tone}-title`}>
       <div className="flex items-center justify-between gap-3">
         <h3
-          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "publish-package-{v0}-title"), { v0: String(tone) })}
+          id={`publish-package-${tone}-title`}
           className="flex items-center gap-2 text-sm font-bold text-fg"
         >
-          <Icon size={16} className={isError ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "text-bad") : translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "text-warn")} aria-hidden />
+          <Icon size={16} className={isError ? "text-bad" : "text-warn"} aria-hidden />
           {title}
         </h3>
         <span
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "rounded-full border px-2 py-0.5 text-[0.65rem] font-bold tabular-nums {v0}"), { v0: String(isError
+          className={`rounded-full border px-2 py-0.5 text-[0.65rem] font-bold tabular-nums ${
+            isError
               ? "border-bad/35 bg-bad/10 text-bad"
-              : "border-warn/35 bg-warn/10 text-warn") })}
+              : "border-warn/35 bg-warn/10 text-warn"
+          }`}
         >
           {issues.length.toLocaleString("ko-KR")}
         </span>
@@ -327,7 +327,7 @@ function IssueLedger({
       {issues.length === 0 ? (
         <div className="mt-3 flex min-h-20 items-center gap-3 rounded-xl border border-dashed border-line px-4 text-xs text-fg-3">
           <CheckCircle2 size={17} className="shrink-0 text-good" aria-hidden />
-          {isError ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "내보내기를 막는 오류가 없습니다.") : translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "추가로 확인할 경고가 없습니다.")}
+          {isError ? "내보내기를 막는 오류가 없습니다." : "추가로 확인할 경고가 없습니다."}
         </div>
       ) : (
         <>
@@ -336,7 +336,9 @@ function IssueLedger({
               <li key={`${issue.code}:${issue.path ?? "root"}:${index}`} className="px-3 py-3 sm:px-4">
                 <div className="flex items-start gap-3">
                   <span
-                    className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "mt-0.5 grid size-7 shrink-0 place-items-center rounded-full {v0}"), { v0: String(isError ? "bg-bad/10 text-bad" : "bg-warn/10 text-warn") })}
+                    className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full ${
+                      isError ? "bg-bad/10 text-bad" : "bg-warn/10 text-warn"
+                    }`}
                   >
                     <Icon size={14} aria-hidden />
                   </span>
@@ -353,7 +355,8 @@ function IssueLedger({
           </ol>
           {issues.length > VISIBLE_ISSUE_LIMIT && (
             <p className="mt-2 text-right text-[0.65rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "화면 성능을 위해 처음 ")}{VISIBLE_ISSUE_LIMIT.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "건만 표시합니다. 화면에서 생략한 항목도 현재 검증 계획 데이터에는 유지됩니다.")}</p>
+              화면 성능을 위해 처음 {VISIBLE_ISSUE_LIMIT.toLocaleString("ko-KR")}건만 표시합니다. 화면에서 생략한 항목도 현재 검증 계획 데이터에는 유지됩니다.
+            </p>
           )}
         </>
       )}
@@ -380,7 +383,7 @@ function ArtifactRow({ artifact }: { artifact: StudioPublishArtifactPlan }) {
           </p>
           <p className="mt-0.5 text-[0.68rem] tabular-nums text-fg-2">
             {formatDimension(artifact.width, artifact.height)} · {formatBytes(artifact.byteSize)}
-            {artifact.sha256 ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", " · SHA-256 포함") : ""}
+            {artifact.sha256 ? " · SHA-256 포함" : ""}
           </p>
         </div>
       </div>
@@ -569,25 +572,29 @@ export function StudioPublishPackagePanel({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 id="studio-publish-package-title" className="text-base font-bold tracking-tight text-fg">
-                  {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "Publish Package")}</h2>
+                  Publish Package
+                </h2>
                 <span
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "inline-flex min-h-6 items-center rounded-full border px-2 text-[0.65rem] font-bold {v0}"), { v0: String(plan.canExport
+                  className={`inline-flex min-h-6 items-center rounded-full border px-2 text-[0.65rem] font-bold ${
+                    plan.canExport
                       ? "border-good/35 bg-good/10 text-good"
-                      : "border-bad/35 bg-bad/10 text-bad") })}
+                      : "border-bad/35 bg-bad/10 text-bad"
+                  }`}
                 >
-                  {plan.canExport ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "내보내기 가능") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "오류 {v0}"), { v0: String(plan.errors.length) })}
+                  {plan.canExport ? "내보내기 가능" : `오류 ${plan.errors.length}`}
                 </span>
               </div>
               <p
                 id="studio-publish-package-description"
                 className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3"
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "게시처 규격에 맞춘 로컬 파일 묶음을 계획합니다. 플랫폼 계정에 로그인하거나 직접 업로드하지 않습니다.")}</p>
+                게시처 규격에 맞춘 로컬 파일 묶음을 계획합니다. 플랫폼 계정에 로그인하거나 직접 업로드하지 않습니다.
+              </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "Publish Package 닫기")}
+              aria-label="Publish Package 닫기"
               className={ICON_BUTTON_CLASS}
             >
               <X size={17} aria-hidden />
@@ -597,9 +604,11 @@ export function StudioPublishPackagePanel({
           <div
             role="status"
             aria-live="polite"
-            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.7rem] leading-relaxed {v0}"), { v0: String(plan.canExport
+            className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[0.7rem] leading-relaxed ${
+              plan.canExport
                 ? "border-good/30 bg-good/10 text-good"
-                : "border-bad/30 bg-bad/10 text-bad") })}
+                : "border-bad/30 bg-bad/10 text-bad"
+            }`}
           >
             {plan.canExport ? (
               <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden />
@@ -608,14 +617,14 @@ export function StudioPublishPackagePanel({
             )}
             <span>
               {plan.canExport
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "차단 오류 없음 · 경고 {v0}건은 내보내기 전에 확인하세요."), { v0: String(plan.warnings.length.toLocaleString("ko-KR")) })
-                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "차단 오류 {v0}건을 해결해야 실제 파일 생성을 시작할 수 있습니다."), { v0: String(plan.errors.length.toLocaleString("ko-KR")) })}
+                ? `차단 오류 없음 · 경고 ${plan.warnings.length.toLocaleString("ko-KR")}건은 내보내기 전에 확인하세요.`
+                : `차단 오류 ${plan.errors.length.toLocaleString("ko-KR")}건을 해결해야 실제 파일 생성을 시작할 수 있습니다.`}
             </span>
           </div>
         </header>
 
         <nav
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "Publish Package 단계")}
+          aria-label="Publish Package 단계"
           className="grid shrink-0 grid-cols-3 border-b border-line bg-card/35"
         >
           {TABS.map((tab) => {
@@ -630,15 +639,17 @@ export function StudioPublishPackagePanel({
             return (
               <button
                 key={tab}
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "publish-package-tab-{v0}"), { v0: String(tab) })}
+                id={`publish-package-tab-${tab}`}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "publish-package-panel-{v0}"), { v0: String(tab) })}
+                aria-controls={`publish-package-panel-${tab}`}
                 tabIndex={active ? 0 : -1}
                 onClick={() => selectTab(tab)}
                 onKeyDown={onTabKeyDown}
-                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "relative min-h-12 min-w-0 px-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:px-4 {v0}"), { v0: String(active ? "bg-raised/70 text-fg" : "text-fg-3 hover:bg-raised/35 hover:text-fg-2") })}
+                className={`relative min-h-12 min-w-0 px-2 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:px-4 ${
+                  active ? "bg-raised/70 text-fg" : "text-fg-3 hover:bg-raised/35 hover:text-fg-2"
+                }`}
               >
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <span className="truncate">{meta.label}</span>
@@ -665,8 +676,8 @@ export function StudioPublishPackagePanel({
               <div className="flex items-start gap-3 rounded-xl border border-cool/30 bg-cool/10 px-3 py-3 text-xs leading-relaxed text-cool sm:px-4">
                 <ShieldCheck size={17} className="mt-0.5 shrink-0" aria-hidden />
                 <p>
-                  <strong className="font-bold">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "정책 기준일 ")}{formatPolicyDate(STUDIO_PUBLISH_PACKAGE_POLICY_SNAPSHOT)}</strong>
-                  <span className="text-fg-2"> {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "· 아래 규격은 고정된 벤치마크이며 게시처 정책이 바뀔 수 있습니다. 업로드 직전에 공식 원문을 다시 확인하세요.")}</span>
+                  <strong className="font-bold">정책 기준일 {formatPolicyDate(STUDIO_PUBLISH_PACKAGE_POLICY_SNAPSHOT)}</strong>
+                  <span className="text-fg-2"> · 아래 규격은 고정된 벤치마크이며 게시처 정책이 바뀔 수 있습니다. 업로드 직전에 공식 원문을 다시 확인하세요.</span>
                 </p>
               </div>
 
@@ -674,8 +685,9 @@ export function StudioPublishPackagePanel({
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>
                     <h3 id="publish-destination-title" className="text-sm font-bold text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "목적지와 이미지 형식")}</h3>
-                    <p className="mt-0.5 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "파일 규격 검증과 이름 규칙에만 사용합니다.")}</p>
+                      목적지와 이미지 형식
+                    </h3>
+                    <p className="mt-0.5 text-xs text-fg-3">파일 규격 검증과 이름 규칙에만 사용합니다.</p>
                   </div>
                   <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] text-fg-3">
                     {preset.revision}
@@ -683,13 +695,14 @@ export function StudioPublishPackagePanel({
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <label htmlFor={destinationId} className="text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "게시 목적지")}<select
+                    게시 목적지
+                    <select
                       id={destinationId}
                       value={settings.destination}
                       onChange={(event) =>
                         changeDestination(event.target.value as StudioPublishPackageDestination)
                       }
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "{v0} mt-1.5"), { v0: String(FIELD_CLASS) })}
+                      className={`${FIELD_CLASS} mt-1.5`}
                     >
                       {(Object.keys(DESTINATION_LABELS) as StudioPublishPackageDestination[]).map(
                         (destination) => (
@@ -702,7 +715,7 @@ export function StudioPublishPackagePanel({
                   </label>
 
                   <fieldset>
-                    <legend className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "회차 이미지 형식")}</legend>
+                    <legend className="text-xs font-semibold text-fg-2">회차 이미지 형식</legend>
                     <div className="mt-1.5 grid min-h-11 grid-cols-3 overflow-hidden rounded-lg border border-line bg-card">
                       {(Object.keys(FORMAT_LABELS) as OutputFormat[]).map((format) => {
                         const supported = supportedFormats.includes(format);
@@ -715,7 +728,9 @@ export function StudioPublishPackagePanel({
                             aria-checked={active}
                             disabled={!supported}
                             onClick={() => updateSettings({ outputFormat: format })}
-                            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "min-h-11 border-r border-line px-2 text-xs font-semibold transition-colors last:border-r-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-fg-3/45 {v0}"), { v0: String(active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised hover:text-fg") })}
+                            className={`min-h-11 border-r border-line px-2 text-xs font-semibold transition-colors last:border-r-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-fg-3/45 ${
+                              active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised hover:text-fg"
+                            }`}
                           >
                             {FORMAT_LABELS[format]}
                           </button>
@@ -732,13 +747,16 @@ export function StudioPublishPackagePanel({
               <section aria-labelledby="publish-thumbnail-title">
                 <div>
                   <h3 id="publish-thumbnail-title" className="text-sm font-bold text-fg">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "썸네일 산출물")}</h3>
+                    썸네일 산출물
+                  </h3>
                   <p className="mt-0.5 text-xs text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "필수 규격은 해제할 수 없으며, 선택한 슬롯은 원본이 없으면 파일 계획에 ‘원본 필요’로 표시됩니다.")}</p>
+                    필수 규격은 해제할 수 없으며, 선택한 슬롯은 원본이 없으면 파일 계획에 ‘원본 필요’로 표시됩니다.
+                  </p>
                 </div>
                 {preset.thumbnails.length === 0 ? (
                   <p className="mt-3 rounded-xl border border-dashed border-line px-4 py-5 text-xs text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "이 목적지에는 별도 썸네일 규격이 없습니다.")}</p>
+                    이 목적지에는 별도 썸네일 규격이 없습니다.
+                  </p>
                 ) : (
                   <div className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25">
                     {preset.thumbnails.map((thumbnail) => {
@@ -750,9 +768,11 @@ export function StudioPublishPackagePanel({
                           disabled={thumbnail.required}
                           onChange={(checked) => toggleThumbnail(thumbnail.slot, checked)}
                           label={`${thumbnail.label}${thumbnail.required ? " · 필수" : ""}`}
-                          description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "{v0} × {v1}px · {v2}{v3}"), { v0: String(thumbnail.width.toLocaleString("ko-KR")), v1: String(thumbnail.height.toLocaleString("ko-KR")), v2: String(thumbnail.allowedMimeTypes.join(", ")), v3: String(thumbnail.maxBytesExclusive
+                          description={`${thumbnail.width.toLocaleString("ko-KR")} × ${thumbnail.height.toLocaleString("ko-KR")}px · ${thumbnail.allowedMimeTypes.join(", ")}${
+                            thumbnail.maxBytesExclusive
                               ? ` · ${formatBytes(thumbnail.maxBytesExclusive)} 미만`
-                              : "") })}
+                              : ""
+                          }`}
                         />
                       );
                     })}
@@ -764,18 +784,20 @@ export function StudioPublishPackagePanel({
 
               <section aria-labelledby="publish-extras-title">
                 <h3 id="publish-extras-title" className="text-sm font-bold text-fg">
-                  {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "검수·출처 파일")}</h3>
+                  검수·출처 파일
+                </h3>
                 <div className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25">
                   <SettingToggle
                     checked={settings.includeReviewPdf}
                     onChange={(includeReviewPdf) => updateSettings({ includeReviewPdf })}
-                    label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "내부 검수 PDF 포함")}
-                    description={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "공개 게시 이미지와 분리된 내부 회람용 review.pdf를 패키지에 계획합니다.")}
+                    label="내부 검수 PDF 포함"
+                    description="공개 게시 이미지와 분리된 내부 회람용 review.pdf를 패키지에 계획합니다."
                   />
                   {settings.includeReviewPdf ? (
                     <div className="px-3 py-3">
                       <label htmlFor={reviewPdfProfileId} className="block text-xs font-semibold text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "검수 PDF 구성")}<select
+                        검수 PDF 구성
+                        <select
                           id={reviewPdfProfileId}
                           value={settings.reviewPdfProfile}
                           onChange={(event) =>
@@ -783,7 +805,7 @@ export function StudioPublishPackagePanel({
                               reviewPdfProfile: event.currentTarget.value as StudioReviewPdfProfileId,
                             })
                           }
-                          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "{v0} mt-1.5"), { v0: String(FIELD_CLASS) })}
+                          className={`${FIELD_CLASS} mt-1.5`}
                         >
                           {STUDIO_REVIEW_PDF_PROFILE_IDS.map((profileId) => (
                             <option key={profileId} value={profileId}>
@@ -797,19 +819,21 @@ export function StudioPublishPackagePanel({
                       </p>
                       <p className="mt-2 flex min-h-11 items-center gap-2 rounded-lg border border-warn/35 bg-warn/10 px-3 text-[0.68rem] leading-relaxed text-warn">
                         <ShieldCheck size={15} className="shrink-0" aria-hidden />
-                        {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "내부 전용: 담당자·검토 메모·갱신 시각은 선택한 review.pdf에만 그리며 공개 manifest에는 기록하지 않습니다.")}</p>
+                        내부 전용: 담당자·검토 메모·갱신 시각은 선택한 review.pdf에만 그리며 공개 manifest에는 기록하지 않습니다.
+                      </p>
                     </div>
                   ) : null}
                   <SettingToggle
                     checked={settings.includeCredits}
                     onChange={(includeCredits) => updateSettings({ includeCredits })}
-                    label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "출처·라이선스 파일 포함")}
-                    description={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "소재 출처와 라이선스를 credits.txt로 함께 전달합니다. 내용이 비어 있으면 경고합니다.")}
+                    label="출처·라이선스 파일 포함"
+                    description="소재 출처와 라이선스를 credits.txt로 함께 전달합니다. 내용이 비어 있으면 경고합니다."
                   />
                 </div>
                 {settings.includeCredits && onCreditsTextChange ? (
                   <label htmlFor={creditsId} className="mt-3 block text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "출처·라이선스 내용")}<textarea
+                    출처·라이선스 내용
+                    <textarea
                       id={creditsId}
                       value={creditsText}
                       onChange={(event) =>
@@ -819,11 +843,11 @@ export function StudioPublishPackagePanel({
                       }
                       maxLength={STUDIO_PUBLISH_PACKAGE_LIMITS.maxCreditsCodeUnits}
                       rows={5}
-                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "예: 배경 사진 — 작가명 / 원문 URL / 라이선스\n폰트 — 이름 / 라이선스 / 배포처")}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "{v0} mt-1.5 min-h-32 resize-y font-mono text-[0.72rem] leading-relaxed"), { v0: String(FIELD_CLASS) })}
+                      placeholder={"예: 배경 사진 — 작가명 / 원문 URL / 라이선스\n폰트 — 이름 / 라이선스 / 배포처"}
+                      className={`${FIELD_CLASS} mt-1.5 min-h-32 resize-y font-mono text-[0.72rem] leading-relaxed`}
                     />
                     <span className="mt-1 flex justify-between gap-3 text-[0.65rem] font-normal text-fg-3">
-                      <span>{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "캔버스에 삽입한 Unsplash 출처는 자동 제안되며 직접 보완할 수 있습니다.")}</span>
+                      <span>캔버스에 삽입한 Unsplash 출처는 자동 제안되며 직접 보완할 수 있습니다.</span>
                       <span className="shrink-0 tabular-nums">
                         {creditsText.length.toLocaleString("ko-KR")}/{STUDIO_PUBLISH_PACKAGE_LIMITS.maxCreditsCodeUnits.toLocaleString("ko-KR")}
                       </span>
@@ -840,13 +864,14 @@ export function StudioPublishPackagePanel({
                     <Sparkles size={17} aria-hidden />
                   </span>
                   <div>
-                    <h3 id="publish-ai-title" className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "AI 사용 공개")}</h3>
+                    <h3 id="publish-ai-title" className="text-sm font-bold text-fg">AI 사용 공개</h3>
                     <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "사용 여부는 자동 추정하지 않습니다. 창작자가 실제 제작 과정을 기준으로 직접 선택합니다.")}</p>
+                      사용 여부는 자동 추정하지 않습니다. 창작자가 실제 제작 과정을 기준으로 직접 선택합니다.
+                    </p>
                   </div>
                 </div>
                 <fieldset className="mt-3">
-                  <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "AI 사용 범위")}</legend>
+                  <legend className="sr-only">AI 사용 범위</legend>
                   <div className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25">
                     {(["none", "assisted", "generated"] as const).map((usage) => {
                       const meta = AI_USAGE_META[usage];
@@ -880,19 +905,19 @@ export function StudioPublishPackagePanel({
 
                 {settings.aiUsage !== "none" && (
                   <label htmlFor={disclosureId} className="mt-3 block text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "공개 고지 문구 ")}<span className="text-bad">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "필수")}</span>
+                    공개 고지 문구 <span className="text-bad">필수</span>
                     <textarea
                       id={disclosureId}
                       value={settings.aiDisclosure}
                       onChange={(event) => updateSettings({ aiDisclosure: event.target.value })}
                       maxLength={STUDIO_PUBLISH_PACKAGE_LIMITS.maxDisclosureCodeUnits}
                       rows={4}
-                      placeholder={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "예: 배경 아이디어 탐색에 AI를 보조적으로 사용했으며, 최종 구성과 작화는 작가가 직접 완성했습니다.")}
-                      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "{v0} mt-1.5 min-h-28 resize-y leading-relaxed"), { v0: String(FIELD_CLASS) })}
+                      placeholder="예: 배경 아이디어 탐색에 AI를 보조적으로 사용했으며, 최종 구성과 작화는 작가가 직접 완성했습니다."
+                      className={`${FIELD_CLASS} mt-1.5 min-h-28 resize-y leading-relaxed`}
                       aria-invalid={plan.errors.some((issue) => issue.code === "AI_DISCLOSURE_REQUIRED")}
                     />
                     <span className="mt-1 flex justify-between gap-3 text-[0.65rem] font-normal text-fg-3">
-                      <span>{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "독자가 이해할 수 있게 사용 범위와 최종 결정 주체를 적으세요.")}</span>
+                      <span>독자가 이해할 수 있게 사용 범위와 최종 결정 주체를 적으세요.</span>
                       <span className="shrink-0 tabular-nums">
                         {settings.aiDisclosure.length}/{STUDIO_PUBLISH_PACKAGE_LIMITS.maxDisclosureCodeUnits}
                       </span>
@@ -903,35 +928,37 @@ export function StudioPublishPackagePanel({
                 {preset.aiPolicy === "generated-prohibited" && settings.aiUsage === "generated" && (
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-bad/35 bg-bad/10 px-3 py-2 text-[0.7rem] leading-relaxed text-bad">
                     <XCircle size={15} className="mt-0.5 shrink-0" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "현재 벤치마크한 ")}{preset.label} {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "정책에서는 AI 생성 콘텐츠 게시가 금지됩니다. 공식 원문을 직접 확인하세요.")}</div>
+                    현재 벤치마크한 {preset.label} 정책에서는 AI 생성 콘텐츠 게시가 금지됩니다. 공식 원문을 직접 확인하세요.
+                  </div>
                 )}
               </section>
 
               <div className="my-5 border-t border-line" />
 
               <section aria-labelledby="publish-policy-title">
-                <h3 id="publish-policy-title" className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "사람이 확인할 정책")}</h3>
+                <h3 id="publish-policy-title" className="text-sm font-bold text-fg">사람이 확인할 정책</h3>
                 <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "ToonSpectrum은 제3자 정책의 최신성이나 최종 게시 승인을 대신 보증하지 않습니다.")}</p>
+                  ToonSpectrum은 제3자 정책의 최신성이나 최종 게시 승인을 대신 보증하지 않습니다.
+                </p>
                 <div className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25">
                   {preset.requiresCurrentPolicyReview && (
                     <SettingToggle
                       checked={settings.policyReviewConfirmed}
                       onChange={(policyReviewConfirmed) => updateSettings({ policyReviewConfirmed })}
-                      label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0} 최신 정책을 직접 확인했습니다"), { v0: String(preset.label) })}
-                      description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "기준 스냅샷 {v0} 이후 변경 여부와 계정별 조건을 공식 원문에서 검토했습니다."), { v0: String(formatPolicyDate(preset.policySnapshotDate)) })}
+                      label={`${preset.label} 최신 정책을 직접 확인했습니다`}
+                      description={`기준 스냅샷 ${formatPolicyDate(preset.policySnapshotDate)} 이후 변경 여부와 계정별 조건을 공식 원문에서 검토했습니다.`}
                     />
                   )}
                   {thumbnailArtifactCount > 0 && (
                     <SettingToggle
                       checked={settings.thumbnailSafetyConfirmed}
                       onChange={(thumbnailSafetyConfirmed) => updateSettings({ thumbnailSafetyConfirmed })}
-                      label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "썸네일 안전 영역과 공개 적합성을 확인했습니다")}
-                      description={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "전 연령 노출 적합성, 글자 잘림, 얼굴·로고 크롭과 작은 화면 가독성을 사람이 직접 확인했습니다.")}
+                      label="썸네일 안전 영역과 공개 적합성을 확인했습니다"
+                      description="전 연령 노출 적합성, 글자 잘림, 얼굴·로고 크롭과 작은 화면 가독성을 사람이 직접 확인했습니다."
                     />
                   )}
                   {!preset.requiresCurrentPolicyReview && thumbnailArtifactCount === 0 && (
-                    <p className="px-3 py-4 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "이 범용 프로필에는 필수 정책 확인 항목이 없습니다.")}</p>
+                    <p className="px-3 py-4 text-xs text-fg-3">이 범용 프로필에는 필수 정책 확인 항목이 없습니다.</p>
                   )}
                 </div>
                 {preset.policySourceUrls.length > 0 && (
@@ -965,29 +992,33 @@ export function StudioPublishPackagePanel({
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>
                     <h3 id="publish-validation-summary-title" className="text-sm font-bold text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "검증 요약")}</h3>
+                      검증 요약
+                    </h3>
                     <p className="mt-0.5 text-xs text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "알려진 메타데이터만 검증합니다. 렌더 후 최종 픽셀 크기와 파일 용량을 다시 검사해야 합니다.")}</p>
+                      알려진 메타데이터만 검증합니다. 렌더 후 최종 픽셀 크기와 파일 용량을 다시 검사해야 합니다.
+                    </p>
                   </div>
                   <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] text-fg-3">
                     {preset.label} · {formatPolicyDate(preset.policySnapshotDate)}
                   </span>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25 sm:grid-cols-4">
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "차단 오류")} value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}건"), { v0: String(plan.errors.length) })} detail={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "0건이어야 내보내기 가능")} />
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "검토 경고")} value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}건"), { v0: String(plan.warnings.length) })} detail={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "사람 확인 또는 렌더 후 재검사")} />
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "계획 파일")} value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}개"), { v0: String(plan.artifacts.length) })} detail={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "이미지와 보조 파일 합계")} />
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "알려진 회차 용량")} value={formatBytes(plan.manifest.totals.knownEpisodeBytes)} />
+                  <Metric label="차단 오류" value={`${plan.errors.length}건`} detail="0건이어야 내보내기 가능" />
+                  <Metric label="검토 경고" value={`${plan.warnings.length}건`} detail="사람 확인 또는 렌더 후 재검사" />
+                  <Metric label="계획 파일" value={`${plan.artifacts.length}개`} detail="이미지와 보조 파일 합계" />
+                  <Metric label="알려진 회차 용량" value={formatBytes(plan.manifest.totals.knownEpisodeBytes)} />
                 </dl>
               </section>
 
-              <IssueLedger title={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "내보내기를 막는 오류")} issues={plan.errors} tone="error" />
-              <IssueLedger title={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "내보내기 전 확인할 경고")} issues={plan.warnings} tone="warning" />
+              <IssueLedger title="내보내기를 막는 오류" issues={plan.errors} tone="error" />
+              <IssueLedger title="내보내기 전 확인할 경고" issues={plan.warnings} tone="warning" />
 
               <div className="flex items-start gap-3 rounded-xl border border-line bg-card/25 px-3 py-3 text-[0.7rem] leading-relaxed text-fg-3 sm:px-4">
                 <ShieldCheck size={16} className="mt-0.5 shrink-0 text-cool" aria-hidden />
                 <p>
-                  {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "이 검증은 파일 구조 계획이며 플랫폼 심사, 저작권 확인, 콘텐츠 등급 판정 또는 게시 성공을 보장하지 않습니다. 실제 업로드는 각 플랫폼의 공식 게시 화면에서 작가가 직접 수행합니다.")}</p>
+                  이 검증은 파일 구조 계획이며 플랫폼 심사, 저작권 확인, 콘텐츠 등급 판정 또는 게시 성공을 보장하지 않습니다.
+                  실제 업로드는 각 플랫폼의 공식 게시 화면에서 작가가 직접 수행합니다.
+                </p>
               </div>
             </div>
           )}
@@ -1006,27 +1037,29 @@ export function StudioPublishPackagePanel({
                   </span>
                   <div>
                     <h3 id="publish-render-plan-title" className="text-sm font-bold text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "원본 → 리샘플 → 분할 계획")}</h3>
+                      원본 → 리샘플 → 분할 계획
+                    </h3>
                     <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "이 화면은 현재 계획의 요약입니다. 실제 픽셀 렌더와 분할은 내보내기 콜백이 수행해야 합니다.")}</p>
+                      이 화면은 현재 계획의 요약입니다. 실제 픽셀 렌더와 분할은 내보내기 콜백이 수행해야 합니다.
+                    </p>
                   </div>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25 sm:grid-cols-4">
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "원본 캔버스")} value={sourceCanvasStatus} detail={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "현재 계획에서는 검증 상태만 표시")} />
+                  <Metric label="원본 캔버스" value={sourceCanvasStatus} detail="현재 계획에서는 검증 상태만 표시" />
                   <Metric
-                    label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "리샘플")}
-                    value={resampleCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}개 경고"), { v0: String(resampleCount) }) : translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "추가 경고 없음")}
+                    label="리샘플"
+                    value={resampleCount > 0 ? `${resampleCount}개 경고` : "추가 경고 없음"}
                     detail={targetWidth}
                   />
                   <Metric
-                    label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "분할 산출물")}
-                    value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}장"), { v0: String(plan.manifest.totals.episodeImageCount) })}
-                    detail={maxHeight ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "출력 높이 최대 {v0}px"), { v0: String(maxHeight.toLocaleString("ko-KR")) }) : translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "공식 공통 높이 상한 미설정")}
+                    label="분할 산출물"
+                    value={`${plan.manifest.totals.episodeImageCount}장`}
+                    detail={maxHeight ? `출력 높이 최대 ${maxHeight.toLocaleString("ko-KR")}px` : "공식 공통 높이 상한 미설정"}
                   />
                   <Metric
-                    label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "썸네일")}
-                    value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}개"), { v0: String(plan.manifest.totals.thumbnailCount) })}
-                    detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "{v0}개 슬롯 요청"), { v0: String(settings.requestedThumbnailSlots.length) })}
+                    label="썸네일"
+                    value={`${plan.manifest.totals.thumbnailCount}개`}
+                    detail={`${settings.requestedThumbnailSlots.length}개 슬롯 요청`}
                   />
                 </dl>
               </section>
@@ -1036,27 +1069,28 @@ export function StudioPublishPackagePanel({
               <section aria-labelledby="publish-artifact-title">
                 <div className="flex flex-wrap items-end justify-between gap-2">
                   <div>
-                    <h3 id="publish-artifact-title" className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "산출물 manifest")}</h3>
+                    <h3 id="publish-artifact-title" className="text-sm font-bold text-fg">산출물 manifest</h3>
                     <p className="mt-0.5 text-xs text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "파일명은 경로 문자를 제거한 휴대 가능한 이름으로 계획됩니다.")}</p>
+                      파일명은 경로 문자를 제거한 휴대 가능한 이름으로 계획됩니다.
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5 text-[0.62rem] tabular-nums text-fg-3">
-                    <span className="rounded-full border border-line bg-card px-2 py-1">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "확인 ")}{artifactStateCounts.ready}</span>
+                    <span className="rounded-full border border-line bg-card px-2 py-1">확인 {artifactStateCounts.ready}</span>
                     <span className="rounded-full border border-line bg-card px-2 py-1">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "미완료 ")}{artifactStateCounts["metadata-incomplete"]}
+                      미완료 {artifactStateCounts["metadata-incomplete"]}
                     </span>
                     <span className="rounded-full border border-line bg-card px-2 py-1">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "원본 필요 ")}{artifactStateCounts["needs-source"]}
+                      원본 필요 {artifactStateCounts["needs-source"]}
                     </span>
-                    <span className="rounded-full border border-line bg-card px-2 py-1">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "생성 예정 ")}{artifactStateCounts.planned}</span>
+                    <span className="rounded-full border border-line bg-card px-2 py-1">생성 예정 {artifactStateCounts.planned}</span>
                   </div>
                 </div>
 
                 {plan.artifacts.length === 0 ? (
                   <div className="mt-3 flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed border-line px-4 text-center">
                     <FileArchive size={20} className="text-fg-3" aria-hidden />
-                    <p className="mt-2 text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "계획된 파일이 없습니다.")}</p>
-                    <p className="mt-1 text-[0.68rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "회차 이미지 원본과 설정을 확인하세요.")}</p>
+                    <p className="mt-2 text-xs font-semibold text-fg-2">계획된 파일이 없습니다.</p>
+                    <p className="mt-1 text-[0.68rem] text-fg-3">회차 이미지 원본과 설정을 확인하세요.</p>
                   </div>
                 ) : (
                   <ol className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25">
@@ -1067,7 +1101,8 @@ export function StudioPublishPackagePanel({
                 )}
                 {plan.artifacts.length > VISIBLE_ARTIFACT_LIMIT && (
                   <p className="mt-2 text-right text-[0.65rem] text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "화면 성능을 위해 처음 ")}{VISIBLE_ARTIFACT_LIMIT.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "개만 표시합니다. 전체 ")}{plan.artifacts.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "개 파일은 manifest에 유지됩니다.")}</p>
+                    화면 성능을 위해 처음 {VISIBLE_ARTIFACT_LIMIT.toLocaleString("ko-KR")}개만 표시합니다. 전체 {plan.artifacts.length.toLocaleString("ko-KR")}개 파일은 manifest에 유지됩니다.
+                  </p>
                 )}
               </section>
 
@@ -1080,16 +1115,19 @@ export function StudioPublishPackagePanel({
                   </span>
                   <div>
                     <h3 id="publish-manifest-privacy-title" className="text-sm font-bold text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "공개 manifest 경계")}</h3>
+                      공개 manifest 경계
+                    </h3>
                     <p className="mt-0.5 max-w-[70ch] text-xs leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "다운로드되는 manifest에는 파일 역할·공개 파일명·규격·체크섬·검증 결과만 포함합니다. 내부 source ID, 로컬 경로, API 키, 원문 프롬프트와 공급자 요청 ID는 포함하지 않습니다.")}</p>
+                      다운로드되는 manifest에는 파일 역할·공개 파일명·규격·체크섬·검증 결과만 포함합니다. 내부 source ID,
+                      로컬 경로, API 키, 원문 프롬프트와 공급자 요청 ID는 포함하지 않습니다.
+                    </p>
                   </div>
                 </div>
                 <dl className="mt-3 grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25 sm:grid-cols-4">
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "스키마")} value={plan.manifest.schema} />
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "버전")} value={`v${plan.manifest.version}`} />
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "AI 사용")} value={AI_USAGE_META[plan.manifest.ai.usage].label} />
-                  <Metric label={translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "검증 상태")} value={plan.manifest.validation.canExport ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "통과") : translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "오류 있음")} />
+                  <Metric label="스키마" value={plan.manifest.schema} />
+                  <Metric label="버전" value={`v${plan.manifest.version}`} />
+                  <Metric label="AI 사용" value={AI_USAGE_META[plan.manifest.ai.usage].label} />
+                  <Metric label="검증 상태" value={plan.manifest.validation.canExport ? "통과" : "오류 있음"} />
                 </dl>
               </section>
             </div>
@@ -1104,11 +1142,13 @@ export function StudioPublishPackagePanel({
             <p
               role="status"
               aria-live="polite"
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "mb-2 rounded-lg border px-3 py-2 text-xs leading-relaxed {v0}"), { v0: String(exportStatus.tone === "good"
+              className={`mb-2 rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+                exportStatus.tone === "good"
                   ? "border-good/35 bg-good/10 text-good"
                   : exportStatus.tone === "bad"
                     ? "border-bad/35 bg-bad/10 text-bad"
-                    : "border-cool/35 bg-cool/10 text-cool") })}
+                    : "border-cool/35 bg-cool/10 text-cool"
+              }`}
             >
               {exportStatus.text}
               {exportBusy && exportProgress
@@ -1119,7 +1159,8 @@ export function StudioPublishPackagePanel({
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="flex max-w-[55ch] items-start gap-2 text-[0.65rem] leading-relaxed text-fg-3">
               <ImageIcon size={14} className="mt-0.5 shrink-0" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "로컬 파일 생성 계획만 제공합니다. 외부 플랫폼 전송·예약 게시·계정 연동은 수행하지 않습니다.")}</p>
+              로컬 파일 생성 계획만 제공합니다. 외부 플랫폼 전송·예약 게시·계정 연동은 수행하지 않습니다.
+            </p>
             <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:flex sm:shrink-0">
               {onDownloadManifest && (
                 <button
@@ -1127,14 +1168,15 @@ export function StudioPublishPackagePanel({
                   onClick={() => onDownloadManifest(plan.manifest)}
                   className={BUTTON_CLASS}
                 >
-                  <Download size={15} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "manifest")}</button>
+                  <Download size={15} aria-hidden /> manifest
+                </button>
               )}
               {onBeginExport && (
                 <button
                   type="button"
                   onClick={() => onBeginExport(plan)}
                   disabled={!plan.canExport || exportBusy}
-                  aria-describedby={!plan.canExport ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "en", "publish-package-export-blocked") : undefined}
+                  aria-describedby={!plan.canExport ? "publish-package-export-blocked" : undefined}
                   className={PRIMARY_BUTTON_CLASS}
                 >
                   {exportBusy ? (
@@ -1142,14 +1184,15 @@ export function StudioPublishPackagePanel({
                   ) : (
                     <FileArchive size={15} aria-hidden />
                   )}
-                  {exportBusy ? translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "패키지 생성 중…") : translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "패키지 내보내기")}
+                  {exportBusy ? "패키지 생성 중…" : "패키지 내보내기"}
                 </button>
               )}
             </div>
           </div>
           {!plan.canExport && onBeginExport && (
             <p id="publish-package-export-blocked" className="mt-1 text-right text-[0.65rem] text-bad">
-              {translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "차단 오류 ")}{plan.errors.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.StudioPublishPackagePanel", "ko", "건을 해결하면 실제 파일 생성을 시작할 수 있습니다.")}</p>
+              차단 오류 {plan.errors.length.toLocaleString("ko-KR")}건을 해결하면 실제 파일 생성을 시작할 수 있습니다.
+            </p>
           )}
         </footer>
       </div>

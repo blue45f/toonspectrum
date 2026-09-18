@@ -1,6 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import type { Title } from "./types";
 
 import type { RecommendationDiversity } from "./catalog-discovery-state";

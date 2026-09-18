@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Magic Wand Panel
  * 마술봉(자동 선택) 도구 컨트롤 — 켜면 메인 캔버스에서 이미지를 클릭할 때마다 studio-magic-wand
@@ -43,22 +40,24 @@ export function StudioMagicWandPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Wand2 size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "마술봉 자동 선택")}</p>
+          마술봉 자동 선택
+        </p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
       <StudioToggleChip
         active={active}
         onClick={onToggleActive}
-        title={translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "켜고 이미지를 클릭하면 비슷한 색으로 이어진 영역이 자동으로 선택됩니다.")}
+        title="켜고 이미지를 클릭하면 비슷한 색으로 이어진 영역이 자동으로 선택됩니다."
       >
         <span className="inline-flex items-center gap-1">
           <Wand2 className="size-3" aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "마술봉으로 선택")}</span>
+          마술봉으로 선택
+        </span>
       </StudioToggleChip>
 
       <StudioSliderRow
-        label={translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "허용 오차")}
+        label="허용 오차"
         min={MAGIC_WAND_TOLERANCE_RANGE.min}
         max={MAGIC_WAND_TOLERANCE_RANGE.max}
         step={MAGIC_WAND_TOLERANCE_RANGE.step}
@@ -69,10 +68,10 @@ export function StudioMagicWandPanel({
 
       <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
         {busy
-          ? translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "선택 영역을 계산하는 중...")
+          ? "선택 영역을 계산하는 중..."
           : active
-            ? translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "이미지 위 지점을 클릭하면 그 지점과 이어진 비슷한 색 영역이 선택됩니다. 허용 오차가 클수록 더 넓게 선택돼요. 결합(합치기/빼기)은 위 픽셀 선택 패널의 설정을 그대로 따릅니다.")
-            : translateCurrentStaticSourceText("domains.creator.StudioMagicWandPanel", "ko", "켜고 이미지 위를 클릭하면 클릭한 지점과 이어진 비슷한 색 영역이 자동으로 선택됩니다.")}
+            ? "이미지 위 지점을 클릭하면 그 지점과 이어진 비슷한 색 영역이 선택됩니다. 허용 오차가 클수록 더 넓게 선택돼요. 결합(합치기/빼기)은 위 픽셀 선택 패널의 설정을 그대로 따릅니다."
+            : "켜고 이미지 위를 클릭하면 클릭한 지점과 이어진 비슷한 색 영역이 자동으로 선택됩니다."}
       </p>
     </div>
   );

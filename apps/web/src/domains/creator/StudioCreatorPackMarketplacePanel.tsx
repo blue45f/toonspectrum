@@ -1,7 +1,4 @@
 import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Box,
   Brush,
   ChevronDown,
@@ -142,13 +139,15 @@ function PackCard({
           <div className="flex flex-wrap items-center gap-1">
             <h4 className="text-[0.72rem] font-black text-fg">{pack.metadata.name}</h4>
             <span className="rounded-full border border-good/35 bg-good/10 px-1.5 py-0.5 text-[0.52rem] font-black text-good">
-              {translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "en", "FREE")}</span>
+              FREE
+            </span>
             <span className="rounded-full border border-line px-1.5 py-0.5 text-[0.52rem] font-semibold text-fg-3">
               {KIND_LABEL[pack.resourceKind]}
             </span>
           </div>
           <p className="mt-0.5 text-[0.57rem] text-fg-3">
-            v{pack.metadata.version} · {pack.metadata.license.label} · {pack.entries.length}{translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "개")}</p>
+            v{pack.metadata.version} · {pack.metadata.license.label} · {pack.entries.length}개
+          </p>
         </div>
       </div>
       <p className="mt-2 text-[0.61rem] leading-relaxed text-fg-2">
@@ -199,14 +198,14 @@ function PackCard({
           {installed
             ? <Trash2 size={14} aria-hidden />
             : <PackageCheck size={14} aria-hidden />}
-          {pending ? translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "로컬 SQL 확인 중…") : actionLabel}
+          {pending ? "로컬 SQL 확인 중…" : actionLabel}
         </button>
         <span className="inline-flex min-h-11 items-center rounded-lg border border-line px-2 text-[0.54rem] font-semibold text-fg-3">
           {bundled
-            ? translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "도구에서 바로 사용")
+            ? "도구에서 바로 사용"
             : usesSqlCatalog
-              ? translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "무제한 · 로컬 SQL")
-              : translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "기기 로컬")}
+              ? "무제한 · 로컬 SQL"
+              : "기기 로컬"}
         </span>
       </div>
     </article>
@@ -235,7 +234,7 @@ export function StudioCreatorPackMarketplacePanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "Creator Pack 통합 마켓")}
+      aria-label="Creator Pack 통합 마켓"
       data-studio-creator-pack-marketplace="local-phase-1"
       className="mb-3 overflow-hidden rounded-lg border border-line bg-panel"
     >
@@ -253,12 +252,14 @@ export function StudioCreatorPackMarketplacePanel({
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
-              <strong className="text-xs text-fg">{translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "Creator Pack 통합 마켓")}</strong>
+              <strong className="text-xs text-fg">Creator Pack 통합 마켓</strong>
               <span className="rounded-full border border-good/35 bg-good/10 px-2 py-0.5 text-[0.55rem] font-black text-good">
-                {translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "en", "13 FREE")}</span>
+                13 FREE
+              </span>
             </span>
             <span className="mt-0.5 block truncate text-[0.58rem] text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "브러시·필터·팔레트·템플릿·3D")}</span>
+              브러시·필터·팔레트·템플릿·3D
+            </span>
           </span>
           <ChevronDown
             size={15}
@@ -272,7 +273,8 @@ export function StudioCreatorPackMarketplacePanel({
             <div className="flex items-start gap-2 rounded-lg border border-good/25 bg-good/5 p-2.5">
               <ShieldCheck size={15} className="mt-0.5 shrink-0 text-good" aria-hidden />
               <p className="text-[0.6rem] leading-relaxed text-fg-2">
-                {translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "작은 JSON은 기존 Studio 라이브러리에 실제 설치합니다. 템플릿·3D는 검증된 내장 ID와 성능 예산만 참조하며 결제·가짜 클라우드 설치는 제공하지 않습니다.")}</p>
+                작은 JSON은 기존 Studio 라이브러리에 실제 설치합니다. 템플릿·3D는 검증된 내장 ID와 성능 예산만 참조하며 결제·가짜 클라우드 설치는 제공하지 않습니다.
+              </p>
             </div>
             <div className="relative mt-2">
               <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" aria-hidden />
@@ -280,8 +282,8 @@ export function StudioCreatorPackMarketplacePanel({
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value.slice(0, 120))}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "Creator Pack 검색")}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "이름·종류·태그 검색")}
+                aria-label="Creator Pack 검색"
+                placeholder="이름·종류·태그 검색"
                 className={cx(
                   "min-h-11 w-full rounded-lg border border-line bg-card pl-9 pr-11 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent",
                   FOCUS,
@@ -291,7 +293,7 @@ export function StudioCreatorPackMarketplacePanel({
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "Creator Pack 검색어 지우기")}
+                  aria-label="Creator Pack 검색어 지우기"
                   className={cx("absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised", FOCUS)}
                 >
                   <X size={14} aria-hidden />
@@ -336,11 +338,12 @@ export function StudioCreatorPackMarketplacePanel({
             </div>
             {visible.length === 0 ? (
               <p role="status" className="mt-2 rounded-lg border border-dashed border-line px-3 py-5 text-center text-xs text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "ko", "조건에 맞는 Creator Pack이 없습니다.")}</p>
+                조건에 맞는 Creator Pack이 없습니다.
+              </p>
             ) : null}
             {status ? (
               <p
-                role={status.status === "invalid" || status.status === "conflict" || status.status === "full" || status.status === "storage-error" ? translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCreatorPackMarketplacePanel", "en", "status")}
+                role={status.status === "invalid" || status.status === "conflict" || status.status === "full" || status.status === "storage-error" ? "alert" : "status"}
                 className={cx(
                   "mt-2 rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed",
                   status.status === "invalid" || status.status === "conflict" || status.status === "full" || status.status === "storage-error"

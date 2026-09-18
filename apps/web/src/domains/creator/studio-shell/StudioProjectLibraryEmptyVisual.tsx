@@ -1,8 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, FileUp, PlayCircle, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -80,7 +75,7 @@ export function StudioProjectLibraryEmptyVisual({ locale }: { readonly locale: s
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
         <img src="/brand/theme-scenes/aurora-studio.svg" alt={copy.visualAlt} loading="lazy" decoding="async" />
-        <figcaption>{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryEmptyVisual", "en", "TOONSTUDIO · START → CREATE → CONTINUE")}</figcaption>
+        <figcaption>TOONSTUDIO · START → CREATE → CONTINUE</figcaption>
       </motion.figure>
       <div className="studio-project-empty-visual__routes">
         {copy.routes.map(([number, title, body], index) => (

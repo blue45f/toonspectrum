@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioWebtoonCelShadePanel.tsx
  *
@@ -101,31 +97,37 @@ export function StudioWebtoonCelShadePanel({
       {/* Subtab Toggle */}
       <div
         role="tablist"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "웹툰 채색 모드")}
+        aria-label="웹툰 채색 모드"
         className="flex rounded-xl border border-line/70 bg-raised/50 p-1 backdrop-blur-sm"
       >
         <button
           type="button"
           role="tab"
           aria-selected={subTab === "hue-shift"}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "쿨톤 음영 자동 생성기")}
+          aria-label="쿨톤 음영 자동 생성기"
           onClick={() => setSubTab("hue-shift")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "en", "flex-1 rounded-lg py-1 text-[0.65rem] font-medium transition-all {v0}"), { v0: String(subTab === "hue-shift"
+          className={`flex-1 rounded-lg py-1 text-[0.65rem] font-medium transition-all ${
+            subTab === "hue-shift"
               ? "bg-card text-accent font-semibold shadow-sm border border-accent/40"
-              : "text-fg-3 hover:text-fg-1") })}
+              : "text-fg-3 hover:text-fg-1"
+          }`}
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "쿨톤 음영 생성기")}</button>
+          쿨톤 음영 생성기
+        </button>
         <button
           type="button"
           role="tab"
           aria-selected={subTab === "skin-tones"}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "인물 피부톤 프리셋")}
+          aria-label="인물 피부톤 프리셋"
           onClick={() => setSubTab("skin-tones")}
-          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "en", "flex-1 rounded-lg py-1 text-[0.65rem] font-medium transition-all {v0}"), { v0: String(subTab === "skin-tones"
+          className={`flex-1 rounded-lg py-1 text-[0.65rem] font-medium transition-all ${
+            subTab === "skin-tones"
               ? "bg-card text-accent font-semibold shadow-sm border border-accent/40"
-              : "text-fg-3 hover:text-fg-1") })}
+              : "text-fg-3 hover:text-fg-1"
+          }`}
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "인물 피부톤 프리셋")}</button>
+          인물 피부톤 프리셋
+        </button>
       </div>
 
       {subTab === "hue-shift" ? (
@@ -133,9 +135,11 @@ export function StudioWebtoonCelShadePanel({
           {/* Continuous Tone Ribbon preview */}
           <div className="flex items-center justify-between px-0.5">
             <span className="text-[0.64rem] font-medium text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "맑은 음영 색상환 회전 (탁한 회색 방지)")}</span>
+              맑은 음영 색상환 회전 (탁한 회색 방지)
+            </span>
             <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[0.56rem] font-mono font-bold text-accent">
-              {translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "en", "Anti-Muddy")}</span>
+              Anti-Muddy
+            </span>
           </div>
 
           <div className="relative overflow-hidden rounded-lg border border-line/60 p-1 bg-raised/40">
@@ -150,7 +154,7 @@ export function StudioWebtoonCelShadePanel({
           <div
             className="grid grid-cols-3 gap-1.5"
             role="radiogroup"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "웹툰 음영 단계 목록")}
+            aria-label="웹툰 음영 단계 목록"
           >
             {celShadeSteps.map((step) => {
               const isSelected = step.hex.toLowerCase() === value.toLowerCase();
@@ -160,11 +164,13 @@ export function StudioWebtoonCelShadePanel({
                   type="button"
                   role="radio"
                   aria-checked={isSelected}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "{v0} {v1} 선택"), { v0: String(step.label), v1: String(step.hex) })}
+                  aria-label={`${step.label} ${step.hex} 선택`}
                   onClick={() => onSelectColor(step.hex)}
-                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "en", "flex flex-col items-center gap-1 rounded-xl border p-1.5 transition-all duration-150 hover:-translate-y-0.5 active:scale-95 {v0}"), { v0: String(isSelected
+                  className={`flex flex-col items-center gap-1 rounded-xl border p-1.5 transition-all duration-150 hover:-translate-y-0.5 active:scale-95 ${
+                    isSelected
                       ? "border-accent bg-accent-soft/35 ring-1 ring-accent shadow-sm"
-                      : "border-line/70 bg-card/60 hover:bg-card hover:border-line-strong") })}
+                      : "border-line/70 bg-card/60 hover:bg-card hover:border-line-strong"
+                  }`}
                 >
                   <div className="flex items-center justify-between w-full px-0.5">
                     <span className="text-[0.56rem] font-semibold text-fg-2">{step.label}</span>
@@ -191,19 +197,20 @@ export function StudioWebtoonCelShadePanel({
           {onSaveAsPalette && (
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "이 음영 세트를 내 팔레트로 저장")}
+              aria-label="이 음영 세트를 내 팔레트로 저장"
               onClick={handleSaveShadePalette}
               className="mt-1 flex items-center justify-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 px-3 py-1.5 text-[0.66rem] font-semibold text-accent transition-all hover:bg-accent/20 hover:border-accent/60 active:scale-[0.98] shadow-sm"
             >
               <Sparkles className="size-3" aria-hidden />
-              {savedBadge ? translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "음영 세트를 저장했어요!") : translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "이 음영 세트를 내 팔레트로 저장")}
+              {savedBadge ? "음영 세트를 저장했어요!" : "이 음영 세트를 내 팔레트로 저장"}
             </button>
           )}
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-[0.64rem] text-fg-3 px-0.5">
-            {translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "웹툰 연재 스튜디오에서 검증된 5대 캐릭터 피부 톤입니다.")}</p>
+            웹툰 연재 스튜디오에서 검증된 5대 캐릭터 피부 톤입니다.
+          </p>
           <div className="space-y-1.5">
             {WEBTOON_CHARACTER_SKIN_PRESETS.map((preset) => (
               <div
@@ -217,7 +224,7 @@ export function StudioWebtoonCelShadePanel({
                 <div
                   className="flex items-center gap-1.5"
                   role="radiogroup"
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "{v0} 피부톤 색상"), { v0: String(preset.name) })}
+                  aria-label={`${preset.name} 피부톤 색상`}
                 >
                   {preset.colors.map((hex, i) => {
                     const isSelected = hex.toLowerCase() === value.toLowerCase();
@@ -228,9 +235,11 @@ export function StudioWebtoonCelShadePanel({
                         type="button"
                         role="radio"
                         aria-checked={isSelected}
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "ko", "{v0} {v1} {v2} 선택"), { v0: String(preset.name), v1: String(stageNames[i] ?? ""), v2: String(hex) })}
+                        aria-label={`${preset.name} ${stageNames[i] ?? ""} ${hex} 선택`}
                         onClick={() => onSelectColor(hex)}
-                        className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioWebtoonCelShadePanel", "en", "flex-1 h-7 rounded-lg border border-white/20 shadow-sm transition-all hover:scale-105 active:scale-95 {v0}"), { v0: String(isSelected ? "ring-2 ring-accent ring-offset-1 ring-offset-panel" : "") })}
+                        className={`flex-1 h-7 rounded-lg border border-white/20 shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                          isSelected ? "ring-2 ring-accent ring-offset-1 ring-offset-panel" : ""
+                        }`}
                         style={{ backgroundColor: hex }}
                       />
                     );

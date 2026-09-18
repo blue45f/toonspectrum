@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -118,7 +114,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             aria-live="polite"
             className="fixed right-3 top-16 z-[70] rounded-lg border border-line bg-panel px-3 py-2 text-xs font-semibold text-fg shadow-lg"
           >
-            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "빠른 액세스를 여는 중…")}</div>
+            빠른 액세스를 여는 중…
+          </div>
         )}
       >
         <LazyStudioQuickAccessSurface
@@ -139,7 +136,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             role="status"
             aria-live="polite"
           >
-            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "빠른 웹툰 조립 화면을 여는 중…")}</div>
+            빠른 웹툰 조립 화면을 여는 중…
+          </div>
         )}
       >
         <LazyStudioQuickComicWizard
@@ -156,7 +154,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             role="status"
             aria-live="polite"
           >
-            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "장면 스냅샷 라이브러리를 여는 중…")}</div>
+            장면 스냅샷 라이브러리를 여는 중…
+          </div>
         )}
       >
         <LazyStudioSceneSnapshotDialog
@@ -176,7 +175,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             role="status"
             aria-live="polite"
           >
-            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "애니매틱 타임라인을 여는 중…")}</div>
+            애니매틱 타임라인을 여는 중…
+          </div>
         )}
       >
         <LazyStudioAnimaticTimelineDialog
@@ -203,7 +203,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             role="status"
             aria-live="polite"
           >
-            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "제작 바이블을 여는 중…")}</div>
+            제작 바이블을 여는 중…
+          </div>
         )}
       >
         <LazyStudioProductionBibleWorkspace
@@ -223,31 +224,31 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
   {hybridDccRouteRequested && !hybridDccOpen ? (
     <StudioHybridDccRouteGate
       detail={hybridDccRouteAccess === "pending"
-        ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "권한·원고·협업 경계를 확인한 뒤 같은 작품의 3D 작업을 엽니다. 기다리는 동안 캔버스와 로컬 3D 원본은 변경되지 않습니다.")
-        : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "이 작품의 3D 원본을 편집할 수 없어 안전하게 캔버스로 돌아갑니다.")}
+        ? "권한·원고·협업 경계를 확인한 뒤 같은 작품의 3D 작업을 엽니다. 기다리는 동안 캔버스와 로컬 3D 원본은 변경되지 않습니다."
+        : "이 작품의 3D 원본을 편집할 수 없어 안전하게 캔버스로 돌아갑니다."}
       label={hybridDccRouteAccess === "pending"
-        ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "3D 작업 권한을 확인하는 중입니다.")
-        : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "3D 편집 권한을 확인하지 못했습니다.")}
+        ? "3D 작업 권한을 확인하는 중입니다."
+        : "3D 편집 권한을 확인하지 못했습니다."}
       onClose={() => setHybridDccOpen(false)}
       returnFocus={hybridDccReturnFocusRef.current}
     />
   ) : null}
   {hybridDccOpen ? (
     <StudioSurfaceErrorBoundary
-      detail={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "3D 도구 화면만 안전하게 닫았습니다. 현재 캔버스, 문서 변경, 공동작업 연결과 실행 취소 기록은 그대로 보존되어 있습니다.")}
+      detail="3D 도구 화면만 안전하게 닫았습니다. 현재 캔버스, 문서 변경, 공동작업 연결과 실행 취소 기록은 그대로 보존되어 있습니다."
       onExit={() => setHybridDccOpen(false)}
       resetKey={JSON.stringify([
         hybridDccWorkspaceScope,
         studioRoute.dccMode ?? "model",
       ])}
       returnFocus={hybridDccReturnFocusRef.current}
-      surfaceLabel={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "전문 3D 제작 도구")}
+      surfaceLabel="전문 3D 제작 도구"
     >
       <Suspense
         fallback={(
           <StudioHybridDccRouteGate
-            detail={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "편집 권한과 로컬 복구 범위는 확인됐습니다. 무거운 3D 편집 모듈만 불러오는 중입니다.")}
-            label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "전문 3D 제작 도구를 여는 중입니다.")}
+            detail="편집 권한과 로컬 복구 범위는 확인됐습니다. 무거운 3D 편집 모듈만 불러오는 중입니다."
+            label="전문 3D 제작 도구를 여는 중입니다."
             onClose={() => setHybridDccOpen(false)}
             returnFocus={hybridDccReturnFocusRef.current}
           />
@@ -264,7 +265,7 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
           persistenceStatus={hybridDccPersistenceStatus}
           presentation="workspace"
           returnFocus={hybridDccReturnFocusRef.current}
-          workbenchMode={studioRoute.dccMode ?? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "en", "model")}
+          workbenchMode={studioRoute.dccMode ?? "model"}
           workspaceDocumentId={hybridDccWorkspaceDocumentId}
           onWorkspaceChange={(workspace) => {
             setHybridDccWorkspaceState((current) => (
@@ -313,7 +314,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             role="status"
             aria-live="polite"
           >
-            {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "에셋 권리 대장을 만드는 중…")}</div>
+            에셋 권리 대장을 만드는 중…
+          </div>
         )}
       >
         <LazyStudioAssetRightsAuditDialog
@@ -332,10 +334,10 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
           busy={interchangeImportBusy}
           confirmLabel={
             pendingInterchangeImport.kind === "cbz"
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "{v0}페이지 추가"), { v0: String(pendingInterchangeImport.result.pages.length) })
+              ? `${pendingInterchangeImport.result.pages.length}페이지 추가`
               : pendingInterchangeImport.kind === "will-v1"
-                ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "선택한 위치에 WILL v1 추가")
-              : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "선택한 위치로 가져오기")
+                ? "선택한 위치에 WILL v1 추가"
+              : "선택한 위치로 가져오기"
           }
           choices={
             pendingInterchangeImport.kind === "cbz"
@@ -425,8 +427,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
         }}
       >
         <span className="min-w-0 flex-1 leading-relaxed">
-          <strong className="font-semibold">“{pendingBrushDelete.deleted.brush.name}{translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "” 삭제됨")}</strong>
-          {pendingBrushDeletes.length > 1 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", " · 복구 가능 {v0}건"), { v0: String(pendingBrushDeletes.length) }) : ""}
+          <strong className="font-semibold">“{pendingBrushDelete.deleted.brush.name}” 삭제됨</strong>
+          {pendingBrushDeletes.length > 1 ? ` · 복구 가능 ${pendingBrushDeletes.length}건` : ""}
         </span>
         <button
           ref={brushUndoButtonRef}
@@ -440,7 +442,8 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
             aria-hidden
             className={studioChromeIconClass({ tone: "warn" })}
           />
-          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorDialogs", "ko", "삭제 취소")}</button>
+          삭제 취소
+        </button>
       </div>
     ) : null}
     </>

@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   CloudOff,
   ExternalLink,
@@ -454,8 +450,8 @@ function StudioCommentPinPreviewPortal({
       </span>
       <span className="mt-1.5 block text-[0.62rem] font-semibold text-accent">
         {reanchorable
-          ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "드래그·Alt+방향키로 위치 이동 · 클릭·Enter로 열기")
-          : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "클릭·Enter로 열기 · ←/→ 핀 이동")}
+          ? "드래그·Alt+방향키로 위치 이동 · 클릭·Enter로 열기"
+          : "클릭·Enter로 열기 · ←/→ 핀 이동"}
       </span>
     </span>,
     globalThis.document.body
@@ -769,7 +765,7 @@ export function StudioLiveCanvasOverlay({
   return (
     <div
       ref={overlayRef}
-      aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "공동작업 캔버스 오버레이")}
+      aria-label="공동작업 캔버스 오버레이"
       role="group"
       className="pointer-events-none absolute inset-0 z-20 overflow-hidden"
       data-studio-live-canvas-overlay
@@ -846,10 +842,10 @@ export function StudioLiveCanvasOverlay({
                 reanchoring,
                 reanchorDisabledReason,
               })}
-              aria-roledescription={reanchorable ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "이동 가능한 위치 댓글 핀") : undefined}
+              aria-roledescription={reanchorable ? "이동 가능한 위치 댓글 핀" : undefined}
               data-studio-comment-pin="true"
-              data-studio-comment-pin-reanchorable={reanchorable ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "true") : undefined}
-              data-studio-comment-pin-reanchoring={reanchoring ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "true") : undefined}
+              data-studio-comment-pin-reanchorable={reanchorable ? "true" : undefined}
+              data-studio-comment-pin-reanchoring={reanchoring ? "true" : undefined}
               data-studio-comment-pin-anchor-x={reanchoring && dragPreview
                 ? dragPreview.anchor.x.toFixed(4)
                 : undefined}
@@ -869,12 +865,12 @@ export function StudioLiveCanvasOverlay({
                 top: `clamp(1.375rem, calc(${(projected.y * 100).toFixed(4)}% + ${projected.screenOffsetY}px), calc(100% - 1.375rem))`,
               }}
               title={reanchorable
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} · 드래그 또는 Alt+방향키로 위치 이동 · 클릭으로 열기"), { v0: String(pin.label) })
+                ? `${pin.label} · 드래그 또는 Alt+방향키로 위치 이동 · 클릭으로 열기`
                 : reanchorDisabledReason
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} · 위치 이동 불가: {v1} · 클릭으로 열기"), { v0: String(pin.label), v1: String(reanchorDisabledReason) })
+                  ? `${pin.label} · 위치 이동 불가: ${reanchorDisabledReason} · 클릭으로 열기`
                   : pin.previewBody
                     ? undefined
-                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} · {v1}열림 {v2}개"), { v0: String(pin.label), v1: String(pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""), v2: String(pin.count) })}
+                    : `${pin.label} · ${pin.unreadCount ? `읽지 않음 ${pin.unreadCount}개 · ` : ""}열림 ${pin.count}개`}
               onPointerEnter={() => {
                 if (dragSessionRef.current?.pinKey !== pin.key) previewCommentPin(pin.key);
               }}
@@ -1012,7 +1008,7 @@ export function StudioLiveCanvasOverlay({
       {activePreviewPin?.previewBody && activePreviewAnchor ? (
         <StudioCommentPinPreviewPortal
           anchor={activePreviewAnchor}
-          author={activePreviewPin.previewAuthor ?? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "검토자")}
+          author={activePreviewPin.previewAuthor ?? "검토자"}
           body={activePreviewPin.previewBody}
           reanchorable={Boolean(
             activePreviewReanchorTarget
@@ -1072,7 +1068,7 @@ export function StudioLiveCanvasOverlay({
             {pointsString ? (
               <svg
                 className="pointer-events-none absolute inset-0 z-10 size-full"
-                data-studio-live-cursor-trail={isEraserTrail ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "eraser") : isPixelTrail ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "pixel") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "ink")}
+                data-studio-live-cursor-trail={isEraserTrail ? "eraser" : isPixelTrail ? "pixel" : "ink"}
                 preserveAspectRatio="none"
                 viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
               >
@@ -1093,8 +1089,8 @@ export function StudioLiveCanvasOverlay({
                   fill="none"
                   stroke={trailColor}
                   strokeWidth={isEraserTrail ? eraserOutline : strokeWidth}
-                  strokeLinecap={isPixelTrail ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "square") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "round")}
-                  strokeLinejoin={isPixelTrail ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "miter") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "round")}
+                  strokeLinecap={isPixelTrail ? "square" : "round"}
+                  strokeLinejoin={isPixelTrail ? "miter" : "round"}
                   strokeDasharray={isEraserTrail ? `${dash} ${gap}` : undefined}
                   opacity={isEraserTrail ? 0.95 : (cursor.strokeOpacity ?? 0.9)}
                   className="motion-safe:transition-all motion-safe:duration-75"
@@ -1112,7 +1108,7 @@ export function StudioLiveCanvasOverlay({
                 {isDrawing ? (
                   <span
                     className="absolute -left-3 -top-3 block rounded-full border-2 shadow-md animate-pulse"
-                    data-studio-live-cursor-tip={isEraserTrail ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "eraser") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "ink")}
+                    data-studio-live-cursor-tip={isEraserTrail ? "eraser" : "ink"}
                     style={{
                       width: `${Math.max(12, strokeWidth * 2)}px`,
                       height: `${Math.max(12, strokeWidth * 2)}px`,
@@ -1316,8 +1312,8 @@ export function StudioLivePresenceDock({
       {onOpenCompanionTab ? (
         <button
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "새 탭에서 같이 그리기")}
-          title={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "새 탭에서 같이 그리기")}
+          aria-label="새 탭에서 같이 그리기"
+          title="새 탭에서 같이 그리기"
           data-studio-presence-companion-tab="true"
           className="grid size-11 shrink-0 place-items-center rounded-lg border border-accent/40 bg-accent-soft text-accent transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none"
           onClick={onOpenCompanionTab}
@@ -1327,8 +1323,8 @@ export function StudioLivePresenceDock({
       ) : null}
       <button
         type="button"
-        aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "팀 작업 공간 열기")}
-        title={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "팀")}
+        aria-label="팀 작업 공간 열기"
+        title="팀"
         data-studio-presence-team-action="true"
         className="hidden size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none sm:grid"
         onClick={onOpenTeam}
@@ -1338,14 +1334,14 @@ export function StudioLivePresenceDock({
       {onToggleRemoteCursors ? (
         <button
           type="button"
-          aria-label={remoteCursorsVisible ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "팀원 커서 숨기기") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "팀원 커서 표시하기")}
+          aria-label={remoteCursorsVisible ? "팀원 커서 숨기기" : "팀원 커서 표시하기"}
           aria-pressed={remoteCursorsVisible}
           title={
             remoteCursorsVisible
-              ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "팀원 커서 숨기기 · Ctrl/⌘+Alt+\\")
-              : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "팀원 커서 표시하기 · Ctrl/⌘+Alt+\\")
+              ? "팀원 커서 숨기기 · Ctrl/⌘+Alt+\\"
+              : "팀원 커서 표시하기 · Ctrl/⌘+Alt+\\"
           }
-          data-studio-remote-cursor-visibility={remoteCursorsVisible ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "visible") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "en", "hidden")}
+          data-studio-remote-cursor-visibility={remoteCursorsVisible ? "visible" : "hidden"}
           className="hidden size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none sm:grid"
           onClick={onToggleRemoteCursors}
         >
@@ -1358,7 +1354,7 @@ export function StudioLivePresenceDock({
       ) : null}
       <button
         type="button"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} 팀 작업 공간 열기"), { v0: String(collaborationLabel) })}
+        aria-label={`${collaborationLabel} 팀 작업 공간 열기`}
         title={`${syncPresentation.detail} · ${lastAckLabel}`}
         data-studio-presence-link={resolvedSync.phase}
         data-studio-presence-sync-action="true"
@@ -1381,7 +1377,7 @@ export function StudioLivePresenceDock({
       {cursorQuality && cursorQualityPresentation && cursorQuality.tier !== "live" ? (
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} 팀 작업 공간 열기"), { v0: String(cursorQualityPresentation.detail) })}
+          aria-label={`${cursorQualityPresentation.detail} 팀 작업 공간 열기`}
           title={cursorQualityPresentation.detail}
           data-studio-cursor-quality={cursorQuality.tier}
           className={cn(
@@ -1404,7 +1400,7 @@ export function StudioLivePresenceDock({
           type="button"
           data-studio-presence-lock-count={lockCount}
           data-studio-presence-lock-label={lockLabel ?? undefined}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0}, 팀 작업 공간 열기"), { v0: String(lockLabel ?? `활성 편집 잠금 ${lockCount}개`) })}
+          aria-label={`${lockLabel ?? `활성 편집 잠금 ${lockCount}개`}, 팀 작업 공간 열기`}
           title={lockLabel ?? undefined}
           className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold tabular-nums text-accent transition-colors hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           onClick={onOpenTeam}
@@ -1417,7 +1413,7 @@ export function StudioLivePresenceDock({
       <div
         className="hidden items-center -space-x-1.5 pl-0.5 sm:flex"
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "참여자")}
+        aria-label="참여자"
         data-studio-presence-stack="true"
       >
         {visiblePeers.map((peer, index) => {
@@ -1429,8 +1425,8 @@ export function StudioLivePresenceDock({
               type="button"
               aria-label={
                 following
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} 따라가기 중지"), { v0: String(peer.displayName) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} 작업 페이지 따라가기"), { v0: String(peer.displayName) })
+                  ? `${peer.displayName} 따라가기 중지`
+                  : `${peer.displayName} 작업 페이지 따라가기`
               }
               aria-pressed={following}
               className={cn(
@@ -1446,7 +1442,7 @@ export function StudioLivePresenceDock({
             >
               {initial(peer.displayName)}
               <span
-                aria-label={peer.visibility === "active" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "활성") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "자리 비움")}
+                aria-label={peer.visibility === "active" ? "활성" : "자리 비움"}
                 className={cn(
                   "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-panel",
                   peer.visibility === "active" ? "bg-good" : "bg-fg-3"
@@ -1465,7 +1461,7 @@ export function StudioLivePresenceDock({
       {desktopOverflow ? (
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "추가 팀원 {v0}명, 팀 작업 공간 열기"), { v0: String(desktopHiddenPeerCount) })}
+          aria-label={`추가 팀원 ${desktopHiddenPeerCount}명, 팀 작업 공간 열기`}
           className="hidden size-11 shrink-0 place-items-center rounded-full border border-line bg-raised text-[0.65rem] font-bold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:grid"
           onClick={onOpenTeam}
         >
@@ -1476,11 +1472,11 @@ export function StudioLivePresenceDock({
       {followedPeer ? (
         <button
           type="button"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "{v0} 따라가기 중지"), { v0: String(followedPeer.displayName) })}
+          aria-label={`${followedPeer.displayName} 따라가기 중지`}
           className="order-last ml-auto hidden min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 text-[0.68rem] font-bold text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:ml-1 sm:inline-flex sm:max-w-40"
           onClick={() => onToggleFollow(followedPeer.sessionId)}
         >
-          <span className="truncate">{followedPeer.displayName} {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCanvasOverlay", "ko", "따라가기")}</span>
+          <span className="truncate">{followedPeer.displayName} 따라가기</span>
           <X size={12} className="shrink-0" aria-hidden />
         </button>
       ) : null}

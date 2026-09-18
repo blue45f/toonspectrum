@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { WifiOff } from "lucide-react";
 import { useEffect, useState } from "react";
 

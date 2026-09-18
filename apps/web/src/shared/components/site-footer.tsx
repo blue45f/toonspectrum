@@ -1,8 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PenTool, Sparkles } from "lucide-react";
 
 import {
@@ -80,7 +75,8 @@ export function SiteFooter() {
           <div className="public-footer-invitation__content">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
               <PenTool size={14} aria-hidden="true" />
-              {translateCurrentStaticSourceText("shared.components.site.footer", "en", "YOUR NEXT WEBTOON STARTS HERE")}</p>
+              YOUR NEXT WEBTOON STARTS HERE
+            </p>
             <h2 id="footer-creative-title" className="mt-4 text-balance text-3xl font-bold leading-tight tracking-[-0.045em] text-fg sm:text-4xl">
               {bi("오래 상상한 장면, 이제 직접 그려보세요.", "That scene you keep imagining. Make it yours.")}
             </h2>
@@ -102,7 +98,8 @@ export function SiteFooter() {
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 font-display text-[0.65rem] font-bold uppercase tracking-[0.15em] text-accent">
               <Sparkles size={14} aria-hidden="true" />
-              {translateCurrentStaticSourceText("shared.components.site.footer", "en", "YOUR NEXT SCENE")}</p>
+              YOUR NEXT SCENE
+            </p>
             <h2 id="footer-creative-title" className="mt-3 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
               {bi("떠올리고, 조사하고, 만드는 흐름을 한곳에서.", "Spark, research and make in one connected flow.")}
             </h2>
@@ -138,7 +135,7 @@ export function SiteFooter() {
                   {siteBrand}
                 </h2>
                 <span className="block font-display text-[0.58rem] font-semibold uppercase tracking-[0.16em] text-fg-3">
-                  {isPublicPage ? translateCurrentStaticSourceText("shared.components.site.footer", "en", "Draw · Discover · Share") : translateCurrentStaticSourceText("shared.components.site.footer", "en", "Create · Share · Discover")}
+                  {isPublicPage ? "Draw · Discover · Share" : "Create · Share · Discover"}
                 </span>
               </span>
             </Link>
@@ -162,13 +159,13 @@ export function SiteFooter() {
           </div>
 
           {SITE_NAVIGATION_GROUPS.map((group, index) => (
-            <nav key={group.id} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.site.footer", "en", "footer-nav-{v0}"), { v0: String(group.id) })} className="min-w-0">
+            <nav key={group.id} aria-labelledby={`footer-nav-${group.id}`} className="min-w-0">
               <div className="mb-4 flex items-start gap-2.5">
                 <span aria-hidden="true" className="pt-0.5 font-display text-[0.6rem] font-bold tracking-[0.13em] text-accent">
                   0{index + 1}
                 </span>
                 <div>
-                  <h2 id={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.site.footer", "en", "footer-nav-{v0}"), { v0: String(group.id) })} className="font-display text-sm font-bold text-fg">
+                  <h2 id={`footer-nav-${group.id}`} className="font-display text-sm font-bold text-fg">
                     {siteNavigationText(group.label, locale)}
                   </h2>
                   <p className="mt-1 hidden text-[0.68rem] leading-5 text-fg-3 xl:block">

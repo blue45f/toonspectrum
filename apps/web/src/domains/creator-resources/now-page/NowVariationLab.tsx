@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, Copy, PenLine, Shuffle, Sparkles, Target } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
@@ -191,16 +187,20 @@ export function NowVariationLab({
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 text-xs font-bold tracking-[0.14em] text-accent">
-              <Sparkles size={16} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "EXPLICIT VARIATION LAB")}</div>
+              <Sparkles size={16} aria-hidden="true" /> EXPLICIT VARIATION LAB
+            </div>
             <h2 id="variation-lab-title" className="mt-2 text-2xl font-bold text-fg sm:text-3xl">
-              {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "오늘의 변주 랩")}</h2>
+              오늘의 변주 랩
+            </h2>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "더 많은 영감을 무한 스크롤하지 않고, 촬영 거리·서사 압력·대사량·시각 규칙을 직접 정해 같은 소재의 실행 가능한 3개 제작안으로 좁힙니다. 선택은 추천 알고리즘이 아니라 화면에 보이는 규칙으로만 결정됩니다.")}</p>
+              더 많은 영감을 무한 스크롤하지 않고, 촬영 거리·서사 압력·대사량·시각 규칙을 직접 정해 같은 소재의 실행 가능한
+              3개 제작안으로 좁힙니다. 선택은 추천 알고리즘이 아니라 화면에 보이는 규칙으로만 결정됩니다.
+            </p>
           </div>
           <div className="rounded-2xl border border-accent/30 bg-canvas/70 px-4 py-3 text-right">
             <strong className="font-display text-2xl tabular-nums text-fg">256</strong>
-            <span className="ml-1 text-xs font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "COMBINATIONS")}</span>
-            <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "4개 축 × 각 4개 선택지")}</p>
+            <span className="ml-1 text-xs font-bold text-fg-3">COMBINATIONS</span>
+            <p className="mt-1 text-xs text-fg-3">4개 축 × 각 4개 선택지</p>
           </div>
         </div>
       </div>
@@ -208,29 +208,29 @@ export function NowVariationLab({
       <div className="space-y-7 p-5 sm:p-7">
         <div className="grid gap-4 xl:grid-cols-2">
           <AxisPicker
-            title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "1. 촬영 거리")}
-            description={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "독자가 처음 받는 정보의 크기와 순서를 정합니다.")}
+            title="1. 촬영 거리"
+            description="독자가 처음 받는 정보의 크기와 순서를 정합니다."
             options={FRAMING_OPTIONS}
             value={dayState.selection.framing}
             onChange={(value) => updateSelection("framing", value)}
           />
           <AxisPicker
-            title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "2. 서사 압력")}
-            description={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "평범한 장면을 사건으로 바꾸는 긴장 원인을 고릅니다.")}
+            title="2. 서사 압력"
+            description="평범한 장면을 사건으로 바꾸는 긴장 원인을 고릅니다."
             options={PRESSURE_OPTIONS}
             value={dayState.selection.pressure}
             onChange={(value) => updateSelection("pressure", value)}
           />
           <AxisPicker
-            title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "3. 대사 예산")}
-            description={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "설명 과잉을 막고 그림이 담당할 몫을 명확히 합니다.")}
+            title="3. 대사 예산"
+            description="설명 과잉을 막고 그림이 담당할 몫을 명확히 합니다."
             options={DIALOGUE_OPTIONS}
             value={dayState.selection.dialogue}
             onChange={(value) => updateSelection("dialogue", value)}
           />
           <AxisPicker
-            title={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "4. 시각 규칙")}
-            description={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "다섯 컷을 하나의 작품처럼 묶어 줄 형식 제약을 선택합니다.")}
+            title="4. 시각 규칙"
+            description="다섯 컷을 하나의 작품처럼 묶어 줄 형식 제약을 선택합니다."
             options={VISUAL_RULE_OPTIONS}
             value={dayState.selection.visualRule}
             onChange={(value) => updateSelection("visualRule", value)}
@@ -239,15 +239,17 @@ export function NowVariationLab({
 
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-canvas/55 p-4">
           <div>
-            <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "VARIATION SET")}</p>
+            <p className="text-xs font-bold tracking-[0.14em] text-accent">VARIATION SET</p>
             <p className="mt-1 text-sm font-semibold text-fg">
-              {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "세트 ")}{dayState.shuffle + 1} {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "· 선택 규칙을 기준으로 펼친 3개 경로")}</p>
+              세트 {dayState.shuffle + 1} · 선택 규칙을 기준으로 펼친 3개 경로
+            </p>
           </div>
           <button type="button" className={ACTION_BUTTON} onClick={shuffleCandidates}>
-            <Shuffle size={16} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "같은 기준으로 다시 섞기")}</button>
+            <Shuffle size={16} aria-hidden="true" /> 같은 기준으로 다시 섞기
+          </button>
         </div>
 
-        <ol className="grid gap-4 lg:grid-cols-3" aria-label={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "생성된 변주안")}>
+        <ol className="grid gap-4 lg:grid-cols-3" aria-label="생성된 변주안">
           {candidates.map((candidate, index) => {
             const active = candidate.id === dayState.selectedCandidateId;
             return (
@@ -255,7 +257,7 @@ export function NowVariationLab({
                 <button
                   type="button"
                   aria-pressed={active}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "변주안 {v0} 선택: {v1}"), { v0: String(index + 1), v1: String(candidate.title) })}
+                  aria-label={`변주안 ${index + 1} 선택: ${candidate.title}`}
                   onClick={() => selectCandidate(candidate.id)}
                   className={cn(
                     "h-full min-h-72 w-full rounded-2xl border p-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-reduce:transition-none",
@@ -270,7 +272,7 @@ export function NowVariationLab({
                   <span className="mt-2 block text-xs font-semibold leading-5 text-fg-3">{candidate.signature}</span>
                   <span className="mt-5 block text-sm leading-7 text-fg-2">{candidate.hook}</span>
                   <span className="mt-5 block border-t border-line pt-4 text-xs leading-6 text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "완료 기준 · ")}{candidate.successCheck}
+                    완료 기준 · {candidate.successCheck}
                   </span>
                 </button>
               </li>
@@ -282,7 +284,7 @@ export function NowVariationLab({
           <article className="rounded-2xl border border-accent/30 bg-accent-soft p-5 sm:p-6" aria-labelledby="selected-route-title">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "SELECTED ROUTE")}</p>
+                <p className="text-xs font-bold tracking-[0.14em] text-accent">SELECTED ROUTE</p>
                 <h3 id="selected-route-title" className="mt-2 text-xl font-bold text-fg">
                   {selectedCandidate.title}
                 </h3>
@@ -292,33 +294,35 @@ export function NowVariationLab({
             </div>
             <dl className="mt-6 grid gap-5 text-sm sm:grid-cols-2">
               <div>
-                <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "5컷 전략")}</dt>
+                <dt className="font-bold text-fg-3">5컷 전략</dt>
                 <dd className="mt-1 leading-7 text-fg">{selectedCandidate.panelPlan}</dd>
               </div>
               <div>
-                <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "강제 제약")}</dt>
+                <dt className="font-bold text-fg-3">강제 제약</dt>
                 <dd className="mt-1 leading-7 text-fg">{selectedCandidate.constraint}</dd>
               </div>
               <div>
-                <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "첫 행동")}</dt>
+                <dt className="font-bold text-fg-3">첫 행동</dt>
                 <dd className="mt-1 leading-7 text-fg">{selectedCandidate.startAction}</dd>
               </div>
               <div>
-                <dt className="font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "독해 점검")}</dt>
+                <dt className="font-bold text-fg-3">독해 점검</dt>
                 <dd className="mt-1 leading-7 text-fg">{selectedCandidate.successCheck}</dd>
               </div>
             </dl>
-            <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "{v0} mt-6"), { v0: String(PRIMARY_BUTTON) })} onClick={() => void copySelectedBrief()}>
+            <button type="button" className={`${PRIMARY_BUTTON} mt-6`} onClick={() => void copySelectedBrief()}>
               {copyStatus === "copied" ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
-              {copyStatus === "copied" ? translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "선택안 복사됨") : translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "선택안 브리프 복사")}
+              {copyStatus === "copied" ? "선택안 복사됨" : "선택안 브리프 복사"}
             </button>
             {copyStatus === "copied" && (
               <span className="sr-only" role="status">
-                {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "선택한 변주안과 개인 메모가 클립보드에 복사되었습니다.")}</span>
+                선택한 변주안과 개인 메모가 클립보드에 복사되었습니다.
+              </span>
             )}
             {copyStatus === "error" && (
               <p className="mt-3 text-sm font-semibold text-bad" role="alert">
-                {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "선택안을 클립보드에 복사하지 못했습니다. 브라우저 권한을 확인하세요.")}</p>
+                선택안을 클립보드에 복사하지 못했습니다. 브라우저 권한을 확인하세요.
+              </p>
             )}
           </article>
 
@@ -329,31 +333,33 @@ export function NowVariationLab({
               </span>
               <div>
                 <h3 id="variation-note-title" className="font-bold text-fg">
-                  {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "개인 제작 메모")}</h3>
-                <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "캐릭터, 감정, 수정할 단서를 짧게 남겨 복사 브리프에 함께 포함합니다.")}</p>
+                  개인 제작 메모
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-fg-3">캐릭터, 감정, 수정할 단서를 짧게 남겨 복사 브리프에 함께 포함합니다.</p>
               </div>
             </div>
-            <label className="mt-5 block" htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "variation-note-{v0}"), { v0: String(day.iso) })}>
-              <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "개인 제작 메모")}</span>
+            <label className="mt-5 block" htmlFor={`variation-note-${day.iso}`}>
+              <span className="sr-only">개인 제작 메모</span>
               <textarea
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "variation-note-{v0}"), { v0: String(day.iso) })}
+                id={`variation-note-${day.iso}`}
                 value={dayState.note}
                 maxLength={NOW_VARIATION_NOTE_MAX_LENGTH}
                 rows={8}
                 onChange={(event: ChangeEvent<HTMLTextAreaElement>) => updateNote(event.target.value)}
-                aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "variation-note-count-{v0}"), { v0: String(day.iso) })}
-                placeholder={translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "예: 주인공은 장갑을 이미 알고 있다. 마지막 컷에서만 왼손을 보여주기.")}
+                aria-describedby={`variation-note-count-${day.iso}`}
+                placeholder="예: 주인공은 장갑을 이미 알고 있다. 마지막 컷에서만 왼손을 보여주기."
                 className="w-full resize-y rounded-xl border border-line bg-panel px-4 py-3 text-sm leading-7 text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/30"
               />
             </label>
-            <div id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "en", "variation-note-count-{v0}"), { v0: String(day.iso) })} className="mt-2 flex items-center justify-between gap-3 text-xs text-fg-3">
-              <span>{translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "이 날짜에만 연결되는 로컬 메모")}</span>
+            <div id={`variation-note-count-${day.iso}`} className="mt-2 flex items-center justify-between gap-3 text-xs text-fg-3">
+              <span>이 날짜에만 연결되는 로컬 메모</span>
               <span className="font-display tabular-nums">
                 {dayState.note.length}/{NOW_VARIATION_NOTE_MAX_LENGTH}
               </span>
             </div>
             <p className="mt-4 text-xs leading-6 text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.resources.now.page.NowVariationLab", "ko", "변주 선택과 메모는 계정이나 서버로 전송하지 않고 이 브라우저에만 보관합니다.")}</p>
+              변주 선택과 메모는 계정이나 서버로 전송하지 않고 이 브라우저에만 보관합니다.
+            </p>
             {storageError && (
               <p className="mt-3 text-xs font-semibold leading-6 text-bad" role="alert">
                 {storageError}

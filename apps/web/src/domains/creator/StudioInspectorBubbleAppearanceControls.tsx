@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useEffect, useRef } from "react";
 
 import {
@@ -122,9 +121,11 @@ export function StudioInspectorBubbleAppearanceControls({
         data-studio-bubble-variant-picker="true"
       >
         <p className="mb-0.5 text-[0.72rem] font-semibold tracking-tight text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "모양 바꾸기")}</p>
+          모양 바꾸기
+        </p>
         <p className="mb-2 text-[0.6rem] leading-snug text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "같은 대사이어도 말투만 바꿔 보면 분위기가 달라져요.")}</p>
+          같은 대사이어도 말투만 바꿔 보면 분위기가 달라져요.
+        </p>
         <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
           {BUBBLE_VARIANTS.map((variant) => {
             const active = selected.variant === variant.id;
@@ -164,15 +165,16 @@ export function StudioInspectorBubbleAppearanceControls({
         </div>
       </div>
 
-      <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 스타일을 여는 중...")} />}>
+      <Suspense fallback={<StudioPanelLoading label="말풍선 스타일을 여는 중..." />}>
         <StudioBubbleStylePresetPanel selected={selected} onApplyPreset={onPatch} />
       </Suspense>
 
       <div className="mt-2 flex items-center justify-between gap-2 text-sm text-fg-2">
-        {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "배경 투명")}<input
+        배경 투명
+        <input
           type="checkbox"
           checked={selected.fill === "transparent"}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 배경 투명")}
+          aria-label="말풍선 배경 투명"
           onChange={(event) =>
             onPatch({ fill: event.currentTarget.checked ? "transparent" : "#ffffff" })
           }
@@ -183,7 +185,7 @@ export function StudioInspectorBubbleAppearanceControls({
       {selected.fill !== "transparent" && (
         <div className="mt-2">
           <StudioColorField
-            label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 색상")}
+            label="말풍선 색상"
             value={selected.fill}
             purpose="bubble-fill"
             recentColors={recentColors}
@@ -209,12 +211,13 @@ export function StudioInspectorBubbleAppearanceControls({
       {selected.fill !== "transparent" && (
         <div className="mt-2.5 space-y-2 border-t border-line/40 pt-2.5">
           <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "그라데이션 채우기")}</p>
-          <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "그라데이션 패널을 여는 중...")} />}>
+            그라데이션 채우기
+          </p>
+          <Suspense fallback={<StudioPanelLoading label="그라데이션 패널을 여는 중..." />}>
             <StudioGradientEnginePanel
               value={selected.gradient ?? null}
               onChange={(gradient) => onPatch({ gradient: gradient ?? undefined })}
-              title={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 그라데이션")}
+              title="말풍선 그라데이션"
             />
           </Suspense>
         </div>
@@ -222,13 +225,15 @@ export function StudioInspectorBubbleAppearanceControls({
 
       <div className="mt-2.5 space-y-2.5 border-t border-line/40 pt-2.5">
         <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "테두리 설정")}</p>
+          테두리 설정
+        </p>
 
         <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "테두리 커스텀")}<input
+          테두리 커스텀
+          <input
             type="checkbox"
             checked={Boolean(selected.stroke)}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 테두리 커스텀")}
+            aria-label="말풍선 테두리 커스텀"
             onChange={(event) => {
               const enabled = event.currentTarget.checked;
               if (!enabled && selected.stroke) {
@@ -252,7 +257,7 @@ export function StudioInspectorBubbleAppearanceControls({
         {selected.stroke && (
           <>
             <StudioColorField
-              label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "테두리 색상")}
+              label="테두리 색상"
               value={selected.stroke}
               purpose="bubble-stroke"
               recentColors={recentColors}
@@ -274,10 +279,11 @@ export function StudioInspectorBubbleAppearanceControls({
             />
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "테두리 두께")}<span className="flex items-center gap-2">
+              테두리 두께
+              <span className="flex items-center gap-2">
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "테두리 두께")}
+                  aria-label="테두리 두께"
                   min={0.5}
                   max={12}
                   step={0.5}
@@ -297,8 +303,9 @@ export function StudioInspectorBubbleAppearanceControls({
 
         <div className="space-y-1.5 pt-0.5">
           <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "외곽선 스타일")}</p>
-          <div className="flex gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 외곽선 스타일")}>
+            외곽선 스타일
+          </p>
+          <div className="flex gap-1.5" role="group" aria-label="말풍선 외곽선 스타일">
             {BUBBLE_OUTLINE_STYLE_OPTIONS.map((option) => {
               const current = normalizeBubbleOutlineStyle(selected.outlineStyle);
               const active =
@@ -327,11 +334,12 @@ export function StudioInspectorBubbleAppearanceControls({
             })}
           </div>
           <p className="text-[0.6rem] leading-snug text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "손그림 스타일은 외곽선을 결정적으로 흔들어 손맛을 더해요(기본 매끈은 벡터 그대로).")}</p>
+            손그림 스타일은 외곽선을 결정적으로 흔들어 손맛을 더해요(기본 매끈은 벡터 그대로).
+          </p>
         </div>
       </div>
 
-      <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "텍스트 크기 고정 패널을 여는 중...")} />}>
+      <Suspense fallback={<StudioPanelLoading label="텍스트 크기 고정 패널을 여는 중..." />}>
         <StudioBubbleAutoShrinkPanel
           enabled={Boolean(selected.autoShrinkText)}
           minFontSize={
@@ -348,13 +356,15 @@ export function StudioInspectorBubbleAppearanceControls({
 
       <div className="mt-2.5 space-y-2.5 border-t border-line/40 pt-2.5">
         <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 그림자 (Shadow)")}</p>
+          말풍선 그림자 (Shadow)
+        </p>
 
         <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-          {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "그림자 사용")}<input
+          그림자 사용
+          <input
             type="checkbox"
             checked={selected.shadowColor !== undefined}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "말풍선 그림자 사용")}
+            aria-label="말풍선 그림자 사용"
             onChange={(event) => {
               const enabled = event.currentTarget.checked;
               if (!enabled && selected.shadowColor !== undefined) {
@@ -381,7 +391,7 @@ export function StudioInspectorBubbleAppearanceControls({
         {selected.shadowColor !== undefined && (
           <>
             <StudioColorField
-              label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "그림자 색상")}
+              label="그림자 색상"
               value={selected.shadowColor ?? null}
               fallbackColor="#000000"
               purpose="shadow"
@@ -404,10 +414,11 @@ export function StudioInspectorBubbleAppearanceControls({
             />
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "흐림 정도 (Blur)")}<span className="flex items-center gap-2">
+              흐림 정도 (Blur)
+              <span className="flex items-center gap-2">
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "흐림 정도 (Blur)")}
+                  aria-label="흐림 정도 (Blur)"
                   min={0}
                   max={24}
                   step={1}
@@ -424,10 +435,11 @@ export function StudioInspectorBubbleAppearanceControls({
             </label>
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "가로 오프셋 (X)")}<span className="flex items-center gap-2">
+              가로 오프셋 (X)
+              <span className="flex items-center gap-2">
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "가로 오프셋 (X)")}
+                  aria-label="가로 오프셋 (X)"
                   min={-15}
                   max={15}
                   step={1}
@@ -444,10 +456,11 @@ export function StudioInspectorBubbleAppearanceControls({
             </label>
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "세로 오프셋 (Y)")}<span className="flex items-center gap-2">
+              세로 오프셋 (Y)
+              <span className="flex items-center gap-2">
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "세로 오프셋 (Y)")}
+                  aria-label="세로 오프셋 (Y)"
                   min={-15}
                   max={15}
                   step={1}
@@ -464,10 +477,11 @@ export function StudioInspectorBubbleAppearanceControls({
             </label>
 
             <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "불투명도")}<span className="flex items-center gap-2">
+              불투명도
+              <span className="flex items-center gap-2">
                 <input
                   type="range"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorBubbleAppearanceControls", "ko", "불투명도")}
+                  aria-label="불투명도"
                   min={0.05}
                   max={1}
                   step={0.05}

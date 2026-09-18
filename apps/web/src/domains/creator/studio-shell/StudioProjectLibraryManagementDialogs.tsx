@@ -1,8 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Cloud, FileArchive, Trash2 } from "lucide-react";
 
 import Link from "@/compat/router-link";
@@ -54,7 +49,7 @@ export function StudioProjectLibraryManagementDialogs({
               </span>
             </button>
             <Link
-              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementDialogs", "en", "/studio?view=storage&project={v0}"), { v0: String(encodeURIComponent(saveTarget.id)) })}
+              href={`/studio?view=storage&project=${encodeURIComponent(saveTarget.id)}`}
               className="rounded-2xl border border-line bg-panel/50 p-4 text-left transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             >
               <span className="grid size-10 place-items-center rounded-xl bg-card text-accent">

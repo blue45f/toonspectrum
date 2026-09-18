@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { studioLiveAdjustmentDescriptorError } from "./contracts/studio-work-asset-contract";
 import { StudioLiveAdjustmentControls } from "./StudioLiveAdjustmentControls";
 import { ChevronDown } from "lucide-react";
@@ -628,7 +627,7 @@ function AdjustmentSection({
         <ChevronDown
           size={14}
           aria-hidden
-          className={open ? translateCurrentStaticSourceText("domains.creator.StudioImageAdjustmentsPanel", "en", "shrink-0 rotate-180 transition-transform") : translateCurrentStaticSourceText("domains.creator.StudioImageAdjustmentsPanel", "en", "shrink-0 transition-transform")}
+          className={open ? "shrink-0 rotate-180 transition-transform" : "shrink-0 transition-transform"}
         />
       </button>
       {open ? (

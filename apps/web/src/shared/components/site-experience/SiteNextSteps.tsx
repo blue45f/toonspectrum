@@ -1,10 +1,3 @@
-import {
-  formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, CalendarDays, Compass, Images, Library, MessageCircle, PenTool, Search, Sparkles, Store } from "lucide-react";
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
@@ -58,7 +51,7 @@ export function SiteNextSteps() {
           const [title, description] = bi((destination).ko, (destination).en);
           return (
             <Link href={destination.href} className="site-next-steps__card" key={id} data-tone={index}>
-              <span className="site-next-steps__art" aria-hidden="true"><img src={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.site.experience.SiteNextSteps", "en", "/brand/atelier-{v0}.webp"), { v0: String(DESTINATION_ART[id]) })} alt="" width={1536} height={1024} loading="lazy" decoding="async" /><span>0{index + 1} / {id.toUpperCase()}</span></span>
+              <span className="site-next-steps__art" aria-hidden="true"><img src={`/brand/atelier-${DESTINATION_ART[id]}.webp`} alt="" width={1536} height={1024} loading="lazy" decoding="async" /><span>0{index + 1} / {id.toUpperCase()}</span></span>
               <span className="site-next-steps__icon"><Icon size={21} aria-hidden="true" /></span>
               <span className="site-next-steps__copy"><strong>{title}</strong><span>{description}</span></span>
               <ArrowUpRight className="site-next-steps__arrow" size={19} aria-hidden="true" />

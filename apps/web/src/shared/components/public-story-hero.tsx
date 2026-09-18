@@ -1,9 +1,3 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useState, type ReactNode, type Ref } from "react";
 
 import { SiteArtwork } from "./site-experience/SiteArtwork";

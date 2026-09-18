@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowLeft,
   Ban,
   Check,
@@ -345,13 +341,13 @@ export function CafeManagePage() {
   }
 
   if (!userId) {
-    return <Container size="wide" className="py-16"><p className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "로그인이 필요해요.")}</p></Container>;
+    return <Container size="wide" className="py-16"><p className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">로그인이 필요해요.</p></Container>;
   }
   if (loading) {
     return <Container size="wide" className="py-10"><div className="skeleton h-28 rounded-3xl" /><div className="skeleton mt-5 h-96 rounded-3xl" /></Container>;
   }
   if (error && !cafe) {
-    return <Container size="wide" className="py-16"><div className="rounded-2xl border border-bad/30 bg-bad/10 p-8 text-center text-sm text-bad">{error}<div><Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.CafeManagePage", "en", "/community/cafes/{v0}"), { v0: String(encodeURIComponent(slug)) })} className="mt-4 inline-flex rounded-lg border border-line px-3 py-2 text-xs text-fg">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "돌아가기")}</Link></div></div></Container>;
+    return <Container size="wide" className="py-16"><div className="rounded-2xl border border-bad/30 bg-bad/10 p-8 text-center text-sm text-bad">{error}<div><Link href={`/community/cafes/${encodeURIComponent(slug)}`} className="mt-4 inline-flex rounded-lg border border-line px-3 py-2 text-xs text-fg">돌아가기</Link></div></div></Container>;
   }
   if (!cafe) return null;
 
@@ -359,42 +355,42 @@ export function CafeManagePage() {
     <Container size="wide" className="py-8 lg:py-10">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.CafeManagePage", "en", "/community/cafes/{v0}"), { v0: String(encodeURIComponent(slug)) })} className="inline-flex items-center gap-1 text-xs text-fg-3 hover:text-fg"><ArrowLeft size={13} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "커뮤니티로 돌아가기")}</Link>
-          <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold"><Settings size={21} className="text-accent" />{cafe.name} {translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "운영 관리")}</h1>
-          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "내 역할: ")}{cafe.viewerRole ? COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole] : translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "없음")}</p>
+          <Link href={`/community/cafes/${encodeURIComponent(slug)}`} className="inline-flex items-center gap-1 text-xs text-fg-3 hover:text-fg"><ArrowLeft size={13} />커뮤니티로 돌아가기</Link>
+          <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold"><Settings size={21} className="text-accent" />{cafe.name} 운영 관리</h1>
+          <p className="mt-1 text-xs text-fg-3">내 역할: {cafe.viewerRole ? COMMUNITY_CAFE_ROLE_LABELS[cafe.viewerRole] : "없음"}</p>
         </div>
-        <span className="rounded-full border border-line px-3 py-1 text-xs text-fg-3">{cafe.status === "archived" ? translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "보관됨") : translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "운영 중")}</span>
+        <span className="rounded-full border border-line px-3 py-1 text-xs text-fg-3">{cafe.status === "archived" ? "보관됨" : "운영 중"}</span>
       </div>
 
-      {(notice || error) && <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.CafeManagePage", "en", "mb-5 rounded-xl border px-4 py-3 text-sm {v0}"), { v0: String(error ? "border-bad/30 bg-bad/10 text-bad" : "border-good/30 bg-good/10 text-good") })}>{error ?? notice}</div>}
+      {(notice || error) && <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${error ? "border-bad/30 bg-bad/10 text-bad" : "border-good/30 bg-good/10 text-good"}`}>{error ?? notice}</div>}
 
       <div className="space-y-6">
         {canManage && (
           <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Save size={16} className="text-accent" />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "기본 설정")}</h2>
+            <h2 className="flex items-center gap-2 text-base font-semibold"><Save size={16} className="text-accent" />기본 설정</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "이름")}<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
-              <label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "유형")}<select value={kind} onChange={(event) => setKind(event.target.value as CommunityCafeKind)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{COMMUNITY_CAFE_KINDS.map((value) => <option key={value} value={value}>{COMMUNITY_CAFE_KIND_LABELS[value]}</option>)}</select></label>
-              <label className="text-xs text-fg-3 sm:col-span-2">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "소개")}<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
-              <label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "장르")}<select value={genre} onChange={(event) => setGenre(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg"><option value="">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "자유")}</option>{GENRES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-              <label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "태그")}<input value={tags} onChange={(event) => setTags(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
-              <label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "공개 범위")}<select value={visibility} onChange={(event) => setVisibility(event.target.value as CommunityCafeVisibility)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_VISIBILITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "가입 정책")}<select value={joinPolicy} onChange={(event) => setJoinPolicy(event.target.value as CommunityCafeJoinPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_JOIN_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="text-xs text-fg-3 sm:col-span-2">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "작성 권한")}<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_POSTING_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="text-xs text-fg-3 sm:col-span-2">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "규칙 ")}<span className="text-fg-3/70">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "(제목|설명)")}</span><textarea value={rules} onChange={(event) => setRules(event.target.value)} rows={4} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-fg" /></label>
+              <label className="text-xs text-fg-3">이름<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
+              <label className="text-xs text-fg-3">유형<select value={kind} onChange={(event) => setKind(event.target.value as CommunityCafeKind)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{COMMUNITY_CAFE_KINDS.map((value) => <option key={value} value={value}>{COMMUNITY_CAFE_KIND_LABELS[value]}</option>)}</select></label>
+              <label className="text-xs text-fg-3 sm:col-span-2">소개<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
+              <label className="text-xs text-fg-3">장르<select value={genre} onChange={(event) => setGenre(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg"><option value="">자유</option>{GENRES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <label className="text-xs text-fg-3">태그<input value={tags} onChange={(event) => setTags(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
+              <label className="text-xs text-fg-3">공개 범위<select value={visibility} onChange={(event) => setVisibility(event.target.value as CommunityCafeVisibility)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_VISIBILITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="text-xs text-fg-3">가입 정책<select value={joinPolicy} onChange={(event) => setJoinPolicy(event.target.value as CommunityCafeJoinPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_JOIN_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="text-xs text-fg-3 sm:col-span-2">작성 권한<select value={postingPolicy} onChange={(event) => setPostingPolicy(event.target.value as CommunityCafePostingPolicy)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg">{Object.entries(COMMUNITY_CAFE_POSTING_POLICY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="text-xs text-fg-3 sm:col-span-2">규칙 <span className="text-fg-3/70">(제목|설명)</span><textarea value={rules} onChange={(event) => setRules(event.target.value)} rows={4} className="mt-1 w-full resize-none rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-fg" /></label>
             </div>
-            <button type="button" onClick={() => void saveSettings()} disabled={Boolean(busyKey)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><Save size={14} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "설정 저장")}</button>
+            <button type="button" onClick={() => void saveSettings()} disabled={Boolean(busyKey)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-xs font-semibold text-on-accent disabled:opacity-45"><Save size={14} />설정 저장</button>
           </section>
         )}
 
         {canManage && (
           <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Check size={16} className="text-accent" />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "가입 요청 ")}<span className="text-xs font-normal text-fg-3">{requests.length}</span></h2>
+            <h2 className="flex items-center gap-2 text-base font-semibold"><Check size={16} className="text-accent" />가입 요청 <span className="text-xs font-normal text-fg-3">{requests.length}</span></h2>
             <div className="mt-3 space-y-2">
-              {requests.length === 0 ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "대기 중인 요청이 없어요.")}</p> : requests.map((request) => (
+              {requests.length === 0 ? <p className="text-xs text-fg-3">대기 중인 요청이 없어요.</p> : requests.map((request) => (
                 <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-canvas/50 p-3">
-                  <div><p className="text-sm font-medium">{request.userName}</p><p className="mt-1 text-xs text-fg-3">{request.message || translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "가입 메시지 없음")}</p></div>
-                  <div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request.id, "reject")} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-3"><X size={13} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "거절")}</button><button type="button" onClick={() => void reviewRequest(request.id, "approve")} className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent"><Check size={13} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "승인")}</button></div>
+                  <div><p className="text-sm font-medium">{request.userName}</p><p className="mt-1 text-xs text-fg-3">{request.message || "가입 메시지 없음"}</p></div>
+                  <div className="flex gap-2"><button type="button" onClick={() => void reviewRequest(request.id, "reject")} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-3"><X size={13} />거절</button><button type="button" onClick={() => void reviewRequest(request.id, "approve")} className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent"><Check size={13} />승인</button></div>
                 </div>
               ))}
             </div>
@@ -402,8 +398,8 @@ export function CafeManagePage() {
         )}
 
         <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-base font-semibold"><UserCog size={16} className="text-accent" />{canManage ? translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "회원과 역할") : translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "회원 관리")}</h2>
-          <label className="mt-3 block max-w-md text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "차단 사유")}<input value={banReason} onChange={(event) => setBanReason(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
+          <h2 className="flex items-center gap-2 text-base font-semibold"><UserCog size={16} className="text-accent" />{canManage ? "회원과 역할" : "회원 관리"}</h2>
+          <label className="mt-3 block max-w-md text-xs text-fg-3">차단 사유<input value={banReason} onChange={(event) => setBanReason(event.target.value)} className="mt-1 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-fg" /></label>
           <div className="mt-3 divide-y divide-line/70">
             {members.map((member) => {
               const outranksMember = communityCafeRoleRank(cafe.viewerRole) > communityCafeRoleRank(member.role);
@@ -411,11 +407,11 @@ export function CafeManagePage() {
               const canBan = outranksMember && member.role !== "owner" && member.userId !== userId;
               return (
                 <div key={member.userId} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <div><p className="text-sm font-medium">{member.name}</p><p className="text-xs text-fg-3">{COMMUNITY_CAFE_ROLE_LABELS[member.role]} · {formatDate(member.joinedAt)} {translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "가입")}</p></div>
+                  <div><p className="text-sm font-medium">{member.name}</p><p className="text-xs text-fg-3">{COMMUNITY_CAFE_ROLE_LABELS[member.role]} · {formatDate(member.joinedAt)} 가입</p></div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {canChangeRole && <select value={member.role} onChange={(event) => void updateRole(member, event.target.value as CommunityCafeRole)} className="rounded-lg border border-line bg-canvas px-2 py-1.5 text-xs text-fg"><option value="member">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "회원")}</option><option value="moderator">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "운영자")}</option>{isOwner && <option value="admin">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "관리자")}</option>}</select>}
-                    {isOwner && member.role !== "owner" && <button type="button" onClick={() => void transferOwnership(member)} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2"><Crown size={12} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "소유권")}</button>}
-                    {canBan && <button type="button" onClick={() => void banMember(member)} className="inline-flex items-center gap-1 rounded-lg border border-bad/30 px-2.5 py-1.5 text-xs text-bad"><Ban size={12} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "차단")}</button>}
+                    {canChangeRole && <select value={member.role} onChange={(event) => void updateRole(member, event.target.value as CommunityCafeRole)} className="rounded-lg border border-line bg-canvas px-2 py-1.5 text-xs text-fg"><option value="member">회원</option><option value="moderator">운영자</option>{isOwner && <option value="admin">관리자</option>}</select>}
+                    {isOwner && member.role !== "owner" && <button type="button" onClick={() => void transferOwnership(member)} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2"><Crown size={12} />소유권</button>}
+                    {canBan && <button type="button" onClick={() => void banMember(member)} className="inline-flex items-center gap-1 rounded-lg border border-bad/30 px-2.5 py-1.5 text-xs text-bad"><Ban size={12} />차단</button>}
                   </div>
                 </div>
               );
@@ -425,26 +421,26 @@ export function CafeManagePage() {
 
         {canManage && (
           <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
-            <h2 className="flex items-center gap-2 text-base font-semibold"><Link2 size={16} className="text-accent" />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "초대 링크")}</h2>
-            <div className="mt-3 flex flex-wrap items-end gap-2"><label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "사용 횟수")}<input type="number" min={1} max={100} value={inviteUses} onChange={(event) => setInviteUses(Number(event.target.value))} className="mt-1 block w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><label className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "유효 일수")}<input type="number" min={1} max={30} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value))} className="mt-1 block w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><button type="button" onClick={() => void createInvite()} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "초대 만들기")}</button></div>
-            {createdInvite && <div className="mt-3 rounded-xl border border-accent/35 bg-accent-soft p-3"><p className="text-xs font-semibold text-accent">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "새 초대 코드 — 다시 표시되지 않습니다.")}</p><code className="mt-1 block break-all text-xs text-fg">{createdInvite.code}</code><button type="button" onClick={() => void copyInvite()} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-accent/30 px-2 py-1 text-xs text-accent"><Clipboard size={12} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "링크 복사")}</button></div>}
-            <div className="mt-3 space-y-2">{listedInvites.length === 0 ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "초대 내역이 없어요.")}</p> : listedInvites.map((invite) => <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3 text-xs"><span>{invite.useCount}/{invite.maxUses}{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "회 · ")}{formatDate(invite.expiresAt)} {translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "만료")}</span><button type="button" onClick={() => void revokeInvite(invite.id)} className="inline-flex items-center gap-1 text-bad"><Trash2 size={12} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "폐기")}</button></div>)}</div>
+            <h2 className="flex items-center gap-2 text-base font-semibold"><Link2 size={16} className="text-accent" />초대 링크</h2>
+            <div className="mt-3 flex flex-wrap items-end gap-2"><label className="text-xs text-fg-3">사용 횟수<input type="number" min={1} max={100} value={inviteUses} onChange={(event) => setInviteUses(Number(event.target.value))} className="mt-1 block w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><label className="text-xs text-fg-3">유효 일수<input type="number" min={1} max={30} value={inviteDays} onChange={(event) => setInviteDays(Number(event.target.value))} className="mt-1 block w-24 rounded-lg border border-line bg-canvas px-2 py-2 text-sm text-fg" /></label><button type="button" onClick={() => void createInvite()} className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent">초대 만들기</button></div>
+            {createdInvite && <div className="mt-3 rounded-xl border border-accent/35 bg-accent-soft p-3"><p className="text-xs font-semibold text-accent">새 초대 코드 — 다시 표시되지 않습니다.</p><code className="mt-1 block break-all text-xs text-fg">{createdInvite.code}</code><button type="button" onClick={() => void copyInvite()} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-accent/30 px-2 py-1 text-xs text-accent"><Clipboard size={12} />링크 복사</button></div>}
+            <div className="mt-3 space-y-2">{listedInvites.length === 0 ? <p className="text-xs text-fg-3">초대 내역이 없어요.</p> : listedInvites.map((invite) => <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3 text-xs"><span>{invite.useCount}/{invite.maxUses}회 · {formatDate(invite.expiresAt)} 만료</span><button type="button" onClick={() => void revokeInvite(invite.id)} className="inline-flex items-center gap-1 text-bad"><Trash2 size={12} />폐기</button></div>)}</div>
           </section>
         )}
 
         <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-base font-semibold"><Ban size={16} className="text-accent" />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "차단 목록")}</h2>
-          <div className="mt-3 space-y-2">{bans.length === 0 ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "차단된 사용자가 없어요.")}</p> : bans.map((ban) => <div key={ban.userId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"><div><p className="text-sm font-medium">{ban.userName}</p><p className="text-xs text-fg-3">{ban.reason} {translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "· 만료 ")}{formatDate(ban.expiresAt)}</p></div><button type="button" onClick={() => void unban(ban.userId)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "차단 해제")}</button></div>)}</div>
+          <h2 className="flex items-center gap-2 text-base font-semibold"><Ban size={16} className="text-accent" />차단 목록</h2>
+          <div className="mt-3 space-y-2">{bans.length === 0 ? <p className="text-xs text-fg-3">차단된 사용자가 없어요.</p> : bans.map((ban) => <div key={ban.userId} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line p-3"><div><p className="text-sm font-medium">{ban.userName}</p><p className="text-xs text-fg-3">{ban.reason} · 만료 {formatDate(ban.expiresAt)}</p></div><button type="button" onClick={() => void unban(ban.userId)} className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-fg-2">차단 해제</button></div>)}</div>
         </section>
 
         <section className="rounded-2xl border border-line bg-card/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-base font-semibold"><ShieldCheck size={16} className="text-accent" />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "운영 기록")}</h2>
-          <div className="mt-3 space-y-2">{logs.length === 0 ? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "기록이 없어요.")}</p> : logs.map((log) => <div key={log.id} className="rounded-xl border border-line p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold text-fg">{log.action}</p><time className="text-[0.68rem] text-fg-3">{formatDate(log.createdAt)}</time></div><p className="mt-1 text-xs text-fg-3">{log.actorName}{log.targetUserId ? ` → ${log.targetUserId}` : ""}</p></div>)}</div>
+          <h2 className="flex items-center gap-2 text-base font-semibold"><ShieldCheck size={16} className="text-accent" />운영 기록</h2>
+          <div className="mt-3 space-y-2">{logs.length === 0 ? <p className="text-xs text-fg-3">기록이 없어요.</p> : logs.map((log) => <div key={log.id} className="rounded-xl border border-line p-3"><div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold text-fg">{log.action}</p><time className="text-[0.68rem] text-fg-3">{formatDate(log.createdAt)}</time></div><p className="mt-1 text-xs text-fg-3">{log.actorName}{log.targetUserId ? ` → ${log.targetUserId}` : ""}</p></div>)}</div>
         </section>
 
         {isOwner && cafe.status === "active" && (
           <section className="rounded-2xl border border-bad/25 bg-bad/5 p-4 sm:p-5">
-            <h2 className="text-base font-semibold text-bad">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "위험 영역")}</h2><p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "보관하면 기존 콘텐츠는 유지되지만 가입과 작성이 중단됩니다.")}</p><button type="button" onClick={() => void archiveCommunity()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"><Trash2 size={13} />{translateCurrentStaticSourceText("domains.community.CafeManagePage", "ko", "커뮤니티 보관")}</button>
+            <h2 className="text-base font-semibold text-bad">위험 영역</h2><p className="mt-1 text-xs text-fg-3">보관하면 기존 콘텐츠는 유지되지만 가입과 작성이 중단됩니다.</p><button type="button" onClick={() => void archiveCommunity()} className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-bad/35 px-3 py-2 text-xs font-semibold text-bad"><Trash2 size={13} />커뮤니티 보관</button>
           </section>
         )}
       </div>

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Circular lettering controls for ToonStudio.
  * Keeps typography terminology concise and aligned with the shared Studio panel language.
@@ -125,7 +121,7 @@ export function StudioCircularTextPanel({
                     key={g.index}
                     x={nx}
                     y={ny}
-                    transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "en", "rotate({v0}, {v1}, {v2})"), { v0: String(g.rotationDeg), v1: String(nx), v2: String(ny) })}
+                    transform={`rotate(${g.rotationDeg}, ${nx}, ${ny})`}
                     textAnchor="middle"
                     dominantBaseline="central"
                     fill="currentColor"
@@ -223,7 +219,8 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "시계방향")}</button>
+                  시계방향
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -248,7 +245,8 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "반시계방향")}</button>
+                  반시계방향
+                </button>
               </div>
             </div>
 
@@ -277,7 +275,8 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "바깥쪽")}</button>
+                  바깥쪽
+                </button>
                 <button
                   type="button"
                   onClick={() =>
@@ -297,7 +296,8 @@ export function StudioCircularTextPanel({
                     ),
                   })}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "안쪽")}</button>
+                  안쪽
+                </button>
               </div>
             </div>
           </div>

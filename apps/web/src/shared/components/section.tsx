@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight } from "lucide-react";
 
 import { buttonClass } from "./ui/button-utils";
@@ -60,7 +59,7 @@ export function Section({
             href={action.href}
             className={buttonClass({ size: "sm", variant: "quiet", className: "group gap-1" })}
             // 링크 접근명에 섹션 제목을 포함해 "전체 보기" 같은 모호한 링크텍스트 문제 방지(문자열 제목 한정).
-            aria-label={typeof title === "string" ? `${title} ${action.label}` : formatI18nTemplate(translateCurrentStaticSourceText("shared.components.section", "ko", "{v0} 바로가기"), { v0: String(action.label) })}
+            aria-label={typeof title === "string" ? `${title} ${action.label}` : `${action.label} 바로가기`}
           >
             {action.label}
             <ArrowRight size={14} className="transition-transform duration-150 group-hover:translate-x-0.5" />

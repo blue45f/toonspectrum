@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { StudioThreeDToggleIndicator } from "../StudioThreeDToggle";
 
 import {
@@ -164,12 +160,14 @@ export function StudioBg3dMagicLayerControl({
               )}
               aria-hidden
             />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선택 객체 매직 마스크")}</span>
+            선택 객체 매직 마스크
+          </span>
           <span
             id="bg3d-magic-layer-description"
             className="mt-0.5 block text-xs leading-relaxed text-fg-3"
           >
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "컬러 레이어에 편집 가능한 필터 범위를 함께 만듭니다.")}</span>
+            컬러 레이어에 편집 가능한 필터 범위를 함께 만듭니다.
+          </span>
         </span>
         <StudioThreeDToggleIndicator checked={enabled} />
       </button>
@@ -259,12 +257,15 @@ export function StudioBg3dLtPanel({
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                     <ScanLine size={15} className="text-accent" aria-hidden />
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "렌더/LT 변환")}</h3>
+                    렌더/LT 변환
+                  </h3>
                   <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.64rem] font-semibold text-fg-3">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "장면 설정 v1")}</span>
+                    장면 설정 v1
+                  </span>
                 </div>
                 <p className="mt-1.5 text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "3D 배경의 컬러·선화·톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 조정하세요.")}</p>
+                  3D 배경의 컬러·선화·톤 출력 의도를 저장합니다. 프리셋 적용 뒤 필요한 값만 조정하세요.
+                </p>
 
                 <StudioBg3dMagicLayerControl
                   WandSparkles={WandSparkles}
@@ -276,7 +277,8 @@ export function StudioBg3dLtPanel({
                 />
 
                 <label htmlFor="bg3d-lt-preset" className="mt-3 block text-xs font-semibold text-fg-2">
-                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "변환 프리셋")}<select
+                  변환 프리셋
+                  <select
                     id="bg3d-lt-preset"
                     value={appliedLtPresetId}
                     className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -285,8 +287,9 @@ export function StudioBg3dLtPanel({
                     }}
                   >
                     <option value="custom" disabled>
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "사용자 설정")}</option>
-                    <optgroup label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "기본 프리셋")}>
+                      사용자 설정
+                    </option>
+                    <optgroup label="기본 프리셋">
                       {STUDIO_BG3D_LT_BUILT_IN_PRESETS.map((preset) => (
                         <option key={preset.id} value={preset.id}>
                           {preset.name}
@@ -294,7 +297,7 @@ export function StudioBg3dLtPanel({
                       ))}
                     </optgroup>
                     {ltUserPresetPayload.presets.length > 0 ? (
-                      <optgroup label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "내 프리셋 · {v0}개"), { v0: String(ltUserPresetPayload.presets.length) })}>
+                      <optgroup label={`내 프리셋 · ${ltUserPresetPayload.presets.length}개`}>
                         {ltUserPresetPayload.presets.map((preset) => (
                           <option key={preset.id} value={preset.id}>
                             {preset.name}
@@ -305,40 +308,42 @@ export function StudioBg3dLtPanel({
                   </select>
                 </label>
                 <p className="mt-2 min-h-8 text-[0.68rem] leading-relaxed text-fg-3">
-                  {appliedLtPreset?.description ?? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "프리셋을 기준으로 값을 직접 조정한 사용자 설정입니다.")}
+                  {appliedLtPreset?.description ?? "프리셋을 기준으로 값을 직접 조정한 사용자 설정입니다."}
                 </p>
                 <p aria-live="polite" aria-atomic="true" className="sr-only">
-                  {appliedLtPreset ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "{v0} 프리셋 적용됨"), { v0: String(appliedLtPreset.name) }) : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "LT 사용자 설정 적용됨")}
+                  {appliedLtPreset ? `${appliedLtPreset.name} 프리셋 적용됨` : "LT 사용자 설정 적용됨"}
                 </p>
 
                 <details className="group mt-3 rounded-xl border border-line bg-card/45">
                   <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
                     <span className="flex items-center gap-1.5">
                       <Save size={14} className="text-accent" aria-hidden />
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "내 프리셋")}</span>
+                      내 프리셋
+                    </span>
                     <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
                       {ltUserPresetPayload.presets.length}/{STUDIO_BG3D_LT_PRESET_MAX_COUNT}
-                      {ltUserPresetLibraryStatus === "idle" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", " · SQLite 불러오는 중") : ""}
-                      {ltUserPresetLibraryStatus === "saving" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", " · SQLite 저장 중") : ""}
-                      {ltUserPresetLibraryStatus === "memory-only" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", " · 현재 탭 메모리 임시") : ""}
+                      {ltUserPresetLibraryStatus === "idle" ? " · SQLite 불러오는 중" : ""}
+                      {ltUserPresetLibraryStatus === "saving" ? " · SQLite 저장 중" : ""}
+                      {ltUserPresetLibraryStatus === "memory-only" ? " · 현재 탭 메모리 임시" : ""}
                       <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
                     </span>
                   </summary>
                   <div className="border-t border-line/70 px-3 py-3">
                     <p className="text-[0.68rem] leading-relaxed text-fg-3">
                       {managedLtUserPreset
-                        ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "“{v0}”을 관리 중입니다. 현재 LT 값을 덮어쓰거나 이름만 바꿀 수 있어요."), { v0: String(managedLtUserPreset.name) })
-                        : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "현재 선화·톤 값을 새 사용자 프리셋으로 저장합니다.")}
+                        ? `“${managedLtUserPreset.name}”을 관리 중입니다. 현재 LT 값을 덮어쓰거나 이름만 바꿀 수 있어요.`
+                        : "현재 선화·톤 값을 새 사용자 프리셋으로 저장합니다."}
                     </p>
                     <label htmlFor="bg3d-lt-user-preset-name" className="mt-3 block text-xs font-semibold text-fg-2">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "이름")}<input
+                      이름
+                      <input
                         id="bg3d-lt-user-preset-name"
                         type="text"
                         required
                         maxLength={STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}
                         value={ltUserPresetName}
                         className="mt-1.5 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-xs text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                        placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "예: 야간 골목 선화")}
+                        placeholder="예: 야간 골목 선화"
                         onChange={(event) => {
                           setLtUserPresetName(event.target.value);
                           setLtDeleteConfirmId(null);
@@ -346,14 +351,15 @@ export function StudioBg3dLtPanel({
                       />
                     </label>
                     <label htmlFor="bg3d-lt-user-preset-description" className="mt-3 block text-xs font-semibold text-fg-2">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "설명")}<textarea
+                      설명
+                      <textarea
                         id="bg3d-lt-user-preset-description"
                         required
                         rows={2}
                         maxLength={STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}
                         value={ltUserPresetDescription}
                         className="mt-1.5 min-h-20 w-full resize-y rounded-lg border border-line bg-panel px-3 py-2.5 text-xs leading-relaxed text-fg placeholder:text-fg-3 focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                        placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "어떤 장면과 작업 단계에 쓰는 설정인지 기록하세요.")}
+                        placeholder="어떤 장면과 작업 단계에 쓰는 설정인지 기록하세요."
                         onChange={(event) => {
                           setLtUserPresetDescription(event.target.value);
                           setLtDeleteConfirmId(null);
@@ -361,8 +367,8 @@ export function StudioBg3dLtPanel({
                       />
                     </label>
                     <div className="mt-1 flex justify-end gap-3 text-[0.62rem] tabular-nums text-fg-3">
-                      <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "이름 ")}{Array.from(ltUserPresetName).length}/{STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}</span>
-                      <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "설명 ")}{Array.from(ltUserPresetDescription).length}/{STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}</span>
+                      <span>이름 {Array.from(ltUserPresetName).length}/{STUDIO_BG3D_LT_PRESET_MAX_NAME_LENGTH}</span>
+                      <span>설명 {Array.from(ltUserPresetDescription).length}/{STUDIO_BG3D_LT_PRESET_MAX_DESCRIPTION_LENGTH}</span>
                     </div>
 
                     {managedLtUserPreset ? (
@@ -374,7 +380,8 @@ export function StudioBg3dLtPanel({
                           onClick={updateManagedLtUserPreset}
                         >
                           <Save size={14} aria-hidden />
-                          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "현재 설정으로 업데이트")}</button>
+                          현재 설정으로 업데이트
+                        </button>
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             type="button"
@@ -383,7 +390,8 @@ export function StudioBg3dLtPanel({
                             onClick={renameManagedLtUserPreset}
                           >
                             <PencilLine size={14} aria-hidden />
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "이름만 변경")}</button>
+                            이름만 변경
+                          </button>
                           <button
                             type="button"
                             className={cx(
@@ -396,7 +404,7 @@ export function StudioBg3dLtPanel({
                             onClick={deleteManagedLtUserPreset}
                           >
                             <Trash2 size={14} aria-hidden />
-                            {ltDeleteConfirmId === managedLtUserPreset.id ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "삭제 확인") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "삭제")}
+                            {ltDeleteConfirmId === managedLtUserPreset.id ? "삭제 확인" : "삭제"}
                           </button>
                         </div>
                       </div>
@@ -411,7 +419,8 @@ export function StudioBg3dLtPanel({
                         onClick={saveCurrentLtAsUserPreset}
                       >
                         <Save size={14} aria-hidden />
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "현재 설정을 새 프리셋으로 저장")}</button>
+                        현재 설정을 새 프리셋으로 저장
+                      </button>
                     )}
                   </div>
                 </details>
@@ -434,16 +443,17 @@ export function StudioBg3dLtPanel({
                 <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-card/55 px-3 py-2">
                   <div className="min-w-0">
                     <label htmlFor="bg3d-lt-export-height" className="block text-xs font-bold text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "출력 해상도")}</label>
+                      출력 해상도
+                    </label>
                     <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
                       {ltCaptureSizePreview
-                        ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "en", "{v0}×{v1} px{v2}"), { v0: String(ltCaptureSizePreview.width.toLocaleString()), v1: String(ltCaptureSizePreview.height.toLocaleString()), v2: String(ltCaptureSizePreview.wasReduced ? " · 기기 안전 한도 적용" : "") })
-                        : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "현재 기기에서 안전한 출력 크기를 계산할 수 없습니다.")}
+                        ? `${ltCaptureSizePreview.width.toLocaleString()}×${ltCaptureSizePreview.height.toLocaleString()} px${ltCaptureSizePreview.wasReduced ? " · 기기 안전 한도 적용" : ""}`
+                        : "현재 기기에서 안전한 출력 크기를 계산할 수 없습니다."}
                     </p>
                   </div>
                   <select
                     id="bg3d-lt-export-height"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "LT 출력 높이")}
+                    aria-label="LT 출력 높이"
                     className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                     value={sceneBaseDocument.output.exportHeight}
                     onChange={(event) => updateLtExportHeight(Number(event.target.value))}
@@ -462,16 +472,17 @@ export function StudioBg3dLtPanel({
                 <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-card/55 px-3 py-2">
                   <div className="min-w-0">
                     <label htmlFor="bg3d-lt-export-aspect" className="block text-xs font-bold text-fg">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "출력 비율")}</label>
+                      출력 비율
+                    </label>
                     <p className="mt-0.5 text-[0.64rem] leading-relaxed text-fg-3" aria-live="polite">
                       {ltExportAspectRatio === null
-                        ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "자동 — 3D 창 크기에 따라 삽입 구도가 달라집니다. 비율을 고정하세요.")
-                        : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "고정 — 뷰포트의 점선 안쪽만 삽입됩니다.")}
+                        ? "자동 — 3D 창 크기에 따라 삽입 구도가 달라집니다. 비율을 고정하세요."
+                        : "고정 — 뷰포트의 점선 안쪽만 삽입됩니다."}
                     </p>
                   </div>
                   <select
                     id="bg3d-lt-export-aspect"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "LT 출력 비율")}
+                    aria-label="LT 출력 비율"
                     className="min-h-11 rounded-lg border border-line bg-panel px-2.5 text-xs font-semibold text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
                     value={ltCaptureAspectPresetId}
                     onChange={(event) => {
@@ -496,10 +507,10 @@ export function StudioBg3dLtPanel({
                 <div
                   role="group"
                   className="mt-3 rounded-xl border border-line bg-card/55 p-3"
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "LT 출력 의도: {v0}, {v1}, {v2}"), { v0: String(ltLineSettings.enabled ? `${ltLineSettings.widthPx}픽셀 선화` : "선화 없음"), v1: String(LT_TONE_MODE_LABELS[ltToneSettings.mode]), v2: String(LT_TONE_TYPE_LABELS[ltToneSettings.type]) })}
+                  aria-label={`LT 출력 의도: ${ltLineSettings.enabled ? `${ltLineSettings.widthPx}픽셀 선화` : "선화 없음"}, ${LT_TONE_MODE_LABELS[ltToneSettings.mode]}, ${LT_TONE_TYPE_LABELS[ltToneSettings.type]}`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "출력 의도 미리보기")}</span>
+                    <span className="text-xs font-bold text-fg">출력 의도 미리보기</span>
                     <button
                       type="button"
                       aria-pressed={lineArtPreview}
@@ -511,7 +522,7 @@ export function StudioBg3dLtPanel({
                       )}
                       onClick={() => setLineArtPreview((visible) => !visible)}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "캔버스 선화 ")}{lineArtPreview ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "꺼짐")}
+                      캔버스 선화 {lineArtPreview ? "켜짐" : "꺼짐"}
                     </button>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2" aria-hidden>
@@ -537,24 +548,24 @@ export function StudioBg3dLtPanel({
                           ) : null}
                         </>
                       ) : (
-                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선화 꺼짐")}</span>
+                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">선화 꺼짐</span>
                       )}
                     </div>
                     <div className="relative h-12 overflow-hidden rounded-lg border border-line/80" style={ltTonePreviewStyle(ltToneSettings)}>
                       {ltToneSettings.mode === "none" ? (
-                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선화만")}</span>
+                        <span className="absolute inset-0 grid place-items-center text-[0.64rem] text-fg-3">선화만</span>
                       ) : null}
                     </div>
                   </div>
                   <dl className="mt-2 grid grid-cols-2 gap-x-3 text-[0.64rem] leading-relaxed text-fg-3">
                     <div>
-                      <dt className="sr-only">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선화 설정")}</dt>
+                      <dt className="sr-only">선화 설정</dt>
                       <dd>
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선 ")}{ltLineSettings.enabled ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "en", "{v0}px · {v1}%"), { v0: String(round(ltLineSettings.widthPx, 2)), v1: String(Math.round(ltLineSettings.strength * 100)) }) : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "없음")}
+                        선 {ltLineSettings.enabled ? `${round(ltLineSettings.widthPx, 2)}px · ${Math.round(ltLineSettings.strength * 100)}%` : "없음"}
                       </dd>
                     </div>
                     <div>
-                      <dt className="sr-only">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "컬러·톤 설정")}</dt>
+                      <dt className="sr-only">컬러·톤 설정</dt>
                       <dd>
                         {LT_TONE_MODE_LABELS[ltToneSettings.mode]}
                         {ltToneSettings.mode !== "none" ? ` · ${LT_TONE_TYPE_LABELS[ltToneSettings.type]}` : ""}
@@ -564,9 +575,11 @@ export function StudioBg3dLtPanel({
                 </div>
 
                 <p className="mt-2 text-[0.66rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "결과는 컬러/톤·재질선·주선을 편집 가능한 별도 래스터 PNG 레이어로 묶어 추가합니다. 실제 벡터 경로 추출은 아직 지원하지 않으므로 벡터로 표시하거나 내보내지 않습니다.")}</p>
+                  결과는 컬러/톤·재질선·주선을 편집 가능한 별도 래스터 PNG 레이어로 묶어 추가합니다. 실제
+                  벡터 경로 추출은 아직 지원하지 않으므로 벡터로 표시하거나 내보내지 않습니다.
+                </p>
 
-                <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "LT 세부 설정")} className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-card p-1">
+                <div role="group" aria-label="LT 세부 설정" className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-card p-1">
                   {(["line", "tone"] as const).map((section) => {
                     const active = ltEditorSection === section;
                     return (
@@ -582,7 +595,7 @@ export function StudioBg3dLtPanel({
                         )}
                         onClick={() => setLtEditorSection(section)}
                       >
-                        {section === "line" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선화") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "컬러·톤")}
+                        {section === "line" ? "선화" : "컬러·톤"}
                       </button>
                     );
                   })}
@@ -591,28 +604,28 @@ export function StudioBg3dLtPanel({
                 <div hidden={ltEditorSection !== "line"} className="mt-3">
                   <LtToggleRow
                     checked={ltLineSettings.enabled}
-                    label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선화 출력")}
+                    label="선화 출력"
                     onChange={(enabled) => {
                       updateLtLineSettings({ enabled });
                       setLineArtPreview(enabled);
                     }}
                   />
                   <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-2 text-xs">
-                    <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "레이어 의도")}</span>
+                    <span className="font-semibold text-fg-2">레이어 의도</span>
                     <span className="text-right text-[0.68rem] text-fg-3">
-                      {ltLineSettings.layerType === "vector" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "벡터 요청 · 래스터 변환") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "래스터 PNG")}
+                      {ltLineSettings.layerType === "vector" ? "벡터 요청 · 래스터 변환" : "래스터 PNG"}
                     </span>
                   </div>
                   <label htmlFor="bg3d-lt-line-color" className={cx(
                     "flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs",
                     !ltLineSettings.enabled && "opacity-45"
                   )}>
-                    <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선 색상")}</span>
+                    <span className="font-semibold text-fg-2">선 색상</span>
                     <span className="ml-auto font-mono text-[0.68rem] uppercase text-fg-3">{ltLineSettings.color}</span>
                     <input
                       id="bg3d-lt-line-color"
                       type="color"
-                      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "LT 선 색상")}
+                      aria-label="LT 선 색상"
                       className="size-11 cursor-pointer rounded-lg border border-line bg-card p-1 disabled:cursor-not-allowed sm:size-9"
                       disabled={!ltLineSettings.enabled}
                       value={ltLineSettings.color}
@@ -621,18 +634,18 @@ export function StudioBg3dLtPanel({
                   </label>
                   <LtRangeControl
                     id="bg3d-lt-line-width"
-                    label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선 굵기")}
+                    label="선 굵기"
                     min={0.25}
                     max={8}
                     step={0.05}
                     value={ltLineSettings.widthPx}
-                    valueText={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "en", "{v0} px"), { v0: String(round(ltLineSettings.widthPx, 2)) })}
+                    valueText={`${round(ltLineSettings.widthPx, 2)} px`}
                     disabled={!ltLineSettings.enabled}
                     onChange={(widthPx) => updateLtLineSettings({ widthPx })}
                   />
                   <LtRangeControl
                     id="bg3d-lt-line-strength"
-                    label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선 강도")}
+                    label="선 강도"
                     min={0}
                     max={1}
                     step={0.01}
@@ -644,14 +657,16 @@ export function StudioBg3dLtPanel({
 
                   <details className="group border-b border-line/70">
                     <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "정밀 선 검출")}<span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "모서리 · 깊이 · 질감")}<ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
+                      정밀 선 검출
+                      <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
+                        모서리 · 깊이 · 질감
+                        <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
                       </span>
                     </summary>
                     <div className="border-t border-line/60 pl-2">
                       <LtRangeControl
                         id="bg3d-lt-line-accuracy"
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "검출 정밀도")}
+                        label="검출 정밀도"
                         min={0}
                         max={1}
                         step={0.01}
@@ -662,7 +677,7 @@ export function StudioBg3dLtPanel({
                       />
                       <LtRangeControl
                         id="bg3d-lt-line-exterior"
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "외곽선 강조")}
+                        label="외곽선 강조"
                         min={0}
                         max={2}
                         step={0.05}
@@ -673,7 +688,7 @@ export function StudioBg3dLtPanel({
                       />
                       <LtRangeControl
                         id="bg3d-lt-line-smoothing"
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선 다듬기")}
+                        label="선 다듬기"
                         min={0}
                         max={1}
                         step={0.01}
@@ -684,7 +699,7 @@ export function StudioBg3dLtPanel({
                       />
                       <LtRangeControl
                         id="bg3d-lt-line-crease"
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "모서리 각도")}
+                        label="모서리 각도"
                         min={0}
                         max={180}
                         step={1}
@@ -695,19 +710,19 @@ export function StudioBg3dLtPanel({
                       />
                       <LtToggleRow
                         checked={ltLineSettings.scaleAwareAccuracy}
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "화면 크기 보정")}
+                        label="화면 크기 보정"
                         disabled={!ltLineSettings.enabled}
                         onChange={(scaleAwareAccuracy) => updateLtLineSettings({ scaleAwareAccuracy })}
                       />
                       <LtToggleRow
                         checked={ltLineSettings.hiddenLineRemoval}
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "가려진 선 제거")}
+                        label="가려진 선 제거"
                         disabled={!ltLineSettings.enabled}
                         onChange={(hiddenLineRemoval) => updateLtLineSettings({ hiddenLineRemoval })}
                       />
                       <LtToggleRow
                         checked={ltLineSettings.depthEnabled}
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "깊이선 검출")}
+                        label="깊이선 검출"
                         disabled={!ltLineSettings.enabled}
                         onChange={(depthEnabled) => updateLtLineSettings({ depthEnabled })}
                       />
@@ -715,7 +730,7 @@ export function StudioBg3dLtPanel({
                         <>
                           <LtRangeControl
                             id="bg3d-lt-line-depth"
-                            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "깊이선 강도")}
+                            label="깊이선 강도"
                             min={0}
                             max={1}
                             step={0.01}
@@ -726,7 +741,7 @@ export function StudioBg3dLtPanel({
                           />
                           <LtToggleRow
                             checked={ltLineSettings.depthOutlineOnly}
-                            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "깊이 외곽선만")}
+                            label="깊이 외곽선만"
                             disabled={!ltLineSettings.enabled}
                             onChange={(depthOutlineOnly) => updateLtLineSettings({ depthOutlineOnly })}
                           />
@@ -734,14 +749,14 @@ export function StudioBg3dLtPanel({
                       ) : null}
                       <LtToggleRow
                         checked={ltLineSettings.textureLineEnabled}
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "재질선 검출")}
+                        label="재질선 검출"
                         disabled={!ltLineSettings.enabled}
                         onChange={(textureLineEnabled) => updateLtLineSettings({ textureLineEnabled })}
                       />
                       {ltLineSettings.textureLineEnabled ? (
                         <LtRangeControl
                           id="bg3d-lt-line-texture"
-                          label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "재질선 강도")}
+                          label="재질선 강도"
                           min={0}
                           max={1}
                           step={0.01}
@@ -757,7 +772,8 @@ export function StudioBg3dLtPanel({
 
                 <div hidden={ltEditorSection !== "tone"} className="mt-3">
                   <label htmlFor="bg3d-lt-tone-mode" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "베이스 방식")}<select
+                    베이스 방식
+                    <select
                       id="bg3d-lt-tone-mode"
                       value={ltToneSettings.mode}
                       className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -777,11 +793,14 @@ export function StudioBg3dLtPanel({
 
                   {ltToneSettings.mode === "none" ? (
                     <p className="py-4 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "베이스가 꺼져 선만 출력됩니다. 위에서 원본 렌더·셀 명암·스크린톤을 선택하면 채움 레이어 설정이 열립니다.")}</p>
+                      베이스가 꺼져 선만 출력됩니다. 위에서 원본 렌더·셀 명암·스크린톤을 선택하면 채움
+                      레이어 설정이 열립니다.
+                    </p>
                   ) : (
                     <>
                       <label htmlFor="bg3d-lt-tone-type" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "출력 유형")}<select
+                        출력 유형
+                        <select
                           id="bg3d-lt-tone-type"
                           value={ltToneSettings.type}
                           className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -794,7 +813,8 @@ export function StudioBg3dLtPanel({
                       </label>
                       {ltToneSettings.type === "pattern" || ltToneSettings.mode === "screentone" ? (
                         <label htmlFor="bg3d-lt-tone-pattern" className="flex min-h-11 items-center justify-between gap-3 border-b border-line/70 py-1.5 text-xs font-semibold text-fg-2">
-                          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "패턴")}<select
+                          패턴
+                          <select
                             id="bg3d-lt-tone-pattern"
                             value={ltToneSettings.pattern}
                             className="min-h-11 min-w-36 rounded-lg border border-line bg-card px-2.5 text-xs text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
@@ -808,17 +828,17 @@ export function StudioBg3dLtPanel({
                       ) : null}
                       <LtRangeControl
                         id="bg3d-lt-tone-levels"
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "명암 단계")}
+                        label="명암 단계"
                         min={2}
                         max={8}
                         step={1}
                         value={ltToneSettings.levels}
-                        valueText={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "{v0}단계"), { v0: String(ltToneSettings.levels) })}
+                        valueText={`${ltToneSettings.levels}단계`}
                         onChange={(levels) => updateLtToneSettings({ levels })}
                       />
                       <LtRangeControl
                         id="bg3d-lt-tone-opacity"
-                        label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "베이스 농도")}
+                        label="베이스 농도"
                         min={0}
                         max={1}
                         step={0.01}
@@ -828,24 +848,26 @@ export function StudioBg3dLtPanel({
                       />
                       <details className="group border-b border-line/70">
                         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "스크린 정밀 설정")}<span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "선수 · 각도")}<ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
+                          스크린 정밀 설정
+                          <span className="flex items-center gap-1 text-[0.64rem] font-normal text-fg-3">
+                            선수 · 각도
+                            <ChevronDown className="transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none" size={13} aria-hidden />
                           </span>
                         </summary>
                         <div className="border-t border-line/60 pl-2">
                           <LtRangeControl
                             id="bg3d-lt-tone-frequency"
-                            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "패턴 선수")}
+                            label="패턴 선수"
                             min={1}
                             max={200}
                             step={1}
                             value={ltToneSettings.frequency}
-                            valueText={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "en", "{v0} LPI"), { v0: String(Math.round(ltToneSettings.frequency)) })}
+                            valueText={`${Math.round(ltToneSettings.frequency)} LPI`}
                             onChange={(frequency) => updateLtToneSettings({ frequency })}
                           />
                           <LtRangeControl
                             id="bg3d-lt-tone-angle"
-                            label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dLtPanel", "ko", "패턴 각도")}
+                            label="패턴 각도"
                             min={-180}
                             max={180}
                             step={1}

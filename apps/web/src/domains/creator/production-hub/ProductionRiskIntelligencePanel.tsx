@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
@@ -192,56 +188,58 @@ export function ProductionRiskIntelligencePanel({
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 text-accent">
               <Radar className="size-4" aria-hidden="true" />
-              <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "Predictive Risk Intelligence")}</p>
+              <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em]">Predictive Risk Intelligence</p>
             </div>
-            <h2 id="predictive-risk-heading" className="mt-2 text-lg font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "예측 리스크 레이더")}</h2>
+            <h2 id="predictive-risk-heading" className="mt-2 text-lg font-black text-fg">예측 리스크 레이더</h2>
             <p className="mt-1 text-xs leading-5 text-fg-2">
-              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "이미 늦은 작업뿐 아니라 남은 공수, 담당자 가용량, 선행 작업, 검수, revision 연결과 연재 버퍼를 함께 계산합니다. 결과는 규칙 기반 설명이며, 자동으로 담당자나 일정을 바꾸지 않습니다.")}</p>
+              이미 늦은 작업뿐 아니라 남은 공수, 담당자 가용량, 선행 작업, 검수, revision 연결과 연재 버퍼를 함께 계산합니다.
+              결과는 규칙 기반 설명이며, 자동으로 담당자나 일정을 바꾸지 않습니다.
+            </p>
           </div>
-          <Link className={buttonClass({ variant: "outline", size: "sm" })} to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "/production/projects/{v0}/planning"), { v0: String(encodeURIComponent(projectId)) })}>
-            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "위험 원장 열기 ")}<ArrowRight className="size-3.5" aria-hidden="true" />
+          <Link className={buttonClass({ variant: "outline", size: "sm" })} to={`/production/projects/${encodeURIComponent(projectId)}/planning`}>
+            위험 원장 열기 <ArrowRight className="size-3.5" aria-hidden="true" />
           </Link>
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <RiskMetric
-            label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "긴급·높음")}
+            label="긴급·높음"
             value={intelligence.criticalCount + intelligence.highCount}
-            detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "긴급 {v0} · 높음 {v1}"), { v0: String(intelligence.criticalCount), v1: String(intelligence.highCount) })}
+            detail={`긴급 ${intelligence.criticalCount} · 높음 ${intelligence.highCount}`}
             icon={AlertTriangle}
-            tone={intelligence.criticalCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "danger") : intelligence.highCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "success")}
+            tone={intelligence.criticalCount > 0 ? "danger" : intelligence.highCount > 0 ? "warning" : "success"}
           />
           <RiskMetric
-            label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "예측 마감 초과")}
+            label="예측 마감 초과"
             value={intelligence.predictedOverrunTaskCount}
-            detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "현재 조건을 유지할 때 늦어질 작업")}
+            detail="현재 조건을 유지할 때 늦어질 작업"
             icon={CalendarClock}
-            tone={intelligence.predictedOverrunTaskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "success")}
+            tone={intelligence.predictedOverrunTaskCount > 0 ? "danger" : "success"}
           />
           <RiskMetric
-            label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "의존성 병목")}
+            label="의존성 병목"
             value={intelligence.dependencyBottleneckCount}
-            detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "선행 작업이 시작 시점을 제한")}
+            detail="선행 작업이 시작 시점을 제한"
             icon={GitBranch}
-            tone={intelligence.dependencyBottleneckCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "success")}
+            tone={intelligence.dependencyBottleneckCount > 0 ? "warning" : "success"}
           />
           <RiskMetric
-            label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "배정·용량")}
+            label="배정·용량"
             value={intelligence.capacityRiskCount}
-            detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "미배정 또는 담당자 과부하")}
+            detail="미배정 또는 담당자 과부하"
             icon={UserRoundX}
-            tone={intelligence.capacityRiskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "success")}
+            tone={intelligence.capacityRiskCount > 0 ? "warning" : "success"}
           />
           <RiskMetric
-            label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "Revision 연결")}
+            label="Revision 연결"
             value={intelligence.revisionGapCount}
-            detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "입력·산출물 추적 누락")}
+            detail="입력·산출물 추적 누락"
             icon={FileWarning}
-            tone={intelligence.revisionGapCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "en", "success")}
+            tone={intelligence.revisionGapCount > 0 ? "warning" : "success"}
           />
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "예측 위험 필터")}>
+        <div className="mt-3 flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1" role="group" aria-label="예측 위험 필터">
           {FILTERS.map((item) => (
             <button
               key={item.id}
@@ -283,32 +281,32 @@ export function ProductionRiskIntelligencePanel({
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-xl font-black text-fg">{signal.score}</p>
-                  <p className="text-[0.625rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "위험 점수")}</p>
+                  <p className="text-[0.625rem] text-fg-3">위험 점수</p>
                 </div>
               </header>
 
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-raised" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "{v0} 위험 점수 {v1}점"), { v0: String(signal.title), v1: String(signal.score) })}>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-raised" aria-label={`${signal.title} 위험 점수 ${signal.score}점`}>
                 <div className={cn("h-full rounded-full", scoreBarClass(signal.severity))} style={{ width: `${signal.score}%` }} />
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-line bg-card p-3">
-                  <p className="text-[0.6875rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "왜 위험한가")}</p>
+                  <p className="text-[0.6875rem] font-black text-fg">왜 위험한가</p>
                   <ul className="mt-2 space-y-1 text-[0.6875rem] leading-5 text-fg-2">
                     {signal.causes.slice(0, 3).map((cause) => <li key={cause}>• {cause}</li>)}
                   </ul>
                 </div>
                 <div className="rounded-xl border border-line bg-card p-3">
-                  <p className="text-[0.6875rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "예상 영향")}</p>
+                  <p className="text-[0.6875rem] font-black text-fg">예상 영향</p>
                   <p className="mt-2 text-[0.6875rem] leading-5 text-fg-2">{signal.impact}</p>
                   {signal.projectedDelayDays ? (
-                    <Pill tone="danger">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "예상 +")}{signal.projectedDelayDays}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "일")}</Pill>
+                    <Pill tone="danger">예상 +{signal.projectedDelayDays}일</Pill>
                   ) : null}
                 </div>
               </div>
 
               <div className="mt-3 rounded-xl border border-accent/25 bg-accent-soft/40 p-3">
-                <p className="text-[0.6875rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "권장 대응")}</p>
+                <p className="text-[0.6875rem] font-black text-fg">권장 대응</p>
                 <ol className="mt-2 space-y-1 text-[0.6875rem] leading-5 text-fg-2">
                   {signal.mitigations.slice(0, 3).map((mitigation, index) => (
                     <li key={mitigation} className="flex gap-2">
@@ -321,21 +319,21 @@ export function ProductionRiskIntelligencePanel({
 
               <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
                 <Link className={buttonClass({ variant: "outline", size: "sm" })} to={signal.href}>
-                  {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "관련 작업 열기 ")}<ArrowRight className="size-3.5" aria-hidden="true" />
+                  관련 작업 열기 <ArrowRight className="size-3.5" aria-hidden="true" />
                 </Link>
                 {signal.source === "derived" ? (
                   <button
                     type="button"
                     className={buttonClass({ size: "sm" })}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "{v0} 예측 신호를 제작 위험으로 등록"), { v0: String(signal.title) })}
+                    aria-label={`${signal.title} 예측 신호를 제작 위험으로 등록`}
                     disabled={!canEdit || registeringId !== null || registered}
                     onClick={() => void registerRisk(signal)}
                   >
                     {registering ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : registered ? <CheckCircle2 className="size-4" aria-hidden="true" /> : <ShieldAlert className="size-4" aria-hidden="true" />}
-                    {registering ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "등록 중…") : registered ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "위험 원장 등록됨") : canEdit ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "위험으로 등록") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "편집 권한 필요")}
+                    {registering ? "등록 중…" : registered ? "위험 원장 등록됨" : canEdit ? "위험으로 등록" : "편집 권한 필요"}
                   </button>
                 ) : (
-                  <Pill tone="success"><CheckCircle2 className="mr-1 size-3" aria-hidden="true" />{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "위험 원장")}</Pill>
+                  <Pill tone="success"><CheckCircle2 className="mr-1 size-3" aria-hidden="true" />위험 원장</Pill>
                 )}
               </footer>
             </article>
@@ -345,8 +343,8 @@ export function ProductionRiskIntelligencePanel({
         {visibleSignals.length === 0 ? (
           <div className="col-span-full rounded-2xl border border-dashed border-line p-10 text-center">
             <CheckCircle2 className="mx-auto size-8 text-good" aria-hidden="true" />
-            <p className="mt-3 text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "이 조건에서 감지된 예측 위험이 없습니다")}</p>
-            <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionRiskIntelligencePanel", "ko", "업무·일정·배정·revision 연결이 바뀌면 다시 계산합니다.")}</p>
+            <p className="mt-3 text-sm font-black text-fg">이 조건에서 감지된 예측 위험이 없습니다</p>
+            <p className="mt-1 text-xs text-fg-2">업무·일정·배정·revision 연결이 바뀌면 다시 계산합니다.</p>
           </div>
         ) : null}
       </div>

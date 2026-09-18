@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useMemo, type ReactElement } from "react";
 
 import {
@@ -125,12 +121,14 @@ export function MarketplaceAssetQualityMatrix({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h4 id="market-asset-quality-heading" className="text-base font-bold text-fg">
-            {draft.kind === "brush" ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "브러시") : translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "에셋")} {translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "품질 시나리오")}</h4>
+            {draft.kind === "brush" ? "브러시" : "에셋"} 품질 시나리오
+          </h4>
           <p className="mt-1 text-xs leading-5 text-fg-2">
-            {translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "완료로 선택한 항목은 미리보기와 검수 계획에 포함됩니다. 실제 자동 검증 결과와 혼동하지 않습니다.")}</p>
+            완료로 선택한 항목은 미리보기와 검수 계획에 포함됩니다. 실제 자동 검증 결과와 혼동하지 않습니다.
+          </p>
         </div>
         <div className="min-w-28 rounded-xl border border-line bg-card px-3 py-2 text-right">
-          <span className="block text-[10px] uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "필수 계획")}</span>
+          <span className="block text-[10px] uppercase tracking-wider text-fg-3">필수 계획</span>
           <strong className="text-xl tabular-nums text-fg">{completion}%</strong>
         </div>
       </div>
@@ -143,14 +141,18 @@ export function MarketplaceAssetQualityMatrix({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(scenario)}
-              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "en", "min-h-24 rounded-xl border p-3 text-left transition-colors motion-reduce:transition-none {v0}"), { v0: String(active
+              className={`min-h-24 rounded-xl border p-3 text-left transition-colors motion-reduce:transition-none ${
+                active
                   ? "border-accent/50 bg-accent/5"
-                  : "border-line bg-card hover:bg-raised") })}
+                  : "border-line bg-card hover:bg-raised"
+              }`}
             >
               <span className="flex items-center justify-between gap-2">
                 <strong className="text-sm text-fg">{scenario.label}</strong>
-                <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "en", "rounded-full px-2 py-0.5 text-[9px] font-semibold {v0}"), { v0: String(scenario.required ? "bg-warning/15 text-fg" : "bg-raised text-fg-2") })}>
-                  {scenario.required ? translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "필수") : translateCurrentStaticSourceText("domains.market.components.MarketplaceAssetQualityMatrix", "ko", "권장")}
+                <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
+                  scenario.required ? "bg-warning/15 text-fg" : "bg-raised text-fg-2"
+                }`}>
+                  {scenario.required ? "필수" : "권장"}
                 </span>
               </span>
               <span className="mt-2 block text-[11px] leading-4 text-fg-2">

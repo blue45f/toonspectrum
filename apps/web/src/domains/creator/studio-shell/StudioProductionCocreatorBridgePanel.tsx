@@ -1,6 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, ClipboardCheck, Handshake, Scale, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 

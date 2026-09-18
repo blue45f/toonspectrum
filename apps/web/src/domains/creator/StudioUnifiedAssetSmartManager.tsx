@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Bookmark, Check, Star } from "lucide-react";
 
 import {
@@ -46,18 +42,18 @@ export function StudioUnifiedAssetSmartManager({
         type="button"
         onClick={onToggleOpen}
         aria-expanded={open}
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "즐겨찾기 · 프로젝트 트레이 관리")}
+        aria-label="즐겨찾기 · 프로젝트 트레이 관리"
         className={cn(
           "mt-1.5 flex min-h-11 w-full items-center justify-between rounded-lg border border-line bg-card px-2.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised",
           SMART_LIBRARY_FOCUS,
         )}
       >
-        <span>{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "즐겨찾기 · 프로젝트 트레이 관리")}</span>
-        <span className="text-[0.54rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "상위 ")}{items.length}{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "개")}</span>
+        <span>즐겨찾기 · 프로젝트 트레이 관리</span>
+        <span className="text-[0.54rem] text-fg-3">상위 {items.length}개</span>
       </button>
 
       {open ? (
-        <div className="mt-1.5 max-h-64 space-y-1 overflow-y-auto pr-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "스마트 에셋 관리 목록")}>
+        <div className="mt-1.5 max-h-64 space-y-1 overflow-y-auto pr-1" aria-label="스마트 에셋 관리 목록">
           {items.map((item) => {
             const facet = deriveStudioUnifiedAssetFacet(item);
             const favorite = state.favorites.includes(item.id);
@@ -77,20 +73,20 @@ export function StudioUnifiedAssetSmartManager({
                   type="button"
                   onClick={() => onToggleFavorite(item.id)}
                   aria-pressed={favorite}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "{v0} 즐겨찾기 {v1}"), { v0: String(item.title), v1: String(favorite ? "제거" : "추가") })}
+                  aria-label={`${item.title} 즐겨찾기 ${favorite ? "제거" : "추가"}`}
                   className={cn(
                     "grid min-h-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent",
                     SMART_LIBRARY_FOCUS,
                     favorite && "bg-accent-soft text-accent",
                   )}
                 >
-                  <Star size={14} fill={favorite ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "en", "none")} aria-hidden />
+                  <Star size={14} fill={favorite ? "currentColor" : "none"} aria-hidden />
                 </button>
                 <button
                   type="button"
                   onClick={() => onToggleTray(item.id)}
                   aria-pressed={inTray}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "{v0} 프로젝트 트레이 {v1}"), { v0: String(item.title), v1: String(inTray ? "제거" : "추가") })}
+                  aria-label={`${item.title} 프로젝트 트레이 ${inTray ? "제거" : "추가"}`}
                   className={cn(
                     "grid min-h-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent",
                     SMART_LIBRARY_FOCUS,
@@ -106,8 +102,8 @@ export function StudioUnifiedAssetSmartManager({
       ) : null}
 
       {relatedAnchor && related.length > 0 ? (
-        <div className="mt-1.5 rounded-lg border border-accent/25 bg-card p-2" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "{v0} 연관 에셋"), { v0: String(relatedAnchor.title) })}>
-          <p className="text-[0.56rem] font-bold text-accent">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetSmartManager", "ko", "방금 사용한 에셋과 잘 맞는 항목")}</p>
+        <div className="mt-1.5 rounded-lg border border-accent/25 bg-card p-2" aria-label={`${relatedAnchor.title} 연관 에셋`}>
+          <p className="text-[0.56rem] font-bold text-accent">방금 사용한 에셋과 잘 맞는 항목</p>
           <div className="mt-1 flex gap-1 overflow-x-auto pb-1">
             {related.map((item) => (
               <button

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* eslint-disable react-refresh/only-export-components -- command-center view models are intentionally unit-tested beside the component. */
 import {
   AlertCircle,
@@ -521,8 +517,9 @@ export function StudioLiveCollaborationCommandCenter({
             </span>
             <div>
               <h4 className="text-xs font-black text-fg" id="studio-live-command-center-title">
-                {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "협업 관제")}</h4>
-              <p className="mt-0.5 text-[0.64rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "상태·참여·대화·공유를 한 번에 이동")}</p>
+                협업 관제
+              </h4>
+              <p className="mt-0.5 text-[0.64rem] text-fg-3">상태·참여·대화·공유를 한 번에 이동</p>
             </div>
           </div>
         </div>
@@ -533,7 +530,8 @@ export function StudioLiveCollaborationCommandCenter({
           onClick={handleCopySummary}
         >
           {copying ? <span className="size-3 animate-pulse rounded-full bg-accent" aria-hidden /> : <Copy size={13} aria-hidden />}
-          {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "인계 요약 복사")}</button>
+          인계 요약 복사
+        </button>
       </div>
 
       <button
@@ -562,32 +560,32 @@ export function StudioLiveCollaborationCommandCenter({
       <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         <CommandMetric
           icon={<UsersRound size={14} />}
-          label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "참여 탭")}
+          label="참여 탭"
           value={(peers.length + 1).toLocaleString("ko-KR")}
-          detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "{v0}개 활성"), { v0: String(peers.filter((peer) => peer.visibility === "active").length.toLocaleString("ko-KR")) })}
+          detail={`${peers.filter((peer) => peer.visibility === "active").length.toLocaleString("ko-KR")}개 활성`}
           section="people"
         />
         <CommandMetric
           icon={<MessageCircle size={14} />}
-          label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "세션 채팅")}
+          label="세션 채팅"
           value={chatMessages.length.toLocaleString("ko-KR")}
-          detail={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "휘발성 대화")}
+          detail="휘발성 대화"
           section="chat"
         />
         <CommandMetric
           icon={<MonitorUp size={14} />}
-          label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "화면 공유")}
+          label="화면 공유"
           value={
             screenState.pendingRequests.length > 0
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "{v0} 승인"), { v0: String(screenState.pendingRequests.length) })
+              ? `${screenState.pendingRequests.length} 승인`
               : screenActivityCount.toLocaleString("ko-KR")
           }
-          detail={screenState.localSharing ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "내 화면 공유 중") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "요청 기반 연결")}
+          detail={screenState.localSharing ? "내 화면 공유 중" : "요청 기반 연결"}
           section="screen"
         />
         <CommandMetric
           icon={<ShieldCheck size={14} />}
-          label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "원고 보호")}
+          label="원고 보호"
           value={syncValue}
           detail={syncDetail}
           section="sync"
@@ -602,7 +600,8 @@ export function StudioLiveCollaborationCommandCenter({
           className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-[0.68rem] font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
           onClick={toggleRoster}
         >
-          <Search size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "전체 참여 탭 찾기")}{rosterOpen ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />}
+          <Search size={14} aria-hidden /> 전체 참여 탭 찾기
+          {rosterOpen ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />}
         </button>
         <button
           type="button"
@@ -612,10 +611,10 @@ export function StudioLiveCollaborationCommandCenter({
         >
           {followedPeer ? <Check size={14} aria-hidden /> : <MousePointer2 size={14} aria-hidden />}
           {followedPeer
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "집중 모드 종료 · {v0}"), { v0: String(followedPeer.displayName) })
+            ? `집중 모드 종료 · ${followedPeer.displayName}`
             : activePeer
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "집중 모드 시작 · {v0}"), { v0: String(activePeer.displayName) })
-              : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "집중할 활성 탭 없음")}
+              ? `집중 모드 시작 · ${activePeer.displayName}`
+              : "집중할 활성 탭 없음"}
         </button>
       </div>
 
@@ -638,18 +637,18 @@ export function StudioLiveCollaborationCommandCenter({
                 type="search"
                 autoComplete="off"
                 className="min-h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/45"
-                placeholder={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "이름 또는 역할 검색")}
+                placeholder="이름 또는 역할 검색"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
             </label>
             <select
-              aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "역할로 참여 탭 필터")}
+              aria-label="역할로 참여 탭 필터"
               className="min-h-11 rounded-xl border border-line bg-card px-2 text-xs font-semibold text-fg-2 outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/45"
               value={roleFilter}
               onChange={(event) => setRoleFilter(event.target.value as StudioLiveRosterRoleFilter)}
             >
-              <option value="all">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "모든 역할")}</option>
+              <option value="all">모든 역할</option>
               {ROLE_ORDER.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABEL[role]}
@@ -667,16 +666,17 @@ export function StudioLiveCollaborationCommandCenter({
               )}
               onClick={() => setActiveOnly((current) => !current)}
             >
-              {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "활성만")}</button>
+              활성만
+            </button>
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-2 text-[0.64rem] text-fg-3">
-            <span>{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "검색 결과 ")}{filteredPeers.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "개 탭")}</span>
-            {followingSessionId ? <span className="font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "집중 따라가기 중")}</span> : null}
+            <span>검색 결과 {filteredPeers.length.toLocaleString("ko-KR")}개 탭</span>
+            {followingSessionId ? <span className="font-semibold text-accent">집중 따라가기 중</span> : null}
           </div>
 
           {filteredPeers.length > 0 ? (
-            <ul aria-label={translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "전체 참여 작업 탭")} className="mt-2 max-h-64 space-y-1 overflow-y-auto pr-1">
+            <ul aria-label="전체 참여 작업 탭" className="mt-2 max-h-64 space-y-1 overflow-y-auto pr-1">
               {filteredPeers.map((peer) => {
                 const following = peer.sessionId === followingSessionId;
                 return (
@@ -694,8 +694,8 @@ export function StudioLiveCollaborationCommandCenter({
                     <span className="min-w-0 flex-1">
                       <strong className="block truncate text-[0.7rem] text-fg">{peer.displayName}</strong>
                       <span className="mt-0.5 block truncate text-[0.62rem] text-fg-3">
-                        {ROLE_LABEL[peer.role]} · {peer.visibility === "active" ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "활성 탭") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "유휴 탭")}
-                        {peer.pageId ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", " · 캔버스 위치 공유 중") : ""}
+                        {ROLE_LABEL[peer.role]} · {peer.visibility === "active" ? "활성 탭" : "유휴 탭"}
+                        {peer.pageId ? " · 캔버스 위치 공유 중" : ""}
                       </span>
                     </span>
                     {onToggleFollow ? (
@@ -703,8 +703,8 @@ export function StudioLiveCollaborationCommandCenter({
                         type="button"
                         aria-label={
                           following
-                            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "{v0} 따라가기 중지"), { v0: String(peer.displayName) })
-                            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "{v0} 작업 페이지 따라가기"), { v0: String(peer.displayName) })
+                            ? `${peer.displayName} 따라가기 중지`
+                            : `${peer.displayName} 작업 페이지 따라가기`
                         }
                         aria-pressed={following}
                         className={cn(
@@ -716,7 +716,7 @@ export function StudioLiveCollaborationCommandCenter({
                         onClick={() => onToggleFollow(peer.sessionId)}
                       >
                         {following ? <Check size={12} aria-hidden /> : <MousePointer2 size={12} aria-hidden />}
-                        {following ? translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "중지") : translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "따라가기")}
+                        {following ? "중지" : "따라가기"}
                       </button>
                     ) : null}
                   </li>
@@ -725,7 +725,8 @@ export function StudioLiveCollaborationCommandCenter({
             </ul>
           ) : (
             <p className="mt-2 rounded-xl border border-dashed border-line px-3 py-4 text-center text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.live.StudioLiveCollaborationCommandCenter", "ko", "현재 필터와 일치하는 참여 탭이 없습니다.")}</p>
+              현재 필터와 일치하는 참여 탭이 없습니다.
+            </p>
           )}
         </div>
       ) : null}

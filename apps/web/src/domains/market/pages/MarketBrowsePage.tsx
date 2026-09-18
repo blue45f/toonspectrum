@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ChevronDown,
   PackageSearch,
@@ -180,12 +176,12 @@ export function MarketBrowsePage() {
         <Container size="wide" className="py-7 sm:py-10">
           <MarketNavHeader />
           <div className="market-browse-masthead">
-            <div><p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "en", "THE WEBTOON MATERIAL LIBRARY")}</p>
+            <div><p className="eyebrow text-accent">THE WEBTOON MATERIAL LIBRARY</p>
               <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{pageTitle}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.")}</p>
-              <div className="mt-3 flex flex-wrap gap-4"><Link href="/market/library" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline underline-offset-4">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "저장한 리소스 보기")}</Link><Link href="/learn/paths/visual-finish" className="inline-flex min-h-11 items-center text-xs font-semibold text-fg-2 underline underline-offset-4">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "선화·채색 실습으로 연결")}</Link></div>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-fg-2">다음 컷에 필요한 재료를 골라보세요. 구도를 시작하는 템플릿, 장면을 채우는 소재, 손맛을 만드는 브러시와 색감까지 웹툰 제작 순서에 맞춰 찾을 수 있습니다.</p>
+              <div className="mt-3 flex flex-wrap gap-4"><Link href="/market/library" className="inline-flex min-h-11 items-center text-xs font-semibold text-accent underline underline-offset-4">저장한 리소스 보기</Link><Link href="/learn/paths/visual-finish" className="inline-flex min-h-11 items-center text-xs font-semibold text-fg-2 underline underline-offset-4">선화·채색 실습으로 연결</Link></div>
             </div>
-            <img src="/brand/atelier-materials.webp" alt={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "선과 색, 소품 스케치를 모은 재료 콘셉트 이미지")} width={640} height={480} />
+            <img src="/brand/atelier-materials.webp" alt="선과 색, 소품 스케치를 모은 재료 콘셉트 이미지" width={640} height={480} />
           </div>
 
           <form
@@ -202,33 +198,34 @@ export function MarketBrowsePage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-3" aria-hidden="true" />
               <input
                 type="search"
-                aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "마켓 리소스 검색")}
+                aria-label="마켓 리소스 검색"
                 value={draftSearch}
                 onChange={(event) => updateDraftSearch(event.target.value)}
                 maxLength={CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS}
                 aria-invalid={parsedUrlQuery.issues.some((issue) => issue.param === "q") || undefined}
-                aria-describedby={parsedUrlQuery.issues.some((issue) => issue.param === "q") ? translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "en", "market-invalid-query") : undefined}
-                placeholder={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "예: 고백 장면, 학교 배경, G펜, 야간 보정")}
+                aria-describedby={parsedUrlQuery.issues.some((issue) => issue.param === "q") ? "market-invalid-query" : undefined}
+                placeholder="예: 고백 장면, 학교 배경, G펜, 야간 보정"
                 className="h-12 w-full appearance-none rounded-2xl border border-line bg-card pl-10 pr-12 text-sm text-fg placeholder:text-fg-3 outline-none transition-colors focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/50 [&::-webkit-search-cancel-button]:hidden"
               />
               {draftSearch ? (
-                <button type="button" aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "검색어 지우기")} onClick={clearSearch} className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                <button type="button" aria-label="검색어 지우기" onClick={clearSearch} className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-fg-3 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
                   <X className="size-4" aria-hidden="true" />
                 </button>
               ) : null}
             </div>
-            <button type="submit" className={buttonClass({ variant: "solid", size: "md" })}>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "검색")}</button>
+            <button type="submit" className={buttonClass({ variant: "solid", size: "md" })}>검색</button>
           </form>
         </Container>
       </section>
 
       <Container size="wide" className="py-6 sm:py-8">
         <section aria-labelledby="market-work-family-title">
-          <h2 id="market-work-family-title" className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "어떤 리소스가 필요한가요?")}</h2>
-          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "한 번 선택하면 그 작업군에 필요한 세부 카테고리만 아래에 보여줍니다.")}</p>
+          <h2 id="market-work-family-title" className="text-sm font-bold text-fg">어떤 리소스가 필요한가요?</h2>
+          <p className="mt-1 text-xs text-fg-3">한 번 선택하면 그 작업군에 필요한 세부 카테고리만 아래에 보여줍니다.</p>
           <div className="mt-3 flex max-w-full gap-2 overflow-x-auto pb-1">
             <button type="button" onClick={() => patchParams({ kind: null, tag: null })} aria-pressed={!activeFamily} className={filterChipClass(!activeFamily)}>
-              {translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "전체")}</button>
+              전체
+            </button>
             {MARKET_RESOURCE_FAMILIES.map((family) => {
               const Icon = family.icon;
               const selected = activeFamily?.id === family.id;
@@ -249,7 +246,7 @@ export function MarketBrowsePage() {
                 {(() => { const ActiveIcon = activeFamily.icon; return <ActiveIcon className="size-4" aria-hidden="true" />; })()}
               </span>
               <div>
-                <h2 id="market-subcategory-title" className="text-sm font-bold text-fg">{activeFamily.label} {translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "세부 카테고리")}</h2>
+                <h2 id="market-subcategory-title" className="text-sm font-bold text-fg">{activeFamily.label} 세부 카테고리</h2>
                 <p className="mt-0.5 text-xs leading-5 text-fg-3">{activeFamily.description}</p>
               </div>
             </div>
@@ -279,58 +276,61 @@ export function MarketBrowsePage() {
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-4">
           {!hasInvalidQuery && !page.loading && !page.error ? (
             <p className="text-xs text-fg-3" aria-live="polite">
-              {translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "현재 ")}<span className="numeral tnum font-semibold text-fg">{page.items.length}</span>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "개 표시")}</p>
+              현재 <span className="numeral tnum font-semibold text-fg">{page.items.length}</span>개 표시
+            </p>
           ) : <span />}
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             <details className="group relative">
               <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg [&::-webkit-details-marker]:hidden">
                 <SlidersHorizontal className="size-3.5" aria-hidden="true" />
-                {translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "세부 조건")}{activeLicense || query.publisher ? <span className="size-2 rounded-full bg-accent" aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "세부 조건 적용됨")} /> : null}
+                세부 조건
+                {activeLicense || query.publisher ? <span className="size-2 rounded-full bg-accent" aria-label="세부 조건 적용됨" /> : null}
                 <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-line bg-panel p-3 shadow-xl">
-                <p className="text-[0.68rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "라이선스")}</p>
+                <p className="text-[0.68rem] font-bold text-fg">라이선스</p>
                 <div className="mt-2 grid gap-1.5">
-                  <button type="button" onClick={() => patchParams({ license: null })} aria-pressed={!activeLicense} className={cn(filterChipClass(!activeLicense), "justify-start")}>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "전체 라이선스")}</button>
+                  <button type="button" onClick={() => patchParams({ license: null })} aria-pressed={!activeLicense} className={cn(filterChipClass(!activeLicense), "justify-start")}>전체 라이선스</button>
                   {MARKET_LICENSES.map((license) => (
                     <button key={license.license} type="button" onClick={() => patchParams({ license: activeLicense === license.license ? null : license.license })} aria-pressed={activeLicense === license.license} className={cn(filterChipClass(activeLicense === license.license), "justify-start")}>
                       {license.label}
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-[0.65rem] leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "무료 여부와 상업 이용 가능 여부는 다릅니다. 작품 공개 전 상세 화면의 사용권 요약을 다시 확인하세요.")}</p>
+                <p className="mt-3 text-[0.65rem] leading-5 text-fg-3">무료 여부와 상업 이용 가능 여부는 다릅니다. 작품 공개 전 상세 화면의 사용권 요약을 다시 확인하세요.</p>
               </div>
             </details>
 
             <label className="inline-flex min-h-11 items-center gap-2 text-xs font-medium text-fg-2">
-              <span>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "정렬")}</span>
-              <select aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "정렬 기준")} value={query.sort} onChange={(event) => patchParams({ sort: event.target.value })} className="h-11 rounded-xl border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/70">
-                <option value="relevance" disabled={!query.search}>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "관련도순")}</option>
-                <option value="newest">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "최신순")}</option>
+              <span>정렬</span>
+              <select aria-label="정렬 기준" value={query.sort} onChange={(event) => patchParams({ sort: event.target.value })} className="h-11 rounded-xl border border-line bg-card px-2.5 text-xs text-fg outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/70">
+                <option value="relevance" disabled={!query.search}>관련도순</option>
+                <option value="newest">최신순</option>
               </select>
             </label>
           </div>
         </div>
 
         {hasActiveFilters ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs" aria-label={translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "적용된 조건")}>
-            {query.search ? <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "검색: “{v0}” 필터 제거"), { v0: String(query.search) })} onClick={clearSearch} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "검색: “")}{query.search}” <X className="size-3" aria-hidden="true" /></button> : null}
-            {query.tag ? <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "#{v0} 태그 필터 제거"), { v0: String(query.tag) })} onClick={() => patchParams({ tag: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">#{query.tag} <X className="size-3" aria-hidden="true" /></button> : null}
-            {activeLicense ? <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "{v0} 필터 제거"), { v0: String(MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label ?? activeLicense) })} onClick={() => patchParams({ license: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">{MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label} <X className="size-3" aria-hidden="true" /></button> : null}
-            {query.publisher ? <button type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "배급자: {v0} 필터 제거"), { v0: String(activePublisherLabel) })} onClick={() => patchParams({ publisher: null })} className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg"><span className="max-w-64 truncate">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "배급자: ")}{activePublisherLabel}</span><X className="size-3 shrink-0" aria-hidden="true" /></button> : null}
-            <button type="button" onClick={resetFilters} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-bad/10 px-2.5 text-bad hover:bg-bad/20"><RotateCcw className="size-3" aria-hidden="true" />{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "조건 초기화")}</button>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs" aria-label="적용된 조건">
+            {query.search ? <button type="button" aria-label={`검색: “${query.search}” 필터 제거`} onClick={clearSearch} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">검색: “{query.search}” <X className="size-3" aria-hidden="true" /></button> : null}
+            {query.tag ? <button type="button" aria-label={`#${query.tag} 태그 필터 제거`} onClick={() => patchParams({ tag: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">#{query.tag} <X className="size-3" aria-hidden="true" /></button> : null}
+            {activeLicense ? <button type="button" aria-label={`${MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label ?? activeLicense} 필터 제거`} onClick={() => patchParams({ license: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">{MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label} <X className="size-3" aria-hidden="true" /></button> : null}
+            {query.publisher ? <button type="button" aria-label={`배급자: ${activePublisherLabel} 필터 제거`} onClick={() => patchParams({ publisher: null })} className="inline-flex min-h-9 max-w-full items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg"><span className="max-w-64 truncate">배급자: {activePublisherLabel}</span><X className="size-3 shrink-0" aria-hidden="true" /></button> : null}
+            <button type="button" onClick={resetFilters} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-bad/10 px-2.5 text-bad hover:bg-bad/20"><RotateCcw className="size-3" aria-hidden="true" />조건 초기화</button>
           </div>
         ) : null}
 
         {hasInvalidQuery ? (
           <div id="market-invalid-query" role="alert" className="mt-4 rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-fg-2">
-            <p className="font-medium text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "주소의 검색 조건을 적용할 수 없어요.")}</p>
+            <p className="font-medium text-fg">주소의 검색 조건을 적용할 수 없어요.</p>
             <ul className="mt-1.5 list-disc space-y-1 pl-5 text-xs leading-relaxed">
               {parsedUrlQuery.issues.map((issue) => <li key={`${issue.param}-${issue.code}`}>{issue.message}</li>)}
             </ul>
             <button type="button" onClick={() => { cancelPendingSearchCommit(); const patch = Object.fromEntries([...new Set(parsedUrlQuery.issues.map((issue) => issue.param))].map((param) => [param, null])); if ("q" in patch) setDraftSearch(""); patchParams(patch); }} className={buttonClass({ variant: "outline", size: "sm", className: "mt-3" })}>
-              {translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "잘못된 조건 제거")}</button>
+              잘못된 조건 제거
+            </button>
           </div>
         ) : null}
 
@@ -339,16 +339,16 @@ export function MarketBrowsePage() {
         {!hasInvalidQuery && page.error && page.items.length === 0 ? (
           <div role="alert" className="mt-8 rounded-2xl border border-warn/30 bg-warn/5 p-8 text-center sm:p-12">
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-warn/10 text-warn"><AlertTriangle className="size-6" aria-hidden="true" /></div>
-            <h2 className="mt-4 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "리소스를 불러올 수 없어요")}</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "일시적인 네트워크 문제이거나 서버에 장애가 발생했을 수 있어요. 현재 조건은 유지되므로 다시 시도해도 됩니다.")}</p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3"><button type="button" onClick={page.reload} className={buttonClass({ variant: "solid", size: "sm" })}><RefreshCw className="mr-1.5 size-3.5" aria-hidden="true" />{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "다시 시도")}</button><Link href="/studio" className={buttonClass({ variant: "outline", size: "sm" })}>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "Studio로 이동")}</Link></div>
+            <h2 className="mt-4 text-base font-bold text-fg">리소스를 불러올 수 없어요</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">일시적인 네트워크 문제이거나 서버에 장애가 발생했을 수 있어요. 현재 조건은 유지되므로 다시 시도해도 됩니다.</p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3"><button type="button" onClick={page.reload} className={buttonClass({ variant: "solid", size: "sm" })}><RefreshCw className="mr-1.5 size-3.5" aria-hidden="true" />다시 시도</button><Link href="/studio" className={buttonClass({ variant: "outline", size: "sm" })}>Studio로 이동</Link></div>
           </div>
         ) : null}
 
         {hasInvalidQuery || (page.error && page.items.length === 0) ? null : (
           <>
-            <h2 className="sr-only">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "탐색 결과")}</h2>
-            {page.loading ? <p role="status" className="sr-only">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "마켓 탐색 결과를 불러오는 중입니다.")}</p> : null}
+            <h2 className="sr-only">탐색 결과</h2>
+            {page.loading ? <p role="status" className="sr-only">마켓 탐색 결과를 불러오는 중입니다.</p> : null}
             <ul aria-busy={page.loading || undefined} className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
               {page.loading && page.items.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => <li key={index} aria-hidden="true"><div className="skeleton aspect-[16/9] w-full rounded-t-xl" /><div className="space-y-2 rounded-b-xl border border-t-0 border-line bg-card p-3.5"><div className="skeleton h-4 w-4/5" /><div className="skeleton h-3 w-2/5" /></div></li>)
@@ -358,19 +358,19 @@ export function MarketBrowsePage() {
             {!page.loading && page.items.length === 0 ? (
               <div className="mt-8 rounded-2xl border border-dashed border-line bg-panel p-8 text-center sm:p-12">
                 {activeSearch ? (
-                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3"><SearchX className="size-6" aria-hidden="true" /></div><h2 className="mt-4 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "en", "&lsquo;")}{activeSearch}{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "&rsquo; 검색 결과가 없어요")}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "더 짧은 단어로 검색하거나 선택한 카테고리를 하나씩 해제해 보세요.")}</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><button type="button" onClick={clearSearch} className={buttonClass({ variant: "solid", size: "sm" })}>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "검색어 초기화")}</button>{hasActiveFilters ? <button type="button" onClick={resetFilters} className={buttonClass({ variant: "outline", size: "sm" })}><RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "모든 조건 초기화")}</button> : null}</div></>
+                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3"><SearchX className="size-6" aria-hidden="true" /></div><h2 className="mt-4 text-base font-bold text-fg">&lsquo;{activeSearch}&rsquo; 검색 결과가 없어요</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">더 짧은 단어로 검색하거나 선택한 카테고리를 하나씩 해제해 보세요.</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><button type="button" onClick={clearSearch} className={buttonClass({ variant: "solid", size: "sm" })}>검색어 초기화</button>{hasActiveFilters ? <button type="button" onClick={resetFilters} className={buttonClass({ variant: "outline", size: "sm" })}><RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />모든 조건 초기화</button> : null}</div></>
                 ) : activeKind ? (
-                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent">{(() => { const Icon = marketKindMeta(activeKind).icon; return <Icon className="size-6" aria-hidden="true" />; })()}</div><h2 className="mt-4 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "아직 이 조건에 맞는 ")}{marketKindMeta(activeKind).label}{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "이 없어요")}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "세부 카테고리를 바꾸거나 Studio에서 만든 리소스를 첫 번째로 공유해 보세요.")}</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "Studio에서 공유하기")}</Link><button type="button" onClick={() => patchParams({ kind: null, tag: null })} className={buttonClass({ variant: "outline", size: "sm" })}>{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "전체 리소스 보기")}</button></div></>
+                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent">{(() => { const Icon = marketKindMeta(activeKind).icon; return <Icon className="size-6" aria-hidden="true" />; })()}</div><h2 className="mt-4 text-base font-bold text-fg">아직 이 조건에 맞는 {marketKindMeta(activeKind).label}이 없어요</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">세부 카테고리를 바꾸거나 Studio에서 만든 리소스를 첫 번째로 공유해 보세요.</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />Studio에서 공유하기</Link><button type="button" onClick={() => patchParams({ kind: null, tag: null })} className={buttonClass({ variant: "outline", size: "sm" })}>전체 리소스 보기</button></div></>
                 ) : (
-                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3"><PackageSearch className="size-6" aria-hidden="true" /></div><h2 className="mt-4 text-base font-bold text-fg">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "조건에 맞는 공유 리소스가 없어요")}</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "조건을 초기화하거나 Studio에서 만든 리소스를 첫 번째로 공유해 보세요.")}</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "Studio에서 첫 리소스 공유하기")}</Link>{hasActiveFilters ? <button type="button" onClick={resetFilters} className={buttonClass({ variant: "outline", size: "sm" })}><RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />{translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "조건 초기화")}</button> : null}</div></>
+                  <><div className="mx-auto flex size-12 items-center justify-center rounded-full bg-raised text-fg-3"><PackageSearch className="size-6" aria-hidden="true" /></div><h2 className="mt-4 text-base font-bold text-fg">조건에 맞는 공유 리소스가 없어요</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-fg-2">조건을 초기화하거나 Studio에서 만든 리소스를 첫 번째로 공유해 보세요.</p><div className="mt-6 flex flex-wrap justify-center gap-2.5"><Link href="/studio?assetMarket=community&communityView=share" className={buttonClass({ variant: "solid", size: "sm" })}><Upload className="mr-1.5 size-3.5" aria-hidden="true" />Studio에서 첫 리소스 공유하기</Link>{hasActiveFilters ? <button type="button" onClick={resetFilters} className={buttonClass({ variant: "outline", size: "sm" })}><RotateCcw className="mr-1.5 size-3.5" aria-hidden="true" />조건 초기화</button> : null}</div></>
                 )}
               </div>
             ) : null}
 
             {!page.loading && page.loadMoreError && !page.error ? (
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-center text-xs text-bad" role="alert"><span>{page.loadMoreError}</span><button type="button" onClick={page.loadMore} disabled={page.loadingMore} className={buttonClass({ variant: "outline", size: "sm" })}>{page.loadingMore ? translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "다시 불러오는 중…") : translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "다시 시도")}</button></div>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-center text-xs text-bad" role="alert"><span>{page.loadMoreError}</span><button type="button" onClick={page.loadMore} disabled={page.loadingMore} className={buttonClass({ variant: "outline", size: "sm" })}>{page.loadingMore ? "다시 불러오는 중…" : "다시 시도"}</button></div>
             ) : !page.loading && page.hasMore && !page.error ? (
-              <div className="mt-8 text-center"><button type="button" onClick={page.loadMore} disabled={page.loadingMore} className={buttonClass({ variant: "outline", size: "md" })}>{page.loadingMore ? translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "불러오는 중…") : translateCurrentStaticSourceText("domains.market.pages.MarketBrowsePage", "ko", "더 많은 리소스 불러오기")}</button></div>
+              <div className="mt-8 text-center"><button type="button" onClick={page.loadMore} disabled={page.loadingMore} className={buttonClass({ variant: "outline", size: "md" })}>{page.loadingMore ? "불러오는 중…" : "더 많은 리소스 불러오기"}</button></div>
             ) : null}
           </>
         )}

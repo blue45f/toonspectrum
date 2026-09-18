@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check } from "lucide-react";
 
 import {
@@ -67,13 +63,13 @@ function StudioEraserBeforeAfterPreview({
         aria-hidden
         className="mb-1 flex items-center justify-between text-[0.58rem] font-semibold text-fg-3"
       >
-        <span>{translateCurrentStaticSourceText("domains.creator.StudioEraserQuickPicker", "ko", "지우기 전")}</span>
-        <span>{translateCurrentStaticSourceText("domains.creator.StudioEraserQuickPicker", "ko", "한 번 지운 뒤")}</span>
+        <span>지우기 전</span>
+        <span>한 번 지운 뒤</span>
       </div>
       <svg
         viewBox="0 0 220 48"
         role="img"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEraserQuickPicker", "ko", "{v0} 미리보기: {v1}"), { v0: String(option.name), v1: String(option.previewLabel) })}
+        aria-label={`${option.name} 미리보기: ${option.previewLabel}`}
         className="block h-10 w-full overflow-visible text-fg"
       >
         <rect
@@ -149,7 +145,7 @@ export function StudioEraserQuickPicker({
             key={option.id}
             type="button"
             aria-pressed={selected}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEraserQuickPicker", "ko", "{v0}, {v1}% 지움. {v2}"), { v0: String(option.name), v1: String(option.strengthPercent), v2: String(option.description) })}
+            aria-label={`${option.name}, ${option.strengthPercent}% 지움. ${option.description}`}
             onClick={() => onSelect(option.id)}
             data-studio-eraser-quick-option={option.id}
             data-studio-min-target-px="44"
@@ -172,7 +168,7 @@ export function StudioEraserQuickPicker({
                 </span>
               </span>
               <span
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEraserQuickPicker", "ko", "지우기 강도 {v0}%"), { v0: String(option.strengthPercent) })}
+                aria-label={`지우기 강도 ${option.strengthPercent}%`}
                 className={cn(
                   "inline-flex min-h-6 shrink-0 items-center rounded-full border px-2 text-[0.64rem] font-extrabold tabular-nums",
                   selected
@@ -180,7 +176,8 @@ export function StudioEraserQuickPicker({
                     : "border-line bg-canvas/80 text-fg-2",
                 )}
               >
-                {option.strengthPercent}{translateCurrentStaticSourceText("domains.creator.StudioEraserQuickPicker", "ko", "% 지움")}</span>
+                {option.strengthPercent}% 지움
+              </span>
             </span>
 
             <StudioEraserBeforeAfterPreview option={option} />

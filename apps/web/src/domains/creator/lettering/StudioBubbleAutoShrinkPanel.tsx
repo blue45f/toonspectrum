@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Bubble Auto-Shrink Panel
  * 말풍선 "크기 고정" 컨트롤 — 켜면 텍스트가 넘칠 때 (기존 기본 동작인) 높이 자동 확장 대신
@@ -43,10 +39,11 @@ export function StudioBubbleAutoShrinkPanel({
 }: StudioBubbleAutoShrinkPanelProps): ReactElement {
   return (
     <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "ko", "텍스트 크기 고정")}</p>
+      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">텍스트 크기 고정</p>
 
       <label className={PANEL_LABEL_ROW}>
-        {translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "ko", "크기 고정(넘치면 글자 축소)")}<input
+        크기 고정(넘치면 글자 축소)
+        <input
           type="checkbox"
           checked={enabled}
           onChange={(e) => onToggleEnabled(e.target.checked)}
@@ -57,13 +54,13 @@ export function StudioBubbleAutoShrinkPanel({
       {enabled && (
         <>
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "ko", "최소 글자 크기")}
+            label="최소 글자 크기"
             min={BUBBLE_AUTO_SHRINK_MIN_FONT_RANGE.min}
             max={BUBBLE_AUTO_SHRINK_MIN_FONT_RANGE.max}
             step={BUBBLE_AUTO_SHRINK_MIN_FONT_RANGE.step}
             value={minFontSize}
             onChange={onMinFontSizeChange}
-            readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "en", "{v0}px"), { v0: String(minFontSize) })}
+            readout={`${minFontSize}px`}
           />
 
           <p
@@ -71,10 +68,10 @@ export function StudioBubbleAutoShrinkPanel({
             role="status"
           >
             {overflow
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "ko", "⚠️ 최소 크기({v0}px)에서도 텍스트가 넘쳐요 — 말풍선을 키우거나 대사를 줄여보세요."), { v0: String(minFontSize) })
+              ? `⚠️ 최소 크기(${minFontSize}px)에서도 텍스트가 넘쳐요 — 말풍선을 키우거나 대사를 줄여보세요.`
               : effectiveFontSize != null
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "ko", "지금 {v0}px로 자동 축소되어 표시 중이에요."), { v0: String(effectiveFontSize) })
-                : translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleAutoShrinkPanel", "ko", "말풍선 크기는 고정되고, 텍스트가 넘치면 글자 크기가 자동으로 줄어요.")}
+                ? `지금 ${effectiveFontSize}px로 자동 축소되어 표시 중이에요.`
+                : "말풍선 크기는 고정되고, 텍스트가 넘치면 글자 크기가 자동으로 줄어요."}
           </p>
         </>
       )}

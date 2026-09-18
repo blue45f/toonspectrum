@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useId, useMemo } from "react";
 
 import { isEffectivelyHidden } from "./studio-layers";
@@ -110,8 +107,8 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
         hidden={inspectorLayout.primary !== "properties"}
         className={
           inspectorContentMode === "drawing"
-            ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "en", "min-h-0 lg:flex lg:flex-1 lg:flex-col")
-            : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "en", "space-y-2")
+            ? "min-h-0 lg:flex lg:flex-1 lg:flex-col"
+            : "space-y-2"
         }
       >
           {inspectorContentMode === "selection"
@@ -124,7 +121,7 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
               type="button"
               disabled={inspectorInteractionPolicy.selection.disabled}
               title={inspectorInteractionPolicy.selection.reason}
-              aria-label={selected.type === "bubble" ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "ko", "대사 편집") : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "ko", "글자 편집")}
+              aria-label={selected.type === "bubble" ? "대사 편집" : "글자 편집"}
               data-studio-inspector-primary-text-edit="true"
               data-inspector-priority="essential"
               data-inspector-control-id="element.edit-text"
@@ -135,8 +132,8 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
                 className: "min-h-11 w-full justify-between px-3 text-left",
               })}
             >
-              <span>{selected.type === "bubble" ? translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "ko", "대사 편집") : translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "ko", "글자 편집")}</span>
-              <span className="text-[0.6875rem] font-semibold opacity-80">{translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "ko", "내용 수정")}</span>
+              <span>{selected.type === "bubble" ? "대사 편집" : "글자 편집"}</span>
+              <span className="text-[0.6875rem] font-semibold opacity-80">내용 수정</span>
             </button>
           ) : null}
           {inspectorContentMode === "selection" && matchingSourceId ? (
@@ -166,7 +163,7 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
           )}
           {inspectorContentMode === "selection" && marqueeIds.length === 2 && (
             <div
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorAsideBody", "ko", "도형 결합")}
+              aria-label="도형 결합"
               className="rounded-xl border border-line bg-panel/40 p-3"
             >
               <Suspense fallback={null}>

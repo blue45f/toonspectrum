@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Lightweight interaction shell for Studio motion-coach hints.
  * The rich bubble and animated previews are prefetched on intent and remain
@@ -542,7 +539,7 @@ function StudioToolHintCompactFallback({
       data-studio-tool-hint="true"
       data-studio-tool-hint-expanded="false"
       data-studio-tool-hint-loading="true"
-      data-studio-tool-hint-reduced-motion={reducedMotion ? translateCurrentStaticSourceText("domains.creator.StudioToolHint", "en", "true") : undefined}
+      data-studio-tool-hint-reduced-motion={reducedMotion ? "true" : undefined}
       data-studio-tool-hint-viewport={readStudioToolHintViewport().source}
       className="studio-tool-hint-compact"
       style={{
@@ -566,7 +563,7 @@ function StudioToolHintCompactFallback({
           data-studio-tool-hint-unavailable="true"
           className="mt-2 flex items-start gap-1.5 rounded-md border border-warn/35 bg-warn/10 px-2 py-1.5 text-[0.7rem] leading-relaxed"
         >
-          <span className="shrink-0 font-bold text-warn">{translateCurrentStaticSourceText("domains.creator.StudioToolHint", "ko", "사용 조건")}</span>
+          <span className="shrink-0 font-bold text-warn">사용 조건</span>
           <span className="min-w-0 text-fg-2">{unavailableReason}</span>
         </div>
       ) : null}
@@ -1188,7 +1185,7 @@ export function StudioToolHintTarget({
     <span
       ref={wrapRef}
       data-studio-tool-hint-target="true"
-      data-studio-tool-hint-unavailable={disabled ? translateCurrentStaticSourceText("domains.creator.StudioToolHint", "en", "true") : undefined}
+      data-studio-tool-hint-unavailable={disabled ? "true" : undefined}
       className={cn(
         "relative inline-flex",
         disabled && "rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
@@ -1203,7 +1200,7 @@ export function StudioToolHintTarget({
       onClickCapture={handleClickCapture}
       onFocus={handleFocus}
       onBlur={handleBlur}
-      role={disabled ? translateCurrentStaticSourceText("domains.creator.StudioToolHint", "en", "group") : undefined}
+      role={disabled ? "group" : undefined}
       aria-label={disabled ? childAccessibleLabel ?? hint.title : undefined}
       aria-describedby={needsWrapperDescription ? tipId : undefined}
       tabIndex={disabled ? 0 : undefined}

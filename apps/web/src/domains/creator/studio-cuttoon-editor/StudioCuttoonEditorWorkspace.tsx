@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -175,9 +172,9 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
       <div
         id="studio-workspace"
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorWorkspace", "ko", "편집 작업공간")}
+        aria-label="편집 작업공간"
         tabIndex={-1}
-        data-studio-mobile-canvas-workspace={isMobile ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorWorkspace", "en", "true") : undefined}
+        data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
         className={cn(
           // Edge-dock workspace: the mobile dock overlays the scrollport instead of shrinking this
           // flex lane. StudioCanvasViewport owns the matching scroll-safe inset, so the final canvas
@@ -241,7 +238,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
         {/* Left vertical toolbar — desktop only; mobile uses bottom dock / horizontal belt */}
         <StudioWorkspaceRegion
           surfaceId="tool-rail"
-          label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorWorkspace", "ko", "그리기 도구")}
+          label="그리기 도구"
           defaultLayout={TOOL_RAIL_LAYOUT}
           disabled={isMobile || canvasOnlyMode || mobileImmersive || presentationPanelsHidden}
           minWidth={80}

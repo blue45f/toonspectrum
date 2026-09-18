@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { preparePromoVoicePreview } from "./promo-audio";
@@ -122,26 +118,26 @@ export function PromoPreview({ project, disabled, seekRequest }: { project: Prom
     setPlaying(true);
   };
   return (
-    <section className="promo-preview" aria-label={translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "홍보영상 미리보기")}>
-      <div className="promo-preview-top"><span>{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "미리보기")}</span><span>{project.ratio} · {project.seconds}{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "초 · 30fps")}</span></div>
-      <div className="promo-canvas-wrap"><canvas ref={canvasRef} width={size.width} height={size.height} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "{v0} 홍보영상. 아래 컷 편집 영역에서 장면별 자막을 확인할 수 있어요."), { v0: String(project.title) })} /></div>
-      {project.audio ? <audio ref={audioRef} src={project.audio.src} loop preload="metadata" aria-label={translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "미리보기 배경음악")}><track kind="captions" srcLang="ko" label={translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "배경음악 안내")} src={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "en", "data:text/vtt;charset=utf-8,{v0}"), { v0: String(encodeURIComponent("WEBVTT\n\n00:00:00.000 --> 00:01:00.000\n[사용자가 추가한 배경음악]\n")) })} default /></audio> : null}
+    <section className="promo-preview" aria-label="홍보영상 미리보기">
+      <div className="promo-preview-top"><span>미리보기</span><span>{project.ratio} · {project.seconds}초 · 30fps</span></div>
+      <div className="promo-canvas-wrap"><canvas ref={canvasRef} width={size.width} height={size.height} aria-label={`${project.title} 홍보영상. 아래 컷 편집 영역에서 장면별 자막을 확인할 수 있어요.`} /></div>
+      {project.audio ? <audio ref={audioRef} src={project.audio.src} loop preload="metadata" aria-label="미리보기 배경음악"><track kind="captions" srcLang="ko" label="배경음악 안내" src={`data:text/vtt;charset=utf-8,${encodeURIComponent("WEBVTT\n\n00:00:00.000 --> 00:01:00.000\n[사용자가 추가한 배경음악]\n")}`} default /></audio> : null}
       <div className="promo-playback">
-        <button type="button" onClick={() => void play()} disabled={disabled || loading || preparingAudio || project.panels.some((panel) => !images.has(panel.id) || (panel.foregroundSrc && !images.has(`${panel.id}:foreground`))) || !project.panels.length}>{preparingAudio ? translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "내레이션 준비 중") : playing ? translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "일시정지") : translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "재생")}</button>
-        <label className="promo-sr-only" htmlFor="promo-seek">{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "영상 탐색")}</label>
+        <button type="button" onClick={() => void play()} disabled={disabled || loading || preparingAudio || project.panels.some((panel) => !images.has(panel.id) || (panel.foregroundSrc && !images.has(`${panel.id}:foreground`))) || !project.panels.length}>{preparingAudio ? "내레이션 준비 중" : playing ? "일시정지" : "재생"}</button>
+        <label className="promo-sr-only" htmlFor="promo-seek">영상 탐색</label>
         <input id="promo-seek" type="range" min={0} max={total - 1} value={frame} disabled={disabled || playing} onChange={(event) => setFrame(Number(event.target.value))} />
-        <output>{(frame / PROMO_FPS).toFixed(1)} / {project.seconds}{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "초")}</output>
+        <output>{(frame / PROMO_FPS).toFixed(1)} / {project.seconds}초</output>
       </div>
       <div className="promo-button-row">
-        <button type="button" disabled={disabled || playing || preparingAudio || frame === 0} onClick={() => setFrame((value) => Math.max(0, value - 1))}>{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "이전 프레임")}</button>
-        <button type="button" disabled={disabled || playing || preparingAudio || frame >= total - 1} onClick={() => setFrame((value) => Math.min(total - 1, value + 1))}>{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "다음 프레임")}</button>
-        <button type="button" disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(total - PROMO_FPS); }}>{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "마지막 카드 확인")}</button>
+        <button type="button" disabled={disabled || playing || preparingAudio || frame === 0} onClick={() => setFrame((value) => Math.max(0, value - 1))}>이전 프레임</button>
+        <button type="button" disabled={disabled || playing || preparingAudio || frame >= total - 1} onClick={() => setFrame((value) => Math.min(total - 1, value + 1))}>다음 프레임</button>
+        <button type="button" disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(total - PROMO_FPS); }}>마지막 카드 확인</button>
       </div>
-      <div className="promo-scene-strip" aria-label={translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "장면 타임라인")}>{promoTimeline(project).map((scene, index) => <button type="button" key={scene.panel.id} aria-pressed={frame >= scene.from && frame < scene.from + scene.duration} disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(scene.from); }}>{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "컷 ")}{index + 1}<br />{(scene.from / PROMO_FPS).toFixed(1)}{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "초")}</button>)}</div>
-      {preparingAudio ? <button type="button" onClick={() => { voiceOperation.current?.abort(); setPreparingAudio(false); }}>{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "오디오 준비 취소")}</button> : null}
-      {loading ? <p role="status">{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "컷을 준비하고 있어요.")}</p> : null}
+      <div className="promo-scene-strip" aria-label="장면 타임라인">{promoTimeline(project).map((scene, index) => <button type="button" key={scene.panel.id} aria-pressed={frame >= scene.from && frame < scene.from + scene.duration} disabled={disabled || preparingAudio} onClick={() => { setPlaying(false); setFrame(scene.from); }}>컷 {index + 1}<br />{(scene.from / PROMO_FPS).toFixed(1)}초</button>)}</div>
+      {preparingAudio ? <button type="button" onClick={() => { voiceOperation.current?.abort(); setPreparingAudio(false); }}>오디오 준비 취소</button> : null}
+      {loading ? <p role="status">컷을 준비하고 있어요.</p> : null}
       {error ? <p role="alert">{error}</p> : null}
-      <p className="promo-muted">{translateCurrentStaticSourceText("domains.creator.promo.PromoPreview", "ko", "원본 컷에 카메라·장면 전환·입자·자막을 적용하는 모션툰입니다. 투명 전경을 추가하면 2.5D 연출을 사용할 수 있어요. 인물 동작·립싱크·새 프레임을 생성하는 기능은 아닙니다.")}</p>
+      <p className="promo-muted">원본 컷에 카메라·장면 전환·입자·자막을 적용하는 모션툰입니다. 투명 전경을 추가하면 2.5D 연출을 사용할 수 있어요. 인물 동작·립싱크·새 프레임을 생성하는 기능은 아닙니다.</p>
     </section>
   );
 }

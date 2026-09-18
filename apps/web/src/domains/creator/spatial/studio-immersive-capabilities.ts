@@ -1,7 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   diagnoseStudioInAppBrowser,
   type StudioInAppBrowserDiagnosis,
 } from "@/compat/in-app-browser";

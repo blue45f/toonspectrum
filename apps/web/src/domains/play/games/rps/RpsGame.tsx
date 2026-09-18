@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Box, Camera, CameraOff, Hand as HandIcon, RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 
@@ -219,17 +215,18 @@ export function RpsGame({ onExit }: PlayGameProps) {
     <div className="flex flex-col gap-4">
       {/* 헤더 — 제목 + 게임 방법 */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "웹툰 가위바위보")}</h2>
+        <h2 className="text-sm font-bold text-fg">웹툰 가위바위보</h2>
         <GameHelp
           id="rps"
-          title={translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "웹툰 가위바위보")}
+          title="웹툰 가위바위보"
           steps={[
             {
               emoji: "🎯",
               title: "목표",
               desc: (
                 <>
-                  <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "웹툰봇")}</b>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "을 이겨 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "선승 ")}{TARGET}{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "점")}</b>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "을 먼저 따내요.")}</>
+                  <b className="text-fg">웹툰봇</b>을 이겨 <b className="text-fg">선승 {TARGET}점</b>을 먼저 따내요.
+                </>
               ),
             },
             {
@@ -237,7 +234,9 @@ export function RpsGame({ onExit }: PlayGameProps) {
               title: "손 내기",
               desc: (
                 <>
-                  <span className="text-emerald-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "손동작")}</span>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "(웹캠)·")}<span className="text-amber-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "음성 구호")}</span> {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "따라 내거나, 카메라를 끄면")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "가위·바위·보 버튼")}</b>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "으로 골라요.")}</>
+                  <span className="text-emerald-500">손동작</span>(웹캠)·<span className="text-amber-500">음성 구호</span> 따라 내거나,
+                  카메라를 끄면 <b className="text-fg">가위·바위·보 버튼</b>으로 골라요.
+                </>
               ),
             },
             {
@@ -245,7 +244,8 @@ export function RpsGame({ onExit }: PlayGameProps) {
               title: "타이밍",
               desc: (
                 <>
-                  <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "\"가위·바위·보!\"")}</b> {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "구호의 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "\"보!\"")}</b> {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "순간에 든 손이 그 판의 선택이에요.")}</>
+                  <b className="text-fg">"가위·바위·보!"</b> 구호의 <b className="text-fg">"보!"</b> 순간에 든 손이 그 판의 선택이에요.
+                </>
               ),
             },
             {
@@ -253,7 +253,9 @@ export function RpsGame({ onExit }: PlayGameProps) {
               title: "묵찌빠",
               desc: (
                 <>
-                  {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "탭을 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "묵찌빠")}</b>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "로 바꾸면 먼저 ")}<span className="text-amber-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "선(先)")}</span>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "을 잡고, 같은 손이 나오는 순간 선을 쥔 쪽이 이겨요.")}</>
+                  탭을 <b className="text-fg">묵찌빠</b>로 바꾸면 먼저 <span className="text-amber-500">선(先)</span>을 잡고,
+                  같은 손이 나오는 순간 선을 쥔 쪽이 이겨요.
+                </>
               ),
             },
             {
@@ -261,7 +263,9 @@ export function RpsGame({ onExit }: PlayGameProps) {
               title: "승부",
               desc: (
                 <>
-                  {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "이기면 ")}<span className="text-emerald-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "내 점수")}</span>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", ", 지면 ")}<span className="text-rose-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "봇 점수")}</span>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "가 올라가요. 먼저")}<b className="text-fg">{TARGET}{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "점")}</b>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "이면 최종 승리!")}</>
+                  이기면 <span className="text-emerald-500">내 점수</span>, 지면 <span className="text-rose-500">봇 점수</span>가 올라가요.
+                  먼저 <b className="text-fg">{TARGET}점</b>이면 최종 승리!
+                </>
               ),
             },
           ]}
@@ -269,7 +273,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
       </div>
 
       {/* 모드 전환 */}
-      <div className="flex items-center justify-center gap-1 rounded-full border border-line bg-card/50 p-1 text-sm" role="tablist" aria-label={translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "게임 모드")}>
+      <div className="flex items-center justify-center gap-1 rounded-full border border-line bg-card/50 p-1 text-sm" role="tablist" aria-label="게임 모드">
         {(["rps", "muk"] as const).map((m) => (
           <button
             key={m}
@@ -282,7 +286,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
               mode === m ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg",
             )}
           >
-            {m === "rps" ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "가위바위보") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "묵찌빠")}
+            {m === "rps" ? "가위바위보" : "묵찌빠"}
           </button>
         ))}
       </div>
@@ -290,13 +294,14 @@ export function RpsGame({ onExit }: PlayGameProps) {
       {/* 점수판 */}
       <div className="flex items-center justify-between rounded-xl border border-line bg-card/50 px-4 py-2 text-sm">
         <span className="font-semibold text-emerald-500">
-          {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "나 ")}{score.win}
-          {mode === "muk" && initiative === "player" && <span className="ml-1 text-[0.7rem] text-amber-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "●선")}</span>}
+          나 {score.win}
+          {mode === "muk" && initiative === "player" && <span className="ml-1 text-[0.7rem] text-amber-500">●선</span>}
         </span>
-        <span className="text-fg-3">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "선승 ")}{TARGET}{mode === "rps" ? formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", " · {v0}무"), { v0: String(score.draw) }) : ""}</span>
+        <span className="text-fg-3">선승 {TARGET}{mode === "rps" ? ` · ${score.draw}무` : ""}</span>
         <span className="font-semibold text-rose-500">
-          {mode === "muk" && initiative === "ai" && <span className="mr-1 text-[0.7rem] text-amber-500">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "선●")}</span>}
-          {score.lose} {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "봇")}</span>
+          {mode === "muk" && initiative === "ai" && <span className="mr-1 text-[0.7rem] text-amber-500">선●</span>}
+          {score.lose} 봇
+        </span>
       </div>
 
       {/* 대결 무대 */}
@@ -313,9 +318,9 @@ export function RpsGame({ onExit }: PlayGameProps) {
               )}
               {status !== "ready" && (
                 <div className="absolute inset-0 grid place-items-center px-2 text-center text-[0.7rem] text-white/90">
-                  {status === "loading" && translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "카메라 준비 중…")}
-                  {status === "denied" && translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "카메라 권한이 거부됨 — 버튼으로 플레이하세요")}
-                  {status === "error" && translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "카메라를 열 수 없어요 — 버튼으로 플레이")}
+                  {status === "loading" && "카메라 준비 중…"}
+                  {status === "denied" && "카메라 권한이 거부됨 — 버튼으로 플레이하세요"}
+                  {status === "error" && "카메라를 열 수 없어요 — 버튼으로 플레이"}
                 </div>
               )}
             </div>
@@ -324,7 +329,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
               {phase === "result" && player ? HAND_EMOJI[player] : "🙂"}
             </div>
           )}
-          <span className="text-xs font-medium text-fg-2">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "나")}</span>
+          <span className="text-xs font-medium text-fg-2">나</span>
         </div>
 
         {/* 봇 — 3D VRM 캐릭터 상대(폴백: 이모지) */}
@@ -357,7 +362,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
             onClick={() => setUse3d((v) => !v)}
             className="inline-flex items-center gap-1 text-[0.66rem] text-fg-3 hover:text-fg-2"
           >
-            <Box className="h-3 w-3" /> {use3d ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "웹툰봇 (3D)") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "웹툰봇 (2D)")}
+            <Box className="h-3 w-3" /> {use3d ? "웹툰봇 (3D)" : "웹툰봇 (2D)"}
           </button>
         </div>
       </div>
@@ -366,7 +371,7 @@ export function RpsGame({ onExit }: PlayGameProps) {
       <div className="min-h-[2.2rem] text-center" aria-live="polite">
         {phase === "counting" && (
           <span className="text-2xl font-extrabold text-accent">
-            {count > 0 ? count : mode === "muk" && initiative !== null ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "빠!") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "냅다!")}
+            {count > 0 ? count : mode === "muk" && initiative !== null ? "빠!" : "냅다!"}
           </span>
         )}
         {phase === "result" && outcome && (
@@ -378,29 +383,30 @@ export function RpsGame({ onExit }: PlayGameProps) {
               outcome === "draw" && "text-fg-2",
             )}
           >
-            {message || OUTCOME_KO[outcome]} {player && ai && formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "en", "({v0} vs {v1})"), { v0: String(HAND_LABEL[player]), v1: String(HAND_LABEL[ai]) })}
+            {message || OUTCOME_KO[outcome]} {player && ai && `(${HAND_LABEL[player]} vs ${HAND_LABEL[ai]})`}
           </span>
         )}
         {phase === "result" && !outcome && message && (
           <span className="text-lg font-bold text-amber-500">
-            {message} {player && ai && formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "en", "({v0} vs {v1})"), { v0: String(HAND_LABEL[player]), v1: String(HAND_LABEL[ai]) })}
+            {message} {player && ai && `(${HAND_LABEL[player]} vs ${HAND_LABEL[ai]})`}
           </span>
         )}
         {phase === "over" && (
           <span className="text-xl font-extrabold text-accent">
-            {winner === "player" ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "🏆 최종 승리!") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "💀 최종 패배")}
+            {winner === "player" ? "🏆 최종 승리!" : "💀 최종 패배"}
           </span>
         )}
         {phase === "idle" && message && <span className="text-sm text-rose-500">{message}</span>}
-        {phase === "idle" && !message && camera && status === "ready" && <span className="text-sm text-fg-3">{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "손을 준비하세요…")}</span>}
+        {phase === "idle" && !message && camera && status === "ready" && <span className="text-sm text-fg-3">손을 준비하세요…</span>}
       </div>
 
       {/* 조작 */}
       {phase === "over" ? (
         <div className="flex items-center justify-center gap-2">
           <Button variant="solid" onClick={restart}>
-            <RotateCcw className="mr-1 h-4 w-4" /> {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "다시")}</Button>
-          <Button variant="outline" onClick={onExit}>{translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "다른 게임")}</Button>
+            <RotateCcw className="mr-1 h-4 w-4" /> 다시
+          </Button>
+          <Button variant="outline" onClick={onExit}>다른 게임</Button>
         </div>
       ) : (
         <>
@@ -424,19 +430,19 @@ export function RpsGame({ onExit }: PlayGameProps) {
             </div>
           )}
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button variant={camera ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "en", "solid") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "en", "outline")} size="sm" onClick={toggleCamera}>
+            <Button variant={camera ? "solid" : "outline"} size="sm" onClick={toggleCamera}>
               {camera ? <CameraOff className="mr-1 h-4 w-4" /> : <Camera className="mr-1 h-4 w-4" />}
-              {camera ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "버튼으로 플레이") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "손동작으로 플레이")}
+              {camera ? "버튼으로 플레이" : "손동작으로 플레이"}
             </Button>
             {voiceSupported && (
-              <Button variant={voiceOn ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "en", "solid") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "en", "outline")} size="sm" onClick={() => setVoiceOn((v) => !v)}>
+              <Button variant={voiceOn ? "solid" : "outline"} size="sm" onClick={() => setVoiceOn((v) => !v)}>
                 {voiceOn ? <Volume2 className="mr-1 h-4 w-4" /> : <VolumeX className="mr-1 h-4 w-4" />}
-                {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "음성 ")}{voiceOn ? translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "켬") : translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "끔")}
+                음성 {voiceOn ? "켬" : "끔"}
               </Button>
             )}
             {voiceSupported && voiceOn && voices.length > 1 && (
               <select
-                aria-label={translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "음성 선택")}
+                aria-label="음성 선택"
                 value={voiceURI ?? ""}
                 onChange={(e) => setVoiceURI(e.target.value)}
                 className="max-w-[11rem] rounded-lg border border-line bg-card px-2 py-1 text-[0.72rem] text-fg-2"
@@ -450,7 +456,8 @@ export function RpsGame({ onExit }: PlayGameProps) {
             )}
             {!camera && (
               <span className="inline-flex items-center gap-1 text-[0.7rem] text-fg-3">
-                <HandIcon className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.play.games.rps.RpsGame", "ko", "버튼을 눌러 한 판")}</span>
+                <HandIcon className="h-3.5 w-3.5" /> 버튼을 눌러 한 판
+              </span>
             )}
           </div>
         </>

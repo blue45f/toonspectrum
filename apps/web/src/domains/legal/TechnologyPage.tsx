@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   BookOpen,
   Boxes,
@@ -230,7 +225,7 @@ export function TechnologyPage() {
       <section className="py-14 sm:py-20" aria-labelledby="engineering-status-title">
         <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "VERIFIED STATUS")}</p>
+            <p className="eyebrow text-accent">VERIFIED STATUS</p>
             <h2
               id="engineering-status-title"
               className="mt-4 max-w-lg text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -262,7 +257,7 @@ export function TechnologyPage() {
       <section aria-labelledby="engineering-architecture-title">
         <div className="flex items-end justify-between gap-5">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "ARCHITECTURE MAP")}</p>
+            <p className="eyebrow text-accent">ARCHITECTURE MAP</p>
             <h2
               id="engineering-architecture-title"
               className="mt-3 text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -304,7 +299,7 @@ export function TechnologyPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="engineering-hub-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "REUSE THE STORY")}</p>
+        <p className="eyebrow text-accent">REUSE THE STORY</p>
         <h2 id="engineering-hub-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
           {bi("하나의 기술 원본을 여섯 가지 방식으로 사용합니다.", "Use one engineering source in six different ways.")}
         </h2>
@@ -333,7 +328,7 @@ export function TechnologyPage() {
       </section>
 
       <section aria-labelledby="engineering-featured-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "CORE DECISIONS")}</p>
+        <p className="eyebrow text-accent">CORE DECISIONS</p>
         <h2 id="engineering-featured-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
           {bi("ToonStudio를 지탱하는 핵심 기술 의사결정", "Core engineering decisions behind ToonStudio")}
         </h2>
@@ -367,7 +362,7 @@ export function TechnologyPage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <ShieldCheck size={24} className="text-accent" aria-hidden="true" />
-            <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "TRANSPARENCY WITHOUT SECRET EXPOSURE")}</p>
+            <p className="mt-5 eyebrow text-accent">TRANSPARENCY WITHOUT SECRET EXPOSURE</p>
             <h2 id="engineering-transparency-title" className="mt-3 max-w-3xl text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl">
               {bi("판단에 필요한 근거는 공개하고, 공격에 도움이 되는 운영 비밀은 보호합니다.", "Publish evidence needed for judgment while protecting operational secrets.")}
             </h2>

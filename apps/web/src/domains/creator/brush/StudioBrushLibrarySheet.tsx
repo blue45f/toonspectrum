@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioBrushLibrarySheet — searchable built-in brush catalog popover.
  * Search · category · favorites · recent · render-faithful preview tiles.
@@ -326,7 +322,7 @@ function StudioProceduralBrushPreviewDetail({
 
   if (ids.includes("heart")) {
     return (
-      <g fill={ink} opacity={opacity * 0.72} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "translate({v0} 0)"), { v0: String(phase * 3) })}>
+      <g fill={ink} opacity={opacity * 0.72} transform={`translate(${phase * 3} 0)`}>
         <path d="M72 13 C72 8 80 7 81 13 C83 7 91 8 91 13 C91 19 81 24 81 24 C81 24 72 19 72 13Z" />
         <path d="M58 19 C58 16 63 15 64 19 C65 15 70 16 70 19 C70 23 64 26 64 26 C64 26 58 23 58 19Z" opacity="0.62" />
       </g>
@@ -334,7 +330,7 @@ function StudioProceduralBrushPreviewDetail({
   }
   if (ids.includes("footstep")) {
     return (
-      <g fill={ink} opacity={opacity * 0.72} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "rotate({v0} 75 17)"), { v0: String(phase * 8 - 4) })}>
+      <g fill={ink} opacity={opacity * 0.72} transform={`rotate(${phase * 8 - 4} 75 17)`}>
         <ellipse cx="64" cy="20" rx="3.2" ry="6.2" />
         <circle cx="61" cy="12" r="1.5" /><circle cx="64" cy="10.5" r="1.35" /><circle cx="67" cy="11.5" r="1.2" />
         <ellipse cx="79" cy="14" rx="3.2" ry="6.2" />
@@ -344,7 +340,7 @@ function StudioProceduralBrushPreviewDetail({
   }
   if (ids.includes("checker")) {
     return (
-      <g fill={ink} opacity={opacity * 0.58} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "translate({v0} 0)"), { v0: String(phase * 2) })}>
+      <g fill={ink} opacity={opacity * 0.58} transform={`translate(${phase * 2} 0)`}>
         {Array.from({ length: 12 }, (_, index) => {
           const column = index % 6;
           const row = Math.floor(index / 6);
@@ -362,7 +358,7 @@ function StudioProceduralBrushPreviewDetail({
           const y = 10 + ((hash >>> ((index + 3) % 12)) & 11);
           const rotation = -38 + ((hash >>> ((index + 5) % 16)) & 63);
           return (
-            <g key={index} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "translate({v0} {v1}) rotate({v2})"), { v0: String(x), v1: String(y), v2: String(rotation) })}>
+            <g key={index} transform={`translate(${x} ${y}) rotate(${rotation})`}>
               <path d="M0 0 C2.2 -3.4 6.5 -3.1 8 0 C5.9 2.7 2.1 2.9 0 0Z" />
               <path d="M0 0 H7" fill="none" stroke={ink} opacity="0.48" />
             </g>
@@ -388,7 +384,7 @@ function StudioProceduralBrushPreviewDetail({
   }
   if (ids.includes("square") || ids.includes("blade") || ids.includes("flat") || ids.includes("block") || ids.includes("marker")) {
     return (
-      <g fill={ink} opacity={opacity * 0.5} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "rotate({v0} 74 17)"), { v0: String(phase * 18 - 9) })}>
+      <g fill={ink} opacity={opacity * 0.5} transform={`rotate(${phase * 18 - 9} 74 17)`}>
         <rect x="53" y={9 + phase * 3} width={13 + (hash % 9)} height={4 + ((hash >>> 4) % 6)} rx={ids.includes("square") ? 0 : 1.5} />
         <rect x={72 + phase * 4} y={16 - phase * 3} width={17 - (hash % 5)} height={3 + ((hash >>> 7) % 5)} rx="1" opacity="0.58" />
       </g>
@@ -396,7 +392,7 @@ function StudioProceduralBrushPreviewDetail({
   }
   if (ids.includes("oval")) {
     return (
-      <g fill={ink} opacity={opacity * 0.56} transform={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "rotate({v0} 74 17)"), { v0: String(phase * 36 - 18) })}>
+      <g fill={ink} opacity={opacity * 0.56} transform={`rotate(${phase * 36 - 18} 74 17)`}>
         <ellipse cx="60" cy="17" rx={4 + (hash % 4)} ry={2 + ((hash >>> 3) % 3)} />
         <ellipse cx="75" cy="15" rx={6 + ((hash >>> 5) % 4)} ry={2.5 + ((hash >>> 8) % 3)} opacity="0.72" />
         <ellipse cx="89" cy="19" rx={3 + ((hash >>> 10) % 3)} ry={2 + ((hash >>> 12) % 2)} opacity="0.48" />
@@ -506,7 +502,7 @@ export function LargeBrushPreview({
         <path
           d={pathD}
           fill="none"
-          stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : surface.paper}
+          stroke={active ? "currentColor" : surface.paper}
           strokeWidth={Math.max(4.5, strokeW * 1.18)}
           strokeLinecap="round"
           strokeDasharray="2.5 1.4"
@@ -524,8 +520,8 @@ export function LargeBrushPreview({
           fill="none"
           stroke={ink}
           strokeWidth={Math.max(6.8, strokeW * 1.55)}
-          strokeLinecap={chisel ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "butt") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "round")}
-          strokeLinejoin={chisel ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "bevel") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "round")}
+          strokeLinecap={chisel ? "butt" : "round"}
+          strokeLinejoin={chisel ? "bevel" : "round"}
           strokeDasharray={pastel ? "7 0.45" : undefined}
           opacity={opacity * 0.82}
         />
@@ -534,7 +530,7 @@ export function LargeBrushPreview({
           fill="none"
           stroke={ink}
           strokeWidth={Math.max(2.2, strokeW * 0.5)}
-          strokeLinecap={chisel ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "butt") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "round")}
+          strokeLinecap={chisel ? "butt" : "round"}
           strokeDasharray={pastel ? "1.1 1.4" : undefined}
           opacity={opacity * (pastel ? 0.24 : 0.18)}
         />
@@ -567,7 +563,7 @@ export function LargeBrushPreview({
             key={index}
             d={pathD}
             fill="none"
-            stroke={pass.tone === "white-core" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "oklch(0.97 0.015 85)") : ink}
+            stroke={pass.tone === "white-core" ? "oklch(0.97 0.015 85)" : ink}
             strokeWidth={Math.max(1.15, strokeW * pass.widthScale)}
             strokeLinecap="round"
             opacity={pass.opacity * opacity}
@@ -652,8 +648,8 @@ export function LargeBrushPreview({
   } else if (kind === "oil") {
     brushSample = (
       <g data-studio-brush-preview-layer="oil">
-        <path d={ribbonD ?? pathD} fill={ribbonD ? ink : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "none")} stroke={ribbonD ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "none") : ink} opacity={opacity * 0.92} />
-        <path d={pathD} fill="none" stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : surface.paper} strokeWidth={1.1} strokeDasharray="7 2" opacity={opacity * 0.72} />
+        <path d={ribbonD ?? pathD} fill={ribbonD ? ink : "none"} stroke={ribbonD ? "none" : ink} opacity={opacity * 0.92} />
+        <path d={pathD} fill="none" stroke={active ? "currentColor" : surface.paper} strokeWidth={1.1} strokeDasharray="7 2" opacity={opacity * 0.72} />
         <path d={pathD} fill="none" stroke={ink} strokeWidth={0.7} strokeDasharray="2 3" opacity={opacity * 0.58} transform="translate(0 2.2)" />
       </g>
     );
@@ -677,7 +673,7 @@ export function LargeBrushPreview({
             <path
               d={pathD}
               fill="none"
-              stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : surface.paper}
+              stroke={active ? "currentColor" : surface.paper}
               strokeWidth={item.id === "school-pen" ? 0.55 : 0.75}
               opacity={item.id === "school-pen" ? 0.46 : 0.62}
             />
@@ -708,7 +704,7 @@ export function LargeBrushPreview({
             {item.id === "parallel-pen" ? (
               <g
                 fill="none"
-                stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : surface.paper}
+                stroke={active ? "currentColor" : surface.paper}
                 strokeLinecap="square"
                 opacity={0.72}
                 data-studio-brush-preview-detail="parallel-edge"
@@ -722,7 +718,7 @@ export function LargeBrushPreview({
         {item.id === "ruling-pen" ? (
           <g
             fill="none"
-            stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : surface.paper}
+            stroke={active ? "currentColor" : surface.paper}
             strokeLinecap="round"
             opacity={0.68}
             data-studio-brush-preview-detail="ruling-gap"
@@ -769,11 +765,11 @@ export function LargeBrushPreview({
         width={w - 1}
         height={h - 1}
         rx={6}
-        fill={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "oklch(0.98 0.01 85 / 0.14)") : surface.tile}
-        stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "oklch(0.98 0.01 85 / 0.25)") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "oklch(0.4 0.012 64 / 0.35)")}
+        fill={active ? "oklch(0.98 0.01 85 / 0.14)" : surface.tile}
+        stroke={active ? "oklch(0.98 0.01 85 / 0.25)" : "oklch(0.4 0.012 64 / 0.35)"}
         strokeWidth={0.7}
       />
-      <path d={`M5 ${h - 5.5} H${w - 5}`} stroke={active ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : surface.paper} strokeWidth={0.5} opacity={0.35} />
+      <path d={`M5 ${h - 5.5} H${w - 5}`} stroke={active ? "currentColor" : surface.paper} strokeWidth={0.5} opacity={0.35} />
       {brushSample}
       <StudioProceduralBrushPreviewDetail item={item} ink={ink} opacity={opacity} />
     </svg>
@@ -804,7 +800,7 @@ function StudioBrushProfileCard({
 
   return (
     <section
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 브러시 특성"), { v0: String(item.name) })}
+      aria-label={`${item.name} 브러시 특성`}
       data-studio-brush-profile-card={item.id}
       data-studio-brush-engine-family={profile.engineFamilyId}
       className={cn(
@@ -865,7 +861,8 @@ function StudioBrushProfileCard({
         <div className="min-w-0 rounded-lg bg-card px-2 py-1.5 text-fg-2">
           <span className="flex items-center gap-1 font-bold text-fg">
             <Gauge size={11} aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "시작 굵기")}</span>
+            시작 굵기
+          </span>
           <span
             data-studio-brush-size-profile={profile.size.sizeClassLabel}
             className="mt-0.5 block truncate"
@@ -875,7 +872,7 @@ function StudioBrushProfileCard({
           </span>
         </div>
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 핵심 특성")}>
+      <div className="mt-1.5 flex flex-wrap gap-1" aria-label="브러시 핵심 특성">
         {profile.traits.map((trait) => (
           <span
             key={trait}
@@ -888,7 +885,8 @@ function StudioBrushProfileCard({
       </div>
       <details className="mt-1.5 rounded-lg border border-line/70 bg-card/60 px-2 py-1 text-[0.6rem] text-fg-2">
         <summary className="min-h-7 cursor-pointer select-none py-1 font-bold text-fg">
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "엔진 조합 ")}{profile.engineStages.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "단계 자세히")}</summary>
+          엔진 조합 {profile.engineStages.length}단계 자세히
+        </summary>
         <ol className="grid gap-1 pb-1 sm:grid-cols-2">
           {profile.engineStages.map((stage, index) => (
             <li
@@ -910,7 +908,8 @@ function StudioBrushProfileCard({
           data-studio-brush-text-size-policy="preserve"
           className="mt-1.5 text-[0.56rem] font-semibold text-fg-3"
         >
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시를 바꾸면 획 굵기만 이 기본값으로 바뀌며, 텍스트 글자 크기는 유지됩니다.")}</p>
+          브러시를 바꾸면 획 굵기만 이 기본값으로 바뀌며, 텍스트 글자 크기는 유지됩니다.
+        </p>
       ) : null}
     </section>
   );
@@ -1303,17 +1302,17 @@ export function StudioBrushLibrarySheet({
   return (
     <div
       ref={rootRef}
-      role={embedded ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "region") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "dialog")}
+      role={embedded ? "region" : "dialog"}
       aria-label={embedded
-        ? operation === "erase" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 선택") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 전체 라이브러리")
+        ? operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리"
         : undefined}
       aria-labelledby={embedded ? undefined : titleId}
-      aria-describedby={embedded ? undefined : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "{v0}-description"), { v0: String(titleId) })}
+      aria-describedby={embedded ? undefined : `${titleId}-description`}
       data-studio-brush-library="true"
       data-studio-brush-catalog="built-in"
       data-studio-brush-catalog-session="true"
       data-studio-brush-surface-role="full-catalog-management"
-      data-studio-brush-compact={compact ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "true") : undefined}
+      data-studio-brush-compact={compact ? "true" : undefined}
       style={style}
       className={cn(
         embedded
@@ -1333,10 +1332,10 @@ export function StudioBrushLibrarySheet({
       >
         <div className="min-w-0">
           <p id={titleId} className="text-sm font-bold text-fg">
-            {operation === "erase" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 선택") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 전체 라이브러리")}
+            {operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리"}
           </p>
           <p
-            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "{v0}-description"), { v0: String(titleId) })}
+            id={`${titleId}-description`}
             className={cn(
               "text-[0.62rem] text-fg-3",
               compact && "hidden",
@@ -1344,8 +1343,8 @@ export function StudioBrushLibrarySheet({
             )}
           >
             {operation === "erase"
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 {v0}종 · {v1}/{v2}개 표시"), { v0: String(operationCatalogCount), v1: String(visibleItems.length), v2: String(items.length) })
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 {v0}종 · 차세대 {v1}종 · 품질 검증 {v2}종 우선 · 재질 {v3}갈래 · {v4}/{v5}개 표시"), { v0: String(operationCatalogCount), v1: String(STUDIO_BRUSH_LIBRARY_COUNTS.v6), v2: String(qualityFirstCatalogCount), v3: String(materialTabCount), v4: String(visibleItems.length), v5: String(items.length) })}
+              ? `지우개 ${operationCatalogCount}종 · ${visibleItems.length}/${items.length}개 표시`
+              : `브러시 ${operationCatalogCount}종 · 차세대 ${STUDIO_BRUSH_LIBRARY_COUNTS.v6}종 · 품질 검증 ${qualityFirstCatalogCount}종 우선 · 재질 ${materialTabCount}갈래 · ${visibleItems.length}/${items.length}개 표시`}
           </p>
         </div>
         <button
@@ -1356,8 +1355,8 @@ export function StudioBrushLibrarySheet({
             onClose("explicit");
           }}
           aria-label={operation === "erase"
-            ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 선택 닫기")
-            : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 전체 라이브러리 닫기")}
+            ? "지우개 선택 닫기"
+            : "브러시 전체 라이브러리 닫기"}
           data-studio-brush-library-close="true"
           className={cn(
             "grid size-11 shrink-0 place-items-center rounded-xl text-fg-3 hover:bg-raised hover:text-fg",
@@ -1389,19 +1388,19 @@ export function StudioBrushLibrarySheet({
               setFocusedBrushId(null);
             }}
             placeholder={personalSearch
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0}에서 이름·용도로 검색"), { v0: String(tab === "favorites" ? "즐겨찾기" : "최근 사용") })
+              ? `${tab === "favorites" ? "즐겨찾기" : "최근 사용"}에서 이름·용도로 검색`
               : operation === "erase"
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 {v0}종 검색"), { v0: String(operationCatalogCount) })
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "전체 {v0}종 검색 (Hokusai, 강모, 과립, G펜…)"), { v0: String(operationCatalogCount) })}
+              ? `지우개 ${operationCatalogCount}종 검색`
+              : `전체 ${operationCatalogCount}종 검색 (Hokusai, 강모, 과립, G펜…)`}
             className="min-h-11 w-full rounded-xl border border-line bg-card py-1.5 pl-9 pr-3 text-xs outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/40"
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} {v1} 검색"), { v0: String(personalSearch ? tab === "favorites" ? "즐겨찾기" : "최근 사용" : "전체"), v1: String(operationLabel) })}
+            aria-label={`${personalSearch ? tab === "favorites" ? "즐겨찾기" : "최근 사용" : "전체"} ${operationLabel} 검색`}
             aria-controls={panelId}
-            aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "{v0}-search-scope"), { v0: String(titleId) })}
-            data-studio-brush-search-scope={personalSearch ? tab : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "all")}
+            aria-describedby={`${titleId}-search-scope`}
+            data-studio-brush-search-scope={personalSearch ? tab : "all"}
           />
         </div>
         <p
-          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "{v0}-search-scope"), { v0: String(titleId) })}
+          id={`${titleId}-search-scope`}
           className={cn(
             "mt-1 px-1 text-[0.6rem] leading-relaxed text-fg-3",
             compact && "hidden",
@@ -1409,12 +1408,12 @@ export function StudioBrushLibrarySheet({
           )}
         >
           {personalSearch
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 안에서 검색합니다. 다른 브러시는 전체 탭에서 찾으세요."), { v0: String(tab === "favorites" ? "즐겨찾기" : "최근 사용") })
+            ? `${tab === "favorites" ? "즐겨찾기" : "최근 사용"} 안에서 검색합니다. 다른 브러시는 전체 탭에서 찾으세요.`
             : normalizedQuery
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "재질 분류와 관계없이 전체 {v0}종에서 검색 중"), { v0: String(operationCatalogCount) })
+            ? `재질 분류와 관계없이 전체 ${operationCatalogCount}종에서 검색 중`
             : operation === "erase"
-              ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우는 강도와 결과를 비교해 선택하세요.")
-              : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "재질·엔진을 고르거나 이름·용도·질감·특성으로 전체 검색")}
+              ? "지우는 강도와 결과를 비교해 선택하세요."
+              : "재질·엔진을 고르거나 이름·용도·질감·특성으로 전체 검색"}
         </p>
         {operation === "paint" ? (
           <div
@@ -1426,18 +1425,19 @@ export function StudioBrushLibrarySheet({
             )}
           >
             <label
-              htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "{v0}-engine-filter"), { v0: String(titleId) })}
+              htmlFor={`${titleId}-engine-filter`}
               className={cn(
                 "shrink-0 text-[0.62rem] font-semibold text-fg-3",
                 compact && "sr-only",
                 "[@media(max-height:32rem)]:sr-only",
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "엔진")}</label>
+              엔진
+            </label>
             <select
-              id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "{v0}-engine-filter"), { v0: String(titleId) })}
+              id={`${titleId}-engine-filter`}
               value={engineFamilyFilter}
-              aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 엔진 계열 필터")}
+              aria-label="브러시 엔진 계열 필터"
               onChange={(event) => {
                 setEngineFamilyFilter(event.target.value);
                 setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
@@ -1445,10 +1445,11 @@ export function StudioBrushLibrarySheet({
               }}
               className="min-h-11 min-w-0 flex-1 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg outline-none focus:border-accent focus:ring-1 focus:ring-accent/40"
             >
-              <option value="all">{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "모든 엔진 · ")}{catalogItems.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "종")}</option>
+              <option value="all">모든 엔진 · {catalogItems.length}종</option>
               {engineFamilyOptions.map((family) => (
                 <option key={family.id} value={family.id}>
-                  {family.label} · {family.count}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "종")}</option>
+                  {family.label} · {family.count}종
+                </option>
               ))}
             </select>
           </div>
@@ -1467,10 +1468,11 @@ export function StudioBrushLibrarySheet({
               "[@media(max-height:32rem)]:hidden"
             )}
           >
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "표시")}</span>
+            표시
+          </span>
           <div
             role="group"
-            aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 표시 방식")}
+            aria-label="브러시 표시 방식"
             className={cn(
               "grid min-w-0 flex-1 grid-cols-3 rounded-xl border border-line bg-card p-0.5",
               compact && "w-[8.5rem] flex-none",
@@ -1522,7 +1524,7 @@ export function StudioBrushLibrarySheet({
           "[@media(max-height:32rem)]:px-1 [@media(max-height:32rem)]:py-0"
         )}
         role="tablist"
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 재질 분류"), { v0: String(operationLabel) })}
+        aria-label={`${operationLabel} 재질 분류`}
       >
         {catalogTabs.map((chip, chipIndex) => {
           const active = tab === chip.id;
@@ -1575,7 +1577,8 @@ export function StudioBrushLibrarySheet({
           </div>
         ) : null}
         <p role="status" aria-live="polite" className="sr-only">
-          {visibleItems.length}/{items.length}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "개의 ")}{operationLabel}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "가 표시됩니다.")}</p>
+          {visibleItems.length}/{items.length}개의 {operationLabel}가 표시됩니다.
+        </p>
         {inspectedCatalogItem ? (
           <StudioBrushProfileCard
             item={inspectedCatalogItem}
@@ -1588,7 +1591,7 @@ export function StudioBrushLibrarySheet({
         {showEraserQuickPicker ? (
           <StudioEraserQuickPicker
             selectedId={activeEraserId}
-            ariaLabel={translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 종류 선택")}
+            ariaLabel="지우개 종류 선택"
             onSelect={(eraserId) => {
               const item = studioBrushCatalogItemById(eraserId);
               if (item?.operation === "erase") void selectCatalogItem(item);
@@ -1598,10 +1601,10 @@ export function StudioBrushLibrarySheet({
           <div className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-line text-center">
             <p className="text-xs text-fg-3">
               {tab === "favorites"
-                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "즐겨찾기한 {v0}가 없어요. ☆로 추가해 보세요."), { v0: String(operationLabel) })
+                ? `즐겨찾기한 ${operationLabel}가 없어요. ☆로 추가해 보세요.`
                 : tab === "recent"
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "최근 사용한 {v0}가 아직 없어요."), { v0: String(operationLabel) })
-                  : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "검색 결과가 없습니다.")}
+                  ? `최근 사용한 ${operationLabel}가 아직 없어요.`
+                  : "검색 결과가 없습니다."}
             </p>
           </div>
         ) : (
@@ -1632,8 +1635,8 @@ export function StudioBrushLibrarySheet({
                   key={item.id}
                   data-studio-brush-source={nextGen ? "v6" : item.source}
                   data-studio-brush-quality-tier={nextGen
-                    ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "nextgen")
-                    : qualityRepresentative ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "verified") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "extended")}
+                    ? "nextgen"
+                    : qualityRepresentative ? "verified" : "extended"}
                   data-studio-brush-kind={item.mediaGroup}
                   data-studio-brush-engine-lane={profile.engineFamilyId}
                   data-studio-brush-default-size={profile.size.defaultWidth}
@@ -1667,7 +1670,7 @@ export function StudioBrushLibrarySheet({
                     }}
                     onClick={() => void selectCatalogItem(item)}
                     title={`${profile.engineFamilyLabel} · ${profile.traits.join(" · ")} · ${item.hint}`}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 선택"), { v0: String(item.name) })}
+                    aria-label={`${item.name} 선택`}
                     aria-pressed={active}
                     aria-keyshortcuts={onToggleFavorite ? "F" : undefined}
                     tabIndex={item.id === rovingBrushId ? 0 : -1}
@@ -1701,7 +1704,7 @@ export function StudioBrushLibrarySheet({
                       />
                     )}
                     <span
-                      data-studio-brush-text-row={viewMode === "text" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "true") : undefined}
+                      data-studio-brush-text-row={viewMode === "text" ? "true" : undefined}
                       className={cn(
                         "flex min-w-0 items-center gap-1",
                         viewMode === "text" ? "flex-1" : "pr-5"
@@ -1733,7 +1736,7 @@ export function StudioBrushLibrarySheet({
                             )}
                           >
                             {profile.engineFamilyLabel} · {primaryTrait} · {kindLabel} ·{" "}
-                            {profile.size.defaultWidth}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "px · ")}{Math.round(item.defaultOpacity * 100)}%
+                            {profile.size.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
                           </span>
                         ) : null}
                       </span>
@@ -1748,7 +1751,8 @@ export function StudioBrushLibrarySheet({
                         </span>
                       ) : item.source === "pro" ? (
                         <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[0.58rem] font-black text-accent">
-                          {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "PRO")}</span>
+                          PRO
+                        </span>
                       ) : null}
                     </span>
                     {viewMode === "stroke" ? (
@@ -1762,7 +1766,7 @@ export function StudioBrushLibrarySheet({
                         )}
                       >
                         <span className="truncate">
-                          {profile.size.defaultWidth}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "px · ")}{Math.round(item.defaultOpacity * 100)}%
+                          {profile.size.defaultWidth}px · {Math.round(item.defaultOpacity * 100)}%
                         </span>
                         <span className="flex min-w-0 shrink-0 items-center gap-1">
                           <span
@@ -1773,7 +1777,7 @@ export function StudioBrushLibrarySheet({
                                 ? "bg-on-accent/20 text-on-accent"
                                 : "bg-accent/12 text-accent"
                             )}
-                            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "엔진: {v0}"), { v0: String(profile.engineSummary) })}
+                            title={`엔진: ${profile.engineSummary}`}
                           >
                             {profile.engineFamilyLabel}
                           </span>
@@ -1783,7 +1787,7 @@ export function StudioBrushLibrarySheet({
                               "max-w-20 truncate rounded-full px-1.5 py-0.5 font-bold",
                               active ? "bg-on-accent/15 text-on-accent" : "bg-raised text-fg-2"
                             )}
-                            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "재질: {v0} · 특성: {v1}"), { v0: String(kindLabel), v1: String(profile.traits.join(" · ")) })}
+                            title={`재질: ${kindLabel} · 특성: ${profile.traits.join(" · ")}`}
                           >
                             {kindLabel}
                           </span>
@@ -1794,8 +1798,8 @@ export function StudioBrushLibrarySheet({
                   {onToggleFavorite ? (
                     <button
                       type="button"
-                      title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} · 선택 항목에서 F"), { v0: String(fav ? "즐겨찾기 해제" : "즐겨찾기") })}
-                      aria-label={fav ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 즐겨찾기 해제"), { v0: String(item.name) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 즐겨찾기"), { v0: String(item.name) })}
+                      title={`${fav ? "즐겨찾기 해제" : "즐겨찾기"} · 선택 항목에서 F`}
+                      aria-label={fav ? `${item.name} 즐겨찾기 해제` : `${item.name} 즐겨찾기`}
                       aria-pressed={fav}
                       tabIndex={-1}
                       data-studio-brush-favorite={item.id}
@@ -1815,7 +1819,7 @@ export function StudioBrushLibrarySheet({
                             : "text-fg-3 hover:text-fg"
                       )}
                     >
-                      <Star size={12} fill={fav ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "none")} aria-hidden />
+                      <Star size={12} fill={fav ? "currentColor" : "none"} aria-hidden />
                     </button>
                   ) : null}
                 </div>
@@ -1833,7 +1837,7 @@ export function StudioBrushLibrarySheet({
               <button
                 type="button"
                 aria-controls={panelId}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "다음 {v0} {v1}개 불러오기, {v2}개 남음"), { v0: String(operationLabel), v1: String(nextBatchItemCount), v2: String(remainingItemCount) })}
+                aria-label={`다음 ${operationLabel} ${nextBatchItemCount}개 불러오기, ${remainingItemCount}개 남음`}
                 data-studio-brush-progressive-fallback="true"
                 onClick={() => {
                   if (progressiveLoadPendingRef.current) return;
@@ -1850,7 +1854,8 @@ export function StudioBrushLibrarySheet({
                   STUDIO_FOCUS_RING,
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "다음 ")}{operationLabel} {nextBatchItemCount}{translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "개 불러오기")}</button>
+                다음 {operationLabel} {nextBatchItemCount}개 불러오기
+              </button>
             </div>
           ) : null}
           </>
@@ -1872,8 +1877,8 @@ export function StudioBrushLibrarySheet({
           }}
           aria-label={
             activeCatalogItem
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0} 기본값 다시 적용"), { v0: String(activeCatalogItem.name) })
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "현재 {v0} 기본값을 찾을 수 없음"), { v0: String(operationLabel) })
+              ? `${activeCatalogItem.name} 기본값 다시 적용`
+              : `현재 ${operationLabel} 기본값을 찾을 수 없음`
           }
           className={cn(
             "flex min-h-11 w-full items-center gap-2 rounded-xl border border-line bg-card px-3 text-left text-fg-2 hover:border-accent/40 hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50",
@@ -1884,7 +1889,8 @@ export function StudioBrushLibrarySheet({
           <RotateCcw size={14} className="shrink-0" aria-hidden />
           <span className="min-w-0">
             <span className="block truncate text-[0.68rem] font-bold">
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "현재 ")}{operationLabel} {translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "기본값 다시 적용")}</span>
+              현재 {operationLabel} 기본값 다시 적용
+            </span>
             <span
               className={cn(
                 "block truncate text-[0.6rem] text-fg-3",
@@ -1894,9 +1900,9 @@ export function StudioBrushLibrarySheet({
             >
               {activeCatalogItem
                 ? operation === "erase"
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0}의 굵기·지우기 강도·촉 반응"), { v0: String(activeCatalogItem.name) })
-                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "{v0}의 굵기·불투명도·촉 반응 · 텍스트 글자 크기 유지"), { v0: String(activeCatalogItem.name) })
-                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "사용자 저장 {v0}는 내 브러시에서 다시 적용"), { v0: String(operationLabel) })}
+                  ? `${activeCatalogItem.name}의 굵기·지우기 강도·촉 반응`
+                  : `${activeCatalogItem.name}의 굵기·불투명도·촉 반응 · 텍스트 글자 크기 유지`
+                : `사용자 저장 ${operationLabel}는 내 브러시에서 다시 적용`}
             </span>
           </span>
         </button>
@@ -1958,8 +1964,8 @@ export function StudioBrushCatalogPortal({
       onSelect={onSelect}
       onToggleFavorite={onToggleFavorite}
       className={desktop
-        ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "h-full w-full")
-        : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "fixed pointer-events-auto inset-x-2 top-3 w-auto max-h-[calc(100dvh-1.5rem)]")}
+        ? "h-full w-full"
+        : "fixed pointer-events-auto inset-x-2 top-3 w-auto max-h-[calc(100dvh-1.5rem)]"}
       style={desktop ? undefined : mobileStyle}
     />
   );
@@ -1967,8 +1973,8 @@ export function StudioBrushCatalogPortal({
   return createPortal(
     desktop ? (
       <StudioFloatingSurface
-        surfaceId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "en", "brush-catalog:{v0}"), { v0: String(operation) })}
-        label={operation === "erase" ? translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "지우개 선택") : translateCurrentStaticSourceText("domains.creator.brush.StudioBrushLibrarySheet", "ko", "브러시 전체 라이브러리")}
+        surfaceId={`brush-catalog:${operation}`}
+        label={operation === "erase" ? "지우개 선택" : "브러시 전체 라이브러리"}
         layout={layout}
         defaultLayout={DEFAULT_STUDIO_BRUSH_CATALOG_FLOATING_LAYOUT}
         minWidth={360}

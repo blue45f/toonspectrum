@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioCustomFontsPanel — 사용자가 소유한 글꼴 파일을 가져와 보관·적용하는 패널.
  * Props로 목록을 주입하면 기존 controlled import/test seam으로 동작한다. Props가 없으면
@@ -493,14 +492,14 @@ export function StudioCustomFontsPanel({
 
       <p className="mb-2 text-[0.6rem] font-semibold text-fg-3" aria-live="polite">
         {storageState === "loading"
-          ? translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "SQLite/OPFS 사용자 글꼴 확인 중")
+          ? "SQLite/OPFS 사용자 글꼴 확인 중"
           : storageState === "sqlite-opfs"
-            ? translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "이 기기 SQLite manifest · OPFS SHA-256 원본 저장")
+            ? "이 기기 SQLite manifest · OPFS SHA-256 원본 저장"
             : storageState === "memory-only"
-              ? translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "현재 탭 메모리 임시 · 새로고침 시 사라짐")
+              ? "현재 탭 메모리 임시 · 새로고침 시 사라짐"
               : storageState === "unavailable"
-                ? translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "저장소 무결성 확인 실패 · 가져오기 중단")
-                : translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "주입된 controlled 보관함")}
+                ? "저장소 무결성 확인 실패 · 가져오기 중단"
+                : "주입된 controlled 보관함"}
       </p>
 
       <label
@@ -599,7 +598,7 @@ export function StudioCustomFontsPanel({
           <ul
             className="max-h-72 space-y-1.5 overflow-y-auto pr-1"
             aria-label={productPaged
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "담은 글꼴 총 {v0}개 중 {v1}개 표시"), { v0: String(totalEntries.toLocaleString("ko-KR")), v1: String(activeFonts.length.toLocaleString("ko-KR")) })
+              ? `담은 글꼴 총 ${totalEntries.toLocaleString("ko-KR")}개 중 ${activeFonts.length.toLocaleString("ko-KR")}개 표시`
               : tText(
                 t,
                 `담은 글꼴 ${activeFonts.length}개`,
@@ -672,8 +671,8 @@ export function StudioCustomFontsPanel({
               onClick={() => void loadNextProductPage()}
             >
               {pageBusy
-                ? translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "글꼴 더 불러오는 중")
-                : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCustomFontsPanel", "ko", "글꼴 더 보기 ({v0}/{v1})"), { v0: String(activeFonts.length.toLocaleString("ko-KR")), v1: String(totalEntries.toLocaleString("ko-KR")) })}
+                ? "글꼴 더 불러오는 중"
+                : `글꼴 더 보기 (${activeFonts.length.toLocaleString("ko-KR")}/${totalEntries.toLocaleString("ko-KR")})`}
             </button>
           )}
         </div>

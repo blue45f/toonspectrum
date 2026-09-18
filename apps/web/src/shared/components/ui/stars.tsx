@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Star } from "lucide-react";
 
 import { cx } from "@/shared/lib/cx";
@@ -22,7 +21,7 @@ export function Stars({
       role="img"
       className={cx("relative inline-flex shrink-0", className)}
       style={{ gap: px * 0.12 }}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ui.stars", "ko", "별점 {v0} / 5"), { v0: String(value.toFixed(1)) })}
+      aria-label={`별점 ${value.toFixed(1)} / 5`}
     >
       <span className="inline-flex" style={{ gap: px * 0.12 }}>
         {Array.from({ length: 5 }).map((_, i) => (
@@ -68,7 +67,7 @@ export function RatingInline({
   return (
     <span
       className={cx("inline-flex items-center gap-1.5", className)}
-      title={estimated ? translateCurrentStaticSourceText("shared.components.ui.stars", "ko", "추정 별점") : undefined}
+      title={estimated ? "추정 별점" : undefined}
     >
       <Stars value={value} size={size} />
       <span className="numeral text-sm text-fg">
@@ -77,7 +76,7 @@ export function RatingInline({
       </span>
       {count != null && (
         <span className="text-xs text-fg-3 tnum">
-          ({estimated ? translateCurrentStaticSourceText("shared.components.ui.stars", "ko", "약 ") : ""}
+          ({estimated ? "약 " : ""}
           {count.toLocaleString("ko-KR")})
         </span>
       )}

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 창작 커뮤니티 공용 UI — 작품 카드(시리즈/챌린지 배지), 시리즈 카드, 시리즈 폼, 아바타.
 // CreateGalleryPage · CreateSeriesPage · CreateChallengesPage · UserProfilePage 에서 재사용한다.
 import { Bookmark, BookOpen, Eye, Heart, Layers, MessageCircle, PenLine, Trophy } from "lucide-react";
@@ -62,7 +58,7 @@ export function AuthorAvatar({
 export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showAuthor?: boolean }) {
   return (
     <Link
-      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.creator.community.ui", "en", "/create/{v0}"), { v0: String(work.id) })}
+      href={`/create/${work.id}`}
       className="sheen-sweep group flex flex-col overflow-hidden rounded-2xl border border-line bg-panel/30 transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-lg hover:shadow-black/25 active:scale-[0.98]"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-raised/40">
@@ -90,20 +86,20 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
         {work.seriesId && (
           <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.75)] px-2 py-0.5 text-[0.72rem] font-medium text-cool backdrop-blur-md">
             <Layers size={10} />
-            {work.episodeNo != null ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "{v0}화"), { v0: String(work.episodeNo) }) : translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈")}
+            {work.episodeNo != null ? `${work.episodeNo}화` : "시리즈"}
           </span>
         )}
         {/* 챌린지 참여 배지 */}
         {work.challengeId && (
           <span className="absolute bottom-2 left-2 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 truncate rounded-full border border-accent/45 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.72rem] font-medium text-accent backdrop-blur-md">
             <Trophy size={10} className="shrink-0" />
-            <span className="truncate">{work.challengeTitle ?? translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "챌린지")}</span>
+            <span className="truncate">{work.challengeTitle ?? "챌린지"}</span>
           </span>
         )}
         {work.community && (work.community.provenance !== "human" || work.community.portfolio) && (
           <span className="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.68rem] font-medium text-cool backdrop-blur-md">
             {work.community.portfolio
-              ? translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "포트폴리오")
+              ? "포트폴리오"
               : CREATOR_COMMUNITY_PROVENANCE_LABEL[work.community.provenance]}
           </span>
         )}
@@ -167,7 +163,7 @@ export function WorkGridSkeleton({ count = 10 }: { count?: number }) {
 export function SeriesCard({ series }: { series: SeriesSummary }) {
   return (
     <Link
-      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.creator.community.ui", "en", "/create/series/{v0}"), { v0: String(series.id) })}
+      href={`/create/series/${series.id}`}
       className="group flex gap-3.5 overflow-hidden rounded-2xl border border-line bg-panel/30 p-3 transition-colors hover:border-line-strong"
     >
       <div className="relative aspect-[3/4] w-24 shrink-0 overflow-hidden rounded-xl bg-raised/40 sm:w-28">
@@ -192,7 +188,7 @@ export function SeriesCard({ series }: { series: SeriesSummary }) {
           >
             {SERIES_STATUS_LABEL[series.status]}
           </span>
-          <span className="numeral text-[0.7rem] text-fg-3">{series.episodes}{translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "화")}</span>
+          <span className="numeral text-[0.7rem] text-fg-3">{series.episodes}화</span>
         </div>
         <h3 className="mt-1.5 line-clamp-1 text-sm font-semibold text-fg group-hover:text-accent">{series.title}</h3>
         {series.description && (
@@ -211,7 +207,7 @@ export function SeriesCard({ series }: { series: SeriesSummary }) {
             <Heart size={12} />
             <span className="numeral">{formatCount(series.likes)}</span>
           </span>
-          {series.latestEpisodeAt && <span className="ml-auto">{relativeDate(series.latestEpisodeAt)} {translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "갱신")}</span>}
+          {series.latestEpisodeAt && <span className="ml-auto">{relativeDate(series.latestEpisodeAt)} 갱신</span>}
         </div>
       </div>
     </Link>
@@ -257,31 +253,31 @@ export function SeriesForm({
 
   return (
     <div className="rounded-2xl border border-line bg-card/60 p-4">
-      <p className="text-sm font-bold text-fg">{initial ? translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈 정보 수정") : translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "새 연재 시리즈")}</p>
+      <p className="text-sm font-bold text-fg">{initial ? "시리즈 정보 수정" : "새 연재 시리즈"}</p>
       <div className="mt-3 flex flex-col gap-2.5">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value.slice(0, 80))}
-          aria-label={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈 제목")}
-          placeholder={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈 제목 (예: 야자 끝나고 옥상에서)")}
+          aria-label="시리즈 제목"
+          placeholder="시리즈 제목 (예: 야자 끝나고 옥상에서)"
           className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value.slice(0, 2000))}
-          aria-label={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈 소개")}
-          placeholder={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "어떤 이야기인지 소개해 주세요.")}
+          aria-label="시리즈 소개"
+          placeholder="어떤 이야기인지 소개해 주세요."
           rows={3}
           className="w-full resize-y rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
         <input
           value={tagsText}
           onChange={(event) => setTagsText(event.target.value.slice(0, 200))}
-          aria-label={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈 태그 (쉼표로 구분)")}
-          placeholder={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "태그 (쉼표로 구분, 최대 8개)")}
+          aria-label="시리즈 태그 (쉼표로 구분)"
+          placeholder="태그 (쉼표로 구분, 최대 8개)"
           className="w-full rounded-lg border border-line bg-canvas px-2.5 py-2 text-sm text-fg placeholder:text-fg-3 focus:border-accent/50"
         />
-        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "연재 상태")}>
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="연재 상태">
           {(["ongoing", "hiatus", "completed"] as const).map((value) => (
             <button
               key={value}
@@ -303,14 +299,15 @@ export function SeriesForm({
         {error && <p className="text-xs text-bad">{error}</p>}
         <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={onCancel} className={buttonClass({ size: "sm", variant: "quiet" })}>
-            {translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "취소")}</button>
+            취소
+          </button>
           <button
             type="button"
             onClick={submit}
             disabled={!title.trim() || submitting}
             className={buttonClass({ size: "sm", variant: "solid" })}
           >
-            {initial ? translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "저장") : translateCurrentStaticSourceText("domains.creator.creator.community.ui", "ko", "시리즈 만들기")}
+            {initial ? "저장" : "시리즈 만들기"}
           </button>
         </div>
       </div>

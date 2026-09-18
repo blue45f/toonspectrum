@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { ShieldCheck, Plus, Trash2, Key, AlertOctagon } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 
@@ -163,7 +162,7 @@ export function AdminSecurity({ userId }: AdminSecurityProps) {
                     <button
                       onClick={() => void handleDeleteIp(rule.id)}
                       className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title={translateCurrentStaticSourceText("domains.admin.components.AdminSecurity", "en", "Unblock")}
+                      title="Unblock"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

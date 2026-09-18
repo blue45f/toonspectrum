@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { FortuneObservatory } from "./FortuneObservatory";
 import { getCharacters } from "@toonspectrum/core";
 import {
@@ -476,12 +473,14 @@ function CharacterFortunePage() {
       <header className="mb-7 text-center sm:mb-10">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-3.5 py-1 text-xs font-semibold text-accent">
           <Sparkles className="h-3 w-3" />
-          <span>{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "페르소나 캐릭터 운세 레이어")}</span>
+          <span>페르소나 캐릭터 운세 레이어</span>
         </div>
         <h1 className="font-display text-[clamp(1.6rem,8vw,1.875rem)] font-extrabold tracking-tight text-fg sm:text-4xl">
-          {translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "CHARACTER FORTUNE")}</h1>
+          CHARACTER FORTUNE
+        </h1>
         <p className="mx-auto mt-2 max-w-md text-pretty text-sm leading-relaxed text-fg-2">
-          {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "최애 웹툰 캐릭터가 제안하는 사주팔자와 타로 큐레이션")}</p>
+          최애 웹툰 캐릭터가 제안하는 사주팔자와 타로 큐레이션
+        </p>
       </header>
 
       {/* 1단계: 캐릭터 에이전트 선택 */}
@@ -492,8 +491,9 @@ function CharacterFortunePage() {
             <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-line bg-panel/30 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-3">
-                  <Sparkles className="h-3.5 w-3.5 text-accent" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "최근 본 운세")}</h2>
-                <button onClick={clearHistory} className="text-[11px] text-fg-3 hover:text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "전체 지우기")}</button>
+                  <Sparkles className="h-3.5 w-3.5 text-accent" /> 최근 본 운세
+                </h2>
+                <button onClick={clearHistory} className="text-[11px] text-fg-3 hover:text-fg">전체 지우기</button>
               </div>
               <div className="rail flex gap-2.5 overflow-x-auto pb-1">
                 {history.map((h) => (
@@ -516,7 +516,7 @@ function CharacterFortunePage() {
                     <button
                       type="button"
                       onClick={() => removeFromHistory(h.id)}
-                      aria-label={translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "이 운세 기록 삭제")}
+                      aria-label="이 운세 기록 삭제"
                       className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full text-fg-3 opacity-0 transition-opacity hover:bg-raised hover:text-fg focus-visible:opacity-100 group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
@@ -528,16 +528,18 @@ function CharacterFortunePage() {
           )}
 
           <h2 className="mb-6 text-center text-lg font-bold text-fg-2">
-            {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "당신의 운세를 해석해줄 캐릭터 에이전트를 고르세요.")}</h2>
+            당신의 운세를 해석해줄 캐릭터 에이전트를 고르세요.
+          </h2>
           {charLoadFailed && characters.length === 0 && (
             <div role="alert" className="mx-auto mb-6 max-w-md rounded-xl border border-bad/30 bg-bad/10 p-4 text-center">
-              <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "캐릭터를 불러오지 못했어요.")}</p>
+              <p className="text-sm text-fg-2">캐릭터를 불러오지 못했어요.</p>
               <button
                 type="button"
                 onClick={loadCharacters}
                 className="mt-3 rounded-lg bg-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-accent-2"
               >
-                {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "다시 시도")}</button>
+                다시 시도
+              </button>
             </div>
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -584,7 +586,7 @@ function CharacterFortunePage() {
                   "{char.greeting}"
                 </p>
                 <div className="mt-3 flex items-center justify-end text-[10px] font-bold text-accent group-hover:translate-x-1 transition-transform">
-                  {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "선택하기 ")}<ArrowRight className="ml-1 h-3 w-3" />
+                  선택하기 <ArrowRight className="ml-1 h-3 w-3" />
                 </div>
               </motion.button>
             ))}
@@ -614,7 +616,8 @@ function CharacterFortunePage() {
               {/* 연속 출석 스트릭 */}
               {streak > 0 && (
                 <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-accent/25 bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold text-accent">
-                  🔥 {streak}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "일 연속 출석")}</span>
+                  🔥 {streak}일 연속 출석
+                </span>
               )}
 
               <button
@@ -624,13 +627,14 @@ function CharacterFortunePage() {
                 }}
                 className="mt-4 flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-fg-2 hover:bg-card transition-colors"
               >
-                <RotateCcw className="h-3 w-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "다른 캐릭터 선택")}</button>
+                <RotateCcw className="h-3 w-3" /> 다른 캐릭터 선택
+              </button>
             </div>
 
             {/* 에이전트 인사말 + 음성 안내 패널 */}
             <div className="flex-1 rounded-2xl border border-line bg-card/40 p-5 flex flex-col gap-4">
               <div>
-                <span className="text-[10px] tracking-wider text-accent uppercase font-bold mb-2 block">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "AGENT'S VOICE")}</span>
+                <span className="text-[10px] tracking-wider text-accent uppercase font-bold mb-2 block">AGENT'S VOICE</span>
                 <p className="font-serif text-sm leading-relaxed text-fg-2 whitespace-pre-wrap">
                   {`"${selectedChar.greeting}"`}
                 </p>
@@ -639,7 +643,7 @@ function CharacterFortunePage() {
               {/* 웹툰 재생 상태 — 결과가 있을 때만 노출 */}
               {fortuneResult?.panels?.length ? (
                 <div className="mt-auto rounded-xl border border-line/70 bg-panel/40 p-3 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "웹툰 음성 재생")}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-3">웹툰 음성 재생</span>
                   {playback.supported ? (
                     <button
                       type="button"
@@ -647,16 +651,17 @@ function CharacterFortunePage() {
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2"
                     >
                       {playback.status === "playing" ? (
-                        <><Pause className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "일시정지")}</>
+                        <><Pause className="h-3.5 w-3.5" /> 일시정지</>
                       ) : playback.status === "paused" ? (
-                        <><Play className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "이어 보기")}</>
+                        <><Play className="h-3.5 w-3.5" /> 이어 보기</>
                       ) : (
-                        <><Play className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "웹툰 재생")}</>
+                        <><Play className="h-3.5 w-3.5" /> 웹툰 재생</>
                       )}
                     </button>
                   ) : (
                     <p className="text-center text-[10px] leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "이 브라우저는 음성을 지원하지 않아요. (Chrome·Safari 권장)")}</p>
+                      이 브라우저는 음성을 지원하지 않아요. (Chrome·Safari 권장)
+                    </p>
                   )}
                   {playback.status === "playing" && (
                     <p className="flex items-center justify-center gap-1.5 text-center text-[10px] text-accent">
@@ -664,7 +669,8 @@ function CharacterFortunePage() {
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
                       </span>
-                      {playback.activeStep + 1} / {playback.steps.length} {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "컷 상영 중…")}</p>
+                      {playback.activeStep + 1} / {playback.steps.length} 컷 상영 중…
+                    </p>
                   )}
                 </div>
               ) : null}
@@ -677,7 +683,7 @@ function CharacterFortunePage() {
             {/* 탭 네비게이션 — 항상 노출(결과를 보면서도 전환, 탭별 결과 유지) · 모바일 가로 스크롤 + ARIA */}
             <div
               role="tablist"
-              aria-label={translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "운세 종류")}
+              aria-label="운세 종류"
               className="rail flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel/30 p-1"
             >
               {([
@@ -722,7 +728,8 @@ function CharacterFortunePage() {
                     onClick={() => retryRef.current?.()}
                     className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-accent-2"
                   >
-                    {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "다시 시도")}</button>
+                    다시 시도
+                  </button>
                 </div>
               )}
 
@@ -745,10 +752,10 @@ function CharacterFortunePage() {
                         tabIndex={-1}
                         className="text-xl font-extrabold text-fg font-display uppercase tracking-tight outline-none"
                       >
-                        {activeTab === "today" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "TODAY'S ORACLE") : activeTab === "saju" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "SAJU MANSE") : activeTab === "compatibility" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "RELATION COMPATIBILITY") : activeTab === "prescription" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "READING PRESCRIPTION") : activeTab === "zodiac" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "ZODIAC HOROSCOPE") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "TAROT READING")}
+                        {activeTab === "today" ? "TODAY'S ORACLE" : activeTab === "saju" ? "SAJU MANSE" : activeTab === "compatibility" ? "RELATION COMPATIBILITY" : activeTab === "prescription" ? "READING PRESCRIPTION" : activeTab === "zodiac" ? "ZODIAC HOROSCOPE" : "TAROT READING"}
                       </h3>
                       <p className="text-xs text-fg-3 mt-0.5">
-                        {activeTab === "today" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘 하루의 종합 운세 기운") : activeTab === "saju" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일 오행 밸런스 결과") : activeTab === "compatibility" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "두 사람의 기운 융합 및 매칭 스코어") : activeTab === "prescription" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "당신의 고민을 치유해 줄 맞춤 처방 책장") : activeTab === "zodiac" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생일로 보는 별자리 오늘의 운세") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "선택한 카드의 오늘 기운")}
+                        {activeTab === "today" ? "오늘 하루의 종합 운세 기운" : activeTab === "saju" ? "생년월일 오행 밸런스 결과" : activeTab === "compatibility" ? "두 사람의 기운 융합 및 매칭 스코어" : activeTab === "prescription" ? "당신의 고민을 치유해 줄 맞춤 처방 책장" : activeTab === "zodiac" ? "생일로 보는 별자리 오늘의 운세" : "선택한 카드의 오늘 기운"}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -756,12 +763,14 @@ function CharacterFortunePage() {
                         onClick={() => setShareOpen(true)}
                         className="flex items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
                       >
-                        <Share2 className="h-3 w-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "공유·저장")}</button>
+                        <Share2 className="h-3 w-3" /> 공유·저장
+                      </button>
                       <button
                         onClick={handleReset}
                         className="flex items-center gap-1 text-xs text-fg-3 hover:text-fg"
                       >
-                        <RotateCcw className="h-3 w-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "다시 보기")}</button>
+                        <RotateCcw className="h-3 w-3" /> 다시 보기
+                      </button>
                     </div>
                   </div>
 
@@ -773,7 +782,7 @@ function CharacterFortunePage() {
                       <div className="md:col-span-4 flex flex-col items-center justify-center p-4 border border-line/45 rounded-2xl bg-card/30 relative overflow-hidden">
                         {/* 고득점 축포 — 컨페티 버스트 */}
                         {fortuneResult.today.score >= 85 && <ConfettiBurst count={28} />}
-                        <span className="text-[10px] font-bold text-fg-3 uppercase tracking-wider mb-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "FORTUNE SCORE")}</span>
+                        <span className="text-[10px] font-bold text-fg-3 uppercase tracking-wider mb-2">FORTUNE SCORE</span>
                         <div className="relative flex items-center justify-center w-28 h-28">
                           {/* SVG 원형 프로그레스 */}
                           <svg className="w-full h-full transform -rotate-90">
@@ -800,11 +809,11 @@ function CharacterFortunePage() {
                           </svg>
                           <div className="absolute flex flex-col items-center">
                             <CountUp value={fortuneResult.today.score} className="text-3xl font-extrabold font-display text-fg" />
-                            <span className="text-[9px] font-bold text-accent">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "SCORE")}</span>
+                            <span className="text-[9px] font-bold text-accent">SCORE</span>
                           </div>
                         </div>
                         <p className="mt-3 text-xs font-semibold text-fg-2">
-                          {fortuneResult.today.score >= 90 ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "★ 최고의 하루 ★") : fortuneResult.today.score >= 80 ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "☆ 맑음 & 평온 ☆") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "무난하고 조심스러운 하루")}
+                          {fortuneResult.today.score >= 90 ? "★ 최고의 하루 ★" : fortuneResult.today.score >= 80 ? "☆ 맑음 & 평온 ☆" : "무난하고 조심스러운 하루"}
                         </p>
                       </div>
 
@@ -827,14 +836,14 @@ function CharacterFortunePage() {
                       {/* 사주 기반 개인화 안내 — 생년월일 입력 시 노출 */}
                       {fortuneResult.luckyElement && fortuneResult.saju && (
                         <div className="md:col-span-12 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-accent/20 bg-accent-soft/40 px-4 py-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "내 사주 연동")}</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">내 사주 연동</span>
                           <span className="text-xs text-fg-2">
-                            {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "일주 ")}<strong className="text-fg">{fortuneResult.saju.dayPillar.kanKorean}{fortuneResult.saju.dayPillar.jiKorean}</strong>
+                            일주 <strong className="text-fg">{fortuneResult.saju.dayPillar.kanKorean}{fortuneResult.saju.dayPillar.jiKorean}</strong>
                           </span>
                           <span className="text-xs text-fg-2">
-                            {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘 보완하면 좋은 기운 ")}<strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
+                            오늘 보완하면 좋은 기운 <strong className="text-fg">{ELEMENT_KO[fortuneResult.luckyElement] ?? fortuneResult.luckyElement}</strong>
                           </span>
-                          <span className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "→ 행운 컬러·방향이 이 기운에 맞춰졌어요")}</span>
+                          <span className="text-[10px] text-fg-3">→ 행운 컬러·방향이 이 기운에 맞춰졌어요</span>
                         </div>
                       )}
 
@@ -889,7 +898,7 @@ function CharacterFortunePage() {
                         <span className="mt-2 text-lg font-bold text-fg">{fortuneResult.zodiac.ko}</span>
                         <span className="text-[11px] text-fg-3">{fortuneResult.zodiac.en} · {fortuneResult.zodiac.dateRange}</span>
                         <span className="mt-2 rounded-full border border-accent/25 bg-accent-soft px-2.5 py-0.5 text-[11px] font-bold text-accent">
-                          {fortuneResult.zodiac.element}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "의 별자리 · ")}{fortuneResult.zodiac.ruling}
+                          {fortuneResult.zodiac.element}의 별자리 · {fortuneResult.zodiac.ruling}
                         </span>
                       </div>
 
@@ -897,7 +906,7 @@ function CharacterFortunePage() {
                       <div className="md:col-span-8 space-y-4">
                         <div className="flex items-baseline gap-2">
                           <CountUp value={fortuneResult.zodiac.score} className="font-display text-4xl font-extrabold" style={{ color: "var(--char-accent)" }} />
-                          <span className="text-sm font-bold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "점 · 오늘의 별자리 운세")}</span>
+                          <span className="text-sm font-bold text-fg-2">점 · 오늘의 별자리 운세</span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {fortuneResult.zodiac.traits.map((tr) => (
@@ -908,11 +917,11 @@ function CharacterFortunePage() {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                           <div className="rounded-xl border border-line/45 bg-card/20 p-3">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "행운 컬러")}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">행운 컬러</span>
                             <span className="mt-1 block font-serif text-base font-extrabold text-fg">{fortuneResult.zodiac.luckyColor}</span>
                           </div>
                           <div className="rounded-xl border border-line/45 bg-card/20 p-3">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "행운 숫자")}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-accent">행운 숫자</span>
                             <span className="mt-1 block font-serif text-base font-extrabold text-fg">{fortuneResult.zodiac.luckyNumber}</span>
                           </div>
                         </div>
@@ -924,20 +933,21 @@ function CharacterFortunePage() {
                   {activeTab === "prescription" && fortuneResult.query && (
                     <div className="p-5 border border-amber-500/15 bg-gradient-to-br from-amber-500/5 to-card rounded-2xl relative overflow-hidden space-y-4 text-left">
                       {/* 고풍스러운 문양 장식 */}
-                      <div className="absolute top-2 right-4 text-[10px] font-bold text-amber-500/40 uppercase tracking-widest font-display">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "Prescribed by ")}{selectedChar.name}</div>
+                      <div className="absolute top-2 right-4 text-[10px] font-bold text-amber-500/40 uppercase tracking-widest font-display">Prescribed by {selectedChar.name}</div>
                       
                       <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "PRESCRIPTION SLIP")}</span>
-                        <h4 className="text-sm font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "진단된 고민: \"")}{fortuneResult.query}"</h4>
+                        <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">PRESCRIPTION SLIP</span>
+                        <h4 className="text-sm font-semibold text-fg-2">진단된 고민: "{fortuneResult.query}"</h4>
                       </div>
                       
                       <div className="h-px bg-amber-500/10" />
                       
                       {/* 복약 가이드 / 연출 문구 */}
                       <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "복약 처방전 가이드")}</span>
+                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">복약 처방전 가이드</span>
                         <p className="text-xs leading-relaxed text-fg-3 italic">
-                          {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "* 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.")}</p>
+                          * 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -949,20 +959,20 @@ function CharacterFortunePage() {
                       {/* 궁합 요약 매칭 바 */}
                       <div className="p-5 border border-line/45 bg-card/30 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex flex-col gap-1 text-center md:text-left">
-                          <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "COMPATIBILITY MATCH")}</span>
-                          <h4 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "웹툰 주인공 같은 두 사람의 만남")}</h4>
-                          <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오행의 상생 흐름과 상성 결합도를 분석한 결과입니다.")}</p>
+                          <span className="text-[10px] font-bold text-accent uppercase tracking-wider">COMPATIBILITY MATCH</span>
+                          <h4 className="text-lg font-bold text-fg">웹툰 주인공 같은 두 사람의 만남</h4>
+                          <p className="text-xs text-fg-3">오행의 상생 흐름과 상성 결합도를 분석한 결과입니다.</p>
                         </div>
                         <div className="flex items-center gap-3.5 bg-card px-5 py-3.5 rounded-xl border border-line/40">
                           <div className="text-right">
-                            <span className="text-[10px] font-bold text-fg-3 block">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "궁합 지수")}</span>
+                            <span className="text-[10px] font-bold text-fg-3 block">궁합 지수</span>
                             <span className="text-2xl font-extrabold text-accent font-display">
                               <CountUp value={fortuneResult.score} />%
                             </span>
                           </div>
                           <div className="h-8 w-px bg-line" />
                           <span className="text-xs font-semibold text-fg-2">
-                            {fortuneResult.score >= 90 ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "신이 내린 찰떡궁합") : fortuneResult.score >= 80 ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "든든하고 편안한 연인") : fortuneResult.score >= 70 ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "서로 맞춰가는 든든한 동반자") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "유연한 소통이 필요한 인연")}
+                            {fortuneResult.score >= 90 ? "신이 내린 찰떡궁합" : fortuneResult.score >= 80 ? "든든하고 편안한 연인" : fortuneResult.score >= 70 ? "서로 맞춰가는 든든한 동반자" : "유연한 소통이 필요한 인연"}
                           </span>
                         </div>
                       </div>
@@ -971,21 +981,21 @@ function CharacterFortunePage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* 본인 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "나의 사주 기운")}</span>
+                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">나의 사주 기운</span>
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "일주: ")}{fortuneResult.mySaju.dayPillar.kanKorean}{fortuneResult.mySaju.dayPillar.jiKorean}</span>
+                            <span className="text-sm font-bold text-fg">일주: {fortuneResult.mySaju.dayPillar.kanKorean}{fortuneResult.mySaju.dayPillar.jiKorean}</span>
                             <span className="text-[10px] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "목(")}{fortuneResult.mySaju.elementsRatio.wood}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 화(")}{fortuneResult.mySaju.elementsRatio.fire}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 토(")}{fortuneResult.mySaju.elementsRatio.earth}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 금(")}{fortuneResult.mySaju.elementsRatio.metal}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 수(")}{fortuneResult.mySaju.elementsRatio.water}%)
+                              목({fortuneResult.mySaju.elementsRatio.wood}%) 화({fortuneResult.mySaju.elementsRatio.fire}%) 토({fortuneResult.mySaju.elementsRatio.earth}%) 금({fortuneResult.mySaju.elementsRatio.metal}%) 수({fortuneResult.mySaju.elementsRatio.water}%)
                             </span>
                           </div>
                         </div>
                         {/* 상대방 사주 */}
                         <div className="p-4 border border-line/40 rounded-xl bg-card/15 space-y-2">
-                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "상대방의 사주 기운")}</span>
+                          <span className="text-[9px] font-bold text-accent uppercase tracking-wider">상대방의 사주 기운</span>
                           <div className="flex justify-between items-center">
-                            <span className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "일주: ")}{fortuneResult.partnerSaju.dayPillar.kanKorean}{fortuneResult.partnerSaju.dayPillar.jiKorean}</span>
+                            <span className="text-sm font-bold text-fg">일주: {fortuneResult.partnerSaju.dayPillar.kanKorean}{fortuneResult.partnerSaju.dayPillar.jiKorean}</span>
                             <span className="text-[10px] text-fg-3">
-                              {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "목(")}{fortuneResult.partnerSaju.elementsRatio.wood}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 화(")}{fortuneResult.partnerSaju.elementsRatio.fire}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 토(")}{fortuneResult.partnerSaju.elementsRatio.earth}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 금(")}{fortuneResult.partnerSaju.elementsRatio.metal}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "%) 수(")}{fortuneResult.partnerSaju.elementsRatio.water}%)
+                              목({fortuneResult.partnerSaju.elementsRatio.wood}%) 화({fortuneResult.partnerSaju.elementsRatio.fire}%) 토({fortuneResult.partnerSaju.elementsRatio.earth}%) 금({fortuneResult.partnerSaju.elementsRatio.metal}%) 수({fortuneResult.partnerSaju.elementsRatio.water}%)
                             </span>
                           </div>
                         </div>
@@ -997,7 +1007,7 @@ function CharacterFortunePage() {
                           {fortuneResult.compat.elementComplement != null && (
                             <div className="rounded-xl border border-line/45 bg-card/20 p-3">
                               <div className="flex items-center justify-between text-xs">
-                                <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오행 보완도")}</span>
+                                <span className="font-semibold text-fg-2">오행 보완도</span>
                                 <span className="font-display font-bold text-accent">{fortuneResult.compat.elementComplement}</span>
                               </div>
                               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-card">
@@ -1032,9 +1042,9 @@ function CharacterFortunePage() {
 
                       {/* 사주 8자 격자 표 */}
                       <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "사주 원판 (四柱八字)")}</h4>
-                        {fortuneResult.saju.birthTimeKnown === false && <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "출생시간 미상 · 시주를 제외한 6글자 분석입니다.")}</p>}
-                        {fortuneResult.saju.calculationNotes && <details className="text-xs text-fg-3"><summary>{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "계산 기준과 한계")}</summary>{fortuneResult.saju.calculationNotes.map((note) => <p key={note}>{note}</p>)}</details>}
+                        <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">사주 원판 (四柱八字)</h4>
+                        {fortuneResult.saju.birthTimeKnown === false && <p className="text-xs text-fg-3">출생시간 미상 · 시주를 제외한 6글자 분석입니다.</p>}
+                        {fortuneResult.saju.calculationNotes && <details className="text-xs text-fg-3"><summary>계산 기준과 한계</summary>{fortuneResult.saju.calculationNotes.map((note) => <p key={note}>{note}</p>)}</details>}
                         <div className="grid grid-cols-4 gap-2 text-center">
                           {/* 열 헤더: 시, 일, 월, 년 */}
                           {["시주", "일주", "월주", "년주"].map((h, i) => (
@@ -1079,7 +1089,7 @@ function CharacterFortunePage() {
 
                       {/* 오행 비율 스펙트럼 바 */}
                       <div className="space-y-4">
-                        <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "음양오행 강약 비율")}</h4>
+                        <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">음양오행 강약 비율</h4>
                         <div className="space-y-2.5">
                           {([
                             { key: "wood", label: "목 (Wood)", ratio: fortuneResult.saju.elementsRatio.wood, col: ELEMENT_COLORS["목"] },
@@ -1131,7 +1141,7 @@ function CharacterFortunePage() {
                             <div className="relative">
                               <div className="flex items-center justify-between">
                                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--char-accent)", color: "var(--color-on-accent)" }}>
-                                  {i === 0 ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "올해의 운세 · 세운") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "내년 미리보기")}
+                                  {i === 0 ? "올해의 운세 · 세운" : "내년 미리보기"}
                                 </span>
                                 <span className="text-[10px] text-fg-3">{y.year} {y.kanji}年</span>
                               </div>
@@ -1167,7 +1177,7 @@ function CharacterFortunePage() {
                           </div>
                         ))}
                       </div>
-                      <p className="text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "과거 · 현재 · 미래의 흐름을 ")}{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "가 웹툰으로 풀어드려요.")}</p>
+                      <p className="text-center text-xs text-fg-3">과거 · 현재 · 미래의 흐름을 {selectedChar.name}가 웹툰으로 풀어드려요.</p>
                     </div>
                   )}
                   {activeTab === "tarot" && fortuneResult.card && (!fortuneResult.cards || fortuneResult.cards.length <= 1) && (
@@ -1186,12 +1196,15 @@ function CharacterFortunePage() {
                       {/* 타로 카드 풀이 */}
                       <div className="flex-1 space-y-4 text-left">
                         <div className="space-y-1">
-                          <span className="text-[10px] tracking-wider text-accent uppercase font-bold">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "en", "CARD OVERVIEW")}</span>
+                          <span className="text-[10px] tracking-wider text-accent uppercase font-bold">CARD OVERVIEW</span>
                           <h4 className="text-lg font-bold text-fg">
-                            {fortuneResult.card.name} {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "카드의 수호 메시지")}</h4>
+                            {fortuneResult.card.name} 카드의 수호 메시지
+                          </h4>
                         </div>
                         <p className="text-sm leading-relaxed text-fg-3">
-                          {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘 당신이 드로우한 ")}<strong>{fortuneResult.card.name}</strong> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "카드는 ")}{fortuneResult.card.type === "upright" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "순리적인 출발과 원활한 조화") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "통제하기 어려운 과잉 혹은 억압 상태")}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "를 상징합니다. 이 기운에 매핑되는 캐릭터 조언을 곱씹으며 오늘 하루 조심스러운 균형을 잡아보시길 바랍니다.")}</p>
+                          오늘 당신이 드로우한 <strong>{fortuneResult.card.name}</strong> 카드는 {fortuneResult.card.type === "upright" ? "순리적인 출발과 원활한 조화" : "통제하기 어려운 과잉 혹은 억압 상태"}를 상징합니다.
+                          이 기운에 매핑되는 캐릭터 조언을 곱씹으며 오늘 하루 조심스러운 균형을 잡아보시길 바랍니다.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1202,7 +1215,7 @@ function CharacterFortunePage() {
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-fg-3">
                           <Sparkle className="h-3.5 w-3.5 text-accent" />
-                          <span>{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "의 운세 웹툰")}</span>
+                          <span>{selectedChar.name}의 운세 웹툰</span>
                         </h4>
 
                         {/* 재생 컨트롤바 */}
@@ -1211,7 +1224,7 @@ function CharacterFortunePage() {
                             <button
                               type="button"
                               onClick={playback.prev}
-                              aria-label={translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "이전 컷")}
+                              aria-label="이전 컷"
                               disabled={playback.status === "idle"}
                               className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card disabled:opacity-40"
                             >
@@ -1223,17 +1236,17 @@ function CharacterFortunePage() {
                               className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
                             >
                               {playback.status === "playing" ? (
-                                <><Pause className="h-3 w-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "일시정지")}</>
+                                <><Pause className="h-3 w-3" /> 일시정지</>
                               ) : playback.status === "paused" ? (
-                                <><Play className="h-3 w-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "이어 보기")}</>
+                                <><Play className="h-3 w-3" /> 이어 보기</>
                               ) : (
-                                <><Play className="h-3 w-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "웹툰 재생")}</>
+                                <><Play className="h-3 w-3" /> 웹툰 재생</>
                               )}
                             </button>
                             <button
                               type="button"
                               onClick={playback.next}
-                              aria-label={translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "다음 컷")}
+                              aria-label="다음 컷"
                               disabled={playback.status === "idle"}
                               className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card disabled:opacity-40"
                             >
@@ -1243,7 +1256,7 @@ function CharacterFortunePage() {
                               <button
                                 type="button"
                                 onClick={playback.stop}
-                                aria-label={translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "정지")}
+                                aria-label="정지"
                                 className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card"
                               >
                                 <Square className="h-3 w-3" />
@@ -1274,8 +1287,8 @@ function CharacterFortunePage() {
                         <p className="mb-4 flex items-center gap-1.5 text-[11px] text-fg-3">
                           <Volume2 className="h-3.5 w-3.5" />
                           {selectedChar.id === "ara" || selectedChar.id === "leona"
-                            ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "유나 보이스로 낭독됩니다.")
-                            : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "이 캐릭터는 아직 음성이 없어 자막으로 재생돼요. (아라·레오나는 음성 지원)")}
+                            ? "유나 보이스로 낭독됩니다."
+                            : "이 캐릭터는 아직 음성이 없어 자막으로 재생돼요. (아라·레오나는 음성 지원)"}
                         </p>
                       )}
 
@@ -1298,7 +1311,7 @@ function CharacterFortunePage() {
                   <div className="border-t border-line/80 pt-6">
                     <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Sparkles className="h-3.5 w-3.5 text-accent" />
-                      <span>{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "가 당신에게 제안하는 행운의 타이틀")}</span>
+                      <span>{selectedChar.name}가 당신에게 제안하는 행운의 타이틀</span>
                     </h4>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                       {fortuneResult.recommendations.map((title) => (
@@ -1314,18 +1327,20 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "today" && (
                 <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘 하루는 어떨까요?")}</h3>
+                    <h3 className="text-lg font-bold text-fg">오늘 하루는 어떨까요?</h3>
                     <p className="text-xs text-fg-2 leading-relaxed">
-                      {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일을 입력하면 ")}{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "가 당신의 사주 오행으로 ")}<strong className="text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "개인화된")}</strong> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘의 운세를 풀어드려요. 같은 날에는 결과가 바뀌지 않아요.")}</p>
+                      생년월일을 입력하면 {selectedChar.name}가 당신의 사주 오행으로 <strong className="text-fg-2">개인화된</strong> 오늘의 운세를 풀어드려요. 같은 날에는 결과가 바뀌지 않아요.
+                    </p>
                   </div>
 
                   {/* 생년월일 입력 (선택) — 입력 시 사주 기반 개인화 */}
                   <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-3">
                     <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-accent">
-                      <Calendar className="h-3.5 w-3.5" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "내 생년월일 (선택 입력 시 개인화)")}</span>
+                      <Calendar className="h-3.5 w-3.5" /> 내 생년월일 (선택 입력 시 개인화)
+                    </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label htmlFor="today-birth-date" className="text-[11px] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일 (양력)")}</label>
+                        <label htmlFor="today-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 (양력)</label>
                         <input
                           id="today-birth-date"
                           type="date"
@@ -1335,7 +1350,7 @@ function CharacterFortunePage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="today-birth-time" className="text-[11px] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "태어난 시간")}</label>
+                        <label htmlFor="today-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
                         <input
                           id="today-birth-time"
                           type="time"
@@ -1358,7 +1373,7 @@ function CharacterFortunePage() {
                               : "border-line bg-card text-fg-2 hover:text-fg"
                           )}
                         >
-                          {g === "none" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "선택 안 함") : g === "male" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "남성") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "여성")}
+                          {g === "none" ? "선택 안 함" : g === "male" ? "남성" : "여성"}
                         </button>
                       ))}
                     </div>
@@ -1369,7 +1384,7 @@ function CharacterFortunePage() {
                     onClick={handleAnalyzeToday}
                     className="w-full rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{birthDate ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "내 사주로 오늘의 운세 보기") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘의 운세 확인하기")}</span>
+                    <span>{birthDate ? "내 사주로 오늘의 운세 보기" : "오늘의 운세 확인하기"}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1379,13 +1394,15 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "zodiac" && (
                 <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생일로 보는 별자리 운세")}</h3>
+                    <h3 className="text-lg font-bold text-fg">생일로 보는 별자리 운세</h3>
                     <p className="text-xs text-fg-2 leading-relaxed">
-                      {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일만 입력하면 ")}{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "가 당신의 별자리와 오늘의 별빛 흐름을 풀어드려요. (월·일만 사용)")}</p>
+                      생년월일만 입력하면 {selectedChar.name}가 당신의 별자리와 오늘의 별빛 흐름을 풀어드려요. (월·일만 사용)
+                    </p>
                   </div>
                   <div className="rounded-xl border border-line/50 bg-card/15 p-4 text-left space-y-2">
                     <label htmlFor="zodiac-birth-date" className="flex items-center gap-1.5 text-xs font-semibold text-fg-2">
-                      <Calendar className="h-3.5 w-3.5 text-fg-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일")}</label>
+                      <Calendar className="h-3.5 w-3.5 text-fg-3" /> 생년월일
+                    </label>
                     <input
                       id="zodiac-birth-date"
                       type="date"
@@ -1400,7 +1417,7 @@ function CharacterFortunePage() {
                     disabled={!birthDate}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
                   >
-                    <span>{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "에게 별자리 운세 보기")}</span>
+                    <span>{selectedChar.name}에게 별자리 운세 보기</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1410,20 +1427,21 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "prescription" && (
                 <form onSubmit={handleAnalyzePrescription} className="space-y-5 max-w-md mx-auto w-full text-left">
                   <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "아라의 가상 서재: AI 독서 처방전")}</h3>
-                    <p className="text-xs text-fg-3 mt-1">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘 당신의 지친 마음이나 보고 싶은 분위기를 적어보세요.")}</p>
+                    <h3 className="text-lg font-bold text-fg">아라의 가상 서재: AI 독서 처방전</h3>
+                    <p className="text-xs text-fg-3 mt-1">오늘 당신의 지친 마음이나 보고 싶은 분위기를 적어보세요.</p>
                   </div>
                   
                   <div className="space-y-2">
                     <label htmlFor="prescription-query" className="text-xs font-semibold text-fg-2 flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-accent-soft" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "어떤 이야기가 필요한가요?")}</label>
+                      <Sparkles className="h-3.5 w-3.5 text-accent-soft" /> 어떤 이야기가 필요한가요?
+                    </label>
                     <textarea
                       id="prescription-query"
                       required
                       rows={4}
                       value={prescriptionQuery}
                       onChange={(e) => setPrescriptionQuery(e.target.value)}
-                      placeholder={translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "예: 오늘 회사에서 너무 힘든 일이 있어서 완전 시원하고 통쾌한 사이다 웹툰을 읽으며 스트레스 날려버리고 싶어!")}
+                      placeholder="예: 오늘 회사에서 너무 힘든 일이 있어서 완전 시원하고 통쾌한 사이다 웹툰을 읽으며 스트레스 날려버리고 싶어!"
                       className="w-full rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-fg placeholder:text-fg-4 focus:border-accent focus:outline-none resize-none leading-relaxed"
                     />
                   </div>
@@ -1432,7 +1450,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-4 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "에게 도서 처방받기")}</span>
+                    <span>{selectedChar.name}에게 도서 처방받기</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1442,16 +1460,16 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "compatibility" && (
                 <form onSubmit={handleAnalyzeCompatibility} className="space-y-5 max-w-md mx-auto w-full text-left">
                   <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "두 사람의 궁합 분석 정보 입력")}</h3>
-                    <p className="text-xs text-fg-3 mt-1">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "상대방과의 궁합을 웹툰 콘티 연출 형태로 보여 드립니다.")}</p>
+                    <h3 className="text-lg font-bold text-fg">두 사람의 궁합 분석 정보 입력</h3>
+                    <p className="text-xs text-fg-3 mt-1">상대방과의 궁합을 웹툰 콘티 연출 형태로 보여 드립니다.</p>
                   </div>
                   
                   {/* 본인 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "나의 생년월일시")}</span>
+                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일 *")}</label>
+                        <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 *</label>
                         <input
                           id="my-birth-date"
                           type="date"
@@ -1462,7 +1480,7 @@ function CharacterFortunePage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="my-birth-time" className="text-[11px] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "태어난 시간")}</label>
+                        <label htmlFor="my-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
                         <input
                           id="my-birth-time"
                           type="time"
@@ -1476,10 +1494,10 @@ function CharacterFortunePage() {
 
                   {/* 상대방 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
-                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "상대방의 생년월일시")}</span>
+                    <span className="text-[10px] font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일 *")}</label>
+                        <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 *</label>
                         <input
                           id="partner-birth-date"
                           type="date"
@@ -1490,7 +1508,7 @@ function CharacterFortunePage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="partner-birth-time" className="text-[11px] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "태어난 시간")}</label>
+                        <label htmlFor="partner-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
                         <input
                           id="partner-birth-time"
                           type="time"
@@ -1506,7 +1524,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-6 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "에게 궁합 풀이받기 (웹툰 연출형)")}</span>
+                    <span>{selectedChar.name}에게 궁합 풀이받기 (웹툰 연출형)</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1516,13 +1534,14 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "saju" && (
                 <form onSubmit={handleAnalyzeSaju} className="space-y-5 max-w-md mx-auto w-full text-left">
                   <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "사주팔자 분석 정보 입력")}</h3>
-                    <p className="text-xs text-fg-3 mt-1">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "정확한 연산을 위해 생년월일시를 입력하세요.")}</p>
+                    <h3 className="text-lg font-bold text-fg">사주팔자 분석 정보 입력</h3>
+                    <p className="text-xs text-fg-3 mt-1">정확한 연산을 위해 생년월일시를 입력하세요.</p>
                   </div>
                   
                   <div className="space-y-1.5">
                     <label htmlFor="birth-date" className="text-xs font-semibold text-fg-2 flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5 text-fg-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "생년월일 (양력 기준)")}</label>
+                      <Calendar className="h-3.5 w-3.5 text-fg-3" /> 생년월일 (양력 기준)
+                    </label>
                     <input
                       id="birth-date"
                       type="date"
@@ -1535,7 +1554,8 @@ function CharacterFortunePage() {
 
                   <div className="space-y-1.5">
                     <label htmlFor="birth-time" className="text-xs font-semibold text-fg-2 flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-fg-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "태어난 시간 (선택사항)")}</label>
+                      <Clock className="h-3.5 w-3.5 text-fg-3" /> 태어난 시간 (선택사항)
+                    </label>
                     <input
                       id="birth-time"
                       type="time"
@@ -1547,7 +1567,8 @@ function CharacterFortunePage() {
 
                   <div className="space-y-1.5">
                     <div className="text-xs font-semibold text-fg-2 flex items-center gap-1">
-                      <User className="h-3.5 w-3.5 text-fg-3" /> {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "성별 (선택사항)")}</div>
+                      <User className="h-3.5 w-3.5 text-fg-3" /> 성별 (선택사항)
+                    </div>
                     <div className="flex gap-2">
                       {["none", "male", "female"].map((g) => (
                         <button
@@ -1561,7 +1582,7 @@ function CharacterFortunePage() {
                               : "border-line bg-card text-fg-3 hover:text-fg"
                           )}
                         >
-                          {g === "none" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "선택 안 함") : g === "male" ? translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "남성") : translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "여성")}
+                          {g === "none" ? "선택 안 함" : g === "male" ? "남성" : "여성"}
                         </button>
                       ))}
                     </div>
@@ -1571,7 +1592,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-6 rounded-lg bg-accent py-3 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "에게 사주 풀이받기")}</span>
+                    <span>{selectedChar.name}에게 사주 풀이받기</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1582,9 +1603,10 @@ function CharacterFortunePage() {
                 <div className="space-y-6 text-center max-w-lg mx-auto w-full">
                   {tarotStep === "idle" && (
                     <div className="py-10 space-y-4">
-                      <h3 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘의 타로 리딩")}</h3>
+                      <h3 className="text-lg font-bold text-fg">오늘의 타로 리딩</h3>
                       <p className="text-xs text-fg-3 max-w-sm mx-auto leading-relaxed">
-                        {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "정신을 집중하고 카드를 섞은 뒤, 오늘의 조언을 줄 카드를 직접 뽑아보세요.")}</p>
+                        정신을 집중하고 카드를 섞은 뒤, 오늘의 조언을 줄 카드를 직접 뽑아보세요.
+                      </p>
                       {/* 스프레드 선택 — 1장 / 3장(과거·현재·미래) */}
                       <div className="mx-auto flex max-w-xs items-center overflow-hidden rounded-full border border-line">
                         {([
@@ -1608,7 +1630,8 @@ function CharacterFortunePage() {
                         onClick={startTarotShuffle}
                         className="rounded-lg bg-accent px-6 py-2.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors"
                       >
-                        {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "타로 카드 섞기 시작")}</button>
+                        타로 카드 섞기 시작
+                      </button>
                     </div>
                   )}
 
@@ -1635,14 +1658,14 @@ function CharacterFortunePage() {
                           />
                         ))}
                       </div>
-                      <p className="text-xs text-fg-3 animate-pulse">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "카드를 엄숙히 섞고 있습니다...")}</p>
+                      <p className="text-xs text-fg-3 animate-pulse">카드를 엄숙히 섞고 있습니다...</p>
                     </div>
                   )}
 
                   {/* 카드 드로우 선택 단계 */}
                   {tarotStep === "spread" && (
                     <div className="py-8 space-y-6">
-                      <h3 className="text-sm font-bold text-fg-2">{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "오늘의 대답을 전해줄 카드를 한 장 터치하세요.")}</h3>
+                      <h3 className="text-sm font-bold text-fg-2">오늘의 대답을 전해줄 카드를 한 장 터치하세요.</h3>
                       <div className="flex justify-center gap-4">
                         {[0, 1, 2].map((idx) => (
                           <motion.button
@@ -1682,9 +1705,13 @@ function CharacterFortunePage() {
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
         <p className="text-[10px] text-fg-3 leading-relaxed">
-          <strong>{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "법적 고지 (Disclaimer)")}</strong>{translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", ": 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다. 풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.")}</p>
+          <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다. 
+          풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.
+        </p>
         <p className="text-[10px] text-fg-3 leading-relaxed">
-          {translateCurrentStaticSourceText("domains.fortune.FortunePage", "ko", "본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonSpectrum이 독자적으로 기획·창작한 고유 캐릭터이며, 특정 실존 인물, 단체 또는 타사 웹툰 저작물과 무관합니다.")}</p>
+          본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonSpectrum이 독자적으로 기획·창작한 고유 캐릭터이며, 
+          특정 실존 인물, 단체 또는 타사 웹툰 저작물과 무관합니다.
+        </p>
       </footer>
     </div>
     </MotionConfig>

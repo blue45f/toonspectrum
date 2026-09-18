@@ -1,8 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Menu,
   Palette,
   Search,
@@ -245,7 +241,8 @@ export function SiteHeader() {
                   className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.55rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[410px]:inline"
                   title={t("app.brandBeta")}
                 >
-                  {translateCurrentStaticSourceText("shared.components.site.header", "en", "BETA")}</span>
+                  BETA
+                </span>
               </span>
               <span className="hidden font-display text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-fg-3 lg:block">
                 {brandTagline}
@@ -264,7 +261,7 @@ export function SiteHeader() {
                 <Link
                   key={item.id}
                   href={item.href}
-                  aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header", "en", "page") : undefined}
+                  aria-current={active ? "page" : undefined}
                   title={siteNavigationText(item.description, locale)}
                   data-navigation-entry={item.id}
                   data-navigation-featured={featured || undefined}
@@ -285,7 +282,7 @@ export function SiteHeader() {
             <Link
               href="/sitemap"
               data-navigation-entry="all-menu"
-              title={translateBilingualValueForLocale(locale, "shared.components.site.header", "목적별 전체 메뉴 보기", "Browse every destination by purpose")}
+              title={locale === "ko" ? "목적별 전체 메뉴 보기" : "Browse every destination by purpose"}
               className="inline-flex min-h-9 items-center rounded-xl px-3 py-2 text-[0.82rem] font-semibold text-fg-2 transition-colors hover:bg-raised/70 hover:text-fg"
             >
               {t("nav.allMenu")}
@@ -314,7 +311,7 @@ export function SiteHeader() {
             <Link
               href={create.href}
               aria-label={siteNavigationText(create.label, locale)}
-              aria-current={isPurposeActive(create.href) ? translateCurrentStaticSourceText("shared.components.site.header", "en", "page") : undefined}
+              aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
               className={cx(
                 "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-xl border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm transition-all duration-200 ease-out-expo sm:flex",

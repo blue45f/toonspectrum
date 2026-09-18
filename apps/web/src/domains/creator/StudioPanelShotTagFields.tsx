@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Panel Shot Tag Fields — 컷(페이지)에 샷 타입/카메라 앵글을 태깅하는 프레젠테이션 컴포넌트.
  * 순수 로직은 studio-panel-shot-tags.ts(카탈로그·withShotTag 커밋 함수)가 담당하고, 이 컴포넌트는
@@ -65,11 +64,11 @@ export function StudioPanelShotTagFields({
       <select
         value={shotType ?? ""}
         onChange={handleShotType}
-        title={translateCurrentStaticSourceText("domains.creator.StudioPanelShotTagFields", "ko", "샷 타입")}
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPanelShotTagFields", "ko", "샷 타입")}
+        title="샷 타입"
+        aria-label="샷 타입"
         className={cn(SELECT_BASE_CLASS, sizeClass)}
       >
-        <option value="">{translateCurrentStaticSourceText("domains.creator.StudioPanelShotTagFields", "ko", "샷")}</option>
+        <option value="">샷</option>
         {SHOT_TYPES.map((s) => (
           <option key={s.id} value={s.id} title={s.label}>
             {s.abbr}
@@ -79,11 +78,11 @@ export function StudioPanelShotTagFields({
       <select
         value={cameraAngle ?? ""}
         onChange={handleCameraAngle}
-        title={translateCurrentStaticSourceText("domains.creator.StudioPanelShotTagFields", "ko", "카메라 앵글")}
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPanelShotTagFields", "ko", "카메라 앵글")}
+        title="카메라 앵글"
+        aria-label="카메라 앵글"
         className={cn(SELECT_BASE_CLASS, sizeClass)}
       >
-        <option value="">{translateCurrentStaticSourceText("domains.creator.StudioPanelShotTagFields", "ko", "앵글")}</option>
+        <option value="">앵글</option>
         {CAMERA_ANGLES.map((a) => (
           <option key={a.id} value={a.id} title={a.label}>
             {a.abbr}

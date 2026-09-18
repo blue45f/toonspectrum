@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 // 재사용 색상 선택기 — 스와치 트리거 + 프로급 컬러 스튜디오 팝오버
 // (큐레이션 팔레트, 색상환 휠, 조화 배색, 웹툰 음영 어시스턴트, 슬라이더, 최근 색, 명도 그라데이션).
 import { Check, Copy, Pipette, Plus, X } from "lucide-react";
@@ -445,7 +441,7 @@ export function StudioColorPopover({
           id={popupId}
           role="dialog"
           aria-modal="false"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "{v0} 선택"), { v0: String(label) })}
+          aria-label={`${label} 선택`}
           data-studio-color-popover="true"
           className="fixed z-[180] overflow-auto overscroll-contain rounded-2xl border border-white/15 bg-panel/92 backdrop-blur-2xl p-3.5 shadow-[0_24px_64px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.08)_inset]"
           style={popupStyle}
@@ -461,7 +457,7 @@ export function StudioColorPopover({
                     className="size-1.5 rounded-full"
                     style={{ backgroundColor: contrast.bestForeground }}
                   />
-                  {contrast.bestForeground === "#ffffff" ? translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "어두운 톤") : translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "밝은 톤")}
+                  {contrast.bestForeground === "#ffffff" ? "어두운 톤" : "밝은 톤"}
                 </span>
               </div>
             </div>
@@ -471,7 +467,7 @@ export function StudioColorPopover({
               <div className="flex items-center rounded-xl border border-white/15 bg-card/80 p-0.5 shadow-sm backdrop-blur-sm">
                 <button
                   type="button"
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "이전 색상 {v0}로 되돌리기"), { v0: String(initialColor) })}
+                  aria-label={`이전 색상 ${initialColor}로 되돌리기`}
                   onClick={() => handleSelect(initialColor)}
                   className="size-6 rounded-l-lg border-r border-line/40 transition-transform hover:scale-105 active:scale-95"
                   style={{ backgroundColor: initialColor }}
@@ -479,13 +475,13 @@ export function StudioColorPopover({
                 <div
                   className="size-6 rounded-r-lg"
                   style={{ backgroundColor: value }}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "현재 색상 {v0}"), { v0: String(value) })}
+                  aria-label={`현재 색상 ${value}`}
                 />
               </div>
 
               <button
                 type="button"
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "닫기")}
+                aria-label="닫기"
                 onClick={() => finishSession()}
                 className="grid size-7 place-items-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg active:scale-95"
               >
@@ -497,7 +493,7 @@ export function StudioColorPopover({
           {/* 빠른 선택과 전문 색상 도구를 한 단계 안에서 전환합니다. */}
           <div
             role="tablist"
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "색상 도구 탭")}
+            aria-label="색상 도구 탭"
             className="mb-2.5 grid grid-cols-6 gap-1 rounded-xl border border-line/60 bg-raised/60 p-1 text-center backdrop-blur-sm"
           >
             {[
@@ -515,7 +511,7 @@ export function StudioColorPopover({
                   type="button"
                   role="tab"
                   aria-selected={isActive}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "{v0} 모드"), { v0: String(tab.label) })}
+                  aria-label={`${tab.label} 모드`}
                   onClick={() => setActiveTab(tab.id as StudioColorPopoverTab)}
                   className={cx(
                     "rounded-lg py-1 text-[0.62rem] font-medium transition-all",
@@ -569,13 +565,13 @@ export function StudioColorPopover({
                   <div
                     className="flex flex-wrap gap-1.5 pt-0.5"
                     role="radiogroup"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "{v0} 팔레트"), { v0: String(activePalette.label) })}
+                    aria-label={`${activePalette.label} 팔레트`}
                   >
                     {activePalette.colors.map((c, index) => (
                       <button
                         key={`${activePalette.id}-${index}`}
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "{v0} 색상 {v1} 선택"), { v0: String(activePalette.label), v1: String(c) })}
+                        aria-label={`${activePalette.label} 색상 ${c} 선택`}
                         role="radio"
                         aria-checked={index === selectedPaletteIndex}
                         onClick={() => handleSelect(c)}
@@ -586,7 +582,7 @@ export function StudioColorPopover({
                   </div>
                 </>
               ) : (
-                <div className="flex flex-wrap gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "팔레트 불러오는 중")}>
+                <div className="flex flex-wrap gap-1" aria-label="팔레트 불러오는 중">
                   {Array.from({ length: 15 }).map((_, i) => (
                     <span key={i} className="size-7 rounded-lg border border-line bg-raised/70 animate-pulse" />
                   ))}
@@ -637,23 +633,23 @@ export function StudioColorPopover({
           {/* Bottom Common Area: Tints & Shades 9-step strip */}
           <div className="mt-2.5 border-t border-line/60 pt-2">
             <div className="mb-1 flex items-center justify-between px-0.5">
-              <span className="text-[0.60rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "명도·음영 단계 (Tints & Shades)")}</span>
-              <span className="font-mono text-[0.56rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "하이라이트 → 딥음영")}</span>
+              <span className="text-[0.60rem] font-medium text-fg-3">명도·음영 단계 (Tints & Shades)</span>
+              <span className="font-mono text-[0.56rem] text-fg-3">하이라이트 → 딥음영</span>
             </div>
             <div
               className="flex h-5 w-full overflow-hidden rounded-lg border border-white/15 shadow-inner"
               role="radiogroup"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "명도 및 음영 단계")}
+              aria-label="명도 및 음영 단계"
             >
               {tintsAndShades.map((stepHex, idx) => {
                 const isSelected = idx === selectedTintIndex;
                 return (
                   <button
-                    key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "en", "shade-{v0}"), { v0: String(idx) })}
+                    key={`shade-${idx}`}
                     type="button"
                     role="radio"
                     aria-checked={isSelected}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "명도 단계 {v0} 선택"), { v0: String(stepHex) })}
+                    aria-label={`명도 단계 ${stepHex} 선택`}
                     onClick={() => handleSelect(stepHex)}
                     className="relative flex-1 cursor-pointer transition-opacity hover:opacity-85 active:scale-95"
                     style={{ backgroundColor: stepHex }}
@@ -677,8 +673,8 @@ export function StudioColorPopover({
               type="text"
               value={hexDraft}
               spellCheck={false}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "헥스 색상 코드")}
-              placeholder={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "en", "#rrggbb")}
+              aria-label="헥스 색상 코드"
+              placeholder="#rrggbb"
               onChange={(e) => {
                 const next = e.target.value;
                 setHexDraft(next);
@@ -696,7 +692,7 @@ export function StudioColorPopover({
             {/* Copy button */}
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "색상 코드 복사")}
+              aria-label="색상 코드 복사"
               onClick={handleCopyHex}
               className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
             >
@@ -707,7 +703,7 @@ export function StudioColorPopover({
               <StudioToolHintTarget hint={STUDIO_COLOR_CANVAS_EYEDROPPER_HINT} preferredSide="bottom">
                 <button
                   type="button"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "캔버스에서 정밀 색 가져오기")}
+                  aria-label="캔버스에서 정밀 색 가져오기"
                   aria-keyshortcuts="I"
                   onClick={() => {
                     finishSession(false);
@@ -724,7 +720,7 @@ export function StudioColorPopover({
               <StudioToolHintTarget hint={STUDIO_COLOR_EYEDROPPER_HINT} preferredSide="bottom">
                 <button
                   type="button"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "화면 전체에서 색 가져오기")}
+                  aria-label="화면 전체에서 색 가져오기"
                   onClick={() => {
                     const ed = new eyeDropperCtor();
                     ed.open()
@@ -743,21 +739,22 @@ export function StudioColorPopover({
           {recentColors.length > 0 && (
             <div className="mt-2.5">
               <div className="mb-1 flex items-center justify-between px-0.5">
-                <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "최근")}</p>
+                <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">최근</p>
                 <button
                   type="button"
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "현재 색을 내 팔레트에 추가")}
+                  aria-label="현재 색을 내 팔레트에 추가"
                   onClick={() => handleSavePaletteToLibrary("내 스와치", [value, ...recentColors.slice(0, 7)])}
                   className="flex items-center gap-1 text-[0.58rem] font-medium text-accent hover:underline"
                 >
-                  <Plus className="size-2.5" aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "내 팔레트에 추가")}</button>
+                  <Plus className="size-2.5" aria-hidden /> 내 팔레트에 추가
+                </button>
               </div>
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "최근 색상")}>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="최근 색상">
                 {recentColors.map((c, i) => (
                   <button
                     key={`${c}-${i}`}
                     type="button"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "최근 색상 {v0} 선택"), { v0: String(c) })}
+                    aria-label={`최근 색상 ${c} 선택`}
                     role="radio"
                     aria-checked={i === selectedRecentIndex}
                     onClick={() => handleSelect(c)}
@@ -772,17 +769,17 @@ export function StudioColorPopover({
           {documentColorOptions.length > 0 && (
             <div className="mt-2.5 border-t border-line/50 pt-2">
               <div className="mb-1 flex items-center justify-between px-0.5">
-                <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "이 원고에서 사용 중")}</p>
-                <span className="text-[0.56rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "빈도순")}</span>
+                <p className="text-[0.60rem] font-semibold uppercase tracking-wider text-fg-3">이 원고에서 사용 중</p>
+                <span className="text-[0.56rem] text-fg-3">빈도순</span>
               </div>
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "원고 사용 색상")}>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="원고 사용 색상">
                 {documentColorOptions.map((color, index) => (
                   <button
                     key={`${color}-${index}`}
                     type="button"
                     role="radio"
                     aria-checked={index === selectedDocumentIndex}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "원고 색상 {v0} 선택"), { v0: String(color) })}
+                    aria-label={`원고 색상 ${color} 선택`}
                     onClick={() => handleSelect(color)}
                     className="size-7 rounded-lg border border-white/20 shadow-sm transition-transform hover:scale-105 active:scale-95 aria-checked:ring-2 aria-checked:ring-accent aria-checked:ring-offset-1 aria-checked:ring-offset-card"
                     style={{ background: color }}
@@ -795,7 +792,7 @@ export function StudioColorPopover({
           {addedNotice && (
             <div
               role="status"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorPopover", "ko", "팔레트 저장 결과")}
+              aria-label="팔레트 저장 결과"
               className={cx(
                 "mt-2 flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[0.62rem] font-semibold",
                 addedNotice.tone === "good" ? "bg-good/15 border-good/30 text-good" : "bg-warn/15 border-warn/30 text-warn",

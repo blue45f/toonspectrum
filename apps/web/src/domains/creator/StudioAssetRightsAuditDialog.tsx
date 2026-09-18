@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -66,7 +65,7 @@ export function StudioAssetRightsAuditDialog({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetRightsAuditDialog", "ko", "에셋 권리·납품 감사")}
+      aria-label="에셋 권리·납품 감사"
       className="fixed inset-0 z-[90] grid place-items-center overflow-y-auto overscroll-contain bg-[oklch(0.08_0.01_70/0.82)] p-2 backdrop-blur-sm sm:p-4"
     >
       <div className="w-full max-w-6xl">

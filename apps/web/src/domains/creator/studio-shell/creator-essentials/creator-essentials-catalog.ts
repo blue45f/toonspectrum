@@ -1,13 +1,12 @@
 import manifest from "./creator-essentials.generated.json";
 
-export type EssentialsLocale = string;
-type EssentialsAuthoredLocale = "ko" | "en";
+export type EssentialsLocale = "ko" | "en";
 export const ESSENTIALS_KINDS = ["effect-2d", "pose-2d", "pose-3d", "prop-3d"] as const;
 export type EssentialsKind = (typeof ESSENTIALS_KINDS)[number];
 export interface CreatorEssential {
   readonly id: string;
   readonly kind: EssentialsKind;
-  readonly label: Readonly<Record<EssentialsAuthoredLocale, string>>;
+  readonly label: Readonly<Record<EssentialsLocale, string>>;
   readonly tags: readonly string[];
   readonly url: string;
   readonly preview: string;
@@ -16,7 +15,7 @@ export interface CreatorEssential {
   readonly width: number;
   readonly height: number;
 }
-export const ESSENTIALS_LABELS: Readonly<Record<EssentialsKind, Readonly<Record<EssentialsAuthoredLocale, string>>>> = {
+export const ESSENTIALS_LABELS: Readonly<Record<EssentialsKind, Readonly<Record<EssentialsLocale, string>>>> = {
   "effect-2d": { ko: "효과·말풍선·프레임", en: "Effects, balloons & frames" },
   "pose-2d": { ko: "2D 포즈 참고", en: "2D pose sheets" },
   "pose-3d": { ko: "3D 데생 인형", en: "3D mannequins" },

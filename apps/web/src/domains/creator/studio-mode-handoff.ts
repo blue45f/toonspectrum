@@ -1,6 +1,3 @@
-import {
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { buildStudioModeLaunchHref, resolveStudioModeCreationPlan } from "./studio-mode-creation-plan";
 import type { StudioModeCopy } from "./studio-mode-profile";
 import {
@@ -155,7 +152,7 @@ export function executeStudioModeHandoff(
   storage: StudioModeHandoffStorage,
   projectId: string,
   handoff: StudioModeHandoffDefinition,
-  locale: string,
+  locale: "ko" | "en",
   options: {
     readonly target?: StudioProjectDocumentEventTarget;
     readonly at?: string;
@@ -169,7 +166,7 @@ export function executeStudioModeHandoff(
   const plan = resolveStudioModeCreationPlan(handoff.target);
   const createdAt = options.at ?? new Date().toISOString();
   const created = createStudioProjectDocument(storage, projectId, {
-    title: translateLocaleBranchForLocale(locale, "domains.creator.studio.mode.handoff", handoff.title),
+    title: handoff.title[locale],
     kind: plan.document.kind,
     defaultWorkspace: plan.document.workspace,
     width: plan.document.width,

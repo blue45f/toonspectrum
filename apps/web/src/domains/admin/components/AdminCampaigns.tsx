@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -198,7 +197,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
             </h3>
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.admin.components.AdminCampaigns", "en", "Close")}
+              aria-label="Close"
               className="text-fg-3 hover:text-fg"
               onClick={close}
             >
@@ -218,7 +217,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
             <input
               className={adminInputClass}
               {...register("titleId")}
-              placeholder={translateCurrentStaticSourceText("domains.admin.components.AdminCampaigns", "en", "nw-...")}
+              placeholder="nw-..."
             />
           </Field>
           <Field label={t("admin.plans.description")} full>
@@ -311,8 +310,8 @@ export function AdminCampaigns({ uid }: { uid: string }) {
                     <span
                       className={
                         campaign.isActive
-                          ? translateCurrentStaticSourceText("domains.admin.components.AdminCampaigns", "en", "text-xs text-good")
-                          : translateCurrentStaticSourceText("domains.admin.components.AdminCampaigns", "en", "text-xs text-fg-3")
+                          ? "text-xs text-good"
+                          : "text-xs text-fg-3"
                       }
                     >
                       {campaign.isActive
@@ -339,7 +338,7 @@ export function AdminCampaigns({ uid }: { uid: string }) {
                     type="button"
                     className={adminButtonClass("danger")}
                     onClick={() => void remove(campaign)}
-                    aria-label={translateCurrentStaticSourceText("domains.admin.components.AdminCampaigns", "en", "Delete")}
+                    aria-label="Delete"
                   >
                     <Trash2 size={13} />
                   </button>

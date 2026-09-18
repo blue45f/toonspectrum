@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useId } from "react";
 import type { FortuneSceneTheme } from "./fortune-cinematic-model";
 
@@ -15,13 +14,13 @@ export function FortuneSceneArt({ theme = "violet", closeup = false }: { theme?:
   const [night, light, gold] = INKS[theme];
   return <svg className="fo-scene-art" viewBox={closeup ? "60 25 360 300" : "0 0 480 360"} aria-hidden="true" focusable="false">
     <defs>
-      <radialGradient id={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneSceneArt", "en", "{v0}-sky"), { v0: String(uid) })}><stop stopColor={light} stopOpacity=".35" /><stop offset="1" stopColor={night} /></radialGradient>
-      <linearGradient id={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneSceneArt", "en", "{v0}-paper"), { v0: String(uid) })} x2="0" y2="1"><stop stopColor="#fff1d8" /><stop offset="1" stopColor="#d8bfaa" /></linearGradient>
-      <pattern id={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneSceneArt", "en", "{v0}-dots"), { v0: String(uid) })} width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill={light} opacity=".18" /></pattern>
+      <radialGradient id={`${uid}-sky`}><stop stopColor={light} stopOpacity=".35" /><stop offset="1" stopColor={night} /></radialGradient>
+      <linearGradient id={`${uid}-paper`} x2="0" y2="1"><stop stopColor="#fff1d8" /><stop offset="1" stopColor="#d8bfaa" /></linearGradient>
+      <pattern id={`${uid}-dots`} width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill={light} opacity=".18" /></pattern>
     </defs>
     <rect width="480" height="360" fill={night} />
-    <rect width="480" height="360" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneSceneArt", "en", "url(#{v0}-sky)"), { v0: String(uid) })} />
-    <rect width="480" height="360" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneSceneArt", "en", "url(#{v0}-dots)"), { v0: String(uid) })} />
+    <rect width="480" height="360" fill={`url(#${uid}-sky)`} />
+    <rect width="480" height="360" fill={`url(#${uid}-dots)`} />
     <g fill="none" stroke={light} strokeWidth="1.2" opacity=".5">
       <path d="M84 270V144a156 156 0 0 1 312 0v126M105 270V145a135 135 0 0 1 270 0v125M240 15v198M104 143h272M115 91h250" />
       <circle cx="241" cy="137" r="87" /><ellipse cx="241" cy="137" rx="117" ry="43" transform="rotate(-28 241 137)" />
@@ -43,7 +42,7 @@ export function FortuneSceneArt({ theme = "violet", closeup = false }: { theme?:
       <path d="m211 236-20-2m20 8-22 3m74-11 20-2m-20 10 22 4" fill="none" strokeWidth="1.5" />
       <path d="m179 257 60 15 60-16-8 25-53 7-50-7Z" fill={light} />
       <circle cx="240" cy="275" r="8" fill={gold} /><path d="m240 268 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#6b506c" stroke="none" />
-      <path d="M151 281q47-14 89 10 49-25 91-11l-14 53q-34-13-77 1-40-13-78 0Z" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneSceneArt", "en", "url(#{v0}-paper)"), { v0: String(uid) })} />
+      <path d="M151 281q47-14 89 10 49-25 91-11l-14 53q-34-13-77 1-40-13-78 0Z" fill={`url(#${uid}-paper)`} />
       <path d="m240 292 0 41m-78-43q36-6 66 8m-63 1q32-6 61 7m-58 3q31-5 57 6m29-17q30-13 64-9m-64 17q29-12 62-9m-61 18q28-11 58-8" fill="none" stroke="#78658a" strokeWidth="1.5" />
       <path d="M99 304h31l-3-25h-24Z" fill={light} /><path d="m114 280 16-74q24 11 7 35-7 10-15 17m-7 17 27-54" fill={gold} strokeWidth="2" />
       <path d="m355 265 31 3-9 35-31-3Z" fill="#6f5988" /><path d="m362 276 13 1-2 14-13-1Z" fill="none" stroke={gold} strokeWidth="1.5" />

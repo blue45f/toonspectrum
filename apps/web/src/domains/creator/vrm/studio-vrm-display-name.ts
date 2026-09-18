@@ -1,6 +1,3 @@
-import {
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { normalizeLocaleCode } from "@/shared/lib/i18n-intl-utils";
 
 import type { VrmLibraryEntry } from "./vrm-library";

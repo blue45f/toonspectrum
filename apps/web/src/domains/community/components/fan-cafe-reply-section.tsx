@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { CornerDownRight, MessageCircle, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -236,7 +232,7 @@ export function FanPostReplySection({
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas/25 px-3 py-2 text-[0.68rem] text-fg-3">
-        <span>{translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "동기화 ")}{replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "대기 중")}</span>
+        <span>동기화 {replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : "대기 중"}</span>
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 transition-colors hover:bg-raised/70">
             <input
@@ -245,7 +241,8 @@ export function FanPostReplySection({
               onChange={(event) => setReplyAutoRefreshEnabled(event.target.checked)}
               className="size-3.5"
             />
-            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "30초 갱신")}</label>
+            30초 갱신
+          </label>
           <button
             type="button"
             onClick={refreshReplies}
@@ -253,7 +250,7 @@ export function FanPostReplySection({
             disabled={isLoadingReplies}
           >
             <RefreshCw size={12} className={cn(isLoadingReplies && "animate-spin motion-reduce:animate-none")} />
-            {isLoadingReplies ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "동기화 중") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "새로고침")}
+            {isLoadingReplies ? "동기화 중" : "새로고침"}
           </button>
         </div>
       </div>
@@ -265,7 +262,8 @@ export function FanPostReplySection({
       ) : null}
       {replies.length === 0 && loaded ? (
         <div className="rounded-xl border border-dashed border-line bg-canvas/30 px-3 py-4 text-xs text-fg-3">
-          {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "첫 댓글을 남겨 대화를 시작하세요.")}</div>
+          첫 댓글을 남겨 대화를 시작하세요.
+        </div>
       ) : (
         <ReplyThread
           items={replies}
@@ -286,8 +284,8 @@ export function FanPostReplySection({
             onChange={(event) => setDraft("__root__", event.target.value)}
             maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
             rows={2}
-            aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "댓글 작성")}
-            placeholder={translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "댓글 남기기")}
+            aria-label="댓글 작성"
+            placeholder="댓글 남기기"
             className="min-h-16 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
           />
           <div className="mt-2 flex items-center justify-between gap-2 text-[0.65rem] text-fg-3">
@@ -299,13 +297,14 @@ export function FanPostReplySection({
               className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Send size={13} />
-              {isRootSubmitting ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "등록 중...") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "등록")}
+              {isRootSubmitting ? "등록 중..." : "등록"}
             </button>
           </div>
         </div>
       ) : (
         <p className="rounded-xl border border-line bg-canvas/25 px-3 py-3 text-xs text-fg-3">
-          {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "로그인하면 댓글과 대댓글을 남길 수 있습니다.")}</p>
+          로그인하면 댓글과 대댓글을 남길 수 있습니다.
+        </p>
       )}
       {error ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad">
@@ -315,7 +314,8 @@ export function FanPostReplySection({
             onClick={refreshReplies}
             className="rounded-lg border border-bad/30 px-2 py-1 font-medium"
           >
-            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "다시 시도")}</button>
+            다시 시도
+          </button>
         </div>
       ) : null}
     </div>
@@ -419,21 +419,22 @@ export function FanPostReplyItem({
         {depth > 0 ? <CornerDownRight size={12} className="text-accent/80" aria-hidden /> : null}
         <span className="max-w-[12rem] truncate font-semibold text-fg-2">{reply.author.name}</span>
         <span>{relativeDate(reply.createdAt)}</span>
-        {hasChildren ? <span className="text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "답글 ")}{countReplies(children)}</span> : null}
+        {hasChildren ? <span className="text-fg-3">답글 {countReplies(children)}</span> : null}
         {isOwnReply ? (
           <button
             type="button"
             onClick={() => void onDelete(reply.id)}
-            aria-label={translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "내 댓글 삭제")}
-            title={translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "삭제")}
+            aria-label="내 댓글 삭제"
+            title="삭제"
             className="ml-auto inline-flex min-h-7 items-center gap-1 rounded-lg px-1.5 text-fg-3 transition-colors hover:bg-raised hover:text-bad focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <Trash2 size={12} />
-            {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "삭제")}</button>
+            삭제
+          </button>
         ) : null}
       </div>
       {isDeleted ? (
-        <p className="text-sm italic leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "삭제된 댓글입니다.")}</p>
+        <p className="text-sm italic leading-relaxed text-fg-3">삭제된 댓글입니다.</p>
       ) : (
         <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">{reply.text}</p>
       )}
@@ -450,7 +451,8 @@ export function FanPostReplyItem({
           )}
         >
           <MessageCircle size={12} />
-          {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "대댓글")}</button>
+          대댓글
+        </button>
       )}
       {isOpen && (
         <div className="mt-2">
@@ -461,8 +463,8 @@ export function FanPostReplyItem({
                 onChange={(event) => onChangeDraft(replyKey, event.target.value)}
                 maxLength={FAN_CAFE_REPLY_MAX_LENGTH}
                 rows={2}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "{v0}에게 대댓글 작성"), { v0: String(reply.author.name) })}
-                placeholder={formatI18nTemplate(translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "{v0}에게 대댓글"), { v0: String(reply.author.name) })}
+                aria-label={`${reply.author.name}에게 대댓글 작성`}
+                placeholder={`${reply.author.name}에게 대댓글`}
                 className="min-h-14 w-full resize-none bg-transparent text-sm leading-relaxed text-fg outline-none placeholder:text-fg-3"
               />
               <div className="mt-1 flex flex-wrap items-center justify-between gap-2 text-[0.65rem] text-fg-3">
@@ -473,7 +475,8 @@ export function FanPostReplyItem({
                     onClick={() => onToggleComposer(reply.id)}
                     className="inline-flex min-h-8 items-center rounded-lg border border-line px-2.5 text-xs text-fg-3 transition-colors hover:text-fg"
                   >
-                    {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "닫기")}</button>
+                    닫기
+                  </button>
                   <button
                     type="button"
                     onClick={(event) => void onSubmit(reply.id, event.currentTarget)}
@@ -481,18 +484,20 @@ export function FanPostReplyItem({
                     className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-accent px-2.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Send size={12} />
-                    {isSubmitting ? translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "저장 중...") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "등록")}
+                    {isSubmitting ? "저장 중..." : "등록"}
                   </button>
                 </div>
               </div>
               {depth >= MAX_REPLY_DEPTH - 1 ? (
                 <p className="mt-2 rounded-lg bg-raised/50 px-2 py-1.5 text-[0.65rem] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "최대 대댓글 깊이에 도달했습니다.")}</p>
+                  최대 대댓글 깊이에 도달했습니다.
+                </p>
               ) : null}
             </div>
           ) : (
             <p className="rounded-lg border border-line bg-panel/45 px-3 py-2 text-xs text-fg-3">
-              {translateCurrentStaticSourceText("domains.community.components.fan.cafe.reply.section", "ko", "로그인하면 대댓글을 남길 수 있습니다.")}</p>
+              로그인하면 대댓글을 남길 수 있습니다.
+            </p>
           )}
         </div>
       )}

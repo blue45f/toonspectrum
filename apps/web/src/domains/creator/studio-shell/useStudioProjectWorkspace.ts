@@ -1,6 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -40,7 +37,7 @@ function humanStorageError(_locale): string {
  */
 export function useStudioProjectWorkspace(
   projectId: string,
-  locale: string,
+  locale: "ko" | "en",
 ): StudioProjectWorkspaceController {
   useBilingualI18nRevision();
   const [state, setState] = useState<StudioProjectWorkspaceState | null>(null);

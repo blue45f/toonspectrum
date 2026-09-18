@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useFx } from "@toonspectrum/core/fx";
 import {
   Compass,
@@ -274,7 +270,8 @@ export function ExplorePage() {
               style={{ backgroundImage: spectrumGradient([...GENRES], 90) }}
             />
             <Compass size={14} strokeWidth={2} />
-            {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "GENRE SPECTRUM / 탐색")}</p>
+            GENRE SPECTRUM / 탐색
+          </p>
 
           <div className="mt-3 max-w-2xl sm:mt-4">
             <h1
@@ -283,7 +280,7 @@ export function ExplorePage() {
                 animation: "fade-up 0.6s var(--ease-out-expo) 0.14s both",
               }}
             >
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "색을 따라 떠나는")}{" "}
+              색을 따라 떠나는{" "}
               {heroGenre ? (
                 <span
                   className="relative font-serif font-normal italic"
@@ -306,7 +303,8 @@ export function ExplorePage() {
                   particleCount={22}
                   particleSpread={1.2}
                 >
-                  {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "스펙트럼 탐색")}</ShimmerTitle>
+                  스펙트럼 탐색
+                </ShimmerTitle>
               )}
             </h1>
             <p
@@ -315,11 +313,14 @@ export function ExplorePage() {
                 animation: "fade-up 0.6s var(--ease-out-expo) 0.24s both",
               }}
             >
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는 줄거리와 연재 상태가 함께 표시되어 무슨 작품인지 바로 판단할 수 있습니다.")}</p>
+              장르·태그·유형별로 웹툰과 웹소설을 좁혀봅니다. 작품 카드에는
+              줄거리와 연재 상태가 함께 표시되어 무슨 작품인지 바로 판단할 수
+              있습니다.
+            </p>
             <Link
               href={
                 heroGenre
-                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.ExplorePage", "en", "/random?genre={v0}"), { v0: String(encodeURIComponent(heroGenre)) })
+                  ? `/random?genre=${encodeURIComponent(heroGenre)}`
                   : "/random"
               }
               className="sheen-sweep group mt-4 inline-flex items-center gap-2 overflow-hidden rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-medium text-fg-2 transition-[color,background-color,border-color,box-shadow] duration-200 hover:border-accent/50 hover:bg-accent-soft hover:text-accent hover:shadow-[0_8px_24px_-12px_oklch(0.72_0.185_42/0.5)] sm:mt-5"
@@ -331,7 +332,7 @@ export function ExplorePage() {
                 size={16}
                 className="transition-transform duration-300 ease-out-expo group-hover:rotate-180"
               />
-              {heroGenre ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "{v0}에서 랜덤 발견"), { v0: String(heroGenre) }) : translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "랜덤으로 한 편 발견")}
+              {heroGenre ? `${heroGenre}에서 랜덤 발견` : "랜덤으로 한 편 발견"}
             </Link>
           </div>
 
@@ -395,14 +396,16 @@ export function ExplorePage() {
                   onClick={() => setShowAllGenres(true)}
                   className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
                 >
-                  {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "모든 장르 보기 · ")}{GENRES.length - visibleGenres.length}{translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "개")}</button>
+                  모든 장르 보기 · {GENRES.length - visibleGenres.length}개
+                </button>
               ) : showAllGenres ? (
                 <button
                   type="button"
                   onClick={() => setShowAllGenres(false)}
                   className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
                 >
-                  {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "자주 쓰는 장르만 보기")}</button>
+                  자주 쓰는 장르만 보기
+                </button>
               ) : null}
             </div>
           </RevealOnScroll>
@@ -413,7 +416,7 @@ export function ExplorePage() {
         <DiscoveryWorkspaceNav current="explore" />
 
         <RevealOnScroll variant="fade">
-          <p className="eyebrow mb-3 text-fg-3">{translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "BY CODE / 코드로 좁히기")}</p>
+          <p className="eyebrow mb-3 text-fg-3">BY CODE / 코드로 좁히기</p>
           <div className="flex flex-wrap gap-2">
             {visibleTags.map(({ tag: entry, count }) => {
               const active = filters.tags.includes(entry);
@@ -463,14 +466,16 @@ export function ExplorePage() {
                 onClick={() => setShowAllTags(true)}
                 className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
               >
-                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "태그 더 보기 · ")}{hiddenTagCount}{translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "개")}</button>
+                태그 더 보기 · {hiddenTagCount}개
+              </button>
             ) : showAllTags && tags.length > 12 ? (
               <button
                 type="button"
                 onClick={() => setShowAllTags(false)}
                 className="inline-flex min-h-9 items-center rounded-full px-3 text-sm font-semibold text-fg-3 hover:text-fg"
               >
-                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "주요 태그만 보기")}</button>
+                주요 태그만 보기
+              </button>
             ) : null}
           </div>
         </RevealOnScroll>
@@ -480,7 +485,7 @@ export function ExplorePage() {
             <div
               className="inline-flex items-center rounded-lg border border-line bg-card p-0.5"
               role="group"
-              aria-label={translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "작품 유형")}
+              aria-label="작품 유형"
             >
               {TYPES.map((entry) => {
                 const active =
@@ -546,7 +551,8 @@ export function ExplorePage() {
               )}
             >
               <SlidersHorizontal size={14} className="text-accent" />
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "상세 필터")}{activeFilters > 0 && (
+              상세 필터
+              {activeFilters > 0 && (
                 <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
                   {activeFilters}
                 </span>
@@ -556,7 +562,7 @@ export function ExplorePage() {
 
           <div className="flex items-center gap-4">
             <p className="text-sm text-fg-2">
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "작품")}{" "}
+              작품{" "}
               <CountUp
                 key={results.length}
                 value={results.length}
@@ -564,21 +570,24 @@ export function ExplorePage() {
                 separator={results.length >= 1000}
                 className="numeral text-base text-fg"
               />
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "편")}</p>
+              편
+            </p>
             <button
               type="button"
               onClick={reload}
               className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
             >
               <RefreshCw size={13} className={cn(loading && "animate-spin")} />
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "갱신")}</button>
+              갱신
+            </button>
             {hasFilter && (
               <Link
                 href="/explore"
                 className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-fg-3 transition-colors duration-150 hover:text-accent"
               >
                 <RotateCcw size={13} />
-                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "필터 초기화")}</Link>
+                필터 초기화
+              </Link>
             )}
           </div>
         </div>
@@ -614,7 +623,7 @@ export function ExplorePage() {
           </div>
         ) : error ? (
           <ErrorState
-            title={translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "탐색 데이터를 불러오지 못했습니다.")}
+            title="탐색 데이터를 불러오지 못했습니다."
             message={error}
             onRetry={reload}
           />
@@ -632,7 +641,7 @@ export function ExplorePage() {
                   onClick={showMore}
                   className="inline-flex items-center gap-2 rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-medium text-fg-2 transition-colors hover:border-line-strong hover:text-fg"
                 >
-                  {loading ? translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "불러오는 중…") : translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "더 보기")}
+                  {loading ? "불러오는 중…" : "더 보기"}
                   <span className="numeral text-fg-3">
                     {shown.length} / {results.length}
                   </span>
@@ -662,11 +671,12 @@ export function ExplorePage() {
               />
             </span>
             <p className="relative text-sm font-medium text-fg">
-              {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "조건에 맞는 작품이 없어요.")}</p>
+              조건에 맞는 작품이 없어요.
+            </p>
             <p className="relative mt-1 text-xs text-fg-3">
               {hasFilter
-                ? translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "필터를 조금 넓히거나 초기화해 보세요.")
-                : translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "다른 장르나 태그로 탐색해 보세요.")}
+                ? "필터를 조금 넓히거나 초기화해 보세요."
+                : "다른 장르나 태그로 탐색해 보세요."}
             </p>
             {hasFilter && (
               <Link
@@ -674,7 +684,8 @@ export function ExplorePage() {
                 className="relative mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-4 py-2 text-sm font-medium text-fg-2 transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
               >
                 <RotateCcw size={14} />
-                {translateCurrentStaticSourceText("domains.catalog.ExplorePage", "ko", "필터 초기화")}</Link>
+                필터 초기화
+              </Link>
             )}
           </div>
         )}

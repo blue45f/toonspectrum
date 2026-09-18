@@ -1,9 +1,3 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, Library, Palette, Search, ShieldCheck, Store } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -125,7 +119,7 @@ export function StudioAssetHubPage() {
                 <CurrentViewIcon size={18} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetHubPage", "en", "TOONSTUDIO MATERIALS")}</p>
+                <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">TOONSTUDIO MATERIALS</p>
                 <p className="text-sm font-bold text-fg">{currentLabel}</p>
                 {projectId ? (
                   <p className="mt-0.5 text-xs text-fg-3">
@@ -144,7 +138,7 @@ export function StudioAssetHubPage() {
                     <Link
                       key={candidate}
                       href={assetHubHref(candidate, projectId)}
-                      aria-current={active ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioAssetHubPage", "en", "page") : undefined}
+                      aria-current={active ? "page" : undefined}
                       className={cn(
                         "inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Eraser, Grid3x3, Pencil, Redo2, Trash2, Undo2 } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
@@ -67,22 +63,22 @@ export function SketchPad({ strokes, onChange, guide, label = "드로잉 캔버�
     else if (event.key === "Escape") cancel();
   };
   return <div className="play-sketch-pad">
-    <div className="play-sketch-toolbar" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "드로잉 도구")}>
+    <div className="play-sketch-toolbar" aria-label="드로잉 도구">
       <div className="play-actions">
-        <button type="button" className="play-icon-button" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "펜")} title={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "펜")} aria-pressed={!erase} onClick={() => setErase(false)}><Pencil size={17} /></button>
-        <button type="button" className="play-icon-button" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "지우개")} title={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "지우개")} aria-pressed={erase} onClick={() => setErase(true)}><Eraser size={17} /></button>
+        <button type="button" className="play-icon-button" aria-label="펜" title="펜" aria-pressed={!erase} onClick={() => setErase(false)}><Pencil size={17} /></button>
+        <button type="button" className="play-icon-button" aria-label="지우개" title="지우개" aria-pressed={erase} onClick={() => setErase(true)}><Eraser size={17} /></button>
         <span className="play-toolbar-separator" />
-        {COLORS.map(([name, hex]) => <button key={hex} className="play-swatch-button" type="button" style={{ background: hex }} aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "{v0} 색상"), { v0: String(name) })} title={name} aria-pressed={color === hex && !erase} onClick={() => { setColor(hex); setErase(false); }} />)}
+        {COLORS.map(([name, hex]) => <button key={hex} className="play-swatch-button" type="button" style={{ background: hex }} aria-label={`${name} 색상`} title={name} aria-pressed={color === hex && !erase} onClick={() => { setColor(hex); setErase(false); }} />)}
       </div>
       <div className="play-actions">
-        <label className="play-size">{translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "굵기 ")}<input type="range" min="2" max="24" step="1" value={size} onChange={(event) => setSize(Number(event.target.value))} /><output>{size}</output></label>
-        <button type="button" className="play-icon-button" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "실행 취소")} title={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "실행 취소")} disabled={!strokes.length || disabled} onClick={() => { setUndone([...undone, strokes[strokes.length - 1]]); onChange(strokes.slice(0, -1)); }}><Undo2 size={17} /></button>
-        <button type="button" className="play-icon-button" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "다시 실행")} title={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "다시 실행")} disabled={!undone.length || disabled} onClick={() => { onChange([...strokes, undone[undone.length - 1]]); setUndone(undone.slice(0, -1)); }}><Redo2 size={17} /></button>
-        <button type="button" className="play-icon-button" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "격자 표시")} title={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "격자 표시")} aria-pressed={grid} onClick={() => setGrid(!grid)}><Grid3x3 size={17} /></button>
-        <button type="button" className="play-icon-button" aria-label={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "캔버스 비우기")} title={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "캔버스 비우기")} disabled={!strokes.length || disabled} onClick={() => { if (window.confirm("현재 캔버스의 그림을 지울까요? 중요한 그림은 먼저 파일로 저장해 주세요.")) { setUndone([]); onChange([]); } }}><Trash2 size={17} /></button>
+        <label className="play-size">굵기 <input type="range" min="2" max="24" step="1" value={size} onChange={(event) => setSize(Number(event.target.value))} /><output>{size}</output></label>
+        <button type="button" className="play-icon-button" aria-label="실행 취소" title="실행 취소" disabled={!strokes.length || disabled} onClick={() => { setUndone([...undone, strokes[strokes.length - 1]]); onChange(strokes.slice(0, -1)); }}><Undo2 size={17} /></button>
+        <button type="button" className="play-icon-button" aria-label="다시 실행" title="다시 실행" disabled={!undone.length || disabled} onClick={() => { onChange([...strokes, undone[undone.length - 1]]); setUndone(undone.slice(0, -1)); }}><Redo2 size={17} /></button>
+        <button type="button" className="play-icon-button" aria-label="격자 표시" title="격자 표시" aria-pressed={grid} onClick={() => setGrid(!grid)}><Grid3x3 size={17} /></button>
+        <button type="button" className="play-icon-button" aria-label="캔버스 비우기" title="캔버스 비우기" disabled={!strokes.length || disabled} onClick={() => { if (window.confirm("현재 캔버스의 그림을 지울까요? 중요한 그림은 먼저 파일로 저장해 주세요.")) { setUndone([]); onChange([]); } }}><Trash2 size={17} /></button>
       </div>
     </div>
-    <svg className="play-sketch-surface" viewBox="0 0 960 600" role="application" aria-roledescription={translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "키보드 지원 드로잉 캔버스")} aria-label={label} aria-describedby={helpId} aria-disabled={disabled} tabIndex={0}
+    <svg className="play-sketch-surface" viewBox="0 0 960 600" role="application" aria-roledescription="키보드 지원 드로잉 캔버스" aria-label={label} aria-describedby={helpId} aria-disabled={disabled} tabIndex={0}
       onKeyDown={key} onBlur={() => { if (active.current?.pointer === -1) finish(); setKeyboard(false); }}
       onPointerDown={(event) => {
         if (!event.isPrimary || event.button !== 0 || disabled) return;
@@ -95,13 +91,13 @@ export function SketchPad({ strokes, onChange, guide, label = "드로잉 캔버�
       onPointerCancel={cancel} onLostPointerCapture={() => { if (active.current && active.current.pointer !== -1) cancel(); }}>
       <defs><pattern id={gridId} width="48" height="48" patternUnits="userSpaceOnUse"><path d="M 48 0 L 0 0 0 48" fill="none" stroke="#b1a89a" strokeWidth="1" /></pattern></defs>
       <rect width="960" height="600" fill={PAPER} />
-      {grid && <rect width="960" height="600" fill={formatI18nTemplate(translateCurrentStaticSourceText("domains.play.lab.SketchPad", "en", "url(#{v0})"), { v0: String(gridId) })} opacity=".4" />}
+      {grid && <rect width="960" height="600" fill={`url(#${gridId})`} opacity=".4" />}
       {guide}
       <StrokePaths strokes={strokes} />
       {live && <StrokePaths strokes={[live]} />}
       {keyboard && <g stroke={INK} strokeWidth="1.5" fill="none"><circle cx={cursor.x * 960} cy={cursor.y * 600} r="9" /><path d={`M ${cursor.x * 960 - 15} ${cursor.y * 600} h 30 M ${cursor.x * 960} ${cursor.y * 600 - 15} v 30`} /></g>}
     </svg>
-    <p id={helpId} className="play-note">{translateCurrentStaticSourceText("domains.play.lab.SketchPad", "ko", "마우스·펜·터치 지원. 키보드: 방향키 이동 · Space 펜 내리기/들기 · Enter 선 확정 · Esc 취소. 격자·가이드는 결과 파일에 포함되지 않습니다.")}</p>
+    <p id={helpId} className="play-note">마우스·펜·터치 지원. 키보드: 방향키 이동 · Space 펜 내리기/들기 · Enter 선 확정 · Esc 취소. 격자·가이드는 결과 파일에 포함되지 않습니다.</p>
     <p className="play-note" role="status">{hint}</p>
   </div>;
 }

@@ -1,7 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Cloud, FileArchive, LoaderCircle, X } from "lucide-react";
 import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -20,7 +16,7 @@ const bi = <T,>(ko: T, en: T): T =>
 
 export interface StudioFormalSaveDialogProps {
   readonly open: boolean;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
   readonly projectTitle: string;
   readonly firstSave: boolean;
   readonly busy: boolean;
@@ -86,7 +82,7 @@ export function StudioFormalSaveDialog({
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-              {firstSave ? translateCurrentStaticSourceText("domains.creator.save.first.StudioFormalSaveDialog", "en", "FIRST SAVE") : translateCurrentStaticSourceText("domains.creator.save.first.StudioFormalSaveDialog", "en", "PROJECT SAVE")}
+              {firstSave ? "FIRST SAVE" : "PROJECT SAVE"}
             </p>
             <h2 id={titleId} className="mt-1 text-xl font-black text-fg sm:text-2xl">
               {title}

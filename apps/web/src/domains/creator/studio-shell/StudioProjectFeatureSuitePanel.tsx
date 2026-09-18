@@ -1,11 +1,4 @@
 import {
-  formatI18nTemplate,
-  getCurrentUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   BarChart3,
   Boxes,
   CheckCircle2,
@@ -456,7 +449,7 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
           <Metric label={bt("수정 필요", "Blocking")} value={report.blockingCount} />
           <Metric label={bt("확인 필요", "Warnings")} value={report.warningCount} />
         </div>
-        <StatusBadge status={report.blockingCount > 0 ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectFeatureSuitePanel", "en", "blocked") : report.warningCount > 0 ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectFeatureSuitePanel", "en", "review") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectFeatureSuitePanel", "en", "ready")} locale={locale} />
+        <StatusBadge status={report.blockingCount > 0 ? "blocked" : report.warningCount > 0 ? "review" : "ready"} locale={locale} />
       </div>
       <div className="mt-4 space-y-2">
         {state.quality.balloons.map((balloon) => (
@@ -694,9 +687,9 @@ function AutomationPanel({ projectId, locale }: { readonly projectId: string; re
       <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3">
         <div>
           <b className="text-sm text-fg">{state.automation.recipe.name}</b>
-          <p className="mt-1 text-xs text-fg-3">{state.automation.recipe.steps.length} {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectFeatureSuitePanel", "en", "steps")}</p>
+          <p className="mt-1 text-xs text-fg-3">{state.automation.recipe.steps.length} steps</p>
         </div>
-        <StatusBadge status={plan.status === "confirmation" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectFeatureSuitePanel", "en", "review") : plan.status} locale={locale} />
+        <StatusBadge status={plan.status === "confirmation" ? "review" : plan.status} locale={locale} />
       </div>
       <div className="mt-4 space-y-2">
         {plan.steps.map((step) => {

@@ -1,9 +1,4 @@
 import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -377,7 +372,14 @@ export function EngineeringDeckPage() {
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <style>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringDeckPage", "en", "\n        @media print {\n          body { background: #fff !important; }\n          [data-engineering-deck-shell] { display: none !important; }\n          [data-engineering-print-deck] { display: block !important; }\n          [data-engineering-print-deck] [data-deck-slide] { break-after: page; page-break-after: always; width: 100%; }\n        }\n      ")}</style>
+      <style>{`
+        @media print {
+          body { background: #fff !important; }
+          [data-engineering-deck-shell] { display: none !important; }
+          [data-engineering-print-deck] { display: block !important; }
+          [data-engineering-print-deck] [data-deck-slide] { break-after: page; page-break-after: always; width: 100%; }
+        }
+      `}</style>
       <AboutSectionNav />
       <EngineeringStoryNav className="mt-3" />
 

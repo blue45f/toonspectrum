@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Layers3, Loader2, Scissors, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
 
@@ -57,13 +53,16 @@ export function StudioBgRemoveButton({
         </span>
         <div className="min-w-0 flex-1">
           <h3 id={titleId} className="text-xs font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "로컬 레이어 추출")}</h3>
+            로컬 레이어 추출
+          </h3>
           <p className="mt-0.5 text-[0.66rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "픽셀을 업로드하지 않고 인물·캐릭터와 배경을 분리합니다.")}</p>
+            픽셀을 업로드하지 않고 인물·캐릭터와 배경을 분리합니다.
+          </p>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-good/30 bg-good/10 px-2 py-1 text-[0.58rem] font-bold text-good">
           <ShieldCheck size={11} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "기기 처리")}</span>
+          기기 처리
+        </span>
       </div>
       <div className="flex flex-col gap-2 p-3">
         <button
@@ -71,7 +70,7 @@ export function StudioBgRemoveButton({
           onClick={onOpenLayerLift}
           disabled={!onOpenLayerLift || Boolean(layerLiftDisabledReason)}
           aria-describedby={layerLiftDisabledReason
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "en", "{v0}-disabled"), { v0: String(descriptionId) })
+            ? `${descriptionId}-disabled`
             : descriptionId}
           className={cn(
             "inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-xs font-bold text-on-accent transition-colors hover:bg-accent/90",
@@ -80,21 +79,23 @@ export function StudioBgRemoveButton({
           )}
         >
           <Layers3 size={15} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "컷 레이어 복원")}<span className="rounded-full bg-on-accent/15 px-1.5 py-0.5 text-[0.56rem]">
-            {translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "en", "Beta")}</span>
+          컷 레이어 복원
+          <span className="rounded-full bg-on-accent/15 px-1.5 py-0.5 text-[0.56rem]">
+            Beta
+          </span>
         </button>
         <p
           id={layerLiftDisabledReason
-            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "en", "{v0}-disabled"), { v0: String(descriptionId) })
+            ? `${descriptionId}-disabled`
             : descriptionId}
-          role={layerLiftDisabledReason ? translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "en", "status") : undefined}
+          role={layerLiftDisabledReason ? "status" : undefined}
           className={cn(
             "text-[0.66rem] leading-relaxed",
             layerLiftDisabledReason ? "text-warn" : "text-fg-3",
           )}
         >
           {layerLiftDisabledReason
-            ?? translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "원본 백업·분리 배경·분리 전경을 한 그룹으로 만들며, 실행 취소 한 번으로 되돌립니다.")}
+            ?? "원본 백업·분리 배경·분리 전경을 한 그룹으로 만들며, 실행 취소 한 번으로 되돌립니다."}
         </p>
         <div className="h-px bg-line" aria-hidden />
         <button
@@ -106,15 +107,15 @@ export function StudioBgRemoveButton({
           {busy
             ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
             : <Scissors size={14} aria-hidden />}
-          {busy ? translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "배경 제거 중…") : translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "빠른 배경 제거")}
+          {busy ? "배경 제거 중…" : "빠른 배경 제거"}
         </button>
         {error ? (
           <p role="alert" className="text-xs text-bad">{error}</p>
         ) : (
           <p className="text-[0.66rem] leading-relaxed text-fg-3">
             {busy
-              ? translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "처음 한 번만 로컬 모델을 준비합니다. 원본 이미지는 서버로 보내지 않습니다.")
-              : translateCurrentStaticSourceText("domains.creator.StudioBgRemoveButton", "ko", "선택 레이어 자체를 투명 PNG로 바꾸는 빠른 작업입니다. 원본 보존이 필요하면 위 기능을 사용하세요.")}
+              ? "처음 한 번만 로컬 모델을 준비합니다. 원본 이미지는 서버로 보내지 않습니다."
+              : "선택 레이어 자체를 투명 PNG로 바꾸는 빠른 작업입니다. 원본 보존이 필요하면 위 기능을 사용하세요."}
           </p>
         )}
       </div>

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
   type LightingParams,
   type StudioVrmCostumeMeshEntry,
@@ -143,7 +139,8 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
               <section hidden={hideOnTab("scene")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <Camera size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "카메라")}</h3>
+                  카메라
+                </h3>
                 <div className="grid grid-cols-4 gap-2">
                   {CAMERA_PRESETS.map((preset) => (
                     <button
@@ -165,12 +162,13 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                   <span className="flex items-center justify-between gap-3 text-xs font-semibold text-fg-2">
                     <span className="flex items-center gap-1.5">
                       <RotateCcw size={14} className="text-accent" aria-hidden />
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "캐릭터 회전")}</span>
+                      캐릭터 회전
+                    </span>
                     <span className="numeral text-fg-3">{Math.round(THREE.MathUtils.radToDeg(bodyRotation))}°</span>
                   </span>
                   <input
                     className="mt-3 w-full accent-accent"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "캐릭터 회전")}
+                    aria-label="캐릭터 회전"
                     disabled={!vrm}
                     max="180"
                     min="-180"
@@ -185,7 +183,8 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
               <section hidden={hideOnTab("scene")} className="mt-4">
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <WandSparkles size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "조명 연출")}</h3>
+                  조명 연출
+                </h3>
                 <div className="grid grid-cols-4 gap-2">
                   {[
                     { id: "morning", label: "아침" },
@@ -208,7 +207,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                     </button>
                   ))}
                 </div>
-                <p className="mb-1.5 mt-3 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "퀵 라이팅")}</p>
+                <p className="mb-1.5 mt-3 text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">퀵 라이팅</p>
                 <div className="grid grid-cols-2 gap-2">
                   {STUDIO_VRM_LIGHTING_QUICK_PRESETS.map((preset) => (
                     <button
@@ -242,24 +241,25 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
               <details hidden={hideOnTab("scene")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-3 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "세부 조정 · 상태 저장")}<ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                  세부 조정 · 상태 저장
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
                 <div className="space-y-3.5">
                   {/* 조명 미세 조정 */}
                   <div className="space-y-1.5">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "조명 미세 조정")}</p>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">조명 미세 조정</p>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "밝기")}</span>
+                      <span className="w-12 shrink-0 font-medium">밝기</span>
                       <input type="range" min="0.2" max="3" step="0.05" value={lighting.intensity} onChange={e => setLighting((l: LightingParams) => ({...l, intensity: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.intensity.toFixed(1)}</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "색온도")}</span>
+                      <span className="w-12 shrink-0 font-medium">색온도</span>
                       <input type="range" min="0" max="1" step="0.05" value={lighting.colorTemp} onChange={e => setLighting((l: LightingParams) => ({...l, colorTemp: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
-                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.colorTemp < 0.45 ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "차갑게") : lighting.colorTemp > 0.55 ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "따뜻하게") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "중간")}</span>
+                      <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{lighting.colorTemp < 0.45 ? "차갑게" : lighting.colorTemp > 0.55 ? "따뜻하게" : "중간"}</span>
                     </label>
                     <label className="flex items-center gap-2 text-xs text-fg-2">
-                      <span className="w-12 shrink-0 font-medium">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "방향")}</span>
+                      <span className="w-12 shrink-0 font-medium">방향</span>
                       <input type="range" min="-180" max="180" step="5" value={lighting.directionDeg} onChange={e => setLighting((l: LightingParams) => ({...l, directionDeg: parseFloat(e.target.value)}))} className="h-2 flex-1 accent-accent" />
                       <span className="w-11 shrink-0 text-right tabular-nums text-fg-3">{Math.round(lighting.directionDeg)}°</span>
                     </label>
@@ -267,7 +267,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
 
                   {/* 배경 환경 */}
                   <div className="space-y-1.5 border-t border-line/45 pt-3">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "배경 환경")}</p>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">배경 환경</p>
                     <div className="flex flex-wrap gap-1.5">
                       {ENV_VARIANTS.map(({ id, label }) => (
                         <button
@@ -292,20 +292,23 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                         className="mt-0.5 size-4 accent-accent"
                       />
                       <span className="block text-xs font-bold text-fg">
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "캐릭터만 투명 추출")}<span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "삽입 PNG에서 바닥·벽 환경을 빼고 캐릭터(및 소품)만 남깁니다. 끄면 단색 배경색으로 불투명하게 넣습니다.")}</span>
+                        캐릭터만 투명 추출
+                        <span className="mt-0.5 block text-[0.68rem] font-normal leading-relaxed text-fg-3">
+                          삽입 PNG에서 바닥·벽 환경을 빼고 캐릭터(및 소품)만 남깁니다. 끄면 단색
+                          배경색으로 불투명하게 넣습니다.
+                        </span>
                       </span>
                     </label>
                     {!transparentBackground && (
                       <label className="mt-1.5 flex items-center gap-2 text-xs text-fg-2">
-                        <span className="w-14 shrink-0 font-medium">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "배경색")}</span>
+                        <span className="w-14 shrink-0 font-medium">배경색</span>
                         <input
                           type="color"
                           value={insertBackgroundColor}
                           disabled={isCapturing || isSharingPose || isThumbnailCapturing}
                           onChange={(event) => setInsertBackgroundColor(event.target.value)}
                           className="h-8 w-12 cursor-pointer rounded border border-line bg-card p-0.5"
-                          aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "삽입 배경색")}
+                          aria-label="삽입 배경색"
                         />
                         <span className="tabular-nums text-fg-3">{insertBackgroundColor}</span>
                       </label>
@@ -316,9 +319,10 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                   <div className="space-y-3 border-t border-line/45 pt-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "손 모양 정밀 편집")}</p>
+                        <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">손 모양 정밀 편집</p>
                         <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-3">
-                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "손가락을 각각 굽히고 실제 손·소품 접촉을 확대해서 확인합니다.")}</p>
+                          손가락을 각각 굽히고 실제 손·소품 접촉을 확대해서 확인합니다.
+                        </p>
                       </div>
                       <div className="grid shrink-0 grid-cols-2 gap-1">
                         <button
@@ -334,7 +338,8 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                               : "border-line bg-card text-fg-2 hover:bg-accent-soft hover:text-accent",
                           )}
                         >
-                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "왼손 확대")}</button>
+                          왼손 확대
+                        </button>
                         <button
                           type="button"
                           disabled={!vrm}
@@ -348,13 +353,14 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                               : "border-line bg-card text-fg-2 hover:bg-accent-soft hover:text-accent",
                           )}
                         >
-                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "오른손 확대")}</button>
+                          오른손 확대
+                        </button>
                       </div>
                     </div>
                     {(["left", "right"] as const).map((side) => (
                       <div key={side} className="rounded-xl border border-line/70 bg-panel/35 p-2.5">
                         <p className="text-[0.68rem] font-bold text-fg-2">
-                          {side === "left" ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "왼손") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "오른손")}
+                          {side === "left" ? "왼손" : "오른손"}
                         </p>
                         <div className="mt-2 space-y-1.5">
                           {STUDIO_VRM_FINGER_NAMES.map((finger) => {
@@ -369,7 +375,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                                   step="1"
                                   value={degrees}
                                   disabled={!vrm || webcamActive}
-                                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "{v0} {v1} 굽힘"), { v0: String(side === "left" ? "왼손" : "오른손"), v1: String(STUDIO_VRM_FINGER_LABELS[finger]) })}
+                                  aria-label={`${side === "left" ? "왼손" : "오른손"} ${STUDIO_VRM_FINGER_LABELS[finger]} 굽힘`}
                                   onChange={(event) => updateFingerCurl(side, Number(event.target.value), finger)}
                                   className="h-2 flex-1 accent-accent disabled:opacity-45"
                                 />
@@ -405,23 +411,25 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                         "border-line bg-card px-2 text-[0.66rem] font-medium text-fg-2 hover:bg-raised hover:text-accent",
                       )}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "양손 손가락 초기화")}</button>
+                      양손 손가락 초기화
+                    </button>
                   </div>
 
                   {/* 전체 상태 저장 · 불러오기 */}
                   <div className="space-y-2 border-t border-line/45 pt-3">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "전체 상태 저장 · 불러오기")}</p>
-                    <p className="text-[0.68rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.")}</p>
+                    <p className="text-[0.65rem] font-bold uppercase tracking-wider text-fg-3">전체 상태 저장 · 불러오기</p>
+                    <p className="text-[0.68rem] leading-relaxed text-fg-3">포즈 · 비율 · 손가락 · 의상 · 조명 · 소품을 한 번에 저장하고 불러옵니다.</p>
                     {vrmCreativePersistenceStatus === "memory" ? (
                       <p className="text-[0.65rem] leading-relaxed text-warn">
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "현재 탭 메모리 임시 · 새로고침 시 저장되지 않은 전체 상태가 사라집니다.")}</p>
+                        현재 탭 메모리 임시 · 새로고침 시 저장되지 않은 전체 상태가 사라집니다.
+                      </p>
                     ) : null}
                     <div className="flex gap-1.5">
                       <input
                         value={fullStateName}
                         onChange={(event) => setFullStateName(event.target.value)}
-                        placeholder={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "상태 이름")}
-                        aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "저장할 3D 캐릭터 상태 이름")}
+                        placeholder="상태 이름"
+                        aria-label="저장할 3D 캐릭터 상태 이름"
                         maxLength={STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH}
                         disabled={vrmCreativeReadOnly}
                         className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -432,11 +440,12 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                         disabled={vrmCreativeReadOnly}
                         className="shrink-0 rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-1 text-[0.68rem] font-bold text-accent transition-colors hover:bg-accent-soft disabled:opacity-45"
                       >
-                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "저장")}</button>
+                        저장
+                      </button>
                     </div>
                     <div className="flex gap-1.5">
-                      <button type="button" onClick={handleCopyFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "복사")}</button>
-                      <button type="button" onClick={handlePasteFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "붙여넣기")}</button>
+                      <button type="button" onClick={handleCopyFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">복사</button>
+                      <button type="button" onClick={handlePasteFullState} className="flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.68rem] font-medium text-fg-2 transition-colors hover:bg-raised hover:text-fg">붙여넣기</button>
                     </div>
                     {Object.keys(savedFullStates).length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -454,7 +463,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                               disabled={vrmCreativeReadOnly}
                               onClick={() => handleDeleteFullLocal(name)}
                               className="grid size-7 place-items-center border-l border-line text-fg-3 hover:text-bad disabled:opacity-45"
-                              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "{v0} 전체 포저 상태 삭제"), { v0: String(name) })}
+                              aria-label={`${name} 전체 포저 상태 삭제`}
                             >
                               <Trash2 size={11} aria-hidden />
                             </button>
@@ -470,24 +479,27 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
               <details hidden={hideOnTab("pose")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sparkles size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "생동감 연출 (대기 모션)")}<ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                  생동감 연출 (대기 모션)
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
                 <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "캐릭터가 정지해 있지 않고 자연스럽게 숨을 쉬고 눈을 깜빡이도록 설정하여 씬을 생생하게 연출합니다.")}</p>
+                  캐릭터가 정지해 있지 않고 자연스럽게 숨을 쉬고 눈을 깜빡이도록 설정하여 씬을 생생하게 연출합니다.
+                </p>
                 <div className="flex items-center justify-between text-xs text-fg-2 bg-card/40 border border-line/60 rounded-lg p-2.5">
-                  <span className="font-semibold">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "자연스러운 대기 모션 (숨쉬기 & 눈 깜빡임)")}</span>
+                  <span className="font-semibold">자연스러운 대기 모션 (숨쉬기 & 눈 깜빡임)</span>
                   <input
                     type="checkbox"
                     className="accent-accent size-4 cursor-pointer"
                     checked={idleAnimation}
                     disabled={webcamActive}
                     onChange={(e) => setIdleAnimation(e.target.checked)}
-                    title={webcamActive ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "웹캠 트래킹 중에는 비활성화됩니다") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "대기 애니메이션 토글")}
+                    title={webcamActive ? "웹캠 트래킹 중에는 비활성화됩니다" : "대기 애니메이션 토글"}
                   />
                 </div>
                 {webcamActive && (
                   <p className="mt-1.5 text-[0.68rem] text-accent font-semibold leading-relaxed">
-                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "ℹ️ 웹캠 실시간 페이스 트래킹이 활성화되어 대기 모션이 자동으로 일시 중지되었습니다.")}</p>
+                    ℹ️ 웹캠 실시간 페이스 트래킹이 활성화되어 대기 모션이 자동으로 일시 중지되었습니다.
+                  </p>
                 )}
               </details>
 
@@ -514,16 +526,18 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
               <details hidden={hideOnCharacterSection("appearance")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Sliders size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "의상 분리 · 부분 채색")}<ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                  의상 분리 · 부분 채색
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
                 {costumeMeshes.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
-                    {vrm ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "이 모델은 의상 분리 정보가 없어요.") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "모델을 먼저 불러오세요.")}
+                    {vrm ? "이 모델은 의상 분리 정보가 없어요." : "모델을 먼저 불러오세요."}
                   </p>
                 ) : (
                   <>
                     <p className="mb-2.5 text-[0.68rem] leading-relaxed text-fg-3">
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "탐지된 의상 메시를 슬롯별로 표시/숨김 토글하거나 색을 바꿉니다. 피부·얼굴·머리는 보호됩니다.")}</p>
+                      탐지된 의상 메시를 슬롯별로 표시/숨김 토글하거나 색을 바꿉니다. 피부·얼굴·머리는 보호됩니다.
+                    </p>
                     {(Object.keys(COSTUME_SLOT_LABELS) as CostumeSlot[]).map((slot) => {
                       const meshesInSlot = costumeMeshes.filter((m: StudioVrmCostumeMeshEntry) => m.slot === slot);
                       if (meshesInSlot.length === 0) return null;
@@ -536,7 +550,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                                 <button
                                   key={pal.id}
                                   type="button"
-                                  title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "{v0} ({v1} 전체)"), { v0: String(pal.label), v1: String(COSTUME_SLOT_LABELS[slot]) })}
+                                  title={`${pal.label} (${COSTUME_SLOT_LABELS[slot]} 전체)`}
                                   className="size-4 rounded-full border border-line/70"
                                   style={{ backgroundColor: pal.color }}
                                   onClick={() => recolorCostumeSlot(slot, pal.color)}
@@ -556,14 +570,14 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                                     <button
                                       type="button"
                                       disabled={autoHidden}
-                                      title={autoHidden ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "몸 맞춤 워드로브가 같은 부위의 원본 의상을 자동으로 숨겼습니다.") : undefined}
+                                      title={autoHidden ? "몸 맞춤 워드로브가 같은 부위의 원본 의상을 자동으로 숨겼습니다." : undefined}
                                       className={cx(
                                         "rounded px-1.5 py-0.5 text-[0.64rem] font-semibold transition-colors disabled:cursor-help",
                                         hidden || autoHidden ? "bg-card text-fg-3 line-through" : "bg-accent-soft text-accent"
                                       )}
                                       onClick={() => toggleCostumeMesh(entry.key)}
                                     >
-                                      {autoHidden ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "자동 숨김") : hidden ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "숨김") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "표시")}
+                                      {autoHidden ? "자동 숨김" : hidden ? "숨김" : "표시"}
                                     </button>
                                     <span className="flex-1 truncate text-[0.68rem] text-fg-2" title={entry.label}>
                                       {entry.label}
@@ -573,14 +587,15 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                                       className="text-[0.64rem] text-fg-3 hover:underline"
                                       onClick={() => setSelectedCostumeKey(isOpen ? null : entry.key)}
                                     >
-                                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "색상")}</button>
+                                      색상
+                                    </button>
                                   </div>
                                   {isOpen && (
                                     <div className="mt-1.5 flex items-center gap-2">
                                       <input
                                         type="color"
-                                        value={recolor ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "en", "#ffffff")}
-                                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "{v0} 의상 색상"), { v0: String(entry.label) })}
+                                        value={recolor ?? "#ffffff"}
+                                        aria-label={`${entry.label} 의상 색상`}
                                         onChange={(e) => recolorCostumeMesh(entry.key, e.target.value)}
                                         className="size-6 cursor-pointer rounded border border-line bg-transparent p-0"
                                       />
@@ -589,7 +604,8 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                                         className="rounded border border-line bg-card px-2 py-0.5 text-[0.64rem] text-fg-2 hover:bg-raised"
                                         onClick={() => recolorCostumeMesh(entry.key, null)}
                                       >
-                                        {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "원래 색")}</button>
+                                        원래 색
+                                      </button>
                                     </div>
                                   )}
                                 </div>
@@ -604,7 +620,8 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                       className="mt-1 w-full rounded-lg border border-line bg-card py-1.5 text-xs text-fg hover:bg-raised"
                       onClick={resetCostume}
                     >
-                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "의상 초기화")}</button>
+                      의상 초기화
+                    </button>
                   </>
                 )}
               </details>
@@ -613,13 +630,15 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
               <details hidden={hideOnCharacterSection("appearance")} className="group mt-4 rounded-xl border border-line bg-card/45 p-3">
                 <summary className="mb-2 flex cursor-pointer list-none items-center gap-1.5 text-sm font-bold text-fg [&::-webkit-details-marker]:hidden">
                   <Paintbrush size={15} className="text-accent" aria-hidden />
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "재질 효과 (그림자 · 외곽선 · 림라이트)")}<ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
+                  재질 효과 (그림자 · 외곽선 · 림라이트)
+                  <ChevronDown size={14} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
                 </summary>
                 <p className="mb-3 text-[0.68rem] leading-relaxed text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "베이스 색과 별개로 셀 셰이딩 스타일을 바꿔보세요. MToon 재질을 쓰는 모델에서만 보여요.")}</p>
+                  베이스 색과 별개로 셀 셰이딩 스타일을 바꿔보세요. MToon 재질을 쓰는 모델에서만 보여요.
+                </p>
                 {!hasMToonMaterial ? (
                   <p className="rounded-lg border border-dashed border-line/70 bg-card/40 px-2.5 py-2 text-[0.68rem] text-fg-3">
-                    {vrm ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "이 모델은 MToon 재질이 아니라 재질 효과를 지원하지 않아요.") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "모델을 먼저 불러오세요.")}
+                    {vrm ? "이 모델은 MToon 재질이 아니라 재질 효과를 지원하지 않아요." : "모델을 먼저 불러오세요."}
                   </p>
                 ) : (
                   <div className="space-y-3">
@@ -633,7 +652,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                         <span className="w-16 shrink-0 text-[0.65rem] font-semibold text-fg-2">{row.label}</span>
                         <input
                           type="color"
-                          value={materialFx[row.key] ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "en", "#ffffff")}
+                          value={materialFx[row.key] ?? "#ffffff"}
                           disabled={!vrm}
                           aria-label={row.label}
                           onChange={(e) => {
@@ -648,11 +667,12 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                           onClick={() => setMaterialFx((prev: VrmMaterialFx) => ({ ...prev, [row.key]: null }))}
                           className="rounded border border-line bg-card px-2 py-0.5 text-[0.64rem] text-fg-2 hover:bg-raised disabled:opacity-40"
                         >
-                          {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "끄기")}</button>
+                          끄기
+                        </button>
                       </div>
                     ))}
                     <label className="flex items-center gap-2 text-[0.65rem] text-fg-3">
-                      <span className="w-16 shrink-0 font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "림 강도")}</span>
+                      <span className="w-16 shrink-0 font-semibold text-fg-2">림 강도</span>
                       <input
                         type="range"
                         min="0"
@@ -665,7 +685,7 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                       />
                     </label>
                     <label className="flex items-center gap-2 text-[0.65rem] text-fg-3">
-                      <span className="w-16 shrink-0 font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "발광 강도")}</span>
+                      <span className="w-16 shrink-0 font-semibold text-fg-2">발광 강도</span>
                       <input
                         type="range"
                         min="0"
@@ -688,7 +708,8 @@ export function StudioVrmPoserPanelBodyC({ h }: { h: StudioVrmPoserHost }) {
                     if (vrmRef.current) applyVrmMaterialFx(vrmRef.current, DEFAULT_VRM_MATERIAL_FX);
                   }}
                 >
-                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmPoserPanelBodyC", "ko", "재질 효과 초기화")}</button>
+                  재질 효과 초기화
+                </button>
               </details>
 
               </>

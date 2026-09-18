@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   useCallback,
   useEffect,
   useRef,
@@ -109,11 +105,11 @@ export function StudioColorQuickPicker({
         ref={svRef}
         type="button"
         role="slider"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorQuickPicker", "ko", "채도와 명도")}
+        aria-label="채도와 명도"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(hsv.v)}
-        aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorQuickPicker", "ko", "채도 {v0}%, 명도 {v1}%"), { v0: String(Math.round(hsv.s)), v1: String(Math.round(hsv.v)) })}
+        aria-valuetext={`채도 ${Math.round(hsv.s)}%, 명도 ${Math.round(hsv.v)}%`}
         onPointerDown={(event) => {
           draggingSvRef.current = true;
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -147,7 +143,7 @@ export function StudioColorQuickPicker({
 
       <div className="space-y-1">
         <div className="flex items-center justify-between text-[0.6rem] font-medium text-fg-3">
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorQuickPicker", "ko", "색조")}</span>
+          <span>색조</span>
           <span className="font-mono tabular-nums">H {Math.round(hsv.h)}° · S {Math.round(hsv.s)} · V {Math.round(hsv.v)}</span>
         </div>
         <input
@@ -156,7 +152,7 @@ export function StudioColorQuickPicker({
           max={359}
           step={1}
           value={Math.round(hsv.h)}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorQuickPicker", "ko", "빠른 색조")}
+          aria-label="빠른 색조"
           onChange={(event) => publish({ ...hsv, h: Number(event.currentTarget.value) })}
           onPointerUp={() => onCommit?.(latestHexRef.current)}
           onPointerCancel={() => onCommit?.(latestHexRef.current)}

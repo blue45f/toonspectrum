@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -85,12 +82,12 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
     <div
       id="studio-app-shell"
       ref={studioRootRef}
-      data-studio-mobile-immersive={mobileImmersive ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "en", "true") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "en", "false")}
+      data-studio-mobile-immersive={mobileImmersive ? "true" : "false"}
       data-studio-ui-density={uiDensityMode}
       data-studio-drawing-presentation={drawingPresentation}
       data-studio-tool-hint-mode={appSettings.general.toolHintMode}
-      data-studio-reduce-motion={appSettings.other.reduceMotion ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "en", "true") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "en", "false")}
-      data-studio-device-kind={isMobile ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "en", "mobile") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "en", "desktop")}
+      data-studio-reduce-motion={appSettings.other.reduceMotion ? "true" : "false"}
+      data-studio-device-kind={isMobile ? "mobile" : "desktop"}
       data-studio-editor="true"
       data-studio-app-shell="true"
       data-studio-watermark-persistence={watermarkPreferenceSnapshot.state}
@@ -189,7 +186,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
           type="button"
           onClick={() => setCanvasOnlyMode(false)}
           className="pointer-events-auto inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 text-xs font-semibold text-fg shadow-lg backdrop-blur transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "ko", "일반 편집 화면으로 복원 (Esc)")}
+          title="일반 편집 화면으로 복원 (Esc)"
         >
           <Maximize2
             size={STUDIO_ICON_SIZE.context}
@@ -197,7 +194,8 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
             aria-hidden
             className={studioChromeIconClass({ tone: "accent" })}
           />
-          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorView", "ko", "도구막대 복원")}<kbd className="rounded border border-line bg-card px-1.5 py-0.5 text-[0.65rem] font-medium text-fg-3">Esc</kbd>
+          도구막대 복원
+          <kbd className="rounded border border-line bg-card px-1.5 py-0.5 text-[0.65rem] font-medium text-fg-3">Esc</kbd>
         </button>
       </div>
     ) : null}

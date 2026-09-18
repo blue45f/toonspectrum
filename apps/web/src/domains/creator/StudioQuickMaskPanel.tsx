@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Quick Mask Panel — 포토샵식 퀵 마스크(Q) 컨트롤. 꺼져 있으면 진입 액션만 보여주고,
  * 켜져 있으면 브러시(칠하기=선택 추가/지우기=선택 제거) 파라미터 + 마스크 반전 + 틴트 표시
@@ -104,7 +100,8 @@ export function StudioQuickMaskPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Blend size={12} aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "퀵 마스크")}</p>
+          퀵 마스크
+        </p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
@@ -112,11 +109,12 @@ export function StudioQuickMaskPanel({
         <button
           type="button"
           onClick={onEnter}
-          title={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "현재 픽셀 선택 영역을 편집 가능한 틴트 마스크로 전환합니다(선택이 없으면 빈 마스크에서 시작).")}
+          title="현재 픽셀 선택 영역을 편집 가능한 틴트 마스크로 전환합니다(선택이 없으면 빈 마스크에서 시작)."
           className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
         >
           <Blend className="size-3" aria-hidden />
-          {translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "퀵 마스크 시작")}</button>
+          퀵 마스크 시작
+        </button>
       ) : (
         <>
           <div className="flex gap-1.5">
@@ -139,24 +137,25 @@ export function StudioQuickMaskPanel({
             <button
               type="button"
               onClick={onInvert}
-              title={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "마스크의 선택/비선택 영역을 뒤집습니다(즉시 적용).")}
+              title="마스크의 선택/비선택 영역을 뒤집습니다(즉시 적용)."
               className={cn(PANEL_CHIP_CLASS, "ml-auto flex items-center gap-1")}
             >
               <Contrast className="size-3" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "반전")}</button>
+              반전
+            </button>
           </div>
 
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "브러시 크기")}
+            label="브러시 크기"
             min={QUICK_MASK_BRUSH_RADIUS_RANGE.min}
             max={QUICK_MASK_BRUSH_RADIUS_RANGE.max}
             step={QUICK_MASK_BRUSH_RADIUS_RANGE.step}
             value={radiusPx}
             onChange={onRadiusChange}
-            readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "en", "{v0}px"), { v0: String(radiusPx) })}
+            readout={`${radiusPx}px`}
           />
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "경도")}
+            label="경도"
             min={QUICK_MASK_BRUSH_HARDNESS_RANGE.min}
             max={QUICK_MASK_BRUSH_HARDNESS_RANGE.max}
             step={QUICK_MASK_BRUSH_HARDNESS_RANGE.step}
@@ -165,7 +164,7 @@ export function StudioQuickMaskPanel({
             readout={`${Math.round(hardness * 100)}%`}
           />
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "불투명도")}
+            label="불투명도"
             min={QUICK_MASK_BRUSH_OPACITY_RANGE.min}
             max={QUICK_MASK_BRUSH_OPACITY_RANGE.max}
             step={QUICK_MASK_BRUSH_OPACITY_RANGE.step}
@@ -174,7 +173,7 @@ export function StudioQuickMaskPanel({
             readout={`${Math.round(opacity * 100)}%`}
           />
 
-          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "마스크 표시 색")}</p>
+          <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">마스크 표시 색</p>
           <div className="flex flex-wrap gap-1.5">
             {QUICK_MASK_TINT_PRESETS.map((preset) => (
               <StudioSwatchChip
@@ -182,13 +181,13 @@ export function StudioQuickMaskPanel({
                 color={preset.color}
                 label={preset.label}
                 active={tintColor.toLowerCase() === preset.color.toLowerCase()}
-                title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "마스크 틴트를 {v0}으로 표시합니다(선택 결과에는 영향 없음)."), { v0: String(preset.label) })}
+                title={`마스크 틴트를 ${preset.label}으로 표시합니다(선택 결과에는 영향 없음).`}
                 onClick={() => onTintColorChange(preset.color)}
               />
             ))}
           </div>
           <StudioSliderRow
-            label={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "표시 불투명도")}
+            label="표시 불투명도"
             min={QUICK_MASK_TINT_OPACITY_RANGE.min}
             max={QUICK_MASK_TINT_OPACITY_RANGE.max}
             step={QUICK_MASK_TINT_OPACITY_RANGE.step}
@@ -201,22 +200,24 @@ export function StudioQuickMaskPanel({
             <button
               type="button"
               onClick={onCommit}
-              title={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "다듬은 마스크를 픽셀 선택 영역으로 변환하고 퀵 마스크를 끝냅니다(소프트 엣지는 페더로 보존).")}
+              title="다듬은 마스크를 픽셀 선택 영역으로 변환하고 퀵 마스크를 끝냅니다(소프트 엣지는 페더로 보존)."
               className={cn(
                 PANEL_CHIP_CLASS,
                 "flex flex-1 items-center justify-center gap-1 border-accent bg-accent-soft/50 text-fg"
               )}
             >
               <Check className="size-3" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "선택 영역으로 완료")}</button>
+              선택 영역으로 완료
+            </button>
             <button
               type="button"
               onClick={onCancel}
-              title={translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "마스크 편집을 버리고 원래 선택 영역으로 돌아갑니다.")}
+              title="마스크 편집을 버리고 원래 선택 영역으로 돌아갑니다."
               className={cn(PANEL_CHIP_CLASS, "flex items-center gap-1 text-fg-3 hover:text-fg")}
             >
               <XCircle className="size-3" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioQuickMaskPanel", "ko", "취소")}</button>
+              취소
+            </button>
           </div>
         </>
       )}

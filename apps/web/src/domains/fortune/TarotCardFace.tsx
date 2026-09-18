@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { motion, useReducedMotion } from "motion/react";
 
 import { TarotMotif } from "./TarotMotif";
@@ -84,7 +83,7 @@ export function TarotCardFace({ card, className }: TarotCardFaceProps) {
           className="mx-auto mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
           style={{ background: "rgba(0,0,0,0.45)", color: accent }}
         >
-          {reversed ? translateCurrentStaticSourceText("domains.fortune.TarotCardFace", "ko", "역방향 · Reversed") : translateCurrentStaticSourceText("domains.fortune.TarotCardFace", "ko", "정방향 · Upright")}
+          {reversed ? "역방향 · Reversed" : "정방향 · Upright"}
         </span>
         <div className="mt-2 flex flex-wrap justify-center gap-1">
           {card.keywords.slice(0, 3).map((kw, i) => (

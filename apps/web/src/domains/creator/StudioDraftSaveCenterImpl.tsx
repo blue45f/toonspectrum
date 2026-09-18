@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   CheckCircle2,
   Cloud,
   CloudOff,
@@ -556,7 +552,7 @@ export function StudioDraftSaveCenter({
       data-studio-draft-save-center
       data-studio-draft-save-phase={model.phase}
       data-studio-shell-force-visible={
-        model.tone === "danger" || model.tone === "warning" ? translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "en", "true") : undefined
+        model.tone === "danger" || model.tone === "warning" ? "true" : undefined
       }
       className={cn(
         // Mobile tool sheets occupy z53–55; the passive save launcher must not cover their controls.
@@ -574,7 +570,7 @@ export function StudioDraftSaveCenter({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
-        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "저장 상태: {v0}"), { v0: String(model.compactLabel) })}
+        aria-label={`저장 상태: ${model.compactLabel}`}
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "flex min-h-11 max-w-[min(17rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
@@ -586,7 +582,7 @@ export function StudioDraftSaveCenter({
         <StatusIcon tone={model.tone} className="h-4 w-4 shrink-0" />
         <span className="truncate">{model.compactLabel}</span>
         <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80">
-          {isOnline ? translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "온라인") : translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "오프라인")}
+          {isOnline ? "온라인" : "오프라인"}
         </span>
       </button>
 
@@ -596,8 +592,8 @@ export function StudioDraftSaveCenter({
           id={dialogId}
           role="dialog"
           aria-modal="false"
-          aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "en", "{v0}-title"), { v0: String(dialogId) })}
-          aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "en", "{v0}-description"), { v0: String(dialogId) })}
+          aria-labelledby={`${dialogId}-title`}
+          aria-describedby={`${dialogId}-description`}
           className={cn(
             "absolute right-0 w-[min(26rem,calc(100vw-1rem))] max-h-[min(76dvh,46rem)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-4 text-fg shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable]",
             anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
@@ -608,16 +604,16 @@ export function StudioDraftSaveCenter({
               <StatusIcon tone={model.tone} className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "en", "{v0}-title"), { v0: String(dialogId) })} className="text-base font-black">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "초안 저장 센터")}</h2>
+              <h2 id={`${dialogId}-title`} className="text-base font-black">초안 저장 센터</h2>
               <p className="mt-0.5 text-sm font-bold leading-snug">{model.headline}</p>
-              <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "en", "{v0}-description"), { v0: String(dialogId) })} className="mt-1 text-xs leading-relaxed text-fg-3">
+              <p id={`${dialogId}-description`} className="mt-1 text-xs leading-relaxed text-fg-3">
                 {model.detail}
               </p>
             </div>
             <button
               type="button"
               onClick={closeAndRestoreFocus}
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "초안 저장 센터 닫기")}
+              aria-label="초안 저장 센터 닫기"
               className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               <X className="h-4 w-4" aria-hidden />
@@ -625,47 +621,48 @@ export function StudioDraftSaveCenter({
           </div>
 
           <div className="mt-3 rounded-xl border border-line bg-card/70 px-3 py-2.5 text-xs text-fg-2">
-            <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "2단계 자동 보호")}</p>
+            <p className="font-bold text-fg">2단계 자동 보호</p>
             <p className="mt-1 leading-relaxed">
-              {translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "기기 복구 체크포인트와 서버 revision은 별개입니다. 편집이 멈춘 뒤 약 ")}{formatStudioDraftSaveInterval(STUDIO_SERVER_AUTOSAVE_IDLE_MS)}{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "가 지나면 서버 자동 저장도 시도합니다.")}</p>
+              기기 복구 체크포인트와 서버 revision은 별개입니다. 편집이 멈춘 뒤 약 {formatStudioDraftSaveInterval(STUDIO_SERVER_AUTOSAVE_IDLE_MS)}가 지나면 서버 자동 저장도 시도합니다.
+            </p>
           </div>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <SaveStatusCard
-              label={translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "이 기기")}
+              label="이 기기"
               section={model.device}
               icon={<Database className="h-4 w-4" />}
               footer={leadershipBasisLabel(autosaveDocumentLeadership?.basis ?? null)}
             />
             <SaveStatusCard
-              label={translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "서버 초안")}
+              label="서버 초안"
               section={model.server}
               icon={saving
                 ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
                 : <Cloud className="h-4 w-4" />}
-              footer={serverRevision === null ? translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "revision 없음") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "현재 revision #{v0}"), { v0: String(serverRevision) })}
+              footer={serverRevision === null ? "revision 없음" : `현재 revision #${serverRevision}`}
             />
           </div>
 
           <dl className="mt-3 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "기기 체크포인트")}</dt>
-              <dd className="mt-1 text-sm font-black">{checkpointCount}{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "개")}</dd>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">기기 체크포인트</dt>
+              <dd className="mt-1 text-sm font-black">{checkpointCount}개</dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "서버 revision")}</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">서버 revision</dt>
               <dd className="mt-1 text-sm font-black">{serverRevision ?? "—"}</dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "서버 버전")}</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">서버 버전</dt>
               <dd className="mt-1 flex items-center justify-center gap-1 text-sm font-black">
                 {serverRevisionLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-label={translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "버전 기록 불러오는 중")} />
-                ) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "{v0}개"), { v0: String(serverRevisions.length) })}
+                  <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-label="버전 기록 불러오는 중" />
+                ) : `${serverRevisions.length}개`}
               </dd>
             </div>
             <div className="rounded-xl border border-line bg-card/70 px-2 py-2.5">
-              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "마지막 서버 확인")}</dt>
+              <dt className="text-[0.64rem] font-bold uppercase tracking-wide text-fg-3">마지막 서버 확인</dt>
               <dd className="mt-1 text-xs font-black">
                 {lastServerSaveAt === null ? "—" : formatStudioDraftSaveTime(lastServerSaveAt)}
               </dd>
@@ -674,24 +671,25 @@ export function StudioDraftSaveCenter({
 
           {deferredSave ? (
             <div className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/20 p-3 text-xs text-warning">
-              <p className="font-bold">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "서버 저장 예약 보존 중")}</p>
+              <p className="font-bold">서버 저장 예약 보존 중</p>
               <p className="mt-1 leading-relaxed">
                 {deferredSaveDurable
-                  ? translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "원고 본문을 복제하지 않고 저장 의도만 이 탭의 세션 저장소에 기록했습니다. 새로고침 후에도 복구합니다.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "현재 탭 메모리에만 예약되어 있습니다. 새로고침하거나 탭을 닫기 전에 연결 후 저장해 주세요.")}
-                {deferredSaveQueuedAt === null ? "" : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", " · 예약 {v0}"), { v0: String(formatStudioDraftSaveTime(deferredSaveQueuedAt)) })}
+                  ? "원고 본문을 복제하지 않고 저장 의도만 이 탭의 세션 저장소에 기록했습니다. 새로고침 후에도 복구합니다."
+                  : "현재 탭 메모리에만 예약되어 있습니다. 새로고침하거나 탭을 닫기 전에 연결 후 저장해 주세요."}
+                {deferredSaveQueuedAt === null ? "" : ` · 예약 ${formatStudioDraftSaveTime(deferredSaveQueuedAt)}`}
               </p>
               <button
                 type="button"
                 onClick={cancelDeferredSave}
                 className="mt-2 min-h-9 rounded-lg border border-current/30 px-2.5 py-1.5 font-bold hover:bg-warning-soft/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
-                {translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "저장 예약 취소")}</button>
+                저장 예약 취소
+              </button>
             </div>
           ) : null}
 
           {durableSaveIntent.enabled && (durableSaveIntent.entry || durableSaveIntent.phase === "writing" || durableSaveIntent.error) ? (
-            <Suspense fallback={<p role="status">{translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "저장 대기 안내 여는 중…")}</p>}>
+            <Suspense fallback={<p role="status">저장 대기 안내 여는 중…</p>}>
               <StudioDurableSaveIntentPanel state={durableSaveIntent} saving={saving} deferredSave={deferredSave} />
             </Suspense>
           ) : null}
@@ -704,7 +702,8 @@ export function StudioDraftSaveCenter({
 
           {serverRevisionError ? (
             <p role="status" className="mt-3 rounded-xl border border-warning/40 bg-warning-soft/25 p-2.5 text-xs font-semibold leading-relaxed text-warning">
-              {translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "서버 버전 기록을 불러오지 못했습니다. 현재 편집 내용은 그대로 두고 체크포인트 패널에서 다시 시도할 수 있습니다.")}</p>
+              서버 버전 기록을 불러오지 못했습니다. 현재 편집 내용은 그대로 두고 체크포인트 패널에서 다시 시도할 수 있습니다.
+            </p>
           ) : null}
 
           <div className="mt-3 grid gap-2">
@@ -737,7 +736,8 @@ export function StudioDraftSaveCenter({
                 className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <History className="h-4 w-4" aria-hidden />
-                {translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "버전·체크포인트")}</button>
+                버전·체크포인트
+              </button>
               <button
                 type="button"
                 onClick={() => void Promise.resolve(onExportBackup())}
@@ -750,13 +750,14 @@ export function StudioDraftSaveCenter({
                 )}
               >
                 <Download className="h-4 w-4" aria-hidden />
-                {backupAvailable ? translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "프로젝트 백업") : translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "원고 로드 후 백업")}
+                {backupAvailable ? "프로젝트 백업" : "원고 로드 후 백업"}
               </button>
             </div>
           </div>
 
           <p className="mt-3 text-[0.68rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioDraftSaveCenterImpl", "ko", "같은 탭의 저장 예약과 재실행 후 확인할 기기 기록은 구분됩니다. 저장 대기 기록은 원고 저장 완료를 뜻하지 않습니다. 원고 복구·기기 저장 상태를 확인하고 프로젝트 백업을 보관해 주세요. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.")}</p>
+            같은 탭의 저장 예약과 재실행 후 확인할 기기 기록은 구분됩니다. 저장 대기 기록은 원고 저장 완료를 뜻하지 않습니다. 원고 복구·기기 저장 상태를 확인하고 프로젝트 백업을 보관해 주세요. 충돌 시에는 자동 덮어쓰기 대신 버전 비교·복원 흐름을 사용합니다.
+          </p>
         </div>
       ) : null}
     </div>

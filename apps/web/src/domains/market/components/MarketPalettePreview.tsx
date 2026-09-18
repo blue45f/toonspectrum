@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, Copy, Download, Palette } from "lucide-react";
 import { useState } from "react";
 
@@ -54,22 +50,23 @@ export function MarketPalettePreview({
     <div
       role="region"
       aria-labelledby="market-palette-heading"
-      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "en", "overflow-hidden rounded-xl border border-line bg-card {v0}"), { v0: String(className ?? "") })}
+      className={`overflow-hidden rounded-xl border border-line bg-card ${className ?? ""}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 bg-panel/50">
         <div className="flex items-center gap-2">
           <Palette className="h-4 w-4 text-accent" aria-hidden="true" />
-          <h2 id="market-palette-heading" className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "색상 구성 (")}{colors.length}{translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "색)")}</h2>
+          <h2 id="market-palette-heading" className="text-xs font-semibold text-fg">색상 구성 ({colors.length}색)</h2>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleDownloadPaletteJson}
             className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-8 px-2 text-[0.68rem] pointer-coarse:min-h-11" })}
-            title={translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "JSON 파일로 다운로드")}
+            title="JSON 파일로 다운로드"
           >
             <Download className="h-3 w-3 mr-1" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "JSON 저장")}</button>
+            JSON 저장
+          </button>
         </div>
       </div>
 
@@ -93,7 +90,7 @@ export function MarketPalettePreview({
                 <button
                   type="button"
                   onClick={() => void handleCopyColor(color)}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "{v0} 색상 복사"), { v0: String(color) })}
+                  aria-label={`${color} 색상 복사`}
                   className="group relative flex w-full flex-col overflow-hidden rounded-lg border border-line text-left transition-transform duration-150 hover:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
                   <div
@@ -104,11 +101,13 @@ export function MarketPalettePreview({
                       {isCopied ? (
                         <>
                           <Check className="h-3 w-3 text-good" aria-hidden="true" />
-                          {translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "복사됨")}</>
+                          복사됨
+                        </>
                       ) : (
                         <>
                           <Copy className="h-3 w-3" aria-hidden="true" />
-                          {translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "복사")}</>
+                          복사
+                        </>
                       )}
                     </span>
                   </div>
@@ -124,13 +123,15 @@ export function MarketPalettePreview({
       </div>
 
       <div className="flex min-h-8 items-center justify-between gap-3 border-t border-line bg-panel/30 px-4 py-2 text-[0.68rem] text-fg-3">
-        <span>{translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "색상 타일을 선택하면 HEX 코드를 클립보드에 복사합니다.")}</span>
+        <span>색상 타일을 선택하면 HEX 코드를 클립보드에 복사합니다.</span>
         {copiedColor ? (
           <span className="font-semibold text-good inline-flex items-center gap-1" aria-live="polite">
-            <Check className="h-3 w-3" aria-hidden="true" /> {copiedColor} {translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "복사 완료")}</span>
+            <Check className="h-3 w-3" aria-hidden="true" /> {copiedColor} 복사 완료
+          </span>
         ) : copyError ? (
           <span className="inline-flex items-center gap-1 font-semibold text-bad" role="alert">
-            {copyError} {translateCurrentStaticSourceText("domains.market.components.MarketPalettePreview", "ko", "복사 실패 · 브라우저 권한을 확인해 주세요")}</span>
+            {copyError} 복사 실패 · 브라우저 권한을 확인해 주세요
+          </span>
         ) : null}
       </div>
     </div>

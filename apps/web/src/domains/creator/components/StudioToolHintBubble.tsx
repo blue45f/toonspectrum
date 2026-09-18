@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Lightbulb, LockKeyhole, Sparkles } from "lucide-react";
 import {
   Suspense,
@@ -114,7 +110,7 @@ function StudioToolHintPreviewFallback({
         <StudioColorVisionHintPreview
           animate={false}
           variant={variant}
-          filterId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "{v0}-color-vision"), { v0: String(fallbackId) })}
+          filterId={`${fallbackId}-color-vision`}
         />
       ) : (
         <>
@@ -249,13 +245,13 @@ export function StudioToolHintBubble({
       ref={bubbleRef}
       role="tooltip"
       data-studio-tool-hint="true"
-      data-studio-tool-hint-expanded={coachExpanded ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "true") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "false")}
+      data-studio-tool-hint-expanded={coachExpanded ? "true" : "false"}
       data-studio-tool-hint-condensed={
-        richPreviewEnabled && expanded && !richCoachAvailable ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "true") : undefined
+        richPreviewEnabled && expanded && !richCoachAvailable ? "true" : undefined
       }
-      data-studio-tool-hint-reduced-motion={reducedMotion ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "true") : undefined}
+      data-studio-tool-hint-reduced-motion={reducedMotion ? "true" : undefined}
       data-studio-tool-hint-viewport={viewport.source}
-      data-studio-tool-hint-layout={coachExpanded ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "expanded") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "en", "compact")}
+      data-studio-tool-hint-layout={coachExpanded ? "expanded" : "compact"}
       data-side={position.side}
       id={id ?? defaultHintId(hint)}
       className={cn(
@@ -299,7 +295,7 @@ export function StudioToolHintBubble({
           {richCoachAvailable ? (
             <span className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-accent">
               <Sparkles size={10} strokeWidth={1.8} aria-hidden />
-              {coachExpanded ? translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "ko", "동작 미리보기") : translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "ko", "잠시 머물러 미리보기")}
+              {coachExpanded ? "동작 미리보기" : "잠시 머물러 미리보기"}
             </span>
           ) : null}
         </div>
@@ -345,7 +341,7 @@ export function StudioToolHintBubble({
           className="mt-2 flex items-start gap-1.5 rounded-md border border-warn/35 bg-warn/10 px-2 py-1.5 text-[0.7rem] leading-relaxed"
         >
           <LockKeyhole size={12} strokeWidth={1.9} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-          <span className="shrink-0 font-bold text-warn">{translateCurrentStaticSourceText("domains.creator.components.StudioToolHintBubble", "ko", "사용 조건")}</span>
+          <span className="shrink-0 font-bold text-warn">사용 조건</span>
           <span className="min-w-0 text-fg-2">{unavailableReason}</span>
         </div>
       ) : null}

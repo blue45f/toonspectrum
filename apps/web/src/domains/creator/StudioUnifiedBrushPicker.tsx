@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Mobile built-in preset shelf.
  *
@@ -95,13 +91,13 @@ export function StudioUnifiedBrushPicker({
   };
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "기본 프리셋")}
+      aria-label="기본 프리셋"
       data-studio-unified-brush-picker="mobile"
       className="relative space-y-1.5"
     >
       <div className="flex items-center justify-between gap-2 px-0.5">
-        <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "기본 프리셋")}</p>
-        <p className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "앱 제공 · 내 브러시와 별도")}</p>
+        <p className="text-[0.68rem] font-bold text-fg-2">기본 프리셋</p>
+        <p className="text-[0.6rem] text-fg-3">앱 제공 · 내 브러시와 별도</p>
       </div>
       <StudioActiveBrushSummary
         brushId={catalogBrushId}
@@ -118,9 +114,9 @@ export function StudioUnifiedBrushPicker({
           <button
             type="button"
             onClick={() => onToggleFavoriteBrush(catalogBrushId)}
-            aria-label={activeFavorite ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "{v0} 즐겨찾기 해제"), { v0: String(activeName) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "{v0} 즐겨찾기"), { v0: String(activeName) })}
+            aria-label={activeFavorite ? `${activeName} 즐겨찾기 해제` : `${activeName} 즐겨찾기`}
             aria-pressed={activeFavorite}
-            title={activeFavorite ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "현재 브러시 즐겨찾기 해제") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "현재 브러시 즐겨찾기")}
+            title={activeFavorite ? "현재 브러시 즐겨찾기 해제" : "현재 브러시 즐겨찾기"}
             className={cn(
               "grid size-11 shrink-0 place-items-center rounded-xl border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
               activeFavorite
@@ -128,7 +124,7 @@ export function StudioUnifiedBrushPicker({
                 : "border-line/70 text-fg-3 hover:bg-raised hover:text-fg"
             )}
           >
-            <Bookmark size={14} fill={activeFavorite ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "en", "none")} aria-hidden />
+            <Bookmark size={14} fill={activeFavorite ? "currentColor" : "none"} aria-hidden />
           </button>
         )}
       />
@@ -141,14 +137,14 @@ export function StudioUnifiedBrushPicker({
         libraryOpen={catalogOpen}
         onOpenLibrary={onToggleCatalog}
         onSelect={(item) => selectBrushId(item.id)}
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천")}
+        aria-label="기본 프리셋 빠른 선택 — 즐겨찾기, 최근 사용, 추천"
         className="w-full"
       />
 
       {stampTuning && onStampTuningChange ? (
         <div
           role="group"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "스탬프 브러시 세부 조절")}
+          aria-label="스탬프 브러시 세부 조절"
           className="grid grid-cols-3 gap-1.5 rounded-xl border border-line/70 bg-card/55 p-2"
         >
           {STAMP_TUNING_CONTROLS.map((control) => (
@@ -169,7 +165,7 @@ export function StudioUnifiedBrushPicker({
                   ...stampTuning,
                   [control.key]: Number(event.target.value) / 100,
                 })}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioUnifiedBrushPicker", "ko", "스탬프 {v0}"), { v0: String(control.label) })}
+                aria-label={`스탬프 ${control.label}`}
                 className="h-11 w-full cursor-pointer accent-accent"
               />
             </label>

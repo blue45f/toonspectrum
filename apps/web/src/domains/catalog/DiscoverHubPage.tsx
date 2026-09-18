@@ -1,9 +1,4 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   CalendarDays,
   Compass,

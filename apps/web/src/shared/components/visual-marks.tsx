@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { getCollectionIconOption } from "./visual-marks-utils";
 
 import type { Platform } from "@/shared/lib/types";
@@ -157,7 +156,7 @@ function PlatformSymbol({
             className="relative font-display font-black leading-none"
             style={markStyle({ color: "var(--mark-plate-text)", fontSize: detailed ? "0.38em" : "0.68em" })}
           >
-            {detailed ? translateCurrentStaticSourceText("shared.components.visual.marks", "en", "WEBTOON") : "W"}
+            {detailed ? "WEBTOON" : "W"}
           </span>
         </span>
       );
@@ -168,7 +167,7 @@ function PlatformSymbol({
             className="relative font-display font-black leading-none"
             style={markStyle({ color: "var(--mark-plate-text)", fontSize: detailed ? "0.42em" : "0.72em" })}
           >
-            {detailed ? translateCurrentStaticSourceText("shared.components.visual.marks", "en", "series") : "S"}
+            {detailed ? "series" : "S"}
           </span>
         </span>
       );
@@ -186,11 +185,12 @@ function PlatformSymbol({
             className="font-display font-black leading-none"
             style={markStyle({ color: "var(--mark-fg)", fontSize: detailed ? "0.44em" : "0.82em" })}
           >
-            {detailed ? translateCurrentStaticSourceText("shared.components.visual.marks", "en", "KAKAO") : "K"}
+            {detailed ? "KAKAO" : "K"}
           </span>
           {detailed ? (
             <span className="absolute bottom-[12%] font-display text-[0.22em] font-bold tracking-[0.08em] text-[var(--mark-fg)]">
-              {translateCurrentStaticSourceText("shared.components.visual.marks", "en", "WEBTOON")}</span>
+              WEBTOON
+            </span>
           ) : null}
           <span className="absolute right-[4%] top-[16%] h-[64%] w-[16%] rotate-45 rounded-full bg-[var(--mark-fg)] opacity-75" />
         </span>

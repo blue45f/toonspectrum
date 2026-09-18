@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Navigate, useParams } from "react-router-dom";
 
 import {
@@ -32,7 +31,7 @@ export function StudioTemplateStartRoute() {
   params.sort();
   return (
     <Navigate
-      to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplateStartRoute", "en", "/studio/draft/{v0}?{v1}"), { v0: String(encodeURIComponent(draftId(template.id))), v1: String(params.toString()) })}
+      to={`/studio/draft/${encodeURIComponent(draftId(template.id))}?${params.toString()}`}
       replace
     />
   );

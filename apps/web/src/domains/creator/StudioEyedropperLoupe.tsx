@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
@@ -151,7 +150,7 @@ export function StudioEyedropperLoupe({
             style={{ backgroundColor: safeSwatch(sample?.hex) }}
           />
           <span className="min-w-0">
-            <span className="block text-[0.56rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioEyedropperLoupe", "ko", "채집")}</span>
+            <span className="block text-[0.56rem] text-fg-3">채집</span>
             <span className="block truncate font-mono text-[0.62rem] font-semibold uppercase text-fg">
               {sampledHex}
             </span>

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Detached, same-origin companion for Studio. The primary owns the editable document and undo;
  * this window only receives bounded review projections/WebP previews and sends validated intents.
@@ -1453,7 +1449,7 @@ export function StudioToolsCompanionPage({
             </span>
           </p>
           </div>
-          {effectiveSurface === "workspace" ? <button type="button" aria-label={translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "ko", "탭·창 관리로 이동")}
+          {effectiveSurface === "workspace" ? <button type="button" aria-label="탭·창 관리로 이동"
             onClick={() => {
               setMode("tools");
               requestAnimationFrame(() => {
@@ -1462,7 +1458,8 @@ export function StudioToolsCompanionPage({
                 heading?.scrollIntoView({ block: "nearest" });
               });
             }} className="min-h-11 rounded-xl border border-line bg-card px-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent/50">
-            {translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "ko", "탭·창 관리")}</button> : null}
+            탭·창 관리
+          </button> : null}
           <button
             type="button"
             disabled={!sessionId}
@@ -1515,10 +1512,10 @@ export function StudioToolsCompanionPage({
                 key={id}
                 type="button"
                 role="tab"
-                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "companion-mode-tab-{v0}"), { v0: String(id) })}
+                id={`companion-mode-tab-${id}`}
                 aria-label={label}
                 aria-selected={mode === id}
-                aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "companion-mode-panel-{v0}"), { v0: String(id) })}
+                aria-controls={`companion-mode-panel-${id}`}
                 tabIndex={mode === id ? 0 : -1}
                 onClick={() => setMode(id)}
                 onKeyDown={(event) => handleModeTabKeyDown(event, index)}
@@ -1579,12 +1576,12 @@ export function StudioToolsCompanionPage({
             role={screenPlacementStatus.kind === "requesting"
               || screenPlacementStatus.kind === "requested"
               || screenPlacementStatus.kind === "restored"
-              ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "status")
-              : translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "alert")}
+              ? "status"
+              : "alert"}
             aria-live={screenPlacementStatus.kind === "requesting"
               || screenPlacementStatus.kind === "requested"
               || screenPlacementStatus.kind === "restored"
-              ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "polite")
+              ? "polite"
               : undefined}
             className={cn(
               "rounded-xl border px-3 py-2 text-xs",
@@ -1725,9 +1722,9 @@ export function StudioToolsCompanionPage({
 
         {effectiveSurface === "workspace" || effectiveSurface === "navigator" ? (
           <div
-            role={effectiveSurface === "workspace" ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "tabpanel") : undefined}
+            role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
             id="companion-mode-panel-navigator"
-            aria-labelledby={effectiveSurface === "workspace" ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "companion-mode-tab-navigator") : undefined}
+            aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-navigator" : undefined}
               aria-label={effectiveSurface === "navigator" ? t("studio.toolsCompanion.navigatorAria") : undefined}
             hidden={effectiveSurface === "workspace" && mode !== "navigator"}
             className={cn(dedicatedLayout && "flex min-h-0 flex-1 flex-col")}
@@ -1752,7 +1749,7 @@ export function StudioToolsCompanionPage({
                 viewport={projection?.viewport ?? { x: 0, y: 0, width: 1, height: 1 }}
                 connected={interactionReady}
                 captureAllowed={projection?.captureAllowed ?? false}
-                layout={dedicatedLayout ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "dedicated") : translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "embedded")}
+                layout={dedicatedLayout ? "dedicated" : "embedded"}
                 onNavigate={queueNavigatorControl}
               />
             )}
@@ -1761,9 +1758,9 @@ export function StudioToolsCompanionPage({
 
         {effectiveSurface === "workspace" || effectiveSurface === "review" ? (
           <div
-            role={effectiveSurface === "workspace" ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "tabpanel") : undefined}
+            role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
             id="companion-mode-panel-review"
-            aria-labelledby={effectiveSurface === "workspace" ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "companion-mode-tab-review") : undefined}
+            aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-review" : undefined}
             aria-label={effectiveSurface === "review" ? t("studio.toolsCompanion.reviewAria") : undefined}
             hidden={effectiveSurface === "workspace" && mode !== "review"}
             className={cn(dedicatedLayout && "flex min-h-0 flex-1 flex-col")}
@@ -1772,7 +1769,7 @@ export function StudioToolsCompanionPage({
               projection={projection}
               connected={interactionReady}
               presentationSafe={presentationSafe}
-              layout={dedicatedLayout ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "dedicated") : translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "embedded")}
+              layout={dedicatedLayout ? "dedicated" : "embedded"}
               onSelectLayer={(layerId) => sendControl({ kind: "select-layer", layerId })}
               onHistory={(action) => sendControl({ kind: "history", action })}
               onCommentFocus={(threadId) => sendControl({ kind: "comment-focus", threadId })}
@@ -1784,13 +1781,13 @@ export function StudioToolsCompanionPage({
         {effectiveSurface === "reference"
         || (effectiveSurface === "workspace" && mode === "reference") ? (
           <div
-            role={effectiveSurface === "workspace" ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "tabpanel") : undefined}
+            role={effectiveSurface === "workspace" ? "tabpanel" : undefined}
             id="companion-mode-panel-reference"
-            aria-labelledby={effectiveSurface === "workspace" ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "companion-mode-tab-reference") : undefined}
+            aria-labelledby={effectiveSurface === "workspace" ? "companion-mode-tab-reference" : undefined}
             aria-label={effectiveSurface === "reference" ? t("studio.toolsCompanion.referenceAria") : undefined}
             className={dedicatedLayout
-              ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "flex min-h-[29rem] flex-1 flex-col")
-              : translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "min-h-0")}
+              ? "flex min-h-[29rem] flex-1 flex-col"
+              : "min-h-0"}
           >
             {presentationSafe ? (
               <section className="grid min-h-64 flex-1 place-items-center rounded-xl border border-line bg-card px-5 text-center">
@@ -1833,10 +1830,10 @@ export function StudioToolsCompanionPage({
             role="tabpanel"
             id="companion-mode-panel-assistant"
             aria-labelledby="companion-mode-tab-assistant"
-            className={dedicatedLayout ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "flex min-h-[29rem] flex-1 flex-col") : translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "min-h-0")}
+            className={dedicatedLayout ? "flex min-h-[29rem] flex-1 flex-col" : "min-h-0"}
           >
             <StudioCompanionAssistantDisplay
-              layout={dedicatedLayout ? translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "dedicated") : translateCurrentStaticSourceText("domains.creator.StudioToolsCompanionPage", "en", "embedded")}
+              layout={dedicatedLayout ? "dedicated" : "embedded"}
             />
           </div>
         ) : null}

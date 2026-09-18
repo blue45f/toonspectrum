@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Check,
   Eye,
   Layers,
@@ -231,12 +227,14 @@ export function StudioEyedropperPanel({
         <div className="min-w-0">
           <h3 id={headingId} className="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-fg">
             <Pipette className="size-3.5 text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "정밀 스포이드")}</h3>
+            정밀 스포이드
+          </h3>
           <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3 text-pretty pointer-coarse:text-sm">
-            {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "표시색 또는 레이어를 선택해 한 픽셀부터 넓은 평균색까지 채집합니다.")}</p>
+            표시색 또는 레이어를 선택해 한 픽셀부터 넓은 평균색까지 채집합니다.
+          </p>
         </div>
-        <StudioContextPill tone={active ? translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "en", "accent") : translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "en", "neutral")}>
-          {active ? translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "채집 중") : "I"}
+        <StudioContextPill tone={active ? "accent" : "neutral"}>
+          {active ? "채집 중" : "I"}
         </StudioContextPill>
       </header>
 
@@ -258,16 +256,18 @@ export function StudioEyedropperPanel({
         )}
       >
         <MousePointerClick className="size-4" aria-hidden />
-        {active ? translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "캔버스를 눌러 색 채집") : translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "캔버스 스포이드 켜기")}
+        {active ? "캔버스를 눌러 색 채집" : "캔버스 스포이드 켜기"}
       </button>
       <p className="text-center text-[0.65rem] leading-relaxed text-fg-3 pointer-coarse:text-xs">
-        {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "펜을 쓰는 중에는 ")}<kbd className="rounded border border-line bg-canvas px-1 py-0.5 font-sans">Alt</kbd>{translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "를 누른 채 클릭하면 잠시만 스포이드로 전환됩니다.")}</p>
+        펜을 쓰는 중에는 <kbd className="rounded border border-line bg-canvas px-1 py-0.5 font-sans">Alt</kbd>를
+        누른 채 클릭하면 잠시만 스포이드로 전환됩니다.
+      </p>
 
       <fieldset disabled={disabled}>
-        <legend className="mb-1.5 text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">{translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "참조 대상")}</legend>
+        <legend className="mb-1.5 text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">참조 대상</legend>
         <div
           role="radiogroup"
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "스포이드 참조 대상")}
+          aria-label="스포이드 참조 대상"
           className="grid grid-cols-3 gap-1 rounded-xl border border-line/70 bg-canvas/65 p-1"
         >
           {REFERENCE_OPTIONS.map((option, index) => {
@@ -318,16 +318,16 @@ export function StudioEyedropperPanel({
                 ? "bg-raised/50 text-fg-3"
                 : "border border-warn/35 bg-warn/10 text-warn",
             )}
-            role={activeLayerName ? undefined : translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "en", "status")}
+            role={activeLayerName ? undefined : "status"}
           >
-            {activeLayerName ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "현재 레이어 · {v0}"), { v0: String(activeLayerName) }) : translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "먼저 채집할 레이어를 선택해 주세요.")}
+            {activeLayerName ? `현재 레이어 · ${activeLayerName}` : "먼저 채집할 레이어를 선택해 주세요."}
           </p>
         ) : null}
       </fieldset>
 
       <fieldset disabled={disabled}>
-        <legend className="mb-1.5 text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">{translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "저장할 색")}</legend>
-        <div role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "스포이드 색상 슬롯")} className="grid grid-cols-2 gap-1.5">
+        <legend className="mb-1.5 text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">저장할 색</legend>
+        <div role="radiogroup" aria-label="스포이드 색상 슬롯" className="grid grid-cols-2 gap-1.5">
           {(["primary", "secondary"] as const).map((target, index) => {
             const selected = settings.target === target;
             const targetColor = target === "primary" ? primaryColor : secondaryColor;
@@ -342,7 +342,7 @@ export function StudioEyedropperPanel({
                 role="radio"
                 aria-checked={selected}
                 tabIndex={selected ? 0 : -1}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "{v0}에 채집 · 현재 {v1}"), { v0: String(label), v1: String(targetColor) })}
+                aria-label={`${label}에 채집 · 현재 ${targetColor}`}
                 onClick={() => updateSettings({ target })}
                 onKeyDown={(event) => moveRadioFocus({
                   event,
@@ -381,28 +381,29 @@ export function StudioEyedropperPanel({
 
       <div className="space-y-2 border-t border-line/60 pt-2.5">
         <div className="flex items-center justify-between gap-3">
-          <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "en", "{v0}-average"), { v0: String(headingId) })} className="text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">
-            {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "평균 영역")}</label>
+          <label htmlFor={`${headingId}-average`} className="text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">
+            평균 영역
+          </label>
           <output
-            htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "en", "{v0}-average"), { v0: String(headingId) })}
+            htmlFor={`${headingId}-average`}
             className="rounded-md bg-raised px-1.5 py-0.5 font-mono text-[0.65rem] tabular-nums text-fg-2 pointer-coarse:text-xs"
           >
             {samplingAreaLabel(settings.averageRadius)}
           </output>
         </div>
         <input
-          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "en", "{v0}-average"), { v0: String(headingId) })}
+          id={`${headingId}-average`}
           type="range"
           min={0}
           max={STUDIO_EYEDROPPER_MAX_AVERAGE_RADIUS}
           step={1}
           value={settings.averageRadius}
           disabled={disabled}
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "스포이드 평균 반경 · {v0}픽셀"), { v0: String(settings.averageRadius) })}
+          aria-label={`스포이드 평균 반경 · ${settings.averageRadius}픽셀`}
           onChange={(event) => updateSettings({ averageRadius: Number(event.target.value) })}
           className="h-7 w-full cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:h-11"
         />
-        <div className="grid grid-cols-4 gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "평균 영역 빠른 선택")}>
+        <div className="grid grid-cols-4 gap-1" aria-label="평균 영역 빠른 선택">
           {AVERAGE_PRESETS.map((preset) => (
             <button
               key={preset.radius}
@@ -429,15 +430,15 @@ export function StudioEyedropperPanel({
         <ToggleRow
           checked={settings.showLoupe}
           disabled={disabled}
-          label={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "확대 루페")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "포인터 주변 픽셀과 채집 색을 함께 표시")}
+          label="확대 루페"
+          description="포인터 주변 픽셀과 채집 색을 함께 표시"
           onToggle={() => updateSettings({ showLoupe: !settings.showLoupe })}
         />
         <ToggleRow
           checked={settings.autoReturn}
           disabled={disabled}
-          label={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "채집 후 이전 도구로")}
-          description={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "전용 스포이드로 한 번 고른 뒤 자동 복귀")}
+          label="채집 후 이전 도구로"
+          description="전용 스포이드로 한 번 고른 뒤 자동 복귀"
           onToggle={() => updateSettings({ autoReturn: !settings.autoReturn })}
         />
       </div>
@@ -452,16 +453,17 @@ export function StudioEyedropperPanel({
         )}>
           <span className="inline-flex items-center gap-1.5">
             <SlidersHorizontal className="size-3.5" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "제외 설정")}</span>
+            제외 설정
+          </span>
           <span className="text-[0.62rem] font-normal text-fg-3 pointer-coarse:text-xs">
-            {layerExclusionsAvailable ? translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "레이어 참조에 적용") : translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "레이어 참조에서 사용")}
+            {layerExclusionsAvailable ? "레이어 참조에 적용" : "레이어 참조에서 사용"}
           </span>
         </summary>
         <fieldset
           disabled={disabled || !layerExclusionsAvailable}
           className="mt-1 space-y-0.5 rounded-lg bg-canvas/45 p-1"
         >
-          <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "스포이드에서 제외할 레이어")}</legend>
+          <legend className="sr-only">스포이드에서 제외할 레이어</legend>
           {EXCLUSION_OPTIONS.map((option) => (
             <ToggleRow
               key={option.key}
@@ -473,7 +475,8 @@ export function StudioEyedropperPanel({
           ))}
           {!layerExclusionsAvailable ? (
             <p className="px-2 pb-1 text-[0.64rem] leading-relaxed text-fg-3 pointer-coarse:text-xs">
-              {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "표시색은 완성 화면 그대로 채집합니다. 제외 옵션은 현재·최상위 레이어에서 적용됩니다.")}</p>
+              표시색은 완성 화면 그대로 채집합니다. 제외 옵션은 현재·최상위 레이어에서 적용됩니다.
+            </p>
           ) : null}
         </fieldset>
       </details>
@@ -491,7 +494,7 @@ export function StudioEyedropperPanel({
           />
           <span className="min-w-0">
             <span className="block text-[0.64rem] text-fg-3 pointer-coarse:text-xs">
-              {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "마지막 채집 · ")}{referenceLabel(lastSample?.reference ?? settings.reference)}
+              마지막 채집 · {referenceLabel(lastSample?.reference ?? settings.reference)}
             </span>
             <span className="block font-mono text-xs font-semibold uppercase text-fg pointer-coarse:text-sm">
               {safeLastSample}
@@ -503,7 +506,7 @@ export function StudioEyedropperPanel({
             ) : null}
           </span>
           <span className="ml-auto text-right">
-            <span className="block text-[0.6rem] text-fg-3 pointer-coarse:text-xs">{settings.target === "primary" ? translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "주 색") : translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "보조 색")}</span>
+            <span className="block text-[0.6rem] text-fg-3 pointer-coarse:text-xs">{settings.target === "primary" ? "주 색" : "보조 색"}</span>
             <span className="block font-mono text-[0.62rem] text-fg-2 pointer-coarse:text-xs">
               {normalizeHexColor(selectedTargetColor) ?? selectedTargetColor}
             </span>
@@ -513,16 +516,16 @@ export function StudioEyedropperPanel({
 
       <div className="border-t border-line/60 pt-2.5">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <p className="text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">{translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "최근 채집 색")}</p>
+          <p className="text-[0.7rem] font-medium text-fg-2 pointer-coarse:text-sm">최근 채집 색</p>
           <span className="text-[0.62rem] text-fg-3 pointer-coarse:text-xs">{dedupedRecentColors.length}/10</span>
         </div>
         {dedupedRecentColors.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "최근 스포이드 색상")}>
+          <div className="flex flex-wrap gap-1.5" aria-label="최근 스포이드 색상">
             {dedupedRecentColors.map((hex, index) => (
               <button
                 key={hex}
                 type="button"
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "최근 채집 색 {v0} {v1} · {v2}에 적용"), { v0: String(index + 1), v1: String(hex), v2: String(settings.target === "primary" ? "주 색" : "보조 색") })}
+                aria-label={`최근 채집 색 ${index + 1} ${hex} · ${settings.target === "primary" ? "주 색" : "보조 색"}에 적용`}
                 disabled={disabled}
                 onClick={() => onSelectRecentColor(hex, settings.target)}
                 className={cn(
@@ -540,7 +543,8 @@ export function StudioEyedropperPanel({
           </div>
         ) : (
           <p className="rounded-lg border border-dashed border-line/80 px-2.5 py-2 text-[0.66rem] leading-relaxed text-fg-3 pointer-coarse:text-xs">
-            {translateCurrentStaticSourceText("domains.creator.StudioEyedropperPanel", "ko", "캔버스에서 색을 고르면 최근 채집 색이 여기에 쌓입니다.")}</p>
+            캔버스에서 색을 고르면 최근 채집 색이 여기에 쌓입니다.
+          </p>
         )}
       </div>
     </section>

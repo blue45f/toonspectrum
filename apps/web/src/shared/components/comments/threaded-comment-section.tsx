@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ChevronDown,
   ChevronUp,
   Copy,
@@ -128,7 +124,8 @@ function CommentComposer({
               className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-line px-2.5 text-xs font-medium text-fg-3 transition-colors hover:text-fg"
             >
               <X size={12} aria-hidden />
-              {translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "취소")}</button>
+              취소
+            </button>
           ) : null}
           <button
             type="button"
@@ -137,11 +134,11 @@ function CommentComposer({
             className="inline-flex min-h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <Send size={12} aria-hidden />
-            {submitting ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "저장 중...") : submitLabel}
+            {submitting ? "저장 중..." : submitLabel}
           </button>
         </div>
       </div>
-      <p className="mt-1 text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "⌘/Ctrl + Enter로 등록 · Esc로 닫기")}</p>
+      <p className="mt-1 text-[0.62rem] text-fg-3">⌘/Ctrl + Enter로 등록 · Esc로 닫기</p>
     </div>
   );
 }
@@ -413,7 +410,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
     return (
       <div key={comment.id} className={cn(depth > 0 && "border-l border-line/70 pl-3 sm:pl-4")}>
         <article
-          id={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "en", "comment-{v0}"), { v0: String(comment.id) })}
+          id={`comment-${comment.id}`}
           tabIndex={-1}
           className={cn(
             "scroll-mt-24 rounded-xl border border-line bg-card/55 p-3 transition-colors target:border-accent target:bg-accent-soft/30 sm:p-3.5",
@@ -432,8 +429,8 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                   <span className="max-w-48 truncate font-semibold text-fg-2">{comment.author.name}</span>
                 )}
                 <time dateTime={comment.createdAt}>{relativeDate(comment.createdAt)}</time>
-                {isEdited(comment) && !deleted ? <span>{translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "수정됨")}</span> : null}
-                {depth > 0 ? <span>{translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "대댓글")}</span> : null}
+                {isEdited(comment) && !deleted ? <span>수정됨</span> : null}
+                {depth > 0 ? <span>대댓글</span> : null}
               </div>
 
               {isEditing ? (
@@ -447,15 +444,15 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                       clearDraft(editDraftKey);
                     }}
                     maxLength={maxLength}
-                    placeholder={translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "댓글 수정")}
+                    placeholder="댓글 수정"
                     submitting={busyKeys.has(`edit:${comment.id}`)}
                     compact
-                    submitLabel={translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "수정 저장")}
+                    submitLabel="수정 저장"
                   />
                 </div>
               ) : deleted ? (
                 <p className="mt-1.5 text-sm italic leading-relaxed text-fg-3">
-                  {comment.hidden ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "운영 정책에 따라 숨겨진 댓글입니다.") : translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "삭제된 댓글입니다.")}
+                  {comment.hidden ? "운영 정책에 따라 숨겨진 댓글입니다." : "삭제된 댓글입니다."}
                 </p>
               ) : (
                 <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">
@@ -471,14 +468,14 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                       onClick={() => void toggleLike(comment.id)}
                       disabled={!viewerId || disabled || busyKeys.has(`like:${comment.id}`)}
                       aria-pressed={comment.viewerLiked}
-                      title={viewerId ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "공감") : translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "로그인 후 공감할 수 있어요")}
+                      title={viewerId ? "공감" : "로그인 후 공감할 수 있어요"}
                       className={cn(
                         "inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-55",
                         comment.viewerLiked && "bg-accent-soft text-accent",
                       )}
                     >
-                      <Heart size={12} fill={comment.viewerLiked ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "en", "currentColor") : translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "en", "none")} aria-hidden />
-                      {translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "공감 ")}{comment.likes}
+                      <Heart size={12} fill={comment.viewerLiked ? "currentColor" : "none"} aria-hidden />
+                      공감 {comment.likes}
                     </button>
                   ) : null}
                   {canReply ? (
@@ -492,7 +489,8 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                       className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                     >
                       <Reply size={12} aria-hidden />
-                      {translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "답글")}</button>
+                      답글
+                    </button>
                   ) : null}
                   {canEdit ? (
                     <button
@@ -501,7 +499,8 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                       className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                     >
                       <Pencil size={12} aria-hidden />
-                      {translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "수정")}</button>
+                      수정
+                    </button>
                   ) : null}
                   {canDelete ? (
                     <button
@@ -511,7 +510,8 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                       className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-fg-3 transition-colors hover:bg-bad/10 hover:text-bad disabled:opacity-50"
                     >
                       <Trash2 size={12} aria-hidden />
-                      {translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "삭제")}</button>
+                      삭제
+                    </button>
                   ) : null}
                   <button
                     type="button"
@@ -519,7 +519,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                     className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                   >
                     <Copy size={12} aria-hidden />
-                    {copiedId === comment.id ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "복사됨") : translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "링크")}
+                    {copiedId === comment.id ? "복사됨" : "링크"}
                   </button>
                   {depth === 0 && children.length > 0 ? (
                     <button
@@ -529,7 +529,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                       className="ml-auto inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-fg-3 transition-colors hover:bg-raised hover:text-fg"
                     >
                       {isRootCollapsed ? <ChevronDown size={12} aria-hidden /> : <ChevronUp size={12} aria-hidden />}
-                      {translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "답글 ")}{children.length}{translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "개 ")}{isRootCollapsed ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "보기") : translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "접기")}
+                      답글 {children.length}개 {isRootCollapsed ? "보기" : "접기"}
                     </button>
                   ) : null}
                 </div>
@@ -543,10 +543,10 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
                     onSubmit={() => void createComment(comment.id)}
                     onCancel={() => setOpenReplyId(null)}
                     maxLength={maxLength}
-                    placeholder={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "{v0}님에게 답글"), { v0: String(comment.author.name) })}
+                    placeholder={`${comment.author.name}님에게 답글`}
                     submitting={busyKeys.has(`create:${comment.id}`)}
                     compact
-                    submitLabel={translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "답글 등록")}
+                    submitLabel="답글 등록"
                   />
                 </div>
               ) : null}
@@ -576,7 +576,7 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
           </h2>
           {description ? <p className="mt-1 text-xs leading-relaxed text-fg-3">{description}</p> : null}
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-line bg-canvas/45 p-1" aria-label={translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "댓글 정렬")}>
+        <div className="flex items-center gap-1 rounded-xl border border-line bg-canvas/45 p-1" aria-label="댓글 정렬">
           {SORT_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -607,14 +607,14 @@ export function ThreadedCommentSection<T extends ThreadedCommentRecord>({
         </div>
       ) : (
         <p className="mt-4 rounded-xl border border-dashed border-line bg-card/40 px-3 py-3 text-center text-xs text-fg-3">
-          {disabled ? translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "현재 이 게시물에는 댓글을 작성할 수 없습니다.") : loginText}
+          {disabled ? "현재 이 게시물에는 댓글을 작성할 수 없습니다." : loginText}
         </p>
       )}
 
       {error ? (
         <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad" role="alert">
           <span>{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label={translateCurrentStaticSourceText("shared.components.comments.threaded.comment.section", "ko", "오류 닫기")} className="shrink-0">
+          <button type="button" onClick={() => setError(null)} aria-label="오류 닫기" className="shrink-0">
             <X size={14} aria-hidden />
           </button>
         </div>

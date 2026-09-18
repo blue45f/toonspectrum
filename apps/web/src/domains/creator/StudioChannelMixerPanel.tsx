@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Channel Mixer Panel
  * 선택된 이미지의 채널 믹서(Channel Mixer) 보정 인스펙터 — 원클릭 프리셋 + 흑백 토글 +
@@ -67,16 +66,17 @@ export function StudioChannelMixerPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioChannelMixerPanel", "ko", "채널 믹서 (Channel Mixer)")}</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채널 믹서 (Channel Mixer)</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioChannelMixerPanel", "ko", "채널 믹서를 제거하고 원본 채널로 되돌립니다.")}
+          title="채널 믹서를 제거하고 원본 채널로 되돌립니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioChannelMixerPanel", "ko", "원본으로")}</button>
+          원본으로
+        </button>
       </div>
 
       {/* 원클릭 채널 혼합 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). */}
@@ -99,7 +99,8 @@ export function StudioChannelMixerPanel({
 
       {/* 흑백 토글 — 켜면 빨강 행으로 회색값을 구해 R=G=B에 똑같이 넣는다(green/blue 무시). */}
       <label className={LABEL_ROW}>
-        {translateCurrentStaticSourceText("domains.creator.StudioChannelMixerPanel", "ko", "흑백(Monochrome)")}<input
+        흑백(Monochrome)
+        <input
           type="checkbox"
           checked={value.monochrome}
           onChange={(e) => onPatch({ monochrome: e.target.checked })}

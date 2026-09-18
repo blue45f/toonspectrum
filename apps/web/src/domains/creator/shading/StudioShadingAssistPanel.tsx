@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Guided lighting and shading controls for ToonStudio.
  * The UI favors task language and Studio design tokens over benchmark-product terminology.
@@ -245,18 +241,18 @@ export function StudioShadingAssistPanel({
           <div
             className="size-3.5 rounded-full border border-line/70 shadow-sm"
             style={{ backgroundColor: computed.shadow1ColorHex }}
-            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "그림자 1단계: {v0}"), { v0: String(computed.shadow1ColorHex) })}
+            title={`그림자 1단계: ${computed.shadow1ColorHex}`}
           />
           <div
             className="size-3.5 rounded-full border border-white/20 shadow-sm"
             style={{ backgroundColor: computed.shadow2ColorHex }}
-            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "그림자 2단계: {v0}"), { v0: String(computed.shadow2ColorHex) })}
+            title={`그림자 2단계: ${computed.shadow2ColorHex}`}
           />
           {computed.rimLightColorHex && (
             <div
               className="size-3.5 rounded-full border border-white/20 shadow-sm"
               style={{ backgroundColor: computed.rimLightColorHex }}
-              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.shading.StudioShadingAssistPanel", "ko", "림 라이트: {v0}"), { v0: String(computed.rimLightColorHex) })}
+              title={`림 라이트: ${computed.rimLightColorHex}`}
             />
           )}
         </div>

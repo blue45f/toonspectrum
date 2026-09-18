@@ -1,11 +1,4 @@
 import {
-  formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Accessibility,
   ArrowRight,
   Bot,
@@ -187,7 +180,7 @@ export function ProductPrinciplesPage() {
           const groupCopy = bi((group).ko, (group).en);
 
           return (
-            <section key={group.id} aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.ProductPrinciplesPage", "en", "principle-group-{v0}"), { v0: String(group.id) })}>
+            <section key={group.id} aria-labelledby={`principle-group-${group.id}`}>
               <div className="grid gap-7 md:grid-cols-[0.72fr_1.28fr] md:gap-12">
                 <div>
                   <div className="flex items-center gap-3">
@@ -201,7 +194,7 @@ export function ProductPrinciplesPage() {
                     {groupCopy.eyebrow}
                   </p>
                   <h2
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.ProductPrinciplesPage", "en", "principle-group-{v0}"), { v0: String(group.id) })}
+                    id={`principle-group-${group.id}`}
                     className="mt-3 max-w-md text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
                   >
                     {groupCopy.title}
@@ -215,7 +208,7 @@ export function ProductPrinciplesPage() {
                     return (
                       <article
                         key={principle.id}
-                        id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.ProductPrinciplesPage", "en", "principle-{v0}"), { v0: String(principle.id) })}
+                        id={`principle-${principle.id}`}
                         className="rounded-3xl border border-line/70 bg-panel/60 p-5 shadow-sm sm:p-6"
                       >
                         <div className="flex items-start gap-4">
@@ -242,7 +235,7 @@ export function ProductPrinciplesPage() {
       </div>
 
       <section className="border-y border-line py-14 sm:py-20" aria-labelledby="principles-live-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.ProductPrinciplesPage", "en", "VISIBLE IN THE PRODUCT")}</p>
+        <p className="eyebrow text-accent">VISIBLE IN THE PRODUCT</p>
         <h2 id="principles-live-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
           {bi("원칙을 문구로만 두지 않고, 실제 화면과 선택지에 연결합니다.", "The principles are connected to real surfaces and choices, not left as copy.")}
         </h2>
@@ -275,7 +268,7 @@ export function ProductPrinciplesPage() {
       <section className="py-14 sm:py-20" aria-labelledby="decision-check-title">
         <div className="grid gap-8 rounded-[2rem] border border-line/70 bg-panel/55 p-6 shadow-sm md:grid-cols-[0.8fr_1.2fr] md:gap-12 sm:p-8">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.ProductPrinciplesPage", "en", "DECISION FILTER")}</p>
+            <p className="eyebrow text-accent">DECISION FILTER</p>
             <h2 id="decision-check-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
               {bi("새 기능은 여섯 가지 질문을 통과해야 합니다.", "Every new feature must pass six questions.")}
             </h2>

@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useMemo } from "react";
 
 import { collectStudioDocumentColors } from "./studio-document-colors";
@@ -73,17 +69,19 @@ export function StudioInspectorMultiSelectionSection({
     <section
       data-testid="studio-inspector-context-multi-selection"
       data-studio-multi-selection-count={marqueeIds.length}
-      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "{v0}개 선택 묶음 작업"), { v0: String(marqueeIds.length) })}
+      aria-label={`${marqueeIds.length}개 선택 묶음 작업`}
       className="rounded-xl border border-line bg-panel/40 p-3"
     >
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-extrabold tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "선택 묶음 작업")}</p>
+          <p className="text-xs font-extrabold tracking-tight text-fg">선택 묶음 작업</p>
           <p className="mt-0.5 text-[0.6875rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "공통 선 색상과 배치·순서·이름 작업을 선택 전체에 한 번에 적용합니다.")}</p>
+            공통 선 색상과 배치·순서·이름 작업을 선택 전체에 한 번에 적용합니다.
+          </p>
         </div>
         <span className="shrink-0 rounded-full bg-accent/15 px-2 py-0.5 text-[0.6875rem] font-bold tabular-nums text-accent">
-          {marqueeIds.length}{translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "개")}</span>
+          {marqueeIds.length}개
+        </span>
       </div>
 
       <StudioInspectorMutationLockNotice
@@ -97,7 +95,7 @@ export function StudioInspectorMultiSelectionSection({
         title={inspectorInteractionPolicy.selection.reason}
         className="m-0 min-w-0 border-0 p-0 disabled:[&_button]:cursor-not-allowed disabled:[&_button]:opacity-50"
       >
-        <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "다중 선택 공통 스타일과 빠른 작업")}</legend>
+        <legend className="sr-only">다중 선택 공통 스타일과 빠른 작업</legend>
         {strokeColorState.targets.length > 0 ? (
           <div
             className="mb-3 space-y-1.5 rounded-xl border border-line/55 bg-card/55 p-2.5"
@@ -105,18 +103,20 @@ export function StudioInspectorMultiSelectionSection({
           >
             <div className="flex items-center justify-between gap-2">
               <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "공통 선 스타일")}</p>
+                공통 선 스타일
+              </p>
               <span className="text-[0.6rem] tabular-nums text-fg-3">
-                {strokeColorState.targets.length}{translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "개 요소")}</span>
+                {strokeColorState.targets.length}개 요소
+              </span>
             </div>
             <StudioColorField
-              label={translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "선 색상")}
+              label="선 색상"
               value={strokeColorState.value}
               purpose="stroke"
               recentColors={recentColors}
               documentColors={documentColors}
               allowNone
-              noneLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "선 없음")}
+              noneLabel="선 없음"
               mixed={strokeColorState.mixed}
               onChange={(color) => applyStrokeColor(color, false)}
               onPreview={(color) => applyStrokeColor(color, true)}
@@ -135,10 +135,10 @@ export function StudioInspectorMultiSelectionSection({
             />
             <p className="text-[0.6rem] leading-snug text-fg-3">
               {strokeColorState.mixed
-                ? translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "서로 다른 선 상태입니다. 새 색을 고르면 선택한 요소에 동일하게 적용됩니다.")
+                ? "서로 다른 선 상태입니다. 새 색을 고르면 선택한 요소에 동일하게 적용됩니다."
                 : strokeColorState.includesNone
-                  ? translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "선이 없는 요소들입니다. 색을 고르면 선 두께 3px로 시작합니다.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioInspectorMultiSelectionSection", "ko", "선 색상을 선택 묶음 전체에서 함께 변경합니다.")}
+                  ? "선이 없는 요소들입니다. 색을 고르면 선 두께 3px로 시작합니다."
+                  : "선 색상을 선택 묶음 전체에서 함께 변경합니다."}
             </p>
           </div>
         ) : null}

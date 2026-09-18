@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Tv, Film, Sparkles, Play } from "lucide-react";
 
 import { MiniPoster } from "./rank-row";
@@ -49,7 +45,7 @@ function Node({
 }) {
   return (
     <Link
-      href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.adaptation.graph", "en", "/title/{v0}"), { v0: String(title.slug) })}
+      href={`/title/${title.slug}`}
       className={cn(
         "group flex w-[5.5rem] shrink-0 flex-col items-center gap-1.5 text-center",
         highlight && "scale-[1.03]"
@@ -150,7 +146,7 @@ export function AdaptationGraph({
     <div ref={ref} className={cn("flex items-start gap-1 overflow-x-auto rail pb-1", className)}>
       <Node
         title={original}
-        role={original.type === "webnovel" ? translateCurrentStaticSourceText("shared.components.adaptation.graph", "ko", "원작 소설") : translateCurrentStaticSourceText("shared.components.adaptation.graph", "ko", "원작")}
+        role={original.type === "webnovel" ? "원작 소설" : "원작"}
         highlight={original.id === currentId}
         inView={inView}
         step={0}
@@ -160,7 +156,7 @@ export function AdaptationGraph({
           <Connector inView={inView} step={i + 1} />
           <Node
             title={a}
-            role={TYPE_LABEL[a.type] + translateCurrentStaticSourceText("shared.components.adaptation.graph", "ko", "화")}
+            role={TYPE_LABEL[a.type] + "화"}
             highlight={a.id === currentId}
             inView={inView}
             step={i + 1}

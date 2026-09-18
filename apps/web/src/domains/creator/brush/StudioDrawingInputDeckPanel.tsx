@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   Activity,
   Check,
   Gauge,
@@ -354,14 +350,16 @@ export function StudioDrawingInputDeckPanel({
             id="studio-drawing-input-deck-title"
             className="text-sm font-extrabold text-fg"
           >
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "펜 입력 센터")}</h2>
+            펜 입력 센터
+          </h2>
           <p className="mt-0.5 truncate text-[0.62rem] text-fg-3">
-            {brushLabel} {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "· 실제 캔버스 입력을 작품 좌표 저장 없이 관찰")}</p>
+            {brushLabel} · 실제 캔버스 입력을 작품 좌표 저장 없이 관찰
+          </p>
         </div>
         <button
           ref={closeButtonRef}
           type="button"
-          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "펜 입력 센터 닫기")}
+          aria-label="펜 입력 센터 닫기"
           onClick={onClose}
           className={cn(
             "grid size-9 shrink-0 place-items-center rounded-lg border border-line text-fg-3 hover:bg-raised hover:text-fg",
@@ -385,9 +383,11 @@ export function StudioDrawingInputDeckPanel({
                 className="flex items-center gap-1.5 text-[0.72rem] font-extrabold text-fg-2"
               >
                 <Gauge size={14} aria-hidden="true" />
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "실시간 입력 품질")}</h3>
+                실시간 입력 품질
+              </h3>
               <p className="mt-0.5 text-[0.57rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "패널을 연 채 캔버스에 그리면 압력·기울기·회전·표본 빈도를 확인합니다.")}</p>
+                패널을 연 채 캔버스에 그리면 압력·기울기·회전·표본 빈도를 확인합니다.
+              </p>
             </div>
             <span className="flex shrink-0 gap-1">
               <button
@@ -400,7 +400,8 @@ export function StudioDrawingInputDeckPanel({
                   STUDIO_FOCUS_RING
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "진단 복사")}</button>
+                진단 복사
+              </button>
               <button
                 type="button"
                 onClick={clearTelemetry}
@@ -411,7 +412,8 @@ export function StudioDrawingInputDeckPanel({
                   STUDIO_FOCUS_RING
                 )}
               >
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "지우기")}</button>
+                지우기
+              </button>
             </span>
           </div>
 
@@ -432,28 +434,32 @@ export function StudioDrawingInputDeckPanel({
           <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
             <div className="rounded-lg border border-line/60 bg-card/70 px-2 py-1.5">
               <span className="block text-[0.52rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "입력")}</span>
+                입력
+              </span>
               <strong className="mt-0.5 block text-[0.68rem] text-fg">
                 {latest ? POINTER_LABELS[latest.pointerType] : "—"}
               </strong>
             </div>
             <div className="rounded-lg border border-line/60 bg-card/70 px-2 py-1.5">
               <span className="block text-[0.52rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "유효 표본")}</span>
+                유효 표본
+              </span>
               <strong className="mt-0.5 block text-[0.68rem] tabular-nums text-fg">
                 {numeric(telemetry?.sampleRateHz ?? null, "Hz")}
               </strong>
             </div>
             <div className="rounded-lg border border-line/60 bg-card/70 px-2 py-1.5">
               <span className="block text-[0.52rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "현재 필압")}</span>
+                현재 필압
+              </span>
               <strong className="mt-0.5 block text-[0.68rem] tabular-nums text-fg">
                 {percent(latest?.pressure ?? null)}
               </strong>
             </div>
             <div className="rounded-lg border border-line/60 bg-card/70 px-2 py-1.5">
               <span className="block text-[0.52rem] font-semibold text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "필압 범위")}</span>
+                필압 범위
+              </span>
               <strong className="mt-0.5 block text-[0.68rem] tabular-nums text-fg">
                 {percent(telemetry?.pressureRange ?? null)}
               </strong>
@@ -464,7 +470,7 @@ export function StudioDrawingInputDeckPanel({
             <div className="min-w-0 space-y-1.5">
               <div>
                 <div className="mb-0.5 flex items-center justify-between text-[0.54rem] font-semibold text-fg-3">
-                  <span>{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "필압")}</span>
+                  <span>필압</span>
                   <span className="tabular-nums">
                     {percent(latest?.pressure ?? null)}
                   </span>
@@ -478,26 +484,26 @@ export function StudioDrawingInputDeckPanel({
               </div>
               <div className="flex flex-wrap gap-1 text-[0.52rem] font-semibold text-fg-3">
                 <span className="rounded bg-bg-2 px-1.5 py-1">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "기울기 ")}{latest ? `${Math.round(latest.tiltMagnitude)}°` : "—"}
+                  기울기 {latest ? `${Math.round(latest.tiltMagnitude)}°` : "—"}
                 </span>
                 <span className="rounded bg-bg-2 px-1.5 py-1">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "회전 ")}{latest ? `${Math.round(latest.twist)}°` : "—"}
+                  회전 {latest ? `${Math.round(latest.twist)}°` : "—"}
                 </span>
                 <span className="rounded bg-bg-2 px-1.5 py-1">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "고도 ")}{latest?.altitudeAngle == null
+                  고도 {latest?.altitudeAngle == null
                     ? "—"
                     : `${Math.round(latest.altitudeAngle)}°`}
                 </span>
                 <span className="rounded bg-bg-2 px-1.5 py-1">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "방위 ")}{latest?.azimuthAngle == null
+                  방위 {latest?.azimuthAngle == null
                     ? "—"
                     : `${Math.round(latest.azimuthAngle)}°`}
                 </span>
                 <span className="rounded bg-bg-2 px-1.5 py-1">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "측압 ")}{latest ? signedPercent(latest.tangentialPressure) : "—"}
+                  측압 {latest ? signedPercent(latest.tangentialPressure) : "—"}
                 </span>
                 <span className="rounded bg-bg-2 px-1.5 py-1">
-                  {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "접촉 ")}{latest ? `${latest.contactWidth}×${latest.contactHeight}` : "—"}
+                  접촉 {latest ? `${latest.contactWidth}×${latest.contactHeight}` : "—"}
                 </span>
               </div>
             </div>
@@ -515,7 +521,7 @@ export function StudioDrawingInputDeckPanel({
             </div>
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "입력 기능 감지 결과")}>
+          <div className="mt-2 flex flex-wrap gap-1" aria-label="입력 기능 감지 결과">
             <span
               className={cn(
                 "rounded-full border px-2 py-1 text-[0.52rem] font-bold",
@@ -524,7 +530,7 @@ export function StudioDrawingInputDeckPanel({
                   : "border-line bg-bg-2 text-fg-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "en", "Coalesced ")}{telemetry?.coalescedSupported ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "감지") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "미감지")}
+              Coalesced {telemetry?.coalescedSupported ? "감지" : "미감지"}
             </span>
             <span
               className={cn(
@@ -534,7 +540,7 @@ export function StudioDrawingInputDeckPanel({
                   : "border-line bg-bg-2 text-fg-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "en", "Predicted ")}{telemetry?.predictedSupported ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "감지") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "미감지")}
+              Predicted {telemetry?.predictedSupported ? "감지" : "미감지"}
             </span>
             <span
               className={cn(
@@ -544,7 +550,7 @@ export function StudioDrawingInputDeckPanel({
                   : "border-line bg-bg-2 text-fg-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "en", "Tilt ")}{telemetry?.tiltObserved ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "입력됨") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "대기")}
+              Tilt {telemetry?.tiltObserved ? "입력됨" : "대기"}
             </span>
             <span
               className={cn(
@@ -554,7 +560,7 @@ export function StudioDrawingInputDeckPanel({
                   : "border-line bg-bg-2 text-fg-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "en", "Twist ")}{telemetry?.twistObserved ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "입력됨") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "대기")}
+              Twist {telemetry?.twistObserved ? "입력됨" : "대기"}
             </span>
             <span
               className={cn(
@@ -564,7 +570,7 @@ export function StudioDrawingInputDeckPanel({
                   : "border-line bg-bg-2 text-fg-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "en", "Barrel ")}{telemetry?.tangentialPressureObserved ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "입력됨") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "대기")}
+              Barrel {telemetry?.tangentialPressureObserved ? "입력됨" : "대기"}
             </span>
             <span
               className={cn(
@@ -574,17 +580,17 @@ export function StudioDrawingInputDeckPanel({
                   : "border-line bg-bg-2 text-fg-3"
               )}
             >
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "en", "Hover ")}{telemetry?.hoverObserved ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "입력됨") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "대기")}
+              Hover {telemetry?.hoverObserved ? "입력됨" : "대기"}
             </span>
           </div>
 
           <p className="mt-2 text-[0.53rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "채널 ")}{telemetry ? CHANNEL_LABELS[telemetry.preferredChannel] : "—"}
+            채널 {telemetry ? CHANNEL_LABELS[telemetry.preferredChannel] : "—"}
             {telemetry
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", " · 최근 프레임 {v0} · 하드웨어 표본 {v1}"), { v0: String(telemetry.recentFrameCount), v1: String(telemetry.recentSampleCount) })
+              ? ` · 최근 프레임 ${telemetry.recentFrameCount} · 하드웨어 표본 ${telemetry.recentSampleCount}`
               : ""}
             {latest?.predictedCount
-              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", " · 예측 표본 {v0}개는 진단에만 표시하고 현재값 권위에는 쓰지 않음"), { v0: String(latest.predictedCount) })
+              ? ` · 예측 표본 ${latest.predictedCount}개는 진단에만 표시하고 현재값 권위에는 쓰지 않음`
               : ""}
           </p>
         </section>
@@ -600,12 +606,14 @@ export function StudioDrawingInputDeckPanel({
                 className="flex items-center gap-1.5 text-[0.72rem] font-extrabold text-fg-2"
               >
                 <Zap size={14} aria-hidden="true" />
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "작업별 입력 프로필")}</h3>
+                작업별 입력 프로필
+              </h3>
               <p className="mt-0.5 text-[0.57rem] leading-relaxed text-fg-3">
-                {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "보정 모드·강도·후처리·필압 응답을 한 번에 바꿉니다.")}</p>
+                보정 모드·강도·후처리·필압 응답을 한 번에 바꿉니다.
+              </p>
             </div>
             <span className="rounded-full border border-accent/30 bg-accent-soft px-2 py-1 text-[0.52rem] font-bold text-accent">
-              {telemetry ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "장치 권장") : translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "기본 권장")} ·{" "}
+              {telemetry ? "장치 권장" : "기본 권장"} ·{" "}
               {STUDIO_DRAWING_INPUT_PROFILES.find(
                 (entry) => entry.id === recommendedProfileId
               )?.label}
@@ -640,14 +648,14 @@ export function StudioDrawingInputDeckPanel({
                         <Sparkles
                           size={12}
                           className="text-accent"
-                          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "장치 권장")}
+                          aria-label="장치 권장"
                         />
                       ) : null}
                       {active ? (
                         <Check
                           size={13}
                           className="text-good"
-                          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "현재 적용됨")}
+                          aria-label="현재 적용됨"
                         />
                       ) : null}
                     </span>
@@ -657,7 +665,7 @@ export function StudioDrawingInputDeckPanel({
                   </span>
                   <span className="mt-1.5 block text-[0.52rem] font-semibold text-fg-2">
                     {profileModeLabel(profile.stabilizerMode)} {profile.stabilizer}
-                    {" · "}{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "후처리 ")}{profile.postCorrection}
+                    {" · "}후처리 {profile.postCorrection}
                     {" · "}{profile.pressureCurveId}
                   </span>
                   <span className="mt-0.5 block text-[0.5rem] leading-relaxed text-fg-3">
@@ -683,7 +691,8 @@ export function StudioDrawingInputDeckPanel({
               )}
             >
               <RotateCcw size={12} aria-hidden="true" />
-              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "이전 설정")}</button>
+              이전 설정
+            </button>
           </div>
         </section>
       </div>
@@ -695,7 +704,8 @@ export function StudioDrawingInputDeckPanel({
           ) : (
             <PenLine size={12} aria-hidden="true" />
           )}
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "좌표·획 내용은 저장하지 않습니다")}</span>
+          좌표·획 내용은 저장하지 않습니다
+        </span>
         <button
           type="button"
           onClick={() => {
@@ -709,7 +719,8 @@ export function StudioDrawingInputDeckPanel({
           )}
         >
           <Settings2 size={13} aria-hidden="true" />
-          {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeckPanel", "ko", "정밀 필압 보정")}</button>
+          정밀 필압 보정
+        </button>
       </footer>
     </aside>
   );

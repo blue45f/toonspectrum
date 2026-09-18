@@ -1,7 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, CheckCircle2, FileUp, ShieldCheck } from "lucide-react";
 import { useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -29,7 +25,7 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioImportIntake", ko, en);
 
-export type StudioImportIntakeLocale = string;
+export type StudioImportIntakeLocale = "ko" | "en";
 
 type Selection = Readonly<{
   file: File;
@@ -132,7 +128,8 @@ export function StudioImportIntake({ locale }: { readonly locale: StudioImportIn
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl">
           <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioImportIntake", "en", "SAFE IMPORT")}</p>
+            SAFE IMPORT
+          </p>
           <h2 id="studio-import-intake-title" className="mt-1 text-xl font-black text-fg">
             {bi("먼저 분석하고, 기존 편집기로 안전하게 전달", "Analyze first, then hand off safely to the editor")}
           </h2>

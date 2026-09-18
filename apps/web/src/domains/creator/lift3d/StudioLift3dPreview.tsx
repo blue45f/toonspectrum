@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
@@ -203,13 +202,14 @@ export function StudioLift3dPreview({ buffers, textureUrl, unlit }: StudioLift3d
       <canvas
         ref={canvasRef}
         tabIndex={0}
-        aria-label={translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPreview", "ko", "변환된 3D 모델 미리보기. 끌어서 회전, 휠로 확대, 방향키로도 회전할 수 있습니다.")}
+        aria-label="변환된 3D 모델 미리보기. 끌어서 회전, 휠로 확대, 방향키로도 회전할 수 있습니다."
         role="img"
         className="h-full w-full cursor-grab touch-none rounded-lg outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:cursor-grabbing"
       />
       {unsupported ? (
         <p className="absolute inset-0 grid place-items-center px-4 text-center text-xs text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.lift3d.StudioLift3dPreview", "ko", "이 브라우저에서는 3D 미리보기를 열 수 없습니다. GLB 파일 저장은 그대로 사용할 수 있습니다.")}</p>
+          이 브라우저에서는 3D 미리보기를 열 수 없습니다. GLB 파일 저장은 그대로 사용할 수 있습니다.
+        </p>
       ) : null}
     </div>
   );

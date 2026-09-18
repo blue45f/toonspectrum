@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ChevronRight,
   Copy,
   Eye,
@@ -173,7 +169,7 @@ export function StudioBg3dSceneOutliner({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "3D 장면 계층")}
+      aria-label="3D 장면 계층"
       className={cx(
         "flex min-h-0 flex-col text-fg",
         variant === "dock" && "h-full bg-panel/65",
@@ -188,9 +184,10 @@ export function StudioBg3dSceneOutliner({
         <div className="min-w-0">
           <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
             <Layers3 size={15} className="text-accent" aria-hidden />
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "장면 계층")}</h3>
+            장면 계층
+          </h3>
           {variant === "dock" ? (
-            <p className="mt-1 truncate text-[0.66rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "선택 · 숨김 · 잠금 · 복제")}</p>
+            <p className="mt-1 truncate text-[0.66rem] text-fg-3">선택 · 숨김 · 잠금 · 복제</p>
           ) : null}
         </div>
         <div className="flex items-center gap-1">
@@ -201,8 +198,8 @@ export function StudioBg3dSceneOutliner({
             <button
               type="button"
               className={actionButtonClass("dock")}
-              aria-label={allExpandableCollapsed ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "모든 계층 펼치기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "모든 계층 접기")}
-              title={allExpandableCollapsed ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "모두 펼치기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "모두 접기")}
+              aria-label={allExpandableCollapsed ? "모든 계층 펼치기" : "모든 계층 접기"}
+              title={allExpandableCollapsed ? "모두 펼치기" : "모두 접기"}
               onClick={() => setCollapsedIds(allExpandableCollapsed
                 ? new Set()
                 : new Set(expandableIds))}
@@ -218,7 +215,7 @@ export function StudioBg3dSceneOutliner({
       </div>
 
       <label className={cx("relative block shrink-0", variant === "dock" ? "m-3 mb-2" : "mb-2")}>
-        <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "장면 계층 검색")}</span>
+        <span className="sr-only">장면 계층 검색</span>
         <Search
           size={14}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
@@ -228,7 +225,7 @@ export function StudioBg3dSceneOutliner({
           type="search"
           value={controller.query}
           onChange={(event) => controller.setQuery(event.target.value)}
-          placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "객체 이름 검색…")}
+          placeholder="객체 이름 검색…"
           className={cx(
             "w-full rounded-lg border border-line bg-card pl-9 pr-3 text-xs font-medium text-fg",
             "focus-visible:border-accent focus-visible:outline focus-visible:outline-2",
@@ -244,12 +241,14 @@ export function StudioBg3dSceneOutliner({
       )}>
         {controller.items.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-3 py-4 text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "아직 장면 객체가 없습니다. 도형·템플릿·에셋을 추가하면 이곳에서 계층으로 관리할 수 있어요.")}</p>
+            아직 장면 객체가 없습니다. 도형·템플릿·에셋을 추가하면 이곳에서 계층으로 관리할 수 있어요.
+          </p>
         ) : controller.filteredItems.length === 0 ? (
           <p className="rounded-lg border border-dashed border-line px-3 py-4 text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "검색 결과가 없습니다.")}</p>
+            검색 결과가 없습니다.
+          </p>
         ) : (
-          <ul className="space-y-1" role="tree" aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "3D 장면 객체")}>
+          <ul className="space-y-1" role="tree" aria-label="3D 장면 객체">
             {rows.map((row) => {
               const { item } = row;
               const selected = controller.selectedIds.has(item.id);
@@ -324,8 +323,8 @@ export function StudioBg3dSceneOutliner({
                     )}>
                       <button
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "{v0} 이름 변경"), { v0: String(item.label) })}
-                        title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "이름 변경")}
+                        aria-label={`${item.label} 이름 변경`}
+                        title="이름 변경"
                         className={actionButtonClass(variant)}
                         onClick={() => controller.rename(item)}
                       >
@@ -334,7 +333,7 @@ export function StudioBg3dSceneOutliner({
                       <button
                         type="button"
                         aria-label={`${item.label} ${item.visible ? "숨기기" : "보이기"}`}
-                        title={item.visible ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "숨기기") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "보이기")}
+                        title={item.visible ? "숨기기" : "보이기"}
                         className={actionButtonClass(variant)}
                         onClick={() => controller.toggleVisibility(item)}
                       >
@@ -343,7 +342,7 @@ export function StudioBg3dSceneOutliner({
                       <button
                         type="button"
                         aria-label={`${item.label} ${item.locked ? "잠금 해제" : "잠금"}`}
-                        title={item.locked ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "잠금 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "잠금")}
+                        title={item.locked ? "잠금 해제" : "잠금"}
                         className={actionButtonClass(variant)}
                         onClick={() => controller.toggleLock(item)}
                       >
@@ -351,8 +350,8 @@ export function StudioBg3dSceneOutliner({
                       </button>
                       <button
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "{v0} 복제"), { v0: String(item.label) })}
-                        title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "복제")}
+                        aria-label={`${item.label} 복제`}
+                        title="복제"
                         className={actionButtonClass(variant)}
                         onClick={() => controller.duplicate(item)}
                       >
@@ -360,8 +359,8 @@ export function StudioBg3dSceneOutliner({
                       </button>
                       <button
                         type="button"
-                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "{v0} 삭제"), { v0: String(item.label) })}
-                        title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSceneOutliner", "ko", "삭제")}
+                        aria-label={`${item.label} 삭제`}
+                        title="삭제"
                         className={actionButtonClass(variant)}
                         onClick={() => controller.remove(item)}
                       >

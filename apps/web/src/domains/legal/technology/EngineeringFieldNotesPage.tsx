@@ -1,11 +1,4 @@
 import {
-  formatI18nTemplate,
-  getCurrentUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   AlertTriangle,
   ArrowRight,
   Bot,
@@ -210,7 +203,7 @@ export function EngineeringFieldNotesPage() {
       <section className="mb-8" aria-labelledby="implementation-inventory-title">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "REPOSITORY-VERIFIED INVENTORY")}</p>
+            <p className="eyebrow text-accent">REPOSITORY-VERIFIED INVENTORY</p>
             <h2 id="implementation-inventory-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
               {bi("설명에 사용한 구현 수치를 저장소와 함께 검증합니다.", "Implementation figures are verified against the repository.")}
             </h2>
@@ -346,8 +339,8 @@ export function EngineeringFieldNotesPage() {
               </div>
 
               <div className="mt-7 grid gap-5 xl:grid-cols-[1fr_1fr]">
-                <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "{v0}-reuse-title"), { v0: String(note.id) })} className="rounded-3xl border border-line/70 bg-card/50 p-5">
-                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "{v0}-reuse-title"), { v0: String(note.id) })} className="flex items-center gap-2 text-sm font-black text-fg">
+                <section aria-labelledby={`${note.id}-reuse-title`} className="rounded-3xl border border-line/70 bg-card/50 p-5">
+                  <h3 id={`${note.id}-reuse-title`} className="flex items-center gap-2 text-sm font-black text-fg">
                     <Wrench size={16} className="text-accent" aria-hidden="true" />
                     {bi("다른 프로젝트 적용 순서", "Reuse sequence")}
                   </h3>
@@ -361,8 +354,8 @@ export function EngineeringFieldNotesPage() {
                   </ol>
                 </section>
 
-                <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "{v0}-evidence-title"), { v0: String(note.id) })} className="rounded-3xl border border-line/70 bg-card/50 p-5">
-                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "{v0}-evidence-title"), { v0: String(note.id) })} className="flex items-center gap-2 text-sm font-black text-fg">
+                <section aria-labelledby={`${note.id}-evidence-title`} className="rounded-3xl border border-line/70 bg-card/50 p-5">
+                  <h3 id={`${note.id}-evidence-title`} className="flex items-center gap-2 text-sm font-black text-fg">
                     <Code2 size={16} className="text-accent" aria-hidden="true" />
                     {bi("코드·테스트·공식 자료", "Code, tests and official sources")}
                   </h3>
@@ -408,7 +401,7 @@ export function EngineeringFieldNotesPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="worker-pwa-pattern-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "BROWSER EXECUTION BLUEPRINTS")}</p>
+        <p className="eyebrow text-accent">BROWSER EXECUTION BLUEPRINTS</p>
         <h2 id="worker-pwa-pattern-title" className="mt-3 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("Worker와 PWA는 서로 다른 실패를 격리하는 두 개의 실행 계층입니다.", "Workers and PWA isolate two different classes of failure.")}
         </h2>
@@ -429,7 +422,7 @@ export function EngineeringFieldNotesPage() {
       </section>
 
       <section aria-labelledby="open-api-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "OPEN API ADAPTER MAP")}</p>
+        <p className="eyebrow text-accent">OPEN API ADAPTER MAP</p>
         <h2 id="open-api-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("Open API마다 데이터보다 먼저 권리·출처·실패 규칙을 정의했습니다.", "Rights, provenance and failure rules precede data for every Open API.")}
         </h2>
@@ -480,7 +473,7 @@ export function EngineeringFieldNotesPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="troubleshooting-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "TROUBLESHOOTING CASEBOOK")}</p>
+        <p className="eyebrow text-accent">TROUBLESHOOTING CASEBOOK</p>
         <h2 id="troubleshooting-title" className="mt-3 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("실패를 숨기지 않고 재현 가능한 회귀 계약으로 바꾼 사례", "Failures converted into reproducible regression contracts")}
         </h2>
@@ -526,7 +519,7 @@ export function EngineeringFieldNotesPage() {
       </section>
 
       <section aria-labelledby="reference-products-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringFieldNotesPage", "en", "REFERENCE PRODUCTS · ADOPTION BOUNDARIES")}</p>
+        <p className="eyebrow text-accent">REFERENCE PRODUCTS · ADOPTION BOUNDARIES</p>
         <h2 id="reference-products-title" className="mt-3 text-balance text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("참고한 제품과 실제로 채택한 패턴, 채택하지 않은 이유를 구분합니다.", "Reference products are separated from applied patterns and rejected adoption choices.")}
         </h2>

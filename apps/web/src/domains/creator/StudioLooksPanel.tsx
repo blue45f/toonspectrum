@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Looks Panel
  * 원클릭 룩 인스펙터 — 검색·즐겨찾기·최근 적용 + 카테고리 칩.
@@ -74,43 +70,46 @@ export function StudioLooksPanel({
 
   return (
     <div className="space-y-2">
-      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "원클릭 룩 (Looks)")}</p>
+      <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">원클릭 룩 (Looks)</p>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={onCopy}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "현재 요소의 필터를 클립보드에 복사합니다.")}
+          title="현재 요소의 필터를 클립보드에 복사합니다."
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "필터 복사")}</button>
+          필터 복사
+        </button>
         <button
           type="button"
           onClick={onPaste}
           disabled={!canPaste}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "복사한 필터를 현재 요소에 붙여넣습니다.")}
+          title="복사한 필터를 현재 요소에 붙여넣습니다."
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "붙여넣기")}</button>
+          붙여넣기
+        </button>
         <button
           type="button"
           onClick={onResetAll}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title={translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "현재 요소의 모든 필터를 제거합니다.")}
+          title="현재 요소의 모든 필터를 제거합니다."
         >
           <RotateCcw className="size-3.5" />
-          {translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "전체 초기화")}</button>
+          전체 초기화
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
         <label className="relative min-w-0 flex-1">
-          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "룩 검색")}</span>
+          <span className="sr-only">룩 검색</span>
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "룩 검색…")}
+            placeholder="룩 검색…"
             className="min-h-9 w-full rounded-lg border border-line bg-card py-1.5 pl-7 pr-2 text-[0.7rem] text-fg placeholder:text-fg-3"
           />
         </label>
@@ -125,17 +124,18 @@ export function StudioLooksPanel({
               : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
           )}
         >
-          <Star className="size-3.5" aria-hidden fill={favoritesOnly ? translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "en", "none")} />
-          {translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "즐겨찾기")}</button>
+          <Star className="size-3.5" aria-hidden fill={favoritesOnly ? "currentColor" : "none"} />
+          즐겨찾기
+        </button>
       </div>
 
       {recentLooks.length > 0 && !favoritesOnly && !q ? (
         <div className="space-y-1">
-          <p className="text-[0.6rem] font-medium text-fg-3 uppercase tracking-wide">{translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "최근")}</p>
+          <p className="text-[0.6rem] font-medium text-fg-3 uppercase tracking-wide">최근</p>
           <div className="flex flex-wrap gap-1.5">
             {recentLooks.map((look) => (
               <button
-                key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "en", "recent-{v0}"), { v0: String(look.id) })}
+                key={`recent-${look.id}`}
                 type="button"
                 onClick={() => onApplyLook(look)}
                 title={look.tip}
@@ -150,7 +150,7 @@ export function StudioLooksPanel({
 
       {filtered.length === 0 ? (
         <p className="rounded-lg border border-dashed border-line bg-card/40 px-3 py-4 text-center text-[0.7rem] text-fg-3">
-          {favoritesOnly ? translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "즐겨찾기한 룩이 없어요. 별 아이콘으로 추가해 보세요.") : translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "검색 결과가 없어요.")}
+          {favoritesOnly ? "즐겨찾기한 룩이 없어요. 별 아이콘으로 추가해 보세요." : "검색 결과가 없어요."}
         </p>
       ) : (
         CATEGORY_ORDER.map((category) => {
@@ -175,7 +175,7 @@ export function StudioLooksPanel({
                       </button>
                       <button
                         type="button"
-                        aria-label={favorited ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "{v0} 즐겨찾기 해제"), { v0: String(look.label) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "ko", "{v0} 즐겨찾기"), { v0: String(look.label) })}
+                        aria-label={favorited ? `${look.label} 즐겨찾기 해제` : `${look.label} 즐겨찾기`}
                         aria-pressed={favorited}
                         onClick={() => onToggleFavorite(effectId)}
                         className={cn(
@@ -183,7 +183,7 @@ export function StudioLooksPanel({
                           favorited && "text-accent"
                         )}
                       >
-                        <Star className="size-3" fill={favorited ? translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioLooksPanel", "en", "none")} aria-hidden />
+                        <Star className="size-3" fill={favorited ? "currentColor" : "none"} aria-hidden />
                       </button>
                     </div>
                   );

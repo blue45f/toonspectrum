@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { CalendarDays, CalendarPlus, Database, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { useId, useState, type KeyboardEvent } from "react";
@@ -53,7 +49,7 @@ const asTitleList = (cards: TitleCard[]) => cards as unknown as Title[];
 function CalItem({ title, className }: { title: TitleCard; className?: string }) {
   return (
     <Link
-      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "/title/{v0}"), { v0: String(title.slug) })}
+      href={`/title/${title.slug}`}
       className={cn(
         "group flex gap-2.5 rounded-xl p-1.5 transition-colors hover:bg-raised",
         className
@@ -79,12 +75,12 @@ function CalendarDayItems({ items, day, compact = false }: { items: TitleCard[];
   const listId = useId();
   const visible = items.slice(0, limit);
   return <>
-    <div id={listId} className={compact ? translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "flex flex-col gap-2.5") : translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "grid gap-2 sm:grid-cols-2")}>
-      {visible.map((title) => <CalItem key={title.id} title={title} className={compact ? undefined : translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "border border-line bg-panel/30 p-2")} />)}
+    <div id={listId} className={compact ? "flex flex-col gap-2.5" : "grid gap-2 sm:grid-cols-2"}>
+      {visible.map((title) => <CalItem key={title.id} title={title} className={compact ? undefined : "border border-line bg-panel/30 p-2"} />)}
     </div>
     {items.length > (compact ? 12 : 24) && <div className="mt-3 border-t border-line pt-3">
-      <p role="status" className="mb-2 text-xs text-fg-3">{day}{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "요일 ")}{visible.length.toLocaleString("ko-KR")} / {items.length.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "편")}</p>
-      {limit < items.length && <button type="button" aria-controls={listId} onClick={() => setLimit((current) => current + 24)} className="min-h-11 w-full rounded-lg border border-line-strong bg-panel px-3 py-2 text-xs font-medium text-accent hover:bg-raised">{day}{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "요일 ")}{Math.min(24, items.length - limit)}{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "편 더 보기")}</button>}
+      <p role="status" className="mb-2 text-xs text-fg-3">{day}요일 {visible.length.toLocaleString("ko-KR")} / {items.length.toLocaleString("ko-KR")}편</p>
+      {limit < items.length && <button type="button" aria-controls={listId} onClick={() => setLimit((current) => current + 24)} className="min-h-11 w-full rounded-lg border border-line-strong bg-panel px-3 py-2 text-xs font-medium text-accent hover:bg-raised">{day}요일 {Math.min(24, items.length - limit)}편 더 보기</button>}
     </div>}
   </>;
 }
@@ -175,17 +171,20 @@ export function CalendarPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
           <div>
             <p className="eyebrow flex items-center gap-1.5 text-accent">
-              <CalendarDays size={14} /> {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "RELEASE CALENDAR")}</p>
-            <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "연재 캘린더")}</h1>
+              <CalendarDays size={14} /> RELEASE CALENDAR
+            </p>
+            <h1 className="mt-2 text-[clamp(1.6rem,7vw,1.875rem)] font-bold tracking-tight sm:text-4xl">연재 캘린더</h1>
             <p className="lede mt-2 max-w-2xl text-pretty text-sm leading-relaxed text-fg-2">
-              {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "연재요일 정보가 있는 작품을 요일별로 찾아보세요. 오늘은")}{" "}
-              <span className="font-semibold text-accent">{todayDay}{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "요일")}</span>{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", ", 새 회차가 올라오는 작품이")}{" "}
-              <span className="numeral text-fg">{todayCount.toLocaleString("ko-KR")}</span>{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "편입니다.")}</p>
+              연재요일 정보가 있는 작품을 요일별로 찾아보세요. 오늘은{" "}
+              <span className="font-semibold text-accent">{todayDay}요일</span>, 새 회차가 올라오는 작품이{" "}
+              <span className="numeral text-fg">{todayCount.toLocaleString("ko-KR")}</span>편입니다.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3 text-xs text-fg-2">
               <Database size={14} className="text-accent" />
-              {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "전체 연재 ")}<span className="numeral text-fg">{totalScheduled.toLocaleString("ko-KR")}</span>{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "편")}</span>
+              전체 연재 <span className="numeral text-fg">{totalScheduled.toLocaleString("ko-KR")}</span>편
+            </span>
             <button
               type="button"
               onClick={() => setShowFilters((v) => !v)}
@@ -197,8 +196,9 @@ export function CalendarPage() {
                 className: "gap-1.5",
               })}
             >
-              <SlidersHorizontal size={14} className={titleFilterActive ? translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "text-accent") : undefined} />
-              {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "필터")}{titleFilterActive && (
+              <SlidersHorizontal size={14} className={titleFilterActive ? "text-accent" : undefined} />
+              필터
+              {titleFilterActive && (
                 <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
                   {titleFilterCount}
                 </span>
@@ -208,11 +208,12 @@ export function CalendarPage() {
               type="button"
               onClick={exportIcs}
               disabled={loading || !!error || exportable.size === 0}
-              title={translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "현재 필터 기준 연재 일정을 캘린더 앱용 .ics 파일로 저장 (주간 반복 일정)")}
+              title="현재 필터 기준 연재 일정을 캘린더 앱용 .ics 파일로 저장 (주간 반복 일정)"
               className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
             >
               <CalendarPlus size={14} />
-              {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "내보내기 (.ics)")}{exportable.size > 0 && (
+              내보내기 (.ics)
+              {exportable.size > 0 && (
                 <span className="numeral text-[0.68rem] text-fg-3">
                   {exportable.size.toLocaleString("ko-KR")}
                 </span>
@@ -228,7 +229,7 @@ export function CalendarPage() {
           <div className="mt-5 border-t border-line pt-4">
             <div className="mb-2 flex items-center justify-between gap-2">
               <span className="text-[0.72rem] font-medium text-fg-3">
-                {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "표시할 플랫폼")}{platformFilterActive ? formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", " · {v0}개 선택"), { v0: String(selectedPlatforms.size) }) : translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", " · 전체")}
+                표시할 플랫폼{platformFilterActive ? ` · ${selectedPlatforms.size}개 선택` : " · 전체"}
               </span>
               {platformFilterActive && (
                 <button
@@ -236,7 +237,8 @@ export function CalendarPage() {
                   onClick={() => setFilters({ ...filters, platforms: [] })}
                   className="text-[0.72rem] text-accent hover:underline"
                 >
-                  {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "전체 보기")}</button>
+                  전체 보기
+                </button>
               )}
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -255,7 +257,7 @@ export function CalendarPage() {
                         : "border-line bg-card text-fg-2 hover:bg-raised",
                       platformFilterActive && !on && "opacity-45"
                     )}
-                    title={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "{v0} {v1}편"), { v0: String(platform.label), v1: String(platform.count.toLocaleString("ko-KR")) })}
+                    title={`${platform.label} ${platform.count.toLocaleString("ko-KR")}편`}
                   >
                     <span className="size-1.5 rounded-full" style={{ backgroundColor: platform.color }} />
                     {platform.label}
@@ -282,7 +284,7 @@ export function CalendarPage() {
       </header>
 
       {error ? (
-        <ErrorState title={translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "연재 캘린더를 불러오지 못했습니다.")} message={error} onRetry={reload} />
+        <ErrorState title="연재 캘린더를 불러오지 못했습니다." message={error} onRetry={reload} />
       ) : loading ? (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
           {WEEK_DAYS.map((day) => (
@@ -311,7 +313,7 @@ export function CalendarPage() {
           <div className="xl:hidden">
             <div
               role="tablist"
-              aria-label={translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "요일 선택")}
+              aria-label="요일 선택"
               className="rail -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1"
             >
               {days.map(({ day, items }, index) => {
@@ -322,9 +324,9 @@ export function CalendarPage() {
                     key={day}
                     type="button"
                     role="tab"
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "{v0}-tab-{v1}"), { v0: String(dayTabsId), v1: String(index) })}
+                    id={`${dayTabsId}-tab-${index}`}
                     aria-selected={on}
-                    aria-controls={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "{v0}-panel"), { v0: String(dayTabsId) })}
+                    aria-controls={`${dayTabsId}-panel`}
                     tabIndex={on ? 0 : -1}
                     onKeyDown={(event) => onDayKey(event, index)}
                     onClick={() => setSelectedDayIdx(index)}
@@ -351,10 +353,11 @@ export function CalendarPage() {
                 );
               })}
             </div>
-            <div className="mt-3" id={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "{v0}-panel"), { v0: String(dayTabsId) })} role="tabpanel" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.CalendarPage", "en", "{v0}-tab-{v1}"), { v0: String(dayTabsId), v1: String(selDay) })} tabIndex={0}>
+            <div className="mt-3" id={`${dayTabsId}-panel`} role="tabpanel" aria-labelledby={`${dayTabsId}-tab-${selDay}`} tabIndex={0}>
               {selItems.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-line bg-card/40 px-4 py-10 text-center text-xs text-fg-3">
-                  {days[selDay]?.day}{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "요일 연재 없음")}</p>
+                  {days[selDay]?.day}요일 연재 없음
+                </p>
               ) : (
                 <CalendarDayItems key={`${selDay}-${filterIdentity}`} items={selItems} day={days[selDay]?.day ?? ""} />
               )}
@@ -381,13 +384,13 @@ export function CalendarPage() {
                   >
                     <span className={cn("font-display text-sm font-bold tracking-wide", isToday ? "text-accent" : "text-fg")}>
                       {day}
-                      {isToday && <span className="ml-1.5 text-[0.72rem] font-medium">{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "오늘")}</span>}
+                      {isToday && <span className="ml-1.5 text-[0.72rem] font-medium">오늘</span>}
                     </span>
                     <span className="numeral text-xs text-fg-3">{items.length}</span>
                   </header>
                   <div className="flex flex-col gap-2.5 p-2.5">
                     {items.length === 0 ? (
-                      <p className="px-1 py-6 text-center text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "연재 없음")}</p>
+                      <p className="px-1 py-6 text-center text-xs text-fg-3">연재 없음</p>
                     ) : (
                       <CalendarDayItems key={`${day}-${filterIdentity}`} items={items} day={day} compact />
                     )}
@@ -403,18 +406,19 @@ export function CalendarPage() {
         <div className="mt-4 rounded-2xl border border-dashed border-line bg-card/40 p-10 text-center">
           {anyFilterActive ? (
             <>
-              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "선택한 조건에 맞는 연재 작품이 없습니다.")}</p>
+              <p className="text-sm font-medium text-fg">선택한 조건에 맞는 연재 작품이 없습니다.</p>
               <button
                 type="button"
                 onClick={() => setFilters(EMPTY_TITLE_FILTERS)}
                 className="mt-1 text-xs text-accent hover:underline"
               >
-                {translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "필터 초기화")}</button>
+                필터 초기화
+              </button>
             </>
           ) : (
             <>
-              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "연재요일 정보가 있는 작품이 없습니다.")}</p>
-              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.CalendarPage", "ko", "다음 카탈로그 수집이 성공하면 DB 스냅샷 기준으로 자동 반영됩니다.")}</p>
+              <p className="text-sm font-medium text-fg">연재요일 정보가 있는 작품이 없습니다.</p>
+              <p className="mt-1 text-xs text-fg-3">다음 카탈로그 수집이 성공하면 DB 스냅샷 기준으로 자동 반영됩니다.</p>
             </>
           )}
         </div>

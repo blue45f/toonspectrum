@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
@@ -22,7 +18,7 @@ const STAGE_BY_TAB: Record<FortuneTab, string[]> = {
 };
 
 function Box({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.fortune.FortuneLoading", "en", "skeleton block {v0}"), { v0: String(className ?? "") })} style={style} />;
+  return <span className={`skeleton block ${className ?? ""}`} style={style} />;
 }
 
 function TabSkeleton({ tab }: { tab: FortuneTab }) {
@@ -111,7 +107,7 @@ export function FortuneLoading({
           )}
         </motion.div>
         <p className="font-serif text-sm text-fg-2" aria-live="polite">
-          {characterName}{translateCurrentStaticSourceText("domains.fortune.FortuneLoading", "ko", "가 ")}{stages[stage]}…
+          {characterName}가 {stages[stage]}…
         </p>
       </div>
 

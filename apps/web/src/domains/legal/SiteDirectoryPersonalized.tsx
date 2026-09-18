@@ -1,6 +1,3 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Clock3, Heart, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 

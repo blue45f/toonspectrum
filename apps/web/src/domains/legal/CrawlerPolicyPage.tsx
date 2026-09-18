@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Ban,
   CheckCircle2,
@@ -51,11 +50,15 @@ export function CrawlerPolicyPage() {
   return (
     <Container size="prose" className="py-10 sm:py-14">
       <header>
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "DATA COLLECTION · 투명성")}</p>
+        <p className="eyebrow text-accent">DATA COLLECTION · 투명성</p>
         <h1 className="mt-2 text-balance font-display text-[clamp(1.8rem,7vw,2.25rem)] font-bold tracking-tight text-fg sm:text-5xl">
-          {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "공개 데이터를 정직하게 연결합니다")}</h1>
+          공개 데이터를 정직하게 연결합니다
+        </h1>
         <p className="mt-4 text-base leading-8 text-fg-2">
-          {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "ToonSpectrum은 작품 본문을 복제하는 서비스가 아닙니다. 공식 API·오픈데이터·소유자가 직접 제공한 피드를 우선하고, 공개 웹을 확인할 때에도 접근 가능성, 저장 가능성, 표시·상업 이용 가능성을 서로 다른 기준으로 검토합니다. 배포된 서비스는 외부 사이트를 실시간 또는 주기적으로 수집하지 않으며, 갱신이 필요할 때 운영자가 별도 환경에서 수동으로 실행·검토합니다.")}</p>
+          ToonSpectrum은 작품 본문을 복제하는 서비스가 아닙니다. 공식 API·오픈데이터·소유자가 직접 제공한 피드를 우선하고,
+          공개 웹을 확인할 때에도 접근 가능성, 저장 가능성, 표시·상업 이용 가능성을 서로 다른 기준으로 검토합니다.
+          배포된 서비스는 외부 사이트를 실시간 또는 주기적으로 수집하지 않으며, 갱신이 필요할 때 운영자가 별도 환경에서 수동으로 실행·검토합니다.
+        </p>
       </header>
 
       <section className="mt-10 rounded-2xl border border-line bg-panel/50 p-5 sm:p-6">
@@ -64,8 +67,8 @@ export function CrawlerPolicyPage() {
             <FileSearch size={19} aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "수집 봇 식별 정보")}</h2>
-            <p className="mt-2 text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "자동 요청은 일반 브라우저로 가장하지 않고 아래 User-Agent로 식별합니다.")}</p>
+            <h2 className="text-lg font-bold text-fg">수집 봇 식별 정보</h2>
+            <p className="mt-2 text-sm leading-7 text-fg-2">자동 요청은 일반 브라우저로 가장하지 않고 아래 User-Agent로 식별합니다.</p>
             <code className="mt-3 block overflow-x-auto rounded-xl border border-line bg-canvas p-3 text-xs leading-6 text-fg">
               ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)
             </code>
@@ -76,7 +79,7 @@ export function CrawlerPolicyPage() {
       <section className="mt-10">
         <div className="flex items-center gap-2">
           <Database size={19} className="text-accent" aria-hidden="true" />
-          <h2 className="text-xl font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "사용하는 수집 채널")}</h2>
+          <h2 className="text-xl font-bold text-fg">사용하는 수집 채널</h2>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {COLLECTION_CHANNELS.map((item) => (
@@ -93,7 +96,7 @@ export function CrawlerPolicyPage() {
         <article className="rounded-2xl border border-line bg-card/40 p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck size={18} className="text-good" aria-hidden="true" />
-            <h2 className="font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "확인하는 공개 정보")}</h2>
+            <h2 className="font-bold text-fg">확인하는 공개 정보</h2>
           </div>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-fg-2">
             {COLLECTED_FIELDS.map((item) => <li key={item} className="flex gap-2"><span aria-hidden="true">·</span><span>{item}</span></li>)}
@@ -102,7 +105,7 @@ export function CrawlerPolicyPage() {
         <article className="rounded-2xl border border-danger/30 bg-danger/5 p-5">
           <div className="flex items-center gap-2">
             <Ban size={18} className="text-danger" aria-hidden="true" />
-            <h2 className="font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "수집하거나 우회하지 않는 정보")}</h2>
+            <h2 className="font-bold text-fg">수집하거나 우회하지 않는 정보</h2>
           </div>
           <ul className="mt-4 space-y-3 text-sm leading-6 text-fg-2">
             {NEVER_COLLECTED.map((item) => <li key={item} className="flex gap-2"><span aria-hidden="true">·</span><span>{item}</span></li>)}
@@ -111,9 +114,11 @@ export function CrawlerPolicyPage() {
       </section>
 
       <section className="mt-10 space-y-4 rounded-2xl border border-line bg-panel/50 p-5 sm:p-6">
-        <h2 className="text-xl font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "접근 허용과 재사용 권리는 다릅니다")}</h2>
+        <h2 className="text-xl font-bold text-fg">접근 허용과 재사용 권리는 다릅니다</h2>
         <p className="text-sm leading-7 text-fg-2">
-          {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "robots.txt가 경로 접근을 허용하더라도 이미지 캐시, 본문 저장, 수정, AI 입력, 상업 이용, 재배포까지 허용된 것으로 판단하지 않습니다. 자료마다 메타데이터 표시·썸네일 표시·프로젝트 가져오기·상업 이용 가능성을 분리하여 기록하고, 확인되지 않은 권리는 기본적으로 차단합니다.")}</p>
+          robots.txt가 경로 접근을 허용하더라도 이미지 캐시, 본문 저장, 수정, AI 입력, 상업 이용, 재배포까지 허용된 것으로 판단하지 않습니다.
+          자료마다 메타데이터 표시·썸네일 표시·프로젝트 가져오기·상업 이용 가능성을 분리하여 기록하고, 확인되지 않은 권리는 기본적으로 차단합니다.
+        </p>
         <div className="grid gap-3 sm:grid-cols-3">
           {[
             ["접근", "robots·로그인·차단 여부"],
@@ -132,17 +137,21 @@ export function CrawlerPolicyPage() {
         <div className="flex items-start gap-3">
           <MailQuestion size={20} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold text-fg">{translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "정정·삭제·수집 중지 요청")}</h2>
+            <h2 className="text-lg font-bold text-fg">정정·삭제·수집 중지 요청</h2>
             <p className="mt-2 text-sm leading-7 text-fg-2">
-              {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "권리자나 데이터 제공자는 대상 URL과 요청 근거를 보내 정정, 노출 중지, 캐시 삭제 또는 재수집 방지를 요청할 수 있습니다. 확인 중인 자료는 우선 공개 노출을 중지하고 처리 이력을 남깁니다.")}</p>
+              권리자나 데이터 제공자는 대상 URL과 요청 근거를 보내 정정, 노출 중지, 캐시 삭제 또는 재수집 방지를 요청할 수 있습니다.
+              확인 중인 자료는 우선 공개 노출을 중지하고 처리 이력을 남깁니다.
+            </p>
             <div className="mt-4 flex flex-wrap gap-3">
               <Link href="/contact" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-on-accent">
-                {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "문의하기 ")}<ExternalLink size={14} aria-hidden="true" />
+                문의하기 <ExternalLink size={14} aria-hidden="true" />
               </Link>
               <Link href="/about/data" className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-fg hover:bg-raised">
-                {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "데이터 제공처 보기")}</Link>
+                데이터 제공처 보기
+              </Link>
               <Link href="/copyright" className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-fg hover:bg-raised">
-                {translateCurrentStaticSourceText("domains.legal.CrawlerPolicyPage", "ko", "저작권 안내")}</Link>
+                저작권 안내
+              </Link>
             </div>
           </div>
         </div>

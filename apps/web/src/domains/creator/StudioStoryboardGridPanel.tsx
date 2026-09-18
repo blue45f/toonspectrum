@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Storyboard Control Room — 전체 페이지를 시퀀스, 검토 상태, 제작 준비도 관점에서 보는 작업 공간.
  *
@@ -176,7 +172,7 @@ function PriorityBadge({
         "inline-flex max-w-full items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold",
         PRIORITY_TONE[priority],
       )}
-      title={issueLabel || translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "진단 이슈 없음")}
+      title={issueLabel || "진단 이슈 없음"}
     >
       {STORYBOARD_PRIORITY_LABELS[priority]}
     </span>
@@ -258,7 +254,7 @@ export function StudioStoryboardGridPanel({
     <div className="grid min-h-60 place-items-center rounded-2xl border border-dashed border-line bg-card/30 p-8 text-center">
       <div>
         <Search className="mx-auto mb-3 text-fg-3" size={28} aria-hidden />
-        <p className="text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "조건에 맞는 페이지가 없습니다.")}</p>
+        <p className="text-sm font-semibold text-fg">조건에 맞는 페이지가 없습니다.</p>
         <button
           type="button"
           onClick={() => {
@@ -267,7 +263,8 @@ export function StudioStoryboardGridPanel({
           }}
           className="mt-3 min-h-11 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised"
         >
-          {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "필터 초기화")}</button>
+          필터 초기화
+        </button>
       </div>
     </div>
   );
@@ -287,7 +284,7 @@ export function StudioStoryboardGridPanel({
             <div
               key={page.id}
               {...dragProps}
-              title={reorderEnabled ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "드래그하여 순서 변경") : undefined}
+              title={reorderEnabled ? "드래그하여 순서 변경" : undefined}
               className={cn(
                 "group relative flex flex-col gap-1 rounded-xl border p-1.5 transition-all",
                 isActive ? "border-accent bg-accent-soft/40" : "border-line bg-card hover:bg-raised/50",
@@ -307,7 +304,7 @@ export function StudioStoryboardGridPanel({
               <button
                 type="button"
                 onClick={() => onSelectPage(page.id)}
-                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "{v0} 선택"), { v0: String(displayName) })}
+                aria-label={`${displayName} 선택`}
                 aria-pressed={isActive}
                 className="absolute inset-0 z-10 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               />
@@ -323,22 +320,23 @@ export function StudioStoryboardGridPanel({
                 title={page.note ? `${displayName}\n${page.note}` : displayName}
               >
                 {hasCustomPageName(page) ? `${index + 1}. ${displayName}` : displayName}
-                {page.note ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", " · 메모") : ""}
+                {page.note ? " · 메모" : ""}
               </span>
 
               <div className="flex min-w-0 items-center justify-between gap-1 text-[9px] text-fg-3">
-                <span className="truncate" title={review.assignee || translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당자 미지정")}>
-                  {review.assignee ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당 {v0}"), { v0: String(review.assignee) }) : translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당자 미지정")}
+                <span className="truncate" title={review.assignee || "담당자 미지정"}>
+                  {review.assignee ? `담당 ${review.assignee}` : "담당자 미지정"}
                 </span>
                 {!metadataComplete ? (
                   <span className="shrink-0 rounded-full border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-200">
-                    {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "샷 정보 필요")}</span>
+                    샷 정보 필요
+                  </span>
                 ) : null}
               </div>
 
               <div className="flex min-w-0 items-center justify-between gap-1">
                 <PriorityBadge priority={row.priority} issues={row.issues} />
-                <span className="text-[9px] font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "준비도 ")}{row.readinessScore}%</span>
+                <span className="text-[9px] font-semibold text-fg-3">준비도 {row.readinessScore}%</span>
               </div>
 
               {onShotTagChange ? (
@@ -360,8 +358,8 @@ export function StudioStoryboardGridPanel({
                     onDuplicatePage(page.id);
                   }}
                   className="grid size-11 shrink-0 place-items-center rounded-lg bg-black/55 p-1 text-white hover:bg-black/70"
-                  title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "페이지 복제")}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "{v0} 복제"), { v0: String(label) })}
+                  title="페이지 복제"
+                  aria-label={`${label} 복제`}
                 >
                   <Copy size={11} aria-hidden />
                 </button>
@@ -384,8 +382,8 @@ export function StudioStoryboardGridPanel({
                   }}
                   disabled={!canDelete}
                   className="grid size-11 shrink-0 place-items-center rounded-lg bg-black/55 p-1 text-white hover:bg-bad/80 disabled:opacity-30"
-                  title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "페이지 삭제")}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "{v0} 삭제"), { v0: String(label) })}
+                  title="페이지 삭제"
+                  aria-label={`${label} 삭제`}
                 >
                   <Trash2 size={11} aria-hidden />
                 </button>
@@ -405,7 +403,7 @@ export function StudioStoryboardGridPanel({
         key={page.id}
         type="button"
         onClick={() => onSelectPage(page.id)}
-        aria-current={page.id === currentPageId ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "en", "page") : undefined}
+        aria-current={page.id === currentPageId ? "page" : undefined}
         className={cn(
           "rounded-xl border p-2 text-left transition-colors hover:border-accent/60 hover:bg-raised/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
           page.id === currentPageId ? "border-accent bg-accent-soft/40" : "border-line bg-panel/70",
@@ -416,18 +414,18 @@ export function StudioStoryboardGridPanel({
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-bold text-fg">{originalIndex + 1}. {label}</p>
             <p className="mt-1 truncate text-[10px] text-fg-3">
-              {[page.shotType, page.cameraAngle].filter(Boolean).join(" · ") || translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "샷 정보 미지정")}
+              {[page.shotType, page.cameraAngle].filter(Boolean).join(" · ") || "샷 정보 미지정"}
             </p>
             <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-fg-2">
-              {issueLabel || review.note || page.note || translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "진단 이슈 없음")}
+              {issueLabel || review.note || page.note || "진단 이슈 없음"}
             </p>
           </div>
         </div>
         <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-fg-3">
-          <span className="truncate">{review.assignee ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당 {v0}"), { v0: String(review.assignee) }) : translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당자 미지정")}</span>
+          <span className="truncate">{review.assignee ? `담당 ${review.assignee}` : "담당자 미지정"}</span>
           <span className="inline-flex shrink-0 items-center gap-1">
-            {review.locked ? <Lock size={9} aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "잠금")} /> : null}
-            {!metadataComplete ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "샷 정보 필요") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "준비도 {v0}%"), { v0: String(row.readinessScore) })}
+            {review.locked ? <Lock size={9} aria-label="잠금" /> : null}
+            {!metadataComplete ? "샷 정보 필요" : `준비도 ${row.readinessScore}%`}
           </span>
         </div>
       </button>
@@ -435,7 +433,7 @@ export function StudioStoryboardGridPanel({
   };
 
   const renderReviewBoard = () => (
-    <div className="min-w-[58rem] grid grid-cols-4 gap-3" aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검토 상태별 페이지 보드")}>
+    <div className="min-w-[58rem] grid grid-cols-4 gap-3" aria-label="검토 상태별 페이지 보드">
       {PAGE_REVIEW_STATUSES.map((status) => {
         const rows = visibleRows.filter((row) => row.review.status === status);
         return (
@@ -447,7 +445,8 @@ export function StudioStoryboardGridPanel({
             <div className="flex max-h-[calc(100vh-18rem)] flex-col gap-2 overflow-y-auto pr-0.5">
               {rows.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-line px-2 py-6 text-center text-[10px] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "해당 페이지 없음")}</p>
+                  해당 페이지 없음
+                </p>
               ) : rows.map(renderQueueCard)}
             </div>
           </section>
@@ -457,7 +456,7 @@ export function StudioStoryboardGridPanel({
   );
 
   const renderPriorityBoard = () => (
-    <div className="min-w-[46rem] grid grid-cols-3 gap-3" aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "제작 준비도 우선순위 보드")}>
+    <div className="min-w-[46rem] grid grid-cols-3 gap-3" aria-label="제작 준비도 우선순위 보드">
       {PRIORITY_ORDER.map((priority) => {
         const rows = visibleRows.filter((row) => row.priority === priority);
         return (
@@ -469,7 +468,8 @@ export function StudioStoryboardGridPanel({
             <div className="flex max-h-[calc(100vh-18rem)] flex-col gap-2 overflow-y-auto pr-0.5">
               {rows.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-line px-2 py-6 text-center text-[10px] text-fg-3">
-                  {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "해당 페이지 없음")}</p>
+                  해당 페이지 없음
+                </p>
               ) : rows.map(renderQueueCard)}
             </div>
           </section>
@@ -482,17 +482,17 @@ export function StudioStoryboardGridPanel({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "스토리보드 컨트롤 룸")}
+      aria-label="스토리보드 컨트롤 룸"
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
     >
       <div className="mx-auto flex h-full w-full max-w-[100rem] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           <LayoutGrid size={16} className="text-accent" aria-hidden />
           <div>
-            <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "스토리보드 컨트롤 룸")}</h2>
-            <p className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "시퀀스·샷 메타·검토 상태·제작 준비도를 한 화면에서 점검합니다.")}</p>
+            <h2 className="text-sm font-bold text-fg">스토리보드 컨트롤 룸</h2>
+            <p className="text-[10px] text-fg-3">시퀀스·샷 메타·검토 상태·제작 준비도를 한 화면에서 점검합니다.</p>
           </div>
-          <span className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "총 ")}{summary.total}{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "페이지")}</span>
+          <span className="text-xs text-fg-3">총 {summary.total}페이지</span>
 
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <div className="flex items-center gap-1 rounded-md border border-line bg-card/50 p-0.5">
@@ -500,23 +500,26 @@ export function StudioStoryboardGridPanel({
                 className="min-h-11 gap-1 px-2.5"
                 active={viewMode === "sequence"}
                 onClick={() => setViewMode("sequence")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "원본 순서와 샷 정보를 보는 시퀀스 뷰")}
+                title="원본 순서와 샷 정보를 보는 시퀀스 뷰"
               >
-                <LayoutGrid size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "시퀀스")}</StudioPanelChip>
+                <LayoutGrid size={12} aria-hidden /> 시퀀스
+              </StudioPanelChip>
               <StudioPanelChip
                 className="min-h-11 gap-1 px-2.5"
                 active={viewMode === "review"}
                 onClick={() => setViewMode("review")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검토 상태별 작업 큐")}
+                title="검토 상태별 작업 큐"
               >
-                <ListChecks size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검토 큐")}</StudioPanelChip>
+                <ListChecks size={12} aria-hidden /> 검토 큐
+              </StudioPanelChip>
               <StudioPanelChip
                 className="min-h-11 gap-1 px-2.5"
                 active={viewMode === "priority"}
                 onClick={() => setViewMode("priority")}
-                title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "제작을 막는 문제부터 보는 준비도 큐")}
+                title="제작을 막는 문제부터 보는 준비도 큐"
               >
-                <ListChecks size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "준비도 큐")}</StudioPanelChip>
+                <ListChecks size={12} aria-hidden /> 준비도 큐
+              </StudioPanelChip>
             </div>
 
             {viewMode === "sequence" ? (
@@ -527,9 +530,9 @@ export function StudioStoryboardGridPanel({
                     className="min-h-11 min-w-11"
                     active={cellSize === size}
                     onClick={() => setCellSize(size)}
-                    title={size === "s" ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "작게") : size === "m" ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "보통") : translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "크게")}
+                    title={size === "s" ? "작게" : size === "m" ? "보통" : "크게"}
                   >
-                    {size === "s" ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "소") : size === "m" ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "중") : translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "대")}
+                    {size === "s" ? "소" : size === "m" ? "중" : "대"}
                   </StudioPanelChip>
                 ))}
               </div>
@@ -540,11 +543,12 @@ export function StudioStoryboardGridPanel({
               onClick={onAddPage}
               className="flex min-h-11 min-w-11 items-center gap-1 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-on-accent hover:bg-accent-hover pointer-coarse:px-3"
             >
-              <Plus size={12} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "추가")}</button>
+              <Plus size={12} aria-hidden /> 추가
+            </button>
             <button
               type="button"
-              aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "닫기")}
-              title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "닫기 (Esc)")}
+              aria-label="닫기"
+              title="닫기 (Esc)"
               onClick={onClose}
               className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-3 transition-colors hover:bg-accent-soft hover:text-accent"
             >
@@ -556,20 +560,20 @@ export function StudioStoryboardGridPanel({
         <div className="shrink-0 border-b border-line bg-card/30 px-4 py-3">
           <div className="flex gap-2 overflow-x-auto pb-2">
             <MetricButton
-              label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "제작 준비도")}
+              label="제작 준비도"
               value={`${summary.readinessPercent}%`}
               active={viewMode === "priority" && reviewFilter === "all"}
               onClick={() => focusPriorityQueue("all")}
-              title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "승인·잠금·샷 정보·빈 페이지·연속 구도 진단을 종합한 준비도")}
+              title="승인·잠금·샷 정보·빈 페이지·연속 구도 진단을 종합한 준비도"
             />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "즉시 확인")} value={summary.attention} active={reviewFilter === "attention"} onClick={() => focusPriorityQueue("attention")} title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "차단 또는 확인이 필요한 페이지만 보기")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "연속 구도")} value={summary.continuityRisks} active={reviewFilter === "continuity-risk"} onClick={() => focusPriorityQueue("continuity-risk")} title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "동일한 샷 유형과 카메라 앵글이 3페이지 이상 이어지는 구간")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "승인 진행률")} value={`${summary.approvedPercent}%`} active={reviewFilter === "approved"} onClick={() => setOperationalFilter("approved")} title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "승인 페이지만 보기")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검토 요청")} value={summary.statusCounts["needs-review"]} active={reviewFilter === "needs-review"} onClick={() => setOperationalFilter("needs-review")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "수정 요청")} value={summary.statusCounts["changes-requested"]} active={reviewFilter === "changes-requested"} onClick={() => setOperationalFilter("changes-requested")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "샷 정보 누락")} value={summary.missingMetadata} active={reviewFilter === "missing-metadata"} onClick={() => setOperationalFilter("missing-metadata")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "잠금")} value={summary.locked} active={reviewFilter === "locked"} onClick={() => setOperationalFilter("locked")} />
-            <MetricButton label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당 미지정")} value={summary.total - summary.assigned} active={reviewFilter === "unassigned"} onClick={() => setOperationalFilter("unassigned")} title={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "담당자가 없는 페이지만 보기")} />
+            <MetricButton label="즉시 확인" value={summary.attention} active={reviewFilter === "attention"} onClick={() => focusPriorityQueue("attention")} title="차단 또는 확인이 필요한 페이지만 보기" />
+            <MetricButton label="연속 구도" value={summary.continuityRisks} active={reviewFilter === "continuity-risk"} onClick={() => focusPriorityQueue("continuity-risk")} title="동일한 샷 유형과 카메라 앵글이 3페이지 이상 이어지는 구간" />
+            <MetricButton label="승인 진행률" value={`${summary.approvedPercent}%`} active={reviewFilter === "approved"} onClick={() => setOperationalFilter("approved")} title="승인 페이지만 보기" />
+            <MetricButton label="검토 요청" value={summary.statusCounts["needs-review"]} active={reviewFilter === "needs-review"} onClick={() => setOperationalFilter("needs-review")} />
+            <MetricButton label="수정 요청" value={summary.statusCounts["changes-requested"]} active={reviewFilter === "changes-requested"} onClick={() => setOperationalFilter("changes-requested")} />
+            <MetricButton label="샷 정보 누락" value={summary.missingMetadata} active={reviewFilter === "missing-metadata"} onClick={() => setOperationalFilter("missing-metadata")} />
+            <MetricButton label="잠금" value={summary.locked} active={reviewFilter === "locked"} onClick={() => setOperationalFilter("locked")} />
+            <MetricButton label="담당 미지정" value={summary.total - summary.assigned} active={reviewFilter === "unassigned"} onClick={() => setOperationalFilter("unassigned")} title="담당자가 없는 페이지만 보기" />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -579,15 +583,15 @@ export function StudioStoryboardGridPanel({
                 ref={searchRef}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "페이지·메모·샷·담당자·진단 검색  /")}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "스토리보드 검색")}
+                placeholder="페이지·메모·샷·담당자·진단 검색  /"
+                aria-label="스토리보드 검색"
                 className="min-h-11 w-full rounded-lg border border-line bg-panel pl-9 pr-9 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
               />
               {query ? (
                 <button
                   type="button"
                   onClick={() => setQuery("")}
-                  aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검색어 지우기")}
+                  aria-label="검색어 지우기"
                   className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-md text-fg-3 hover:bg-raised hover:text-fg"
                 >
                   <X size={13} aria-hidden />
@@ -596,11 +600,11 @@ export function StudioStoryboardGridPanel({
             </label>
 
             <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-panel px-3 text-xs text-fg-2">
-              <span className="font-semibold">{translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "상태")}</span>
+              <span className="font-semibold">상태</span>
               <select
                 value={reviewFilter}
                 onChange={(event) => setReviewFilter(event.target.value as StoryboardControlFilter)}
-                aria-label={translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "스토리보드 상태 필터")}
+                aria-label="스토리보드 상태 필터"
                 className="min-h-11 bg-transparent text-xs font-semibold text-fg outline-none"
               >
                 {STORYBOARD_CONTROL_FILTERS.map((filter) => (
@@ -610,16 +614,18 @@ export function StudioStoryboardGridPanel({
             </label>
 
             <span className="inline-flex min-h-11 items-center rounded-lg border border-line bg-panel px-3 text-xs text-fg-3" role="status" aria-live="polite">
-              {summary.visible}/{summary.total} {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "표시")}</span>
+              {summary.visible}/{summary.total} 표시
+            </span>
 
             <button
               type="button"
               disabled={visibleRows.length === 0}
               onClick={() => downloadStoryboardReviewCsv(visibleRows)}
-              title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "현재 검색·필터 결과 {v0}개와 준비도 진단을 CSV로 내보냅니다."), { v0: String(visibleRows.length) })}
+              title={`현재 검색·필터 결과 ${visibleRows.length}개와 준비도 진단을 CSV로 내보냅니다.`}
               className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/50 hover:bg-raised disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Download size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검토표 CSV")}</button>
+              <Download size={13} aria-hidden /> 검토표 CSV
+            </button>
           </div>
         </div>
 
@@ -633,12 +639,12 @@ export function StudioStoryboardGridPanel({
 
         <p className="shrink-0 border-t border-line px-4 py-2 text-[0.7rem] text-fg-3" role="status">
           {viewMode === "priority"
-            ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "준비도 큐는 빈 페이지·수정 요청을 차단으로, 검토 대기·메타 누락·연속 동일 구도를 확인 필요로 분류합니다.")
+            ? "준비도 큐는 빈 페이지·수정 요청을 차단으로, 검토 대기·메타 누락·연속 동일 구도를 확인 필요로 분류합니다."
             : viewMode === "review"
-              ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검토 큐는 원본 페이지 순서를 유지한 채 상태별로 묶습니다. 카드를 클릭하면 해당 페이지로 이동합니다.")
+              ? "검토 큐는 원본 페이지 순서를 유지한 채 상태별로 묶습니다. 카드를 클릭하면 해당 페이지로 이동합니다."
               : reorderEnabled
-                ? translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "카드를 드래그하면 순서가 바뀝니다. / 또는 Ctrl/⌘+F로 검색할 수 있습니다.")
-                : translateCurrentStaticSourceText("domains.creator.StudioStoryboardGridPanel", "ko", "검색·필터 중에는 숨겨진 페이지를 건너뛰는 오배치를 막기 위해 재배열이 잠깁니다.")}
+                ? "카드를 드래그하면 순서가 바뀝니다. / 또는 Ctrl/⌘+F로 검색할 수 있습니다."
+                : "검색·필터 중에는 숨겨진 페이지를 건너뛰는 오배치를 막기 위해 재배열이 잠깁니다."}
         </p>
       </div>
     </div>

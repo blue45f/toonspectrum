@@ -1,4 +1,3 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Circle, Group, Line } from "react-konva/lib/ReactKonvaCore";
 
 import {
@@ -86,11 +85,11 @@ export function StudioAdvancedRulerOverlay({
                         x={point.x}
                         y={point.y}
                         radius={6 / scale}
-                        fill={index === 0 || index === 3 ? stroke : translateCurrentStaticSourceText("domains.creator.StudioAdvancedRulerOverlay", "en", "#ffffff")}
+                        fill={index === 0 || index === 3 ? stroke : "#ffffff"}
                         stroke="#0f172a"
                         strokeWidth={1.5 / scale}
                         draggable={!disabled}
-                        name={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAdvancedRulerOverlay", "en", "advanced-ruler-{v0}-handle"), { v0: String(key) })}
+                        name={`advanced-ruler-${key}-handle`}
                         onDragMove={(event) => onPreviewRuler(ruler.id, {
                           [key]: { x: event.target.x(), y: event.target.y() },
                         } as Partial<StudioAdvancedRuler>)}
@@ -127,7 +126,7 @@ export function StudioAdvancedRulerOverlay({
               ) : null}
               {faintSegments.map((segment, index) => (
                 <Line
-                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAdvancedRulerOverlay", "en", "parallel-{v0}"), { v0: String(index) })}
+                  key={`parallel-${index}`}
                   points={[segment.x1, segment.y1, segment.x2, segment.y2]}
                   stroke={stroke}
                   strokeWidth={0.8 / scale}
@@ -204,7 +203,7 @@ export function StudioAdvancedRulerOverlay({
             <Group key={ruler.id}>
               {guideRadii.map((radius, index) => (
                 <Circle
-                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAdvancedRulerOverlay", "en", "concentric-{v0}"), { v0: String(index) })}
+                  key={`concentric-${index}`}
                   x={ruler.centerX}
                   y={ruler.centerY}
                   radius={radius}
@@ -217,7 +216,7 @@ export function StudioAdvancedRulerOverlay({
               ))}
               {raySegments.map((segment, index) => (
                 <Line
-                  key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAdvancedRulerOverlay", "en", "radial-{v0}"), { v0: String(index) })}
+                  key={`radial-${index}`}
                   points={[segment.x1, segment.y1, segment.x2, segment.y2]}
                   stroke={stroke}
                   strokeWidth={(index === 0 && active ? 2 : 0.8) / scale}

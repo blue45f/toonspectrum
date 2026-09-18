@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowLeft,
   Layers3,
   Map,
@@ -367,7 +363,7 @@ export function StudioInspectorNavigator({
       className="sticky top-0 z-30 -mx-0.5 rounded-lg border border-line bg-panel/95 p-1.5 shadow-[0_6px_20px_oklch(0.12_0.01_70/0.28)] backdrop-blur supports-[backdrop-filter]:bg-panel/90"
       data-testid="studio-inspector-navigator"
       data-inspector-chrome="navigator"
-      data-studio-inspector-context-pinned={panelState.contextPinned ? translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "en", "true") : undefined}
+      data-studio-inspector-context-pinned={panelState.contextPinned ? "true" : undefined}
     >
       {mobileSheetHandle ? (
         <div className="-mx-1.5 -mt-1.5 mb-0.5 lg:hidden">{mobileSheetHandle}</div>
@@ -424,7 +420,7 @@ export function StudioInspectorNavigator({
             <Pin
               size={15}
               strokeWidth={1.75}
-              fill={panelState.contextPinned ? translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "en", "none")}
+              fill={panelState.contextPinned ? "currentColor" : "none"}
               aria-hidden
             />
           </button>
@@ -527,7 +523,9 @@ export function StudioInspectorNavigator({
                   <button
                     key={tabId}
                     type="button"
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "ko", "{v0} 탭 {v1}"), { v0: String(copy(PRIMARY_TAB_COPY[tabId])), v1: String(visible ? "숨기기" : "표시하기") })}
+                    aria-label={`${copy(PRIMARY_TAB_COPY[tabId])} 탭 ${
+                      visible ? "숨기기" : "표시하기"
+                    }`}
                     aria-pressed={visible}
                     disabled={cannotHide}
                     title={cannotHide ? disabledReason : undefined}
@@ -535,7 +533,7 @@ export function StudioInspectorNavigator({
                       setStudioInspectorPanelPrimaryTabVisible(tabId, !visible)
                     }
                     data-inspector-priority="chrome"
-                    data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "en", "panel.chrome.visible.{v0}"), { v0: String(tabId) })}
+                    data-inspector-control-id={`panel.chrome.visible.${tabId}`}
                     data-studio-inspector-tab-visibility={tabId}
                     className={cn(
                       "flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-md border px-1 text-[0.6875rem] font-semibold transition-colors",
@@ -637,7 +635,7 @@ export function StudioInspectorNavigator({
             </span>
             <span className="min-w-0">
               <span className="block truncate text-xs font-bold text-fg">
-                {hasSelection ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "ko", "{v0} 설정"), { v0: String(selectionSummary) }) : copy("currentTool")}
+                {hasSelection ? `${selectionSummary} 설정` : copy("currentTool")}
               </span>
               <span className="block truncate text-[0.6875rem] text-fg-3">
                 {hasSelection ? copy("openTargetSelection") : copy("openTargetTool")}
@@ -681,7 +679,7 @@ export function StudioInspectorNavigator({
         role="tablist"
         aria-label={copy("tablist")}
         data-studio-inspector-primary-tabs-compact={
-          panelState.compactPrimaryTabs ? translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "en", "true") : undefined
+          panelState.compactPrimaryTabs ? "true" : undefined
         }
         className="grid gap-0.5 rounded-lg border border-line/70 bg-canvas/55 p-0.5"
         style={{
@@ -725,7 +723,7 @@ export function StudioInspectorNavigator({
                 tabFocusClass
               )}
             >
-              <Icon size={15} strokeWidth={1.75} className={active ? translateCurrentStaticSourceText("domains.creator.StudioInspectorNavigator", "en", "text-accent") : undefined} aria-hidden />
+              <Icon size={15} strokeWidth={1.75} className={active ? "text-accent" : undefined} aria-hidden />
               <span className={cn("truncate", panelState.compactPrimaryTabs && "sr-only")}>
                 {copy(PRIMARY_TAB_COPY[tabId])}
               </span>

@@ -1,4 +1,3 @@
-import { resolveUiLocale, translateLocaleBranchForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BarChart3,
   BookOpen,
@@ -34,10 +33,9 @@ import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
 
 
 
-export type SiteNavigationLocale = string;
-export type SiteNavigationAuthoredLocale = "ko" | "en";
+export type SiteNavigationLocale = "ko" | "en";
 export type SiteNavigationContext = "studio" | "spectrum";
-export type SiteNavigationText = Record<SiteNavigationAuthoredLocale, string>;
+export type SiteNavigationText = Record<SiteNavigationLocale, string>;
 
 export interface SiteNavigationItem {
   id: string;
@@ -451,5 +449,5 @@ export function siteNavigationLocale(_locale): SiteNavigationLocale {
 }
 
 export function siteNavigationText(text: SiteNavigationText, locale: string): string {
-  return translateLocaleBranchForLocale(locale, "shared.components.siteNavigation", text);
+  return text[siteNavigationLocale(locale)];
 }

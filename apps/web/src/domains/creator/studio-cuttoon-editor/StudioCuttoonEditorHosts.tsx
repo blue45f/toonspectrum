@@ -1,4 +1,3 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -82,13 +81,16 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         className="mx-3 mt-2 flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-danger/40 bg-danger-soft/20 px-3 py-2 text-xs text-danger"
       >
         <span className="min-w-0 flex-1 font-medium leading-relaxed">
-          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "이 기기에 복구 기록을 저장하지 못했습니다. 편집은 계속할 수 있지만, 탭을 닫기 전에 프로젝트를 저장하거나 완전한 사본을 받아 주세요.")}</span>
+          이 기기에 복구 기록을 저장하지 못했습니다. 편집은 계속할 수 있지만, 탭을 닫기 전에
+          프로젝트를 저장하거나 완전한 사본을 받아 주세요.
+        </span>
         <button
           type="button"
           onClick={retryStudioHistoryDurability}
           className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
         >
-          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "다시 저장")}</button>
+          다시 저장
+        </button>
       </div>
     ) : pagesHistoryDurabilityStatus.state === "retrying" ? (
       <div
@@ -97,7 +99,8 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         aria-live="polite"
         className="mx-3 mt-2 shrink-0 rounded-xl border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-medium text-warning"
       >
-        {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "복구 기록을 다시 저장하고 있습니다. 편집은 계속할 수 있습니다.")}</div>
+        복구 기록을 다시 저장하고 있습니다. 편집은 계속할 수 있습니다.
+      </div>
     ) : null}
     {watermarkPreferenceSnapshot.state === "memory-only" ? (
       <div
@@ -114,7 +117,8 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
           onClick={() => void retryWatermarkPreferenceRuntime()}
           className="min-h-11 shrink-0 rounded-lg bg-danger/15 px-3 py-2 font-bold hover:bg-danger/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger"
         >
-          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "다시 저장")}</button>
+          다시 저장
+        </button>
       </div>
     ) : null}
     <input
@@ -122,7 +126,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
       type="file"
       accept={STUDIO_CANVAS_IMAGE_ACCEPT}
       className="hidden"
-      aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "편집 메뉴에서 이미지 파일 붙여넣기")}
+      aria-label="편집 메뉴에서 이미지 파일 붙여넣기"
       onChange={onPickImage}
     />
     {/* File-menu import pickers must live outside LazyStudioMenubarContent so clicks work
@@ -138,7 +142,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         onChange={(event) => {
           void handleImportProject(event);
         }}
-        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "프로젝트 JSON 가져오기")}
+        aria-label="프로젝트 JSON 가져오기"
       />
       <input
         ref={projectArchiveImportInputRef}
@@ -147,7 +151,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         className="hidden"
         disabled={projectArchiveBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportProjectArchive(event)}
-        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "프로젝트 아카이브 가져오기")}
+        aria-label="프로젝트 아카이브 가져오기"
       />
       <input
         ref={brushPackImportInputRef}
@@ -156,7 +160,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         className="hidden"
         disabled={brushPackImporting}
         onChange={(event) => void handleBrushPackImportFromMenu(event)}
-        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "브러시 가져오기 (ABR · MYB · KPP · SUT · SUTG · Krita 번들 · JSON)")}
+        aria-label="브러시 가져오기 (ABR · MYB · KPP · SUT · SUTG · Krita 번들 · JSON)"
       />
       <input
         ref={psdImportInputRef}
@@ -165,7 +169,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         className="hidden"
         disabled={psdImportBusy || interchangeImportBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportPsd(event)}
-        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "PSD 가져오기")}
+        aria-label="PSD 가져오기"
       />
       <input
         ref={interchangeImportInputRef}
@@ -174,7 +178,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
         className="hidden"
         disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportInterchangeArchive(event)}
-        aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorHosts", "ko", "OpenRaster, CBZ 또는 WILL v1 가져오기")}
+        aria-label="OpenRaster, CBZ 또는 WILL v1 가져오기"
       />
     </div>
     </>

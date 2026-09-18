@@ -1,10 +1,4 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   BookOpen,
   Layers,
@@ -222,7 +216,7 @@ export function AboutPage() {
       <section className="py-14 sm:py-20" aria-labelledby="about-purpose-title">
         <div className="grid gap-8 md:grid-cols-[0.72fr_1.28fr] md:gap-14">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.AboutPage", "en", "WHAT TOONSTUDIO CONNECTS")}</p>
+            <p className="eyebrow text-accent">WHAT TOONSTUDIO CONNECTS</p>
             <h2
               id="about-purpose-title"
               className="mt-4 max-w-sm text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -259,7 +253,7 @@ export function AboutPage() {
       </section>
 
       <section aria-labelledby="about-audience-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.AboutPage", "en", "BUILT AROUND CREATOR ROLES")}</p>
+        <p className="eyebrow text-accent">BUILT AROUND CREATOR ROLES</p>
         <h2
           id="about-audience-title"
           className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
@@ -299,7 +293,7 @@ export function AboutPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="about-guides-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.AboutPage", "en", "EXPLORE THE PRODUCT")}</p>
+        <p className="eyebrow text-accent">EXPLORE THE PRODUCT</p>
         <h2
           id="about-guides-title"
           className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"

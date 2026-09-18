@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -306,11 +302,14 @@ export function CreatorMarketplaceModerationBoard() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-bad">
-            <Flag size={13} aria-hidden /> {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "en", "CREATOR MARKET REPORTS")}</p>
+            <Flag size={13} aria-hidden /> CREATOR MARKET REPORTS
+          </p>
           <h2 id={headingId} className="mt-1 text-xl font-bold text-fg">
-            {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "Creator Market 신고 검수")}</h2>
+            Creator Market 신고 검수
+          </h2>
           <p className="mt-1 max-w-2xl text-xs leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "열린 신고와 신고 시점의 변경 불가능한 릴리스 증거를 함께 확인합니다. 숨김 해제는 관리자 숨김만 제거하며 배급자의 목록 내림을 되돌리지 않습니다.")}</p>
+            열린 신고와 신고 시점의 변경 불가능한 릴리스 증거를 함께 확인합니다. 숨김 해제는 관리자 숨김만 제거하며 배급자의 목록 내림을 되돌리지 않습니다.
+          </p>
         </div>
         <button
           type="button"
@@ -323,7 +322,8 @@ export function CreatorMarketplaceModerationBoard() {
             className={cn(loading && "animate-spin motion-reduce:animate-none")}
             aria-hidden
           />
-          {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "열린 신고 새로고침")}</button>
+          열린 신고 새로고침
+        </button>
       </div>
 
       {error ? (
@@ -334,12 +334,14 @@ export function CreatorMarketplaceModerationBoard() {
             onClick={() => setRefreshToken((token) => token + 1)}
             className="mt-2 min-h-11 rounded-lg border border-current/30 px-3 font-semibold hover:bg-bad/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bad/70"
           >
-            {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "목록 다시 불러오기")}</button>
+            목록 다시 불러오기
+          </button>
         </div>
       ) : null}
       {actionError ? (
         <p role="alert" className="mb-3 rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad">
-          {actionError} {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "작성한 검수 메모는 유지되었습니다. 버튼을 다시 누를 때만 새 요청을 보냅니다.")}</p>
+          {actionError} 작성한 검수 메모는 유지되었습니다. 버튼을 다시 누를 때만 새 요청을 보냅니다.
+        </p>
       ) : null}
       {statusMessage ? (
         <p
@@ -354,7 +356,7 @@ export function CreatorMarketplaceModerationBoard() {
       ) : null}
 
       {loading && !page ? (
-        <div role="status" className="space-y-2.5" aria-label={translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "Creator Market 신고 목록 불러오는 중")}>
+        <div role="status" className="space-y-2.5" aria-label="Creator Market 신고 목록 불러오는 중">
           {Array.from({ length: 3 }, (_, index) => (
             <div key={index} className="skeleton h-52 rounded-xl" />
           ))}
@@ -362,8 +364,8 @@ export function CreatorMarketplaceModerationBoard() {
       ) : !loading && !error && (page?.items.length ?? 0) === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-card/40 p-8 text-center">
           <ShieldCheck className="mx-auto text-good" size={24} aria-hidden />
-          <p className="mt-2 text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "검수 대기 중인 Creator Market 신고가 없습니다.")}</p>
-          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "이 표시는 현재 열린 신고 큐만 비어 있다는 뜻입니다.")}</p>
+          <p className="mt-2 text-sm font-semibold text-fg">검수 대기 중인 Creator Market 신고가 없습니다.</p>
+          <p className="mt-1 text-xs text-fg-3">이 표시는 현재 열린 신고 큐만 비어 있다는 뜻입니다.</p>
         </div>
       ) : page && page.items.length > 0 ? (
         <ul className={cn("space-y-3", loading && "opacity-65")} aria-busy={loading}>
@@ -384,7 +386,7 @@ export function CreatorMarketplaceModerationBoard() {
                       <span className="rounded-full bg-bad/10 px-2 py-0.5 font-semibold text-bad">
                         {REASON_LABELS[item.reason]}
                       </span>
-                      <span className="rounded-full border border-line px-2 py-0.5">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "열린 신고")}</span>
+                      <span className="rounded-full border border-line px-2 py-0.5">열린 신고</span>
                       <time dateTime={item.createdAt}>{formatDate(item.createdAt)}</time>
                     </div>
                     <h3 className="mt-2 break-words text-base font-bold text-fg">{item.evidence.name}</h3>
@@ -404,60 +406,62 @@ export function CreatorMarketplaceModerationBoard() {
                 </div>
 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                  <section aria-label={translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고 내용")} className="rounded-xl border border-line bg-panel p-3">
-                    <h4 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고 내용")}</h4>
+                  <section aria-label="신고 내용" className="rounded-xl border border-line bg-panel p-3">
+                    <h4 className="text-xs font-semibold text-fg">신고 내용</h4>
                     <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs leading-relaxed">
-                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고자")}</dt>
+                      <dt className="text-fg-3">신고자</dt>
                       <dd className="min-w-0 break-all text-fg-2">
-                        {item.reporter.name}{item.reporter.id ? ` · ${item.reporter.id}` : translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", " · 탈퇴 계정")}
+                        {item.reporter.name}{item.reporter.id ? ` · ${item.reporter.id}` : " · 탈퇴 계정"}
                       </dd>
-                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "상세")}</dt>
+                      <dt className="text-fg-3">상세</dt>
                       <dd className="whitespace-pre-wrap break-words text-fg-2">
-                        {item.details || translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "상세 설명 없음")}
+                        {item.details || "상세 설명 없음"}
                       </dd>
                     </dl>
                   </section>
 
-                  <section aria-label={translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고 시점 릴리스 증거")} className="rounded-xl border border-line bg-panel p-3">
-                    <h4 className="text-xs font-semibold text-fg">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고 시점 릴리스 증거")}</h4>
+                  <section aria-label="신고 시점 릴리스 증거" className="rounded-xl border border-line bg-panel p-3">
+                    <h4 className="text-xs font-semibold text-fg">신고 시점 릴리스 증거</h4>
                     <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-xs leading-relaxed">
-                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "종류·라이선스")}</dt>
+                      <dt className="text-fg-3">종류·라이선스</dt>
                       <dd className="text-fg-2">{item.evidence.kind} · {item.evidence.license}</dd>
-                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "크기")}</dt>
+                      <dt className="text-fg-3">크기</dt>
                       <dd className="text-fg-2">{formatByteSize(item.evidence.manifestByteSize)}</dd>
-                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "릴리스 시각")}</dt>
+                      <dt className="text-fg-3">릴리스 시각</dt>
                       <dd className="text-fg-2">
                         <time dateTime={item.evidence.releaseCreatedAt}>{formatDate(item.evidence.releaseCreatedAt)}</time>
                       </dd>
-                      <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "en", "Manifest SHA-256")}</dt>
+                      <dt className="text-fg-3">Manifest SHA-256</dt>
                       <dd className="break-all font-mono text-[0.68rem] text-fg-2">{item.evidence.manifestHash}</dd>
                     </dl>
                   </section>
                 </div>
 
                 <div className="mt-3 rounded-xl border border-line bg-raised/35 px-3 py-2.5 text-xs leading-relaxed">
-                  <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "현재 상태 · ")}{state.label}</p>
+                  <p className="font-semibold text-fg">현재 상태 · {state.label}</p>
                   <p className="mt-1 text-fg-3">{state.description}</p>
                   {item.currentPackage?.availability.state === "available" ? (
                     <Link
-                      href={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "en", "/market/resource/{v0}"), { v0: String(encodeURIComponent(item.currentPackage.availability.currentHead.id)) })}
+                      href={`/market/resource/${encodeURIComponent(item.currentPackage.availability.currentHead.id)}`}
                       className="mt-1.5 inline-flex min-h-8 items-center font-semibold text-accent underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
                     >
-                      {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "현재 공개 상세 확인")}</Link>
+                      현재 공개 상세 확인
+                    </Link>
                   ) : null}
                 </div>
 
                 <div className="mt-4">
-                  <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "en", "market-moderation-note-{v0}"), { v0: String(item.reportId) })} className="text-xs font-semibold text-fg-2">
-                    {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "해결 메모 (필수)")}</label>
+                  <label htmlFor={`market-moderation-note-${item.reportId}`} className="text-xs font-semibold text-fg-2">
+                    해결 메모 (필수)
+                  </label>
                   <div className="mt-1 flex items-center justify-between gap-3 text-[0.68rem] text-fg-3">
-                    <span>{translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "검수 근거와 후속 조치를 남겨 주세요.")}</span>
+                    <span>검수 근거와 후속 조치를 남겨 주세요.</span>
                     <span className="tabular-nums" aria-hidden>
                       {note.length}/{CREATOR_MARKETPLACE_RESOURCE_MODERATION_NOTE_MAX_CHARACTERS}
                     </span>
                   </div>
                   <textarea
-                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "en", "market-moderation-note-{v0}"), { v0: String(item.reportId) })}
+                    id={`market-moderation-note-${item.reportId}`}
                     value={note}
                     rows={3}
                     required
@@ -466,12 +470,12 @@ export function CreatorMarketplaceModerationBoard() {
                       setNotes((current) => ({ ...current, [item.reportId]: event.target.value }));
                       setActionError(null);
                     }}
-                    placeholder={translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "예: 권리자 증빙 확인 전 임시 숨김. 2026-09-07 재검수 예정.")}
+                    placeholder="예: 권리자 증빙 확인 전 임시 숨김. 2026-09-07 재검수 예정."
                     className="mt-1.5 w-full resize-y rounded-lg border border-line bg-canvas/50 px-3 py-2.5 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-2 focus:ring-accent/20"
                   />
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "{v0} 검수 액션"), { v0: String(item.evidence.name) })}>
+                <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={`${item.evidence.name} 검수 액션`}>
                   <button
                     type="button"
                     disabled={targetMissing || Boolean(busyAction) || !noteValid || item.currentPackage?.moderation.state === "hidden"}
@@ -480,7 +484,7 @@ export function CreatorMarketplaceModerationBoard() {
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-bad/40 px-3 text-xs font-semibold text-bad hover:bg-bad/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bad/70 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {busy && busyAction?.action === "hide" ? <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <EyeOff size={13} aria-hidden />}
-                    {busy && busyAction?.action === "hide" ? translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "숨김 처리 중…") : translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "숨김")}
+                    {busy && busyAction?.action === "hide" ? "숨김 처리 중…" : "숨김"}
                   </button>
                   <button
                     type="button"
@@ -490,7 +494,7 @@ export function CreatorMarketplaceModerationBoard() {
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-good/40 px-3 text-xs font-semibold text-good hover:bg-good/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-good/70 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {busy && busyAction?.action === "restore" ? <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <RotateCcw size={13} aria-hidden />}
-                    {busy && busyAction?.action === "restore" ? translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "숨김 해제 중…") : translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "숨김 해제")}
+                    {busy && busyAction?.action === "restore" ? "숨김 해제 중…" : "숨김 해제"}
                   </button>
                   <button
                     type="button"
@@ -500,7 +504,7 @@ export function CreatorMarketplaceModerationBoard() {
                     className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {busy && busyAction?.action === "dismiss" ? <LoaderCircle size={13} className="animate-spin motion-reduce:animate-none" aria-hidden /> : <XCircle size={13} aria-hidden />}
-                    {busy && busyAction?.action === "dismiss" ? translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고 기각 중…") : translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "신고 기각")}
+                    {busy && busyAction?.action === "dismiss" ? "신고 기각 중…" : "신고 기각"}
                   </button>
                 </div>
               </li>
@@ -510,9 +514,9 @@ export function CreatorMarketplaceModerationBoard() {
       ) : null}
 
       {page ? (
-        <nav aria-label={translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "Creator Market 신고 페이지")} className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <nav aria-label="Creator Market 신고 페이지" className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-fg-3">
-            {visibleStart === 0 ? translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "표시 항목 없음") : formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "{v0}–{v1}번째 열린 신고"), { v0: String(visibleStart), v1: String(visibleEnd) })}
+            {visibleStart === 0 ? "표시 항목 없음" : `${visibleStart}–${visibleEnd}번째 열린 신고`}
           </p>
           <div className="flex gap-2">
             <button
@@ -521,7 +525,8 @@ export function CreatorMarketplaceModerationBoard() {
               onClick={() => setOffset(Math.max(0, page.offset - PAGE_SIZE))}
               className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <ChevronLeft size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "이전")}</button>
+              <ChevronLeft size={14} aria-hidden /> 이전
+            </button>
             <button
               type="button"
               disabled={loading || Boolean(busyAction) || !page.hasMore || page.nextOffset === null}
@@ -530,7 +535,7 @@ export function CreatorMarketplaceModerationBoard() {
               }}
               className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {translateCurrentStaticSourceText("domains.admin.components.CreatorMarketplaceModerationBoard", "ko", "다음 ")}<ChevronRight size={14} aria-hidden />
+              다음 <ChevronRight size={14} aria-hidden />
             </button>
           </div>
         </nav>

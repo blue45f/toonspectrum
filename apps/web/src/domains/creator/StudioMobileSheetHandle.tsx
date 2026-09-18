@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   collapseStudioMobileSheetSnap,
   expandStudioMobileSheetSnap,
   nextStudioMobileSheetSnap,
@@ -79,16 +75,16 @@ export function StudioMobileSheetHandle({
   return (
     <button
       {...handleProps}
-      aria-orientation={snapEnabled ? translateCurrentStaticSourceText("domains.creator.StudioMobileSheetHandle", "en", "vertical") : undefined}
+      aria-orientation={snapEnabled ? "vertical" : undefined}
       aria-valuemax={snapEnabled ? 2 : undefined}
       aria-valuemin={snapEnabled ? 0 : undefined}
       aria-valuenow={snapEnabled ? studioMobileSheetSnapValue(snap) : undefined}
-      aria-valuetext={snapLabel ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMobileSheetHandle", "ko", "시트 높이 {v0}"), { v0: String(snapLabel) }) : undefined}
+      aria-valuetext={snapLabel ? `시트 높이 ${snapLabel}` : undefined}
       data-studio-sheet-kind={kind}
       data-studio-sheet-snap={snap}
-      role={snapEnabled ? translateCurrentStaticSourceText("domains.creator.StudioMobileSheetHandle", "en", "slider") : undefined}
+      role={snapEnabled ? "slider" : undefined}
       tabIndex={active ? undefined : -1}
-      title={snapEnabled ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMobileSheetHandle", "ko", "{v0} 크기 전환 (현재 {v1})"), { v0: String(label), v1: String(snapLabel) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMobileSheetHandle", "ko", "{v0} 닫기"), { v0: String(label) })}
+      title={snapEnabled ? `${label} 크기 전환 (현재 ${snapLabel})` : `${label} 닫기`}
       className={cn(
         "group relative flex min-h-11 w-full shrink-0 cursor-grab select-none items-start justify-center rounded-xl pt-2 active:cursor-grabbing",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",

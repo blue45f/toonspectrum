@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 import { EyeOff, Eye } from "lucide-react";
 
@@ -88,7 +85,7 @@ export function ReviewControls() {
         )}
       >
         {spoilerHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-        {translateCurrentStaticSourceText("domains.community.reviews.components.review.controls", "ko", "스포일러 ")}{spoilerHidden ? translateCurrentStaticSourceText("domains.community.reviews.components.review.controls", "ko", "숨김") : translateCurrentStaticSourceText("domains.community.reviews.components.review.controls", "ko", "표시")}
+        스포일러 {spoilerHidden ? "숨김" : "표시"}
       </button>
     </div>
   );

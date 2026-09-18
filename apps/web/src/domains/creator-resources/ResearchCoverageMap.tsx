@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { Link } from "react-router-dom";
 
 import { RESOURCE_BUTTON } from "./navigation";
@@ -28,14 +24,14 @@ export function ResearchCoverageMap({ summary }: { summary: ResearchWorkspaceSum
   return <section className="space-y-5" aria-labelledby="research-coverage-title">
     <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div>
-        <p className="text-sm font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.resources.ResearchCoverageMap", "ko", "근거 공백 지도")}</p>
-        <h2 id="research-coverage-title" className="mt-1 text-2xl font-bold">{translateCurrentStaticSourceText("domains.creator.resources.ResearchCoverageMap", "ko", "자료가 많은가보다 무엇이 비어 있는가")}</h2>
-        <p className="mt-2 max-w-3xl leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.ResearchCoverageMap", "ko", "저장한 자료와 직접 작성한 기획에서 확인되는 사실만 분류합니다. 자동 고증 점수나 권리 판정은 제공하지 않습니다.")}</p>
+        <p className="text-sm font-semibold text-accent">근거 공백 지도</p>
+        <h2 id="research-coverage-title" className="mt-1 text-2xl font-bold">자료가 많은가보다 무엇이 비어 있는가</h2>
+        <p className="mt-2 max-w-3xl leading-7 text-fg-2">저장한 자료와 직접 작성한 기획에서 확인되는 사실만 분류합니다. 자동 고증 점수나 권리 판정은 제공하지 않습니다.</p>
       </div>
-      <p className="rounded-full border border-line bg-panel px-4 py-2 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.creator.resources.ResearchCoverageMap", "ko", "근거 확보 ")}{covered}/{coverage.length} {translateCurrentStaticSourceText("domains.creator.resources.ResearchCoverageMap", "ko", "· 보완 ")}{attention}</p>
+      <p className="rounded-full border border-line bg-panel px-4 py-2 text-sm text-fg-2">근거 확보 {covered}/{coverage.length} · 보완 {attention}</p>
     </header>
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {coverage.map((item) => <article key={item.id} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.resources.ResearchCoverageMap", "en", "rounded-2xl border p-5 {v0}"), { v0: String(item.status === "attention" ? "border-accent bg-accent-soft" : item.status === "covered" ? "border-line bg-panel" : "border-line bg-canvas") })}>
+      {coverage.map((item) => <article key={item.id} className={`rounded-2xl border p-5 ${item.status === "attention" ? "border-accent bg-accent-soft" : item.status === "covered" ? "border-line bg-panel" : "border-line bg-canvas"}`}>
         <div className="flex items-start justify-between gap-3">
           <div><p className="text-xs font-bold text-accent">{item.eyebrow}</p><h3 className="mt-2 text-lg font-bold">{item.label}</h3></div>
           <span className="shrink-0 rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-semibold">{STATUS_LABEL[item.status]}</span>

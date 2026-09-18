@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   useRef,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -122,14 +118,14 @@ export function StudioPressureCurveEditor({
   return (
     <>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-[0.68rem] font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "필압 반응 곡선")}</p>
+        <p className="text-[0.68rem] font-bold text-fg-2">필압 반응 곡선</p>
         <span className="tabular-nums text-[0.6rem] font-semibold text-fg-3">
           γ {slider.value.toFixed(2)}
         </span>
       </div>
 
       <svg
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "필압 곡선 직접 편집")}
+        aria-label="필압 곡선 직접 편집"
         width="100%"
         viewBox={`0 0 ${CHART_W} ${CHART_H}`}
         className="mb-2 block h-auto max-h-28 w-full touch-none rounded-lg border border-line/50 bg-canvas/50"
@@ -181,12 +177,12 @@ export function StudioPressureCurveEditor({
           stroke="transparent"
           role="slider"
           tabIndex={0}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "필압 곡선 제어점")}
+          aria-label="필압 곡선 제어점"
           aria-orientation="vertical"
           aria-valuemin={Math.round(handleOutputMinimum * 100)}
           aria-valuemax={Math.round(handleOutputMaximum * 100)}
           aria-valuenow={Math.round(handle.y * 100)}
-          aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "중간 필압 출력 {v0} · 감마 {v1}"), { v0: String(pressurePercent(handle.y)), v1: String(slider.value.toFixed(2)) })}
+          aria-valuetext={`중간 필압 출력 ${pressurePercent(handle.y)} · 감마 ${slider.value.toFixed(2)}`}
           aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home End"
           data-studio-pressure-curve-handle="true"
           className="cursor-ns-resize outline-none focus-visible:stroke-2 focus-visible:stroke-accent"
@@ -208,12 +204,13 @@ export function StudioPressureCurveEditor({
         />
       </svg>
       <p className="mb-2 text-[0.58rem] leading-relaxed text-fg-3">
-        {translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "위로 올리면 약한 압력에 더 민감해지고, 아래로 내리면 더 단단해집니다. 방향키로도 조절할 수 있습니다.")}</p>
+        위로 올리면 약한 압력에 더 민감해지고, 아래로 내리면 더 단단해집니다. 방향키로도 조절할 수 있습니다.
+      </p>
 
       <div
         className="mb-2 flex items-center gap-1"
         role="group"
-        aria-label={translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "필압 프리셋")}
+        aria-label="필압 프리셋"
       >
         {BRUSH_PRESSURE_CURVE_PRESETS.map((preset) => {
           const active = curveId === preset.id;
@@ -250,7 +247,7 @@ export function StudioPressureCurveEditor({
           touch ? "min-h-11" : ""
         )}
       >
-        <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "필압 지수 연속 조절")}</span>
+        <span className="sr-only">필압 지수 연속 조절</span>
         <input
           type="range"
           min={slider.min}
@@ -258,8 +255,8 @@ export function StudioPressureCurveEditor({
           step={slider.step}
           value={slider.value}
           onChange={(event) => onPressureCurveChange(Number(event.target.value))}
-          aria-valuetext={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "감마 {v0}"), { v0: String(slider.value.toFixed(2)) })}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPressureCurveEditor", "ko", "필압 반응 강도")}
+          aria-valuetext={`감마 ${slider.value.toFixed(2)}`}
+          aria-label="필압 반응 강도"
           className={cn("w-full accent-accent", touch ? "h-10" : "h-8")}
         />
       </label>

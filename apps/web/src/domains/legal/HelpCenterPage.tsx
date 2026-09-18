@@ -1,10 +1,4 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ArrowRight,
   BookOpen,
   CircleHelp,
@@ -157,7 +151,7 @@ export function HelpCenterPage() {
       <section className="mt-10" aria-labelledby="help-topics-title">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.HelpCenterPage", "en", "FIND YOUR ANSWER")}</p>
+            <p className="eyebrow text-accent">FIND YOUR ANSWER</p>
             <h2 id="help-topics-title" className="mt-2 text-2xl font-bold tracking-tight text-fg">{copy.results}</h2>
           </div>
           <span className="numeral rounded-full border border-line bg-card px-3 py-1 text-xs text-fg-3" aria-live="polite">{filtered.length}</span>

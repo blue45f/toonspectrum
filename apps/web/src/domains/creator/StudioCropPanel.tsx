@@ -1,6 +1,3 @@
-import {
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Crop Panel
  * 이미지 크롭 도구 인스펙터 — 크롭 모드 토글 + 비율 프리셋(자유/1:1/4:3/16:9) +
@@ -55,22 +52,22 @@ export function StudioCropPanel({
     <div className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5">
       {/* 헤더 + 모드 토글 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭")}</p>
+        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">크롭</p>
         <StudioToggleChip
           active={active}
           disabled={busy}
           onClick={onToggle}
           title={
             busy
-              ? translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "현재 크롭을 적용하는 중입니다.")
+              ? "현재 크롭을 적용하는 중입니다."
               : active
-              ? translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭 모드를 끕니다(조절 중인 영역은 버려집니다).")
-              : translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭 모드를 켜고 이미지에서 남길 영역을 조절합니다.")
+              ? "크롭 모드를 끕니다(조절 중인 영역은 버려집니다)."
+              : "크롭 모드를 켜고 이미지에서 남길 영역을 조절합니다."
           }
         >
           <span className="inline-flex items-center gap-1">
             <Crop className="size-3" aria-hidden />
-            {active ? translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭 중") : translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭 시작")}
+            {active ? "크롭 중" : "크롭 시작"}
           </span>
         </StudioToggleChip>
       </div>
@@ -79,14 +76,15 @@ export function StudioCropPanel({
         <>
           {/* 비율 잠금 — 다음 핸들 드래그부터 화면 표시 비율이 고정된다. */}
           <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
-            {translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "비율")}<span className="flex flex-wrap items-center justify-end gap-1.5">
+            비율
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
               {CROP_ASPECTS.map((a) => (
                 <StudioToggleChip
                   key={a.id}
                   active={aspect === a.id}
                   disabled={busy}
                   onClick={() => onAspectChange(a.id)}
-                  title={busy ? translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "현재 크롭을 적용하는 중입니다.") : a.tip}
+                  title={busy ? "현재 크롭을 적용하는 중입니다." : a.tip}
                 >
                   {a.label}
                 </StudioToggleChip>
@@ -96,7 +94,9 @@ export function StudioCropPanel({
 
           {/* 사용법 힌트 */}
           <p className="text-[0.72rem] leading-relaxed text-fg-3" role="status">
-            {translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "모서리·변 핸들을 드래그해 남길 영역을 조절하고, 안쪽을 끌면 영역이 이동합니다. 적용하면 원본 해상도로 잘립니다(⌘Z 복구 가능).")}</p>
+            모서리·변 핸들을 드래그해 남길 영역을 조절하고, 안쪽을 끌면 영역이 이동합니다. 적용하면
+            원본 해상도로 잘립니다(⌘Z 복구 가능).
+          </p>
 
           {/* 실행 — 적용(파괴적)·초기화·취소 */}
           <div className="flex items-center gap-1.5 border-t border-line/40 pt-2">
@@ -105,34 +105,38 @@ export function StudioCropPanel({
               onClick={onApply}
               disabled={busy || !canApply}
               className={cn(buttonClass({ size: "sm", variant: "solid" }), "flex-1 gap-1")}
-              title={translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭을 적용해 선택한 영역만 남깁니다(원본 해상도 유지).")}
+              title="크롭을 적용해 선택한 영역만 남깁니다(원본 해상도 유지)."
             >
               <Check className="size-3.5" aria-hidden />
-              {busy ? translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "적용 중...") : translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "적용")}
+              {busy ? "적용 중..." : "적용"}
             </button>
             <button
               type="button"
               onClick={onReset}
               disabled={busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              title={translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭 영역을 이미지 전체로 되돌립니다.")}
+              title="크롭 영역을 이미지 전체로 되돌립니다."
             >
               <RotateCcw className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "초기화")}</button>
+              초기화
+            </button>
             <button
               type="button"
               onClick={onCancel}
               disabled={busy}
               className={buttonClass({ size: "sm", variant: "quiet" })}
-              title={translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭을 취소하고 모드를 종료합니다(Esc).")}
+              title="크롭을 취소하고 모드를 종료합니다(Esc)."
             >
               <X className="size-3.5" aria-hidden />
-              {translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "취소")}</button>
+              취소
+            </button>
           </div>
         </>
       ) : (
         <p className="text-[0.72rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioCropPanel", "ko", "크롭을 시작하면 이미지 위에 조절 핸들이 나타납니다. 비율을 잠그고 원하는 부분만 남겨 보세요.")}</p>
+          크롭을 시작하면 이미지 위에 조절 핸들이 나타납니다. 비율을 잠그고 원하는 부분만 남겨
+          보세요.
+        </p>
       )}
     </div>
   );

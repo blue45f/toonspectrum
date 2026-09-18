@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   FolderOpen,
   Layers,
   LoaderCircle,
@@ -323,9 +319,11 @@ export function StudioSelectionWorkbenchPanel({
         <div>
           <h4 className="flex items-center gap-1.5 text-xs font-semibold text-fg">
             <Wand2 className="size-3.5" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 작업대")}</h4>
+            선택 작업대
+          </h4>
           <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "레이어 픽셀과 로컬 AI로 영역을 만들고, 경계를 다듬어 이름으로 다시 불러옵니다.")}</p>
+            레이어 픽셀과 로컬 AI로 영역을 만들고, 경계를 다듬어 이름으로 다시 불러옵니다.
+          </p>
         </div>
         <span className="shrink-0 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[0.62rem] font-medium text-accent">
           {selectedOperationLabel}
@@ -334,8 +332,8 @@ export function StudioSelectionWorkbenchPanel({
 
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 소스")}</span>
-          <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "최대 640px 추적 · 원본 비파괴")}</span>
+          <span className="text-[0.68rem] font-semibold text-fg-2">선택 소스</span>
+          <span className="text-[0.6rem] text-fg-3">최대 640px 추적 · 원본 비파괴</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -346,12 +344,13 @@ export function StudioSelectionWorkbenchPanel({
             )}
             disabled={sourceDisabled}
             onClick={() => void runSourceSelection("opaque")}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "레이어 불투명도로 픽셀 선택")}
+            aria-label="레이어 불투명도로 픽셀 선택"
           >
             {sourceJob === "opaque"
               ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
               : <Layers className="size-3.5" aria-hidden="true" />}
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "불투명도")}</button>
+            불투명도
+          </button>
           <button
             type="button"
             className={cn(
@@ -360,15 +359,16 @@ export function StudioSelectionWorkbenchPanel({
             )}
             disabled={sourceDisabled}
             onClick={() => void runSourceSelection("subject")}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "로컬 AI로 주요 피사체 선택")}
+            aria-label="로컬 AI로 주요 피사체 선택"
           >
             {sourceJob === "subject"
               ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
               : <Sparkles className="size-3.5" aria-hidden="true" />}
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "AI 피사체")}</button>
+            AI 피사체
+          </button>
         </div>
         <label htmlFor={thresholdInputId} className="grid grid-cols-[1fr_auto] items-center gap-x-2 text-[0.65rem] text-fg-3">
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "피사체 경계 기준")}</span>
+          <span>피사체 경계 기준</span>
           <output htmlFor={thresholdInputId} className="tabular-nums text-fg-2">
             {Math.round(subjectThreshold * 100)}%
           </output>
@@ -386,21 +386,23 @@ export function StudioSelectionWorkbenchPanel({
         </label>
         {!imageSource ? (
           <p className="text-[0.62rem] leading-relaxed text-warning">
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "검증된 이미지 픽셀을 준비한 뒤 선택 소스를 사용할 수 있습니다.")}</p>
+            검증된 이미지 픽셀을 준비한 뒤 선택 소스를 사용할 수 있습니다.
+          </p>
         ) : null}
       </div>
 
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5" data-studio-selection-border="true">
-        <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "테두리 선택")}</span>
+        <span className="text-[0.68rem] font-semibold text-fg-2">테두리 선택</span>
         <p className="text-[0.62rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택의 안쪽을 비우고 윤곽만 남깁니다. 구멍과 떨어진 영역의 경계에도 적용됩니다.")}</p>
-        <div className="grid grid-cols-3 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 테두리 위치")}>
+          선택의 안쪽을 비우고 윤곽만 남깁니다. 구멍과 떨어진 영역의 경계에도 적용됩니다.
+        </p>
+        <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="선택 테두리 위치">
           {STUDIO_SELECTION_BORDER_PLACEMENTS.map((placement) => (
             <button
               key={placement.id}
               type="button"
               className="min-h-8 rounded-md border border-line bg-card px-1.5 text-[0.65rem] font-medium text-fg-2 aria-pressed:border-accent/60 aria-pressed:bg-accent/10 disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 테두리 {v0}"), { v0: String(placement.label) })}
+              aria-label={`선택 테두리 ${placement.label}`}
               aria-pressed={borderPlacement === placement.id}
               disabled={busy || sourceJob !== null}
               onClick={() => setBorderPlacement(placement.id)}
@@ -410,7 +412,7 @@ export function StudioSelectionWorkbenchPanel({
           ))}
         </div>
         <label htmlFor={borderWidthInputId} className="flex items-center justify-between gap-2 text-[0.65rem] text-fg-3">
-          <span>{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "테두리 두께 (px)")}</span>
+          <span>테두리 두께 (px)</span>
           <input
             id={borderWidthInputId}
             type="number"
@@ -431,25 +433,26 @@ export function StudioSelectionWorkbenchPanel({
           className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-medium text-fg-2 transition hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
           disabled={borderDisabled}
           onClick={() => void runBorderSelection()}
-          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 영역을 테두리로 바꾸기")}
+          aria-label="선택 영역을 테두리로 바꾸기"
         >
           {sourceJob === "border"
             ? <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
             : <SquareDashed className="size-3.5" aria-hidden="true" />}
-          {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "테두리 선택 적용")}</button>
+          테두리 선택 적용
+        </button>
         <p className="text-[0.6rem] leading-relaxed text-fg-3">
           {!borderGeometryValid
-            ? translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "이미지의 너비와 높이를 지정한 뒤 테두리를 선택할 수 있습니다.")
+            ? "이미지의 너비와 높이를 지정한 뒤 테두리를 선택할 수 있습니다."
             : borderRaster.minimumWidthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX
-              ? translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "이미지가 너무 커서 테두리를 계산할 수 없습니다. 표시 크기를 줄여 주세요.")
-              : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "현재 크기에서 최소 {v0}px · 현재 페더 유지{v1}"), { v0: String(borderRaster.minimumWidthPx), v1: String(Math.max(displayWidth, displayHeight) > 640 ? " · 미세한 경계는 근사됩니다." : "") })}
+              ? "이미지가 너무 커서 테두리를 계산할 수 없습니다. 표시 크기를 줄여 주세요."
+              : `현재 크기에서 최소 ${borderRaster.minimumWidthPx}px · 현재 페더 유지${Math.max(displayWidth, displayHeight) > 640 ? " · 미세한 경계는 근사됩니다." : ""}`}
         </p>
       </div>
 
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "경계 스무딩")}</span>
-          <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "면적·중심 보존")}</span>
+          <span className="text-[0.68rem] font-semibold text-fg-2">경계 스무딩</span>
+          <span className="text-[0.6rem] text-fg-3">면적·중심 보존</span>
         </div>
         <div className="grid grid-cols-3 gap-1.5">
           {PIXEL_SELECTION_SMOOTH_PRESETS.map((preset) => (
@@ -459,7 +462,7 @@ export function StudioSelectionWorkbenchPanel({
               className="min-h-8 rounded-md border border-line bg-card px-1.5 text-[0.65rem] font-medium text-fg-2 transition hover:border-accent/50 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
               disabled={smoothDisabled}
               onClick={() => applySmoothPreset(preset.id)}
-              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 경계 {v0} 스무딩"), { v0: String(preset.label) })}
+              aria-label={`선택 경계 ${preset.label} 스무딩`}
             >
               {preset.label}
             </button>
@@ -467,17 +470,18 @@ export function StudioSelectionWorkbenchPanel({
         </div>
         {!canSmoothPixelSelection(selection) ? (
           <p className="text-[0.62rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "자유형 또는 점이 충분한 선택 경계에서 사용할 수 있습니다.")}</p>
+            자유형 또는 점이 충분한 선택 경계에서 사용할 수 있습니다.
+          </p>
         ) : null}
       </div>
 
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[0.68rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "저장된 선택")}</span>
-          <span className="text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "이 이미지 · 이 기기 · ")}{library.items.length}/{STUDIO_SAVED_SELECTION_MAX_ITEMS}</span>
+          <span className="text-[0.68rem] font-semibold text-fg-2">저장된 선택</span>
+          <span className="text-[0.6rem] text-fg-3">이 이미지 · 이 기기 · {library.items.length}/{STUDIO_SAVED_SELECTION_MAX_ITEMS}</span>
         </div>
         <div className="flex gap-1.5">
-          <label htmlFor={nameInputId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "저장할 선택 이름")}</label>
+          <label htmlFor={nameInputId} className="sr-only">저장할 선택 이름</label>
           <input
             id={nameInputId}
             className="min-w-0 flex-1 rounded-md border border-line bg-bg px-2 py-1.5 text-[0.68rem] text-fg outline-none placeholder:text-fg-3 focus:border-accent"
@@ -491,20 +495,21 @@ export function StudioSelectionWorkbenchPanel({
                 saveCurrentSelection();
               }
             }}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "선택 이름")}
+            placeholder="선택 이름"
           />
           <button
             type="button"
             className="inline-flex min-h-8 items-center gap-1 rounded-md border border-accent/35 bg-accent/10 px-2 text-[0.65rem] font-semibold text-fg transition hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
             disabled={busy || !selectionReady || name.trim().length === 0}
             onClick={saveCurrentSelection}
-            aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "현재 픽셀 선택 저장")}
+            aria-label="현재 픽셀 선택 저장"
           >
             <Save className="size-3.5" aria-hidden="true" />
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "저장")}</button>
+            저장
+          </button>
         </div>
         {library.items.length > 0 ? (
-          <ul className="max-h-40 space-y-1 overflow-y-auto pr-0.5" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "저장된 픽셀 선택 목록")}>
+          <ul className="max-h-40 space-y-1 overflow-y-auto pr-0.5" aria-label="저장된 픽셀 선택 목록">
             {library.items.map((item) => (
               <li key={item.id} className="flex items-center gap-1.5 rounded-md border border-line/70 bg-card/60 p-1.5">
                 <button
@@ -515,7 +520,7 @@ export function StudioSelectionWorkbenchPanel({
                     onCommitSelection(item.selection, "restore-saved");
                     setStatus(`“${item.name}” 선택을 불러왔습니다.`);
                   }}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "{v0} 선택 불러오기"), { v0: String(item.name) })}
+                  aria-label={`${item.name} 선택 불러오기`}
                 >
                   <span className="flex items-center gap-1.5 text-[0.67rem] font-medium text-fg-2">
                     <FolderOpen className="size-3.5 shrink-0" aria-hidden="true" />
@@ -533,7 +538,7 @@ export function StudioSelectionWorkbenchPanel({
                     const next = removeStudioSavedSelection(library, item.id);
                     persistLibrary(next, `“${item.name}” 저장 선택을 삭제했습니다.`);
                   }}
-                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "{v0} 저장 선택 삭제"), { v0: String(item.name) })}
+                  aria-label={`${item.name} 저장 선택 삭제`}
                 >
                   <Trash2 className="size-3.5" aria-hidden="true" />
                 </button>
@@ -542,7 +547,8 @@ export function StudioSelectionWorkbenchPanel({
           </ul>
         ) : (
           <p className="text-[0.62rem] leading-relaxed text-fg-3">
-            {translateCurrentStaticSourceText("domains.creator.StudioSelectionWorkbenchPanel", "ko", "자주 다시 쓰는 선택 경계를 이름으로 저장해 두세요. 프로젝트 데이터에는 포함되지 않습니다.")}</p>
+            자주 다시 쓰는 선택 경계를 이름으로 저장해 두세요. 프로젝트 데이터에는 포함되지 않습니다.
+          </p>
         )}
       </div>
 

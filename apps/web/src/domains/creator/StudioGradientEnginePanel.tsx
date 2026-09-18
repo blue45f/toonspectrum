@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Gradient Engine Panel
  * 도형/텍스트 공용 그라데이션 인스펙터 — 프리셋 12종 스와치 + 종류(선형/방사) 토글 +
@@ -113,23 +109,25 @@ export function StudioGradientEnginePanel({
             onClick={() => onChange(null)}
             disabled={current == null}
             className={buttonClass({ size: "sm", variant: "quiet" })}
-            title={translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "그라데이션을 제거하고 단색 채우기로 되돌립니다.")}
+            title="그라데이션을 제거하고 단색 채우기로 되돌립니다."
           >
             <RotateCcw className="size-3.5" />
-            {translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "단색으로")}</button>
+            단색으로
+          </button>
         )}
       </div>
 
       {current == null ? (
         <>
           {/* 미적용 — 프리셋에서 시작하거나 기본 스펙으로 직접 만들기 */}
-          <p className="text-[0.66rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "프리셋을 고르거나 직접 만들어 적용합니다.")}</p>
+          <p className="text-[0.66rem] text-fg-3">프리셋을 고르거나 직접 만들어 적용합니다.</p>
           <PresetGrid current={null} onChange={onChange} />
           <StudioPanelChip
             onClick={() => onChange(normalizeGradientSpec(DEFAULT_GRADIENT_SPEC))}
-            title={translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "기본 2색 선형 그라데이션에서 시작해 색·각도를 직접 편집합니다.")}
+            title="기본 2색 선형 그라데이션에서 시작해 색·각도를 직접 편집합니다."
           >
-            {translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "+ 직접 만들기")}</StudioPanelChip>
+            + 직접 만들기
+          </StudioPanelChip>
         </>
       ) : (
         <>
@@ -142,13 +140,14 @@ export function StudioGradientEnginePanel({
 
           {/* 종류 — 선형(각도) / 방사(중심에서 퍼짐) */}
           <div className={PANEL_LABEL_ROW}>
-            {translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "종류")}<span className="flex items-center gap-1.5">
+            종류
+            <span className="flex items-center gap-1.5">
               {GRADIENT_TYPES.map((t) => (
                 <StudioToggleChip
                   key={t.id}
                   active={current.type === t.id}
                   onClick={() => onChange(setGradientType(current, t.id))}
-                  title={t.id === "linear" ? translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "지정한 각도 방향으로 색이 흐릅니다.") : translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "중심에서 바깥으로 색이 퍼집니다.")}
+                  title={t.id === "linear" ? "지정한 각도 방향으로 색이 흐릅니다." : "중심에서 바깥으로 색이 퍼집니다."}
                 >
                   {t.label}
                 </StudioToggleChip>
@@ -159,7 +158,7 @@ export function StudioGradientEnginePanel({
           {/* 각도 — 선형 전용(0°=위, 90°=오른쪽, CSS와 동일) */}
           {current.type === "linear" && (
             <StudioSliderRow
-              label={translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "각도")}
+              label="각도"
               min={GRADIENT_ANGLE_RANGE.min}
               max={GRADIENT_ANGLE_RANGE.max}
               step={GRADIENT_ANGLE_RANGE.step}
@@ -178,7 +177,7 @@ export function StudioGradientEnginePanel({
                     type="color"
                     value={stop.color}
                     onChange={(e) => onChange(updateGradientStop(current, i, { color: e.target.value }))}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "색 단계 {v0} 색상"), { v0: String(i + 1) })}
+                    aria-label={`색 단계 ${i + 1} 색상`}
                     className="h-7 w-7 cursor-pointer rounded border border-line bg-card"
                   />
                   <span className="text-[10px] tabular-nums text-fg-3">{i + 1}</span>
@@ -191,7 +190,7 @@ export function StudioGradientEnginePanel({
                     step={1}
                     value={Math.round(stop.offset * 100)}
                     onChange={(e) => onChange(updateGradientStop(current, i, { offset: Number(e.target.value) / 100 }))}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "색 단계 {v0} 위치"), { v0: String(i + 1) })}
+                    aria-label={`색 단계 ${i + 1} 위치`}
                     className={PANEL_RANGE_CLASS}
                   />
                   <span className={PANEL_READOUT_CLASS}>{Math.round(stop.offset * 100)}%</span>
@@ -199,8 +198,8 @@ export function StudioGradientEnginePanel({
                     type="button"
                     onClick={() => onChange(removeGradientStop(current, i))}
                     disabled={current.stops.length <= GRADIENT_STOPS_MIN}
-                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "색 단계 {v0} 삭제"), { v0: String(i + 1) })}
-                    title={current.stops.length <= GRADIENT_STOPS_MIN ? translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "색 단계는 최소 2개가 필요합니다.") : translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "이 색 단계를 삭제합니다.")}
+                    aria-label={`색 단계 ${i + 1} 삭제`}
+                    title={current.stops.length <= GRADIENT_STOPS_MIN ? "색 단계는 최소 2개가 필요합니다." : "이 색 단계를 삭제합니다."}
                     className="rounded-md border border-line bg-card p-1 text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <X className="size-3" />
@@ -214,12 +213,12 @@ export function StudioGradientEnginePanel({
               }}
               title={
                 current.stops.length < GRADIENT_STOPS_MAX
-                  ? translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "가장 넓은 구간의 중앙에 중간색 단계를 추가합니다.")
-                  : translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "색 단계는 최대 5개까지입니다.")
+                  ? "가장 넓은 구간의 중앙에 중간색 단계를 추가합니다."
+                  : "색 단계는 최대 5개까지입니다."
               }
             >
               <span className="inline-flex items-center gap-1">
-                <Plus className="size-3" />{translateCurrentStaticSourceText("domains.creator.StudioGradientEnginePanel", "ko", "색 추가 (")}{current.stops.length}/{GRADIENT_STOPS_MAX})
+                <Plus className="size-3" />색 추가 ({current.stops.length}/{GRADIENT_STOPS_MAX})
               </span>
             </StudioPanelChip>
           </div>

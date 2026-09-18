@@ -1,7 +1,3 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -62,30 +58,30 @@ function EducationCard({
 }) {
   const headingId = `education-${institution.id}`;
   return (
-    <article className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "flex h-full flex-col rounded-3xl border bg-panel p-6 {v0}"), { v0: String(selected ? "border-accent ring-1 ring-accent" : "border-line") })} aria-labelledby={headingId}>
+    <article className={`flex h-full flex-col rounded-3xl border bg-panel p-6 ${selected ? "border-accent ring-1 ring-accent" : "border-line"}`} aria-labelledby={headingId}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">{EDUCATION_KIND_LABELS[institution.kind]}</span>
-        <span className="text-xs text-fg-2">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "확인 ")}{compactDate(institution.verifiedAt)}</span>
+        <span className="text-xs text-fg-2">확인 {compactDate(institution.verifiedAt)}</span>
       </div>
       <h3 id={headingId} className="mt-4 text-xl font-bold">{institution.name}</h3>
       <p className="mt-2 text-sm font-semibold text-fg-2">{institution.location} · {institution.delivery.map((item) => EDUCATION_DELIVERY_LABELS[item]).join("·")}</p>
       <p className="mt-4 leading-7 text-fg-2">{institution.summary}</p>
 
       <div className="mt-5">
-        <h4 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "주요 분야")}</h4>
+        <h4 className="text-sm font-bold">주요 분야</h4>
         <div className="mt-2 flex flex-wrap gap-2">
           {institution.focus.map((focus) => <span key={focus} className="rounded-full border border-line bg-raised px-3 py-1 text-xs font-semibold">{focus}</span>)}
         </div>
       </div>
 
       <div className="mt-5">
-        <h4 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "찾는 목적")}</h4>
+        <h4 className="text-sm font-bold">찾는 목적</h4>
         <div className="mt-2 flex flex-wrap gap-2">
           {institution.goals.map((goal) => <span key={goal} className="rounded-full border border-line px-3 py-1 text-xs text-fg-2">{EDUCATION_GOAL_LABELS[goal]}</span>)}
         </div>
       </div>
 
-      <p className="mt-5 rounded-2xl bg-canvas p-4 text-sm leading-6 text-fg-2"><strong className="text-fg">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "비용:")}</strong> {institution.costLabel}</p>
+      <p className="mt-5 rounded-2xl bg-canvas p-4 text-sm leading-6 text-fg-2"><strong className="text-fg">비용:</strong> {institution.costLabel}</p>
 
       <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
         <a
@@ -93,20 +89,22 @@ function EducationCard({
           href={institution.officialUrl}
           target="_blank"
           rel="noreferrer"
-          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "{v0} 공식 홈페이지 새 창에서 열기"), { v0: String(institution.name) })}
+          aria-label={`${institution.name} 공식 홈페이지 새 창에서 열기`}
         >
-          {translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "공식 정보 확인 ↗")}</a>
-        <label className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold {v0}"), { v0: String(comparisonFull && !selected ? "cursor-not-allowed opacity-50" : "hover:bg-raised") })}>
+          공식 정보 확인 ↗
+        </a>
+        <label className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold ${comparisonFull && !selected ? "cursor-not-allowed opacity-50" : "hover:bg-raised"}`}>
           <input
             type="checkbox"
             checked={selected}
             disabled={comparisonFull && !selected}
-            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "{v0} 비교 {v1}"), { v0: String(institution.name), v1: String(selected ? "제외" : "추가") })}
+            aria-label={`${institution.name} 비교 ${selected ? "제외" : "추가"}`}
             onChange={onToggle}
           />
-          {translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "비교")}</label>
+          비교
+        </label>
       </div>
-      <p className="mt-3 text-xs leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "출처: ")}{institution.sourceLabel}</p>
+      <p className="mt-3 text-xs leading-5 text-fg-2">출처: {institution.sourceLabel}</p>
     </article>
   );
 }
@@ -116,30 +114,30 @@ function ComparisonTable({ institutions, onClear }: { readonly institutions: rea
     <section className="rounded-3xl border border-accent bg-panel p-5 sm:p-7" aria-labelledby="education-compare-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold tracking-[.14em] text-accent">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "COMPARE")}</p>
-          <h2 id="education-compare-title" className="mt-2 text-2xl font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "선택한 교육기관 비교")}</h2>
+          <p className="text-xs font-bold tracking-[.14em] text-accent">COMPARE</p>
+          <h2 id="education-compare-title" className="mt-2 text-2xl font-bold">선택한 교육기관 비교</h2>
         </div>
-        <button className="min-h-11 rounded-xl border border-line px-4 py-2 text-sm font-bold hover:bg-raised" type="button" onClick={onClear}>{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "비교 비우기")}</button>
+        <button className="min-h-11 rounded-xl border border-line px-4 py-2 text-sm font-bold hover:bg-raised" type="button" onClick={onClear}>비교 비우기</button>
       </div>
       {institutions.length < 2 ? (
-        <p className="mt-5 rounded-2xl bg-accent-soft p-4 text-sm leading-7 text-fg-2">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "한 곳을 더 선택하면 유형·방식·목적·비용 안내를 나란히 비교할 수 있습니다.")}</p>
+        <p className="mt-5 rounded-2xl bg-accent-soft p-4 text-sm leading-7 text-fg-2">한 곳을 더 선택하면 유형·방식·목적·비용 안내를 나란히 비교할 수 있습니다.</p>
       ) : (
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[46rem] border-separate border-spacing-0 text-left text-sm">
-            <caption className="sr-only">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "선택한 웹툰 교육기관 비교표")}</caption>
+            <caption className="sr-only">선택한 웹툰 교육기관 비교표</caption>
             <thead>
               <tr>
-                <th scope="col" className="border-b border-line bg-canvas p-3 font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "비교 항목")}</th>
+                <th scope="col" className="border-b border-line bg-canvas p-3 font-bold">비교 항목</th>
                 {institutions.map((institution) => <th key={institution.id} scope="col" className="border-b border-line bg-canvas p-3 text-base font-bold">{institution.name}</th>)}
               </tr>
             </thead>
             <tbody>
-              <tr><th scope="row" className="border-b border-line p-3 font-semibold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "유형")}</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{EDUCATION_KIND_LABELS[item.kind]}</td>)}</tr>
-              <tr><th scope="row" className="border-b border-line p-3 font-semibold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "지역")}</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.location}</td>)}</tr>
-              <tr><th scope="row" className="border-b border-line p-3 font-semibold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "수업 방식")}</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.delivery.map((value) => EDUCATION_DELIVERY_LABELS[value]).join(" · ")}</td>)}</tr>
-              <tr><th scope="row" className="border-b border-line p-3 font-semibold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "교육 목적")}</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.goals.map((value) => EDUCATION_GOAL_LABELS[value]).join(" · ")}</td>)}</tr>
-              <tr><th scope="row" className="border-b border-line p-3 font-semibold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "주요 분야")}</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.focus.join(" · ")}</td>)}</tr>
-              <tr><th scope="row" className="p-3 font-semibold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "비용 안내")}</th>{institutions.map((item) => <td key={item.id} className="p-3">{item.costLabel}</td>)}</tr>
+              <tr><th scope="row" className="border-b border-line p-3 font-semibold">유형</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{EDUCATION_KIND_LABELS[item.kind]}</td>)}</tr>
+              <tr><th scope="row" className="border-b border-line p-3 font-semibold">지역</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.location}</td>)}</tr>
+              <tr><th scope="row" className="border-b border-line p-3 font-semibold">수업 방식</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.delivery.map((value) => EDUCATION_DELIVERY_LABELS[value]).join(" · ")}</td>)}</tr>
+              <tr><th scope="row" className="border-b border-line p-3 font-semibold">교육 목적</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.goals.map((value) => EDUCATION_GOAL_LABELS[value]).join(" · ")}</td>)}</tr>
+              <tr><th scope="row" className="border-b border-line p-3 font-semibold">주요 분야</th>{institutions.map((item) => <td key={item.id} className="border-b border-line p-3">{item.focus.join(" · ")}</td>)}</tr>
+              <tr><th scope="row" className="p-3 font-semibold">비용 안내</th>{institutions.map((item) => <td key={item.id} className="p-3">{item.costLabel}</td>)}</tr>
             </tbody>
           </table>
         </div>
@@ -184,58 +182,64 @@ export function EducationDirectoryPage() {
   return (
     <LearningReferenceLayout
       eyebrow="WEBTOON EDUCATION DIRECTORY"
-      title={translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "목표와 지역에 맞는 웹툰 교육 찾기")}
-      intro={translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "대학·전문대학, 사설 학원, 공공·온라인 교육을 같은 기준으로 찾아보고 최대 3곳까지 비교할 수 있습니다. 순위나 추천 광고가 아닌 공식 정보 확인을 위한 출발점입니다.")}
+      title="목표와 지역에 맞는 웹툰 교육 찾기"
+      intro="대학·전문대학, 사설 학원, 공공·온라인 교육을 같은 기준으로 찾아보고 최대 3곳까지 비교할 수 있습니다. 순위나 추천 광고가 아닌 공식 정보 확인을 위한 출발점입니다."
       actions={(
         <>
-          <a className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent hover:bg-accent-2" href="#education-search">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "조건으로 찾기")}</a>
-          <Link className={secondaryLinkClass} to="/learn/careers">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "직무부터 알아보기")}</Link>
-          <Link className={secondaryLinkClass} to="/learn/process">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "제작 과정 보기")}</Link>
+          <a className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent hover:bg-accent-2" href="#education-search">조건으로 찾기</a>
+          <Link className={secondaryLinkClass} to="/learn/careers">직무부터 알아보기</Link>
+          <Link className={secondaryLinkClass} to="/learn/process">제작 과정 보기</Link>
         </>
       )}
     >
       <aside className="rounded-3xl border border-line bg-accent-soft p-6 sm:p-7" aria-labelledby="education-policy-title">
-        <p className="text-xs font-bold tracking-[.14em] text-accent">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "INFORMATION POLICY")}</p>
-        <h2 id="education-policy-title" className="mt-2 text-xl font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "기관의 우열을 평가하지 않고, 공식 페이지로 확인할 사실만 정리합니다.")}</h2>
+        <p className="text-xs font-bold tracking-[.14em] text-accent">INFORMATION POLICY</p>
+        <h2 id="education-policy-title" className="mt-2 text-xl font-bold">기관의 우열을 평가하지 않고, 공식 페이지로 확인할 사실만 정리합니다.</h2>
         <p className="mt-3 leading-7 text-fg-2">
-          {translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "학과명·모집 전형·수강료·운영 과정은 바뀔 수 있습니다. 이 페이지는 자동 크롤링이나 사용자 별점을 사용하지 않으며, 등록일 이후의 최신 일정과 비용은 반드시 각 기관의 공식 홈페이지에서 다시 확인해야 합니다.")}</p>
+          학과명·모집 전형·수강료·운영 과정은 바뀔 수 있습니다. 이 페이지는 자동 크롤링이나 사용자 별점을 사용하지 않으며, 등록일 이후의 최신 일정과 비용은 반드시 각 기관의 공식 홈페이지에서 다시 확인해야 합니다.
+        </p>
       </aside>
 
       <section id="education-search" className="scroll-mt-24 rounded-3xl border border-line bg-panel p-6 sm:p-8" aria-labelledby="education-search-title">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold tracking-[.14em] text-accent">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "FIND A PROGRAM")}</p>
-            <h2 id="education-search-title" className="mt-2 text-2xl font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "교육기관 검색·필터")}</h2>
+            <p className="text-xs font-bold tracking-[.14em] text-accent">FIND A PROGRAM</p>
+            <h2 id="education-search-title" className="mt-2 text-2xl font-bold">교육기관 검색·필터</h2>
           </div>
-          <button className="min-h-11 rounded-xl border border-line px-4 py-2 text-sm font-bold hover:bg-raised" type="button" onClick={() => setParams({})}>{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "검색 조건 초기화")}</button>
+          <button className="min-h-11 rounded-xl border border-line px-4 py-2 text-sm font-bold hover:bg-raised" type="button" onClick={() => setParams({})}>검색 조건 초기화</button>
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <label className="xl:col-span-2">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "기관·과정 검색")}<input className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "{v0} mt-2"), { v0: String(inputClass) })} type="search" maxLength={120} value={query} placeholder={translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "기관명, 콘티, 입시, 채색…")} onChange={(event) => setFilter("q", event.currentTarget.value.slice(0, 120))} />
+          <label className="xl:col-span-2">기관·과정 검색
+            <input className={`${inputClass} mt-2`} type="search" maxLength={120} value={query} placeholder="기관명, 콘티, 입시, 채색…" onChange={(event) => setFilter("q", event.currentTarget.value.slice(0, 120))} />
           </label>
-          <label>{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "기관 유형")}<select className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "{v0} mt-2"), { v0: String(inputClass) })} value={kind} onChange={(event) => setFilter("kind", event.currentTarget.value)}>
-              <option value="all">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "전체 유형")}</option>
+          <label>기관 유형
+            <select className={`${inputClass} mt-2`} value={kind} onChange={(event) => setFilter("kind", event.currentTarget.value)}>
+              <option value="all">전체 유형</option>
               {Object.entries(EDUCATION_KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
-          <label>{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "지역")}<select className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "{v0} mt-2"), { v0: String(inputClass) })} value={region} onChange={(event) => setFilter("region", event.currentTarget.value)}>
-              <option value="all">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "전체 지역")}</option>
+          <label>지역
+            <select className={`${inputClass} mt-2`} value={region} onChange={(event) => setFilter("region", event.currentTarget.value)}>
+              <option value="all">전체 지역</option>
               {EDUCATION_REGIONS.map((value) => <option key={value} value={value}>{value}</option>)}
             </select>
           </label>
-          <label>{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "수업 방식")}<select className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "{v0} mt-2"), { v0: String(inputClass) })} value={delivery} onChange={(event) => setFilter("delivery", event.currentTarget.value)}>
-              <option value="all">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "전체 방식")}</option>
+          <label>수업 방식
+            <select className={`${inputClass} mt-2`} value={delivery} onChange={(event) => setFilter("delivery", event.currentTarget.value)}>
+              <option value="all">전체 방식</option>
               {Object.entries(EDUCATION_DELIVERY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
-          <label className="xl:col-start-4">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "교육 목적")}<select className={formatI18nTemplate(translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "{v0} mt-2"), { v0: String(inputClass) })} value={goal} onChange={(event) => setFilter("goal", event.currentTarget.value)}>
-              <option value="all">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "전체 목적")}</option>
+          <label className="xl:col-start-4">교육 목적
+            <select className={`${inputClass} mt-2`} value={goal} onChange={(event) => setFilter("goal", event.currentTarget.value)}>
+              <option value="all">전체 목적</option>
               {Object.entries(EDUCATION_GOAL_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </label>
         </div>
         <p className="mt-5 text-sm text-fg-2" role="status" aria-live="polite">
-          {translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "등록된 ")}{EDUCATION_INSTITUTIONS.length}{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "곳 중 ")}<strong className="text-fg">{institutions.length}{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "곳")}</strong> {translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "표시 · 비교 선택 ")}{selectedIds.length}/3
+          등록된 {EDUCATION_INSTITUTIONS.length}곳 중 <strong className="text-fg">{institutions.length}곳</strong> 표시 · 비교 선택 {selectedIds.length}/3
         </p>
       </section>
 
@@ -244,10 +248,10 @@ export function EducationDirectoryPage() {
       <section aria-labelledby="education-results-title">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-bold tracking-[.14em] text-accent">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "DIRECTORY")}</p>
-            <h2 id="education-results-title" className="mt-2 text-3xl font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "교육기관 정보")}</h2>
+            <p className="text-xs font-bold tracking-[.14em] text-accent">DIRECTORY</p>
+            <h2 id="education-results-title" className="mt-2 text-3xl font-bold">교육기관 정보</h2>
           </div>
-          <p className="max-w-xl text-sm leading-6 text-fg-2">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "현재 목록은 전체 기관을 포괄하지 않는 초기 선별 목록입니다. 공식 출처 확인일은 2026년 9월 16일이며 상세 전형·일정·비용은 공식 홈페이지가 최종 기준입니다.")}</p>
+          <p className="max-w-xl text-sm leading-6 text-fg-2">현재 목록은 전체 기관을 포괄하지 않는 초기 선별 목록입니다. 공식 출처 확인일은 2026년 9월 16일이며 상세 전형·일정·비용은 공식 홈페이지가 최종 기준입니다.</p>
         </div>
 
         {institutions.length ? (
@@ -264,16 +268,16 @@ export function EducationDirectoryPage() {
           </div>
         ) : (
           <div className="mt-7 rounded-3xl border border-dashed border-line bg-panel p-8 text-center">
-            <h3 className="text-xl font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "일치하는 기관이 없습니다.")}</h3>
-            <p className="mt-3 text-fg-2">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "검색어를 줄이거나 지역·목적 필터를 초기화해 보세요.")}</p>
-            <button className="mt-5 min-h-11 rounded-xl border border-line px-4 py-2 text-sm font-bold hover:bg-raised" type="button" onClick={() => setParams({})}>{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "전체 기관 보기")}</button>
+            <h3 className="text-xl font-bold">일치하는 기관이 없습니다.</h3>
+            <p className="mt-3 text-fg-2">검색어를 줄이거나 지역·목적 필터를 초기화해 보세요.</p>
+            <button className="mt-5 min-h-11 rounded-xl border border-line px-4 py-2 text-sm font-bold hover:bg-raised" type="button" onClick={() => setParams({})}>전체 기관 보기</button>
           </div>
         )}
       </section>
 
       <section className="rounded-3xl border border-line bg-panel p-6 sm:p-8" aria-labelledby="education-check-title">
-        <p className="text-xs font-bold tracking-[.14em] text-accent">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "en", "BEFORE ENROLLMENT")}</p>
-        <h2 id="education-check-title" className="mt-2 text-2xl font-bold">{translateCurrentStaticSourceText("domains.learn.EducationDirectoryPage", "ko", "등록 전에 직접 확인할 다섯 가지")}</h2>
+        <p className="text-xs font-bold tracking-[.14em] text-accent">BEFORE ENROLLMENT</p>
+        <h2 id="education-check-title" className="mt-2 text-2xl font-bold">등록 전에 직접 확인할 다섯 가지</h2>
         <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           {[
             ["목표", "입시·데뷔·취미·취업 중 커리큘럼의 최종 결과가 내 목적과 같은가"],
