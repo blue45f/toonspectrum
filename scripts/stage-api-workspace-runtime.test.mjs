@@ -29,6 +29,11 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     );
     await compiledPackage(
       root,
+      "packages/core/src/creator-role.js",
+      '"use strict"; module.exports = { creatorRole: "artist" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/core/src/production/index.js",
       '"use strict"; module.exports = { production: "risk-v2" };\n',
     );
@@ -117,6 +122,11 @@ test("fails when an exported workspace subpath was not compiled", async () => {
       root,
       "packages/core/src/index.js",
       '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/core/src/creator-role.js",
+      '"use strict"; module.exports = { creatorRole: "artist" };\n',
     );
     await compiledPackage(
       root,
