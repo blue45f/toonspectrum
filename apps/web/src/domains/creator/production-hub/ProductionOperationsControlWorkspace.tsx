@@ -29,7 +29,6 @@ import {
   deriveProductionFinancialForecast,
   deriveProductionFlowAnalytics,
   deriveScheduleRecoveryScenarios,
-  evaluateAutomationRule,
   evaluateReleaseReadiness,
   type EpisodeReleasePlan,
   type ExternalReviewAccess,

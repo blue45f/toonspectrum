@@ -81,10 +81,15 @@ function pathSegment(value: unknown, maximumLength = 180): string {
     // Nest already decodes query values. A literal percent sign is valid content.
   }
   const normalized = decoded.normalize("NFC").trim();
+  const containsUnsafeCharacter = Array.from(normalized).some((character) => {
+    if (character === "\\" || character === "/") return true;
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint <= 0x1f || codePoint === 0x7f;
+  });
   if (
     !normalized
     || normalized.length > maximumLength
-    || /[\\/\u0000-\u001f\u007f]/u.test(normalized)
+    || containsUnsafeCharacter
   ) {
     return "";
   }

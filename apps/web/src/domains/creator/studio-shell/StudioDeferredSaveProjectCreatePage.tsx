@@ -16,13 +16,12 @@ import {
 import { useMemo, useState, type ChangeEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual  } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -58,8 +57,6 @@ import {
   StudioTaskSummary,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
-
-type Locale = string;
 
 const KIND_ICONS: Readonly<Record<StudioProjectKind, LucideIcon>> = {
   webtoon: PanelsTopLeft,

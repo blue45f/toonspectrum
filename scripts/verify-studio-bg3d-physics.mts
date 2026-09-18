@@ -52,6 +52,7 @@ const VITE_ERROR_OVERLAY_SELECTOR = [
 
 interface PhysicsStatus {
   state: string;
+  message: string;
   revision: number;
   dynamicCount: number;
   sampleCount: number;
@@ -174,6 +175,13 @@ function collectBrowserErrors(page: Page, studioUrl: string): BrowserErrorCollec
 }
 
 async function configureStudioPage(page: Page): Promise<void> {
+  await page.route("**/api/health/ready", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ ready: true }),
+    });
+  });
   await page.addInitScript((configuration) => {
     try {
       window.localStorage.setItem(configuration.quickStartKey, "1");
@@ -383,6 +391,7 @@ async function readPhysicsStatus(status: Locator): Promise<PhysicsStatus> {
     const sampleCount = Number(element.getAttribute("data-sample-count"));
     return {
       state: element.getAttribute("data-state") ?? "",
+      message: element.textContent?.trim() ?? "",
       revision: Number.isFinite(revision) ? revision : 0,
       dynamicCount: Number.isFinite(dynamicCount) ? dynamicCount : 0,
       sampleCount: Number.isFinite(sampleCount) ? sampleCount : 0,

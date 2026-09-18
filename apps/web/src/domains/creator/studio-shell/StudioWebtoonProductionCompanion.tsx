@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual  } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
@@ -17,16 +17,10 @@ import {
   webtoonProductionStagesForProjectView,
   type WebtoonProductionStageSupport,
 } from "@/shared/lib/webtoon-production-support";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { StudioProjectSection } from "../studio-project-views";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
 type ProgressMap = Readonly<Record<string, readonly number[]>>;
 
 function progressKey(projectId: string, stageId: string): string {
@@ -57,8 +51,11 @@ function writeProgress(projectId: string, stageId: string, values: readonly numb
   }
 }
 
-function localizedStageTitle(stage: WebtoonProductionStageSupport, locale: Locale): string {
-  return bt(stage.titleKo, stage.titleEn);
+function localizedStageTitle(
+  stage: WebtoonProductionStageSupport,
+  localize: (ko: string, en: string) => string,
+): string {
+  return localize(stage.titleKo, stage.titleEn);
 }
 
 export function StudioWebtoonProductionCompanion({
@@ -132,7 +129,7 @@ export function StudioWebtoonProductionCompanion({
                   <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-sm font-black text-on-accent">{stage.order}</span>
                   <div className="min-w-0">
                     <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-fg-3">EPISODE PIPELINE</p>
-                    <h3 className="mt-1 text-lg font-black text-fg">{localizedStageTitle(stage, l)}</h3>
+                    <h3 className="mt-1 text-lg font-black text-fg">{localizedStageTitle(stage, bt)}</h3>
                   </div>
                 </div>
                 <span className="rounded-full border border-accent/25 bg-accent-soft px-2.5 py-1 text-xs font-black text-accent">

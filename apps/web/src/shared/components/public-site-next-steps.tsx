@@ -1,6 +1,7 @@
 import {
-  resolveUiLocale,
-  translateCurrentStaticSourceText,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useId } from "react";
@@ -14,11 +15,6 @@ import Link from "@/compat/router-link";
 
 
 import "./public-site-vibrance.css";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-site-next-steps", ko, en);

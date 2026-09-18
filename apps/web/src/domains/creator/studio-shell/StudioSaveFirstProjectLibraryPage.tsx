@@ -1,10 +1,5 @@
 import {
-  formatI18nTemplate,
-  getCurrentUiLocale,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateCurrentStaticSourceText, useBilingual
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   CheckCircle2,
@@ -26,13 +21,12 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import { type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -92,10 +86,6 @@ const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, BilingualText>> = {
   archived: { ko: "잠시 보관한 작업을 다시 내 작업으로 옮길 수 있습니다.", en: "Move archived work back into My work whenever you need it." },
   trash: { ko: "삭제한 작업을 복원하거나 완전히 삭제합니다.", en: "Restore deleted work or remove it permanently." },
 };
-
-function localeFromLanguage(language: string): Locale {
-  return language;
-}
 
 function resolveView(value: string | null, initialView?: InitialLibraryView): LibraryView {
   if (value && Object.hasOwn(VIEW_LABELS, value)) return value as LibraryView;
@@ -177,8 +167,8 @@ export function StudioSaveFirstProjectLibraryPage({
   const bt = useBilingual("StudioSaveFirstProjectLibraryPage");
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: session } = useSession();
-  const l = useBilingualLocalizer("studioProjectLibrary");
   const language = useI18n((state) => state.lang);
+  const locale = language;
   const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
   const authUserId = session?.user?.id ?? null;
   const view = resolveView(searchParams.get("view"), initialView);
@@ -218,7 +208,7 @@ export function StudioSaveFirstProjectLibraryPage({
     next.delete("cloudError");
     if (result === "error") next.delete("sync");
     setSearchParams(next, { replace: true });
-  }, [l, reloadCloudConnections, searchParams, setSearchParams]);
+  }, [bt, reloadCloudConnections, searchParams, setSearchParams]);
 
   const allProjects = library.state?.projects ?? [];
   const activeProjects = allProjects.filter((project) => project.status === "active");

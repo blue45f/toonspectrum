@@ -34,15 +34,15 @@ import {
   type StudioInAppRuntimeError,
 } from "./lib/studio-inapp-sweep-harness.mjs";
 import {
+  evaluateStudioSoakHeapGrowth,
+  STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR,
+} from "./lib/studio-memory-growth-policy.mjs";
+import {
   findFreePort,
   spawnVitePreview,
   stopChildProcess,
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
-import {
-  evaluateStudioSoakHeapGrowth,
-  STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR,
-} from "./lib/studio-memory-growth-policy.mjs";
 
 const MINUTES = Math.max(1, Number(process.env.TOONSPECTRUM_SOAK_MINUTES ?? "300") || 300);
 const PROFILE_ID = process.env.TOONSPECTRUM_SOAK_PROFILE?.trim() || "desktop";
@@ -589,6 +589,9 @@ try {
       report.checkpoints.push({
         atMs: nowMs(startedAt), cycle,
         heapBytes: heap?.usedBytes ?? null,
+        heapSlopeBytesPerHour: heapSlopeBytesPerHour(report.heapSamples),
+        domNodes: null,
+        eventListeners: null,
         failures: report.failures.length,
       });
       await page.screenshot({ path: join(OUT, `checkpoint-${Math.round(nowMs(startedAt) / 60000)}m.png`) }).catch(() => undefined);

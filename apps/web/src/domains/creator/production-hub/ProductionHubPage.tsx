@@ -21,7 +21,6 @@ import {
   PanelTopOpen,
   Scale,
   ScrollText,
-  ShieldAlert,
   Users,
   Workflow,
 } from "lucide-react";
@@ -54,7 +53,6 @@ import {
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
-import { ProductionRiskWorkspace } from "./ProductionRiskWorkspace";
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
 import { ProductionStudioRevisionBridgePanel } from "./ProductionStudioRevisionBridgePanel";

@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import {
   WEBTOON_PLATFORM_SPECS,
@@ -37,8 +38,6 @@ import {
 import { auditStudioRightsGraph } from "../studio-rights-graph";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -48,13 +47,7 @@ import {
 } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
 type DeliveryView = "publish" | "package" | "archive";
 
 const CHECKSUM_A = `sha256:${"a".repeat(64)}`;
@@ -149,7 +142,7 @@ function documentSizeLabel(
   localize: (ko: string, en: string) => string,
 ): string {
   if (!document || document.width === null || document.height === null) {
-    return bt("크기 정보 없음", "Dimensions unavailable");
+    return localize("크기 정보 없음", "Dimensions unavailable");
   }
   return `${document.width.toLocaleString()} × ${document.height.toLocaleString()}px`;
 }
@@ -189,7 +182,6 @@ function StatusPanel({
   readonly description: string;
   readonly locale?: string;
 }) {
-  const l = useBilingualLocalizer("studioDelivery.status");
   return (
     <div className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -312,7 +304,7 @@ export function StudioProjectDeliveryPanel({
       sourceUrl: null,
     }],
     edges: [],
-  }, [documentId]), [documentId, l]);
+  }, [documentId]), [bt, documentId]);
 
   const packagePlan: StudioPublishingPackagePlan | null = useMemo(() => {
     if (!preflight || !state) return null;
@@ -377,7 +369,7 @@ export function StudioProjectDeliveryPanel({
     } catch {
       return null;
     }
-  }, [connector.id, connector.policyVersion, documentId, l, platformId, preflight, projectId, requestedAt, rights, state]);
+  }, [bt, connector.id, connector.policyVersion, documentId, platformId, preflight, projectId, requestedAt, rights, state]);
 
   const packageDeliveryStatus = packagePlan === null
     ? null
@@ -541,7 +533,7 @@ export function StudioProjectDeliveryPanel({
                     ) : null}
                     {webtoonDocuments.map((document) => (
                       <option key={document.id} value={document.id}>
-                        {document.title} · {documentSizeLabel(document, l)}
+                        {document.title} · {documentSizeLabel(document, bt)}
                       </option>
                     ))}
                   </select>
@@ -624,7 +616,7 @@ export function StudioProjectDeliveryPanel({
                     <StatusPanel
                       title={platformDeliveryPlan.platformName}
                       status={platformDeliveryPlan.grade ?? "review"}
-                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, l)} · ${selectedFormat.toUpperCase()}`}
+                      description={`${selectedDocument.title} · ${documentSizeLabel(selectedDocument, bt)} · ${selectedFormat.toUpperCase()}`}
                       locale={legacyLocale}
                     />
                     <div className="grid gap-3 sm:grid-cols-4">

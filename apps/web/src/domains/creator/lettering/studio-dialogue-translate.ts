@@ -19,13 +19,6 @@
  */
 
 import { isDialogueElement, type DialogueBatchItem, type DialoguePageLike } from "./studio-dialogue-batch";
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("studio-dialogue-translate", ko, en);
-
 // ── 로케일 ────────────────────────────────────────────────────────────────
 
 /** 원문(번역 이전 원본 텍스트)을 가리키는 예약 로케일 키. 사용자에게 노출 시 "원문"으로 표시. */

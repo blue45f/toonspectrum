@@ -1,9 +1,8 @@
 import {
   formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowLeft,
@@ -63,10 +62,6 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
 import type { StudioHelpHubActions, StudioHelpHubTab } from "./studio-help-hub-channel";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioHelpHubDialog", ko, en);

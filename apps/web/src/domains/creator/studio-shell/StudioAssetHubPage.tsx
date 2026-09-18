@@ -7,8 +7,8 @@ import { MarketBrowsePage } from "@/domains/market/pages/MarketBrowsePage";
 import { MarketLibraryPage } from "@/domains/market/pages/MarketCloudLibraryPage";
 import { MarketManagePage } from "@/domains/market/pages/MarketOwnedResourcesPage";
 import { Container } from "@/shared/components/section";
-import { useI18n } from "@/shared/lib/i18n";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { StudioAssetGovernancePanel } from "./StudioAssetGovernancePanel";
@@ -20,11 +20,6 @@ import {
   resolveStudioAssetHubView,
   type AssetHubView,
 } from "./studio-asset-hub-view";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
@@ -60,10 +55,8 @@ function assetHubHref(view: AssetHubView, projectId: string | null): string {
 }
 
 function MissingProjectView({
-  locale,
   view,
 }: {
-  readonly locale: string;
   readonly view: "safety" | "series-kit";
 }) {
   const bt = useBilingual("StudioAssetHubPage");
@@ -96,9 +89,6 @@ function MissingProjectView({
 export function StudioAssetHubPage() {
   useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
-  const t = useT();
-  const language = useI18n((state) => state.lang);
-  const locale = language;
   const bt = useBilingual("StudioAssetHubPage");
   const view = resolveStudioAssetHubView(searchParams.get("view"));
   const projectId = searchParams.get("project")?.trim() || null;

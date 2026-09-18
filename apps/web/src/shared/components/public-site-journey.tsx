@@ -1,6 +1,8 @@
 import {
-  translateBilingualValueForLocale,
+
   translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, Boxes, Compass, FolderKanban, Images, PackageCheck, Palette, Sparkles, Store, Workflow } from "lucide-react";
 import { useEffect, useRef } from "react";
@@ -12,10 +14,6 @@ import Link from "@/compat/router-link";
 
 import "./public-site-shell.css";
 import "./public-site-vibrance.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-site-journey", ko, en);

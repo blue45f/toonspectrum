@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { loadRequiredTargets } from "./run-core-vitest.mjs";
+
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
