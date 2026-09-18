@@ -1,11 +1,14 @@
 import { api } from "@/infrastructure/api";
 
 export type EconomyPolicy = {
-  mode: "activity-points";
+  mode: "dual-wallet-beta";
   paymentsEnabled: boolean;
+  studioCreditsEnabled: boolean;
+  membershipCreditsEnabled: boolean;
   creditPurchasesEnabled: boolean;
   publicAsset: "reward_point";
   pointExpiryDays: number | null;
+  purchasedCreditExpiryDays: number | null;
   fairUseLimitsApplyDuringBeta: boolean;
 };
 
@@ -65,6 +68,14 @@ export type MembershipOverview = {
   economy: EconomyPolicy;
   wallet: {
     points: WalletBalanceView;
+    studioCredits: WalletBalanceView;
+  };
+  creditCycle: {
+    monthlyIncluded: number;
+    dailyLimit: number;
+    spentToday: number;
+    remainingToday: number;
+    resetsAt: string;
   };
   levels: {
     creatorLevel: string;
