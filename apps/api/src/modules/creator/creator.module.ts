@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
 import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
+import { MembershipWalletModule } from "../membership-wallet/membership-wallet.module";
 
 import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-preflight";
 import { CreatorCollaborationRepository } from "./creator-collaboration.repository";
@@ -70,6 +71,7 @@ const privateObjectStorageModule =
 @Module({
   imports: [
     StudioRealtimeRevocationModule,
+    MembershipWalletModule,
     ...(privateObjectStorageModule ? [privateObjectStorageModule] : []),
   ],
   controllers: [

@@ -43,8 +43,8 @@ export const BETA_OPEN_EVENT: MarketingEvent = {
     en: "Join during beta and use everything free for up to a year.",
   },
   summary: {
-    ko: "베타 오픈 기간에는 모든 서비스를 제한 없이 무료로 이용하세요. 지금 가입하면 베타 종료 이후에도 특별 무료 혜택이 이어집니다.",
-    en: "Every service is unlimited and free during beta. Join now and your special free period continues even after beta ends.",
+    ko: "베타 오픈 기간에는 주요 서비스를 이용료 없이 사용할 수 있습니다. 저장공간·업로드·동시 처리에는 서비스 안정성을 위한 공정 사용 한도가 적용되며, 가입 혜택은 베타 종료 이후에도 이어집니다.",
+    en: "Major services are free of charge during beta. Fair-use limits still apply to storage, uploads, and concurrent processing, while signup benefits can continue after beta ends.",
   },
   signupFreeMonths: 6,
   publicCreatorFreeMonths: 12,
@@ -55,10 +55,10 @@ export const BETA_OPEN_EVENT: MarketingEvent = {
   benefits: [
     {
       id: "beta-unlimited",
-      title: { ko: "베타 기간 전 서비스 무제한 무료", en: "Unlimited access throughout beta" },
+      title: { ko: "베타 기간 주요 서비스 이용료 무료", en: "Major services free during beta" },
       body: {
-        ko: "베타가 열려 있는 동안 웹툰·일러스트·드로잉·프로젝트 도구와 새로 추가되는 주요 기능을 제한 없이 이용할 수 있습니다.",
-        en: "Use webtoon, illustration, drawing, project tools, and major new beta features without feature limits while beta is open.",
+        ko: "베타가 열려 있는 동안 웹툰·일러스트·드로잉·프로젝트 도구와 주요 신규 기능을 이용료 없이 사용할 수 있습니다. 저장공간·파일 크기·동시 처리량 등에는 공정 사용 및 기술 안전 한도가 적용됩니다.",
+        en: "Use webtoon, illustration, drawing, project tools, and major new beta features at no charge while beta is open. Fair-use and technical safety limits apply to storage, file sizes, and concurrent processing.",
       },
       emphasis: { ko: "지금은 전 기능 무료", en: "Everything is free during beta" },
     },
@@ -66,8 +66,8 @@ export const BETA_OPEN_EVENT: MarketingEvent = {
       id: "signup-six-months",
       title: { ko: "베타 가입자는 가입일부터 6개월 무료", en: "Beta members get 6 months free" },
       body: {
-        ko: "베타 기간 중 회원가입하면 가입일부터 6개월 동안 전 서비스를 제한 없이 이용할 수 있습니다.",
-        en: "Create an account during beta and receive unrestricted access to every service for six months from your signup date.",
+        ko: "베타 기간 중 회원가입하면 가입일부터 6개월 동안 대상 서비스를 이용료 없이 이용할 수 있으며, 공정 사용 및 기술 안전 한도는 동일하게 적용됩니다.",
+        en: "Create an account during beta and receive eligible services at no charge for six months from signup, with the same fair-use and technical safety limits.",
       },
       emphasis: { ko: "회원가입만 해도 6개월", en: "6 months just for joining" },
     },
