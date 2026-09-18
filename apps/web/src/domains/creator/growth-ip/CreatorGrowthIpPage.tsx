@@ -175,7 +175,15 @@ export function CreatorGrowthIpPage() {
 
   const addSupportRequest = () => {
     if (!supportDraft.title.trim()) { setNotice(bi("지원 요청 제목을 입력하세요.", "Enter a support request title.")); return; }
-    setState((current) => ({ ...current, supportRequests: [...current.supportRequests, { id: safeUuid(), area: supportDraft.area, title: supportDraft.title.trim().slice(0, 160), detail: supportDraft.detail.trim().slice(0, 3000), status: "requested", createdAt: new Date().toISOString() }].slice(-200) }));
+    const request: CreatorGrowthIpState["supportRequests"][number] = {
+      id: safeUuid(),
+      area: supportDraft.area,
+      title: supportDraft.title.trim().slice(0, 160),
+      detail: supportDraft.detail.trim().slice(0, 3000),
+      status: "requested",
+      createdAt: new Date().toISOString(),
+    };
+    setState((current) => ({ ...current, supportRequests: [...current.supportRequests, request].slice(-200) }));
     setSupportDraft((current) => ({ ...current, title: "", detail: "" }));
     setNotice(bi("지원 요청을 등록했습니다. 자동 계약이나 결제는 발생하지 않습니다.", "Support request saved. No contract or payment is executed automatically."));
   };
@@ -206,7 +214,17 @@ export function CreatorGrowthIpPage() {
   const addRightsInquiry = () => {
     if (!rightsPolicy.allowed) { setNotice(rightsPolicy.reason); return; }
     if (!rightsDraft.company.trim() || !rightsDraft.scope.trim()) { setNotice(bi("제안 회사와 제안 범위를 입력하세요.", "Enter the proposing company and scope.")); return; }
-    setState((current) => ({ ...current, rightsInquiries: [...current.rightsInquiries, { id: safeUuid(), ...rightsDraft, company: rightsDraft.company.trim().slice(0, 160), contact: rightsDraft.contact.trim().slice(0, 240), territory: rightsDraft.territory.trim().slice(0, 160), scope: rightsDraft.scope.trim().slice(0, 3000), status: "received", createdAt: new Date().toISOString() }].slice(-200) }));
+    const inquiry: RightsInquiry = {
+      id: safeUuid(),
+      ...rightsDraft,
+      company: rightsDraft.company.trim().slice(0, 160),
+      contact: rightsDraft.contact.trim().slice(0, 240),
+      territory: rightsDraft.territory.trim().slice(0, 160),
+      scope: rightsDraft.scope.trim().slice(0, 3000),
+      status: "received",
+      createdAt: new Date().toISOString(),
+    };
+    setState((current) => ({ ...current, rightsInquiries: [...current.rightsInquiries, inquiry].slice(-200) }));
     setRightsDraft((current) => ({ ...current, company: "", contact: "", territory: "", scope: "" }));
     setNotice(bi("IP 제안 CRM에 기록했습니다. 계약 체결은 이 화면에서 자동 실행되지 않습니다.", "Recorded in the IP inquiry CRM. Contracts are not executed from this screen."));
   };

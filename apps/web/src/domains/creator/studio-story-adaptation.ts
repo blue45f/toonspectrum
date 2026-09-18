@@ -61,7 +61,8 @@ function compact(value: string, max = 500): string {
 }
 
 function sentences(paragraph: string): string[] {
-  const matched = paragraph.match(/[^.!?。！？\n]+[.!?。！？]?/gu) ?? [];
+  // Keep a closing quote attached to the terminator so dialogue detection retains paired quotes.
+  const matched = paragraph.match(/[^.!?。！？\n]+[.!?。！？]?[”"」』]?/gu) ?? [];
   return matched.map((item) => compact(item, 700)).filter(Boolean);
 }
 

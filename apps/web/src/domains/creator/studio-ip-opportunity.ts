@@ -56,7 +56,7 @@ export function createStudioIpOpportunityDocument(projectId: string): StudioIpOp
     projectId,
     rightsStatus: "unknown",
     availability: "available",
-    availableMedia: Object.freeze(["film", "series", "animation"]),
+    availableMedia: Object.freeze(["film", "series", "animation"] as StudioIpMedia[]),
     territories: Object.freeze(["worldwide"]),
     contributorAgreementsComplete: false,
     sourceRightsVerified: false,

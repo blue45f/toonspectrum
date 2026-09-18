@@ -49,7 +49,7 @@ const StudioProjectVersionStackPanel = lazy(async () => {
   return { default: module.StudioProjectVersionStackPanel };
 });
 
-function ProjectGraphPanelFallback({ locale: _locale }: { readonly locale: string }) {
+function ProjectGraphPanelFallback({ locale: _locale }: { readonly locale: "ko" | "en" }) {
   const bt = useBilingual("studioProjectIntegrated.graphFallback");
   return (
     <div
@@ -60,7 +60,7 @@ function ProjectGraphPanelFallback({ locale: _locale }: { readonly locale: strin
   );
 }
 
-function localeFromLanguage(language: string) {
+function localeFromLanguage(language: string): "ko" | "en" {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
@@ -81,7 +81,7 @@ function SectionWorkflow({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
 }) {
   useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");

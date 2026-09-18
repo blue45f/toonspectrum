@@ -71,12 +71,6 @@ export const StudioCreatorSupportPage = lazyRetry(
   })),
   "StudioCreatorSupportPage",
 );
-export const StudioEnvironmentGuidePage = lazyRetry(
-  () => import("@/domains/creator/studio-shell/StudioEnvironmentGuidePage").then((module) => ({
-    default: module.StudioEnvironmentGuidePage,
-  })),
-  "StudioEnvironmentGuidePage",
-);
 export const StudioNewPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({
     default: module.StudioNewIntegratedPage,
