@@ -1293,9 +1293,11 @@ export class MembershipWalletService {
         const numeric = Number(value);
         const creditInteger = key === "credit.monthlyIncluded"
           || key === "credit.dailyLimit";
+        const creditDailyLimit = key === "credit.dailyLimit";
         if (
           Number.isFinite(numeric)
           && numeric >= 0
+          && (!creditDailyLimit || numeric >= 1)
           && (!creditInteger || (Number.isSafeInteger(numeric) && numeric <= 10_000_000))
         ) {
           entitlements[key] = numeric as never;
