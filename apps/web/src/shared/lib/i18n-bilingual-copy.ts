@@ -4,7 +4,6 @@ import {
   getLang,
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
-  registerI18nRuntimeSourceEntries,
   resolveTranslationForDisplay,
   triggerTranslationBundleUpdate,
   useI18n,
@@ -101,7 +100,9 @@ export function defineStaticSourceText(
   }
   const id = stableTextId(normalizedSourceLocale, source);
   const key = `staticUi.${normalizedScope}.${normalizedSourceLocale}.${id}`;
-  registerI18nRuntimeSourceEntries(normalizedSourceLocale, { [key]: source });
+  const sourceRoot = normalizedSourceLocale.split("-")[0];
+  if (sourceRoot === "en") registerI18nEnglishSourceEntries({ [key]: source });
+  else registerI18nLocaleEntries(normalizedSourceLocale, { [key]: source });
   return key;
 }
 
