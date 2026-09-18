@@ -43,6 +43,10 @@ import {
   loadStudioCrdtDocumentInTransaction,
   withStudioCrdtWorkMutationLock,
 } from "./studio-crdt.repository";
+import {
+  enforceMembershipGeneratedStorageQuota,
+  enforceMembershipUploadQuota,
+} from "../membership-operations/membership-resource-quota";
 
 import type {
   CreatorCollaborationAccess,
@@ -1104,6 +1108,32 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
 
       let inserted: (typeof creatorWorkAssets.$inferSelect)[] = [];
       if (missing.length > 0) {
+        const incomingBytes = missing.reduce(
+          (total, input) => total + input.payload.byteLength,
+          0,
+        );
+        const largestFileBytes = Math.max(
+          ...missing.map((input) => input.payload.byteLength),
+        );
+        const sourceDigest = createHash("sha256")
+          .update(
+            missing
+              .map((input) => input.assetId)
+              .sort()
+              .join(","),
+          )
+          .digest("hex");
+        await enforceMembershipUploadQuota(transaction, {
+          workId,
+          incomingBytes,
+          largestFileBytes,
+          sourceKey: `studio-work-asset:${workId}:${sourceDigest}`,
+          metadata: {
+            assetCount: missing.length,
+            surface: "studio-work-asset",
+          },
+        });
+
         const values = missing.map((input) => ({
           workId: input.workId,
           assetId: input.assetId,
@@ -1305,6 +1335,7 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
     if (object.purpose === "source") {
       throw new StudioWorkAssetStorageReferenceConflictError();
     }
+    const generatedPurpose = object.purpose;
     return db.transaction(async (transaction) => {
       await requireAccess(transaction, actorUserId, input.workId, "edit", true);
       const [source] = await transaction
@@ -1318,6 +1349,18 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
         )
         .limit(1);
       if (!source) throw new StudioWorkAssetNotFoundError();
+      await enforceMembershipGeneratedStorageQuota(transaction, {
+        workId: input.workId,
+        purpose: generatedPurpose,
+        digest: object.digest,
+        byteLength: object.byteLength,
+        sourceKey: `studio-generated:${input.workId}:${object.purpose}:${object.digest}`,
+        metadata: {
+          surface: "studio-work-asset-generated",
+          sourceAssetId: input.sourceAssetId,
+          referenceId: input.referenceId,
+        },
+      });
       const registeredObject = await registerStorageObjectInTransaction(
         transaction,
         object,

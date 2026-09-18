@@ -41,6 +41,10 @@ const AiSettingsPage = lazyPage(
   () => import("@/domains/account/AiSettingsPage"),
   "AiSettingsPage",
 );
+const MembershipUsagePage = lazyPage(
+  () => import("@/domains/account/MembershipUsagePage"),
+  "MembershipUsagePage",
+);
 const MessagesPage = lazyPage(() => import("@/domains/messages/MessagesPage"), "MessagesPage");
 const MessageRequestPage = lazyPage(
   () => import("@/domains/messages/MessageRequestPage"),
@@ -49,6 +53,7 @@ const MessageRequestPage = lazyPage(
 
 export const accountRoutes = defineAppRoutes([
   route("account-ai-settings", "/settings/ai", AiSettingsPage),
+  route("account-membership-usage", "/membership/usage", MembershipUsagePage),
   route("account-my-space", "/my", MySpaceHubPage),
   route("account-me", "/me", AccountPage),
   route("account-creators", "/creators", CreatorDirectoryPage),

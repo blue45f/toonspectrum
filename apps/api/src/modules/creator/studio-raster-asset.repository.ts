@@ -19,6 +19,7 @@ import {
   loadStudioCrdtDocumentInTransaction,
   withStudioCrdtWorkMutationLock,
 } from "./studio-crdt.repository";
+import { enforceMembershipUploadQuota } from "../membership-operations/membership-resource-quota";
 
 import type {
   CreatorCollaborationAccess,
@@ -368,6 +369,15 @@ export class DrizzleStudioRasterAssetRepository implements StudioRasterAssetRepo
         assetCount: Number(usage?.assetCount ?? 0),
         totalBytes: Number(usage?.totalBytes ?? 0),
         incomingBytes: input.payload.byteLength,
+      });
+      await enforceMembershipUploadQuota(transaction, {
+        workId: input.workId,
+        incomingBytes: input.payload.byteLength,
+        sourceKey: `studio-raster-asset:${input.workId}:${input.assetId}`,
+        metadata: {
+          surface: "studio-raster-asset",
+          assetId: input.assetId,
+        },
       });
 
       const [stored] = await transaction

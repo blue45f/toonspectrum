@@ -302,6 +302,17 @@ export function SettingsPage() {
           </span>
           <ChevronRight size={18} aria-hidden />
         </Link>
+        <Link to="/membership/usage" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
+          <span>
+            <strong>{lang.startsWith("ko") ? "내 사용량 · 멤버십 알림" : "My usage & membership notices"}</strong>
+            <span className="mt-1 block text-sm text-fg-2">
+              {lang.startsWith("ko")
+                ? "실제 저장공간, 오늘 업로드량, 포인트 적립 잔여량과 한도 경고 확인"
+                : "See actual storage, today's uploads, reward limits and quota notices"}
+            </span>
+          </span>
+          <ChevronRight size={18} aria-hidden />
+        </Link>
         <Link to="/settings/ai" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
           <span><strong>통합 AI 설정</strong><span className="mt-1 block text-sm text-fg-2">텍스트·이미지·영상·3D의 사용자 키와 암호화 보관함을 한곳에서 관리</span></span>
           <ChevronRight size={18} aria-hidden />

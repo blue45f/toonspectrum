@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { AdminMembershipPolicy } from "./AdminMembershipPolicy";
+import { AdminMembershipOperations } from "./AdminMembershipOperations";
 import {
   adminFetch,
   centsToWon,
@@ -234,6 +235,7 @@ export function AdminPlans({ uid }: { uid: string }) {
       </div>
 
       <AdminMembershipPolicy uid={uid} />
+      <AdminMembershipOperations uid={uid} />
     </div>
   );
 }

@@ -1372,6 +1372,17 @@ export class MembershipWalletService {
     };
   }
 
+  private async rewardAccrualRestricted(userId: string): Promise<boolean> {
+    const result = await dbPool.query<{ trustLevel: string }>(
+      `SELECT "trustLevel"
+       FROM member_level
+       WHERE "userId" = $1
+       LIMIT 1`,
+      [userId],
+    );
+    return result.rows[0]?.trustLevel === "restricted";
+  }
+
   async grantActivityPoints(input: {
     userId: string | undefined;
     activity: unknown;
@@ -1384,6 +1395,14 @@ export class MembershipWalletService {
       throw new BadRequestException("지원하지 않는 포인트 활동입니다.");
     }
     const activityKey = input.activity;
+    if (await this.rewardAccrualRestricted(userId)) {
+      return {
+        granted: false,
+        restricted: true,
+        activity: activityKey,
+        points: 0,
+      };
+    }
     const sourceRef = boundedText(input.sourceRef, 180);
     if (!sourceRef) {
       throw new BadRequestException("포인트 적립 근거 식별자가 필요합니다.");
@@ -1551,6 +1570,14 @@ export class MembershipWalletService {
     const sourceRef = boundedText(sourceRefValue, 180);
     if (!sourceRef) {
       throw new BadRequestException("리워드 근거 식별자가 필요합니다.");
+    }
+    if (await this.rewardAccrualRestricted(userId)) {
+      return {
+        granted: false,
+        restricted: true,
+        milestone,
+        points: 0,
+      };
     }
     const policy = REWARD_MILESTONES[milestone];
     return this.grantAsset({

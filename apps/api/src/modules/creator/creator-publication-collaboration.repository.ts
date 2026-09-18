@@ -10,6 +10,7 @@ import {
   type CreatorPublicationDirective,
 } from "../../../../web/src/shared/lib/creator-publication-contract";
 
+import { MembershipOperationsService } from "../membership-operations/membership-operations.service";
 import {
   CreatorCollaborationRepository,
   type CreatorSharedDocument,
@@ -149,5 +150,10 @@ export class CreatorPublicationCollaborationRepository extends CreatorCollaborat
 
 export const creatorPublicationCollaborationRepositoryProvider = {
   provide: CreatorCollaborationRepository,
-  useFactory: () => new CreatorPublicationCollaborationRepository(),
+  inject: [MembershipOperationsService],
+  useFactory: (membershipOperations: MembershipOperationsService) =>
+    new CreatorPublicationCollaborationRepository(undefined, {
+      resolveMemberLimit: (ownerUserId) =>
+        membershipOperations.collaborationMemberLimit(ownerUserId),
+    }),
 };

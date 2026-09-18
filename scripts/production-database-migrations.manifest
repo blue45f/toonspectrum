@@ -71,3 +71,7 @@ apps/api/src/db/migrations/0070_user_region_settings.sql
 apps/api/src/db/migrations/0071_supporter_payments.sql
 apps/api/src/db/migrations/0072_creator_support_program.sql
 apps/api/src/db/migrations/0073_commerce_payments.sql
+apps/api/src/db/migrations/0074_creator_ecosystem.sql
+apps/api/src/db/migrations/0075_membership_wallet_policy.sql
+apps/api/src/db/migrations/0076_creator_role_profile_v2.sql
+apps/api/src/db/migrations/0077_membership_operations.sql

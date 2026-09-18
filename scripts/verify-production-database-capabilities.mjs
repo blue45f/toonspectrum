@@ -15,6 +15,7 @@ import {
   buildCreatorAssetObjectStorageRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMessagingRuntimeAclViolationSql,
+  buildMembershipRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
@@ -443,6 +444,11 @@ BEGIN
   IF ${buildMessagingRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact member messaging privileges';
+  END IF;
+
+  IF ${buildMembershipRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION
+      'runtime role lacks the exact membership and wallet privileges';
   END IF;
 
   IF ${buildRuntimeCutoverLedgerAclViolationSql(runtimeDatabaseRole)} THEN

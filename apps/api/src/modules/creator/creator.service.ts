@@ -26,6 +26,7 @@ import {
   MEMBERSHIP_REWARD_SERVICE,
   type MembershipRewardService,
 } from "../membership-wallet/membership-wallet.tokens";
+import { MembershipRewardReversalService } from "../membership-operations/membership-reward-reversal.service";
 import {
   addComment,
   bumpAssetDownloads,
@@ -185,6 +186,9 @@ export class CreatorService {
     @Optional()
     @Inject(MEMBERSHIP_REWARD_SERVICE)
     private readonly membershipWallet?: MembershipRewardService,
+    @Optional()
+    @Inject(MembershipRewardReversalService)
+    private readonly rewardReversal?: MembershipRewardReversalService,
   ) {}
 
   private async awardActivity(
@@ -222,16 +226,47 @@ export class CreatorService {
     }
   }
 
-  private async awardFirstPublicWork(userId: string): Promise<void> {
-    if (!this.membershipWallet) return;
+
+  private async reverseActivity(
+    activity:
+      | "creator.work.created"
+      | "creator.work.published"
+      | "community.comment.created",
+    sourceRef: string,
+    actorUserId: string,
+    reason: string,
+  ): Promise<void> {
+    if (!this.rewardReversal) return;
     try {
-      await this.membershipWallet.grantRewardMilestone(
-        userId,
-        "first-public-work",
-        userId,
-      );
+      await this.rewardReversal.reverseActivityBySource({
+        activity,
+        sourceRef,
+        actorUserId,
+        reason,
+      });
     } catch {
-      // The published work remains authoritative even if the reward ledger is unavailable.
+      // Creator mutations stay authoritative if reward recovery is unavailable.
+    }
+  }
+
+  private async reverseActivitiesByMetadata(
+    activity: "community.comment.created",
+    metadataKey: string,
+    metadataValue: string,
+    actorUserId: string,
+    reason: string,
+  ): Promise<void> {
+    if (!this.rewardReversal) return;
+    try {
+      await this.rewardReversal.reverseActivitiesByMetadata({
+        activity,
+        metadataKey,
+        metadataValue,
+        actorUserId,
+        reason,
+      });
+    } catch {
+      // Creator mutations stay authoritative if reward recovery is unavailable.
     }
   }
 
@@ -278,7 +313,6 @@ export class CreatorService {
           { source: "create" },
         );
         await this.awardFirstPublicWork(userId);
-        await this.awardFirstPublicWork(userId);
       }
       return work;
     } catch (error) {
@@ -300,7 +334,13 @@ export class CreatorService {
           { source: "update" },
         );
         await this.awardFirstPublicWork(userId);
-        await this.awardFirstPublicWork(userId);
+      } else if (body.status !== undefined) {
+        await this.reverseActivity(
+          "creator.work.published",
+          id,
+          userId,
+          "작품 공개 해제에 따른 활동 포인트 회수",
+        );
       }
       return work;
     } catch (error) {
@@ -596,7 +636,31 @@ export class CreatorService {
         id,
         isAdmin,
       );
-      return await deleteWork(userId, id, isAdmin);
+      const result = await deleteWork(userId, id, isAdmin);
+      if (result.deleted) {
+        await Promise.allSettled([
+          this.reverseActivity(
+            "creator.work.created",
+            id,
+            userId,
+            "작품 삭제에 따른 생성 활동 포인트 회수",
+          ),
+          this.reverseActivity(
+            "creator.work.published",
+            id,
+            userId,
+            "작품 삭제에 따른 공개 활동 포인트 회수",
+          ),
+          this.reverseActivitiesByMetadata(
+            "community.comment.created",
+            "workId",
+            id,
+            userId,
+            "작품 삭제로 함께 제거된 댓글 활동 포인트 회수",
+          ),
+        ]);
+      }
+      return result;
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 삭제할 수 없습니다.");
@@ -767,7 +831,16 @@ export class CreatorService {
       );
     }
     try {
-      return await deleteComment(userId, workId, commentId, canModerate);
+      const result = await deleteComment(userId, workId, commentId, canModerate);
+      if (result.deleted) {
+        await this.reverseActivity(
+          "community.comment.created",
+          commentId,
+          userId,
+          "작품 댓글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+        );
+      }
+      return result;
     } catch (error) {
       throw new BadRequestException(
         error instanceof Error ? error.message : "댓글을 삭제할 수 없습니다.",
