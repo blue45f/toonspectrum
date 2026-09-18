@@ -34,7 +34,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringStoryPage", ko, en);
 
 const EVIDENCE_ICONS: Record<EngineeringEvidenceKind, typeof Code2> = {
