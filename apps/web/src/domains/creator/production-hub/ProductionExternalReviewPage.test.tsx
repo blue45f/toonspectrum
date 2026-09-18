@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ProductionExternalReviewPage } from "./ProductionExternalReviewPage";
@@ -50,28 +50,18 @@ const reviewView: ProductionExternalReviewView = {
 
 afterEach(() => {
   cleanup();
-  globalThis.sessionStorage.clear();
   getProductionExternalReview.mockReset();
   submitProductionExternalReview.mockReset();
 });
 
-function LocationProbe() {
-  const location = useLocation();
-  return <output data-testid="review-location">{`${location.pathname}${location.search}${location.hash}`}</output>;
-}
-
-function renderPage(mode: "fragment" | "query" = "fragment") {
-  const secret = "a".repeat(64);
-  const suffix = mode === "fragment" ? `#token=${secret}` : `?token=${secret}`;
+function renderPage() {
   render(
-    <MemoryRouter initialEntries={[`/production/review/project-1/review-1${suffix}`]}>
-      <LocationProbe />
+    <MemoryRouter initialEntries={["/production/review/project-1/review-1?token=" + "a".repeat(64)]}>
       <Routes>
         <Route path="/production/review/:projectId/:reviewId" element={<ProductionExternalReviewPage />} />
       </Routes>
     </MemoryRouter>,
   );
-  return secret;
 }
 
 describe("ProductionExternalReviewPage", () => {
@@ -91,16 +81,8 @@ describe("ProductionExternalReviewPage", () => {
       },
     });
 
-    const secret = renderPage();
+    renderPage();
     expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
-    expect(document.querySelector('[data-route-ready="external-review"]')).not.toBeNull();
-    expect(document.querySelector("main")).toBeNull();
-    expect(getProductionExternalReview).toHaveBeenCalledWith("project-1", "review-1", secret);
-    await waitFor(() => expect(screen.getByTestId("review-location").textContent).toBe(
-      "/production/review/project-1/review-1",
-    ));
-    expect(document.head.querySelector('meta[name="referrer"]')?.getAttribute("content")).toBe("no-referrer");
-    expect(document.head.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe("noindex,nofollow,noarchive");
     expect(screen.getByText("밤의 우편배달부")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "통합 웹툰 원고" })).toBeTruthy();
     expect(screen.getByRole("link", { name: /자료 열기/u }).getAttribute("href")).toBe("https://example.test/review.png");
@@ -123,24 +105,10 @@ describe("ProductionExternalReviewPage", () => {
     expect(screen.getByText("외부 편집자")).toBeTruthy();
   });
 
-  it("accepts a legacy query token once and removes it from browser-visible history", async () => {
-    getProductionExternalReview.mockResolvedValue(reviewView);
-    const secret = renderPage("query");
-
-    expect(await screen.findByRole("heading", { name: "편집부 최종 검수" })).toBeTruthy();
-    expect(getProductionExternalReview).toHaveBeenCalledWith("project-1", "review-1", secret);
-    await waitFor(() => expect(screen.getByTestId("review-location").textContent).toBe(
-      "/production/review/project-1/review-1",
-    ));
-    expect(globalThis.sessionStorage.getItem("toonstudio:external-review:project-1:review-1")).toBe(secret);
-  });
-
   it("shows a neutral invalid-link screen without leaking project data", async () => {
     getProductionExternalReview.mockRejectedValue(new Error("not found"));
     renderPage();
     expect(await screen.findByRole("heading", { name: "검수 링크를 열 수 없습니다" })).toBeTruthy();
-    expect(document.querySelector('[data-route-error="external-review"]')).not.toBeNull();
-    expect(document.querySelector("main")).toBeNull();
     expect(screen.queryByText("밤의 우편배달부")).toBeNull();
   });
 });

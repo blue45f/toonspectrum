@@ -37,6 +37,22 @@ export const ProductionRevisionRefSchema = z.object({
   createdAt: IsoDateTimeSchema,
 }).strict();
 
+const ProductionStudioRevisionLinkSchema = z.object({
+  id: IdentitySchema,
+  projectId: IdentitySchema,
+  workId: IdentitySchema,
+  episodeId: IdentitySchema.nullable(),
+  studioDocumentRef: z.string().trim().min(1).max(500),
+  documentRole: z.enum(PRODUCTION_STUDIO_DOCUMENT_ROLES),
+  studioRevisionRef: ProductionRevisionRefSchema,
+  deliverableId: IdentitySchema,
+  submissionId: IdentitySchema,
+  linkedByAssignmentId: IdentitySchema,
+  status: z.enum(["submitted", "approved", "superseded"]),
+  linkedAt: IsoDateTimeSchema,
+  approvedAt: NullableIsoDateTimeSchema,
+}).strict();
+
 const CollaborationPartySchema = z.object({
   id: IdentitySchema,
   accountUserId: IdentitySchema.nullable(),
@@ -1297,15 +1313,13 @@ export const ProductionExternalReviewParamsSchema = z.object({
   reviewId: IdentitySchema,
 }).strict();
 
-const ExternalReviewTokenSchema = z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u);
-
 export const ProductionExternalReviewQuerySchema = z.object({
-  token: ExternalReviewTokenSchema.optional(),
+  token: z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u),
 }).strict();
 
 export const SubmitProductionExternalReviewSchema = z.object({
   responseId: z.string().uuid(),
-  token: ExternalReviewTokenSchema.optional(),
+  token: z.string().trim().min(32).max(512).regex(/^[A-Za-z0-9_-]+$/u),
   reviewerName: z.string().trim().min(1).max(120),
   decision: z.enum(["comment", "approve", "request-changes"]),
   note: z.string().trim().max(4_000),

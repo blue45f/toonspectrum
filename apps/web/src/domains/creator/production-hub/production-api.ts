@@ -81,6 +81,49 @@ export interface ProductionProjectRecord {
   readonly access: ProductionProjectAccess;
 }
 
+export interface ProductionProjectSummary {
+  readonly projectId: string;
+  readonly workId: string;
+  readonly title: string;
+  readonly collaborationModel: ProductionProjectAggregate["collaborationModel"];
+  readonly revision: number;
+  readonly updatedAt: string;
+  readonly access: ProductionProjectAccess;
+  readonly healthScore: number;
+  readonly activeEpisodeCount: number;
+  readonly readyBufferCount: number;
+  readonly criticalRiskCount: number;
+  readonly overdueTaskCount: number;
+  readonly blockedTaskCount: number;
+  readonly unassignedTaskCount: number;
+  readonly reviewTaskCount: number;
+  readonly nextReleaseAt: string | null;
+  readonly forecastFinishAt: string | null;
+  readonly scheduleConfidencePercent: number | null;
+}
+
+export interface ProductionProjectListResponse {
+  readonly projects: readonly ProductionProjectSummary[];
+}
+
+export interface ProductionPersonalInboxItem {
+  readonly bucket: "dueToday" | "inProgress" | "review" | "ready" | "waitingInput" | "blockingOthers";
+  readonly projectId: string;
+  readonly projectTitle: string;
+  readonly taskId: string;
+  readonly taskTitle: string;
+  readonly processKey: string;
+  readonly status: string;
+  readonly dueAt: string | null;
+  readonly estimateHours: number;
+  readonly episodeId: string | null;
+}
+
+export interface ProductionPersonalInboxResponse {
+  readonly items: readonly ProductionPersonalInboxItem[];
+  readonly counts: Readonly<Record<ProductionPersonalInboxItem["bucket"], number>>;
+}
+
 export interface ProductionMutationResponse {
   readonly aggregate: ProductionProjectAggregate;
   readonly derived?: unknown;
@@ -159,6 +202,14 @@ export type ProductionClientCommand =
 function mutationId(): string {
   return globalThis.crypto?.randomUUID?.()
     ?? `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, "0").slice(-12)}`;
+}
+
+export function listProductionProjects(): Promise<ProductionProjectListResponse> {
+  return api.get("/production/projects");
+}
+
+export function getProductionPersonalInbox(): Promise<ProductionPersonalInboxResponse> {
+  return api.get("/production/inbox");
 }
 
 export function getProductionProject(projectId: string): Promise<ProductionProjectRecord> {
@@ -282,19 +333,13 @@ export interface ProductionExternalReviewView {
   }[];
 }
 
-function externalReviewAuthorization(token: string): { readonly headers: Readonly<Record<string, string>> } {
-  return { headers: { Authorization: `Bearer ${token}` } };
-}
-
 export function getProductionExternalReview(
   projectId: string,
   reviewId: string,
   token: string,
 ): Promise<ProductionExternalReviewView> {
-  return api.get(
-    `/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}`,
-    externalReviewAuthorization(token),
-  );
+  const query = new URLSearchParams({ token });
+  return api.get(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}?${query.toString()}`);
 }
 
 export function submitProductionExternalReview(
@@ -307,11 +352,10 @@ export function submitProductionExternalReview(
     readonly note: string;
   },
 ): Promise<ProductionExternalReviewView> {
-  const { token, ...review } = input;
   return api.post(`/production/public-reviews/${encodeURIComponent(projectId)}/${encodeURIComponent(reviewId)}/responses`, {
     responseId: mutationId(),
-    ...review,
-  }, externalReviewAuthorization(token));
+    ...input,
+  });
 }
 
 export type ProductionGoogleDriveArtifact =

@@ -22,9 +22,9 @@ import {
   deriveCriticalPathSchedule,
   derivePersonalProductionInbox,
   evaluateAutomationRule,
-  evaluateProductionRisks,
   evaluateHandoffReadiness,
   evaluateProductionStudioRevisionCoverage,
+  evaluateReleaseReadiness,
   evaluateReviewApproval,
   resolveDecisionAuthority,
   preflightCreditManifest,
@@ -85,7 +85,6 @@ import {
   SubmitProductionExternalReviewDto,
   type ExecuteProductionCommand,
   type ProductionCommand,
-  type ProductionRiskQuery,
 } from "./production-collaboration.dto";
 import {
   ProductionCollaborationRepository,
@@ -211,7 +210,14 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
 
 function commandCapability(command: ProductionCommand): "comment" | "edit" | "manage" {
   if (command.type === "record-review-decision") return "comment";
-  if (command.type === "upsert-studio-revision-link" && command.link.status === "approved") return "manage";
+  if (command.type === "upsert-operations-record") {
+    return [
+      "resource-calendar",
+      "external-review-access",
+      "automation-rule",
+      "notification-policy",
+    ].includes(command.record.kind) ? "manage" : "edit";
+  }
   if (command.type === "upsert-commercial-record") {
     const record = command.record;
     if (record.kind === "proposal") {
@@ -1510,6 +1516,70 @@ function externalReviewProjection(
   });
 }
 
+function externalReviewTokenDigest(token: string): string {
+  return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
+}
+
+function externalReviewTokenMatches(expectedDigest: string, token: string): boolean {
+  const actual = Buffer.from(externalReviewTokenDigest(token), "utf8");
+  const expected = Buffer.from(expectedDigest, "utf8");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function requireExternalReviewAccess(
+  aggregate: ProductionProjectAggregate,
+  reviewId: string,
+  token: string,
+): ExternalReviewAccess {
+  const access = (aggregate.externalReviewAccesses ?? []).find((entry) => entry.id === reviewId);
+  if (
+    !access
+    || access.status !== "active"
+    || Date.parse(access.expiresAt) <= Date.now()
+    || !externalReviewTokenMatches(access.tokenDigest, token)
+  ) {
+    throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
+  }
+  return access;
+}
+
+function externalReviewProjection(
+  aggregate: ProductionProjectAggregate,
+  access: ExternalReviewAccess,
+) {
+  const submissions = access.submissionIds.flatMap((submissionId) => {
+    const submission = aggregate.submissions.find((entry) => entry.id === submissionId);
+    if (!submission) return [];
+    const deliverable = aggregate.deliverables.find((entry) => entry.id === submission.deliverableId) ?? null;
+    return [{
+      id: submission.id,
+      status: submission.status,
+      submittedAt: submission.submittedAt,
+      revisionRef: submission.revisionRef,
+      evidenceRefs: submission.evidenceRefs,
+      deliverable: deliverable ? {
+        id: deliverable.id,
+        type: deliverable.type,
+        expectedFormat: deliverable.expectedFormat,
+        completionCriteria: deliverable.completionCriteria,
+      } : null,
+    }];
+  });
+  return Object.freeze({
+    projectId: aggregate.projectId,
+    projectTitle: aggregate.title,
+    review: {
+      id: access.id,
+      label: access.label,
+      watermark: access.watermark,
+      permissions: access.permissions,
+      expiresAt: access.expiresAt,
+      responses: access.responses,
+    },
+    submissions: Object.freeze(submissions),
+  });
+}
+
 @Injectable()
 export class ProductionCollaborationService {
   constructor(
@@ -1662,7 +1732,6 @@ export class ProductionCollaborationService {
   async submitExternalReview(
     projectId: string,
     reviewId: string,
-    token: string,
     body: SubmitProductionExternalReviewDto,
   ) {
     if (body.decision !== "approve" && !body.note.trim()) {
@@ -1671,7 +1740,7 @@ export class ProductionCollaborationService {
     const result = await this.run(() => this.repository.mutatePublicReview({
       projectId,
       mutate: (current) => {
-        const access = requireExternalReviewAccess(current, reviewId, token);
+        const access = requireExternalReviewAccess(current, reviewId, body.token);
         if (!access.permissions.includes("comment") && body.decision === "comment") {
           throw new ForbiddenException("이 링크에는 댓글 권한이 없습니다.");
         }
@@ -1724,66 +1793,6 @@ export class ProductionCollaborationService {
       },
     }));
     return result.derived;
-  }
-
-  async getRisks(
-    actorUserId: string,
-    projectIdValue: string,
-    query: ProductionRiskQuery,
-  ) {
-    const { projectId } = ProductionProjectParamsSchema.parse({ projectId: projectIdValue });
-    return this.run(async () => {
-      const record = await this.repository.getProject(actorUserId, projectId);
-      const evaluation = evaluateProductionRisks(record.aggregate);
-      const statuses = query.status?.split(",").filter(Boolean) ?? [];
-      const severities = query.severity?.split(",").filter(Boolean) ?? [];
-      const categories = query.category?.split(",").filter(Boolean) ?? [];
-      const search = query.q?.toLocaleLowerCase("ko-KR") ?? "";
-      const signalsByRiskId = new Map(
-        evaluation.signals
-          .filter((signal) => signal.linkedRiskId)
-          .map((signal) => [signal.linkedRiskId!, signal]),
-      );
-      const items = evaluation.risks.filter((risk) => {
-        const signal = signalsByRiskId.get(risk.id);
-        return (statuses.length === 0 || statuses.includes(risk.status))
-          && (severities.length === 0 || severities.includes(risk.severity))
-          && (categories.length === 0 || categories.includes(risk.category))
-          && (!query.source || risk.source === query.source)
-          && (!query.episodeId || risk.affectedEpisodeIds.includes(query.episodeId))
-          && (!query.ownerAssignmentId || risk.ownerAssignmentId === query.ownerAssignmentId)
-          && (!query.ruleKey || signal?.ruleKey === query.ruleKey)
-          && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search));
-      }).slice(0, query.limit).map((risk) => ({
-        risk,
-        signal: signalsByRiskId.get(risk.id) ?? null,
-        responseCount: record.aggregate.riskResponses.filter((response) => response.riskId === risk.id).length,
-      }));
-      return {
-        summary: evaluation.summary,
-        items,
-        nextCursor: null,
-        evaluatedAt: evaluation.evaluatedAt,
-      };
-    });
-  }
-
-  async getRisk(actorUserId: string, projectIdValue: string, riskId: string) {
-    const { projectId } = ProductionProjectParamsSchema.parse({ projectId: projectIdValue });
-    return this.run(async () => {
-      const record = await this.repository.getProject(actorUserId, projectId);
-      const evaluation = evaluateProductionRisks(record.aggregate);
-      const risk = evaluation.risks.find((entry) => entry.id === riskId);
-      if (!risk) throw new NotFoundException("위험 항목을 찾을 수 없습니다.");
-      return {
-        risk,
-        signal: evaluation.signals.find((entry) => risk.signalIds.includes(entry.id)) ?? null,
-        responses: record.aggregate.riskResponses.filter((response) => response.riskId === risk.id),
-        assessment: evaluation.assessments.find((entry) => entry.riskId === risk.id) ?? null,
-        taskForecasts: risk.affectedTaskIds.map((taskId) => evaluation.schedule.byTaskId[taskId]).filter(Boolean),
-        evaluatedAt: evaluation.evaluatedAt,
-      };
-    });
   }
 
   async createProject(

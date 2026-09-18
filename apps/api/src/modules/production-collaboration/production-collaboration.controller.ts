@@ -21,8 +21,6 @@ import {
   ProductionExternalReviewQueryDto,
   ProductionProjectByWorkParamsDto,
   ProductionProjectParamsDto,
-  ProductionRiskParamsDto,
-  ProductionRiskQueryDto,
   SubmitProductionExternalReviewDto,
 } from "./production-collaboration.dto";
 import { ProductionCollaborationService } from "./production-collaboration.service";
@@ -94,28 +92,6 @@ export class ProductionCollaborationController {
     return this.service.getPersonalInbox(authenticatedProductionUserId(userId));
   }
 
-  @Get("/projects/:projectId/risks")
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  getRisks(
-    @Param(new ZodValidationPipe(ProductionProjectParamsDto))
-    params: ProductionProjectParamsDto,
-    @Query(new ZodValidationPipe(ProductionRiskQueryDto))
-    query: ProductionRiskQueryDto,
-    @Headers("x-user-id") userId?: string,
-  ) {
-    return this.service.getRisks(authenticatedProductionUserId(userId), params.projectId, query);
-  }
-
-  @Get("/projects/:projectId/risks/:riskId")
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  getRisk(
-    @Param(new ZodValidationPipe(ProductionRiskParamsDto))
-    params: ProductionRiskParamsDto,
-    @Headers("x-user-id") userId?: string,
-  ) {
-    return this.service.getRisk(authenticatedProductionUserId(userId), params.projectId, params.riskId);
-  }
-
   @Get("/projects/:projectId")
   @Header("Cache-Control", "private, no-store, max-age=0")
   getProject(
@@ -144,39 +120,24 @@ export class ProductionCollaborationController {
 
   @Get("/public-reviews/:projectId/:reviewId")
   @Header("Cache-Control", "private, no-store, max-age=0")
-  @Header("Referrer-Policy", "no-referrer")
-  @Header("X-Robots-Tag", "noindex, nofollow, noarchive")
   getExternalReview(
     @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
     params: ProductionExternalReviewParamsDto,
     @Query(new ZodValidationPipe(ProductionExternalReviewQueryDto))
     query: ProductionExternalReviewQueryDto,
-    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.getExternalReview(
-      params.projectId,
-      params.reviewId,
-      externalReviewToken(authorization, query.token),
-    );
+    return this.service.getExternalReview(params.projectId, params.reviewId, query.token);
   }
 
   @Post("/public-reviews/:projectId/:reviewId/responses")
   @Header("Cache-Control", "private, no-store, max-age=0")
-  @Header("Referrer-Policy", "no-referrer")
-  @Header("X-Robots-Tag", "noindex, nofollow, noarchive")
   submitExternalReview(
     @Param(new ZodValidationPipe(ProductionExternalReviewParamsDto))
     params: ProductionExternalReviewParamsDto,
     @Body(new ZodValidationPipe(SubmitProductionExternalReviewDto))
     body: SubmitProductionExternalReviewDto,
-    @Headers("authorization") authorization?: string,
   ) {
-    return this.service.submitExternalReview(
-      params.projectId,
-      params.reviewId,
-      externalReviewToken(authorization, body.token),
-      body,
-    );
+    return this.service.submitExternalReview(params.projectId, params.reviewId, body);
   }
 
   @Post("/projects/:projectId/commands")
