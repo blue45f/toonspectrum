@@ -95,12 +95,10 @@ jobs:
       - name: Strict lint full repository
         if: github.event_name != 'pull_request'
         run: pnpm run lint:strict
-      - name: Save ESLint result cache on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.eslint-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: node_modules/.cache/eslint/full
-          key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
+      - name: Import and dependency hygiene
+        run: pnpm run quality:imports
+      - name: Secret scan
+        run: pnpm run quality:secrets
 
   typecheck:
     name: Core preflight and application typecheck
