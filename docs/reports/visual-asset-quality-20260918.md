@@ -109,3 +109,15 @@ The 20 legacy portrait webtoon backgrounds remain the only material image-qualit
 - Core dark/mobile route audit: 15 of 16 audited routes clean; `/production` reports only the pre-existing `route-scene-missing` architecture marker, with no image-quality or overflow issue.
 - Full TypeScript check with the repository 12GB heap profile: passed.
 - `audit:visual-assets`, deep strict audit, GPT Image 2.5 replacement-map contract, Creator Essentials regeneration, and `git diff --check`: passed.
+
+## 2026-09-18 후속 tracked 정리
+
+- 현재 `main` 재집계 기준 tracked blob은 22,859개이며, 이미지·3D·미디어 확장자 기준 실에셋은 3,938개(약 2.93GB)다. 단순 파일 수만으로 삭제하지 않고 시각 검수 원장, 런타임 참조, 라이선스, 해상도, 해시 중복을 함께 판정했다.
+- GPT Image 2.5로 1152×2048 재생성·전체 프레임 검수를 완료한 20개 ID에 대응하던 627×940 레거시 JPG 20개와 동일 바이트 PNG 호환 별칭 20개를 tracked 트리에서 제거한다.
+- 레거시 경로를 직접 사용하던 공용 spatial 비주얼 1건은 동일 ID의 검수 완료 GPT25 연구실 배경으로 교체한다. 교체 맵의 `legacySrc` 문자열은 이력 추적용으로만 보존하고 런타임 파일은 보존하지 않는다.
+- 활성 레거시 manifest는 실제 계속 사용하는 9종만 남기며, 교체된 20종은 generated manifest를 단일 권위로 사용한다. 회귀 테스트가 40개 구형 바이너리의 재유입을 차단한다.
+- 검수 완료 GPT25 배경 20종은 `studio-asset:gpt25/*` 신뢰 네임스페이스로 공식 마켓에 노출한다. 카드 미리보기뿐 아니라 실제 삽입 시 로컬 allowlist, 파일 크기, SHA-256, PNG 헤더, 디코드 해상도까지 재검증한다.
+- 마켓 레코드는 `containsAi: true`, `toonspectrum-standard`, first-party provenance로 명시한다. Studio 저장 레코드도 `sourceKind: ai-generated`와 AI 배지를 유지한다.
+- 완성 장면 성격이 강한 8종은 Creator Ecosystem의 “검수 완료 샘플 일러스트”로 재활용한다. 원본을 복제한 별도 파일을 만들지 않고 동일 검수 원본을 lazy-load하며, 해당 마켓 배경 검색으로 연결한다.
+- CC0 대규모 묶음은 기존 23장 review sheet와 개별 curation 상태를 유지한다. assembly-component/quarantine/mobile-budget 제외 항목을 단순 수량 확대 목적으로 승격하지 않는다.
+

@@ -60,3 +60,12 @@ export const GENERATED_GPT25_BG_SCENES: readonly GeneratedStudio2dScene[] =
     width,
     height,
   })));
+
+export const GENERATED_GPT25_MARKETPLACE_ID_PREFIX = "gpt25/";
+
+export function findGeneratedStudio2dAsset(reference: string): GeneratedStudio2dAsset | null {
+  const id = reference.startsWith(GENERATED_GPT25_MARKETPLACE_ID_PREFIX)
+    ? reference.slice(GENERATED_GPT25_MARKETPLACE_ID_PREFIX.length)
+    : reference;
+  return GENERATED_GPT25_ASSET_METADATA.find((asset) => asset.id === id) ?? null;
+}

@@ -1,4 +1,5 @@
 import { studioCc0AssetUrl } from "./studio-cc0-asset-delivery";
+import { findGeneratedStudio2dAsset } from "./studio-2d-generated-backgrounds";
 import { findStudioMarketplaceCc0Asset as findRegisteredStudioMarketplaceCc0Asset } from "./studio-marketplace-cc0-assets";
 import { findStudioMarketplaceCc0Asset, resolveStudioMarketplaceCc0Model } from "./studio-marketplace-cc0-registry";
 import { createStudioOriginalFreeAssetRecord, findStudioOriginalFreeAsset } from "./studio-original-free-asset-packs";
@@ -25,6 +26,12 @@ export function resolveStudioMarketplaceAssetPreview(runtimeRef: string): Studio
   if (original) return {
     src: createStudioOriginalFreeAssetRecord(original).dataUrl, name: original.name,
     caption: "Studio에 삽입되는 실제 SVG 원본입니다.",
+  };
+  const generated = findGeneratedStudio2dAsset(id);
+  if (generated) return {
+    src: generated.src,
+    name: generated.title,
+    caption: `${generated.width}×${generated.height}px · 전체 프레임 시각 검수 완료 · ToonSpectrum 1차 AI 생성 배경`,
   };
   const cc0 = findStudioMarketplaceCc0Asset(id);
   return cc0 && cc0.kind !== "model" ? {
