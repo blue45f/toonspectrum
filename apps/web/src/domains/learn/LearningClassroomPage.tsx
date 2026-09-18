@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import { LESSONS } from "./learning-content";
@@ -6,6 +6,7 @@ import {
   CLASSROOM_TEMPLATES,
   createClassroomPlan,
   loadClassroomPlan,
+  parseClassroomPlan,
   saveClassroomPlan,
   type ClassroomAssignment,
   type ClassroomPlan,
@@ -34,6 +35,9 @@ export function LearningClassroomPage() {
   const [lessonId, setLessonId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [curriculumWeek, setCurriculumWeek] = useState(1);
+  const [curriculumContent, setCurriculumContent] = useState("");
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => { document.title = "Classroom · 툰스튜디오 Academy"; }, []);
 
@@ -55,7 +59,29 @@ export function LearningClassroomPage() {
     }));
     persist({ ...next, assignments });
     setWeek(1);
+    setCurriculumWeek(1);
     setLessonId("");
+    setCurriculumContent("");
+  }
+
+  function addWeek() {
+    if (plan.weeks.length >= 24) {
+      setWarning("수업 계획은 최대 24주까지 구성할 수 있습니다.");
+      return;
+    }
+    const nextWeek = plan.weeks.length + 1;
+    persist({
+      ...plan,
+      weeks: [...plan.weeks, {
+        week: nextWeek,
+        title: `새 학습 주차 ${nextWeek}`,
+        summary: "학습 목표와 실습 내용을 입력하세요.",
+        lessonIds: [],
+        resourceIds: [],
+      }],
+    });
+    setCurriculumWeek(nextWeek);
+    setWeek(nextWeek);
   }
 
   function addAssignment(event: FormEvent<HTMLFormElement>) {
@@ -78,6 +104,62 @@ export function LearningClassroomPage() {
 
   function removeAssignment(id: string) {
     persist({ ...plan, assignments: plan.assignments.filter((assignment) => assignment.id !== id) });
+  }
+
+  function addCurriculumContent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!curriculumContent) return;
+    const [kind, rawId] = curriculumContent.split(":", 2);
+    const id = rawId ?? "";
+    const targetWeek = Math.max(1, Math.min(plan.weeks.length, curriculumWeek));
+    const validLesson = kind === "lesson" && lessonById.has(id);
+    const validResource = kind === "resource" && resourceById.has(id);
+    if (!validLesson && !validResource) return;
+
+    persist({
+      ...plan,
+      weeks: plan.weeks.map((item) => {
+        if (item.week !== targetWeek) return item;
+        if (validLesson) return { ...item, lessonIds: [...new Set([...item.lessonIds, id])] };
+        return { ...item, resourceIds: [...new Set([...item.resourceIds, id])] };
+      }),
+    });
+    setCurriculumContent("");
+  }
+
+  function removeCurriculumContent(weekNumber: number, kind: "lesson" | "resource", id: string) {
+    persist({
+      ...plan,
+      weeks: plan.weeks.map((item) => item.week !== weekNumber ? item : {
+        ...item,
+        lessonIds: kind === "lesson" ? item.lessonIds.filter((candidate) => candidate !== id) : item.lessonIds,
+        resourceIds: kind === "resource" ? item.resourceIds.filter((candidate) => candidate !== id) : item.resourceIds,
+      }),
+    });
+  }
+
+  async function importPlan(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (file.size > 250_000) {
+      setWarning("수업 계획 파일이 너무 큽니다. 250KB 이하 JSON 파일을 사용하세요.");
+      return;
+    }
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || (parsed as { version?: unknown }).version !== 1) {
+        throw new Error("unsupported classroom plan");
+      }
+      const imported = parseClassroomPlan(raw);
+      persist(imported);
+      setWeek(1);
+      setCurriculumWeek(1);
+      setCurriculumContent("");
+    } catch {
+      setWarning("수업 계획을 가져오지 못했습니다. ToonSpectrum Classroom JSON 형식을 확인하세요.");
+    }
   }
 
   function exportPlan() {
@@ -110,7 +192,18 @@ export function LearningClassroomPage() {
       <section className="academy-template-picker" aria-labelledby="academy-template-title">
         <div className="learn-section-heading">
           <div><p className="learn-eyebrow">CURRICULUM TEMPLATE</p><h2 id="academy-template-title">수업 목적에 맞는 시작점을 고르세요.</h2></div>
-          <button type="button" onClick={exportPlan}>수업 계획 JSON 내보내기</button>
+          <div className="academy-plan-file-actions">
+            <button type="button" onClick={() => importInputRef.current?.click()}>JSON 가져오기</button>
+            <button type="button" onClick={exportPlan}>JSON 내보내기</button>
+            <input
+              ref={importInputRef}
+              className="academy-hidden-file-input"
+              type="file"
+              accept="application/json,.json"
+              aria-label="수업 계획 JSON 가져오기"
+              onChange={(event) => void importPlan(event)}
+            />
+          </div>
         </div>
         <div className="academy-template-grid">
           {CLASSROOM_TEMPLATES.map((item) => (
@@ -134,8 +227,34 @@ export function LearningClassroomPage() {
       <section className="academy-week-section" aria-labelledby="academy-week-title">
         <div className="learn-section-heading">
           <div><p className="learn-eyebrow">WEEKLY COURSE</p><h2 id="academy-week-title">강의 → 참고자료 → 실습의 한 흐름</h2></div>
-          <Link to="/learn/resources">강좌·자료 더 찾기 →</Link>
+          <div className="academy-week-heading-actions">
+            <button type="button" onClick={addWeek} disabled={plan.weeks.length >= 24}>주차 추가</button>
+            <Link to="/learn/resources">강좌·자료 더 찾기 →</Link>
+          </div>
         </div>
+        <form className="academy-curriculum-builder" onSubmit={addCurriculumContent}>
+          <div>
+            <strong>수업 자료 배치</strong>
+            <span>자체 강좌와 검증된 외부 자료를 원하는 주차에 추가하세요.</span>
+          </div>
+          <label htmlFor="academy-curriculum-week">주차
+            <select id="academy-curriculum-week" value={curriculumWeek} onChange={(event) => setCurriculumWeek(Number(event.currentTarget.value))}>
+              {plan.weeks.map((item) => <option key={item.week} value={item.week}>{item.week}주차 · {item.title}</option>)}
+            </select>
+          </label>
+          <label htmlFor="academy-curriculum-content">강좌·자료
+            <select id="academy-curriculum-content" required value={curriculumContent} onChange={(event) => setCurriculumContent(event.currentTarget.value)}>
+              <option value="">추가할 항목 선택</option>
+              <optgroup label="ToonSpectrum 자체 강좌">
+                {LESSONS.map((lesson) => <option key={lesson.id} value={`lesson:${lesson.id}`}>{lesson.title}</option>)}
+              </optgroup>
+              <optgroup label="큐레이션 학습 자료">
+                {CURATED_LEARNING_RESOURCES.map((resource) => <option key={resource.id} value={`resource:${resource.id}`}>{resource.title}</option>)}
+              </optgroup>
+            </select>
+          </label>
+          <button type="submit" disabled={!curriculumContent}>주차에 추가</button>
+        </form>
         <ol className="academy-week-list">
           {plan.weeks.map((item) => (
             <li key={item.week}>
@@ -144,14 +263,24 @@ export function LearningClassroomPage() {
               <div className="academy-week-links">
                 {item.lessonIds.map((id) => {
                   const lesson = lessonById.get(id);
-                  return lesson ? <Link key={id} to={lessonUrl(id)}><span>자체 강좌</span>{lesson.title}</Link> : null;
+                  return lesson ? (
+                    <div className="academy-week-link-row" key={id}>
+                      <Link to={lessonUrl(id)}><span>자체 강좌</span>{lesson.title}</Link>
+                      <button type="button" onClick={() => removeCurriculumContent(item.week, "lesson", id)}>제거</button>
+                    </div>
+                  ) : null;
                 })}
                 {item.resourceIds.map((id) => {
                   const resource = resourceById.get(id);
                   if (!resource) return null;
-                  return resource.external
-                    ? <a key={id} href={resource.url} target="_blank" rel="noopener noreferrer"><span>외부 참고</span>{resource.title} ↗</a>
-                    : <Link key={id} to={resource.url}><span>학습 자료</span>{resource.title}</Link>;
+                  return (
+                    <div className="academy-week-link-row" key={id}>
+                      {resource.external
+                        ? <a href={resource.url} target="_blank" rel="noopener noreferrer"><span>외부 참고</span>{resource.title} ↗</a>
+                        : <Link to={resource.url}><span>학습 자료</span>{resource.title}</Link>}
+                      <button type="button" onClick={() => removeCurriculumContent(item.week, "resource", id)}>제거</button>
+                    </div>
+                  );
                 })}
                 <a href="/studio" target="_blank" rel="noopener noreferrer"><span>실습</span>툰스튜디오에서 작업 ↗</a>
               </div>

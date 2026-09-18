@@ -20,10 +20,22 @@ describe("academy product surfaces", () => {
     expect(screen.getAllByText("공식·검증 출처").length).toBeGreaterThan(0);
   });
 
-  it("switches classroom templates and adds a locally managed assignment", () => {
+  it("builds a classroom curriculum and adds a locally managed assignment", () => {
     render(<MemoryRouter initialEntries={["/learn/classroom"]}><LearningClassroomPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole("button", { name: /스토리·콘티 집중/u }));
     expect(screen.getByDisplayValue("스토리·콘티 집중 · 6주")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("강좌·자료"), { target: { value: "lesson:inking" } });
+    fireEvent.click(screen.getByRole("button", { name: "주차에 추가" }));
+    const addedLesson = screen.getByRole("link", { name: /선 굵기와 필압/u });
+    expect(addedLesson).toBeTruthy();
+    const removeButton = addedLesson.parentElement?.querySelector("button");
+    expect(removeButton).toBeTruthy();
+    fireEvent.click(removeButton as HTMLButtonElement);
+    expect(screen.queryByRole("link", { name: /선 굵기와 필압/u })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "주차 추가" }));
+    expect(screen.getByRole("option", { name: /7주차 · 새 학습 주차 7/u })).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("과제 이름"), { target: { value: "3컷 콘티 제출" } });
     fireEvent.click(screen.getByRole("button", { name: "과제 추가" }));
