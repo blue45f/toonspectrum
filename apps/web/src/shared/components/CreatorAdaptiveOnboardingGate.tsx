@@ -311,7 +311,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
         </header>
 
         <div className="shrink-0 px-5 pt-4 sm:px-7">
-          <ol className="grid grid-cols-5 gap-1.5" aria-label={localized(locale, "설정 진행 단계", "Setup progress")}>
+          <ol className="grid grid-cols-6 gap-1.5" aria-label={localized(locale, "설정 진행 단계", "Setup progress")}>
             {STEP_LABELS.map((label, index) => (
               <li key={label.en} className="min-w-0">
                 <div className={cn(
