@@ -311,6 +311,22 @@ export function useBilingual(scope: string): (ko: string, en: string) => string 
   );
 }
 
+export type BilingualLocalizer = <TKo, TEn>(ko: TKo, en: TEn) => TKo;
+
+/**
+ * Generic React compatibility bridge for legacy surfaces whose bilingual branches are
+ * structured values rather than plain strings. This keeps old call sites working while
+ * routing every translated string leaf through the current i18n runtime.
+ */
+export function useBilingualLocalizer(scope: string): BilingualLocalizer {
+  useBilingualI18nRevision();
+  return useCallback(
+    ((ko: unknown, en: unknown) =>
+      translateBilingualValueForActiveLocale(scope, ko, en)) as BilingualLocalizer,
+    [scope],
+  );
+}
+
 function translateParallelNode(
   t: TranslationResolver,
   scope: string,
