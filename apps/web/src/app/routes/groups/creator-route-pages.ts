@@ -65,6 +65,12 @@ export const StudioHomePage = lazyRetry(
   })),
   "StudioProjectLibraryPage",
 );
+export const StudioCreatorSupportPage = lazyRetry(
+  () => import("@/domains/creator/studio-shell/StudioCreatorSupportPage").then((module) => ({
+    default: module.StudioCreatorSupportPage,
+  })),
+  "StudioCreatorSupportPage",
+);
 export const StudioNewPage = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioNewIntegratedPage").then((module) => ({
     default: module.StudioNewIntegratedPage,
@@ -137,6 +143,18 @@ export const CreatorEcosystemPage = lazyRetry(
     default: module.CreatorEcosystemPage,
   })),
   "CreatorEcosystemPage",
+);
+export const CreatorEnvironmentGuidePage = lazyRetry(
+  () => import("@/domains/creator/growth-ip/CreatorEnvironmentGuidePage").then((module) => ({
+    default: module.CreatorEnvironmentGuidePage,
+  })),
+  "CreatorEnvironmentGuidePage",
+);
+export const CreatorGrowthIpPage = lazyRetry(
+  () => import("@/domains/creator/growth-ip/CreatorGrowthIpPage").then((module) => ({
+    default: module.CreatorGrowthIpPage,
+  })),
+  "CreatorGrowthIpPage",
 );
 export const CreatorEcosystemViewerPage = lazyRetry(
   () => import("@/domains/creator/ecosystem/CreatorEcosystemViewerPage").then((module) => ({

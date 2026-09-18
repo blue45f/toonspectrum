@@ -1,85 +1,33 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { lazy, Suspense } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 
-import { StudioCompatibilityReportsPanel } from "../project-graph/StudioCompatibilityReportsPanel";
-import { StudioProjectGraphContextBar } from "../project-graph/StudioProjectGraphContextBar";
-import { StudioProjectVersionStackPanel } from "../project-graph/StudioProjectVersionStackPanel";
 import {
   resolveStudioProjectView,
   studioProjectDefaultView,
 } from "../studio-project-views";
+import { StudioAudiencePolicyPanel } from "./StudioAudiencePolicyPanel";
 import { StudioExportPanel } from "./StudioExportPanel";
+import { StudioIpOpportunityPanel } from "./StudioIpOpportunityPanel";
 import { StudioLocalizationPanel } from "./StudioLocalizationPanel";
 import { StudioProjectAssistantPanel } from "./StudioProjectAssistantPanel";
+import { StudioProjectMediaGuide } from "./StudioProjectMediaGuide";
 import { StudioProjectDeliveryPanel } from "./StudioProjectDeliveryPanel";
 import { StudioProjectDocumentsPanel } from "./StudioProjectDocumentsPanel";
 import { StudioProductionCocreatorBridgePanel } from "./StudioProductionCocreatorBridgePanel";
+import { StudioStaffingSourcingPanel } from "./StudioStaffingSourcingPanel";
 import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
-import { StudioWebtoonProductionCompanion } from "./StudioWebtoonProductionCompanion";
 import {
   StudioProjectShellPage,
   type StudioProjectSection,
 } from "./StudioProjectShellPage";
 
-type Locale = string;
-
-const WEBTOON_ONBOARDING_PROFILE_PREFIX = "toonstudio:webtoon-onboarding:v1:";
-const LazyStudioWebtoonOnboardingPanel = lazy(async () => {
-  const module = await import("./StudioWebtoonOnboardingPanel");
-  return { default: module.StudioWebtoonOnboardingPanel };
-});
-
-function hasStoredWebtoonOnboarding(projectId: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(`${WEBTOON_ONBOARDING_PROFILE_PREFIX}${projectId}`) !== null;
-  } catch {
-    return false;
-  }
-}
-
-function StudioWebtoonOnboardingPanelSlot({
-  projectId,
-  locale,
-}: {
-  readonly projectId: string;
-  readonly locale: string;
-}) {
-  const l = useBilingualLocalizer("studioProjectIntegrated.onboarding");
-  const [enabled, setEnabled] = useState(() => hasStoredWebtoonOnboarding(projectId));
-
-  useEffect(() => {
-    setEnabled(hasStoredWebtoonOnboarding(projectId));
-  }, [projectId]);
-
-  if (!enabled) return null;
-
-  return (
-    <Suspense
-      fallback={(
-        <div
-          className="min-h-28 animate-pulse rounded-3xl border border-accent/20 bg-accent-soft/15"
-          aria-busy="true"
-          aria-label={bt("제작 온보딩 불러오는 중", "Loading production onboarding")}
-        />
-      )}
-    >
-      <LazyStudioWebtoonOnboardingPanel projectId={projectId} locale={locale} />
-    </Suspense>
-  );
-}
 
 const StudioCreatorIntelligencePanel = lazy(async () => {
   const module = await import("../creator-intelligence/StudioCreatorIntelligencePanel");
@@ -101,8 +49,8 @@ const StudioProjectVersionStackPanel = lazy(async () => {
   return { default: module.StudioProjectVersionStackPanel };
 });
 
-function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
-  const l = useBilingualLocalizer("studioProjectIntegrated.graphFallback");
+function ProjectGraphPanelFallback({ locale: _locale }: { readonly locale: "ko" | "en" }) {
+  const bt = useBilingual("studioProjectIntegrated.graphFallback");
   return (
     <div
       className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
@@ -112,7 +60,7 @@ function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
   );
 }
 
-function localeFromLanguage(language: string) {
+function localeFromLanguage(language: string): "ko" | "en" {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
@@ -133,7 +81,7 @@ function SectionWorkflow({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
 }) {
   useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
@@ -153,6 +101,9 @@ function SectionWorkflow({
       ) : null}
       {section === "production" ? (
         <StudioProductionCocreatorBridgePanel projectId={projectId} locale={locale} />
+      ) : null}
+      {section === "production" && (view === "board" || view === "workload") ? (
+        <StudioStaffingSourcingPanel projectId={projectId} />
       ) : null}
       {section === "production" && view === "documents" ? (
         <StudioProjectDocumentsPanel projectId={projectId} locale={locale} />
@@ -179,6 +130,12 @@ function SectionWorkflow({
         || (section === "export" && view === "preflight") ? (
           <StudioCompatibilityReportsPanel projectId={projectId} locale={locale} />
         ) : null}
+      {(section === "settings" && view === "general") || (section === "export" && view === "preflight") ? (
+        <StudioAudiencePolicyPanel projectId={projectId} />
+      ) : null}
+      {section === "export" && (view === "targets" || view === "packages") ? (
+        <StudioIpOpportunityPanel projectId={projectId} />
+      ) : null}
       {section === "export" ? (
         <StudioExportPanel projectId={projectId} locale={locale} />
       ) : null}
@@ -204,7 +161,6 @@ export function StudioProjectIntegratedPage({
 }: {
   readonly section: StudioProjectSection;
 }) {
-  const bt = useBilingual("StudioProjectIntegratedPage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);
@@ -224,6 +180,7 @@ export function StudioProjectIntegratedPage({
       {decodedProjectId ? (
         <Container size="wide" className="-mt-3 space-y-5 pb-10 sm:-mt-5 sm:pb-14">
           <StudioProjectGraphContextBar projectId={decodedProjectId} locale={locale} />
+          <StudioProjectMediaGuide section={section} />
           <SectionWorkflow
             projectId={decodedProjectId}
             section={section}

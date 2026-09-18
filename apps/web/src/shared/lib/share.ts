@@ -5,6 +5,9 @@ export type ShareChannel =
   | "line"
   | "x"
   | "facebook"
+  | "linkedin"
+  | "instagram"
+  | "tiktok"
   | "telegram"
   | "email"
   | "copy"
@@ -88,7 +91,7 @@ export function shareText(payload: SharePayload): string {
 
 export type LinkShareChannel = Exclude<
   ShareChannel,
-  "native" | "kakao" | "copy" | "qr"
+  "native" | "kakao" | "instagram" | "tiktok" | "copy" | "qr"
 >;
 
 export function shareTargetUrl(
@@ -108,6 +111,8 @@ export function shareTargetUrl(
       return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     case "facebook":
       return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+    case "linkedin":
+      return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
     case "telegram":
       return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
     case "email": {
@@ -117,11 +122,14 @@ export function shareTargetUrl(
   }
 }
 
-function nativeShareData(payload: SharePayload): ShareData {
+function nativeShareData(
+  payload: SharePayload,
+  channel: ShareChannel = "native",
+): ShareData {
   return {
     title: compact(payload.title, 120),
     text: shareText(payload),
-    url: withShareAttribution(payload.url, "native"),
+    url: withShareAttribution(payload.url, channel),
   };
 }
 
@@ -147,6 +155,16 @@ export async function nativeShare(payload: SharePayload): Promise<void> {
   await navigator.share(nativeShareData(payload));
 }
 
+export async function nativeShareForChannel(
+  channel: "instagram" | "tiktok",
+  payload: SharePayload,
+): Promise<void> {
+  if (!canNativeShare(payload)) {
+    throw new Error("Web Share API is unavailable.");
+  }
+  await navigator.share(nativeShareData(payload, channel));
+}
+
 export function isShareCancellation(error: unknown): boolean {
   return Boolean(
     error
@@ -156,8 +174,11 @@ export function isShareCancellation(error: unknown): boolean {
   );
 }
 
-export async function copyShareLink(payload: SharePayload): Promise<boolean> {
-  const url = withShareAttribution(payload.url, "copy");
+export async function copyShareLink(
+  payload: SharePayload,
+  attributionChannel: ShareChannel = "copy",
+): Promise<boolean> {
+  const url = withShareAttribution(payload.url, attributionChannel);
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(url);

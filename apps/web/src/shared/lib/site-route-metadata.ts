@@ -91,6 +91,7 @@ const BETA_ROUTES = [
   "/studio/bg3d",
   "/studio/character",
   "/studio/ecosystem",
+  "/studio/growth-ip",
   "/studio/poser",
   "/studio/storyworld",
 ] as const;

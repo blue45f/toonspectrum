@@ -12,12 +12,12 @@ function normalizedExperiencePath(pathname: string): string {
 /** Editors and administrative tools never inherit promotional chrome or effects. */
 export function supportsSiteExperience(pathname: string): boolean {
   const path = normalizedExperiencePath(pathname);
-  return !/^\/(?:studio|shaper|brush-lab|music|admin)(?:\/|$)/u.test(path);
+  return !/^\/(?:studio|shaper|brush-lab|music|production|admin)(?:\/|$)/u.test(path);
 }
 
 const STUDIO_ROUTE_GUIDE_PATHS = new Set([
-  "/studio", "/studio/ai-settings", "/studio/assets", "/studio/ecosystem",
-  "/studio/engines", "/studio/immersive", "/studio/import", "/studio/jobs",
+  "/studio", "/studio/ai-settings", "/studio/assets", "/studio/ecosystem", "/studio/growth-ip",
+  "/studio/engines", "/studio/environment", "/studio/immersive", "/studio/import", "/studio/jobs",
   "/studio/manual", "/studio/new", "/studio/templates", "/studio/toolchain",
 ]);
 
