@@ -73,6 +73,20 @@ export function defineBilingualMap<
   return Object.freeze(mapped) as { readonly [K in keyof T]: string };
 }
 
+/** Resolves a keyed { ko, en } map through the active translator in one pass. */
+export function translateBilingualMap<
+  const T extends Readonly<Record<string, BilingualText>>,
+>(
+  t: TranslationResolver,
+  scope: string,
+  entries: T,
+): { readonly [K in keyof T]: string } {
+  const keys = defineBilingualMap(scope, entries);
+  return Object.fromEntries(
+    Object.entries(keys).map(([id, key]) => [id, t(key)]),
+  ) as { readonly [K in keyof T]: string };
+}
+
 /** Small-diff bridge for legacy maps shaped as `{ ko, en }`. */
 export function translateBilingualText(
   t: TranslationResolver,
