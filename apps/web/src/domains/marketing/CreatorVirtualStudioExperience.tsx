@@ -31,10 +31,14 @@ import { useI18n } from "@/shared/lib/i18n";
 import "./creator-virtual-studio.css";
 
 const CHARACTERS = [
-  { src: "/images/characters/ara.jpg", name: "아라" },
-  { src: "/images/characters/danwoo.jpg", name: "단우" },
-  { src: "/images/characters/gaon.jpg", name: "가온" },
-  { src: "/images/characters/leona.jpg", name: "레오나" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/fumi.png", name: "후미" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/mio.png", name: "미오" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/anna.png", name: "안나" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/moon-girl.png", name: "루나" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/megan-the-fox.png", name: "메건" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/teddy.png", name: "테디" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/bot-bunny.png", name: "버니" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png", name: "베리" },
 ] as const;
 
 type VirtualStudioNavItem = {
@@ -145,36 +149,43 @@ const ROOM_PROPS: Readonly<Record<string, readonly VirtualRoomProp[]>> = {
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-design-sofa.png", x: 8, y: 4, width: 44, rotate: -2 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-coffee.png", x: 48, y: 2, width: 27 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small2.png", x: 75, y: 10, width: 20 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-round-floor.png", x: 2, y: 5, width: 16 },
   ],
   writers: [
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png", x: 15, y: 2, width: 46 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-desk.png", x: 52, y: 0, width: 28, flip: true },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png", x: 72, y: 14, width: 23 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-books.png", x: 40, y: 18, width: 15 },
   ],
   storyboard: [
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cabinet-television.png", x: 9, y: 4, width: 43 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-cross.png", x: 49, y: 0, width: 28 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-modern-cushion.png", x: 72, y: 1, width: 22, flip: true },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-square-floor.png", x: 82, y: 13, width: 14 },
   ],
   assets: [
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-bookcase-open.png", x: 5, y: 9, width: 38 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cardboard-box-open.png", x: 47, y: 1, width: 30 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-survival-box-large.png", x: 70, y: 0, width: 27 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-square-table.png", x: 41, y: 16, width: 13 },
   ],
   drawing: [
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk-corner.png", x: 5, y: 0, width: 48 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-computer-screen.png", x: 43, y: 12, width: 27 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lamp-square-floor.png", x: 73, y: 6, width: 22 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-computer-keyboard.png", x: 44, y: 20, width: 17 },
   ],
   review: [
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-television-modern.png", x: 8, y: 12, width: 31 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-lounge-sofa-long.png", x: 34, y: 0, width: 45 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-table-coffee-glass.png", x: 70, y: 0, width: 23 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small3.png", x: 83, y: 12, width: 14 },
   ],
   assistant: [
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-desk.png", x: 7, y: 1, width: 42 },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-chair-rounded.png", x: 47, y: 0, width: 25, flip: true },
     { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-cardboard-box-closed.png", x: 73, y: 1, width: 22 },
+    { src: "/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small1.png", x: 84, y: 11, width: 13 },
   ],
 };
 
@@ -185,32 +196,34 @@ type VirtualSceneCharacter = {
   readonly width: number;
   readonly flip?: boolean;
   readonly status?: "online" | "focused" | "reviewing";
+  readonly labelKo: string;
+  readonly labelEn: string;
 };
 
 const ROOM_CHARACTERS: Readonly<Record<string, readonly VirtualSceneCharacter[]>> = {
   lounge: [
-    { src: "/assets/3d/characters/thumbnails/avatar-a.png", x: 28, y: 3, width: 22, status: "online" },
-    { src: "/assets/3d/characters/thumbnails/avatar-c.png", x: 68, y: 4, width: 20, flip: true, status: "online" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/teddy.png", x: 27, y: 1, width: 22, status: "online", labelKo: "아이디어 토크", labelEn: "Idea chat" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/megan-the-fox.png", x: 69, y: 2, width: 21, flip: true, status: "online", labelKo: "레퍼런스 공유", labelEn: "Sharing refs" },
   ],
   writers: [
-    { src: "/assets/3d/characters/thumbnails/avatar-b.png", x: 57, y: 1, width: 22, status: "focused" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/fumi.png", x: 58, y: 0, width: 23, status: "focused", labelKo: "38화 대본", labelEn: "EP38 script" },
   ],
   storyboard: [
-    { src: "/assets/3d/characters/thumbnails/avatar-c.png", x: 60, y: 0, width: 21, flip: true, status: "reviewing" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/mio.png", x: 61, y: 0, width: 22, flip: true, status: "reviewing", labelKo: "컷 흐름 리뷰", labelEn: "Panel review" },
   ],
   assets: [
-    { src: "/assets/3d/characters/thumbnails/mushroom-fairy.png", x: 62, y: 0, width: 24, status: "online" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/bot-bunny.png", x: 62, y: 0, width: 25, status: "online", labelKo: "배경 탐색", labelEn: "Finding assets" },
   ],
   drawing: [
-    { src: "/assets/3d/characters/thumbnails/avatar-a.png", x: 30, y: 0, width: 23, status: "focused" },
-    { src: "/assets/3d/characters/thumbnails/avatar-b.png", x: 70, y: 0, width: 21, flip: true, status: "online" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/anna.png", x: 29, y: 0, width: 23, status: "focused", labelKo: "선화 작업", labelEn: "Line art" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/moon-girl.png", x: 71, y: 0, width: 22, flip: true, status: "online", labelKo: "채색 합류", labelEn: "Color pass" },
   ],
   review: [
-    { src: "/assets/3d/characters/thumbnails/avatar-c.png", x: 55, y: 0, width: 21, status: "reviewing" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png", x: 55, y: 0, width: 22, status: "reviewing", labelKo: "승인 대기", labelEn: "Awaiting approval" },
   ],
   assistant: [
-    { src: "/assets/3d/characters/thumbnails/mushroom-fairy.png", x: 36, y: 0, width: 24, status: "online" },
-    { src: "/assets/3d/characters/thumbnails/avatar-b.png", x: 72, y: 0, width: 20, flip: true, status: "focused" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png", x: 35, y: 0, width: 24, status: "online", labelKo: "작업 배정", labelEn: "Task routing" },
+    { src: "/assets/3d/characters/thumbnails/refined-v2/blue-pixie.png", x: 72, y: 0, width: 21, flip: true, status: "focused", labelKo: "마감 체크", labelEn: "Deadline check" },
   ],
 };
 
@@ -280,7 +293,7 @@ export function CreatorVirtualStudioExperience() {
           ))}
         </nav>
         <Link href="/showcase" className="vs-sidebar-promo">
-          <img src="/images/characters/ara.jpg" alt="" />
+          <img src="/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png" alt="" />
           <span><strong>{t("함께 만드는", "Create together")}</strong>{t("더 큰 이야기", "Bigger stories")}</span>
           <Heart size={18} fill="currentColor" aria-hidden="true" />
         </Link>
@@ -303,6 +316,12 @@ export function CreatorVirtualStudioExperience() {
         <div className="vs-room-map">
           <div className="vs-ambient vs-ambient--a" aria-hidden="true" />
           <div className="vs-ambient vs-ambient--b" aria-hidden="true" />
+          <div className="vs-world-path" aria-hidden="true">
+            <i className="vs-world-path-line vs-world-path-line--top" />
+            <i className="vs-world-path-line vs-world-path-line--middle" />
+            <i className="vs-world-path-line vs-world-path-line--left" />
+            <i className="vs-world-path-line vs-world-path-line--right" />
+          </div>
           {ROOMS.map(({ id, ko, subKo, en, subEn, href, image, icon: Icon }, index) => (
             <Link
               key={id}
@@ -345,6 +364,7 @@ export function CreatorVirtualStudioExperience() {
                       "--vs-character-delay": `${characterIndex * 110}ms`,
                     } as CSSProperties}
                   >
+                    <span className="vs-scene-character-label">{t(character.labelKo, character.labelEn)}</span>
                     <img src={character.src} alt="" loading="lazy" decoding="async" />
                     <i />
                   </span>
@@ -355,18 +375,18 @@ export function CreatorVirtualStudioExperience() {
               <span className="vs-room-avatar"><CharacterAvatar index={index + 1} small /></span>
             </Link>
           ))}
-          <div className="vs-plaza" aria-label={t("중앙 크리에이터 플라자", "Central creator plaza")}>
+          <Link href="/studio/immersive" className="vs-plaza" aria-label={t("중앙 크리에이터 플라자 열기", "Open the central creator plaza")}>
             <img className="vs-plaza-prop vs-plaza-prop--left" src="/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small1.png" alt="" aria-hidden="true" />
             <img className="vs-plaza-prop vs-plaza-prop--right" src="/assets/studio/cc0-20260906/previews/kenney-furniture-plant-small3.png" alt="" aria-hidden="true" />
             <span className="vs-plaza-crew" aria-hidden="true">
-              <img className="vs-plaza-person vs-plaza-person--a" src="/assets/3d/characters/thumbnails/avatar-a.png" alt="" />
-              <img className="vs-plaza-person vs-plaza-person--b" src="/assets/3d/characters/thumbnails/avatar-b.png" alt="" />
-              <img className="vs-plaza-person vs-plaza-person--c" src="/assets/3d/characters/thumbnails/mushroom-fairy.png" alt="" />
+              <img className="vs-plaza-person vs-plaza-person--a" src="/assets/3d/characters/thumbnails/refined-v2/lady-koi.png" alt="" />
+              <img className="vs-plaza-person vs-plaza-person--b" src="/assets/3d/characters/thumbnails/refined-v2/cute-saurus.png" alt="" />
+              <img className="vs-plaza-person vs-plaza-person--c" src="/assets/3d/characters/thumbnails/refined-v2/mushroom-fairy.png" alt="" />
             </span>
             <span className="vs-plaza-orb"><Sparkles size={25} aria-hidden="true" /></span>
             <strong>ToonSpectrum</strong><small>VIRTUAL STUDIO</small>
-            <span>{t("Together, creators make brighter stories.", "Together, creators make brighter stories.")}</span>
-          </div>
+            <span>{t("라이브 · 이벤트 · 공개 협업 공간", "Live · events · public collaboration")}</span>
+          </Link>
         </div>
       </section>
 
@@ -374,7 +394,7 @@ export function CreatorVirtualStudioExperience() {
         <section className="vs-panel vs-huddle-preview">
           <header><div><strong>{t("Huddle", "Huddle")}</strong><small>{t("P2P 화상 대화 미리보기", "P2P video huddle preview")}</small></div><Video size={16} /></header>
           <div className="vs-video-grid">
-            {CHARACTERS.map((character, index) => (
+            {CHARACTERS.slice(0, 4).map((character, index) => (
               <figure key={character.name}><img src={character.src} alt="" /><figcaption>{index === 0 ? t("작가 A", "Creator A") : index === 1 ? "PD" : index === 2 ? t("어시스트", "Assistant") : t("작가 B", "Creator B")}</figcaption></figure>
             ))}
           </div>
@@ -409,6 +429,18 @@ export function CreatorVirtualStudioExperience() {
             ))}
           </div>
           <Link href="/collaborate" className="vs-panel-action">{t("멤버와 협업 관리", "Manage collaboration")}<ChevronRight size={14} /></Link>
+        </section>
+
+        <section className="vs-panel vs-ai-preview">
+          <header><div><strong>{t("AI 프로듀서", "AI Producer")}</strong><small>{t("창작 흐름을 정리하는 프로젝트 코디네이터", "Project coordinator for the creative flow")}</small></div><Bot size={17} /></header>
+          <div className="vs-ai-brief">
+            <p><span>38</span><strong>{t("화 진행 중", "episode in progress")}</strong><small>{t("리뷰 대기 3컷 · 배경 6컷 작업 중", "3 panels awaiting review · 6 backgrounds in progress")}</small></p>
+            <ul>
+              <li><i>✓</i>{t("회의 결정사항을 작업으로 연결", "Turn meeting decisions into tasks")}</li>
+              <li><i>✓</i>{t("리뷰 병목과 다음 액션 표시", "Surface review bottlenecks and next actions")}</li>
+            </ul>
+          </div>
+          <Link href="/studio/ai-settings" className="vs-panel-action">{t("AI 프로듀서 열기", "Open AI Producer")}<ChevronRight size={14} /></Link>
         </section>
       </aside>
 

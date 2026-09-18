@@ -30,7 +30,6 @@ import {
   useSyncExternalStore,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from "react";
 import { useParams } from "react-router-dom";
 
@@ -61,7 +60,6 @@ import {
   studioVirtualSpaceDestination,
   studioVirtualSpaceInitialPoint,
   studioVirtualSpaceState,
-  type StudioVirtualAvatarProfile,
   type StudioVirtualSpaceActivity,
   type StudioVirtualSpaceFacing,
   type StudioVirtualSpacePoint,
@@ -77,18 +75,21 @@ import "./studio-virtual-space.css";
 
 const MOVE_STEP = 28;
 const VIRTUAL_AVATAR_ART = [
-  "/images/characters/ara.jpg",
-  "/images/characters/danwoo.jpg",
-  "/images/characters/gaon.jpg",
-  "/images/characters/leona.jpg",
+  "/assets/3d/characters/thumbnails/refined-v2/fumi.png",
+  "/assets/3d/characters/thumbnails/refined-v2/mio.png",
+  "/assets/3d/characters/thumbnails/refined-v2/anna.png",
+  "/assets/3d/characters/thumbnails/refined-v2/moon-girl.png",
+  "/assets/3d/characters/thumbnails/refined-v2/megan-the-fox.png",
+  "/assets/3d/characters/thumbnails/refined-v2/teddy.png",
+  "/assets/3d/characters/thumbnails/refined-v2/bot-bunny.png",
+  "/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png",
+  "/assets/3d/characters/thumbnails/refined-v2/lady-koi.png",
+  "/assets/3d/characters/thumbnails/refined-v2/blue-pixie.png",
+  "/assets/3d/characters/thumbnails/refined-v2/cute-saurus.png",
+  "/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png",
 ] as const;
 
-const VIRTUAL_SCENE_AVATAR_ART = [
-  "/assets/3d/characters/thumbnails/avatar-a.png",
-  "/assets/3d/characters/thumbnails/avatar-b.png",
-  "/assets/3d/characters/thumbnails/avatar-c.png",
-  "/assets/3d/characters/thumbnails/mushroom-fairy.png",
-] as const;
+const VIRTUAL_SCENE_AVATAR_ART = VIRTUAL_AVATAR_ART;
 
 function virtualAvatarIndex(identity: string): number {
   let hash = 2166136261;
@@ -221,36 +222,6 @@ function stagePosition(point: StudioVirtualSpacePoint): CSSProperties {
   };
 }
 
-function accessoryNode(profile: StudioVirtualAvatarProfile): ReactNode {
-  const shared = "absolute z-30 drop-shadow-sm";
-  switch (profile.accessory) {
-    case "beret":
-      return <span className={cn(shared, "-top-1 left-2 h-3 w-10 -rotate-6 rounded-[70%_70%_45%_45%]")} style={{ backgroundColor: profile.accent }} />;
-    case "bow":
-      return (
-        <span className={cn(shared, "-right-1 top-1 grid grid-cols-2 gap-0.5")}>
-          <span className="h-3 w-3 -rotate-12 rounded-[70%_30%_70%_30%]" style={{ backgroundColor: profile.accent }} />
-          <span className="h-3 w-3 rotate-12 rounded-[30%_70%_30%_70%]" style={{ backgroundColor: profile.accent }} />
-        </span>
-      );
-    case "cat":
-      return (
-        <>
-          <span className={cn(shared, "-top-1 left-1 h-4 w-4 -rotate-12 rounded-sm")} style={{ backgroundColor: profile.hair }} />
-          <span className={cn(shared, "-top-1 right-1 h-4 w-4 rotate-12 rounded-sm")} style={{ backgroundColor: profile.hair }} />
-        </>
-      );
-    case "headphones":
-      return <span className={cn(shared, "left-0 top-2 h-8 w-full rounded-t-full border-[4px] border-b-0")} style={{ borderColor: profile.accent }} />;
-    case "leaf":
-      return <span className={cn(shared, "-top-2 right-1 h-3 w-6 rotate-[28deg] rounded-[100%_0_100%_0]")} style={{ backgroundColor: "oklch(0.72 0.17 145)" }} />;
-    case "star":
-      return <Sparkles className={cn(shared, "-right-2 -top-2")} size={18} style={{ color: profile.accent }} aria-hidden />;
-    case "none":
-      return null;
-  }
-}
-
 function ChibiAvatar({
   identity,
   name,
@@ -284,7 +255,7 @@ function ChibiAvatar({
         )}
         aria-hidden
       >
-        <img src={art} alt="" className="size-full object-cover" loading="lazy" decoding="async" />
+        <img src={art} alt="" className="size-full bg-[radial-gradient(circle_at_50%_34%,oklch(0.35_0.05_300),oklch(0.18_0.02_260)_72%)] object-contain" loading="lazy" decoding="async" />
         <span className={cn("absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-panel", activityTone)} />
       </span>
     );
@@ -311,7 +282,6 @@ function ChibiAvatar({
           decoding="async"
         />
       </span>
-      {accessoryNode(profile)}
       <span className={cn("absolute bottom-2 right-0 z-30 size-3 rounded-full border-2 border-panel", activityTone)} />
       <span className="absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm backdrop-blur">
         {self ? <Sparkles size={9} className="shrink-0 text-accent" aria-hidden /> : null}
@@ -395,11 +365,11 @@ function ZoneSurface({
   const body = (
     <>
       <span
-        className="absolute inset-0 bg-cover bg-center opacity-45 saturate-[0.88]"
+        className="absolute inset-0 bg-cover bg-center opacity-60 saturate-[1.04]"
         style={{ backgroundImage: `url("${ZONE_ART[zone.id]}")` }}
         aria-hidden
       />
-      <span className="absolute inset-0 bg-gradient-to-t from-panel/95 via-panel/45 to-black/5" aria-hidden />
+      <span className="absolute inset-0 bg-gradient-to-t from-panel/90 via-panel/28 to-white/[0.03]" aria-hidden />
       <span className="studio-vspace-zone-floor" aria-hidden />
       <span className="absolute inset-2 rounded-[1.25rem] border border-white/15 bg-gradient-to-br from-white/10 via-transparent to-black/10" aria-hidden />
       <span className="studio-vspace-zone-props" aria-hidden>
@@ -451,6 +421,7 @@ function ZoneSurface({
         style={style}
         className={className}
         data-space-interactive="true"
+        data-zone={zone.id}
         onClick={onAssistant}
       >
         {body}
@@ -464,13 +435,14 @@ function ZoneSurface({
         style={style}
         className={className}
         data-space-interactive="true"
+        data-zone={zone.id}
       >
         {body}
       </Link>
     );
   }
   return (
-    <div style={style} className={className} data-space-interactive="true">
+    <div style={style} className={className} data-space-interactive="true" data-zone={zone.id}>
       {body}
     </div>
   );
@@ -752,7 +724,7 @@ function VirtualSpaceExperience({
                 role="application"
                 aria-label={bt("가상 스튜디오 공간", "Virtual studio space")}
                 onPointerDown={handleStagePointer}
-                className="relative aspect-[59/36] min-h-[34rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_50%_44%,oklch(0.78_0.13_300/0.16),transparent_17%),linear-gradient(145deg,var(--color-panel),var(--color-card))] shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                className="studio-vspace-stage relative aspect-[59/36] min-h-[34rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 data-studio-virtual-space="true"
               >
                 <div aria-hidden className="absolute inset-0 opacity-40 [background-image:linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] [background-size:40px_40px] text-line" />
@@ -768,10 +740,12 @@ function VirtualSpaceExperience({
 
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute left-1/2 top-[45%] z-[3] size-24 -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/30 bg-panel/80 shadow-[0_0_45px_oklch(0.7_0.18_300/0.2)]"
+                  className="studio-vspace-plaza pointer-events-none absolute left-1/2 top-[45%] z-[3] size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/30 bg-panel/80 shadow-[0_0_45px_oklch(0.7_0.18_300/0.2)]"
                 >
-                  <div className="absolute inset-3 grid place-items-center rounded-full bg-accent-soft text-accent">
-                    <Sparkles size={28} />
+                  <span className="studio-vspace-plaza-ring" />
+                  <img src="/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png" alt="" className="studio-vspace-plaza-mascot" />
+                  <div className="absolute inset-[1.05rem] grid place-items-center rounded-full bg-accent-soft text-accent">
+                    <Sparkles size={26} />
                   </div>
                 </div>
 
