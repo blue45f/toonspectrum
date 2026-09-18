@@ -3,6 +3,8 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   Boxes,
@@ -23,19 +25,35 @@ import {
   Users,
   WandSparkles,
   type LucideIcon,
-  } from "lucide-react"; import { useMemo } from "react"; import { Navigate,
-  useLocation,
-  useParams } from "react-router-dom"; import { useBilingual,
-  useDocumentTitle } from "@/hooks/use-document-title"; import { Container } from "@/shared/components/section"; import { buttonClass } from "@/shared/components/ui/button-utils"; import { useI18n } from "@/shared/lib/i18n"; import { useBilingualLocalizer,
-  type BilingualText,
-  cn } from "@/shared/lib/utils"; import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia"; import { STUDIO_PROJECT_SECTION_VIEWS,
+} from "lucide-react";
+import { useMemo } from "react";
+import { Navigate, useLocation, useParams } from "react-router-dom";
+
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import Link from "@/compat/router-link";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import { cn } from "@/shared/lib/utils";
+
+import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia";
+import {
+  STUDIO_PROJECT_SECTION_VIEWS,
   resolveStudioProjectView,
   studioProjectDefaultView,
   type StudioProjectSection as StudioProjectSectionId,
-  } from "../studio-project-views"; import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations"; import { StudioCompetitorCapabilityPanel } from "./StudioCompetitorCapabilityPanel"; import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge"; import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel"; import { translateBilingualValueForActiveLocale,
+} from "../studio-project-views";
+import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
+import { StudioCompetitorCapabilityPanel } from "./StudioCompetitorCapabilityPanel";
+import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
+import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
+import {
+  translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import Link from "@/compat/router-link";
+
 export type StudioProjectSection = StudioProjectSectionId;
 
 type Locale = string;
