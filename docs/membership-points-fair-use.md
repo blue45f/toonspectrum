@@ -6,8 +6,9 @@
 
 서비스 재화는 목적에 따라 **Reward Point**와 **Studio Credit**으로 분리한다.
 Reward Point는 작품·커뮤니티·운세·놀이터 등 정상 활동에 대한 보상이며 현금이나 출금 가능한 잔액이 아니다.
-Studio Credit은 AI 생성·서버 렌더처럼 변동원가가 큰 작업의 사용량을 통제하는 소모성 재화다.
-멤버십은 현재 결제 상품이 아니라 저장공간·업로드·협업·보관 정책과 월 Studio Credit을 묶는 **권한 등급**이다.
+Studio Credit은 ToonSpectrum이 비용을 부담하는 AI 생성·서버 렌더처럼 변동원가가 큰 작업의 사용량을 통제하는 소모성 재화다.
+현재 운영되는 개인 API 키, 개인/관리형 Creator Runtime 직접 연결, 브라우저 로컬 처리에는 Studio Credit을 차감하지 않는다.
+멤버십은 현재 결제 상품이 아니라 저장공간·업로드·협업·보관 정책과 월 Studio Credit 예산을 묶는 **권한 등급**이다.
 
 `creditPurchasesEnabled=false`이므로 현재 Studio Credit을 직접 판매하지 않는다.
 멤버십 포함 Credit은 매월 지급되고 이월되지 않으며, 플랜 승급 시 해당 월 목표량까지 차액만 보충한다.
