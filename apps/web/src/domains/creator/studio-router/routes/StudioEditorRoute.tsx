@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useMemo } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -94,7 +95,7 @@ export function StudioEditorRoute({ resolution }: {
         <StudioOfflinePanelBoundary>
           <Suspense fallback={null}><StudioOfflinePanel /></Suspense>
         </StudioOfflinePanelBoundary>
-        <Suspense fallback={<StudioRouteLoading label="Studio 편집기를 여는 중..." />}>
+        <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioEditorRoute", "ko", "Studio 편집기를 여는 중...")} />}>
           <LegacyStudioEditorAdapter
             remixId={route.remixSourceWorkId}
             studioRoute={route}

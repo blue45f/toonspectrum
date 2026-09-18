@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * NotifyDesk 네이티브 통합 — 인앱 알림 벨/인박스.
  * ──────────────────────────────────────────────────────────────────────────
@@ -152,7 +156,7 @@ export function NativeNotify() {
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={unread > 0 ? `알림 ${unread}건` : "알림"}
+        aria-label={unread > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("components.deskcloud.native.NativeNotify", "ko", "알림 {v0}건"), { v0: String(unread) }) : translateCurrentStaticSourceText("components.deskcloud.native.NativeNotify", "ko", "알림")}
         onClick={open ? closePanel : openPanel}
         className="relative inline-flex size-10 items-center justify-center rounded-full border border-line bg-card/95 text-fg-2 shadow-lg backdrop-blur transition-[color,border-color,transform] duration-150 ease-out-expo hover:-translate-y-0.5 hover:border-accent/60 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas motion-reduce:transition-none motion-reduce:hover:translate-y-0"
       >
@@ -174,8 +178,7 @@ export function NativeNotify() {
         >
           <header className="flex items-center gap-2 border-b border-line px-4 py-3">
             <h2 id={titleId} className="flex-1 text-sm font-bold tracking-tight text-fg">
-              알림
-            </h2>
+              {translateCurrentStaticSourceText("components.deskcloud.native.NativeNotify", "ko", "알림")}</h2>
             {unread > 0 && (
               <button
                 type="button"
@@ -183,12 +186,11 @@ export function NativeNotify() {
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80"
               >
                 <Check size={13} aria-hidden="true" />
-                모두 읽음
-              </button>
+                {translateCurrentStaticSourceText("components.deskcloud.native.NativeNotify", "ko", "모두 읽음")}</button>
             )}
             <button
               type="button"
-              aria-label="닫기"
+              aria-label={translateCurrentStaticSourceText("components.deskcloud.native.NativeNotify", "ko", "닫기")}
               onClick={closePanel}
               className="flex size-7 shrink-0 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80"
             >
@@ -246,7 +248,7 @@ export function NativeNotify() {
                         {n.body && <p className="mt-0.5 text-pretty text-sm leading-relaxed text-fg-2">{n.body}</p>}
                         <time className="mt-1 block text-xs text-fg-3" dateTime={n.createdAt}>
                           {relativeTime(n.createdAt)}
-                          {isUnread && <span className="sr-only"> · 읽지 않음</span>}
+                          {isUnread && <span className="sr-only"> {translateCurrentStaticSourceText("components.deskcloud.native.NativeNotify", "ko", "· 읽지 않음")}</span>}
                         </time>
                       </div>
                     </li>

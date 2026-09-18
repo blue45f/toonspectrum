@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   Download,
@@ -132,11 +136,11 @@ function IssueRow({
       <Icon
         size={16}
         aria-hidden
-        className={issue.severity === "warning" ? "text-warning" : issue.severity === "info" ? "text-fg-2" : "text-bad"}
+        className={issue.severity === "warning" ? translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "en", "text-warning") : issue.severity === "info" ? translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "en", "text-fg-2") : translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "en", "text-bad")}
       />
       <span className="min-w-0 flex-1 text-left">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded-full border px-2 py-0.5 text-[0.64rem] font-bold ${meta.badgeClassName}`}>
+          <span className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "en", "rounded-full border px-2 py-0.5 text-[0.64rem] font-bold {v0}"), { v0: String(meta.badgeClassName) })}>
             {meta.label}
           </span>
           <span className="rounded-full border border-line bg-panel px-2 py-0.5 text-[0.64rem] font-semibold text-fg-2">
@@ -155,14 +159,14 @@ function IssueRow({
   );
 
   if (!onSelect || (!issue.pageId && !issue.elementId)) {
-    return <li className={`flex items-start gap-2.5 px-3 py-3 ${meta.className}`}>{content}</li>;
+    return <li className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "en", "flex items-start gap-2.5 px-3 py-3 {v0}"), { v0: String(meta.className) })}>{content}</li>;
   }
   return (
     <li className={meta.className}>
       <button
         type="button"
         onClick={() => onSelect(issue)}
-        aria-label={`${issue.title}, ${locationText(issue)}로 이동`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "{v0}, {v1}로 이동"), { v0: String(issue.title), v1: String(locationText(issue)) })}
         className="flex w-full items-start gap-2.5 px-3 py-3 transition-colors hover:bg-raised/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/65"
       >
         {content}
@@ -212,16 +216,14 @@ export function StudioFinishQualityView({
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 id="studio-finish-quality-title" className="text-sm font-bold text-fg">
-            마감 품질 검사
-          </h3>
+            {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "마감 품질 검사")}</h3>
           <p className="mt-0.5 text-[0.72rem] leading-relaxed text-fg-2">
-            원고 구조·대사·말풍선·레이어·이미지·획·애니메이션·승인·댓글을 현재 문서에서 결정적으로 검사합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "원고 구조·대사·말풍선·레이어·이미지·획·애니메이션·승인·댓글을 현재 문서에서 결정적으로 검사합니다.")}</p>
         </div>
         <div className="flex items-center gap-2">
           <span
             className="grid min-w-16 place-items-center rounded-xl border border-line bg-panel px-3 py-2"
-            aria-label={`마감 품질 점수 ${result.score}점`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "마감 품질 점수 {v0}점"), { v0: String(result.score) })}
           >
             <strong className="text-lg font-black tabular-nums text-fg">{result.score}</strong>
             <span className="text-[0.6rem] font-semibold text-fg-3">/ 100</span>
@@ -230,16 +232,15 @@ export function StudioFinishQualityView({
             <button
               type="button"
               onClick={onDownloadReport}
-              aria-label="마감 품질 검사 JSON 보고서 다운로드"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "마감 품질 검사 JSON 보고서 다운로드")}
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/65"
             >
-              <Download size={14} aria-hidden /> 보고서
-            </button>
+              <Download size={14} aria-hidden /> {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "보고서")}</button>
           ) : null}
         </div>
       </div>
 
-      <div className={`mt-3 flex items-start gap-2.5 rounded-xl border p-3 ${status.className}`} role="status">
+      <div className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "en", "mt-3 flex items-start gap-2.5 rounded-xl border p-3 {v0}"), { v0: String(status.className) })} role="status">
         <StatusIcon size={17} aria-hidden className="mt-0.5 shrink-0" />
         <div className="min-w-0">
           <p className="text-xs font-bold text-fg">{status.title}</p>
@@ -247,7 +248,7 @@ export function StudioFinishQualityView({
         </div>
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="마감 품질 검사 개수">
+      <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label={translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "마감 품질 검사 개수")}>
         {STUDIO_FINISH_QUALITY_SEVERITIES.map((value) => {
           const meta = SEVERITY_META[value];
           return (
@@ -261,7 +262,7 @@ export function StudioFinishQualityView({
 
       <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_10rem]">
         <label className="relative block">
-          <span className="sr-only">검사 결과 검색</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "검사 결과 검색")}</span>
           <Search
             size={14}
             aria-hidden
@@ -270,18 +271,18 @@ export function StudioFinishQualityView({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="문제·코드·페이지 검색"
+            placeholder={translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "문제·코드·페이지 검색")}
             className="min-h-10 w-full rounded-xl border border-line bg-panel pl-9 pr-3 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent"
           />
         </label>
         <label>
-          <span className="sr-only">심각도 필터</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "심각도 필터")}</span>
           <select
             value={severity}
             onChange={(event) => setSeverity(event.target.value as SeverityFilter)}
             className="min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-xs text-fg outline-none focus:border-accent"
           >
-            <option value="all">모든 심각도</option>
+            <option value="all">{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "모든 심각도")}</option>
             {STUDIO_FINISH_QUALITY_SEVERITIES.map((value) => (
               <option key={value} value={value}>
                 {SEVERITY_META[value].label} {result.counts[value]}
@@ -290,13 +291,13 @@ export function StudioFinishQualityView({
           </select>
         </label>
         <label>
-          <span className="sr-only">검사 영역 필터</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "검사 영역 필터")}</span>
           <select
             value={category}
             onChange={(event) => setCategory(event.target.value as CategoryFilter)}
             className="min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-xs text-fg outline-none focus:border-accent"
           >
-            <option value="all">모든 검사 영역</option>
+            <option value="all">{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "모든 검사 영역")}</option>
             {STUDIO_FINISH_QUALITY_CATEGORIES.map((value) => (
               <option key={value} value={value}>
                 {CATEGORY_LABELS[value]}
@@ -307,21 +308,20 @@ export function StudioFinishQualityView({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.66rem] text-fg-3">
-        <span>페이지 {result.checkedPageCount}</span>
-        <span>요소 {result.checkedElementCount}</span>
-        <span>대사 {result.checkedDialogueCount}</span>
-        <span>이미지 {result.checkedImageCount}</span>
-        <span>획 {result.checkedStrokeCount}</span>
-        <span>열린 댓글 {result.openCommentCount}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "페이지 ")}{result.checkedPageCount}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "요소 ")}{result.checkedElementCount}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "대사 ")}{result.checkedDialogueCount}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "이미지 ")}{result.checkedImageCount}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "획 ")}{result.checkedStrokeCount}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "열린 댓글 ")}{result.openCommentCount}</span>
         <span className="ml-auto font-semibold text-fg-2">
-          표시 {filteredIssues.length} / 전체 {result.counts.total}
+          {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "표시 ")}{filteredIssues.length} {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "/ 전체 ")}{result.counts.total}
         </span>
       </div>
 
       {result.truncated ? (
         <p className="mt-3 rounded-lg border border-warning/35 bg-warning-soft/15 px-3 py-2 text-[0.7rem] leading-relaxed text-warning">
-          문제 수가 안전 상한을 넘어 일부 결과만 표시합니다. 심각한 구조 문제부터 줄인 뒤 다시 검사하세요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "문제 수가 안전 상한을 넘어 일부 결과만 표시합니다. 심각한 구조 문제부터 줄인 뒤 다시 검사하세요.")}</p>
       ) : null}
 
       {filteredIssues.length === 0 ? (
@@ -329,7 +329,7 @@ export function StudioFinishQualityView({
           <div>
             <CheckCircle2 size={22} aria-hidden className="mx-auto text-good" />
             <p className="mt-2 text-xs font-bold text-fg">
-              {result.issues.length === 0 ? "자동 검사에서 문제를 찾지 못했습니다" : "현재 필터에 맞는 문제가 없습니다"}
+              {result.issues.length === 0 ? translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "자동 검사에서 문제를 찾지 못했습니다") : translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "현재 필터에 맞는 문제가 없습니다")}
             </p>
           </div>
         </div>
@@ -342,8 +342,7 @@ export function StudioFinishQualityView({
       )}
 
       <p className="mt-3 text-[0.66rem] leading-relaxed text-fg-3">
-        자동 검사는 확정 가능한 구조와 기계적 위험만 판단합니다. 연출·표현·문맥과 플랫폼 최신 정책은 작가와 검수자가 최종 결정합니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioFinishQualityView", "ko", "자동 검사는 확정 가능한 구조와 기계적 위험만 판단합니다. 연출·표현·문맥과 플랫폼 최신 정책은 작가와 검수자가 최종 결정합니다.")}</p>
     </section>
   );
 }

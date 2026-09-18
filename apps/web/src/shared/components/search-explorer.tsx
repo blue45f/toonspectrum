@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Search,
   SlidersHorizontal,
   X,
@@ -629,7 +633,7 @@ export function SearchExplorer({
                   : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
               )}
             >
-              <Bookmark size={14} className={savedOnly ? "fill-current" : ""} />
+              <Bookmark size={14} className={savedOnly ? translateCurrentStaticSourceText("shared.components.search.explorer", "en", "fill-current") : ""} />
               {t("search.explorer.savedOnly")}
             </button>
 
@@ -813,7 +817,7 @@ export function SearchExplorer({
           <div className="lg:hidden">
             <button
               type="button"
-              aria-label="필터 닫기"
+              aria-label={translateCurrentStaticSourceText("shared.components.search.explorer", "ko", "필터 닫기")}
               className="fixed inset-0 z-[70] bg-canvas/75 backdrop-blur-sm"
               onClick={() => setShowFilters(false)}
             />
@@ -836,8 +840,8 @@ export function SearchExplorer({
                   </h2>
                   <p className="mt-0.5 text-xs text-fg-3">
                     {activeCount > 0
-                      ? `${activeCount}개 조건 적용 중`
-                      : "원하는 조건을 골라 결과를 좁히세요."}
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.search.explorer", "ko", "{v0}개 조건 적용 중"), { v0: String(activeCount) })
+                      : translateCurrentStaticSourceText("shared.components.search.explorer", "ko", "원하는 조건을 골라 결과를 좁히세요.")}
                   </p>
                 </div>
                 {activeCount > 0 ? (
@@ -868,8 +872,8 @@ export function SearchExplorer({
                   className="min-h-12 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent"
                 >
                   {search.total > 0
-                    ? `${compactNumber(search.total)}개 결과 보기`
-                    : "결과 보기"}
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.search.explorer", "ko", "{v0}개 결과 보기"), { v0: String(compactNumber(search.total)) })
+                    : translateCurrentStaticSourceText("shared.components.search.explorer", "ko", "결과 보기")}
                 </button>
               </footer>
             </section>

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { StudioRouteLoading } from "../../StudioLazySurfaceFallback";
@@ -19,7 +20,7 @@ type StudioStoryworldRouteProps = {
 /** The router owns document identity; this leaf owns the asynchronous page boundary. */
 export function StudioStoryworldRoute(props: StudioStoryworldRouteProps) {
   return (
-    <Suspense fallback={<StudioRouteLoading label="스토리월드 인과관계 랩을 여는 중..." />}>
+    <Suspense fallback={<StudioRouteLoading label={translateCurrentStaticSourceText("domains.creator.studio.router.routes.StudioStoryworldRoute", "ko", "스토리월드 인과관계 랩을 여는 중...")} />}>
       <StudioStoryworldLabPage {...props} />
     </Suspense>
   );

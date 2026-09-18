@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   Gauge,
@@ -81,13 +85,13 @@ function ComparisonTray({
   if (entries.length === 0) return null;
   return (
     <section
-      aria-label="에셋 비교함"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "에셋 비교함")}
       className="rounded-xl border border-line bg-card p-2.5"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="inline-flex items-center gap-1.5 text-xs font-black text-fg">
           <GitCompareArrows size={14} className="text-accent" aria-hidden />
-          비교함 {entries.length}/3
+          {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "비교함 ")}{entries.length}/3
         </p>
         <button
           type="button"
@@ -97,8 +101,7 @@ function ComparisonTray({
             FOCUS,
           )}
         >
-          모두 비우기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "모두 비우기")}</button>
       </div>
       <div className="mt-2 grid gap-1.5 sm:grid-cols-3">
         {entries.map((entry) => {
@@ -126,7 +129,7 @@ function ComparisonTray({
                 <button
                   type="button"
                   onClick={() => onRemove(entry.id)}
-                  aria-label={`${entry.title} 비교 제거`}
+                  aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "{v0} 비교 제거"), { v0: String(entry.title) })}
                   className={cn(
                     "grid size-10 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-bad pointer-coarse:size-11",
                     FOCUS,
@@ -137,15 +140,15 @@ function ComparisonTray({
               </div>
               <dl className="mt-1.5 space-y-1 text-[0.54rem] text-fg-3">
                 <div className="flex justify-between gap-2">
-                  <dt>형식</dt>
+                  <dt>{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "형식")}</dt>
                   <dd className="font-semibold text-fg-2">{plan.formatLabel}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt>편집</dt>
+                  <dt>{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "편집")}</dt>
                   <dd className="font-semibold text-fg-2">{plan.editabilityLabel}</dd>
                 </div>
                 <div className="flex justify-between gap-2">
-                  <dt>성능</dt>
+                  <dt>{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "성능")}</dt>
                   <dd className="font-semibold text-fg-2">{plan.performanceLabel}</dd>
                 </div>
               </dl>
@@ -204,7 +207,7 @@ export function StudioAssetDecisionPanel({
 
       {selected && plan ? (
         <section
-          aria-label={`${selected.title} 적용 전 검토`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "{v0} 적용 전 검토"), { v0: String(selected.title) })}
           data-studio-asset-decision={selected.id}
           className="overflow-hidden rounded-xl border border-accent/35 bg-card shadow-sm"
         >
@@ -214,8 +217,7 @@ export function StudioAssetDecisionPanel({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[0.58rem] font-bold uppercase tracking-wide text-accent">
-                적용 전 검토
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "적용 전 검토")}</p>
               <h3 className="mt-0.5 line-clamp-2 text-sm font-black text-fg">
                 {selected.title}
               </h3>
@@ -226,7 +228,7 @@ export function StudioAssetDecisionPanel({
             <button
               type="button"
               onClick={onClose}
-              aria-label="적용 전 검토 닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "적용 전 검토 닫기")}
               className={cn(
                 "grid size-11 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg",
                 FOCUS,
@@ -239,15 +241,15 @@ export function StudioAssetDecisionPanel({
           <div className="space-y-3 p-3">
             <dl className="grid grid-cols-2 gap-1.5 text-[0.58rem]">
               <div className="rounded-lg border border-line bg-panel p-2">
-                <dt className="text-fg-3">형식</dt>
+                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "형식")}</dt>
                 <dd className="mt-0.5 font-bold text-fg">{plan.formatLabel}</dd>
               </div>
               <div className="rounded-lg border border-line bg-panel p-2">
-                <dt className="text-fg-3">편집 가능성</dt>
+                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "편집 가능성")}</dt>
                 <dd className="mt-0.5 font-bold text-fg">{plan.editabilityLabel}</dd>
               </div>
               <div className="rounded-lg border border-line bg-panel p-2">
-                <dt className="text-fg-3">권리 상태</dt>
+                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "권리 상태")}</dt>
                 <dd className={cn(
                   "mt-0.5 font-bold",
                   plan.rights === "review" ? "text-warn" : "text-fg",
@@ -256,7 +258,7 @@ export function StudioAssetDecisionPanel({
                 </dd>
               </div>
               <div className="rounded-lg border border-line bg-panel p-2">
-                <dt className="text-fg-3">예상 부하</dt>
+                <dt className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "예상 부하")}</dt>
                 <dd className="mt-0.5 font-bold text-fg">{plan.performanceLabel}</dd>
               </div>
             </dl>
@@ -264,8 +266,7 @@ export function StudioAssetDecisionPanel({
             <div className="rounded-lg border border-line bg-panel p-2.5">
               <p className="inline-flex items-center gap-1 text-[0.62rem] font-black text-fg">
                 <CheckCircle2 size={13} className="text-good" aria-hidden />
-                예상 작업
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "예상 작업")}</p>
               <ol className="mt-1.5 space-y-1 pl-4 text-[0.58rem] leading-relaxed text-fg-3">
                 {plan.steps.map((step) => (
                   <li key={step} className="list-decimal">{step}</li>
@@ -280,19 +281,17 @@ export function StudioAssetDecisionPanel({
               </p>
               <p className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line bg-panel px-2 text-fg-2">
                 <Gauge size={13} className="text-accent" aria-hidden />
-                {plan.placementLabel} 배치
-              </p>
+                {plan.placementLabel} {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "배치")}</p>
             </div>
 
             {plan.warnings.length > 0 ? (
               <div
-                role={plan.requiresExplicitConfirmation ? "alert" : "status"}
+                role={plan.requiresExplicitConfirmation ? translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "en", "status")}
                 className="rounded-lg border border-warn/35 bg-warn/10 p-2.5"
               >
                 <p className="inline-flex items-center gap-1 text-[0.62rem] font-black text-warn">
                   <AlertTriangle size={13} aria-hidden />
-                  적용 전 확인
-                </p>
+                  {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "적용 전 확인")}</p>
                 <ul className="mt-1.5 space-y-1 text-[0.58rem] leading-relaxed text-fg-2">
                   {plan.warnings.map((warning) => (
                     <li key={warning}>• {warning}</li>
@@ -313,8 +312,7 @@ export function StudioAssetDecisionPanel({
                   }
                   className="size-4 accent-[var(--accent)]"
                 />
-                라이선스와 원본 출처를 확인했습니다.
-              </label>
+                {translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "라이선스와 원본 출처를 확인했습니다.")}</label>
             ) : null}
 
             <div className="grid gap-1.5 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
@@ -329,7 +327,7 @@ export function StudioAssetDecisionPanel({
                 )}
               >
                 <GitCompareArrows size={14} aria-hidden />
-                {compared ? "비교함에서 제거" : "비교함에 추가"}
+                {compared ? translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "비교함에서 제거") : translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "비교함에 추가")}
               </button>
               <button
                 type="button"
@@ -338,14 +336,14 @@ export function StudioAssetDecisionPanel({
                   || (plan.requiresExplicitConfirmation && !rightsAcknowledged)
                 }
                 onClick={() => onConfirm(selected)}
-                aria-label={`${selected.title} ${selected.useLabel} 확정`}
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "{v0} {v1} 확정"), { v0: String(selected.title), v1: String(selected.useLabel) })}
                 className={cn(
                   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-[0.66rem] font-black text-on-accent hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45",
                   FOCUS,
                 )}
               >
                 <Layers3 size={14} aria-hidden />
-                {pending ? "처리 중…" : `현재 설정으로 ${selected.useLabel}`}
+                {pending ? translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "처리 중…") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioAssetDecisionPanel", "ko", "현재 설정으로 {v0}"), { v0: String(selected.useLabel) })}
               </button>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { PenLine, Search } from "lucide-react";
 import { useState } from "react";
 
@@ -91,7 +92,7 @@ export function AuthorsPage() {
           {filtered.map((a) => (
             <Link
               key={a.name}
-              href={`/author/${encodeURIComponent(a.name)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.AuthorsPage", "en", "/author/{v0}"), { v0: String(encodeURIComponent(a.name)) })}
               className="group flex items-center gap-3.5 rounded-xl border border-line bg-card/40 p-3 transition-colors hover:border-line-strong hover:bg-raised"
             >
               <div

@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Compass, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
@@ -6,8 +9,15 @@ import {
   catalogDiscoveryHref,
   type CatalogDiscoveryMode,
 } from "@/shared/lib/catalog-discovery-state";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("discovery-workspace-nav", ko, en);
 
 interface DiscoveryDestination {
   readonly id: CatalogDiscoveryMode;
@@ -52,13 +62,14 @@ export function DiscoveryWorkspaceNav({
   readonly current: CatalogDiscoveryMode;
   readonly className?: string;
 }) {
+  useBilingualI18nRevision();
   const [params] = useSearchParams();
-  const language = useI18n((state) => state.lang);
-  const korean = language.toLowerCase().split(/[-_]/u)[0] === "ko";
+
+
 
   return (
     <nav
-      aria-label={korean ? "작품 발견 방식" : "Discovery modes"}
+      aria-label={bi("작품 발견 방식", "Discovery modes")}
       className={cn(
         "overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
@@ -72,7 +83,7 @@ export function DiscoveryWorkspaceNav({
             <Link
               key={destination.id}
               href={catalogDiscoveryHref(destination.id, params)}
-              aria-current={active ? "page" : undefined}
+              aria-current={active ? translateCurrentStaticSourceText("shared.components.discovery.workspace.nav", "en", "page") : undefined}
               className={cn(
                 "group flex min-h-16 min-w-0 items-center gap-3 rounded-2xl border px-3 py-2.5 transition-[border-color,background-color,transform]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
@@ -93,10 +104,10 @@ export function DiscoveryWorkspaceNav({
               </span>
               <span className="min-w-0">
                 <strong className="block truncate text-sm font-bold">
-                  {korean ? destination.ko : destination.en}
+                  {bi(destination.ko, destination.en)}
                 </strong>
                 <span className="mt-0.5 block truncate text-[0.7rem] text-fg-3">
-                  {korean ? destination.koDescription : destination.enDescription}
+                  {bi(destination.koDescription, destination.enDescription)}
                 </span>
               </span>
             </Link>

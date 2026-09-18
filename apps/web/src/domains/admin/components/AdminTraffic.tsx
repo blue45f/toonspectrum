@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Activity,
   Clock3,
@@ -255,7 +256,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <div
               className="inline-flex rounded-xl border border-line bg-canvas p-1"
-              aria-label="Traffic range"
+              aria-label={translateCurrentStaticSourceText("domains.admin.components.AdminTraffic", "en", "Traffic range")}
             >
               {TRAFFIC_RANGE_DAYS.map((range) => (
                 <button
@@ -437,7 +438,7 @@ export function AdminTraffic({ uid }: { uid: string }) {
       <aside className="flex items-start gap-2 rounded-2xl border border-line bg-card px-4 py-3 text-xs leading-relaxed text-fg-3">
         <Wifi className="mt-0.5 size-4 shrink-0 text-accent" />
         <p>
-          {t("admin.traffic.privacy")} · {data.retentionDays}d retention ·{" "}
+          {t("admin.traffic.privacy")} · {data.retentionDays}{translateCurrentStaticSourceText("domains.admin.components.AdminTraffic", "en", "d retention ·")}{" "}
           {data.storageMode}
         </p>
       </aside>

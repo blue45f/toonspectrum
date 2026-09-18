@@ -1,4 +1,4 @@
-/** Managed first-party feedback and private business inquiry grants. The API itself never creates tables or indexes. */
+/** Managed first-party feedback, private inquiries, and support-program grants. */
 function roleName(role) {
   if (typeof role !== "string" || role === "public" || !/^[a-z_][a-z0-9_]{0,62}$/u.test(role)) {
     throw new Error("An explicit safe feedback runtime role is required");
@@ -68,7 +68,7 @@ BEGIN
     ${required}
   ) AS required(table_name, privilege_name)
     WHERE NOT pg_catalog.has_table_privilege('${safeRole}', 'public.' || table_name, privilege_name)) THEN
-    RAISE EXCEPTION 'feedback/contact runtime DML privileges are incomplete';
+    RAISE EXCEPTION 'feedback/contact/supporter runtime DML privileges are incomplete';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_constraint AS constraint_record

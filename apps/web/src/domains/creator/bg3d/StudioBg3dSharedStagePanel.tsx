@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { StudioBg3dSharedCharacterPlacementPanel } from "./StudioBg3dSharedCharacterPlacementPanel";
 
 import type { StudioBg3dSharedCharacterGroundingResult } from "./studio-bg3d-shared-character-grounding";
@@ -181,11 +185,11 @@ export function StudioBg3dSharedStagePanel({
           role={resolution.phase === "ready"
             || resolution.phase === "live-update"
             || resolution.phase === "unlinked"
-            ? "status"
-            : "alert"}
+            ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "en", "status")
+            : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "en", "alert")}
         >
           <div className="flex items-center justify-between gap-2">
-            <p className="font-bold">공유 3D 장면</p>
+            <p className="font-bold">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "공유 3D 장면")}</p>
             <span className="rounded-md border border-current/25 px-1.5 py-0.5 text-[0.62rem] font-bold">
               {statusCopy.label}
             </span>
@@ -194,7 +198,7 @@ export function StudioBg3dSharedStagePanel({
         </div>
         <div
           role="group"
-          aria-label="이 배경의 공유 3D 장면 적용 방식"
+          aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "이 배경의 공유 3D 장면 적용 방식")}
           className="mt-2 grid grid-cols-1 gap-2 min-[390px]:grid-cols-2"
         >
           {targetHasSavedSharedScene ? (
@@ -210,7 +214,7 @@ export function StudioBg3dSharedStagePanel({
               )}
               onClick={() => onSelectMutation("refresh")}
             >
-              {targetHasLinkedCharacters ? "현재 연결 유지" : "배경 연결 유지"}
+              {targetHasLinkedCharacters ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "현재 연결 유지") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "배경 연결 유지")}
             </button>
           ) : null}
           {!targetHasSavedSharedScene || !targetHasLinkedCharacters ? (
@@ -226,8 +230,7 @@ export function StudioBg3dSharedStagePanel({
               )}
               onClick={() => onSelectMutation("connect")}
             >
-              이 배경에 캐릭터 연결
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "이 배경에 캐릭터 연결")}</button>
           ) : (
             <button
               type="button"
@@ -244,8 +247,7 @@ export function StudioBg3dSharedStagePanel({
               )}
               onClick={() => onSelectMutation("relink")}
             >
-              현재 원본으로 다시 연결
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "현재 원본으로 다시 연결")}</button>
           )}
           {targetHasSavedSharedScene ? (
             <button
@@ -262,7 +264,7 @@ export function StudioBg3dSharedStagePanel({
               )}
               onClick={() => onSelectMutation("unlink")}
             >
-              {targetHasLinkedCharacters ? "캐릭터 연결 해제" : "배경 연결 해제"}
+              {targetHasLinkedCharacters ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "캐릭터 연결 해제") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "배경 연결 해제")}
             </button>
           ) : (
             <button
@@ -277,8 +279,7 @@ export function StudioBg3dSharedStagePanel({
               )}
               onClick={() => onSelectMutation("background-only")}
             >
-              배경만 추가
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "배경만 추가")}</button>
           )}
           {targetHasSavedSharedScene ? (
             <button
@@ -298,43 +299,38 @@ export function StudioBg3dSharedStagePanel({
                 onSetMaterialization("detached-editable-composite");
               }}
             >
-              3D 원본 유지 · 한 장으로 정리
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "3D 원본 유지 · 한 장으로 정리")}</button>
           ) : null}
         </div>
         {charactersLinkedToOtherBackgroundCount > 0 ? (
           <p className="mt-2 font-semibold text-accent">
-            다른 배경에서도 쓰는 캐릭터 {charactersLinkedToOtherBackgroundCount}명을 이 배경에 그대로 재사용할 수 있어요. 여기서 바꾼 위치와 방향은 이 배경에만 저장돼요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "다른 배경에서도 쓰는 캐릭터 ")}{charactersLinkedToOtherBackgroundCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "명을 이 배경에 그대로 재사용할 수 있어요. 여기서 바꾼 위치와 방향은 이 배경에만 저장돼요.")}</p>
         ) : null}
         <p className="mt-2 text-[0.65rem] text-fg-3">
           {mutationKind === "unlink"
             ? materializationKind === "detached-editable-composite"
-              ? "컬러·톤·선을 한 이미지로 합치고 공유 연결만 끊어요. 캐릭터 원본은 정확히 복원되고, 배경 3D 원본은 남아 나중에 다시 편집할 수 있어요. 한 번의 실행 취소로 되돌릴 수 있어요."
+              ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "컬러·톤·선을 한 이미지로 합치고 공유 연결만 끊어요. 캐릭터 원본은 정확히 복원되고, 배경 3D 원본은 남아 나중에 다시 편집할 수 있어요. 한 번의 실행 취소로 되돌릴 수 있어요.")
               : targetHasLinkedCharacters
-                ? "적용하면 배경은 3D 편집 상태로 남고, Studio가 이 연결에서 숨긴 원본 레이어만 다시 보여요. 직접 숨겼거나 다른 모델로 바뀐 레이어는 그대로예요. 한 번의 실행 취소로 되돌릴 수 있어요."
-                : "적용하면 이 배경의 공유 연결만 끊고 3D 편집 원본은 그대로 남겨요. 한 번의 실행 취소로 되돌릴 수 있어요."
+                ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "적용하면 배경은 3D 편집 상태로 남고, Studio가 이 연결에서 숨긴 원본 레이어만 다시 보여요. 직접 숨겼거나 다른 모델로 바뀐 레이어는 그대로예요. 한 번의 실행 취소로 되돌릴 수 있어요.")
+                : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "적용하면 이 배경의 공유 연결만 끊고 3D 편집 원본은 그대로 남겨요. 한 번의 실행 취소로 되돌릴 수 있어요.")
             : mutationKind === "relink"
               ? (
                   <span className="block space-y-0.5">
                     <span className="block">
-                      현재 결과에 담을 수 있는 {captureElementCount}명만 다시 연결해요.
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "현재 결과에 담을 수 있는 ")}{captureElementCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "명만 다시 연결해요.")}</span>
                     {resolution.missingCharacterElementIds.length > 0 ? (
                       <span className="block font-semibold text-warning">
-                        찾지 못한 {resolution.missingCharacterElementIds.length}명은 연결 목록에서 제외해요.
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "찾지 못한 ")}{resolution.missingCharacterElementIds.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "명은 연결 목록에서 제외해요.")}</span>
                     ) : null}
                     {resolution.replacedCharacterElementIds.length > 0 ? (
                       <span className="block font-semibold text-warning">
-                        모델이 바뀐 {resolution.replacedCharacterElementIds.length}명은 현재 모델로 교체해요.
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "모델이 바뀐 ")}{resolution.replacedCharacterElementIds.length}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "명은 현재 모델로 교체해요.")}</span>
                     ) : null}
                   </span>
                 )
               : includeCharactersInCapture
-                ? `적용하면 캐릭터 ${captureElementCount}명이 결과 이미지와 함께 연결돼요.`
-                : "캐릭터를 결과에 넣지 않고 배경만 관리해요."}
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "적용하면 캐릭터 {v0}명이 결과 이미지와 함께 연결돼요."), { v0: String(captureElementCount) })
+                : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSharedStagePanel", "ko", "캐릭터를 결과에 넣지 않고 배경만 관리해요.")}
         </p>
       </div>
       {includeCharactersInCapture && characters.length > 0 ? (

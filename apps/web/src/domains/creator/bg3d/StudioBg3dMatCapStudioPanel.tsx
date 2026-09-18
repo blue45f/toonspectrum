@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useState } from "react";
 
 import {
@@ -44,11 +48,9 @@ export function StudioBg3dMatCapStudioPanel({
             type="button"
             disabled={disabled}
             onClick={() => setActiveCategory(cat.id)}
-            className={`rounded-md py-1 text-[0.65rem] font-bold transition-all ${
-              activeCategory === cat.id
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "en", "rounded-md py-1 text-[0.65rem] font-bold transition-all {v0}"), { v0: String(activeCategory === cat.id
                 ? "bg-raised text-fg shadow-sm border border-line"
-                : "text-fg-3 hover:text-fg"
-            }`}
+                : "text-fg-3 hover:text-fg") })}
           >
             {cat.label}
           </button>
@@ -65,11 +67,9 @@ export function StudioBg3dMatCapStudioPanel({
               type="button"
               disabled={disabled}
               onClick={() => handleSelect(preset)}
-              className={`flex flex-col gap-1 rounded-lg border p-2 text-left transition-all ${
-                isSelected
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "en", "flex flex-col gap-1 rounded-lg border p-2 text-left transition-all {v0}"), { v0: String(isSelected
                   ? "border-accent bg-accent/15 text-accent shadow-sm"
-                  : "border-line bg-card text-fg hover:bg-raised"
-              }`}
+                  : "border-line bg-card text-fg hover:bg-raised") })}
             >
               <div className="flex items-center justify-between">
                 <span className="truncate text-[0.68rem] font-bold">{preset.name.split(" ")[0]}</span>
@@ -96,21 +96,21 @@ export function StudioBg3dMatCapStudioPanel({
 
           <div className="grid grid-cols-2 gap-2 border-t border-line/50 pt-2 text-[0.65rem]">
             <div className="flex items-center justify-between">
-              <span className="text-fg-3">음영 단계:</span>
-              <span className="font-mono font-bold text-fg">{selectedPreset.shadowSteps}단 Step</span>
+              <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "ko", "음영 단계:")}</span>
+              <span className="font-mono font-bold text-fg">{selectedPreset.shadowSteps}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "ko", "단 Step")}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-fg-3">림라이트:</span>
+              <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "ko", "림라이트:")}</span>
               <span className="font-mono font-bold text-fg">{selectedPreset.rimLightIntensity}x</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-fg-3">투과도 (Glass):</span>
+              <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "ko", "투과도 (Glass):")}</span>
               <span className="font-mono font-bold text-fg">
                 {Math.round(selectedPreset.transmission * 100)}%
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-fg-3">금속도 / 거칠기:</span>
+              <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dMatCapStudioPanel", "ko", "금속도 / 거칠기:")}</span>
               <span className="font-mono font-bold text-fg">
                 {selectedPreset.metalness} / {selectedPreset.roughness}
               </span>

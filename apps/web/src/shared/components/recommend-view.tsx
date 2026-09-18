@@ -1,4 +1,9 @@
 import {
+  formatI18nTemplate,
+  resolveUiLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   RotateCcw,
   Sparkles,
   Wand2,
@@ -27,7 +32,7 @@ import {
 } from "@/shared/lib/catalog-discovery-state";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { genreColor, genreTextColor } from "@/shared/lib/genre-color";
-import { useI18n } from "@/shared/lib/i18n";
+
 import {
   clearRecommendationFeedback,
   diversifyRecommendations,
@@ -46,6 +51,9 @@ import {
 } from "@/shared/lib/title-filters";
 import { useRememberedFilters } from "@/shared/lib/use-remembered-filters";
 import { cn } from "@/shared/lib/utils";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 const DIVERSITY_OPTIONS = ["focused", "balanced", "wide"] as const;
 
@@ -54,6 +62,7 @@ export function RecommendView({
 }: {
   initialGenres?: string[];
 }) {
+  useBilingualI18nRevision();
   const hydrated = useHydrated();
   const ratings = useApp((s) => s.ratings);
   const reads = useApp((s) => s.reads);
@@ -73,9 +82,9 @@ export function RecommendView({
   const picked = [...routeState.tasteGenres];
   const seedId = routeState.seedId;
   const diversity = routeState.diversity;
-  const language = useI18n((state) => state.lang);
+
   const locale =
-    language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+    getActiveI18nLocale();
 
   const [data, setData] = useState<RecommendPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -306,30 +315,26 @@ export function RecommendView({
         <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-warn/40 bg-[oklch(0.82_0.15_80/0.08)] p-5 text-sm text-fg-2">
           <Sparkles size={18} className="shrink-0 text-warn" />
           <p className="flex-1">
-            추천을 불러오지 못했어요. 장르 선택은 그대로 두고 다시 시도할 수
-            있습니다.
-          </p>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "추천을 불러오지 못했어요. 장르 선택은 그대로 두고 다시 시도할 수 있습니다.")}</p>
           <button
             type="button"
             onClick={() => setReloadKey((k) => k + 1)}
             className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-fg hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            다시 시도
-          </button>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "다시 시도")}</button>
         </div>
       )}
 
       <section className="-mb-8 rounded-2xl border border-line bg-panel/45 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
         <div>
-          <p className="text-sm font-bold text-fg">추천 폭 조절</p>
+          <p className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "추천 폭 조절")}</p>
           <p className="mt-1 text-xs leading-5 text-fg-3">
-            익숙한 취향에 집중하거나 새로운 장르가 섞이도록 직접 조절하세요.
-          </p>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "익숙한 취향에 집중하거나 새로운 장르가 섞이도록 직접 조절하세요.")}</p>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0 sm:justify-end">
           <div
             role="group"
-            aria-label="추천 폭"
+            aria-label={translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "추천 폭")}
             className="inline-flex flex-wrap rounded-xl border border-line bg-card p-1"
           >
             {DIVERSITY_OPTIONS.map((option) => (
@@ -356,8 +361,7 @@ export function RecommendView({
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
             >
               <RotateCcw size={14} aria-hidden="true" />
-              숨긴 추천 {hiddenCount}개 복원
-            </button>
+              {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "숨긴 추천 ")}{hiddenCount}{translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "개 복원")}</button>
           ) : null}
         </div>
       </section>
@@ -375,8 +379,7 @@ export function RecommendView({
               : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
           )}
         >
-          <SlidersHorizontal size={15} className="text-accent" /> 필터
-          {activeFilters > 0 && (
+          <SlidersHorizontal size={15} className="text-accent" /> {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "필터")}{activeFilters > 0 && (
             <span className="rounded-full bg-accent/15 px-1.5 text-[0.68rem] text-accent">
               {activeFilters}
             </span>
@@ -411,13 +414,10 @@ export function RecommendView({
         <div className="mb-5 flex items-center gap-2">
           <Wand2 size={18} className="text-accent" />
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-            어떤 결이 끌리나요?
-          </h2>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "어떤 결이 끌리나요?")}</h2>
         </div>
         <p className="mb-4 max-w-xl text-sm text-fg-3">
-          끌리는 장르를 고르면 즉시 추천이 갱신됩니다. 평가 이력이 있다면
-          그것까지 함께 반영해요.
-        </p>
+          {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "끌리는 장르를 고르면 즉시 추천이 갱신됩니다. 평가 이력이 있다면 그것까지 함께 반영해요.")}</p>
         <div className="mb-7 flex flex-wrap gap-2">
           {GENRES.map((g) => {
             const on = picked.includes(g);
@@ -450,20 +450,18 @@ export function RecommendView({
               onClick={() => setPicked([])}
               className="rounded-full border border-line px-3 py-1.5 text-sm text-fg-3 hover:text-fg"
             >
-              초기화
-            </button>
+              {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "초기화")}</button>
           )}
         </div>
 
         {pickedLabelGenres.length > 0 && (
           <p className="mb-4 text-sm text-fg-2">
             <span className="text-accent">{pickedLabelGenres.join(" · ")}</span>{" "}
-            취향으로 고른{" "}
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "취향으로 고른")}{" "}
             <span className="numeral text-fg">
               {loading ? "..." : pickedRecs.length}
             </span>
-            편
-          </p>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "편")}</p>
         )}
         <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
           {pickedRecs.map((title) => (
@@ -485,8 +483,8 @@ export function RecommendView({
         tasteRecs.length > 0 && (
           <Section
             eyebrow="FOR YOU"
-            title="당신의 평가가 가리키는 다음 작품"
-            desc={`평가 ${data.profile.ratedCount}편, 관심 ${data.profile.readCount}편을 분석했어요`}
+            title={translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "당신의 평가가 가리키는 다음 작품")}
+            desc={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "평가 {v0}편, 관심 {v1}편을 분석했어요"), { v0: String(data.profile.ratedCount), v1: String(data.profile.readCount) })}
             action={{ label: "취향 분석", href: "/library?tab=taste" }}
           >
             <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-6">
@@ -511,12 +509,9 @@ export function RecommendView({
           </div>
           <div className="space-y-1">
             <h3 className="text-lg font-bold text-fg">
-              나를 위한 개인화 추천 받기
-            </h3>
+              {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "나를 위한 개인화 추천 받기")}</h3>
             <p className="text-xs text-fg-3 max-w-sm leading-relaxed">
-              인생작 몇 편과 선호하는 장르를 선택해주시면, 툰스펙트럼의 다축 AI
-              엔진이 전 플랫폼을 가로질러 맞춤 작품을 즉시 제안해 드립니다.
-            </p>
+              {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "인생작 몇 편과 선호하는 장르를 선택해주시면, 툰스펙트럼의 다축 AI 엔진이 전 플랫폼을 가로질러 맞춤 작품을 즉시 제안해 드립니다.")}</p>
           </div>
           <button
             type="button"
@@ -526,8 +521,7 @@ export function RecommendView({
             className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2.5 text-xs font-semibold text-on-accent hover:bg-accent/90 transition-all cursor-pointer shadow-md"
           >
             <Wand2 size={13} />
-            10초 취향 테스트 시작
-          </button>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "10초 취향 테스트 시작")}</button>
         </div>
       )}
 
@@ -536,12 +530,10 @@ export function RecommendView({
         <div className="mb-5 flex items-center gap-2">
           <Shuffle size={18} className="text-accent" />
           <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-            이 작품과 비슷한
-          </h2>
+            {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "이 작품과 비슷한")}</h2>
         </div>
         <p className="mb-4 text-sm text-fg-3">
-          기준 작품을 고르면 장르·태그·어댑테이션으로 닮은 작품을 찾아줍니다.
-        </p>
+          {translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "기준 작품을 고르면 장르·태그·어댑테이션으로 닮은 작품을 찾아줍니다.")}</p>
         <Rail itemClassName="w-14">
           {popular.map((t) => (
             <button
@@ -563,7 +555,7 @@ export function RecommendView({
           <div className="mt-6">
             <p className="mb-4 text-sm text-fg-2">
               <span className="font-semibold text-fg">{seed.title}</span>
-              <span className="text-fg-3">와 비슷한 작품</span>
+              <span className="text-fg-3">{translateCurrentStaticSourceText("shared.components.recommend.view", "ko", "와 비슷한 작품")}</span>
             </p>
             <Rail itemClassName="w-52">
               {similar.map((title) => (

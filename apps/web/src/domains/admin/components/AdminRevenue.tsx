@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useState } from "react";
 
 import { getAdminRevenueCopy } from "./admin-revenue-copy";
@@ -152,11 +153,11 @@ export function AdminRevenue({ uid }: { uid: string }) {
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-raised/50 text-left text-xs text-fg-3">
             <tr>
-              <th className="px-4 py-2.5 font-medium">Event</th>
-              <th className="px-4 py-2.5 font-medium">Amount</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Date</th>
-              <th className="px-4 py-2.5 font-medium">Action</th>
+              <th className="px-4 py-2.5 font-medium">{translateCurrentStaticSourceText("domains.admin.components.AdminRevenue", "en", "Event")}</th>
+              <th className="px-4 py-2.5 font-medium">{translateCurrentStaticSourceText("domains.admin.components.AdminRevenue", "en", "Amount")}</th>
+              <th className="px-4 py-2.5 font-medium">{translateCurrentStaticSourceText("domains.admin.components.AdminRevenue", "en", "Status")}</th>
+              <th className="px-4 py-2.5 font-medium">{translateCurrentStaticSourceText("domains.admin.components.AdminRevenue", "en", "Date")}</th>
+              <th className="px-4 py-2.5 font-medium">{translateCurrentStaticSourceText("domains.admin.components.AdminRevenue", "en", "Action")}</th>
             </tr>
           </thead>
           <tbody>

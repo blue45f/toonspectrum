@@ -14,7 +14,7 @@
   "studio.aiToolPopover.panelLoadingAssist": "Отвара се табла АИ Ассист...",
   "studio.aiToolPopover.panelLoadingStock": "Отварање панела са сликама са залихама...",
   "studio.aiToolPopover.panelLoadingIntegrations": "Отварање панела за подешавања интеграције...",
-  "studio.aiToolPopover.serverProviderConnected": "__ПХ0__ повезан",
+  "studio.aiToolPopover.serverProviderConnected": "{provider} connected",
   "studio.aiToolPopover.internalProviderConnected": "Мој АПИ је повезан",
   "studio.aiToolPopover.imageApiConnected": "АПИ за слике је повезан",
   "studio.aiToolPopover.serverLoginHint": "Потребна је пријава или АПИ кључ",

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Download, DollarSign, Gauge, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -163,7 +167,7 @@ function MonetizationToggle({
       <div className="flex items-center justify-between gap-4 rounded-xl border border-line bg-panel px-4 py-3">
         <div>
           <p className="text-sm font-medium text-fg">{t("admin.ops.monetizationTitle")}</p>
-          <p className="mt-0.5 text-xs text-fg-3">{on ? "ON" : "OFF"}</p>
+          <p className="mt-0.5 text-xs text-fg-3">{on ? translateCurrentStaticSourceText("domains.admin.components.AdminOps", "en", "ON") : translateCurrentStaticSourceText("domains.admin.components.AdminOps", "en", "OFF")}</p>
         </div>
         <Switch
           checked={on}
@@ -318,7 +322,7 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="min-w-0 flex-1">
-          <p className="text-xs text-fg-3">반복 횟수 (1~10)</p>
+          <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "반복 횟수 (1~10)")}</p>
           <input
             type="number"
             inputMode="numeric"
@@ -347,7 +351,7 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
             onChange={(e) => setWarmupEnabled(e.target.checked)}
             disabled={loading}
           />
-          <span className="text-fg-3">워밍업 1회 포함</span>
+          <span className="text-fg-3">{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "워밍업 1회 포함")}</span>
         </label>
 
         <div className="flex gap-2">
@@ -356,7 +360,7 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
             className={adminButtonClass("ghost")}
             onClick={() => void exportJson()}
             disabled={!result || loading}
-            title="JSON 저장"
+            title={translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "JSON 저장")}
           >
             <Download size={15} /> JSON
           </button>
@@ -365,7 +369,7 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
             className={adminButtonClass("ghost")}
             onClick={() => void exportCsv()}
             disabled={!result || loading}
-            title="CSV 저장"
+            title={translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "CSV 저장")}
           >
             <Download size={15} /> CSV
           </button>
@@ -379,10 +383,10 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
           <div className="flex flex-col gap-1 text-xs">
             <span className="font-medium text-fg">{t("admin.ops.benchmarkResult")}</span>
             <span className="text-fg-3">
-              실행 시각 {formatDateTime(result.generatedAt)} · 반복 {formatNum(result.samples[0]?.iterations ?? 0)}
-              {result.metadata ? ` · 총 측정 시간 ${formatDuration(result.metadata.totalDurationMs)}` : null}
-              {result.metadata ? ` / 워밍업 ${result.metadata.warmup ? "ON" : "OFF"}` : null}
-              {previousResult ? ` / 이전 비교 기준 ${formatDateTime(previousResult.generatedAt)}` : null}
+              {translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "실행 시각 ")}{formatDateTime(result.generatedAt)} {translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "· 반복 ")}{formatNum(result.samples[0]?.iterations ?? 0)}
+              {result.metadata ? formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", " · 총 측정 시간 {v0}"), { v0: String(formatDuration(result.metadata.totalDurationMs)) }) : null}
+              {result.metadata ? formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", " / 워밍업 {v0}"), { v0: String(result.metadata.warmup ? "ON" : "OFF") }) : null}
+              {previousResult ? formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", " / 이전 비교 기준 {v0}"), { v0: String(formatDateTime(previousResult.generatedAt)) }) : null}
             </span>
           </div>
           <ul className="mt-3 divide-y divide-line text-sm">
@@ -404,16 +408,16 @@ function AdminBenchmarkPanel({ uid }: { uid: string }) {
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-fg-3">
-                    <span>응답 {formatDuration(sample.durationMs)}</span>
+                    <span>{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "응답 ")}{formatDuration(sample.durationMs)}</span>
                     {delta ? <span className={delta.tone}>({delta.direction})</span> : null}
-                    {sample.sampleSize != null && <span>샘플 수 {formatNum(sample.sampleSize)}</span>}
+                    {sample.sampleSize != null && <span>{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "샘플 수 ")}{formatNum(sample.sampleSize)}</span>}
                     <span>p50 {formatDuration(sample.p50Ms)}</span>
                     <span>p95 {formatDuration(sample.p95Ms)}</span>
                     <span>p99 {formatDuration(sample.p99Ms)}</span>
-                    <span>표준편차 {formatDuration(sample.stdDevMs)}</span>
-                    <span>실패율 {formatNum(sample.errorRate * 100)}%</span>
+                    <span>{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "표준편차 ")}{formatDuration(sample.stdDevMs)}</span>
+                    <span>{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "실패율 ")}{formatNum(sample.errorRate * 100)}%</span>
                     {sample.status === "error" && sample.error && (
-                      <span className="text-bad break-all">오류: {sample.error}</span>
+                      <span className="text-bad break-all">{translateCurrentStaticSourceText("domains.admin.components.AdminOps", "ko", "오류: ")}{sample.error}</span>
                     )}
                   </div>
                 </li>

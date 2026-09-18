@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
@@ -58,7 +62,7 @@ function Sample({ program, label, compact = false }: {
     observer?.observe(canvas);
     return () => observer?.disconnect();
   }, [program]);
-  return <canvas ref={canvasRef} role="img" aria-label={label} className={`${compact ? "h-40" : "h-56"} w-full rounded-xl border border-line bg-white`} />;
+  return <canvas ref={canvasRef} role="img" aria-label={label} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "en", "{v0} w-full rounded-xl border border-line bg-white"), { v0: String(compact ? "h-40" : "h-56") })} />;
 }
 
 export function StudioBrushV6Experiments({ program, reference, onPin, onRestore, onChange }: {
@@ -78,41 +82,40 @@ export function StudioBrushV6Experiments({ program, reference, onPin, onRestore,
       <section className="rounded-2xl border border-line bg-card/60 p-4 shadow-sm" aria-labelledby="brush-v6-comparison-title">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 id="brush-v6-comparison-title" className="text-sm font-black text-fg">기준 브러시와 비교</h2>
-            <p className="mt-1 text-xs leading-5 text-fg-3">좋았던 설정을 기준으로 고정한 뒤 자유롭게 실험하세요. 기준 복원도 실행 취소할 수 있습니다.</p>
+            <h2 id="brush-v6-comparison-title" className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "기준 브러시와 비교")}</h2>
+            <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "좋았던 설정을 기준으로 고정한 뒤 자유롭게 실험하세요. 기준 복원도 실행 취소할 수 있습니다.")}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={BUTTON} onClick={onPin}>현재를 기준으로 고정</button>
-            <button type="button" className={BUTTON} disabled={differences.length === 0} onClick={onRestore}>기준 설정 복원</button>
+            <button type="button" className={BUTTON} onClick={onPin}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "현재를 기준으로 고정")}</button>
+            <button type="button" className={BUTTON} disabled={differences.length === 0} onClick={onRestore}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "기준 설정 복원")}</button>
           </div>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <figure className="min-w-0">
-            <figcaption className="mb-2 flex items-center justify-between gap-2 text-xs text-fg-2"><strong>A · 기준</strong><span className="truncate">{reference.name}</span></figcaption>
-            <Sample program={reference} label="A 기준 브러시 비교 획" />
+            <figcaption className="mb-2 flex items-center justify-between gap-2 text-xs text-fg-2"><strong>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "A · 기준")}</strong><span className="truncate">{reference.name}</span></figcaption>
+            <Sample program={reference} label={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "A 기준 브러시 비교 획")} />
           </figure>
           <figure className="min-w-0">
-            <figcaption className="mb-2 flex items-center justify-between gap-2 text-xs text-fg-2"><strong>B · 현재</strong><span className="truncate">{program.name}</span></figcaption>
-            <Sample program={program} label="B 현재 브러시 비교 획" />
+            <figcaption className="mb-2 flex items-center justify-between gap-2 text-xs text-fg-2"><strong>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "B · 현재")}</strong><span className="truncate">{program.name}</span></figcaption>
+            <Sample program={program} label={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "B 현재 브러시 비교 획")} />
           </figure>
         </div>
-        <p className="mt-3 text-xs text-fg-3">같은 궤적·필압으로 비교합니다.{reference.seed !== program.seed ? " 개성 시드도 달라졌으므로 질감 배치가 함께 바뀝니다." : " 질감 시드도 동일합니다."}</p>
+        <p className="mt-3 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "같은 궤적·필압으로 비교합니다.")}{reference.seed !== program.seed ? translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", " 개성 시드도 달라졌으므로 질감 배치가 함께 바뀝니다.") : translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", " 질감 시드도 동일합니다.")}</p>
         {differences.length ? <details className="mt-3 rounded-xl border border-line bg-bg-2/55 p-3">
-          <summary className={`cursor-pointer text-xs font-bold text-fg-2 ${STUDIO_FOCUS_RING}`}>기준에서 바뀐 설정 {differences.length}개</summary>
+          <summary className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "en", "cursor-pointer text-xs font-bold text-fg-2 {v0}"), { v0: String(STUDIO_FOCUS_RING) })}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "기준에서 바뀐 설정 ")}{differences.length}{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "개")}</summary>
           <dl className="mt-3 space-y-2">
             {differences.map((difference) => <div key={difference.path} className="grid gap-1 text-xs sm:grid-cols-[7.5rem_minmax(0,1fr)]">
-              <dt className="font-bold text-fg-2">{LABELS[difference.path] ?? "추가 설정"}</dt>
-              <dd className="break-words text-fg-3"><span>{displayValue(difference.path, difference.before)}</span><span aria-label="변경 후"> → </span><span className="font-semibold text-fg">{displayValue(difference.path, difference.after)}</span></dd>
+              <dt className="font-bold text-fg-2">{LABELS[difference.path] ?? translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "추가 설정")}</dt>
+              <dd className="break-words text-fg-3"><span>{displayValue(difference.path, difference.before)}</span><span aria-label={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "변경 후")}> → </span><span className="font-semibold text-fg">{displayValue(difference.path, difference.after)}</span></dd>
             </div>)}
           </dl>
-        </details> : <p className="mt-3 text-xs text-fg-3">현재 설정과 기준이 같습니다.</p>}
+        </details> : <p className="mt-3 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "현재 설정과 기준이 같습니다.")}</p>}
       </section>
 
       <section className="rounded-2xl border border-line bg-card/60 p-4 shadow-sm" aria-labelledby="brush-v6-sweep-title">
-        <h2 id="brush-v6-sweep-title" className="text-sm font-black text-fg">한 가지 속성만 바꿔보기</h2>
-        <p className="mt-1 text-xs leading-5 text-fg-3">같은 색·시드·물리 조합에서 한 설정만 바꿉니다. 원하는 획을 고르면 현재 브러시에 적용됩니다.</p>
-        <label htmlFor="brush-v6-experiment-field" className="mt-4 block text-xs font-bold text-fg-2">비교할 속성
-          <select id="brush-v6-experiment-field" value={field.key} onChange={(event) => setRequestedField(event.currentTarget.value as BrushStudioV6NumericTuning)} className={`mt-1.5 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg ${STUDIO_FOCUS_RING}`}>
+        <h2 id="brush-v6-sweep-title" className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "한 가지 속성만 바꿔보기")}</h2>
+        <p className="mt-1 text-xs leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "같은 색·시드·물리 조합에서 한 설정만 바꿉니다. 원하는 획을 고르면 현재 브러시에 적용됩니다.")}</p>
+        <label htmlFor="brush-v6-experiment-field" className="mt-4 block text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "비교할 속성")}<select id="brush-v6-experiment-field" value={field.key} onChange={(event) => setRequestedField(event.currentTarget.value as BrushStudioV6NumericTuning)} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "en", "mt-1.5 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg {v0}"), { v0: String(STUDIO_FOCUS_RING) })}>
             {fields.map((candidate) => <option key={candidate.key} value={candidate.key}>{candidate.label}</option>)}
           </select>
         </label>
@@ -120,8 +123,8 @@ export function StudioBrushV6Experiments({ program, reference, onPin, onRestore,
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {samples.map((sample, index) => <figure key={sample.label} className="min-w-0">
             <figcaption className="mb-2 flex justify-between gap-2 text-xs text-fg-2"><strong>{sample.label}</strong><span className="tabular-nums">{sample.value}</span></figcaption>
-            <Sample program={sample.program} label={`${field.label} ${sample.label} 비교 획`} compact />
-            <button type="button" className={`${BUTTON} mt-2 w-full`} disabled={index === 1 || sample.value === program.tuning[field.key]} onClick={() => onChange(sample.program, `${field.label} ${sample.value} 비교안을 적용했습니다.`)}>{index === 1 ? "현재 설정" : `${sample.label} 적용`}</button>
+            <Sample program={sample.program} label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "{v0} {v1} 비교 획"), { v0: String(field.label), v1: String(sample.label) })} compact />
+            <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "en", "{v0} mt-2 w-full"), { v0: String(BUTTON) })} disabled={index === 1 || sample.value === program.tuning[field.key]} onClick={() => onChange(sample.program, `${field.label} ${sample.value} 비교안을 적용했습니다.`)}>{index === 1 ? translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "현재 설정") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Experiments", "ko", "{v0} 적용"), { v0: String(sample.label) })}</button>
           </figure>)}
         </div>
       </section>

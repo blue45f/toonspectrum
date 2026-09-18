@@ -10,21 +10,33 @@ import { useState } from "react";
 
 import { api, apiPath } from "@/infrastructure/api";
 
+type MergeProfilePreview = {
+  name: string | null;
+  image: string | null;
+  avatar: string | null;
+  bio: string | null;
+};
+
 type MergePreview = {
   source: {
     name: string | null;
     email: string | null;
     providers: string[];
+    profile: MergeProfilePreview;
   };
   target: {
     name: string | null;
     email: string | null;
     providers: string[];
+    profile: MergeProfilePreview;
   };
   affectedRecordCount: number;
+  deduplicatedRecordCount: number;
   expiresAt: string;
   warnings: string[];
 };
+
+type ProfilePreference = "target" | "source";
 
 function responseError(payload: unknown, fallback: string): string {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
@@ -48,6 +60,7 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
   const [preview, setPreview] = useState<MergePreview | null>(null);
   const [busy, setBusy] = useState<"issue" | "preview" | "confirm" | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [profilePreference, setProfilePreference] = useState<ProfilePreference>("target");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -116,7 +129,8 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
         return;
       }
       setPreview(payload);
-      setMessage("양쪽 계정 확인이 완료됐어요. 내용을 확인한 뒤 통합을 확정해 주세요.");
+      setProfilePreference("target");
+      setMessage("양쪽 계정 확인이 완료됐어요. 남길 프로필과 이전 내용을 확인해 주세요.");
     } catch {
       setError("계정 통합 서버에 접속하지 못했어요.");
     } finally {
@@ -138,10 +152,15 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
         method: "POST",
         cache: "no-store",
         throwHttpErrors: false,
-        json: { token: mergeCode.trim() },
+        json: {
+          token: mergeCode.trim(),
+          profilePreference,
+        },
       });
       const payload = await response.json<{
         transferredRecordCount?: unknown;
+        deduplicatedRecordCount?: unknown;
+        consolidatedQuotaRecordCount?: unknown;
         error?: unknown;
       } | null>().catch(() => null);
       if (!response.ok) {
@@ -152,7 +171,12 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
       const count = typeof payload?.transferredRecordCount === "number"
         ? payload.transferredRecordCount
         : preview.affectedRecordCount;
-      setMessage(`계정 통합을 완료했어요. ${count.toLocaleString()}개 연결 데이터를 현재 계정으로 정리했어요.`);
+      const deduplicated = typeof payload?.deduplicatedRecordCount === "number"
+        ? payload.deduplicatedRecordCount
+        : preview.deduplicatedRecordCount;
+      setMessage(
+        `계정 통합을 완료했어요. ${count.toLocaleString()}개 데이터를 이전하고 ${deduplicated.toLocaleString()}개 중복 관계를 정리했어요.`,
+      );
       globalThis.setTimeout(() => {
         globalThis.location.assign("/settings#account-security");
       }, 700);
@@ -285,6 +309,55 @@ export function AccountMergeSettings({ userId }: { userId: string | null }) {
             <CheckCircle2 size={14} className="shrink-0 text-good" aria-hidden />
             약 {preview.affectedRecordCount.toLocaleString()}개 사용자 연결 데이터가 주 계정으로 이전 대상이에요.
           </div>
+
+          {preview.deduplicatedRecordCount > 0 && (
+            <div className="mt-2 rounded-lg border border-good/30 bg-good/5 px-3 py-2 text-xs text-good">
+              좋아요·북마크·팔로우 등 {preview.deduplicatedRecordCount.toLocaleString()}개 중복 관계는 하나로 정리돼요.
+            </div>
+          )}
+
+          <fieldset className="mt-4 rounded-xl border border-line bg-card/60 p-3">
+            <legend className="px-1 text-xs font-semibold text-fg">통합 후 사용할 프로필</legend>
+            <p className="mb-3 mt-1 text-[0.72rem] leading-relaxed text-fg-3">
+              연락 이메일과 로그인 계정은 항상 현재 주 계정을 유지하고, 이름·아바타·소개·창작자 역할 프로필만 선택한 쪽을 사용해요.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(["target", "source"] as const).map((preference) => {
+                const account = preference === "target" ? preview.target : preview.source;
+                const selected = profilePreference === preference;
+                return (
+                  <label
+                    key={preference}
+                    className={
+                      selected
+                        ? "cursor-pointer rounded-lg border border-accent bg-accent-soft/30 p-3"
+                        : "cursor-pointer rounded-lg border border-line bg-panel/60 p-3 hover:bg-raised"
+                    }
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="account-merge-profile"
+                        value={preference}
+                        checked={selected}
+                        onChange={() => setProfilePreference(preference)}
+                        className="accent-[var(--accent)]"
+                      />
+                      <span className="text-xs font-semibold text-fg">
+                        {preference === "target" ? "현재 계정 프로필 유지" : "보조 계정 프로필 사용"}
+                      </span>
+                    </span>
+                    <span className="mt-2 block text-sm font-medium text-fg">
+                      {account.profile.name ?? account.name ?? "이름 없음"}
+                    </span>
+                    <span className="mt-0.5 line-clamp-2 block text-[0.72rem] text-fg-3">
+                      {account.profile.bio?.trim() || "소개 없음"}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-fg-3">
             {preview.warnings.map((warning) => (

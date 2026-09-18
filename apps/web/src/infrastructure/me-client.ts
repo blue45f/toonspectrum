@@ -8,6 +8,7 @@ import {
   normalizeCreatorRoleProfile,
   type CreatorRoleProfile,
 } from "@/shared/lib/creator-role-contract";
+import { parseRegionSettings, type RegionSettings } from "@/shared/lib/region-settings";
 import { api, toApiError } from "@/infrastructure/api";
 
 export interface MeProfile {
@@ -18,6 +19,7 @@ export interface MeProfile {
   email: string | null;
   bio: string | null;
   creatorRoleProfile: CreatorRoleProfile;
+  regionSettings: RegionSettings | null;
 }
 
 export interface UpdateProfilePayload {
@@ -25,10 +27,12 @@ export interface UpdateProfilePayload {
   bio?: string;
   image?: string | null; // dataURL(webp/png/jpeg) 또는 null(제거). 미포함 시 변경 없음.
   creatorRoleProfile?: CreatorRoleProfile;
+  regionSettings?: RegionSettings;
 }
 
-type MeProfileResponse = Omit<MeProfile, "creatorRoleProfile"> & {
+type MeProfileResponse = Omit<MeProfile, "creatorRoleProfile" | "regionSettings"> & {
   creatorRoleProfile?: unknown;
+  regionSettings?: unknown;
 };
 type ProfileListener = (profile: MeProfile | null) => void;
 
@@ -43,6 +47,7 @@ function normalizeMeProfile(profile: MeProfileResponse): MeProfile {
   return {
     ...profile,
     creatorRoleProfile: normalizeCreatorRoleProfile(profile.creatorRoleProfile),
+    regionSettings: parseRegionSettings(profile.regionSettings),
   };
 }
 

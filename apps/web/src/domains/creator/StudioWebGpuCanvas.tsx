@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react";
 
 import { resolveStudioWebGpuCanvasStrokes } from "./render/studio-webgpu-canvas-authority";
@@ -762,10 +763,10 @@ function StudioWebGpuCanvas({
         height: surfaceBounds.height,
       } : undefined}
       data-studio-gpu-compositor="true"
-      data-studio-gpu-active={presentationActive ? "true" : "false"}
+      data-studio-gpu-active={presentationActive ? translateCurrentStaticSourceText("domains.creator.StudioWebGpuCanvas", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioWebGpuCanvas", "en", "false")}
       data-studio-gpu-readback="disabled"
-      data-studio-gpu-frame-authorized={frameAuthorized ? "true" : "false"}
-      data-studio-gpu-pinned={pinnedShown ? "true" : "false"}
+      data-studio-gpu-frame-authorized={frameAuthorized ? translateCurrentStaticSourceText("domains.creator.StudioWebGpuCanvas", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioWebGpuCanvas", "en", "false")}
+      data-studio-gpu-pinned={pinnedShown ? translateCurrentStaticSourceText("domains.creator.StudioWebGpuCanvas", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioWebGpuCanvas", "en", "false")}
       data-studio-gpu-surface-width={surfaceBounds?.width}
       data-studio-gpu-surface-height={surfaceBounds?.height}
     >

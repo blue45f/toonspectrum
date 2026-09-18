@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   CircleDot,
   CornerDownRight,
@@ -245,12 +249,12 @@ export const StudioLayerNavigatorItemRow = memo(
     return (
       <li role="none">
         <div
-          id={`studio-layer-${item.id}`}
+          id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "studio-layer-{v0}"), { v0: String(item.id) })}
           ref={(node) => stableHandlers.registerRowRef(rowKey, node)}
           role="treeitem"
           aria-level={level}
           aria-selected={selected}
-          aria-current={current ? "true" : undefined}
+          aria-current={current ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "true") : undefined}
           aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Home End Shift+ArrowUp Shift+ArrowDown Shift+Home Shift+End Shift+Space Enter Space F2 Shift+F10 Control+A Meta+A Control+G Meta+G Shift+Control+G Shift+Meta+G Control+] Meta+] Shift+Control+] Shift+Meta+] Control+[ Meta+[ Shift+Control+[ Shift+Meta+[ Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowUp Shift+Alt+ArrowDown"
           aria-label={`${item.label}, ${accessibleMetadata}`}
           tabIndex={tabStop ? 0 : -1}
@@ -273,13 +277,13 @@ export const StudioLayerNavigatorItemRow = memo(
             STUDIO_LAYER_NAVIGATOR_FOCUS_RING
           )}
           data-studio-layer-row="true"
-          data-studio-layer-selected={selected ? "true" : "false"}
+          data-studio-layer-selected={selected ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "true") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "false")}
           data-studio-layer-selection-state={selectionState}
-          data-studio-layer-local-hidden={locallyHidden ? "true" : "false"}
+          data-studio-layer-local-hidden={locallyHidden ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "true") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "false")}
           data-studio-live-ownership={
-            showLiveOwnershipBadge ? liveOwnership!.kind : "free"
+            showLiveOwnershipBadge ? liveOwnership!.kind : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "free")
           }
-          data-studio-live-ownership-blocked={peerBlocked ? "true" : "false"}
+          data-studio-live-ownership-blocked={peerBlocked ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "true") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "en", "false")}
           data-studio-layer-drop-side={dropSide ?? undefined}
         >
           {dropSide ? (
@@ -320,9 +324,9 @@ export const StudioLayerNavigatorItemRow = memo(
               stableHandlers.onItemDragStart?.(event, item.id, rowKey)
             }
             onDragEnd={() => stableHandlers.onItemDragEnd?.()}
-            aria-label={`${item.label} 레이어 끌어 순서 변경`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 레이어 끌어 순서 변경"), { v0: String(item.label) })}
             aria-describedby={dragHelpId}
-            title={dragEnabled ? "끌어서 순서를 바꾸거나 그룹으로 이동" : undefined}
+            title={dragEnabled ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "끌어서 순서를 바꾸거나 그룹으로 이동") : undefined}
             className={cn(
               "hidden size-6 shrink-0 cursor-grab place-items-center rounded text-fg-3 hover:bg-raised hover:text-fg active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-25 [@media(pointer:fine)]:grid",
               STUDIO_LAYER_NAVIGATOR_FOCUS_RING
@@ -332,7 +336,7 @@ export const StudioLayerNavigatorItemRow = memo(
           </button>
           {item.color ? (
             <span
-              aria-label={`색 라벨 ${STUDIO_LAYER_COLOR_LABELS[item.color]}`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "색 라벨 {v0}"), { v0: String(STUDIO_LAYER_COLOR_LABELS[item.color]) })}
               className={cn(
                 "h-5 w-1.5 shrink-0 rounded-full shadow-sm",
                 COLOR_DOT_CLASS[item.color]
@@ -394,7 +398,7 @@ export const StudioLayerNavigatorItemRow = memo(
             <span
               data-studio-live-ownership-badge={liveOwnership!.kind}
               title={liveStatusLabel ?? undefined}
-              aria-label={liveStatusLabel ?? "협업 편집 상태"}
+              aria-label={liveStatusLabel ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "협업 편집 상태")}
               className={cn(
                 "grid size-5 shrink-0 place-items-center rounded-full border text-[0.58rem] font-bold leading-none text-white shadow-sm",
                 peerBlocked
@@ -459,14 +463,14 @@ export const StudioLayerNavigatorItemRow = memo(
             )}
             aria-label={
               hiddenByGroup
-                ? `${item.label}, 그룹에서 숨김`
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0}, 그룹에서 숨김"), { v0: String(item.label) })
                 : item.hidden
-                  ? `${item.label} 표시`
-                  : `${item.label} 숨김`
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 표시"), { v0: String(item.label) })
+                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 숨김"), { v0: String(item.label) })
             }
             title={
               hiddenByGroup
-                ? "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요"
+                ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "상위 그룹이 숨겨져 있어 그룹을 먼저 표시해야 해요")
                 : undefined
             }
           >
@@ -497,16 +501,16 @@ export const StudioLayerNavigatorItemRow = memo(
               peerBlocked
                 ? `${item.label}, ${liveStatusLabel ?? "다른 참가자가 편집 중"}`
                 : lockedByGroup
-                  ? `${item.label}, 그룹에서 잠김`
+                  ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0}, 그룹에서 잠김"), { v0: String(item.label) })
                   : item.locked
-                    ? `${item.label} 잠금 해제`
-                    : `${item.label} 잠금`
+                    ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 잠금 해제"), { v0: String(item.label) })
+                    : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 잠금"), { v0: String(item.label) })
             }
             title={
               peerBlocked
-                ? (liveStatusLabel ?? "다른 참가자가 편집 중이에요")
+                ? (liveStatusLabel ?? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "다른 참가자가 편집 중이에요"))
                 : lockedByGroup
-                  ? "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요"
+                  ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "상위 그룹이 잠겨 있어 그룹 잠금을 먼저 해제해야 해요")
                   : undefined
             }
           >
@@ -520,7 +524,7 @@ export const StudioLayerNavigatorItemRow = memo(
             surface="layer-opacity"
             rowAction="opacity"
             tabIndex={-1}
-            label={`${item.label} 불투명도`}
+            label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 불투명도"), { v0: String(item.label) })}
             value={opacityPercent}
             min={0}
             max={100}
@@ -568,7 +572,7 @@ export const StudioLayerNavigatorItemRow = memo(
               STUDIO_LAYER_NAVIGATOR_COARSE_TARGET,
               STUDIO_LAYER_NAVIGATOR_FOCUS_RING
             )}
-            aria-label={`${item.label} 레이어 작업`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorItemRow", "ko", "{v0} 레이어 작업"), { v0: String(item.label) })}
           >
             <MoreHorizontal size={15} />
           </button>

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   Eye,
   ImagePlus,
@@ -264,22 +268,18 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
           <div className="min-w-0">
             <h3 className="flex items-center gap-1.5 text-sm font-extrabold text-fg">
               <ScanSearch size={15} className="text-accent" aria-hidden />
-              참고 이미지로 스타일 찾기
-            </h3>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "참고 이미지로 스타일 찾기")}</h3>
             <p className="mt-1 max-w-[34rem] text-[0.68rem] leading-relaxed text-fg-3">
-              이미지 전체 특징과 프리셋 기준을 비교해 가까운 시작점을 제안합니다. 추천은 자동 적용되지 않습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "이미지 전체 특징과 프리셋 기준을 비교해 가까운 시작점을 제안합니다. 추천은 자동 적용되지 않습니다.")}</p>
           </div>
           <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[0.58rem] font-bold text-fg-3">
-            MediaPipe
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "en", "MediaPipe")}</span>
         </div>
 
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-panel/70 p-2.5 text-[0.62rem] leading-relaxed text-fg-3">
           <ShieldCheck size={14} className="mt-0.5 shrink-0 text-good" aria-hidden />
           <p>
-            JPG·PNG·WebP를 메모리의 전용 Worker에서만 분석합니다. 원본 이미지와 픽셀은 프로젝트·브라우저 저장소·서버에 남기지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "JPG·PNG·WebP를 메모리의 전용 Worker에서만 분석합니다. 원본 이미지와 픽셀은 프로젝트·브라우저 저장소·서버에 남기지 않습니다.")}</p>
         </div>
       </div>
 
@@ -296,8 +296,8 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
               aria-hidden
             />
             <div>
-              <p className="font-bold text-fg">검증된 추천 기준을 불러오는 중</p>
-              <p className="mt-1 text-fg-3">Forge를 사용할 때만 작은 기준 파일을 확인합니다.</p>
+              <p className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "검증된 추천 기준을 불러오는 중")}</p>
+              <p className="mt-1 text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "Forge를 사용할 때만 작은 기준 파일을 확인합니다.")}</p>
             </div>
           </div>
         ) : effectiveCatalogueStatus === "unavailable" || !catalogue ? (
@@ -306,7 +306,7 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
             <div className="min-w-0 flex-1">
               <p>
                 {catalogueUnavailableReason
-                  ?? "검증된 프리셋 추천 기준을 사용할 수 없습니다. 스타일 탭에서 프리셋을 직접 선택해 주세요."}
+                  ?? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "검증된 프리셋 추천 기준을 사용할 수 없습니다. 스타일 탭에서 프리셋을 직접 선택해 주세요.")}
               </p>
               {onCatalogueRetry ? (
                 <button
@@ -316,15 +316,14 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                   className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-[0.64rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
                 >
                   <RotateCcw size={13} aria-hidden />
-                  추천 기준 다시 불러오기
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "추천 기준 다시 불러오기")}</button>
               ) : null}
             </div>
           </div>
         ) : !runtimeSupported ? (
           <div role="status" className="flex items-start gap-2 rounded-xl border border-line bg-panel/55 p-3 text-[0.65rem] leading-relaxed text-fg-2">
             <TriangleAlert size={15} className="mt-0.5 shrink-0 text-warn" aria-hidden />
-            <p>이 브라우저는 전용 이미지 Worker와 OffscreenCanvas 전처리를 지원하지 않습니다.</p>
+            <p>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "이 브라우저는 전용 이미지 Worker와 OffscreenCanvas 전처리를 지원하지 않습니다.")}</p>
           </div>
         ) : (
           <>
@@ -338,24 +337,20 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                   aria-describedby={mediaPipeConsentDescriptionId}
                   className="mt-1 size-4 shrink-0 accent-[var(--color-accent)]"
                 />
-                <span>MediaPipe 분석과 아래 메타데이터 처리 가능성을 확인하고 동의합니다.</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "MediaPipe 분석과 아래 메타데이터 처리 가능성을 확인하고 동의합니다.")}</span>
               </label>
               <p
                 id={mediaPipeConsentDescriptionId}
                 className="mt-1.5 text-[0.6rem] leading-relaxed text-fg-3"
               >
-                이미지 픽셀은 이 기기의 메모리 Worker에서 처리되고 업로드되지 않습니다. Google
-                MediaPipe API는 앱 식별자, 처리 매체의 일반적 특성, 추론·세션 수, 호스트 환경 같은
-                이용·성능 메타데이터를 처리할 수 있습니다. 동의하지 않아도 프리셋을 직접 선택할 수
-                있습니다.{" "}
+                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "이미지 픽셀은 이 기기의 메모리 Worker에서 처리되고 업로드되지 않습니다. Google MediaPipe API는 앱 식별자, 처리 매체의 일반적 특성, 추론·세션 수, 호스트 환경 같은 이용·성능 메타데이터를 처리할 수 있습니다. 동의하지 않아도 프리셋을 직접 선택할 수 있습니다.")}{" "}
                 <a
                   href="https://developers.google.com/edge/mediapipe/legal/tos"
                   target="_blank"
                   rel="noreferrer"
                   className="font-bold text-accent underline underline-offset-2"
                 >
-                  MediaPipe API 약관
-                </a>
+                  {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "MediaPipe API 약관")}</a>
               </p>
             </div>
             <input
@@ -365,7 +360,7 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
               accept="image/jpeg,image/png,image/webp"
               disabled={disabled || busy || !mediaPipeConsentGranted}
               onChange={handleFileSelected}
-              aria-label="아바타 스타일 참고 이미지 선택"
+              aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "아바타 스타일 참고 이미지 선택")}
             />
             <button
               type="button"
@@ -374,7 +369,7 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
               className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-3 text-[0.7rem] font-extrabold text-on-accent transition-colors hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-40"
             >
               <ImagePlus size={16} aria-hidden />
-              {busy ? "이미지 비교 중" : receipt ? "다른 이미지 비교" : "참고 이미지 선택"}
+              {busy ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "이미지 비교 중") : receipt ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "다른 이미지 비교") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "참고 이미지 선택")}
             </button>
 
             {busy ? (
@@ -401,15 +396,14 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
             ) : null}
 
             {receipt ? (
-              <div className="mt-3" aria-label="추천 아바타 프리셋">
+              <div className="mt-3" aria-label={translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "추천 아바타 프리셋")}>
                 {previewingPresetId && onPreviewClear ? (
                   <div
                     role="status"
                     className="mb-3 flex items-center justify-between gap-2 rounded-xl border border-accent/35 bg-accent-soft p-2.5"
                   >
                     <p className="text-[0.62rem] leading-relaxed text-fg-2">
-                      추천 스타일을 임시로 보고 있습니다. 아직 프로젝트와 되돌리기 기록에는 반영되지 않았습니다.
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "추천 스타일을 임시로 보고 있습니다. 아직 프로젝트와 되돌리기 기록에는 반영되지 않았습니다.")}</p>
                     <button
                       type="button"
                       disabled={disabled || busy}
@@ -417,18 +411,16 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                       className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg border border-line bg-card px-2.5 text-[0.62rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
                     >
                       <RotateCcw size={13} aria-hidden />
-                      원래대로
-                    </button>
+                      {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "원래대로")}</button>
                   </div>
                 ) : null}
                 <div className="flex items-end justify-between gap-3 border-b border-line/70 pb-2">
                   <div>
-                    <p className="text-[0.68rem] font-extrabold text-fg">가까운 프리셋</p>
-                    <p className="mt-0.5 text-[0.58rem] text-fg-3">전체 이미지 특징 기준 · 인물 식별 용도 아님</p>
+                    <p className="text-[0.68rem] font-extrabold text-fg">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "가까운 프리셋")}</p>
+                    <p className="mt-0.5 text-[0.58rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "전체 이미지 특징 기준 · 인물 식별 용도 아님")}</p>
                   </div>
                   <span className="text-[0.58rem] tabular-nums text-fg-3">
-                    기준 {receipt.cataloguePresetIds.length}개
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "기준 ")}{receipt.cataloguePresetIds.length}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "개")}</span>
                 </div>
                 <ol className="divide-y divide-line/60">
                   {receipt.recommendations.map((recommendation) => {
@@ -444,7 +436,7 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                               state={previewState}
                               variant="compact"
                               showBody
-                              label={`${preset.label} 추천 미리보기`}
+                              label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "{v0} 추천 미리보기"), { v0: String(preset.label) })}
                             />
                           </span>
                           <div className="min-w-0 flex-1">
@@ -453,8 +445,7 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                                 {recommendation.rank}. {preset.label}
                               </p>
                               <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-0.5 text-[0.58rem] font-bold tabular-nums text-fg-3">
-                                {Math.round(recommendation.similarity * 100)}% 유사
-                              </span>
+                                {Math.round(recommendation.similarity * 100)}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "% 유사")}</span>
                             </div>
                             <p className="mt-0.5 line-clamp-2 text-[0.6rem] leading-relaxed text-fg-3">{preset.hint}</p>
                             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -470,21 +461,19 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                                 disabled={disabled || busy}
                                 onClick={() => emitSelection(recommendation.presetId, onPreview)}
                                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-[0.64rem] font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
-                                aria-label={`${preset.label} 프리셋 미리 보기`}
+                                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "{v0} 프리셋 미리 보기"), { v0: String(preset.label) })}
                               >
                                 <Eye size={14} aria-hidden />
-                                미리 보기
-                              </button>
+                                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "미리 보기")}</button>
                               <button
                                 type="button"
                                 disabled={disabled || busy}
                                 onClick={() => emitSelection(recommendation.presetId, onApply)}
                                 className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-accent/45 bg-accent-soft text-[0.64rem] font-extrabold text-accent transition-colors hover:bg-accent hover:text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
-                                aria-label={`${preset.label} 프리셋 적용`}
+                                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "{v0} 프리셋 적용"), { v0: String(preset.label) })}
                               >
                                 <Check size={14} aria-hidden />
-                                적용
-                              </button>
+                                {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "적용")}</button>
                             </div>
                           </div>
                         </div>
@@ -493,9 +482,9 @@ export function StudioVrmAvatarReferenceRecommendationsPanel({
                   })}
                 </ol>
                 <details className="border-t border-line/70 pt-2 text-[0.56rem] leading-relaxed text-fg-3">
-                  <summary className="min-h-8 cursor-pointer font-semibold text-fg-3">분석 기술 정보</summary>
+                  <summary className="min-h-8 cursor-pointer font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "ko", "분석 기술 정보")}</summary>
                   <p className="mt-1 break-all">
-                    {receipt.modelId} r{receipt.modelRevision} · model sha256 {receipt.modelSha256.slice(0, 12)}… · catalogue {receipt.catalogueRevision}
+                    {receipt.modelId} r{receipt.modelRevision} {translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "en", "· model sha256 ")}{receipt.modelSha256.slice(0, 12)}{translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmAvatarReferenceRecommendationsPanel", "en", "… · catalogue ")}{receipt.catalogueRevision}
                   </p>
                 </details>
               </div>

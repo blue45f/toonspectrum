@@ -259,7 +259,11 @@ async function publishManifest(config) {
     if (!(await exists(audioPath))) continue;
     const bytes = new Uint8Array(await readFile(audioPath));
     if (!isMp3(bytes) || sha256(bytes) !== metadata.sha256) throw new Error(`Integrity check failed for ${audioName}`);
-    if (metadata.provider !== "elevenlabs" || metadata.model !== "music_v2_5" || metadata.c2paRequested !== true) throw new Error(`Provenance check failed for ${audioName}`);
+    const elevenLabs = metadata.provider === "elevenlabs" && metadata.model === "music_v2_5" && metadata.c2paRequested === true;
+    const aceStep = metadata.provider === "ace-step" && metadata.model === "acestep-v15-turbo"
+      && /^[a-f0-9]{40}$/u.test(metadata.generator?.sourceRevision ?? "")
+      && metadata.quality?.automatedQcPassed === true;
+    if (!elevenLabs && !aceStep) throw new Error(`Provenance check failed for ${audioName}`);
     if (metadata.review?.approvedForSite !== true) {
       console.warn(`Skipping ${audioName}: review.approvedForSite is not true.`);
       continue;
@@ -274,18 +278,22 @@ async function publishManifest(config) {
       vocalMode: metadata.variant,
       language: metadata.variant === "vocal" ? track.language : "none",
       summary: track.summary,
-      license: "Eleven Music original generation; commercial use subject to the active ToonSpectrum subscription and Music Terms review",
-      creditUrl: TERMS_URL,
+      license: elevenLabs
+        ? "Eleven Music original generation; commercial use subject to the active ToonSpectrum subscription and Music Terms review"
+        : "ToonSpectrum original generation using the MIT-licensed ACE-Step 1.5 software; generation provenance is recorded in the adjacent sidecar",
+      creditUrl: elevenLabs ? TERMS_URL : "https://github.com/ace-step/ACE-Step-1.5",
       profiles: track.profiles,
       intensity: track.intensity,
       durationMs: track.durationMs,
       bpm: track.bpm,
       provider: metadata.provider,
       model: metadata.model,
-      songId: metadata.songId,
+      ...(metadata.songId ? { songId: metadata.songId } : {}),
       sha256: metadata.sha256,
       generatedAt: metadata.generatedAt,
-      c2paRequested: metadata.c2paRequested,
+      ...(elevenLabs
+        ? { provenance: "c2pa-requested", c2paRequested: true }
+        : { provenance: "local-generation-recorded", generatorRevision: metadata.generator.sourceRevision }),
       status: "published"
     });
   }
@@ -296,7 +304,7 @@ async function publishManifest(config) {
     const bi = config.tracks.indexOf(bTrack);
     return ai - bi || a.vocalMode.localeCompare(b.vocalMode);
   });
-  const manifest = { version: 2, collection: config.collection, publishedAt: new Date().toISOString(), tracks };
+  const manifest = { version: 3, collection: config.collection, publishedAt: new Date().toISOString(), tracks };
   await writeFile(PLAYLIST_PATH, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   console.log(`Published ${tracks.length} approved original track variants to ${PLAYLIST_PATH.slice(ROOT.length + 1)}.`);
 }

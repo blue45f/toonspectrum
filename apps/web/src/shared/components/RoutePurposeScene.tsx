@@ -1,12 +1,18 @@
-import { Pause, Play, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  Pause,
+  Play,
+  Sparkles } from "lucide-react";
+import { useEffect,
+  defineBilingualText,
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  useRef,
+  useState } from "react";
 
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
 
 import {
   defineBilingualMap,
-  defineBilingualText,
-  formatI18nTemplate,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { useT } from "@/shared/lib/i18n";
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
@@ -133,8 +139,8 @@ export function RoutePurposeScene({
         className="route-purpose-scene"
         data-route-visual-kind={profile.kind}
         data-route-visual-motion={profile.motion}
-        data-route-visual-running={running ? "true" : "false"}
-        data-route-visual-video-ready={videoReady ? "true" : "false"}
+        data-route-visual-running={running ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "true") : translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "false")}
+        data-route-visual-video-ready={videoReady ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "true") : translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "false")}
         aria-label={formatI18nTemplate(t(COPY.pageGuide), { title })}
       >
         <div className="route-purpose-scene__copy">
@@ -156,12 +162,12 @@ export function RoutePurposeScene({
             <img
               src={visualImage}
               srcSet={imageSrcSet}
-              sizes={imageSrcSet ? "(max-width: 760px) calc(100vw - 2rem), 44vw" : undefined}
+              sizes={imageSrcSet ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "(max-width: 760px) calc(100vw - 2rem), 44vw") : undefined}
               alt=""
               width={960}
               height={640}
-              loading={profile.density === "prominent" ? "eager" : "lazy"}
-              fetchPriority={profile.density === "prominent" ? "high" : "auto"}
+              loading={profile.density === "prominent" ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "eager") : translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "lazy")}
+              fetchPriority={profile.density === "prominent" ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "high") : translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "auto")}
               decoding="async"
               draggable={false}
               style={{ objectPosition: profile.imagePosition }}
@@ -171,10 +177,10 @@ export function RoutePurposeScene({
                 ref={videoRef}
                 muted
                 playsInline
-                preload={profile.density === "prominent" ? "metadata" : "none"}
+                preload={profile.density === "prominent" ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "metadata") : translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "none")}
                 poster={profile.video.poster}
                 tabIndex={-1}
-                data-ready={videoReady ? "true" : "false"}
+                data-ready={videoReady ? translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "true") : translateCurrentStaticSourceText("shared.components.RoutePurposeScene", "en", "false")}
                 style={{ objectPosition: profile.imagePosition }}
                 onPlaying={() => setVideoReady(true)}
                 onEnded={restartVideo}
