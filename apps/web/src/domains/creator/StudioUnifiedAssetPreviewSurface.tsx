@@ -16,16 +16,43 @@ import type {
 
 import { cn } from "@/shared/lib/utils";
 
-const THREE_POSTER_CACHE = new Map<string, string>();
+interface ThreePosterCacheEntry {
+  readonly value: string;
+  readonly estimatedBytes: number;
+}
+
+const THREE_POSTER_CACHE = new Map<string, ThreePosterCacheEntry>();
 const THREE_POSTER_CACHE_LIMIT = 96;
+const THREE_POSTER_CACHE_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
+let threePosterCacheRetainedBytes = 0;
+
+function deleteThreePoster(key: string): void {
+  const cached = THREE_POSTER_CACHE.get(key);
+  if (!cached) return;
+  THREE_POSTER_CACHE.delete(key);
+  threePosterCacheRetainedBytes = Math.max(
+    0,
+    threePosterCacheRetainedBytes - cached.estimatedBytes,
+  );
+}
+
+function getThreePoster(key: string): string | null {
+  return THREE_POSTER_CACHE.get(key)?.value ?? null;
+}
 
 function cacheThreePoster(key: string, value: string): void {
-  if (THREE_POSTER_CACHE.has(key)) THREE_POSTER_CACHE.delete(key);
-  THREE_POSTER_CACHE.set(key, value);
-  while (THREE_POSTER_CACHE.size > THREE_POSTER_CACHE_LIMIT) {
+  deleteThreePoster(key);
+  const estimatedBytes = 192 + value.length * 2;
+  if (estimatedBytes > THREE_POSTER_CACHE_MAX_ESTIMATED_BYTES) return;
+  THREE_POSTER_CACHE.set(key, { value, estimatedBytes });
+  threePosterCacheRetainedBytes += estimatedBytes;
+  while (
+    THREE_POSTER_CACHE.size > THREE_POSTER_CACHE_LIMIT
+    || threePosterCacheRetainedBytes > THREE_POSTER_CACHE_MAX_ESTIMATED_BYTES
+  ) {
     const oldest = THREE_POSTER_CACHE.keys().next().value as string | undefined;
     if (!oldest) break;
-    THREE_POSTER_CACHE.delete(oldest);
+    deleteThreePoster(oldest);
   }
 }
 
@@ -198,9 +225,10 @@ function ThreePreview({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
+  const requestRenderRef = useRef<(() => void) | null>(null);
   const active = useIntersectionActivation(hostRef, mode === "interactive");
   const cachedPoster = mode === "thumbnail"
-    ? THREE_POSTER_CACHE.get(preview.cacheKey) ?? null
+    ? getThreePoster(preview.cacheKey)
     : null;
   const [poster, setPoster] = useState<string | null>(cachedPoster);
   const [scrubbing, setScrubbing] = useState(false);
@@ -218,6 +246,10 @@ function ThreePreview({
   autoRotateRef.current = autoRotate;
 
   useEffect(() => {
+    requestRenderRef.current?.();
+  }, [autoRotate]);
+
+  useEffect(() => {
     if (!active || (mode === "thumbnail" && poster && !scrubbing)) return undefined;
     const hostNode = canvasHostRef.current;
     if (!hostNode) return undefined;
@@ -228,6 +260,7 @@ function ThreePreview({
     let cleanObject: Object3D | null = null;
     let renderer: import("three").WebGLRenderer | null = null;
     let controls: import("three/examples/jsm/controls/OrbitControls.js").OrbitControls | null = null;
+    let detachControlEvents: (() => void) | null = null;
 
     async function start(): Promise<void> {
       setState("loading");
@@ -270,15 +303,18 @@ function ThreePreview({
         rim.position.set(-radius * 2, radius * 1.3, -radius * 1.5);
         scene.add(rim);
 
-        const render = () => {
+        const resize = () => {
           if (!renderer) return;
           const width = Math.max(1, host.clientWidth || (mode === "thumbnail" ? 280 : 420));
           const height = Math.max(1, host.clientHeight || (mode === "thumbnail" ? 210 : 360));
           renderer.setSize(width, height, false);
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
-          renderer.render(scene, camera);
         };
+        const render = () => {
+          renderer?.render(scene, camera);
+        };
+        resize();
 
         if (mode === "thumbnail") {
           if (!poster) {
@@ -291,18 +327,26 @@ function ThreePreview({
             }
             return;
           }
-          const animateThumbnail = () => {
+          const renderThumbnail = () => {
+            frame = 0;
             if (cancelled || !renderer) return;
             object.rotation.y = thumbnailRotationRef.current;
             render();
-            frame = requestAnimationFrame(animateThumbnail);
           };
+          const requestThumbnailRender = () => {
+            if (cancelled || frame !== 0) return;
+            frame = requestAnimationFrame(renderThumbnail);
+          };
+          requestRenderRef.current = requestThumbnailRender;
           resizeObserver = typeof ResizeObserver === "undefined"
             ? null
-            : new ResizeObserver(render);
+            : new ResizeObserver(() => {
+              resize();
+              requestThumbnailRender();
+            });
           resizeObserver?.observe(host);
           setState("ready");
-          animateThumbnail();
+          requestThumbnailRender();
           return;
         }
 
@@ -317,19 +361,53 @@ function ThreePreview({
         controls.autoRotateSpeed = 1.25;
         controls.target.set(0, 0, 0);
         controls.update();
-        const animate = () => {
+
+        let interacting = false;
+        let dampingFramesRemaining = 0;
+        const renderInteractiveFrame = (): void => {
+          frame = 0;
           if (cancelled || !renderer || !controls) return;
           controls.autoRotate = autoRotateRef.current;
           controls.update();
           render();
-          frame = requestAnimationFrame(animate);
+          if (interacting) dampingFramesRemaining = 18;
+          else if (!autoRotateRef.current && dampingFramesRemaining > 0) dampingFramesRemaining -= 1;
+          if (autoRotateRef.current || interacting || dampingFramesRemaining > 0) {
+            requestInteractiveRender();
+          }
         };
-        animate();
+        const requestInteractiveRender = (): void => {
+          if (cancelled || frame !== 0) return;
+          frame = requestAnimationFrame(renderInteractiveFrame);
+        };
+        const handleInteractionStart = () => {
+          interacting = true;
+          requestInteractiveRender();
+        };
+        const handleInteractionEnd = () => {
+          interacting = false;
+          dampingFramesRemaining = 18;
+          requestInteractiveRender();
+        };
+        const handleControlsChange = () => render();
+        controls.addEventListener("start", handleInteractionStart);
+        controls.addEventListener("end", handleInteractionEnd);
+        controls.addEventListener("change", handleControlsChange);
+        detachControlEvents = () => {
+          controls?.removeEventListener("start", handleInteractionStart);
+          controls?.removeEventListener("end", handleInteractionEnd);
+          controls?.removeEventListener("change", handleControlsChange);
+        };
+        requestRenderRef.current = requestInteractiveRender;
         resizeObserver = typeof ResizeObserver === "undefined"
           ? null
-          : new ResizeObserver(render);
+          : new ResizeObserver(() => {
+            resize();
+            requestInteractiveRender();
+          });
         resizeObserver?.observe(host);
         setState("ready");
+        requestInteractiveRender();
       } catch {
         if (!cancelled) setState("error");
       }
@@ -338,8 +416,10 @@ function ThreePreview({
     void start();
     return () => {
       cancelled = true;
+      requestRenderRef.current = null;
       cancelAnimationFrame(frame);
       resizeObserver?.disconnect();
+      detachControlEvents?.();
       controls?.dispose();
       if (cleanObject) disposeObject(cleanObject);
       renderer?.dispose();
@@ -365,6 +445,7 @@ function ThreePreview({
           ? (event.clientX - bounds.left) / bounds.width
           : 0.5;
         thumbnailRotationRef.current = (progress * Math.PI * 2) - Math.PI;
+        requestRenderRef.current?.();
       } : undefined}
       data-studio-three-preview={preview.cacheKey}
       data-preview-mode={mode}
