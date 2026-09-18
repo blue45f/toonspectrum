@@ -43,6 +43,7 @@ describe("Studio music publication bridge", () => {
       .toBe("https://cdn.example.test/ost/opening.mp3?rev=2");
     expect(() => normalizeHostedMusicUrl("http://example.test/a.mp3")).toThrow(/HTTPS/);
     expect(() => normalizeHostedMusicUrl("https://example.test/a.wav")).toThrow(/MP3/);
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     expect(() => normalizeHostedMusicUrl("https://user:secret@example.test/a.mp3")).toThrow(/HTTPS/);
   });
 

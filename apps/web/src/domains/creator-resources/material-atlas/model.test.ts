@@ -41,6 +41,7 @@ describe("material catalog trust boundary", () => {
   it("keeps a safe source when the preview URL is invalid", () => expect(parseMaterialAsset({ ...asset, thumbnailUrl: "https://evil.test/image" })?.thumbnailUrl).toBe(""));
   it.each([
     "http://cdn.polyhaven.com/asset_img/thumbs/wood_chair.png", "https://cdn.polyhaven.com.evil.test/asset_img/thumbs/wood_chair.png",
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     "https://user:secret@cdn.polyhaven.com/asset_img/thumbs/wood_chair.png", "https://cdn.polyhaven.com:444/asset_img/thumbs/wood_chair.png",
     "https://cdn.polyhaven.com/asset_img/thumbs/other.png", "https://cdn.polyhaven.com/asset_img/thumbs/wood_chair.png#fragment",
   ])("rejects thumbnail host/path/credential mismatch %s", (url) => expect(safeMaterialThumbnail("polyhaven", "wood_chair", url)).toBe(""));
