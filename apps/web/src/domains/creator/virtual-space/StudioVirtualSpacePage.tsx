@@ -448,21 +448,18 @@ function VirtualSpaceExperience({
     const controller = new StudioVirtualSpacePresenceController(
       room.participant,
       room.direct,
-      snapshot.self,
+      studioVirtualSpaceInitialPoint(room.participant.sessionId),
     );
     controllerRef.current = controller;
     const refresh = () => setSnapshot(controller.snapshot());
     const unsubscribe = controller.subscribe(refresh);
     controller.start();
-    controller.setActivity(activity);
     refresh();
     return () => {
       unsubscribe();
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-    // Snapshot position is deliberately captured only when the direct lane generation changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live.availability, live.room]);
 
   const updatePosition = useCallback((
@@ -613,7 +610,6 @@ function VirtualSpaceExperience({
                 ref={stageRef}
                 role="application"
                 aria-label={bt("가상 스튜디오 공간", "Virtual studio space")}
-                tabIndex={0}
                 onPointerDown={handleStagePointer}
                 className="relative aspect-[59/36] min-h-[34rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line bg-[radial-gradient(circle_at_50%_44%,oklch(0.78_0.13_300/0.16),transparent_17%),linear-gradient(145deg,var(--color-panel),var(--color-card))] shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 data-studio-virtual-space="true"
