@@ -38,14 +38,19 @@ describe("production engine verifier entry", () => {
     expect(job).not.toContain("continue-on-error");
     expect(job).not.toContain("|| true");
   });
-  it("executes each engine regression exactly once through the mandatory manifest runner", () => {
+  it("executes each engine regression exactly once through the mandatory portfolio", () => {
     const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
     const staticJob = workflow.split("  static:")[1]?.split("  serial:")[0] ?? "";
-    const targets = readFileSync(
-      new URL("./ci-required-vitest-targets.txt", import.meta.url),
+    const portfolio = readFileSync(
+      new URL("ci-required-vitest-targets.txt", import.meta.url),
       "utf8",
-    ).trim().split(/\r?\n/u);
-    expect(staticJob.match(/node scripts\/run-core-vitest\.mjs/gu)).toHaveLength(1);
+    )
+      .trim()
+      .split(/\r?\n/u)
+      .filter(Boolean);
+
+    expect(staticJob).toContain("mapfile -t targets < scripts/ci-required-vitest-targets.txt");
+    expect(staticJob).toContain('pnpm exec vitest run "${targets[@]}"');
     for (const target of [
       "scripts/verify-studio-engine-editor-entry.test.ts",
       "scripts/verify-studio-hokusai-live-integration.test.ts",
@@ -54,7 +59,7 @@ describe("production engine verifier entry", () => {
       "scripts/verify-studio-hybrid-dcc-opfs-race.test.ts",
     ]) {
       expect(
-        targets.filter((candidate) => candidate === target),
+        portfolio.filter((entry) => entry === target),
         `${target} must remain mandatory without duplicate execution`,
       ).toHaveLength(1);
     }

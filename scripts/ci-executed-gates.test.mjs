@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { REQUIRED_CORE_GATES } from "./ci-core-gate.mjs";
 import {
@@ -9,14 +11,52 @@ import {
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
-const requiredTargets = loadRequiredTargets();
-const jobs = source.slice(source.indexOf("\njobs:\n") + 7)
-  .split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m);
+const requiredTargets = readFileSync(
+  new URL("./ci-required-vitest-targets.txt", import.meta.url),
+  "utf8",
+).trim().split(/\r?\n/).filter(Boolean);
+const repoRoot = fileURLToPath(new URL("../", import.meta.url));
+const jobs = source.slice(source.indexOf("\njobs:\n") + 7).split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m);
 
 function job(name) {
   const block = jobs.find((entry) => entry.startsWith(`  ${name}:\n`));
   assert.ok(block, `missing job: ${name}`);
   return block;
+}
+
+function targetExists(target) {
+  const absoluteTarget = join(repoRoot, target);
+  if (existsSync(absoluteTarget)) return true;
+
+  const directory = dirname(absoluteTarget);
+  if (!existsSync(directory)) return false;
+  const name = basename(target);
+  if (!name.includes("*")) {
+    return readdirSync(directory).some(
+      (entry) => entry.startsWith(name) && /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry),
+    );
+  }
+
+  const expression = new RegExp(
+    `^${name
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replaceAll("*", ".*")}$`,
+  );
+  return readdirSync(directory).some((entry) => expression.test(entry));
+}
+
+function assertRequiredPortfolio(block) {
+  assert.match(block, /mapfile -t targets < scripts\/ci-required-vitest-targets\.txt/);
+  assert.match(block, /test "\$\{#targets\[@\]\}" -gt 0/);
+  assert.match(
+    block,
+    /pnpm exec vitest run "\$\{targets\[@\]\}" --pool=forks --maxWorkers=4/,
+  );
+  assert.equal(
+    [...block.matchAll(/pnpm exec vitest run/g)].length,
+    1,
+    "required regression portfolio must start Vitest exactly once",
+  );
 }
 
 test("core retains every mandatory quality lane without a bypass", () => {
@@ -133,42 +173,43 @@ test("PR lint is scoped while push and merge validation stay repository-wide", (
   }
 });
 
-test("core Vitest coverage is manifest-driven and starts one runner process", () => {
+test("PR caches restore without paying cache-save post steps", () => {
+  for (const [name, cacheId] of [
+    ["lint", "eslint-cache"],
+    ["typecheck", "typescript-cache"],
+  ]) {
+    const block = job(name);
+    assert.match(block, new RegExp(`id: ${cacheId}\\n\\s+uses: actions/cache/restore@v4`));
+    assert.match(block, /uses: actions\/cache\/save@v4/);
+    assert.match(block, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(block, /uses: actions\/cache@v4/);
+  }
+});
+
+test("the required Vitest manifest is sorted, unique, resolvable and executed once", () => {
   assert.deepEqual(requiredTargets, [...requiredTargets].sort());
   assert.equal(new Set(requiredTargets).size, requiredTargets.length);
   assert.ok(requiredTargets.length >= 160, "unexpected regression coverage shrink");
-
-  const resolved = resolveRequiredTargets(requiredTargets);
-  assert.ok(resolved.length >= requiredTargets.length);
-  assert.equal(new Set(resolved).size, resolved.length);
-
-  const staticJob = job("static");
-  assert.equal((staticJob.match(/node scripts\/run-core-vitest\.mjs/g) ?? []).length, 1);
-  assert.doesNotMatch(staticJob, /pnpm exec vitest run/);
+  for (const target of requiredTargets) {
+    assert.ok(targetExists(target), `missing mandatory Vitest target: ${target}`);
+  }
+  assertRequiredPortfolio(job("static"));
 });
-test("static regressions use sparse checkout and one consolidated Node test command", () => {
-  const staticJob = job("static");
-  for (const path of [
-    "filter: blob:none",
-    "!/apps/web/public/assets/",
-    "/apps/web/public/assets/reference-rebuild/",
-    "!/apps/web/public/vrm/",
+
+test("the expensive portfolio runs after cheap fail-fast contracts", () => {
+  const block = job("static");
+  const portfolio = block.indexOf("Run required Vitest regression portfolio");
+  for (const command of [
+    "node --test scripts/verify-studio-p2p-huddle.test.mjs",
+    "node --test scripts/studio-offline-resilience.test.mjs",
+    "pnpm run validate:architecture",
+    "node --test scripts/verify-studio-menus-ci.test.mjs",
+    "node --experimental-strip-types --test scripts/api-followup-unit.test.mjs",
   ]) {
-    assert.ok(staticJob.includes(path), `static sparse checkout is missing ${path}`);
+    assert.ok(block.indexOf(command) < portfolio, `${command} must fail before the full portfolio`);
   }
-  for (const fixture of [
-    "/apps/web/public/vrm/AvatarSample_B.vrm",
-    "/apps/web/public/vrm/sample.vrm",
-    "/docs/studio-selection-benchmark.md",
-  ]) {
-    assert.ok(staticJob.includes(fixture), `static sparse checkout is missing ${fixture}`);
-  }
-  assert.equal(
-    (staticJob.match(/node --experimental-strip-types --test --test-concurrency=1/g) ?? []).length,
-    1,
-  );
-  assert.doesNotMatch(staticJob, /node --test scripts\//);
-  assert.doesNotMatch(staticJob, /node --experimental-strip-types --test scripts\//);
+  assert.ok(block.indexOf("pnpm run test:studio-material-brush") > portfolio);
+  assert.ok(block.indexOf("scripts/audit-studio-brush-quality-portfolio.mts") > portfolio);
 });
 
 test("production visual audit and protected core share the Vitest policy suite", () => {
@@ -176,12 +217,10 @@ test("production visual audit and protected core share the Vitest policy suite",
     new URL("../.github/workflows/studio-3d-production-visual-audit.yml", import.meta.url),
     "utf8",
   );
-  assert.ok(audit.includes(
-    "      - name: Verify audit policy\n" +
-    "        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n",
-  ));
+  assert.ok(audit.includes("      - name: Verify audit policy\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
+  assert.doesNotMatch(audit, /node\s+--test\s+scripts\/lib\/studio-3d-production-audit-policy\.test\.mjs/);
   assert.ok(requiredTargets.includes("scripts/lib/studio-3d-production-audit-policy.test.mjs"));
-  assert.ok(job("static").includes("node scripts/run-core-vitest.mjs"));
+  assertRequiredPortfolio(job("static"));
 });
 test("manual validation cannot cancel push validation and retries retain evidence", () => {
   assert.ok(source.includes(
@@ -191,7 +230,7 @@ test("manual validation cannot cancel push validation and retries retain evidenc
   assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
 });
 
-test("ToonStudio session validation shares one setup and delegates full gates", () => {
+test("ToonStudio session validation shares one setup and delegates full gates to protected core", () => {
   const session = readFileSync(
     new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url),
     "utf8",

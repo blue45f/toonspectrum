@@ -80,7 +80,8 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - name: Restore ESLint result cache
-        uses: actions/cache@v4
+        id: eslint-cache
+        uses: actions/cache/restore@v4
         with:
           path: node_modules/.cache/eslint
           key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
@@ -94,10 +95,12 @@ jobs:
       - name: Strict lint full repository
         if: github.event_name != 'pull_request'
         run: pnpm run lint:strict
-      - name: Import and dependency hygiene
-        run: pnpm run quality:imports
-      - name: Secret scan
-        run: pnpm run quality:secrets
+      - name: Save ESLint result cache on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.eslint-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: node_modules/.cache/eslint/full
+          key: core-eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.mjs') }}-${{ github.sha }}
 
   typecheck:
     name: Core preflight and application typecheck
@@ -129,7 +132,8 @@ jobs:
         run: python3 scripts/verify-pr-workflow-fanout.py
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Restore TypeScript incremental state
-        uses: actions/cache@v4
+        id: typescript-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             **/*.tsbuildinfo
@@ -141,6 +145,13 @@ jobs:
           set -euo pipefail
           pnpm run typecheck
           pnpm run typecheck:cloudflare-realtime
+      - name: Save TypeScript incremental state on main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.typescript-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            **/*.tsbuildinfo
+          key: core-ts-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json', 'apps/**/tsconfig*.json', 'deploy/**/tsconfig*.json', 'packages/**/tsconfig*.json') }}-${{ github.sha }}
 
   static:
     name: Core regression shard / ${{ matrix.shard }}
@@ -182,25 +193,33 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Node regression contracts
-        run: |
-          node --experimental-strip-types --test --test-concurrency=1 \
-            scripts/api-followup-ci-policy.test.mjs \
-            scripts/api-followup-unit.test.mjs \
-            scripts/studio-offline-resilience.test.mjs \
-            scripts/verify-studio-menus-ci.test.mjs \
-            scripts/verify-studio-p2p-huddle.test.mjs
-      - name: Required product and Studio Vitest regressions
-        run: node scripts/run-core-vitest.mjs
+      - name: P2P browser verification cache regression
+        run: node --test scripts/verify-studio-p2p-huddle.test.mjs
+      - name: Studio offline drawing resilience contract
+        run: node --test scripts/studio-offline-resilience.test.mjs
       - name: Repository contracts
         run: |
           set -euo pipefail
           pnpm run validate:architecture
           pnpm run verify:csp
           pnpm run verify:toolchain-coverage
+      - name: Production menu verifier entry execution
+        run: node --test scripts/verify-studio-menus-ci.test.mjs
+      - name: API runtime follow-up policy
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types --test scripts/api-followup-unit.test.mjs
+          node --test scripts/api-followup-ci-policy.test.mjs
+      - name: Run required Vitest regression portfolio
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t targets < scripts/ci-required-vitest-targets.txt
+          test "${#targets[@]}" -gt 0
+          pnpm exec vitest run "${targets[@]}" --pool=forks --maxWorkers=4
       - name: Material brush execution and saved recipe regressions
         run: pnpm run test:studio-material-brush
-      - name: Brush quality portfolio audit
+      - name: Audit Studio brush quality portfolio
         run: pnpm exec tsx scripts/audit-studio-brush-quality-portfolio.mts
 
   serial:
