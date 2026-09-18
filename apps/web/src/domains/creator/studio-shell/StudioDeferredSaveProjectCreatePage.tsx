@@ -308,7 +308,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     )}>
                       <Icon size={19} aria-hidden="true" />
                     </span>
-                    <b className="mt-3 block break-words text-base text-fg">{projectTitle(option, locale)}</b>
+                    <b className="mt-3 block break-words text-base text-fg">{projectTitle(option, l)}</b>
                     <span id={descriptionId} className="mt-1 block break-words text-xs leading-5 text-fg-3">
                       {l(option.descriptionKo, option.descriptionEn)}
                     </span>
