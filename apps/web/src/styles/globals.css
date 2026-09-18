@@ -66,7 +66,7 @@ html[data-studio-canvas-only="true"] body {
   --radius-2xl: 1.4rem;
 
   /* 애니메이션 */
-  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-shimmer: shimmer 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   --animate-fade-up: fade-up 0.5s var(--ease-out-expo) both;
   --animate-fade-in: fade-in 0.18s var(--ease-out-expo) both;
   --animate-hud-in: hud-in 0.2s var(--ease-out-expo) both;
@@ -118,10 +118,19 @@ html[data-studio-canvas-only="true"] body {
 
 @keyframes shimmer {
   0% {
-    background-position: -200% 0;
+    transform: translate3d(-135%, 0, 0);
   }
   100% {
-    background-position: 200% 0;
+    transform: translate3d(235%, 0, 0);
+  }
+}
+
+@keyframes skeleton-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 @keyframes fade-in {
@@ -522,17 +531,49 @@ html[data-studio-canvas-only="true"] body {
   font-size: 0.7rem;
 }
 
-/* 스켈레톤 시머 */
+/* 스켈레톤 시머 — 배경 위치 전체를 다시 칠하는 대신 얇은 pseudo 레이어만 transform 한다. */
 @utility skeleton {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  contain: paint;
+  background: color-mix(in oklab, var(--color-raised) 92%, var(--color-line) 8%);
+  border-radius: 0.5rem;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -55%;
+  width: 55%;
+  pointer-events: none;
   background: linear-gradient(
     100deg,
-    var(--color-raised) 30%,
-    oklch(0.3 0.011 64) 50%,
-    var(--color-raised) 70%
+    transparent 0%,
+    color-mix(in oklab, var(--color-fg) 7%, transparent) 45%,
+    color-mix(in oklab, var(--color-fg) 12%, transparent) 52%,
+    color-mix(in oklab, var(--color-fg) 7%, transparent) 59%,
+    transparent 100%
   );
-  background-size: 200% 100%;
   animation: var(--animate-shimmer);
-  border-radius: 0.5rem;
+  will-change: transform;
+}
+
+/* 120ms보다 짧은 로딩에서는 공간만 예약하고 시각 스켈레톤은 드러내지 않아 flash를 줄인다. */
+.skeleton-group {
+  animation: skeleton-reveal 140ms ease-out 120ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none !important;
+    opacity: 0;
+  }
+
+  .skeleton-group {
+    animation: none !important;
+    opacity: 1;
+  }
 }
 
 /* 텍스트 밸런스/클램프 */

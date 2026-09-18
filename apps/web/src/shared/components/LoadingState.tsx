@@ -77,7 +77,8 @@ export function LoadingState({
         role="status"
         aria-busy="true"
         aria-label={resolvedLabel}
-        className={cn("w-full", className)}
+        aria-live="polite"
+        className={cn("skeleton-group w-full", className)}
       >
         <div className="flex flex-col gap-3" aria-hidden="true">
           <span className="skeleton h-3 w-24" />
@@ -86,7 +87,11 @@ export function LoadingState({
         </div>
         <div className="mt-8 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: cardCount }).map((_, i) => (
-            <span key={i} className="skeleton aspect-[3/4] w-full rounded-2xl" aria-hidden="true" />
+            <div key={i} className="min-w-0" aria-hidden="true" data-skeleton-card>
+              <span className="skeleton block aspect-[3/4] w-full rounded-2xl" />
+              <span className="skeleton mt-2.5 block h-3.5 w-4/5" />
+              <span className="skeleton mt-1.5 block h-3 w-3/5 opacity-80" />
+            </div>
           ))}
         </div>
         <span className="sr-only">{resolvedLabel}</span>
@@ -100,7 +105,8 @@ export function LoadingState({
       role="status"
       aria-busy="true"
       aria-label={resolvedLabel}
-      className={cn("flex w-full max-w-full flex-col gap-2.5", className)}
+      aria-live="polite"
+      className={cn("skeleton-group flex w-full max-w-full flex-col gap-2.5", className)}
     >
       <span className="skeleton h-4 w-3/4" aria-hidden="true" />
       <span className="skeleton h-4 w-full" aria-hidden="true" />
