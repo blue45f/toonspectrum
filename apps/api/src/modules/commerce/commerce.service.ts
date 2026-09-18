@@ -19,7 +19,7 @@ import {
 import {
   isCommerceOrderStatus,
   type CommerceOrderPublicEntry,
-  type CommerceProvider,
+  type CommerceOrderStatus,
 } from "../../../../../packages/core/src/commerce";
 import {
   commerceEntitlements,
@@ -317,7 +317,6 @@ export class CommerceService {
       });
     }
 
-    const config = await getCommerceConfig();
     const runtime = resolveCommerceProviderRuntime("toss");
     if (!runtime.tossConfig?.serverReady || !row.paymentKey && !identity.paymentKey) {
       throw new ServiceUnavailableException("결제 공급자 조회 설정이 준비되지 않았습니다.");
@@ -586,7 +585,7 @@ export class CommerceService {
   private assertPaymentMatchesOrder(
     row: CommerceOrderRow,
     payment: SupporterTossPayment,
-  ): void {
+  ): CommerceOrderStatus {
     if (
       payment.orderId !== row.orderId
       || payment.totalAmount !== row.amount
@@ -605,6 +604,7 @@ export class CommerceService {
         message: "지원하지 않는 결제 상태가 반환되었습니다.",
       });
     }
+    return payment.status;
   }
 
   private async applyVerifiedPayment(
@@ -612,8 +612,7 @@ export class CommerceService {
     payment: SupporterTossPayment,
     webhookVerified: boolean,
   ): Promise<CommerceOrderRow> {
-    this.assertPaymentMatchesOrder(row, payment);
-    const status = payment.status;
+    const status = this.assertPaymentMatchesOrder(row, payment);
     const balanceAmount = Math.max(
       0,
       Math.min(
