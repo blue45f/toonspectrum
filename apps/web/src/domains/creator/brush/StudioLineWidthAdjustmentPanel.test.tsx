@@ -10,13 +10,13 @@ describe("StudioLineWidthAdjustmentPanel", () => {
     cleanup();
   });
 
-  it("renders with header, CSP badge, and action tabs", () => {
+  it("renders with a Studio-native header and action tabs", () => {
     render(<StudioLineWidthAdjustmentPanel onApply={vi.fn()} />);
 
-    expect(screen.getByText("선폭 수정 (Line Width)")).toBeDefined();
-    expect(screen.getByText("CSP")).toBeDefined();
-    expect(screen.getByText("굵게 (+)")).toBeDefined();
-    expect(screen.getByText("가늘게 (-)")).toBeDefined();
+    expect(screen.getByText("선 굵기 조절")).toBeDefined();
+    expect(screen.queryByText("CSP")).toBeNull();
+    expect(screen.getByText("굵게")).toBeDefined();
+    expect(screen.getByText("가늘게")).toBeDefined();
     expect(screen.getByText("배율 (×)")).toBeDefined();
   });
 
@@ -33,7 +33,7 @@ describe("StudioLineWidthAdjustmentPanel", () => {
     const onApply = vi.fn();
     render(<StudioLineWidthAdjustmentPanel currentWidth={4} onApply={onApply} />);
 
-    const applyBtn = screen.getByRole("button", { name: "선택한 선에 선폭 적용" });
+    const applyBtn = screen.getByRole("button", { name: "선택한 선에 적용" });
     fireEvent.click(applyBtn);
 
     expect(onApply).toHaveBeenCalledWith(

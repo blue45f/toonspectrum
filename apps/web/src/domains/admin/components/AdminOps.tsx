@@ -10,6 +10,7 @@ import {
 import { AdminNotice, AdminSpinner } from "./admin-ui";
 import { adminButtonClass } from "./admin-ui-utils";
 
+import { Switch } from "@/shared/components/ui/switch";
 import { useT } from "@/shared/lib/i18n";
 import { getApiErrorMessage } from "@/infrastructure/api";
 
@@ -164,25 +165,12 @@ function MonetizationToggle({
           <p className="text-sm font-medium text-fg">{t("admin.ops.monetizationTitle")}</p>
           <p className="mt-0.5 text-xs text-fg-3">{on ? "ON" : "OFF"}</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
+        <Switch
+          checked={on}
           aria-label={t("admin.ops.monetizationTitle")}
-          onClick={() => void toggle()}
+          onCheckedChange={() => void toggle()}
           disabled={savingKey === "monetizationEnabled"}
-          className={[
-            "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
-            on ? "bg-accent" : "bg-raised",
-          ].join(" ")}
-        >
-          <span
-            className={[
-              "inline-block size-5 rounded-full bg-canvas shadow transition-transform",
-              on ? "translate-x-[1.375rem]" : "translate-x-0.5",
-            ].join(" ")}
-          />
-        </button>
+        />
       </div>
       <p className="text-xs leading-relaxed text-fg-3">{t("admin.ops.monetizationDesc")}</p>
     </div>
@@ -220,25 +208,12 @@ function ContentKillSwitches({
                 {on ? t("admin.plans.statusActive") : t("admin.plans.statusInactive")} · {desc}
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={on}
+            <Switch
+              checked={on}
               aria-label={label}
-              onClick={() => void toggle(key)}
+              onCheckedChange={() => void toggle(key)}
               disabled={savingKey !== null}
-              className={[
-                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
-                on ? "bg-accent" : "bg-raised",
-              ].join(" ")}
-            >
-              <span
-                className={[
-                  "inline-block size-5 rounded-full bg-canvas shadow transition-transform",
-                  on ? "translate-x-[1.375rem]" : "translate-x-0.5",
-                ].join(" ")}
-              />
-            </button>
+            />
           </div>
         );
       })}

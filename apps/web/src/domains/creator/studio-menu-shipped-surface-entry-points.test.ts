@@ -158,7 +158,7 @@ describe("§15.3 rows that open an already-shipped surface", () => {
     }
   });
 
-  it("opens every platform canvas through the existing new-work creator with the exact preset", () => {
+  it("applies every platform size to the current drawing with the exact preset", () => {
     const { groups, ui } = buildMenu();
     const presets = [
       "webtoon-vertical",
@@ -167,9 +167,9 @@ describe("§15.3 rows that open an already-shipped surface", () => {
       "webtoon-canvas",
     ] as const;
 
-    for (const preset of presets) item(groups, "canvas", `new-${preset}`).onSelect();
+    for (const preset of presets) item(groups, "canvas", `apply-${preset}`).onSelect();
 
-    expect(ui.openQuickStart?.mock.calls).toEqual(presets.map((preset) => [preset]));
+    expect(ui.applyWebtoonCanvasPreset?.mock.calls).toEqual(presets.map((preset) => [preset]));
   });
 
   /** The tone library was always a valid `openStudioMenu` target; nothing used it. */

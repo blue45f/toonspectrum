@@ -62,6 +62,7 @@ describe("me profile client", () => {
       email: "profile@example.com",
       bio: "새 소개",
       creatorRoleProfile,
+      regionSettings: null,
     };
     apiPatch.mockResolvedValue({ profile });
 

@@ -50,7 +50,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('href="/studio/new"');
     expect(source).toContain('href="/studio/projects"');
     expect(source).toContain('href="/brand-film"');
-    expect(source).toContain('href="/production"');
+    expect(source).toContain('href: "/production"');
     expect(identity).toContain('href: "/story-lab"');
     expect(identity).toContain('href: "/studio/bg3d"');
     expect(identity).toContain('href: "/studio/assets"');

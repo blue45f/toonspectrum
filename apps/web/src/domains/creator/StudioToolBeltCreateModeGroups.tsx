@@ -208,7 +208,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 minHeight: 320,
                 maxWidth: 860,
                 maxHeight: 1100,
-                contentClassName: "overflow-y-auto",
+                contentClassName: "overflow-y-auto overflow-x-hidden",
               }}
             >
               <Suspense fallback={<StudioPanelLoading label="에셋 메뉴를 여는 중..." />}>

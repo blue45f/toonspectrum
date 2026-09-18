@@ -96,7 +96,7 @@ const SUPPORT_ACTIONS: readonly Readonly<{
 }>[] = Object.freeze([
   {
     section: "terminology",
-    label: "CSP·Photoshop 용어",
+    label: "다른 앱 용어",
     description: "쓰던 이름을 ToonStudio 기능으로 연결",
     icon: Command,
   },
@@ -174,7 +174,7 @@ function EmptySearch({ onOpenCommandSearch }: { onOpenCommandSearch: () => void 
       <Search size={24} aria-hidden className="mx-auto text-fg-3" />
       <h3 className="mt-3 text-sm font-semibold text-fg">작성형 가이드에서 찾지 못했습니다</h3>
       <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-fg-3">
-        F1 검색은 모든 명령·설정·패널·튜토리얼과 CSP·Photoshop·Krita·Procreate 별칭을 함께 찾습니다.
+        F1 검색은 모든 명령·설정·패널·튜토리얼과 다른 앱에서 쓰던 용어를 함께 찾습니다.
       </p>
       <button
         type="button"

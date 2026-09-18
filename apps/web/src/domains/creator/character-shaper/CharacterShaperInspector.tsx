@@ -64,6 +64,7 @@ import type { PropInstance } from "../vrm/studio-vrm-props";
 import type { WardrobeEquip, WardrobeSlot } from "../vrm/studio-vrm-wardrobe";
 import type { ReactNode } from "react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 /* -------------------------------------------------------------------------- */
@@ -217,7 +218,7 @@ function ToggleRow({
       disabled={disabled}
       onClick={onToggle}
       className={cn(
-        "flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left",
+        "flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left",
         "transition-colors disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
         STUDIO_FOCUS_RING,
         checked ? "border-accent/55 bg-accent-soft" : "border-line bg-card hover:bg-raised",
@@ -227,20 +228,7 @@ function ToggleRow({
         <span className={cn("block text-[0.72rem] font-bold", checked ? "text-accent" : "text-fg-2")}>{label}</span>
         {hint ? <span className="mt-0.5 block text-[0.62rem] leading-relaxed text-fg-3">{hint}</span> : null}
       </span>
-      <span
-        aria-hidden
-        className={cn(
-          "grid h-6 w-10 shrink-0 grid-cols-2 items-center rounded-full border px-0.5",
-          checked ? "border-accent bg-accent" : "border-line bg-raised",
-        )}
-      >
-        <span
-          className={cn(
-            "size-5 rounded-full transition-transform motion-reduce:transition-none",
-            checked ? "translate-x-4 bg-on-accent" : "bg-fg-3",
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={checked} />
     </button>
   );
 }

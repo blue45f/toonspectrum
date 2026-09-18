@@ -321,6 +321,25 @@ describe("studio chrome UI", () => {
     expect(html).toContain("100%");
   });
 
+  it("keeps Korean HUD labels atomic when the canvas status bar narrows", () => {
+    const { container } = render(
+      <StudioStatusBar>
+        <StudioHudPill>필압 민감</StudioHudPill>
+        <span>레이아웃 모드</span>
+      </StudioStatusBar>
+    );
+    const statusBar = screen.getByRole("group", { name: "캔버스 상태 및 보기" });
+    const pill = container.querySelector('[data-studio-hud-pill="true"]');
+
+    expect(statusBar.className).toContain("min-w-0");
+    expect(statusBar.className).toContain("whitespace-nowrap");
+    expect(statusBar.className).toContain("[word-break:keep-all]");
+    expect(statusBar.className).toContain("[&>*]:shrink-0");
+    expect(pill?.className).toContain("shrink-0");
+    expect(pill?.className).toContain("whitespace-nowrap");
+    expect(pill?.textContent).toBe("필압 민감");
+  });
+
   it("tells launchers apart from direct tools on the rail (감사 §4.3)", () => {
     const html = renderToStaticMarkup(
       <StudioVerticalToolRail>

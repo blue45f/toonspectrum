@@ -133,7 +133,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       ) : (
         <StudioWorkspaceNavigator />
       )}
-      <StudioDrawingGestureBridge enabled={drawingAppPresentation} session={s} />
+      <StudioDrawingGestureBridge enabled session={s} />
       <StudioCuttoonEditorHosts {...s} />
       <StudioCuttoonEditorDialogs {...s} />
       <Container
