@@ -21,6 +21,9 @@
     "./feedback": "./src/feedback.ts",
     "./feedback-response": "./src/feedback-response.ts",
     "./business-inquiry": "./src/business-inquiry.ts",
+    "./creator-support": "./src/creator-support.ts",
+    "./supporter-payment": "./src/supporter-payment.ts",
+    "./commerce": "./src/commerce.ts",
     "./studio-music": "./src/studio-music.ts",
     "./reference-query-language": "./src/reference-query-language.ts",
     "./server": {

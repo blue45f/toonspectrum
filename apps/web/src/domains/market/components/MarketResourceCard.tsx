@@ -1,5 +1,6 @@
 import { ArrowUpRight, Heart, Layers } from "lucide-react";
 
+import { useCommerceConfig } from "../hooks/use-commerce-config";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 import { formatMarketDate, marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 import {
@@ -31,6 +32,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
   const brushPreviews = brushPreviewData(record);
   const recipe = recipePreviewData(record)?.[0];
   const { isWishlisted, toggleWishlist } = useMarketWishlist();
+  const { isPaidMode } = useCommerceConfig();
   const wishlisted = isWishlisted(record.id);
 
   return (
@@ -184,7 +186,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
             {record.name}
           </Link>
           <span className="shrink-0 rounded bg-good/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-good">
-            무료
+            {isPaidMode ? "유료 운영" : "무료"}
           </span>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs text-fg-2">

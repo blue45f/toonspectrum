@@ -1,47 +1,107 @@
-# ToonSpectrum supporter center
+# ToonSpectrum operating-cost supporter center
 
-## Product boundary
+## Purpose
 
-`/support-us` separates three activities that must not be presented as the same thing:
+`/support-us` exists so people can voluntarily help the developer keep ToonSpectrum free.
+It is intentionally separated from the existing customer-support route (`/support`) and from creator settlement or business sponsorship.
 
-1. **Individual supporter payment** — paid support for the ToonSpectrum service/creator environment.
-2. **Business sponsorship** — routed to the existing private `/business?type=sponsorship` intake.
-3. **Public-interest donation** — not collected by this implementation. Tax-deductible donation or public fundraising requires a separate legal/accounting/receipt path before it can be enabled.
+The public page has three clear boundaries:
 
-The existing `/support` route remains the customer support center and is intentionally not reused for payments.
+1. **Operating-cost support** — optional one-time support for the developer and site infrastructure.
+2. **Business sponsorship** — routed to `/business?type=sponsorship` when a company expects advertising, deliverables, joint projects, or other consideration.
+3. **Tax-deductible/public-interest donation** — not offered. The site must not promise a statutory donation receipt or tax deduction through this flow.
 
-## Checkout safety model
+Supporting ToonSpectrum does not unlock features, change an account tier, provide preferential exposure, create equity/revenue rights, or purchase a membership.
+Core service access remains independent of support.
 
-The browser never receives a payment secret and ToonSpectrum does not render card-number, bank-authentication, or wallet-balance fields. The public page can only navigate to a provider-hosted checkout after both build variables are explicitly configured:
+## Payment architecture
+
+The checkout uses Toss Payments SDK v2 in the browser and Toss Core API on the server.
+
+1. The browser fetches `/api/supporter-payments/config`.
+2. The server exposes only the matching Toss **client key** when checkout is explicitly enabled.
+3. The browser sends the amount/privacy choices to `/api/supporter-payments/orders`.
+4. The server validates the amount and writes the order ledger before checkout is rendered.
+5. Toss Payments authenticates the payment method.
+6. The success redirect returns `paymentKey`, `orderId`, and `amount`.
+7. `/api/supporter-payments/confirm` loads the stored order and confirms using the **stored amount**.
+8. The server calls `POST /v1/payments/confirm` with the secret key and an idempotency key.
+9. Webhooks never become trusted payment state by themselves. The server retrieves the payment from Toss and reconciles the verified response.
+10. Operators can explicitly re-sync a ledger row with Toss before refund or incident handling.
+
+The browser never receives the secret key. ToonSpectrum never stores card numbers, bank authentication credentials, or virtual-account refund account data.
+
+## Privacy and public supporter wall
+
+The default is anonymous. A supporter can explicitly choose to publish a display name.
+Even after choosing a public name, the amount and message each require a separate opt-in.
+
+The public supporter-wall endpoint never returns `paymentKey`, `orderId`, receipt URLs, internal row IDs, cancel reasons, or operator metadata.
+
+The monthly operating-cost progress is aggregate data only. Administrators can change the monthly goal or disable the public wall without disabling payment processing.
+
+## Database and runtime permissions
+
+Migration `0069_supporter_payments.sql` creates:
+
+- `supporter_payment` — payment lifecycle, privacy choices, receipt URL, and idempotency metadata;
+- `supporter_funding_setting` — monthly goal and public-wall switch.
+
+`PUBLIC` receives no table privileges. The managed API runtime role receives:
+
+- `supporter_payment`: `SELECT`, `INSERT`, `UPDATE`;
+- `supporter_funding_setting`: `SELECT`, `UPDATE`.
+
+The runtime role does not receive `DELETE`, `TRUNCATE`, `REFERENCES`, or `TRIGGER` privileges for these tables.
+
+## Safe configuration
+
+Start with matching Toss test keys:
 
 ```dotenv
-VITE_SUPPORTER_HOSTED_CHECKOUT_ENABLED=true
-VITE_SUPPORTER_HOSTED_CHECKOUT_URL=https://<provider-hosted-checkout>
+SUPPORTER_PAYMENTS_ENABLED=false
+TOSS_PAYMENTS_CLIENT_KEY=
+TOSS_PAYMENTS_SECRET_KEY=
+TOSS_PAYMENTS_API_BASE_URL=https://api.tosspayments.com
+PRODUCTION_INTEGRATION_COST_POLICY=zero-cost-only
+PRODUCTION_TOSS_ALLOW_LIVE=false
 ```
 
-The resolver fails closed when the enable flag is absent, the URL is absent or malformed, the scheme is not HTTPS, or URL userinfo is present. `VITE_*` values are public build configuration and must never contain API secrets.
+Test keys must both be test-mode keys. Test payments do not create real charges.
+
+Live checkout is fail-closed. It requires matching live keys, the supporter enable switch, explicit-cost policy, and the live-payment allow switch.
 
 ## Production activation checklist
 
-Before changing the enable flag to `true`:
+Before enabling live payments:
 
-- create the real supporter product in the selected payment provider;
-- ensure the hosted checkout shows the merchant/seller information required for the operating business;
-- finalize price, benefits, billing interval (if recurring), cancellation, and refund terms;
-- verify the success/cancel experience and provider receipts;
-- confirm the payment provider account and settlement destination are production-ready;
-- review the Terms/Privacy disclosures for the final product behavior;
-- perform an explicit production-payment approval separate from code merge or deployment approval.
+- apply managed migration `0069` and runtime ACLs;
+- finish the Toss Payments merchant/PG onboarding required for live keys and settlement;
+- register the Toss webhook URL as `/api/supporter-payments/webhooks/toss`;
+- verify the public merchant/operator disclosures required for the actual business;
+- review refund, cancellation, receipt, tax/accounting, and settlement handling with the final merchant setup;
+- run a test-key end-to-end payment, webhook, re-sync, receipt, and cancellation exercise;
+- deploy the code with live payment switches still disabled;
+- enable live payment only as a separate explicit production change.
 
-No production deployment or payment activation is implied by the feature PR.
+## Refund behavior
+
+The admin ledger supports full cancellation for payment states that Toss can cancel without collecting additional sensitive data. Cancellation requests include an idempotency key.
+
+An already-deposited virtual-account payment is intentionally not auto-refunded from ToonSpectrum because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
+
+## Tax and terminology boundary
+
+Product copy uses **operating-cost support / 후원** as the primary term.
+It does not describe this flow as a tax-deductible statutory donation and does not promise donation receipts.
+Any tax, accounting, cash-receipt, or business-registration obligations for real receipts still depend on the actual operator/merchant setup and should be reviewed before live activation.
 
 ## Deliberately excluded
 
-- securities/equity subscription or investment checkout;
-- promised returns or investment amount collection;
-- tax-deductible donation receipts;
-- public charitable fundraising collection;
-- ToonSpectrum-held user wallet balances;
-- creator payout/settlement routing.
-
-Creator-to-creator support can reuse the provider-adapter principle later, but should get its own payout, settlement, tax, moderation, and refund design rather than being grafted onto this service-support page.
+- recurring billing or supporter subscriptions;
+- feature-gated supporter tiers;
+- internal wallet/stored value;
+- securities/equity or promised returns;
+- creator-to-creator payout and settlement;
+- statutory donation receipts or charitable fundraising claims;
+- collection of card numbers, bank-authentication credentials, or virtual-account refund credentials.
