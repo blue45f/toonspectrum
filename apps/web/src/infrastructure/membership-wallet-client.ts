@@ -85,6 +85,16 @@ export type MembershipOverview = {
     trustScore: number;
     updatedAt?: string;
   };
+  creatorProgress: {
+    metrics: {
+      verifiedCreator: boolean;
+      publishedWorks: number;
+      activityPoints: number;
+    };
+    automaticLevel: string;
+    effectiveLevel: string;
+    manuallyManaged: boolean;
+  };
   recentLedger: Array<{
     id: string;
     entryType: string;
