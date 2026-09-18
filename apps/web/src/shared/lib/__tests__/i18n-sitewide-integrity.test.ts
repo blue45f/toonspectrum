@@ -4,6 +4,7 @@ import {
   formatMissingTranslationKey,
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
+  registerI18nRuntimeSourceEntries,
   resolveTranslation,
   resolveTranslationForDisplay,
 } from "@/shared/lib/i18n-core";
@@ -57,10 +58,19 @@ describe("sitewide i18n integrity", () => {
     expect(getRuntimeTranslationPendingKeys("fr")).not.toContain(key);
   });
 
-  it("does not auto-translate the English and Korean source/fallback locales", () => {
-    expect(getRuntimeTranslationPendingKeys("en")).toEqual([]);
-    expect(getRuntimeTranslationPendingKeys("en-US")).toEqual([]);
-    expect(getRuntimeTranslationPendingKeys("ko")).toEqual([]);
-    expect(getRuntimeTranslationPendingKeys("ko-KR")).toEqual([]);
+  it("does not translate a runtime source back into its own authored locale", () => {
+    const englishKey = "siteAudit.syntheticEnglishSource";
+    const koreanKey = "siteAudit.syntheticKoreanSource";
+
+    registerI18nRuntimeSourceEntries("en", { [englishKey]: "English source" });
+    registerI18nRuntimeSourceEntries("ko", { [koreanKey]: "한국어 원문" });
+
+    expect(getRuntimeTranslationPendingKeys("en")).not.toContain(englishKey);
+    expect(getRuntimeTranslationPendingKeys("en-US")).not.toContain(englishKey);
+    expect(getRuntimeTranslationPendingKeys("ko")).not.toContain(koreanKey);
+    expect(getRuntimeTranslationPendingKeys("ko-KR")).not.toContain(koreanKey);
+    expect(getRuntimeTranslationPendingKeys("ja")).toEqual(
+      expect.arrayContaining([englishKey, koreanKey]),
+    );
   });
 });
