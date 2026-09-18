@@ -101,7 +101,7 @@ const SECTION_META: Readonly<
 
 const PANEL_TITLE: Readonly<Record<StudioHelpCenterSection, string>> = {
   "current-tool": "현재 도구 도움말",
-  terminology: "CSP · Photoshop 용어 사전",
+  terminology: "다른 앱 용어 사전",
   diagnostics: "기기 · 브라우저 진단",
   recovery: "복구 가이드",
   license: "라이선스 · 서드파티 고지",

@@ -29,11 +29,13 @@ import {
 import { useMemo } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { STUDIO_PROJECT_NAVIGATION } from "../studio-product-ia";
@@ -46,25 +48,28 @@ import {
 import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export type StudioProjectSection = StudioProjectSectionId;
 
 type Locale = string;
-type AuthoredLocale = "ko" | "en";
 
 type ProjectAction = Readonly<{
-  title: Record<AuthoredLocale, string>;
-  description: Record<AuthoredLocale, string>;
+  title: BilingualText;
+  description: BilingualText;
   href: (projectId: string) => string;
   icon: LucideIcon;
-  badge?: Record<AuthoredLocale, string>;
+  badge?: BilingualText;
 }>;
 
 interface SectionDefinition {
-  label: Record<AuthoredLocale, string>;
+  label: BilingualText;
   eyebrow: string;
-  title: Record<AuthoredLocale, string>;
-  description: Record<AuthoredLocale, string>;
+  title: BilingualText;
+  description: BilingualText;
   icon: LucideIcon;
   actions: readonly ProjectAction[];
 }
@@ -76,7 +81,7 @@ function action(
   koDescription: string,
   enDescription: string,
   href: (projectId: string) => string,
-  badge?: Record<AuthoredLocale, string>,
+  badge?: BilingualText,
 ): ProjectAction {
   return {
     icon,
@@ -229,26 +234,27 @@ const PRIMARY_SECTIONS = STUDIO_PROJECT_NAVIGATION.map(
   (item) => item.id,
 ) as readonly Exclude<StudioProjectSection, "settings">[];
 
-function localeFromLanguage(language: string): Locale {
-  return resolveUiLocale(language);
+function localeFromLanguage(language: string) {
+  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
 function projectSectionHref(projectId: string, section: StudioProjectSection): string {
   return `/studio/p/${encodeURIComponent(projectId)}/${section}`;
 }
 
-function InvalidProject({ locale }: { readonly locale: Locale }) {
+function InvalidProject({ locale: _locale }: { readonly locale?: string }) {
+  const l = useBilingualLocalizer("studioProjectShell.invalid");
   return (
     <Container size="wide" className="py-10">
       <section className="rounded-3xl border border-line bg-card p-6" role="alert">
         <h1 className="text-xl font-bold text-fg">
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "프로젝트를 찾을 수 없어요.", "Project not found.")}
+          {bt("프로젝트를 찾을 수 없어요.", "Project not found.")}
         </h1>
         <p className="mt-2 text-sm text-fg-3">
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "저장된 작업은 변경하지 않았습니다. 내 작업에서 프로젝트를 다시 선택하세요.", "No saved work was changed. Choose the project again from My work.")}
+          {bt("저장된 작업은 변경하지 않았습니다. 내 작업에서 프로젝트를 다시 선택하세요.", "No saved work was changed. Choose the project again from My work.")}
         </p>
         <Link href="/studio" className={buttonClass({ className: "mt-5" })}>
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "내 작업으로", "Go to My work")}
+          {bt("내 작업으로", "Go to My work")}
         </Link>
       </section>
     </Container>
@@ -256,6 +262,7 @@ function InvalidProject({ locale }: { readonly locale: Locale }) {
 }
 
 export function StudioProjectShellPage({ section }: { readonly section: StudioProjectSection }) {
+  const bt = useBilingual("StudioProjectShellPage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);
@@ -285,7 +292,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
     }
   }, [displayProjectId, section, selectedView]);
 
-  useDocumentTitle(`${translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", definition.label)} · ToonStudio`);
+  useDocumentTitle(`${l(definition.label.ko, definition.label.en)} · ToonStudio`);
 
   if (!projectId || !viewResolution || !destination) return <InvalidProject locale={locale} />;
   if (viewResolution.changed) return <Navigate to={viewResolution.canonicalHref} replace />;
@@ -297,30 +304,30 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link href="/studio" className="text-xs font-semibold text-accent hover:text-accent-2">
-              ← {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "내 작업", "My work")}
+              ← {bt("내 작업", "My work")}
             </Link>
             <p className="mt-4 text-[0.68rem] font-black uppercase tracking-[0.17em] text-accent">
               {definition.eyebrow}
             </p>
             <h1 className="mt-2 text-pretty text-2xl font-black tracking-tight text-fg sm:text-4xl">
-              {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", definition.title)}
+              {l(definition.title.ko, definition.title.en)}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-              {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", definition.description)}
+              {l(definition.description.ko, definition.description.en)}
             </p>
             <p className="mt-3 text-xs text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "프로젝트", "Project")} · {displayProjectId}
+              {bt("프로젝트", "Project")} · {displayProjectId}
             </p>
           </div>
           <Link href={workHref(displayProjectId)} className={buttonClass({ size: "lg", className: "gap-2" })}>
             <Brush size={17} aria-hidden="true" />
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "원고 열기", "Open manuscript")}
+            {bt("원고 열기", "Open manuscript")}
           </Link>
         </div>
       </header>
 
       <nav
-        aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "프로젝트 메뉴", "Project navigation")}
+        aria-label={bt("프로젝트 메뉴", "Project navigation")}
         className="mt-5 overflow-x-auto rounded-2xl border border-line bg-card p-1.5"
       >
         <div className="flex min-w-max gap-1">
@@ -336,14 +343,14 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   active ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                 )}
               >
-                {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", SECTION_DEFINITIONS[id].label)}
+                {l(SECTION_DEFINITIONS[id].label.ko, SECTION_DEFINITIONS[id].label.en)}
               </Link>
             );
           })}
           <Link
             href={projectSectionHref(displayProjectId, "settings")}
-            aria-current={section === "settings" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "page") : undefined}
-            aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "프로젝트 설정", "Project settings")}
+            aria-current={section === "settings" ? "page" : undefined}
+            aria-label={bt("프로젝트 설정", "Project settings")}
             className={cn(
               "ml-1 inline-flex size-10 items-center justify-center rounded-xl transition-colors",
               section === "settings"
@@ -357,7 +364,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
       </nav>
 
       <nav
-        aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", `${definition.label.ko} 세부 화면`, `${definition.label.en} views`)}
+        aria-label={bt(`${definition.label.ko} 세부 화면`, `${definition.label.en} views`)}
         className="mt-3 overflow-x-auto"
       >
         <div className="flex min-w-max gap-2">
@@ -376,7 +383,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                     : "border-line bg-card text-fg-3 hover:border-line-strong hover:text-fg",
                 )}
               >
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", viewLabel.labelKo, viewLabel.labelEn)}
+                {bt(viewLabel.labelKo, viewLabel.labelEn)}
               </Link>
             );
           })}
@@ -393,20 +400,20 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
               {destination.owner === "project-shell" ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "PROJECT OWNED") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectShellPage", "en", "CONNECTED WORKSPACE")}
             </p>
             <h2 className="mt-1 text-lg font-black text-fg">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", destination.labelKo, destination.labelEn)}
+              {bt(destination.labelKo, destination.labelEn)}
             </h2>
             <p className="mt-1 text-sm leading-6 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", destination.descriptionKo, destination.descriptionEn)}
+              {bt(destination.descriptionKo, destination.descriptionEn)}
             </p>
           </div>
           {destination.href ? (
             <Link href={destination.href} className={buttonClass({ className: "shrink-0 gap-2" })}>
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", destination.ctaKo, destination.ctaEn)}
+              {bt(destination.ctaKo, destination.ctaEn)}
               <ArrowRight size={15} aria-hidden="true" />
             </Link>
           ) : (
             <span className="rounded-full border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", destination.ctaKo, destination.ctaEn)}
+              {bt(destination.ctaKo, destination.ctaEn)}
             </span>
           )}
         </div>
@@ -425,7 +432,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             <SectionIcon size={19} aria-hidden="true" />
           </span>
           <h2 id="project-section-actions" className="text-xl font-bold text-fg">
-            {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", definition.label)}
+            {l(definition.label.ko, definition.label.en)}
           </h2>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -441,18 +448,18 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
                   <Icon size={18} aria-hidden="true" />
                 </span>
                 <span className="mt-4 flex items-center gap-2">
-                  <strong className="text-sm text-fg">{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", item.title)}</strong>
+                  <strong className="text-sm text-fg">{l(item.title.ko, item.title.en)}</strong>
                   {item.badge ? (
                     <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[0.62rem] font-bold text-accent">
-                      {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", item.badge)}
+                      {l(item.badge.ko, item.badge.en)}
                     </span>
                   ) : null}
                 </span>
                 <span className="mt-1.5 flex-1 text-xs leading-5 text-fg-3">
-                  {translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", item.description)}
+                  {l(item.description.ko, item.description.en)}
                 </span>
                 <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-accent">
-                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "열기", "Open")}
+                  {bt("열기", "Open")}
                   <ArrowRight size={13} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </span>
               </Link>
@@ -465,10 +472,10 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <strong className="text-sm text-fg">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "기능 이름을 몰라도 괜찮아요.", "You do not need to know feature names.")}
+              {bt("기능 이름을 몰라도 괜찮아요.", "You do not need to know feature names.")}
             </strong>
             <p className="mt-1 text-xs leading-5 text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "⌘K 검색이나 도우미에서 하려는 일을 입력하면 현재 프로젝트에 맞는 기능을 찾습니다.", "Use command search or the assistant to find the right action for this project.")}
+              {bt("⌘K 검색이나 도우미에서 하려는 일을 입력하면 현재 프로젝트에 맞는 기능을 찾습니다.", "Use command search or the assistant to find the right action for this project.")}
             </p>
           </div>
           <button
@@ -477,7 +484,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             className={buttonClass({ variant: "outline", className: "shrink-0 gap-2" })}
           >
             <WandSparkles size={16} aria-hidden="true" />
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectShellPage", "기능 검색", "Search commands")}
+            {bt("기능 검색", "Search commands")}
           </button>
         </div>
       </section>

@@ -4,6 +4,13 @@ import {
 import type { Title } from "./types";
 
 import type { RecommendationDiversity } from "./catalog-discovery-state";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("recommendation-feedback", ko, en);
 
 const STORAGE_KEY = "toonspectrum:recommendation-feedback:v1";
 const MAX_IDS = 200;
@@ -136,15 +143,15 @@ export function diversifyRecommendations(
 export function recommendationReason(
   title: Title,
   tasteGenres: readonly string[],
-  locale: string,
+  _locale,
 ): string {
   const matched = tasteGenres.find((genre) => title.genres.includes(genre));
   if (matched) {
-    return translateBilingualValueForLocale(locale, "shared.lib.recommendation.feedback", `${matched} 취향과 닮은 작품`, `Matches your ${matched} preference`);
+    return formatI18nTemplate(String(bi("{value0} 취향과 닮은 작품", "Matches your {value0} preference")), { value0: matched });
   }
   const genre = title.genres[0];
   if (genre) {
-    return translateBilingualValueForLocale(locale, "shared.lib.recommendation.feedback", `${genre}에서 새로운 결을 제안`, `A different angle on ${genre}`);
+    return formatI18nTemplate(String(bi("{value0}에서 새로운 결을 제안", "A different angle on {value0}")), { value0: genre });
   }
-  return translateBilingualValueForLocale(locale, "shared.lib.recommendation.feedback", "취향 범위를 넓히는 추천", "Broadens your discovery mix");
+  return bi("취향 범위를 넓히는 추천", "Broadens your discovery mix");
 }

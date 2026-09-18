@@ -26,6 +26,13 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("EngineeringVideosPage", ko, en);
 
 const STORYBOARD = [
   {
@@ -74,8 +81,12 @@ const RENDER_PIPELINE = [
 ] as const;
 
 export function EngineeringVideosPage() {
-  const locale = useEngineeringLocale();  useDocumentTitle(
-    translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "ToonStudio 기술 영상 · Remotion 제작 구조", "ToonStudio engineering film · Remotion production structure"),
+  useBilingualI18nRevision();
+  const locale = useEngineeringLocale();
+
+
+  useDocumentTitle(
+    bi("ToonStudio 기술 영상 · Remotion 제작 구조", "ToonStudio engineering film · Remotion production structure"),
   );
 
   return (
@@ -86,19 +97,19 @@ export function EngineeringVideosPage() {
       <EngineeringPageIntro
         eyebrow="REMOTION · REVIEWABLE FILM"
         title={
-          translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "영상도 페이지와 같은 사실을 말하도록 코드로 만듭니다.", "The film is coded to tell the same facts as the website.")
+          bi("영상도 페이지와 같은 사실을 말하도록 코드로 만듭니다.", "The film is coded to tell the same facts as the website.")
         }
         description={
-          translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "기존 격리된 Remotion 도구 체인에 기술 스토리 컴포지션을 추가했습니다. 영상은 자동 게시하지 않고, 수동 workflow에서 렌더한 artifact를 사람이 검수한 뒤 배포합니다.", "Engineering-story compositions are registered in the existing isolated Remotion toolchain. Nothing is auto-published: a person reviews manually rendered workflow artifacts before distribution.")
+          bi("기존 격리된 Remotion 도구 체인에 기술 스토리 컴포지션을 추가했습니다. 영상은 자동 게시하지 않고, 수동 workflow에서 렌더한 artifact를 사람이 검수한 뒤 배포합니다.", "Engineering-story compositions are registered in the existing isolated Remotion toolchain. Nothing is auto-published: a person reviews manually rendered workflow artifacts before distribution.")
         }
         aside={
           <div className="rounded-3xl border border-accent/25 bg-accent-soft/30 p-5">
             <EngineeringStatusBadge status="configured" locale={locale} />
             <p className="mt-4 text-sm font-black text-fg">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "컴포지션과 렌더 workflow 연결 완료", "Composition and render workflow connected")}
+              {bi("컴포지션과 렌더 workflow 연결 완료", "Composition and render workflow connected")}
             </p>
             <p className="mt-2 text-xs leading-6 text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "공개 MP4는 검수 후 별도 배포하므로 페이지가 아직 없는 파일을 성공 영상처럼 재생하지 않습니다.", "Public MP4s are distributed only after review, so the page never pretends a missing file is a successful film.")
+              {bi("공개 MP4는 검수 후 별도 배포하므로 페이지가 아직 없는 파일을 성공 영상처럼 재생하지 않습니다.", "Public MP4s are distributed only after review, so the page never pretends a missing file is a successful film.")
               }
             </p>
           </div>
@@ -127,10 +138,10 @@ export function EngineeringVideosPage() {
             <div>
               <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[#b5d782]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "WHY · HOW · PROOF")}</p>
               <h2 id="film-preview-title" className="mt-4 max-w-xl text-balance text-2xl font-black leading-[1.16] tracking-[-0.04em] sm:text-4xl">
-                {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "브라우저 제작실을 만든 판단과 검증", "Decisions and evidence behind a browser studio")}
+                {bi("브라우저 제작실을 만든 판단과 검증", "Decisions and evidence behind a browser studio")}
               </h2>
               <p className="mt-4 max-w-lg text-xs leading-6 text-[#c6d8bf] sm:text-sm sm:leading-7">
-                {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "문제 → 도메인 경계 → 로컬 실행 → 전문 엔진 → 데이터 → 검증 → 재사용", "Problem → domain boundary → local execution → specialist engines → data → verification → reuse")
+                {bi("문제 → 도메인 경계 → 로컬 실행 → 전문 엔진 → 데이터 → 검증 → 재사용", "Problem → domain boundary → local execution → specialist engines → data → verification → reuse")
                 }
               </p>
             </div>
@@ -167,8 +178,8 @@ export function EngineeringVideosPage() {
                   {format.duration}
                 </span>
               </div>
-              <h3 className="mt-5 text-lg font-black text-fg">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringVideosPage", format.title)}</h3>
-              <p className="mt-2 text-sm leading-7 text-fg-3">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringVideosPage", format.purpose)}</p>
+              <h3 className="mt-5 text-lg font-black text-fg">{bi((format.title).ko, (format.title).en)}</h3>
+              <p className="mt-2 text-sm leading-7 text-fg-3">{bi((format.purpose).ko, (format.purpose).en)}</p>
               <code className="mt-4 block overflow-x-auto whitespace-nowrap rounded-xl bg-panel px-3 py-2 text-[0.66rem] text-fg-2">
                 {format.composition}
               </code>
@@ -180,7 +191,7 @@ export function EngineeringVideosPage() {
       <section className="py-14 sm:py-20" aria-labelledby="storyboard-title">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "90-SECOND STORYBOARD")}</p>
         <h2 id="storyboard-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-          {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "장면마다 하나의 판단만 설명합니다.", "Each scene explains one decision.")}
+          {bi("장면마다 하나의 판단만 설명합니다.", "Each scene explains one decision.")}
         </h2>
         <ol className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {STORYBOARD.map((scene, index) => (
@@ -189,8 +200,8 @@ export function EngineeringVideosPage() {
                 <span className="grid size-9 place-items-center rounded-full bg-accent text-xs font-black text-on-accent">{index + 1}</span>
                 <span className="font-display text-[0.66rem] font-bold text-fg-3">{scene.time}</span>
               </div>
-              <h3 className="mt-5 text-lg font-black text-fg">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringVideosPage", scene.title)}</h3>
-              <p className="mt-3 text-sm leading-7 text-fg-3">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringVideosPage", scene.body)}</p>
+              <h3 className="mt-5 text-lg font-black text-fg">{bi((scene.title).ko, (scene.title).en)}</h3>
+              <p className="mt-3 text-sm leading-7 text-fg-3">{bi((scene.body).ko, (scene.body).en)}</p>
             </li>
           ))}
         </ol>
@@ -200,13 +211,13 @@ export function EngineeringVideosPage() {
         <div className="rounded-[2rem] border border-line/70 bg-card/65 p-6 sm:p-8">
           <Workflow size={23} className="text-accent" aria-hidden="true" />
           <h2 id="render-pipeline-title" className="mt-4 text-2xl font-black text-fg">
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "검토 가능한 렌더 파이프라인", "Reviewable render pipeline")}
+            {bi("검토 가능한 렌더 파이프라인", "Reviewable render pipeline")}
           </h2>
           <ol className="mt-6 space-y-3">
             {RENDER_PIPELINE.map((step, index) => (
               <li key={step.ko} className="flex items-start gap-3 rounded-2xl border border-line/65 bg-panel/65 p-4">
                 <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-xs font-black text-on-accent">{index + 1}</span>
-                <p className="pt-1 text-sm leading-6 text-fg-2">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringVideosPage", step)}</p>
+                <p className="pt-1 text-sm leading-6 text-fg-2">{bi((step).ko, (step).en)}</p>
               </li>
             ))}
           </ol>
@@ -215,25 +226,25 @@ export function EngineeringVideosPage() {
         <div className="space-y-4">
           <article className="rounded-[2rem] border border-accent/25 bg-accent-soft/25 p-6">
             <Captions size={22} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-4 text-xl font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "무음으로도 이해", "Understandable without sound")}</h2>
+            <h2 className="mt-4 text-xl font-black text-fg">{bi("무음으로도 이해", "Understandable without sound")}</h2>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "모든 핵심 메시지는 화면 텍스트로 전달하고, 한국어·영어 VTT와 전체 대본을 영상 artifact와 함께 생성하도록 설계합니다.", "Every key message appears on screen, with Korean and English VTT captions and a complete transcript designed to ship with the artifact.")
+              {bi("모든 핵심 메시지는 화면 텍스트로 전달하고, 한국어·영어 VTT와 전체 대본을 영상 artifact와 함께 생성하도록 설계합니다.", "Every key message appears on screen, with Korean and English VTT captions and a complete transcript designed to ship with the artifact.")
               }
             </p>
           </article>
           <article className="rounded-[2rem] border border-line/70 bg-card/65 p-6">
             <ShieldCheck size={22} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-4 text-xl font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "자동 공개 없음", "No automatic publication")}</h2>
+            <h2 className="mt-4 text-xl font-black text-fg">{bi("자동 공개 없음", "No automatic publication")}</h2>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "workflow 권한은 contents: read로 제한되고 렌더 결과는 artifact에만 올라갑니다. 운영 사이트 반영은 검수된 파일을 별도 변경으로 제출합니다.", "Workflow permission stays at contents: read and rendered output is uploaded only as an artifact. Publishing requires a separate reviewed change.")
+              {bi("workflow 권한은 contents: read로 제한되고 렌더 결과는 artifact에만 올라갑니다. 운영 사이트 반영은 검수된 파일을 별도 변경으로 제출합니다.", "Workflow permission stays at contents: read and rendered output is uploaded only as an artifact. Publishing requires a separate reviewed change.")
               }
             </p>
           </article>
           <article className="rounded-[2rem] border border-line/70 bg-card/65 p-6">
             <Subtitles size={22} className="text-accent" aria-hidden="true" />
-            <h2 className="mt-4 text-xl font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "접근성 폴백", "Accessible fallback")}</h2>
+            <h2 className="mt-4 text-xl font-black text-fg">{bi("접근성 폴백", "Accessible fallback")}</h2>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "영상이 없거나 모션 감소가 설정돼도 스토리 페이지와 웹 발표 모드에서 동일한 내용을 읽을 수 있습니다.", "When film is unavailable or reduced motion is preferred, the story page and web deck expose the same content.")
+              {bi("영상이 없거나 모션 감소가 설정돼도 스토리 페이지와 웹 발표 모드에서 동일한 내용을 읽을 수 있습니다.", "When film is unavailable or reduced motion is preferred, the story page and web deck expose the same content.")
               }
             </p>
           </article>
@@ -245,10 +256,10 @@ export function EngineeringVideosPage() {
           <div>
             <MonitorPlay size={23} className="text-accent" aria-hidden="true" />
             <h2 id="video-next-title" className="mt-4 text-2xl font-black text-fg">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "영상 렌더 전에도 웹 발표를 바로 사용할 수 있습니다.", "The web presentation works before a film is rendered.")}
+              {bi("영상 렌더 전에도 웹 발표를 바로 사용할 수 있습니다.", "The web presentation works before a film is rendered.")}
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "발표 모드는 같은 콘텐츠를 사용하며 키보드, 전체 화면, 발표자 노트와 인쇄·PDF를 지원합니다.", "Presentation mode uses the same content with keyboard controls, fullscreen, speaker notes and print or PDF.")
+              {bi("발표 모드는 같은 콘텐츠를 사용하며 키보드, 전체 화면, 발표자 노트와 인쇄·PDF를 지원합니다.", "Presentation mode uses the same content with keyboard controls, fullscreen, speaker notes and print or PDF.")
               }
             </p>
           </div>
@@ -257,7 +268,7 @@ export function EngineeringVideosPage() {
             className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
           >
             <Play size={15} aria-hidden="true" />
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringVideosPage", "발표 모드 열기", "Open presentation mode")}
+            {bi("발표 모드 열기", "Open presentation mode")}
             <ArrowRight size={15} aria-hidden="true" />
           </Link>
         </div>

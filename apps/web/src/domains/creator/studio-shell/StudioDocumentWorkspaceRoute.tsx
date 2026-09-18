@@ -8,7 +8,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useI18n } from "@/shared/lib/i18n";
+
 
 import { parseStudioDocumentLocation } from "../studio-document-workspace";
 import { StudioEditorRoute } from "../studio-router/routes/StudioEditorRoute";
@@ -16,9 +16,6 @@ import { resolveStudioRoute } from "../studio-router/studio-route-manifest";
 import { useStudioI18nPriorityLoading } from "../studio-router/useStudioI18nPriorityLoading";
 import { StudioModeExperienceBoundary } from "./StudioModeExperienceBoundary";
 
-function localeFromLanguage(language: string): string {
-  return resolveUiLocale(language);
-}
 
 /**
  * Canonical project/document and draft URLs mount the established editor runtime directly.
@@ -26,10 +23,11 @@ function localeFromLanguage(language: string): string {
  * document identity instead of navigating through a second legacy URL and remounting the editor.
  */
 export function StudioDocumentWorkspaceRoute() {
+  useBilingualI18nRevision();
   useStudioI18nPriorityLoading();
   const location = useLocation();
-  const language = useI18n((state) => state.lang);
-  const locale = localeFromLanguage(language);
+
+
   const documentResolution = parseStudioDocumentLocation({
     pathname: location.pathname,
     search: location.search,
@@ -77,17 +75,17 @@ export function StudioDocumentWorkspaceRoute() {
           <AlertTriangle size={21} aria-hidden="true" />
         </span>
         <h1 className="mt-5 text-xl font-black text-fg">
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceRoute", "문서 주소를 안전하게 열 수 없어요.", "This document address cannot be opened safely.")}
+          {bi("문서 주소를 안전하게 열 수 없어요.", "This document address cannot be opened safely.")}
         </h1>
         <p className="mt-2 text-sm leading-6 text-fg-3">
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceRoute", "프로젝트와 원고는 변경하지 않았습니다. 주소의 문서·작업공간 정보를 확인하거나 내 작업에서 다시 열어 주세요.", "No project or manuscript data was changed. Check the document and workspace address, or reopen it from My work.")}
+          {bi("프로젝트와 원고는 변경하지 않았습니다. 주소의 문서·작업공간 정보를 확인하거나 내 작업에서 다시 열어 주세요.", "No project or manuscript data was changed. Check the document and workspace address, or reopen it from My work.")}
         </p>
         <p className="mt-3 rounded-xl border border-line bg-panel/60 px-3 py-2 text-xs font-mono text-fg-3">
           {errorCode}
         </p>
         <Link href="/studio" className={buttonClass({ className: "mt-5 gap-2" })}>
           <ArrowLeft size={15} aria-hidden="true" />
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioDocumentWorkspaceRoute", "내 작업으로", "Back to My work")}
+          {bi("내 작업으로", "Back to My work")}
         </Link>
       </div>
     </Container>

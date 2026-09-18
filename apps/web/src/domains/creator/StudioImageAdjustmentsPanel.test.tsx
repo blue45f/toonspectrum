@@ -37,7 +37,7 @@ describe("StudioImageAdjustmentsPanel", () => {
       />,
     );
 
-    expect(screen.getByText("컬러 매치 (CSP 3.0)")).toBeDefined();
-    expect(screen.getByText("자동 음영 어시스트 (CSP 2.0)")).toBeDefined();
+    expect(screen.getByText("색감 맞추기")).toBeDefined();
+    expect(screen.getByText("자동 명암")).toBeDefined();
   });
 });

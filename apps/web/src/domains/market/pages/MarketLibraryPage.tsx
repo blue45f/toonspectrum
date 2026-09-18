@@ -136,7 +136,8 @@ export function MarketLibraryPage() {
               : translateCurrentStaticSourceText("domains.market.pages.MarketLibraryPage", "ko", "검색 조건에 맞는 에셋이 없어요")}
           </h2>
           <p className="mx-auto max-w-sm text-xs text-fg-3 leading-relaxed">
-            {translateCurrentStaticSourceText("domains.market.pages.MarketLibraryPage", "ko", "마켓에서 마음에 드는 리소스를 찾아 '무료 소장하기'를 눌러보세요.")}</p>
+            마켓에서 마음에 드는 리소스를 찾아 '내 에셋에 추가'를 눌러보세요.
+          </p>
           {activeItems.length === 0 ? (
             <Link
               href="/market/browse"

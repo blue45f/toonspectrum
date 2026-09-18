@@ -21,9 +21,16 @@ import { useState } from "react";
 
 import Link from "@/compat/router-link";
 import { useI18n } from "@/shared/lib/i18n";
-import { resolveProductLocale, type ProductLocale } from "@/shared/lib/product-identity";
+import { resolveProductLocale } from "@/shared/lib/product-identity";
 
 import "./creator-feature-reels.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorFeatureReels", ko, en);
 
 type ReelId = "draw" | "three-d" | "assets" | "continuity" | "collaborate" | "publish";
 
@@ -176,6 +183,7 @@ const COPY = {
 } as const;
 
 function ReelPicture({ reel, alt }: { reel: ReelVisual; alt: string }) {
+  useBilingualI18nRevision();
   if (reel.image.endsWith(".webp") && reel.image640 && reel.image960) {
     return (
       <picture>
@@ -189,9 +197,10 @@ function ReelPicture({ reel, alt }: { reel: ReelVisual; alt: string }) {
 }
 
 export function CreatorFeatureReels({ showFilm = true, embedded = false }: { readonly showFilm?: boolean; readonly embedded?: boolean } = {}) {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
-  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", COPY);
+  const copy = bi((COPY).ko, (COPY).en);
   const prefersReducedMotion = useReducedMotion();
   const [activeId, setActiveId] = useState<ReelId>("draw");
   const [filmMounted, setFilmMounted] = useState(false);
@@ -227,7 +236,7 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <Icon size={18} aria-hidden="true" />
-                  <strong>{translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", reel.label)}</strong>
+                  <strong>{bi((reel.label).ko, (reel.label).en)}</strong>
                 </button>
               );
             })}
@@ -244,11 +253,11 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
                   transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
                   style={{ "--reel-position": active.position ?? "center" } as React.CSSProperties}
                 >
-                  <ReelPicture reel={active} alt={`${copy.visualAlt}: ${translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.title)}`} />
+                  <ReelPicture reel={active} alt={`${copy.visualAlt}: ${bi((active.title).ko, (active.title).en)}`} />
                   <div className="creator-feature-reels__scan" aria-hidden="true" />
                   <figcaption>
-                    <span><ActiveIcon size={14} aria-hidden="true" />{translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.label)}</span>
-                    <span>{translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "en", "TOONSTUDIO · VISUAL WALKTHROUGH")}</span>
+                    <span><ActiveIcon size={14} aria-hidden="true" />{bi((active.label).ko, (active.label).en)}</span>
+                    <span>TOONSTUDIO · VISUAL WALKTHROUGH</span>
                   </figcaption>
                 </motion.figure>
               </AnimatePresence>
@@ -263,14 +272,14 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
                 exit={prefersReducedMotion ? undefined : { opacity: 0, y: -8 }}
                 transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
               >
-                <p className="creator-feature-reels__label">{translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.label)}</p>
-                <h3>{translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.title)}</h3>
-                <p>{translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.body)}</p>
+                <p className="creator-feature-reels__label">{bi((active.label).ko, (active.label).en)}</p>
+                <h3>{bi((active.title).ko, (active.title).en)}</h3>
+                <p>{bi((active.body).ko, (active.body).en)}</p>
                 <div className="creator-feature-reels__proofs">
-                  {translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.proof).map((proof) => <span key={proof}>{proof}</span>)}
+                  {bi((active.proof).ko, (active.proof).en).map((proof) => <span key={proof}>{proof}</span>)}
                 </div>
                 <Link href={active.href} className="creator-feature-reels__action">
-                  {translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", active.action)}<ArrowRight size={17} aria-hidden="true" />
+                  {bi((active.action).ko, (active.action).en)}<ArrowRight size={17} aria-hidden="true" />
                 </Link>
               </motion.div>
             </AnimatePresence>
@@ -287,7 +296,7 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
                 </span>
                 <span className="creator-feature-reels__micro-copy">
                   <Icon size={16} aria-hidden="true" />
-                  <strong>{translateLocaleBranchForLocale(locale, "domains.marketing.CreatorFeatureReels", reel.label)}</strong>
+                  <strong>{bi((reel.label).ko, (reel.label).en)}</strong>
                 </span>
               </button>
             );

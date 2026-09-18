@@ -25,8 +25,12 @@ import {
   FriendlyQuickGuide,
   PurposeExperienceStage,
 } from "@/shared/components/purpose-experience-stage";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("MakeHubPage", ko, en);
 
 const COPY = {
   ko: {
@@ -124,10 +128,11 @@ const FLOW_ICONS = [Lightbulb, BookOpen, Sparkles, Palette, Images] as const;
 const TOOL_ICONS = [Brush, Music, BookOpen, Clock3] as const;
 
 export function MakeHubPage() {
-  const language = useI18n((state) => state.lang);
-  const locale = resolveUiLocale(language);
-  const copy = translateLocaleBranchForLocale(locale, "domains.creator.resources.MakeHubPage", COPY);
-  useDocumentTitle(translateBilingualValueForLocale(locale, "domains.creator.resources.MakeHubPage", "새로 만들기", "New"));
+  useBilingualI18nRevision();
+
+
+  const copy = bi((COPY).ko, (COPY).en);
+  useDocumentTitle(bi("새로 만들기", "New"));
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">

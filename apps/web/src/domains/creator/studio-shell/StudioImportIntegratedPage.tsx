@@ -6,12 +6,15 @@ import { StudioImportPage } from "./StudioFrontDoorPages";
 import { StudioImportIntake } from "./StudioImportIntake";
 import { StudioImportVisualGuide } from "./StudioImportVisualGuide";
 
-function localeFromLanguage(language: string): string {
-  return resolveUiLocale(language);
+
+
+function localeFromLanguage(_language): "ko" | "en" {
+  return getActiveI18nLocale();
 }
 
 /** Keeps the visual front door while adding the real preflight-to-editor import path below it. */
 export function StudioImportIntegratedPage() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
   return (

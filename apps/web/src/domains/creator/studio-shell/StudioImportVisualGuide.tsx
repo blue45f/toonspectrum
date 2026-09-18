@@ -69,7 +69,8 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: Locale })
         </div>
         <motion.figure
           initial={reducedMotion ? false : { opacity: 0, x: 18 }}
-          animate={reducedMotion ? undefined : { opacity: 1, x: 0 }}
+          whileInView={reducedMotion ? undefined : { opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: .2 }}
           transition={{ duration: .48, ease: [0.16, 1, 0.3, 1] }}
         >
           <picture>
@@ -90,7 +91,8 @@ export function StudioImportVisualGuide({ locale }: { readonly locale: Locale })
             <motion.article
               key={title}
               initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-              animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+              whileInView={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: .3 }}
               transition={{ duration: .38, delay: index * .06, ease: [0.16, 1, 0.3, 1] }}
             >
               <span>{number}</span><Icon size={19} aria-hidden="true" /><h3>{title}</h3><p>{body}</p>

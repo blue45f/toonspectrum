@@ -20,6 +20,7 @@ import {
 } from "../studio-feature-surface-registry";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Locale = string;
@@ -55,13 +56,14 @@ export function StudioFeatureOperationsPanel({
   projectId,
   section,
   view,
-  locale,
+  locale: _locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  const bt = useBilingual("StudioFeatureOperationsPanel");
   const registrations = studioFeatureSurfacesForView(section, view);
   if (registrations.length === 0) return null;
 
@@ -81,10 +83,13 @@ export function StudioFeatureOperationsPanel({
             id="studio-feature-operations-title"
             className="mt-1 text-xl font-black tracking-tight text-fg"
           >
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioFeatureOperationsPanel", "프로젝트 기능과 실제 작업 연결", "Connected project operations")}
+            {bt("프로젝트 기능과 실제 작업 연결", "Connected project operations")}
           </h2>
           <p className="mt-1 text-sm leading-6 text-fg-2">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioFeatureOperationsPanel", "권리·품질·마켓·플러그인·게시·보관 기능을 현재 프로젝트의 정본 화면에서 실행합니다.", "Use rights, quality, market, plugin, publishing and archive capabilities from their canonical project surfaces.")}
+            {bt(
+              "권리·품질·마켓·플러그인·게시·보관 기능을 현재 프로젝트의 정본 화면에서 실행합니다.",
+              "Use rights, quality, market, plugin, publishing and archive capabilities from their canonical project surfaces.",
+            )}
           </p>
         </div>
       </div>
@@ -113,14 +118,14 @@ export function StudioFeatureOperationsPanel({
                   <Icon size={17} aria-hidden="true" />
                 </span>
                 <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.62rem] font-bold text-fg-3">
-                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioFeatureOperationsPanel", `검증 연산 ${operationCount}개`, `${operationCount} validated operations`)}
+                  {bt(`검증 연산 ${operationCount}개`, `${operationCount} validated operations`)}
                 </span>
               </div>
               <h3 className="mt-4 text-base font-black text-fg">
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioFeatureOperationsPanel", registration.titleKo, registration.titleEn)}
+                {bt(registration.titleKo, registration.titleEn)}
               </h3>
               <p className="mt-2 flex-1 text-sm leading-6 text-fg-2">
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioFeatureOperationsPanel", registration.descriptionKo, registration.descriptionEn)}
+                {bt(registration.descriptionKo, registration.descriptionEn)}
               </p>
               <Link
                 to={href}
@@ -130,7 +135,7 @@ export function StudioFeatureOperationsPanel({
                   className: "mt-4 w-fit gap-1.5",
                 })}
               >
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioFeatureOperationsPanel", registration.primaryActionKo, registration.primaryActionEn)}
+                {bt(registration.primaryActionKo, registration.primaryActionEn)}
                 <ExternalLink size={14} aria-hidden="true" />
               </Link>
             </article>

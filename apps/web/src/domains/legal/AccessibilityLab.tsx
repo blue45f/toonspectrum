@@ -13,7 +13,11 @@ import { useState } from "react";
 
 import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
-import { useI18n } from "@/shared/lib/i18n";
+
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("AccessibilityLab", ko, en);
 
 const COPY = {
   ko: {
@@ -58,9 +62,10 @@ const LIMITATIONS = {
 } as const;
 
 export function AccessibilityLab() {
-  const language = useI18n((state) => state.lang);
-  const locale = resolveUiLocale(language);
-  const copy = translateLocaleBranchForLocale(locale, "domains.legal.AccessibilityLab", COPY);
+  useBilingualI18nRevision();
+
+
+  const copy = bi((COPY).ko, (COPY).en);
   const [textScale, setTextScale] = useState(100);
   const [strongContrast, setStrongContrast] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -145,7 +150,7 @@ export function AccessibilityLab() {
           <div className="min-w-0 flex-1">
             <h2 id="accessibility-limitations-title" className="font-display text-lg font-bold text-fg">{copy.limitationsTitle}</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {translateLocaleBranchForLocale(locale, "domains.legal.AccessibilityLab.limitations", LIMITATIONS).map(([title, body]) => (
+              {bi((LIMITATIONS).ko, (LIMITATIONS).en).map(([title, body]) => (
                 <article key={title} className="rounded-2xl border border-line bg-card/75 p-4">
                   <h3 className="text-sm font-bold text-fg">{title}</h3>
                   <p className="mt-2 text-xs leading-6 text-fg-3">{body}</p>
@@ -169,6 +174,7 @@ function PreferenceToggle({
   readonly pressed: boolean;
   readonly onToggle: () => void;
 }) {
+  useBilingualI18nRevision();
   return (
     <button
       type="button"

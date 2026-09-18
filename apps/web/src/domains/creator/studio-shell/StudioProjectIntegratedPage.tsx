@@ -5,8 +5,10 @@ import {
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   resolveStudioProjectView,
@@ -50,8 +52,9 @@ function StudioWebtoonOnboardingPanelSlot({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.onboarding");
   const [enabled, setEnabled] = useState(() => hasStoredWebtoonOnboarding(projectId));
 
   useEffect(() => {
@@ -66,7 +69,7 @@ function StudioWebtoonOnboardingPanelSlot({
         <div
           className="min-h-28 animate-pulse rounded-3xl border border-accent/20 bg-accent-soft/15"
           aria-busy="true"
-          aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectIntegratedPage", "제작 온보딩 불러오는 중", "Loading production onboarding")}
+          aria-label={bt("제작 온보딩 불러오는 중", "Loading production onboarding")}
         />
       )}
     >
@@ -95,18 +98,19 @@ const StudioProjectVersionStackPanel = lazy(async () => {
   return { default: module.StudioProjectVersionStackPanel };
 });
 
-function ProjectGraphPanelFallback({ locale }: { readonly locale: Locale }) {
+function ProjectGraphPanelFallback({ locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioProjectIntegrated.graphFallback");
   return (
     <div
       className="min-h-20 animate-pulse rounded-2xl border border-line bg-card/80"
       role="status"
-      aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectIntegratedPage", "작품 버전 정보를 불러오는 중", "Loading project version data")}
+      aria-label={bt("작품 버전 정보를 불러오는 중", "Loading project version data")}
     />
   );
 }
 
-function localeFromLanguage(language: string): Locale {
-  return resolveUiLocale(language);
+function localeFromLanguage(language: string) {
+  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
 function decodeProjectId(projectId: string): string {
@@ -126,8 +130,9 @@ function SectionWorkflow({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  useBilingualI18nRevision();
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
 
   return (
@@ -200,6 +205,7 @@ export function StudioProjectIntegratedPage({
 }: {
   readonly section: StudioProjectSection;
 }) {
+  const bt = useBilingual("StudioProjectIntegratedPage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const location = useLocation();
   const language = useI18n((state) => state.lang);

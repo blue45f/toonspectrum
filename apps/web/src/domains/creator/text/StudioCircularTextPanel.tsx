@@ -3,19 +3,8 @@ import {
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";
 /**
- * StudioCircularTextPanel.tsx
- *
- * CLIP STUDIO PAINT Ver.3.0 Parity:
- * - Circular Text Arrangement (원형 텍스트 배치):
- *   - Places sound effects (SFX), magic incantations, titles, or logo stamps along a circular arc.
- *   - Interactive controls:
- *     - Circular Layout Toggle (On/Off)
- *     - Arc Radius (반경)
- *     - Start Angle (시작 각도)
- *     - Flow Direction (시계방향 / 반시계방향)
- *     - Glyph Orientation (바깥쪽 / 안쪽)
- *     - Letter Spacing (자간 조정)
- *   - Real-time SVG preview of glyph arc positions and rotations.
+ * Circular lettering controls for ToonStudio.
+ * Keeps typography terminology concise and aligned with the shared Studio panel language.
  */
 
 import { Compass } from "lucide-react";
@@ -57,18 +46,16 @@ export function StudioCircularTextPanel({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 p-3 text-xs bg-slate-900/90 text-slate-100 rounded-lg border border-slate-800 shadow-xl",
+        "flex flex-col gap-3 rounded-xl border border-line bg-card p-3 text-xs text-fg shadow-sm",
         className,
       )}
       data-testid="studio-circular-text-panel"
     >
       {/* Header with toggle */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-200">
-          <Compass size={15} className="text-pink-400" />
-          <span>{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 텍스트 (Circular Text)")}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 font-medium">
-            {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "en", "CSP 3.0")}</span>
+      <div className="flex items-center justify-between border-b border-line/60 pb-2">
+        <div className="flex items-center gap-1.5 font-semibold text-fg-2">
+          <Compass size={15} className="text-accent" aria-hidden />
+          <span>원형 글자 배치</span>
         </div>
         <button
           type="button"
@@ -83,25 +70,26 @@ export function StudioCircularTextPanel({
             className: cn(
               "h-6 px-2 text-[11px] font-medium transition-colors",
               enabled
-                ? "bg-pink-600 hover:bg-pink-500 text-white"
-                : "border-slate-700 text-slate-400 hover:text-slate-200",
+                ? "border-accent bg-accent text-on-accent"
+                : "border-line text-fg-3 hover:bg-raised hover:text-fg",
             ),
           })}
         >
-          {enabled ? translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 배치 On") : translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 배치 Off")}
+          {enabled ? "사용 중" : "사용 안 함"}
         </button>
       </div>
 
-      <p className="text-[11px] text-slate-400 leading-relaxed">
-        {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "효과음, 마법진 영창, 엠블럼 식자를 원형 호를 따라 자연스러운 회전 각도로 배치합니다.")}</p>
+      <p className="text-[11px] leading-relaxed text-fg-3">
+        효과음이나 제목 글자를 원을 따라 배치하고 방향·간격을 바로 조절합니다.
+      </p>
 
       {enabled && (
         <>
           {/* Real-time SVG preview */}
-          <div className="flex flex-col items-center justify-center p-2 bg-slate-950/60 rounded border border-slate-800 relative overflow-hidden h-36">
+          <div className="relative flex h-36 flex-col items-center justify-center overflow-hidden rounded-xl border border-line/70 bg-panel/55 p-2">
             <svg
               viewBox="0 0 200 200"
-              className="w-32 h-32 text-pink-300 overflow-visible"
+              className="h-32 w-32 overflow-visible text-accent"
             >
               {/* Circle guideline */}
               <circle
@@ -149,8 +137,8 @@ export function StudioCircularTextPanel({
                 );
               })}
             </svg>
-            <div className="absolute bottom-1 right-2 text-[10px] text-slate-500">
-              {translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "총 전개각: ")}{Math.round(layout.totalSpanDeg)}°
+            <div className="absolute bottom-1 right-2 text-[10px] text-fg-3">
+              총 전개각: {Math.round(layout.totalSpanDeg)}°
             </div>
           </div>
 
@@ -159,8 +147,8 @@ export function StudioCircularTextPanel({
             {/* Radius slider */}
             <div className="flex flex-col gap-1">
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "원형 반경 (Radius)")}</span>
-                <span className="font-semibold text-slate-200">
+                <span className="text-fg-3">반경</span>
+                <span className="font-semibold tabular-nums text-fg-2">
                   {Math.round(options.radius)}px
                 </span>
               </div>
@@ -170,6 +158,7 @@ export function StudioCircularTextPanel({
                 max={300}
                 step={2}
                 value={options.radius}
+                aria-label="원형 글자 반경"
                 onChange={(e) =>
                   onOptionsChange({
                     ...options,
@@ -178,14 +167,14 @@ export function StudioCircularTextPanel({
                 }
                 data-inspector-control-id="typography.circular.radius"
                 data-inspector-priority="advanced"
-                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-pink-400"
+                className="h-6 w-full cursor-pointer accent-accent"
               />
             </div>
 
             {/* Start Angle slider */}
             <div className="flex flex-col gap-1">
               <div className="flex justify-between text-[11px]">
-                <span className="text-slate-400">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "시작 각도 (Start Angle)")}</span>
+                <span className="text-fg-3">시작 각도</span>
                 <span className="font-semibold text-slate-200">
                   {Math.round(options.startAngleDeg ?? -90)}°
                 </span>
@@ -196,6 +185,7 @@ export function StudioCircularTextPanel({
                 max={180}
                 step={5}
                 value={options.startAngleDeg ?? -90}
+                aria-label="원형 글자 시작 각도"
                 onChange={(e) =>
                   onOptionsChange({
                     ...options,
@@ -210,7 +200,7 @@ export function StudioCircularTextPanel({
 
             {/* Direction toggle */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-slate-400 text-[11px]">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "진행 방향")}</span>
+              <span className="text-[11px] text-fg-3">진행 방향</span>
               <div className="flex gap-1">
                 <button
                   type="button"
@@ -228,8 +218,8 @@ export function StudioCircularTextPanel({
                     className: cn(
                       "h-6 px-2 text-[10px]",
                       (options.direction ?? "clockwise") === "clockwise"
-                        ? "bg-slate-700 text-white"
-                        : "text-slate-400",
+                        ? "border-accent/45 bg-accent-soft text-fg"
+                        : "text-fg-3 hover:bg-raised hover:text-fg",
                     ),
                   })}
                 >
@@ -264,7 +254,7 @@ export function StudioCircularTextPanel({
 
             {/* Orientation toggle */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-slate-400 text-[11px]">{translateCurrentStaticSourceText("domains.creator.text.StudioCircularTextPanel", "ko", "글자 방향")}</span>
+              <span className="text-[11px] text-fg-3">글자 방향</span>
               <div className="flex gap-1">
                 <button
                   type="button"

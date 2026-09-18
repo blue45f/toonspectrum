@@ -28,7 +28,9 @@ import {
   readStudioMarketplaceSubmissionDraft,
   writeStudioMarketplaceSubmissionDraft,
 } from "../studio-marketplace-submission-store";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 type Locale = string;
@@ -61,7 +63,7 @@ function statusTone(status: string): string {
   return "border-warning/35 bg-warning-soft/15 text-warning";
 }
 
-function statusLabel(status: string, locale: Locale): string {
+function statusLabel(status: string, bt: (ko: string, en: string) => string): string {
   const ko: Readonly<Record<string, string>> = {
     draft: "작성 중",
     submitted: "심사 중",
@@ -86,17 +88,18 @@ function statusLabel(status: string, locale: Locale): string {
     review: "Review",
     blocked: "Blocked",
   };
-  return (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", ko[status], en[status])) ?? status;
+  return ko[status] && en[status] ? bt(ko[status]!, en[status]!) : status;
 }
 
 /** A real seller draft, file checksum, readiness and moderation-state workflow. */
 export function StudioMarketplaceSellerPanel({
   sellerId,
-  locale,
+  locale: _locale,
 }: {
   readonly sellerId: string;
-  readonly locale: Locale;
+  readonly locale?: string;
 }) {
+  const bt = useBilingual("StudioMarketplaceSellerPanel");
   const [submission, setSubmission] = useState<StudioMarketplaceSubmission>(() => (
     createStudioMarketplaceSubmissionDraft(sellerId)
   ));
@@ -123,7 +126,7 @@ export function StudioMarketplaceSellerPanel({
       ? next
       : writeStudioMarketplaceSubmissionDraft(window.localStorage, next, window);
     setSubmission(stored);
-    setMessage(nextMessage ?? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "판매 초안을 저장했습니다.", "Saved seller draft.")));
+    setMessage(nextMessage ?? (bt("판매 초안을 저장했습니다.", "Saved seller draft.")));
     setError(null);
   };
 
@@ -155,9 +158,9 @@ export function StudioMarketplaceSellerPanel({
           nextFile,
         ]),
         updatedAt: new Date().toISOString(),
-      }, translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", `${file.name}의 무결성을 확인했습니다.`, `Verified ${file.name}.`));
+      }, bt(`${file.name}의 무결성을 확인했습니다.`, `Verified ${file.name}.`));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "파일을 확인하지 못했습니다.", "Could not verify the file.")));
+      setError(cause instanceof Error ? cause.message : (bt("파일을 확인하지 못했습니다.", "Could not verify the file.")));
     } finally {
       setBusyRole(null);
     }
@@ -168,9 +171,9 @@ export function StudioMarketplaceSellerPanel({
       commit(transitionStudioMarketplaceSubmission(submission, {
         type: "submit",
         at: new Date().toISOString(),
-      }), translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "심사 요청을 준비했습니다. 서버 연결 시 안전하게 제출됩니다.", "Review request is prepared and will submit through the configured server."));
+      }), bt("심사 요청을 준비했습니다. 서버 연결 시 안전하게 제출됩니다.", "Review request is prepared and will submit through the configured server."));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "제출할 수 없습니다.", "Submission is not available.")));
+      setError(cause instanceof Error ? cause.message : (bt("제출할 수 없습니다.", "Submission is not available.")));
     }
   };
 
@@ -179,14 +182,14 @@ export function StudioMarketplaceSellerPanel({
       commit(transitionStudioMarketplaceSubmission(submission, {
         type: "withdraw",
         at: new Date().toISOString(),
-      }), translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "심사 요청을 철회했습니다.", "Withdrew the review request."));
+      }), bt("심사 요청을 철회했습니다.", "Withdrew the review request."));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "철회할 수 없습니다.", "Could not withdraw.")));
+      setError(cause instanceof Error ? cause.message : (bt("철회할 수 없습니다.", "Could not withdraw.")));
     }
   };
 
   const reset = () => {
-    commit(createStudioMarketplaceSubmissionDraft(sellerId), translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "새 판매 초안을 시작했습니다.", "Started a new seller draft."));
+    commit(createStudioMarketplaceSubmissionDraft(sellerId), bt("새 판매 초안을 시작했습니다.", "Started a new seller draft."));
   };
 
   return (
@@ -196,18 +199,18 @@ export function StudioMarketplaceSellerPanel({
           <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
             <Store size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "SELLER CENTER")}</p>
           <h2 id="seller-panel-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "파일부터 권리·심사까지 한 번에", "From files to rights and review")}
+            {bt("파일부터 권리·심사까지 한 번에", "From files to rights and review")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "실제 판매 파일과 미리보기의 SHA-256을 계산하고, 품질·호환성·라이선스·AI 사용 여부를 모두 확인한 뒤에만 심사를 요청합니다.", "Calculate SHA-256 for real product and preview files, then require quality, compatibility, license and AI disclosure checks before review.")}
+            {bt("실제 판매 파일과 미리보기의 SHA-256을 계산하고, 품질·호환성·라이선스·AI 사용 여부를 모두 확인한 뒤에만 심사를 요청합니다.", "Calculate SHA-256 for real product and preview files, then require quality, compatibility, license and AI disclosure checks before review.")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn("rounded-full border px-3 py-1.5 text-xs font-black", statusTone(submission.status))}>
-            {statusLabel(submission.status, locale)}
+            {statusLabel(submission.status, bt)}
           </span>
           <span className={cn("rounded-full border px-3 py-1.5 text-xs font-black", statusTone(readiness.status))}>
-            {statusLabel(readiness.status, locale)}
+            {statusLabel(readiness.status, bt)}
           </span>
         </div>
       </div>
@@ -219,35 +222,35 @@ export function StudioMarketplaceSellerPanel({
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-black text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "에셋 이름", "Asset title")}
+              {bt("에셋 이름", "Asset title")}
               <input disabled={!editable} value={submission.title} onChange={(event) => patch("title", event.target.value)} className={FIELD_CLASS} />
             </label>
             <label className="text-xs font-black text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "에셋 종류", "Asset type")}
+              {bt("에셋 종류", "Asset type")}
               <select disabled={!editable} value={submission.assetType} onChange={(event) => patch("assetType", event.target.value)} className={FIELD_CLASS}>
-                <option value="brush">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "브러시", "Brush")}</option>
-                <option value="image">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "2D 이미지·소재", "2D image")}</option>
-                <option value="3d">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "3D", "3D")}</option>
-                <option value="font">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "글꼴", "Font")}</option>
-                <option value="audio">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "오디오", "Audio")}</option>
-                <option value="design-template">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "디자인 템플릿", "Design template")}</option>
-                <option value="plugin">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "확장 기능", "Extension")}</option>
+                <option value="brush">{bt("브러시", "Brush")}</option>
+                <option value="image">{bt("2D 이미지·소재", "2D image")}</option>
+                <option value="3d">{bt("3D", "3D")}</option>
+                <option value="font">{bt("글꼴", "Font")}</option>
+                <option value="audio">{bt("오디오", "Audio")}</option>
+                <option value="design-template">{bt("디자인 템플릿", "Design template")}</option>
+                <option value="plugin">{bt("확장 기능", "Extension")}</option>
               </select>
             </label>
             <label className="text-xs font-black text-fg-2 sm:col-span-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "설명", "Description")}
-              <textarea disabled={!editable} rows={4} value={submission.description} onChange={(event) => patch("description", event.target.value)} className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "{v0} py-2"), { v0: String(FIELD_CLASS) })} />
+              {bt("설명", "Description")}
+              <textarea disabled={!editable} rows={4} value={submission.description} onChange={(event) => patch("description", event.target.value)} className={`${FIELD_CLASS} py-2`} />
             </label>
             <label className="text-xs font-black text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "가격", "Price")}
+              {bt("가격", "Price")}
               <input disabled={!editable} type="number" min={0} step={100} value={submission.priceMinor} onChange={(event) => patch("priceMinor", Math.max(0, Number(event.target.value) || 0))} className={FIELD_CLASS} />
             </label>
             <label className="text-xs font-black text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "기술 품질 점수", "Technical quality score")}
+              {bt("기술 품질 점수", "Technical quality score")}
               <input disabled={!editable} type="number" min={0} max={100} value={submission.qualityScore} onChange={(event) => patch("qualityScore", Math.min(100, Math.max(0, Number(event.target.value) || 0)))} className={FIELD_CLASS} />
             </label>
             <label className="text-xs font-black text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "라이선스", "License")}
+              {bt("라이선스", "License")}
               <select disabled={!editable} value={submission.licenseId} onChange={(event) => patch("licenseId", event.target.value)} className={FIELD_CLASS}>
                 <option value="commercial-standard">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "Commercial Standard")}</option>
                 <option value="commercial-extended">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioMarketplaceSellerPanel", "en", "Commercial Extended")}</option>
@@ -256,21 +259,21 @@ export function StudioMarketplaceSellerPanel({
               </select>
             </label>
             <label className="text-xs font-black text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "AI 사용", "AI use")}
+              {bt("AI 사용", "AI use")}
               <select disabled={!editable} value={submission.aiClassification} onChange={(event) => patch("aiClassification", event.target.value as StudioMarketplaceAiClassification)} className={FIELD_CLASS}>
-                <option value="none">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "사용하지 않음", "Not used")}</option>
-                <option value="assisted">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "일부 보조", "AI assisted")}</option>
-                <option value="generated">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "AI 생성 포함", "Includes AI-generated content")}</option>
+                <option value="none">{bt("사용하지 않음", "Not used")}</option>
+                <option value="assisted">{bt("일부 보조", "AI assisted")}</option>
+                <option value="generated">{bt("AI 생성 포함", "Includes AI-generated content")}</option>
               </select>
             </label>
             {submission.aiClassification !== "none" ? (
               <label className="text-xs font-black text-fg-2 sm:col-span-2">
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "사용한 AI 도구·모델", "AI tools and models")}
+                {bt("사용한 AI 도구·모델", "AI tools and models")}
                 <input
                   disabled={!editable}
                   value={submission.aiProviderNames.join(", ")}
                   onChange={(event) => patch("aiProviderNames", Object.freeze(event.target.value.split(",").map((value) => value.trim()).filter(Boolean)))}
-                  placeholder={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "예: Firefly, 모델명", "Example: Firefly, model name")}
+                  placeholder={bt("예: Firefly, 모델명", "Example: Firefly, model name")}
                   className={FIELD_CLASS}
                 />
               </label>
@@ -279,8 +282,8 @@ export function StudioMarketplaceSellerPanel({
 
           <div className="grid gap-3 sm:grid-cols-2">
             {([
-              ["primary", PackagePlus, translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "판매할 실제 파일", "Product file"), translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "브러시·PSD·GLB·폰트·오디오·템플릿 파일", "Brush, PSD, GLB, font, audio or template")],
-              ["preview", FileImage, translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "미리보기", "Preview"), translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "사용 전 결과를 판단할 이미지·영상", "Image or video that demonstrates the result")],
+              ["primary", PackagePlus, bt("판매할 실제 파일", "Product file"), bt("브러시·PSD·GLB·폰트·오디오·템플릿 파일", "Brush, PSD, GLB, font, audio or template")],
+              ["preview", FileImage, bt("미리보기", "Preview"), bt("사용 전 결과를 판단할 이미지·영상", "Image or video that demonstrates the result")],
             ] as const).map(([role, Icon, title, description]) => {
               const file = submission.files.find((item) => item.role === role);
               return (
@@ -302,7 +305,7 @@ export function StudioMarketplaceSellerPanel({
                       {file.path.split("/").at(-1)} · {Math.ceil(file.sizeBytes / 1024)}KB
                     </span>
                   ) : null}
-                  {busyRole === role ? <span className="mt-2 text-xs font-bold text-accent">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "무결성 확인 중…", "Verifying…")}</span> : null}
+                  {busyRole === role ? <span className="mt-2 text-xs font-bold text-accent">{bt("무결성 확인 중…", "Verifying…")}</span> : null}
                 </label>
               );
             })}
@@ -311,7 +314,7 @@ export function StudioMarketplaceSellerPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex min-h-12 items-center gap-3 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2">
               <input disabled={!editable} type="checkbox" checked={submission.sourceReferencesCleared} onChange={(event) => patch("sourceReferencesCleared", event.target.checked)} />
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "참조 원본과 포함 파일의 판매 권리를 확인했습니다", "I have cleared rights for references and included files")}
+              {bt("참조 원본과 포함 파일의 판매 권리를 확인했습니다", "I have cleared rights for references and included files")}
             </label>
             <label className="flex min-h-12 items-center gap-3 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2">
               <input
@@ -320,7 +323,7 @@ export function StudioMarketplaceSellerPanel({
                 checked={submission.compatibilityTargets.includes("desktop")}
                 onChange={(event) => patch("compatibilityTargets", Object.freeze(event.target.checked ? ["web", "desktop"] : ["web"]))}
               />
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "데스크톱 앱에서도 사용 가능", "Also compatible with desktop app")}
+              {bt("데스크톱 앱에서도 사용 가능", "Also compatible with desktop app")}
             </label>
           </div>
         </div>
@@ -328,12 +331,12 @@ export function StudioMarketplaceSellerPanel({
         <aside className="rounded-2xl border border-line bg-panel/55 p-4 xl:sticky xl:top-6 xl:self-start">
           <h3 className="flex items-center gap-2 text-sm font-black text-fg">
             <FileCheck2 size={17} className="text-accent" aria-hidden="true" />
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "제출 전 확인", "Before submission")}
+            {bt("제출 전 확인", "Before submission")}
           </h3>
           <div className="mt-3 grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.65rem] text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "품질 점수", "Quality")}</p><b className="mt-1 block text-lg text-fg">{submission.qualityScore}</b></div>
-            <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.65rem] text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "첨부 파일", "Files")}</p><b className="mt-1 block text-lg text-fg">{submission.files.length}</b></div>
-            <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.65rem] text-fg-3">{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "확인 항목", "Findings")}</p><b className="mt-1 block text-lg text-fg">{readiness.findings.length}</b></div>
+            <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.65rem] text-fg-3">{bt("품질 점수", "Quality")}</p><b className="mt-1 block text-lg text-fg">{submission.qualityScore}</b></div>
+            <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.65rem] text-fg-3">{bt("첨부 파일", "Files")}</p><b className="mt-1 block text-lg text-fg">{submission.files.length}</b></div>
+            <div className="rounded-xl border border-line bg-card p-3"><p className="text-[0.65rem] text-fg-3">{bt("확인 항목", "Findings")}</p><b className="mt-1 block text-lg text-fg">{readiness.findings.length}</b></div>
           </div>
 
           <div className="mt-3 space-y-2">
@@ -345,13 +348,13 @@ export function StudioMarketplaceSellerPanel({
                   : "border-warning/30 bg-warning-soft/10 text-fg-2",
               )}>
                 <CircleAlert size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", finding.messageKo, finding.messageEn)}
+                {bt(finding.messageKo, finding.messageEn)}
               </div>
             ))}
             {readiness.findings.length === 0 ? (
               <div className="flex items-start gap-2 rounded-xl border border-success/30 bg-success-soft/12 px-3 py-2 text-xs leading-5 text-fg-2">
                 <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "심사를 요청할 준비가 됐습니다.", "Ready to request review.")}
+                {bt("심사를 요청할 준비가 됐습니다.", "Ready to request review.")}
               </div>
             ) : null}
           </div>
@@ -360,26 +363,26 @@ export function StudioMarketplaceSellerPanel({
             {editable ? (
               <button type="button" disabled={readiness.status === "blocked" || busyRole !== null} onClick={submit} className={buttonClass({ className: "gap-2" })}>
                 <Send size={16} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "심사 요청 준비", "Prepare review request")}
+                {bt("심사 요청 준비", "Prepare review request")}
               </button>
             ) : null}
             {["submitted", "changes-requested", "approved"].includes(submission.status) ? (
               <button type="button" onClick={withdraw} className={buttonClass({ variant: "outline", className: "gap-2" })}>
                 <RotateCcw size={16} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "요청 철회", "Withdraw")}
+                {bt("요청 철회", "Withdraw")}
               </button>
             ) : null}
             {["withdrawn", "rejected", "published"].includes(submission.status) ? (
               <button type="button" onClick={reset} className={buttonClass({ variant: "outline", className: "gap-2" })}>
                 <PackagePlus size={16} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "새 에셋 등록", "New submission")}
+                {bt("새 에셋 등록", "New submission")}
               </button>
             ) : null}
           </div>
 
           <p className="mt-3 flex items-start gap-2 text-[0.67rem] leading-5 text-fg-3">
             <Upload size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioMarketplaceSellerPanel", "브라우저에서는 파일 무결성과 제출 준비 상태를 저장합니다. 실제 업로드·결제·공개는 인증된 서버 연결이 있을 때만 수행됩니다.", "The browser stores file integrity and submission readiness. Actual upload, payment and publication require an authenticated server connection.")}
+            {bt("브라우저에서는 파일 무결성과 제출 준비 상태를 저장합니다. 실제 업로드·결제·공개는 인증된 서버 연결이 있을 때만 수행됩니다.", "The browser stores file integrity and submission readiness. Actual upload, payment and publication require an authenticated server connection.")}
           </p>
         </aside>
       </div>

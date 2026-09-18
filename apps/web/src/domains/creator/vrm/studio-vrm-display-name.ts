@@ -4,6 +4,12 @@ import {
 import { normalizeLocaleCode } from "@/shared/lib/i18n-intl-utils";
 
 import type { VrmLibraryEntry } from "./vrm-library";
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("studio-vrm-display-name", ko, en);
 
 type DisplayLocale = "en" | "ko" | "ja" | "zhHans" | "zhHant";
 type LocalizedNames = Readonly<Record<DisplayLocale, string>>;
@@ -176,9 +182,9 @@ function quaterniusDisplayName(id: string, locale: DisplayLocale): string | null
   const role = QUATERNIUS_ROLE_NAMES[match[2]];
   if (!role) return null;
 
-  const brandName = translateLocaleBranchForLocale(locale, "domains.creator.vrm.studio.vrm.display.name", QUATERNIUS_BRAND_NAMES);
-  const roleName = translateLocaleBranchForLocale(locale, "domains.creator.vrm.studio.vrm.display.name", role);
-  const genderName = translateLocaleBranchForLocale(locale, "domains.creator.vrm.studio.vrm.display.name", QUATERNIUS_GENDER_NAMES[gender]);
+  const brandName = bi((QUATERNIUS_BRAND_NAMES).ko, (QUATERNIUS_BRAND_NAMES).en);
+  const roleName = bi((role).ko, (role).en);
+  const genderName = bi((QUATERNIUS_GENDER_NAMES[gender]).ko, (QUATERNIUS_GENDER_NAMES[gender]).en);
   return locale === "en" || locale === "ko"
     ? `${brandName} ${roleName} (${genderName})`
     : `${brandName} ${roleName}（${genderName}）`;

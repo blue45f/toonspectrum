@@ -29,6 +29,10 @@ import type {
   SiteRouteProduct,
   SiteRoutePurpose,
 } from "@/shared/lib/site-route-metadata";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("SiteDirectorySearch", ko, en);
 
 const PRODUCT_VALUES = ["studio", "spectrum", "docs"] as const satisfies readonly SiteRouteProduct[];
 const PURPOSE_VALUES = ["create", "discover", "learn", "connect", "manage", "trust"] as const satisfies readonly SiteRoutePurpose[];
@@ -82,6 +86,7 @@ function allowedParam<T extends string>(value: string | null, allowed: readonly 
 }
 
 export function SiteDirectorySearch({ entries, locale }: { entries: readonly SiteDirectoryEntry[]; locale: SiteNavigationLocale }) {
+  useBilingualI18nRevision();
   const [params, setParams] = useSearchParams();
   const [favorites, setFavorites] = useState<string[]>(() => readFavoriteSiteRoutes());
   const query = (params.get("menu") ?? "").slice(0, 160);
@@ -91,7 +96,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
   const access = allowedParam(params.get("access"), ACCESS_VALUES);
   const device = allowedParam(params.get("device"), DEVICE_VALUES);
   const favoritesOnly = params.get("saved") === "1";
-  const copy = translateLocaleBranchForLocale(locale, "domains.legal.SiteDirectorySearch", FILTER_COPY);
+  const copy = bi((FILTER_COPY).ko, (FILTER_COPY).en);
   const activeFilters = product !== "all" || purpose !== "all" || maturity !== "all" || access !== "all" || device !== "all" || favoritesOnly;
   const results = useMemo(() => filterSiteDirectory(entries, query, {
     product,
@@ -104,7 +109,10 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
   }), [access, device, entries, favorites, favoritesOnly, maturity, product, purpose, query]);
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const resultRef = useRef<HTMLUListElement>(null);  useEffect(() => {
+  const resultRef = useRef<HTMLUListElement>(null);
+
+
+  useEffect(() => {
     const sync = () => setFavorites(readFavoriteSiteRoutes());
     window.addEventListener(SITE_ROUTE_PREFERENCES_EVENT, sync);
     window.addEventListener("storage", sync);
@@ -159,12 +167,12 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
         event.preventDefault();
         resultRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
       }}>
-        <label id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-label"), { v0: String(id) })} htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-query"), { v0: String(id) })}>{translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "메뉴·도구 바로 찾기", "Find a page or tool")}</label>
-        <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-hint"), { v0: String(id) })}>{translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "이름, 하고 싶은 일, 제품 상태를 검색하세요. 예: 학습 기록, 베타 3D, 로그인 필요", "Search a name, task or product state: learning records, beta 3D, sign-in required.")}</p>
+        <label id={`${id}-label`} htmlFor={`${id}-query`}>{bi("메뉴·도구 바로 찾기", "Find a page or tool")}</label>
+        <p id={`${id}-hint`}>{bi("이름, 하고 싶은 일, 제품 상태를 검색하세요. 예: 학습 기록, 베타 3D, 로그인 필요", "Search a name, task or product state: learning records, beta 3D, sign-in required.")}</p>
         <div className="directory-search__field">
           <Search size={20} aria-hidden="true" />
-          <input ref={inputRef} id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-query"), { v0: String(id) })} type="search" value={query} maxLength={160} onChange={(event) => setQuery(event.target.value)} aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-hint"), { v0: String(id) })} autoComplete="off" enterKeyHint="search" placeholder={translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "어떤 공간을 찾으세요?", "Where would you like to go?")} />
-          {query && <button type="button" onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label={translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "메뉴 검색 지우기", "Clear page search")}><X size={18} aria-hidden="true" /></button>}
+          <input ref={inputRef} id={`${id}-query`} type="search" value={query} maxLength={160} onChange={(event) => setQuery(event.target.value)} aria-describedby={`${id}-hint`} autoComplete="off" enterKeyHint="search" placeholder={bi("어떤 공간을 찾으세요?", "Where would you like to go?")} />
+          {query && <button type="button" onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label={bi("메뉴 검색 지우기", "Clear page search")}><X size={18} aria-hidden="true" /></button>}
         </div>
         <details className="directory-search__filters" open={activeFilters || undefined}>
           <summary><SlidersHorizontal size={16} aria-hidden="true" />{copy.showFilters}</summary>
@@ -191,11 +199,11 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
       </form>
       <p className="directory-search__status" role="status" aria-live="polite" aria-atomic="true">
         {visibleResults
-          ? (translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", `${results.length}개의 목적지를 찾았습니다.`, `${results.length} destinations found.`))
-          : (translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", `전체 ${filterSiteDirectory(entries, "").length}개 목적지에서 검색하거나 조건을 선택하세요.`, `Search or filter ${filterSiteDirectory(entries, "").length} destinations.`))}
+          ? (formatI18nTemplate(String(bi("{value0}개의 목적지를 찾았습니다.", "{value0} destinations found.")), { value0: results.length }))
+          : (formatI18nTemplate(String(bi("전체 {value0}개 목적지에서 검색하거나 조건을 선택하세요.", "Search or filter {value0} destinations.")), { value0: filterSiteDirectory(entries, "").length }))}
       </p>
       {visibleResults && (results.length ? (
-        <ul ref={resultRef} className="directory-search__results" aria-label={translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "메뉴 검색 결과", "Page search results")}>
+        <ul ref={resultRef} className="directory-search__results" aria-label={bi("메뉴 검색 결과", "Page search results")}>
           {results.map((entry) => {
             const metadata = siteDirectoryEntryMetadata(entry);
             const favorite = favorites.includes(metadata.canonicalPath);
@@ -203,7 +211,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
               <Link href={metadata.canonicalPath}>
                 <strong>{siteNavigationText(entry.label, locale)}</strong>
                 <span>{siteNavigationText(entry.description, locale)}</span>
-                <span className="directory-search__badges" aria-label={translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "페이지 상태", "Page status")}>
+                <span className="directory-search__badges" aria-label={bi("페이지 상태", "Page status")}>
                   <small data-kind={metadata.product}>{copy.productValues[metadata.product]}</small>
                   <small data-kind={metadata.maturity}>{copy.maturityValues[metadata.maturity]}</small>
                   {metadata.access !== "public" ? <small data-kind={metadata.access}>{copy.accessValues[metadata.access]}</small> : null}
@@ -224,8 +232,8 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
           })}
         </ul>
       ) : <div className="directory-search__empty">
-        <p>{translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "조건에 맞는 목적지가 없습니다. 검색어 또는 필터를 줄여보세요.", "No destination matches these conditions. Try fewer words or filters.")}</p>
-        <button type="button" onClick={reset}>{activeFilters ? copy.reset : (translateBilingualValueForLocale(locale, "domains.legal.SiteDirectorySearch", "검색 초기화", "Reset search"))}</button>
+        <p>{bi("조건에 맞는 목적지가 없습니다. 검색어 또는 필터를 줄여보세요.", "No destination matches these conditions. Try fewer words or filters.")}</p>
+        <button type="button" onClick={reset}>{activeFilters ? copy.reset : (bi("검색 초기화", "Reset search"))}</button>
       </div>)}
     </section>
   );

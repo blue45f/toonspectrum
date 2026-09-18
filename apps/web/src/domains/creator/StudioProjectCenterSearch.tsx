@@ -450,10 +450,18 @@ export function StudioProjectCenterSearch(): ReactElement {
     );
     rebuildIndex();
 
+    let rebuildFrame = 0;
+    const scheduleRebuild = () => {
+      if (rebuildFrame !== 0) return;
+      rebuildFrame = requestAnimationFrame(() => {
+        rebuildFrame = 0;
+        rebuildIndex();
+      });
+    };
     const observer = typeof MutationObserver === "function"
       ? new MutationObserver((mutations) => {
         if (mutations.every((mutation) => root.contains(mutation.target))) return;
-        rebuildIndex();
+        scheduleRebuild();
       })
       : null;
     observer?.observe(panel, {
@@ -478,7 +486,12 @@ export function StudioProjectCenterSearch(): ReactElement {
     };
     panel.addEventListener("click", recordAction, true);
     return () => {
+      disposed = true;
+      if (rebuildFrame !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(rebuildFrame);
+      }
       observer?.disconnect();
+      if (rebuildFrame !== 0) cancelAnimationFrame(rebuildFrame);
       panel.removeEventListener("click", recordAction, true);
     };
   }, [rebuildIndex, rememberRecent]);

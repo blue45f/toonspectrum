@@ -46,6 +46,7 @@ const DOC_ROUTES = [
   "/sitemap",
   "/support",
   "/support-us",
+  "/support-creators",
   "/terms",
 ] as const;
 
@@ -66,7 +67,7 @@ const STUDIO_PUBLIC_ROUTES = [
 ] as const;
 
 const LEARNING_ROUTES = ["/about/workflow", "/learn", "/references", "/research"] as const;
-const CONNECT_ROUTES = ["/business", "/collaborate", "/community", "/contact", "/feedback", "/messages", "/showcase", "/support", "/support-us"] as const;
+const CONNECT_ROUTES = ["/business", "/collaborate", "/community", "/contact", "/feedback", "/messages", "/showcase", "/support", "/support-us", "/support-creators"] as const;
 const MANAGE_ROUTES = ["/library", "/me", "/my", "/settings"] as const;
 const TRUST_ROUTES = ["/about", "/about/principles", "/accessibility", "/copyright", "/design", "/guide", "/help", "/privacy", "/sitemap", "/terms"] as const;
 const CREATE_ROUTES = ["/market", "/now", "/opportunities", "/story-lab", "/studio"] as const;

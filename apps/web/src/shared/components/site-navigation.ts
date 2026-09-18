@@ -30,6 +30,9 @@ import {
   type SitePrimaryRouteId,
 } from "@/shared/lib/site-route-authority";
 import { resolveSiteRouteNavigationContext } from "@/shared/lib/site-route-metadata";
+import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 export type SiteNavigationLocale = string;
 export type SiteNavigationAuthoredLocale = "ko" | "en";
@@ -443,8 +446,8 @@ export function mobileSiteTabsForPath(pathname: string): readonly SiteNavigation
     : TOONSPECTRUM_MOBILE_TABS;
 }
 
-export function siteNavigationLocale(locale: string): SiteNavigationLocale {
-  return resolveUiLocale(locale);
+export function siteNavigationLocale(_locale): SiteNavigationLocale {
+  return getActiveI18nLocale();
 }
 
 export function siteNavigationText(text: SiteNavigationText, locale: string): string {

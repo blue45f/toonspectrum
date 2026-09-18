@@ -36,8 +36,16 @@ import {
   type CreatorSpecialtyId,
   type CreatorStage,
 } from "@/shared/lib/creator-role-contract";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { cn } from "@/shared/lib/utils";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorRoleProfileEditor", ko, en);
 
 const FEATURED_ROLES: readonly CreatorRoleId[] = [
   "story",
@@ -56,8 +64,8 @@ const ROLE_GROUP_LABELS: Readonly<Record<CreatorRoleGroup, { ko: string; en: str
   production: { ko: "편집·운영", en: "Editorial & operations" },
 };
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return translateBilingualValueForLocale(locale, "domains.account.CreatorRoleProfileEditor", ko, en);
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
 }
 
 function roleLabel(role: CreatorRoleId, locale: CreatorRoleLocale): string {
@@ -81,7 +89,8 @@ export function CreatorRoleProfileEditor({
   readonly onChange: (next: CreatorRoleProfile) => void;
   readonly disabled?: boolean;
 }) {
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang);
+  useBilingualI18nRevision();
+  const locale: CreatorRoleLocale = getActiveI18nLocale();
   const selectedRoles = creatorRoleSelection(value);
   const recommendedSpecialtySet = useMemo(
     () => new Set(recommendedCreatorSpecialties(selectedRoles)),
@@ -212,7 +221,7 @@ export function CreatorRoleProfileEditor({
           >
             <option value="">{localized(locale, "직무를 선택해 주세요", "Select a role")}</option>
             {Object.keys(ROLE_GROUP_LABELS).map((group) => (
-              <optgroup key={group} label={translateLocaleBranchForLocale(locale, "domains.account.CreatorRoleProfileEditor", ROLE_GROUP_LABELS[group as CreatorRoleGroup])}>
+              <optgroup key={group} label={bi((ROLE_GROUP_LABELS[group as CreatorRoleGroup]).ko, (ROLE_GROUP_LABELS[group as CreatorRoleGroup]).en)}>
                 {CREATOR_ROLE_DEFINITIONS.filter((entry) => entry.group === group).map((entry) => (
                   <option key={entry.id} value={entry.id}>{creatorText(entry.label, locale)}</option>
                 ))}

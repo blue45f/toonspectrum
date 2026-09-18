@@ -692,8 +692,8 @@ export function StudioImageAdjustmentsPanel({
     light: t("studio.imageAdjustments.section.light"),
     detail: t("studio.imageAdjustments.section.detail"),
     sketch: t("studio.imageAdjustments.section.sketch"),
-    colorMatch: "컬러 매치 (CSP 3.0)",
-    shadingAssist: "자동 음영 어시스트 (CSP 2.0)",
+    colorMatch: "색감 맞추기",
+    shadingAssist: "자동 명암",
   };
   if (selected.adjustmentLayer) return <>
     <StudioLiveAdjustmentControls selected={selected} onPatch={onPatch} />

@@ -14,8 +14,11 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -28,9 +31,14 @@ import {
 } from "../studio-project-document-store";
 import { markStudioProjectOpened } from "../studio-project-library-store";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
+import {
+  formatI18nTemplate,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
-type AuthoredLocale = "ko" | "en";
 type DocumentView = "active" | "archived" | "trash";
 
 const VIEW_STATUS: Readonly<Record<DocumentView, StudioDocumentStatus>> = Object.freeze({
@@ -58,7 +66,7 @@ const DOCUMENT_KIND_OPTIONS: readonly Readonly<{
   { id: "localization", labelKo: "현지화", labelEn: "Localization" },
 ]);
 
-const WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, Readonly<Record<AuthoredLocale, string>>>> = Object.freeze({
+const WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, BilingualText>> = Object.freeze({
   draw: { ko: "그리기", en: "Draw" },
   comic: { ko: "웹툰", en: "Comic" },
   image: { ko: "이미지", en: "Image" },
@@ -74,14 +82,18 @@ const WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, Readonly<Record
   review: { ko: "검토", en: "Review" },
 });
 
-function defaultTitle(kind: StudioDocumentKind, locale: Locale): string {
+function defaultTitle(
+  kind: StudioDocumentKind,
+  bt: (ko: string, en: string) => string,
+): string {
   const item = DOCUMENT_KIND_OPTIONS.find((option) => option.id === kind);
-  const label = translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", item?.labelKo, item?.labelEn);
-  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", `새 ${label ?? "문서"}`, `New ${label ?? "document"}`);
+  return item
+    ? bt(`새 ${item.labelKo}`, `New ${item.labelEn}`)
+    : bt("새 문서", "New document");
 }
 
 function formatDate(value: string, locale: Locale): string {
-  return new Intl.DateTimeFormat(getCurrentUiLocale(), {
+  return new Intl.DateTimeFormat(locale || "en", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -89,9 +101,12 @@ function formatDate(value: string, locale: Locale): string {
   }).format(new Date(value));
 }
 
-function documentKindLabel(kind: StudioDocumentKind, locale: Locale): string {
+function documentKindLabel(
+  kind: StudioDocumentKind,
+  bt: (ko: string, en: string) => string,
+): string {
   const item = DOCUMENT_KIND_OPTIONS.find((option) => option.id === kind);
-  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", item?.labelKo ?? kind, item?.labelEn ?? kind);
+  return item ? bt(item.labelKo, item.labelEn) : kind;
 }
 
 function DocumentRow({
@@ -107,7 +122,7 @@ function DocumentRow({
   onDelete,
 }: {
   readonly document: StudioProjectDocumentEntry;
-  readonly locale: Locale;
+  readonly locale: string;
   readonly view: DocumentView;
   readonly onWorkspace: (workspace: StudioDocumentWorkspace) => void;
   readonly onOpen: () => void;
@@ -117,6 +132,7 @@ function DocumentRow({
   readonly onRestore: () => void;
   readonly onDelete: () => void;
 }) {
+  const bt = useBilingual("StudioProjectDocumentsPanel.row");
   return (
     <article className="rounded-2xl border border-line bg-card p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -124,25 +140,25 @@ function DocumentRow({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-base font-black text-fg">{document.title}</h3>
             <span className="rounded-full bg-accent-soft px-2 py-1 text-[0.62rem] font-bold text-accent">
-              {documentKindLabel(document.kind, locale)}
+              {documentKindLabel(document.kind, bt)}
             </span>
           </div>
           <p className="mt-1 text-xs text-fg-3">
             {document.width && document.height ? `${document.width.toLocaleString()} × ${document.height.toLocaleString()} · ` : ""}
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", `${document.pageCount}페이지`, `${document.pageCount} page${document.pageCount === 1 ? "" : "s"}`)} · {formatDate(document.lastOpenedAt, locale)}
+            {bt(`${document.pageCount}페이지`, `${document.pageCount} page${document.pageCount === 1 ? "" : "s"}`)} · {formatDate(document.lastOpenedAt, locale)}
           </p>
         </div>
 
         {view === "active" ? (
           <label className="text-[0.65rem] font-bold text-fg-3">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "기본 작업공간", "Default workspace")}
+            {bt("기본 작업공간", "Default workspace")}
             <select
               value={document.defaultWorkspace}
               onChange={(event) => onWorkspace(event.target.value as StudioDocumentWorkspace)}
               className="mt-1 min-h-10 rounded-xl border border-line bg-panel px-3 text-xs font-semibold text-fg"
             >
               {document.allowedWorkspaces.map((workspace) => (
-                <option key={workspace} value={workspace}>{translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", WORKSPACE_LABELS[workspace])}</option>
+                <option key={workspace} value={workspace}>{bt(WORKSPACE_LABELS[workspace].ko, WORKSPACE_LABELS[workspace].en)}</option>
               ))}
             </select>
           </label>
@@ -157,15 +173,15 @@ function DocumentRow({
                 className={buttonClass({ size: "sm", className: "gap-1.5" })}
               >
                 <FolderOpen size={15} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "열기", "Open")}
+                {bt("열기", "Open")}
               </Link>
-              <button type="button" onClick={onDuplicate} aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서 복제", "Duplicate document")} className={buttonClass({ variant: "outline", size: "icon" })}>
+              <button type="button" onClick={onDuplicate} aria-label={bt("문서 복제", "Duplicate document")} className={buttonClass({ variant: "outline", size: "icon" })}>
                 <Copy size={15} aria-hidden="true" />
               </button>
-              <button type="button" onClick={onArchive} aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서 보관", "Archive document")} className={buttonClass({ variant: "quiet", size: "icon" })}>
+              <button type="button" onClick={onArchive} aria-label={bt("문서 보관", "Archive document")} className={buttonClass({ variant: "quiet", size: "icon" })}>
                 <Archive size={15} aria-hidden="true" />
               </button>
-              <button type="button" onClick={onTrash} aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서를 휴지통으로", "Move document to Trash")} className={buttonClass({ variant: "quiet", size: "icon", className: "text-danger" })}>
+              <button type="button" onClick={onTrash} aria-label={bt("문서를 휴지통으로", "Move document to Trash")} className={buttonClass({ variant: "quiet", size: "icon", className: "text-danger" })}>
                 <Trash2 size={15} aria-hidden="true" />
               </button>
             </>
@@ -173,9 +189,9 @@ function DocumentRow({
             <>
               <button type="button" onClick={onRestore} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
                 <RotateCcw size={15} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "복원", "Restore")}
+                {bt("복원", "Restore")}
               </button>
-              <button type="button" onClick={onTrash} className={buttonClass({ variant: "quiet", size: "icon", className: "text-danger" })} aria-label={translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서를 휴지통으로", "Move document to Trash")}>
+              <button type="button" onClick={onTrash} className={buttonClass({ variant: "quiet", size: "icon", className: "text-danger" })} aria-label={bt("문서를 휴지통으로", "Move document to Trash")}>
                 <Trash2 size={15} aria-hidden="true" />
               </button>
             </>
@@ -183,10 +199,10 @@ function DocumentRow({
             <>
               <button type="button" onClick={onRestore} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}>
                 <RotateCcw size={15} aria-hidden="true" />
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "복원", "Restore")}
+                {bt("복원", "Restore")}
               </button>
               <button type="button" onClick={onDelete} className={buttonClass({ variant: "outline", size: "sm", className: "border-danger/50 text-danger hover:border-danger hover:bg-danger-soft/25 hover:text-danger" })}>
-                {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "완전히 삭제", "Delete permanently")}
+                {bt("완전히 삭제", "Delete permanently")}
               </button>
             </>
           )}
@@ -202,12 +218,13 @@ export function StudioProjectDocumentsPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: string;
 }) {
+  const bt = useBilingual("StudioProjectDocumentsPanel");
   const [view, setView] = useState<DocumentView>("active");
   const documents = useStudioProjectDocuments(projectId, locale, VIEW_STATUS[view]);
   const [kind, setKind] = useState<StudioDocumentKind>("webtoon");
-  const [title, setTitle] = useState(() => defaultTitle("webtoon", locale));
+  const [title, setTitle] = useState(() => defaultTitle("webtoon", bt));
   const [width, setWidth] = useState<number | null>(1_080);
   const [height, setHeight] = useState<number | null>(8_000);
   const [pageCount, setPageCount] = useState(1);
@@ -222,7 +239,7 @@ export function StudioProjectDocumentsPanel({
 
   const selectKind = (next: StudioDocumentKind) => {
     setKind(next);
-    setTitle(defaultTitle(next, locale));
+    setTitle(defaultTitle(next, bt));
     if (next === "webtoon") {
       setWidth(1_080);
       setHeight(8_000);
@@ -241,8 +258,8 @@ export function StudioProjectDocumentsPanel({
   const create = () => {
     const created = documents.create({ title, kind, width, height, pageCount });
     if (!created) return;
-    setTitle(defaultTitle(kind, locale));
-    setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", `“${created.title}” 문서를 만들었습니다.`, `Created “${created.title}”.`));
+    setTitle(defaultTitle(kind, bt));
+    setMessage(bt(`“${created.title}” 문서를 만들었습니다.`, `Created “${created.title}”.`));
   };
 
   const markOpened = (document: StudioProjectDocumentEntry) => {
@@ -273,10 +290,10 @@ export function StudioProjectDocumentsPanel({
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDocumentsPanel", "en", "PROJECT DOCUMENTS")}</p>
           <h2 id="project-documents-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서와 작업공간", "Documents and workspaces")}
+            {bt("문서와 작업공간", "Documents and workspaces")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "원고, 일러스트, 디자인, 슬라이드, 3D와 모션 문서를 한 프로젝트에서 관리합니다. 작업공간을 바꿔도 같은 문서의 선택·저장·작업 내역은 유지됩니다.", "Manage manuscripts, illustrations, design, slides, 3D and motion in one project. Switching workspace preserves the same document identity, selection, saving and history.")}
+            {bt("원고, 일러스트, 디자인, 슬라이드, 3D와 모션 문서를 한 프로젝트에서 관리합니다. 작업공간을 바꿔도 같은 문서의 선택·저장·작업 내역은 유지됩니다.", "Manage manuscripts, illustrations, design, slides, 3D and motion in one project. Switching workspace preserves the same document identity, selection, saving and history.")}
           </p>
         </div>
         <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-panel p-1">
@@ -295,10 +312,10 @@ export function StudioProjectDocumentsPanel({
               )}
             >
               {candidate === "active"
-                ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "작업 문서", "Active")
+                ? bt("작업 문서", "Active")
                 : candidate === "archived"
-                  ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "보관됨", "Archived")
-                  : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "휴지통", "Trash")}
+                  ? bt("보관됨", "Archived")
+                  : bt("휴지통", "Trash")}
               <span className="ml-1 opacity-75">{counts[candidate]}</span>
             </button>
           ))}
@@ -309,32 +326,32 @@ export function StudioProjectDocumentsPanel({
         <div className="mt-5 rounded-2xl border border-line bg-panel/55 p-4">
           <div className="grid gap-3 lg:grid-cols-[12rem_1fr_7rem_7rem_6rem_auto]">
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서 종류", "Document type")}
+              {bt("문서 종류", "Document type")}
               <select value={kind} onChange={(event) => selectKind(event.target.value as StudioDocumentKind)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg">
                 {DOCUMENT_KIND_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>{translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", option.labelKo, option.labelEn)}</option>
+                  <option key={option.id} value={option.id}>{bt(option.labelKo, option.labelEn)}</option>
                 ))}
               </select>
             </label>
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서 이름", "Document name")}
+              {bt("문서 이름", "Document name")}
               <input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm font-semibold text-fg" />
             </label>
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "가로", "Width")}
+              {bt("가로", "Width")}
               <input type="number" min={1} value={width ?? ""} disabled={kind === "audio"} onChange={(event) => setWidth(event.target.value ? Number(event.target.value) : null)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg disabled:opacity-50" />
             </label>
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "세로", "Height")}
+              {bt("세로", "Height")}
               <input type="number" min={1} value={height ?? ""} disabled={kind === "audio"} onChange={(event) => setHeight(event.target.value ? Number(event.target.value) : null)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg disabled:opacity-50" />
             </label>
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "페이지", "Pages")}
+              {bt("페이지", "Pages")}
               <input type="number" min={1} value={pageCount} onChange={(event) => setPageCount(Math.max(1, Number(event.target.value)))} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg" />
             </label>
             <button type="button" onClick={create} disabled={!title.trim()} className={buttonClass({ className: "mt-auto min-h-11 gap-1.5" })}>
               <FilePlus2 size={16} aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서 만들기", "Create")}
+              {bt("문서 만들기", "Create")}
             </button>
           </div>
         </div>
@@ -357,8 +374,8 @@ export function StudioProjectDocumentsPanel({
             <FilePlus2 size={22} className="mx-auto text-fg-3" aria-hidden="true" />
             <p className="mt-3 text-sm font-bold text-fg">
               {view === "active"
-                ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "아직 문서가 없습니다", "No documents yet")
-                : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "이 목록은 비어 있습니다", "This list is empty")}
+                ? bt("아직 문서가 없습니다", "No documents yet")
+                : bt("이 목록은 비어 있습니다", "This list is empty")}
             </p>
           </div>
         ) : documents.documents.map((document) => (
@@ -371,7 +388,7 @@ export function StudioProjectDocumentsPanel({
               onOpen={() => markOpened(document)}
               onDuplicate={() => {
                 const copy = documents.duplicate(document.id);
-                if (copy) setMessage(translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "문서 복사본을 만들었습니다.", "Document copy created."));
+                if (copy) setMessage(bt("문서 복사본을 만들었습니다.", "Document copy created."));
               }}
               onArchive={() => documents.archive(document.id)}
               onTrash={() => documents.trash(document.id)}
@@ -381,16 +398,16 @@ export function StudioProjectDocumentsPanel({
             {confirmDeleteId === document.id ? (
               <div className="mt-2 flex flex-col gap-2 rounded-xl border border-danger/35 bg-danger-soft/15 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs font-bold text-danger">
-                  {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "이 문서 목록을 완전히 삭제할까요?", "Permanently delete this document entry?")}
+                  {bt("이 문서 목록을 완전히 삭제할까요?", "Permanently delete this document entry?")}
                 </p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => {
                     if (documents.removePermanently(document.id)) setConfirmDeleteId(null);
                   }} className={buttonClass({ variant: "outline", size: "sm", className: "border-danger/50 text-danger hover:border-danger hover:bg-danger-soft/25 hover:text-danger" })}>
-                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "삭제", "Delete")}
+                    {bt("삭제", "Delete")}
                   </button>
                   <button type="button" onClick={() => setConfirmDeleteId(null)} className={buttonClass({ variant: "quiet", size: "sm" })}>
-                    {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioProjectDocumentsPanel", "취소", "Cancel")}
+                    {bt("취소", "Cancel")}
                   </button>
                 </div>
               </div>

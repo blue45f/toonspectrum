@@ -172,7 +172,8 @@ export function StudioCommandSearchHost({
                 className={studioChromeIconClass({ tone: "default" })}
               />
               <span className="min-w-0 flex-1 truncate">
-                {translateCurrentStaticSourceText("domains.creator.StudioCommandSearchHost", "ko", "기능·설정 찾기 · CSP·Photoshop 용어")}</span>
+                기능·설정 찾기 · 다른 앱 용어도 검색
+              </span>
               <span
                 className="flex shrink-0 items-center gap-1"
                 aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommandSearchHost", "ko", "단축키 Command K, Control K 또는 F1")}

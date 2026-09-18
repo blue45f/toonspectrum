@@ -6,6 +6,9 @@ export type SiteOstProfile = "animation" | "webtoon" | "lofi" | "cinematic" | "f
 export type SiteOstStylePreference = "auto" | SiteOstProfile;
 export type SiteOstIntensity = "chill" | "normal" | "epic";
 export type SiteOstVocalPreference = "auto" | SiteOstVocalMode;
+export type SiteOstProvider = "elevenlabs" | "ace-step";
+export type SiteOstModel = "music_v2_5" | "acestep-v15-turbo";
+export type SiteOstProvenance = "c2pa-requested" | "local-generation-recorded";
 
 export interface SiteBgmExperience {
   readonly id: string;
@@ -44,11 +47,13 @@ export interface SiteOstTrack {
   readonly intensity: SiteOstIntensity;
   readonly durationMs: number;
   readonly bpm: number;
-  readonly provider: "elevenlabs";
-  readonly model: "music_v2_5";
+  readonly provider: SiteOstProvider;
+  readonly model: SiteOstModel;
   readonly sha256: string;
   readonly generatedAt: string;
-  readonly c2paRequested: true;
+  readonly provenance: SiteOstProvenance;
+  readonly c2paRequested?: true;
+  readonly generatorRevision?: string;
   readonly status: "published";
   readonly songId?: string;
 }
@@ -237,13 +242,19 @@ function parseTrack(value: unknown): SiteOstTrack | null {
   if (!title || !artist || !isRole(role) || origin !== "original" || !isVocalMode(vocalMode)) return null;
   if (!language || !summary || !license || !creditUrl.startsWith("https://")) return null;
   if (!profiles || !isIntensity(intensity) || durationMs === null || bpm === null) return null;
-  if (provider !== "elevenlabs" || model !== "music_v2_5" || !/^[a-f0-9]{64}$/u.test(sha256)) return null;
-  if (!generatedAt || Number.isNaN(Date.parse(generatedAt)) || track.c2paRequested !== true || status !== "published") return null;
+  const provenance = safeText(track.provenance, 80);
+  const generatorRevision = safeText(track.generatorRevision, 64);
+  if (!/^[a-f0-9]{64}$/u.test(sha256) || !generatedAt || Number.isNaN(Date.parse(generatedAt)) || status !== "published") return null;
+  const elevenLabs = provider === "elevenlabs" && model === "music_v2_5" && provenance === "c2pa-requested" && track.c2paRequested === true;
+  const aceStep = provider === "ace-step" && model === "acestep-v15-turbo" && provenance === "local-generation-recorded" && /^[a-f0-9]{40}$/u.test(generatorRevision);
+  if (!elevenLabs && !aceStep) return null;
 
   return {
     id, src, title, artist, role, origin: "original", vocalMode, language, summary, license, creditUrl,
-    profiles, intensity, durationMs, bpm, provider: "elevenlabs", model: "music_v2_5", sha256, generatedAt,
-    c2paRequested: true, status: "published", ...(songId ? { songId } : {}),
+    profiles, intensity, durationMs, bpm, provider: provider as SiteOstProvider, model: model as SiteOstModel, sha256, generatedAt,
+    provenance: provenance as SiteOstProvenance,
+    ...(elevenLabs ? { c2paRequested: true as const } : { generatorRevision }),
+    status: "published", ...(songId ? { songId } : {}),
   };
 }
 

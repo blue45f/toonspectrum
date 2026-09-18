@@ -1,9 +1,12 @@
-import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
-import { useI18n } from "@/shared/lib/i18n";
+
 
 import type { EngineeringLocale } from "./engineering-story-content";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 export function useEngineeringLocale(): EngineeringLocale {
-  const language = useI18n((state) => state.lang);
-  return resolveUiLocale(language);
+  useBilingualI18nRevision();
+
+  return getActiveI18nLocale();
 }

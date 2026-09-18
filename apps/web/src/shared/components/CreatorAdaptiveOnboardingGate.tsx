@@ -46,8 +46,16 @@ import {
   type CreatorWorkspaceMode,
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { cn } from "@/shared/lib/utils";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorAdaptiveOnboardingGate", ko, en);
 
 const GOAL_LABELS: Readonly<Record<CreatorRoleUsageGoal, { ko: string; en: string }>> = {
   learning: { ko: "웹툰 제작 배우기", en: "Learn webtoon production" },
@@ -98,8 +106,8 @@ const STEP_LABELS = [
   { ko: "미리보기", en: "Preview" },
 ] as const;
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return translateBilingualValueForLocale(locale, "shared.components.CreatorAdaptiveOnboardingGate", ko, en);
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
 }
 
 function selectedRoleLabel(role: CreatorRoleId, locale: CreatorRoleLocale): string {
@@ -114,8 +122,9 @@ function toggleDistinct<T>(values: readonly T[], value: T, maximum: number): T[]
 }
 
 export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly enabled?: boolean }) {
+  useBilingualI18nRevision();
   const { status } = useSession();
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang);
+  const locale: CreatorRoleLocale = getActiveI18nLocale();
   const dialogRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -410,7 +419,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                       )}
                     >
                       {selected ? <Check size={14} aria-hidden="true" /> : null}
-                      {translateLocaleBranchForLocale(locale, "shared.components.CreatorAdaptiveOnboardingGate", GOAL_LABELS[goal])}
+                      {bi((GOAL_LABELS[goal]).ko, (GOAL_LABELS[goal]).en)}
                     </button>
                   );
                 })}
@@ -464,7 +473,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-bold">
                     {stage ? <span className="rounded-full bg-card px-3 py-1 text-fg-2">{creatorText(CREATOR_STAGE_LABELS[stage], locale)}</span> : null}
                     {primaryDefinition ? <span className="rounded-full bg-accent px-3 py-1 text-on-accent">{creatorText(primaryDefinition.label, locale)}</span> : null}
-                    <span className="rounded-full bg-card px-3 py-1 text-fg-2">{translateLocaleBranchForLocale(locale, "shared.components.CreatorAdaptiveOnboardingGate", MODE_COPY[workspaceMode])}</span>
+                    <span className="rounded-full bg-card px-3 py-1 text-fg-2">{bi((MODE_COPY[workspaceMode]).ko, (MODE_COPY[workspaceMode]).en)}</span>
                   </div>
                   <h3 className="mt-4 text-xl font-black text-fg">
                     {primaryDefinition ? creatorText(primaryDefinition.workspaceTitle, locale) : localized(locale, "내 작업실", "My workspace")}

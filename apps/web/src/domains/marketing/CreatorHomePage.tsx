@@ -17,10 +17,18 @@ import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
 import Link from "@/compat/router-link";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorHomePage", ko, en);
 
 const FEATURE_ICONS = [Brush, LayoutGrid, Box, Layers] as const;
 
 function StudioPreview({ copy, stage }: { copy: CreatorHomeCopy; stage: number }) {
+  useBilingualI18nRevision();
   return (
     <figure className={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "ch-workspace ch-workspace--{v0}"), { v0: String(copy.stages[stage].id) })} aria-label={copy.previewNote}>
       <div className="ch-windowbar"><span className="ch-windowdots" aria-hidden="true"><i /><i /><i /></span><span>{copy.preview}</span><span className="ch-window-status"><Check size={12} aria-hidden="true" /> ToonStudio</span></div>
@@ -34,7 +42,8 @@ function StudioPreview({ copy, stage }: { copy: CreatorHomeCopy; stage: number }
   );
 }
 
-export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; locale: string }) {
+export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; locale: "ko" | "en" }) {
+  useBilingualI18nRevision();
   const [mode, setMode] = useState<"poster" | "playing" | "error">("poster");
   const [loading, setLoading] = useState(false);
   const [activeChapter, setActiveChapter] = useState(0);
@@ -44,7 +53,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
   const requestedStart = useRef(0);
   const focusPlayer = useRef(false);
   const restorePosterFocus = useRef(false);
-  const ui = translateLocaleBranchForLocale(locale, "domains.marketing.CreatorHomePage", CREATOR_FILM_UI);
+  const ui = bi((CREATOR_FILM_UI).ko, (CREATOR_FILM_UI).en);
 
   const failPlayback = useCallback(() => {
     // Recover focus only when a disappearing control owns it. An unrelated link or
@@ -128,7 +137,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
             onError={failPlayback}
             onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, CREATOR_FILM.chapters))}
           >
-            <track kind="captions" src={locale.split("-")[0] === "ko" ? CREATOR_FILM.captions : "/brand/toonstudio-intro.en.vtt"} srcLang={locale.split("-")[0] === "ko" ? translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "ko") : translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "en")} label={translateBilingualValueForLocale(locale, "domains.marketing.CreatorHomePage", "한국어", "English")} default />
+            <track kind="captions" src={bi(CREATOR_FILM.captions, "/brand/toonstudio-intro.en.vtt")} srcLang={locale} label={bi("한국어", "English")} default />
           </video>
         ) : (
           <button ref={posterRef} type="button" className="ch-film-poster" onClick={() => playAt(0, true)} aria-label={copy.filmPlay} data-testid="creator-film-play">
@@ -165,9 +174,10 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
 }
 
 export function CreatorHomePage() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = creatorHomeLocale(language);
-  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.CreatorHomePage", HOME_COPY);
+  const copy = bi((HOME_COPY).ko, (HOME_COPY).en);
   const [stage, setStage] = useState(0);
   const selectedStage = copy.stages[stage];
   return (

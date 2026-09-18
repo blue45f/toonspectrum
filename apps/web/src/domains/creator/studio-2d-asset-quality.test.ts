@@ -27,14 +27,14 @@ const anyScene = (id: string) => ALL_BG_SCENES.find((item) => item.id === id)!;
 describe("2D scene quality and discovery", () => {
   it("exposes only reviewed large raster originals in the default picker", () => {
     const result = filterStudio2dScenes(groups, { quality: "recommended" });
-    expect(result).toHaveLength(33);
+    expect(result).toHaveLength(53);
     expect(result.every(isRecommendedStudio2dScene)).toBe(true);
     expect(filterStudio2dScenes(groups, { quality: "raster" })).toEqual(result);
-    expect(result).not.toContain(anyScene("webtoon-bedroom"));
+    expect(result).toContain(scene("webtoon-bedroom"));
     expect(result).toContain(scene("polyhaven-background-wide-street-01"));
   });
   it("keeps low-quality legacy IDs for document compatibility without exposing them by default", () => {
-    expect(BG_SCENE_COMPATIBILITY_LIBRARY).toHaveLength(24);
+    expect(BG_SCENE_COMPATIBILITY_LIBRARY).toHaveLength(4);
     expect(CURATED_CC0_BG_SCENES).toHaveLength(28);
     const activeIds = new Set(BG_SCENES.map((item) => item.id));
     expect(BG_SCENE_COMPATIBILITY_LIBRARY.every((item) => !activeIds.has(item.id))).toBe(true);
@@ -44,7 +44,7 @@ describe("2D scene quality and discovery", () => {
   it("retains every active ID exactly once after recommendation regrouping", () => {
     const sections = bgSceneSections(BG_SCENES);
     expect(sections[0].genre).toBe("추천");
-    expect(sections[0].scenes).toHaveLength(33);
+    expect(sections[0].scenes).toHaveLength(53);
     const ids = sections.flatMap((group) => group.scenes.map((item) => item.id));
     expect(new Set(ids).size).toBe(BG_SCENES.length);
     expect(ids).toHaveLength(BG_SCENES.length);
@@ -64,7 +64,7 @@ describe("2D scene quality and discovery", () => {
   it("keeps high-quality raster scenes discoverable in their normalized genre", () => {
     expect(filterStudio2dScenes(groups, { genre: "일상·학원", quality: "raster" })).toContain(scene("polyhaven-background-wide-street-01"));
     expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toContain(scene("webtoon-rooftop-sunset"));
-    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toHaveLength(6);
+    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toHaveLength(8);
   });
   it("searches multiple terms across tags and time of day", () => {
     expect(filterStudio2dScenes(groups, { query: " 비   밤 " })).toContain(scene("webtoon-neon-alley"));
@@ -77,7 +77,7 @@ describe("2D scene quality and discovery", () => {
   it("filters reviewed source aspect ratios without guessing vector dimensions", () => {
     expect(filterStudio2dScenes(groups, { orientation: "landscape" })).toHaveLength(32);
     expect(filterStudio2dScenes(groups, { orientation: "square" })).toEqual([scene("webtoon-palace")]);
-    expect(filterStudio2dScenes(groups, { orientation: "portrait" })).toEqual([]);
+    expect(filterStudio2dScenes(groups, { orientation: "portrait" })).toHaveLength(20);
   });
   it("does not advertise people scenes or unknown vectors as person-free images", () => {
     const result = filterStudio2dScenes(groups, { emptySceneOnly: true });
@@ -117,7 +117,7 @@ describe("2D scene quality and discovery", () => {
     expect(studio2dOrientation(1024, 1024)).toBe("square");
   });
   it("returns zero results for incompatible filters instead of silently relaxing them", () => {
-    expect(filterStudio2dScenes(groups, { quality: "recommended", orientation: "portrait" })).toEqual([]);
+    expect(filterStudio2dScenes(groups, { quality: "vector", orientation: "portrait" })).toEqual([]);
     expect(filterStudio2dScenes(groups, { query: "존재하지않는배경" })).toEqual([]);
   });
 });

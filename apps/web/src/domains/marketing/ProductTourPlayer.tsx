@@ -13,6 +13,13 @@ import { creatorFilmChapterAt } from "./creator-film-playback";
 import { PRODUCT_TOUR, PRODUCT_TOUR_COPY, type ProductTourLocale } from "./product-tour-content";
 
 import "./product-tour-player.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("ProductTourPlayer", ko, en);
 
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -21,7 +28,8 @@ function formatTime(seconds: number): string {
 }
 
 export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLocale }) {
-  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPlayer", PRODUCT_TOUR_COPY);
+  useBilingualI18nRevision();
+  const copy = bi((PRODUCT_TOUR_COPY).ko, (PRODUCT_TOUR_COPY).en);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [activeChapter, setActiveChapter] = useState(0);
   const [mounted, setMounted] = useState(false);
@@ -101,37 +109,37 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
             onError={() => { setLoading(false); setFailed(true); }}
             onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)))}
           >
-            <track kind="captions" src={translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", PRODUCT_TOUR.captionsKo, PRODUCT_TOUR.captionsEn)} srcLang={locale} label={translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "한국어", "English")} default />
+            <track kind="captions" src={bi(PRODUCT_TOUR.captionsKo, PRODUCT_TOUR.captionsEn)} srcLang={locale} label={bi("한국어", "English")} default />
           </video>
         ) : (
           <button type="button" className="product-tour-player__poster" onClick={() => seekTo(0)} aria-label={copy.watch}>
             <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
             <span><Play size={24} fill="currentColor" aria-hidden="true" /></span>
             <strong>{copy.watch}</strong>
-            <small>{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "클릭할 때만 35MB 본편을 불러옵니다", "The 35 MB film loads only after you press play")}</small>
+            <small>{bi("클릭할 때만 35MB 본편을 불러옵니다", "The 35 MB film loads only after you press play")}</small>
           </button>
         )}
-        {loading && !failed && <div className="product-tour-player__status" role="status"><LoaderCircle size={22} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "제품 투어를 불러오는 중", "Loading product tour")}</div>}
+        {loading && !failed && <div className="product-tour-player__status" role="status"><LoaderCircle size={22} aria-hidden="true" />{bi("제품 투어를 불러오는 중", "Loading product tour")}</div>}
         {failed && (
           <div className="product-tour-player__error" role="alert">
-            <strong>{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "영상을 불러오지 못했습니다.", "The video could not be loaded.")}</strong>
-            <p>{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "아래 챕터와 실제 제품 화면으로 전체 내용을 계속 살펴볼 수 있습니다.", "You can still explore the complete tour through the chapters and product screens below.")}</p>
-            <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "다시 시도", "Try again")}</button>
+            <strong>{bi("영상을 불러오지 못했습니다.", "The video could not be loaded.")}</strong>
+            <p>{bi("아래 챕터와 실제 제품 화면으로 전체 내용을 계속 살펴볼 수 있습니다.", "You can still explore the complete tour through the chapters and product screens below.")}</p>
+            <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("다시 시도", "Try again")}</button>
           </div>
         )}
       </div>
 
-      <nav className="product-tour-player__chapters" aria-label={translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPlayer", "제품 투어 챕터", "Product tour chapters")}>
+      <nav className="product-tour-player__chapters" aria-label={bi("제품 투어 챕터", "Product tour chapters")}>
         {PRODUCT_TOUR.chapters.map((chapter, index) => {
           const active = index === activeChapter;
           return (
             <div className="product-tour-player__chapter" data-active={active || undefined} key={chapter.id}>
               <button type="button" onClick={() => seekTo(chapter.start)} aria-pressed={active}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
-                <strong>{translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPlayer", chapter)}</strong>
+                <strong>{bi((chapter).ko, (chapter).en)}</strong>
                 <small>{formatTime(chapter.start)}</small>
               </button>
-              <Link href={chapter.route} aria-label={`${translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPlayer", chapter)} — ${copy.visualOpen}`}>
+              <Link href={chapter.route} aria-label={`${bi((chapter).ko, (chapter).en)} — ${copy.visualOpen}`}>
                 <ArrowRight size={15} aria-hidden="true" />
               </Link>
             </div>
@@ -146,8 +154,8 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
             <li key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.ProductTourPlayer", "en", "{v0}-transcript"), { v0: String(chapter.id) })}>
               <button type="button" onClick={() => seekTo(chapter.start)}>{formatTime(chapter.start)}</button>
               <div>
-                <strong>{translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPlayer", chapter)}</strong>
-                <span>{translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPlayer", chapter.summary)}</span>
+                <strong>{bi((chapter).ko, (chapter).en)}</strong>
+                <span>{bi((chapter.summary).ko, (chapter.summary).en)}</span>
               </div>
             </li>
           ))}

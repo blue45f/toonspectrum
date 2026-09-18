@@ -33,6 +33,14 @@ import { PRODUCT_ADVANTAGES, PRODUCT_CAPABILITIES, PRODUCT_ROLES, PRODUCT_TOUR, 
 
 import "./creator-home.css";
 import "./product-tour-page.css";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("ProductTourPage", ko, en);
 
 const CAPABILITY_ICONS: readonly LucideIcon[] = [
   BookOpen,
@@ -48,9 +56,10 @@ const CAPABILITY_ICONS: readonly LucideIcon[] = [
 const POSTER_URL = `${SITE_URL}${PRODUCT_TOUR.poster}`;
 
 export function ProductTourPage() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = creatorHomeLocale(language);
-  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", PRODUCT_TOUR_COPY);
+  const copy = bi((PRODUCT_TOUR_COPY).ko, (PRODUCT_TOUR_COPY).en);
 
   useDocumentTitle(copy.pageTitle);
   useMetaDescription(copy.metaDescription);
@@ -70,11 +79,11 @@ export function ProductTourPage() {
     contentUrl: `${SITE_URL}${PRODUCT_TOUR.src}`,
     embedUrl: `${SITE_URL}/product-tour#product-tour-video`,
     duration: "PT8M24S",
-    inLanguage: getCurrentUiLocale(),
+    inLanguage: getActiveI18nLocale(),
     isFamilyFriendly: true,
     hasPart: PRODUCT_TOUR.chapters.map((chapter) => ({
       "@type": "Clip",
-      name: translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", chapter),
+      name: bi((chapter).ko, (chapter).en),
       startOffset: chapter.start,
       endOffset: chapter.end,
       url: `${SITE_URL}/product-tour#product-tour-video`,
@@ -87,7 +96,7 @@ export function ProductTourPage() {
         <div className="product-tour-page__hero-copy">
           <Link href="/" className="product-tour-page__back">
             <ArrowLeft size={16} aria-hidden="true" />
-            {translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "홈으로", "Back home")}
+            {bi("홈으로", "Back home")}
           </Link>
           <p className="ch-eyebrow"><Sparkles size={14} aria-hidden="true" />{copy.eyebrow}</p>
           <h1>{copy.title[0]}<br /><span>{copy.title[1]}</span></h1>
@@ -101,7 +110,7 @@ export function ProductTourPage() {
           <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" fetchPriority="high" />
           <span>{translateCurrentStaticSourceText("domains.marketing.ProductTourPage", "en", "LONG-FORM REMOTION TOUR · 08:24")}</span>
         </div>
-        <dl className="product-tour-page__facts" aria-label={translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "제품 투어 정보", "Product tour facts")}>
+        <dl className="product-tour-page__facts" aria-label={bi("제품 투어 정보", "Product tour facts")}>
           {copy.facts.map(([label, value]) => (
             <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
           ))}
@@ -112,9 +121,9 @@ export function ProductTourPage() {
 
       <section className="product-tour-page__interactive" aria-labelledby="product-tour-interactive-title">
         <div className="product-tour-page__interactive-heading">
-          <p className="ch-eyebrow">{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "INTERACTIVE QUICK LOOK", "INTERACTIVE QUICK LOOK")}</p>
-          <h2 id="product-tour-interactive-title">{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "영상에서 본 기능을, 직접 골라 비교해보세요.", "Pick and compare the capabilities you just saw.")}</h2>
-          <p>{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "긴 영상은 전체 흐름을 설명하고, 이 인터랙티브 워크스루는 2D·3D·소재·저장·협업·게시의 핵심 결과를 즉시 비교할 수 있게 합니다.", "The long film explains the full journey; this interactive walkthrough lets you compare the outcomes of 2D, 3D, assets, continuity, collaboration and publishing immediately.")}</p>
+          <p className="ch-eyebrow">{bi("INTERACTIVE QUICK LOOK", "INTERACTIVE QUICK LOOK")}</p>
+          <h2 id="product-tour-interactive-title">{bi("영상에서 본 기능을, 직접 골라 비교해보세요.", "Pick and compare the capabilities you just saw.")}</h2>
+          <p>{bi("긴 영상은 전체 흐름을 설명하고, 이 인터랙티브 워크스루는 2D·3D·소재·저장·협업·게시의 핵심 결과를 즉시 비교할 수 있게 합니다.", "The long film explains the full journey; this interactive walkthrough lets you compare the outcomes of 2D, 3D, assets, continuity, collaboration and publishing immediately.")}</p>
         </div>
         <CreatorFeatureReels showFilm={false} embedded />
       </section>
@@ -130,11 +139,11 @@ export function ProductTourPage() {
             <article key={chapter.id}>
               <figure>
                 <img src={chapter.image} alt="" width={1440} height={1000} loading="lazy" />
-                <span>{String(index + 1).padStart(2, "0")} · {translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", chapter)}</span>
+                <span>{String(index + 1).padStart(2, "0")} · {bi((chapter).ko, (chapter).en)}</span>
               </figure>
               <div>
-                <h3>{translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", chapter)}</h3>
-                <p>{translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", chapter.summary)}</p>
+                <h3>{bi((chapter).ko, (chapter).en)}</h3>
+                <p>{bi((chapter.summary).ko, (chapter.summary).en)}</p>
                 <Link href={chapter.route}>{copy.visualOpen}<ArrowRight size={14} aria-hidden="true" /></Link>
               </div>
             </article>
@@ -151,13 +160,13 @@ export function ProductTourPage() {
         <div className="product-tour-page__capability-grid">
           {PRODUCT_CAPABILITIES.map((item, index) => {
             const Icon = CAPABILITY_ICONS[index] ?? FileOutput;
-            const [title, body] = translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", item);
+            const [title, body] = bi((item).ko, (item).en);
             return (
               <Link href={item.href} className="product-tour-page__capability" key={item.id}>
                 <span><Icon size={20} strokeWidth={1.7} aria-hidden="true" />{item.tag}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
-                <small>{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "기능 열기", "Open workspace")}<ArrowRight size={14} aria-hidden="true" /></small>
+                <small>{bi("기능 열기", "Open workspace")}<ArrowRight size={14} aria-hidden="true" /></small>
               </Link>
             );
           })}
@@ -171,7 +180,7 @@ export function ProductTourPage() {
         </div>
         <ol className="product-tour-page__advantage-grid">
           {PRODUCT_ADVANTAGES.map((item, index) => {
-            const [title, body] = translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", item);
+            const [title, body] = bi((item).ko, (item).en);
             return <li key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{body}</p></li>;
           })}
         </ol>
@@ -184,13 +193,13 @@ export function ProductTourPage() {
         </header>
         <div className="product-tour-page__role-grid">
           {PRODUCT_ROLES.map((role) => {
-            const [title, body] = translateLocaleBranchForLocale(locale, "domains.marketing.ProductTourPage", role);
+            const [title, body] = bi((role).ko, (role).en);
             return (
               <Link href={role.href} key={role.tag}>
                 <span><Users size={17} aria-hidden="true" />{role.tag}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
-                <small>{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "이 역할로 시작", "Start in this role")}<ArrowRight size={14} aria-hidden="true" /></small>
+                <small>{bi("이 역할로 시작", "Start in this role")}<ArrowRight size={14} aria-hidden="true" /></small>
               </Link>
             );
           })}
@@ -205,7 +214,7 @@ export function ProductTourPage() {
         </div>
         <div className="product-tour-page__closing-actions">
           <Link className="ch-button ch-button--primary" href="/studio/new">{copy.start}<ArrowRight size={17} aria-hidden="true" /></Link>
-          <Link className="ch-button ch-button--quiet" href="/brand-film">{translateBilingualValueForLocale(locale, "domains.marketing.ProductTourPage", "24초 브랜드 필름", "24-second brand film")}</Link>
+          <Link className="ch-button ch-button--quiet" href="/brand-film">{bi("24초 브랜드 필름", "24-second brand film")}</Link>
         </div>
       </section>
     </main>

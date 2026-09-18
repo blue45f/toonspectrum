@@ -7,6 +7,13 @@ import { Search, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorReferenceSearch", ko, en);
 
 const COPY = {
   ko: {
@@ -31,8 +38,9 @@ const COPY = {
   },
 } as const;
 
-export function CreatorReferenceSearch({ locale }: { locale: string }) {
-  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.CreatorReferenceSearch", COPY);
+export function CreatorReferenceSearch({ locale: _locale }: { locale: "ko" | "en" }) {
+  useBilingualI18nRevision();
+  const copy = bi((COPY).ko, (COPY).en);
   const navigate = useNavigate();
   const id = useId();
   const composing = useRef(false);

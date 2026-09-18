@@ -1,9 +1,10 @@
+import { useCallback } from "react";
+
 import {
   getLang,
   registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
-  registerI18nRuntimeSourceEntries,
-  resolveTranslationForDisplay,
+  useT,
 } from "./i18n-core";
 import { normalizeLocaleCode } from "./i18n-intl-utils";
 import { loadRuntimeTranslationBundle } from "./i18n-runtime-translation";
@@ -17,11 +18,30 @@ export type TranslationResolver = (key: string) => string;
 
 type StringTree = string | readonly StringTree[] | { readonly [key: string]: StringTree };
 
+type TranslatedStringTree<T extends StringTree> =
+  T extends string ? string
+    : T extends readonly (infer U extends StringTree)[] ? readonly TranslatedStringTree<U>[]
+      : T extends { readonly [key: string]: StringTree }
+        ? { readonly [K in keyof T]: T[K] extends StringTree ? TranslatedStringTree<T[K]> : never }
+        : never;
+
 function normalizeKeyPart(value: string): string {
   return value
     .trim()
     .replace(/[^\p{L}\p{N}_.:-]+/gu, "-")
     .replace(/^-+|-+$/gu, "");
+}
+
+const registeredBilingualKeys = new Set<string>();
+let translationRevisionScheduled = false;
+
+function scheduleTranslationRevision(): void {
+  if (translationRevisionScheduled) return;
+  translationRevisionScheduled = true;
+  queueMicrotask(() => {
+    translationRevisionScheduled = false;
+    triggerTranslationBundleUpdate();
+  });
 }
 
 function stableTextId(ko: string, en: string): string {
@@ -55,8 +75,12 @@ export function defineBilingualText(
   }
 
   const key = `legacyUi.${normalizedScope}.${normalizedId}`;
-  registerI18nLocaleEntries("ko", { [key]: ko });
-  registerI18nEnglishSourceEntries({ [key]: en });
+  if (!registeredBilingualKeys.has(key)) {
+    registerI18nLocaleEntries("ko", { [key]: ko });
+    registerI18nEnglishSourceEntries({ [key]: en });
+    registeredBilingualKeys.add(key);
+    scheduleTranslationRevision();
+  }
   return key;
 }
 
@@ -104,6 +128,129 @@ export function defineBilingualAutoText(scope: string, ko: string, en: string): 
   return defineBilingualText(scope, stableTextId(ko, en), ko, en);
 }
 
+/** Current BCP-47 locale for Intl/date/number metadata migrated from ko/en branches. */
+export function getActiveI18nLocale(): string {
+  return getLang();
+}
+
+/** Resolves an authored ko/en pair through the currently selected global locale. */
+export function translateBilingualPair(
+  scope: string,
+  ko: string,
+  en: string,
+): string {
+  return resolveTranslationForDisplay(
+    getLang(),
+    defineBilingualAutoText(scope, ko, en),
+  );
+}
+
+function translateBilingualArrayValue(
+  scope: string,
+  ko: readonly unknown[],
+  en: readonly unknown[],
+): readonly unknown[] | null {
+  if (ko.length !== en.length) return null;
+  const translated: unknown[] = [];
+  for (let index = 0; index < ko.length; index += 1) {
+    const koValue = ko[index];
+    const enValue = en[index];
+    if (Object.is(koValue, enValue)) {
+      translated.push(koValue);
+      continue;
+    }
+    if (typeof koValue === "string" && typeof enValue === "string") {
+      translated.push(translateBilingualPair(`${scope}.${index}`, koValue, enValue));
+      continue;
+    }
+    if (Array.isArray(koValue) && Array.isArray(enValue)) {
+      const nested = translateBilingualArrayValue(`${scope}.${index}`, koValue, enValue);
+      if (nested === null) return null;
+      translated.push(nested);
+      continue;
+    }
+    return null;
+  }
+  return translated;
+}
+
+function translateBilingualObjectValue(
+  scope: string,
+  ko: Readonly<Record<string, unknown>>,
+  en: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> | null {
+  const koKeys = Object.keys(ko);
+  if (koKeys.length !== Object.keys(en).length || koKeys.some((key) => !(key in en))) return null;
+  const translated: Record<string, unknown> = {};
+  for (const key of koKeys) {
+    const koValue = ko[key];
+    const enValue = en[key];
+    if (Object.is(koValue, enValue)) {
+      translated[key] = koValue;
+      continue;
+    }
+    if (typeof koValue === "string" && typeof enValue === "string") {
+      translated[key] = translateBilingualPair(`${scope}.${key}`, koValue, enValue);
+      continue;
+    }
+    if (Array.isArray(koValue) && Array.isArray(enValue)) {
+      const nested = translateBilingualArrayValue(`${scope}.${key}`, koValue, enValue);
+      if (nested === null) return null;
+      translated[key] = nested;
+      continue;
+    }
+    if (
+      koValue !== null && enValue !== null
+      && typeof koValue === "object" && typeof enValue === "object"
+      && !Array.isArray(koValue) && !Array.isArray(enValue)
+    ) {
+      const nested = translateBilingualObjectValue(
+        `${scope}.${key}`,
+        koValue as Readonly<Record<string, unknown>>,
+        enValue as Readonly<Record<string, unknown>>,
+      );
+      if (nested === null) return null;
+      translated[key] = nested;
+      continue;
+    }
+    return null;
+  }
+  return translated;
+}
+
+/**
+ * Compatibility bridge for dynamic authored pairs such as `labelKo/labelEn` and `tasksKo/tasksEn`.
+ * Strings and string arrays join the global translation pipeline. Other value shapes retain the
+ * authored Korean/English branch instead of sending arbitrary structured/user data externally.
+ */
+export function translateBilingualValueForActiveLocale<T>(
+  scope: string,
+  ko: T,
+  en: T,
+): T {
+  if (typeof ko === "string" && typeof en === "string") {
+    return translateBilingualPair(scope, ko, en) as T;
+  }
+  if (Array.isArray(ko) && Array.isArray(en)) {
+    const translated = translateBilingualArrayValue(scope, ko, en);
+    if (translated !== null) return translated as T;
+  }
+  if (
+    ko !== null && en !== null
+    && typeof ko === "object" && typeof en === "object"
+    && !Array.isArray(ko) && !Array.isArray(en)
+  ) {
+    const translated = translateBilingualObjectValue(
+      scope,
+      ko as Readonly<Record<string, unknown>>,
+      en as Readonly<Record<string, unknown>>,
+    );
+    if (translated !== null) return translated as T;
+  }
+  const root = getLang().split("-")[0]?.toLowerCase();
+  return (root === "ko" ? ko : en);
+}
+
 export function defineBilingualMap<
   const T extends Readonly<Record<string, BilingualText>>,
 >(
@@ -117,13 +264,47 @@ export function defineBilingualMap<
   return Object.freeze(mapped) as { readonly [K in keyof T]: string };
 }
 
+/** Resolves a keyed { ko, en } map through the active translator in one pass. */
+export function translateBilingualMap<
+  const T extends Readonly<Record<string, BilingualText>>,
+>(
+  t: TranslationResolver,
+  scope: string,
+  entries: T,
+): { readonly [K in keyof T]: string } {
+  const keys = defineBilingualMap(scope, entries);
+  return Object.fromEntries(
+    Object.entries(keys).map(([id, key]) => [id, t(key)]),
+  ) as { readonly [K in keyof T]: string };
+}
+
 /** Small-diff bridge for legacy maps shaped as `{ ko, en }`. */
 export function translateBilingualText(
   t: TranslationResolver,
   scope: string,
   value: BilingualText,
 ): string {
+  if (value.ko === value.en) return value.ko;
   return t(defineBilingualAutoText(scope, value.ko, value.en));
+}
+
+/** Concise inline bridge for legacy `locale === "ko" ? ko : en` expressions. */
+export function translateBilingual(
+  t: TranslationResolver,
+  scope: string,
+  ko: string,
+  en: string,
+): string {
+  return t(defineBilingualAutoText(scope, ko, en));
+}
+
+/** React bridge for incrementally migrating legacy inline bilingual copy. */
+export function useBilingual(scope: string): (ko: string, en: string) => string {
+  const t = useT();
+  return useCallback(
+    (ko: string, en: string) => translateBilingual(t, scope, ko, en),
+    [scope, t],
+  );
 }
 
 function translateParallelNode(
@@ -134,6 +315,9 @@ function translateParallelNode(
   path: readonly string[],
 ): StringTree {
   if (typeof ko === "string" && typeof en === "string") {
+    // Identical branches are locale-invariant tokens (URLs, ids, numbers, brand terms, etc.).
+    // Preserve them verbatim instead of registering them as machine-translation sources.
+    if (ko === en) return ko;
     const keyScope = path.length > 0 ? `${scope}.${path.join(".")}` : scope;
     return t(defineBilingualAutoText(keyScope, ko, en));
   }
@@ -170,12 +354,12 @@ function translateParallelNode(
  * Localizes a legacy `COPY = { ko: {...}, en: {...} }` tree without rewriting its authored data.
  * Every string leaf is registered as an i18n source and resolved through the active global locale.
  */
-export function translateParallelBilingualCopy<const T extends StringTree>(
+export function translateParallelBilingualCopy<const TKo extends StringTree, const TEn extends StringTree>(
   t: TranslationResolver,
   scope: string,
-  branches: Readonly<{ readonly ko: T; readonly en: T }>,
-): T {
-  return translateParallelNode(t, scope, branches.ko, branches.en, []) as T;
+  branches: Readonly<{ readonly ko: TKo; readonly en: TEn }>,
+): TKo {
+  return translateParallelNode(t, scope, branches.ko, branches.en, []) as TKo;
 }
 
 
@@ -320,4 +504,10 @@ export function formatI18nTemplate(
     const value = values[name];
     return value === undefined ? token : String(value);
   });
+}
+
+/** Subscribe legacy-migrated surfaces to both locale and async translation bundle changes. */
+export function useBilingualI18nRevision(): void {
+  useI18n((state) => state.lang);
+  useI18n((state) => state.translationBundleRevision);
 }

@@ -41,6 +41,14 @@ import {
 } from "./studio-project-library-management-model";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
+import {
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("useStudioProjectLibraryManagementController", ko, en);
 
 export interface StudioProjectLibraryNoticeState {
   readonly message: string;
@@ -54,6 +62,7 @@ export interface StudioProjectLibraryDeleteRequest {
 }
 
 export function useStudioProjectLibraryManagementController() {
+  useBilingualI18nRevision();
   const [searchParams] = useSearchParams();
   const { data: session } = useSession();
   const language = useI18n((state) => state.lang);
@@ -142,13 +151,13 @@ export function useStudioProjectLibraryManagementController() {
     setSelectedIds(new Set());
     if (result.affectedIds.length === 0) {
       setNotice({
-        message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", "변경할 수 있는 프로젝트가 없습니다.", "There are no eligible projects to change."),
+        message: bi("변경할 수 있는 프로젝트가 없습니다.", "There are no eligible projects to change."),
       });
       return;
     }
     setNotice({
       message: successMessage,
-      actionLabel: undo ? (translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", "실행 취소", "Undo")) : undefined,
+      actionLabel: undo ? (bi("실행 취소", "Undo")) : undefined,
       action: undo,
     });
   };
@@ -158,11 +167,11 @@ export function useStudioProjectLibraryManagementController() {
     const result = archiveStudioProjectsBulk(window.localStorage, ids, { target: window });
     showBulkResult(
       result,
-      translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${result.affectedIds.length}개 프로젝트를 보관함으로 옮겼습니다.`, `Archived ${result.affectedIds.length} project(s).`),
+      formatI18nTemplate(String(bi("{value0}개 프로젝트를 보관함으로 옮겼습니다.", "Archived {value0} project(s).")), { value0: result.affectedIds.length }),
       () => {
         const undone = activateStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window });
         setNotice({
-          message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${undone.affectedIds.length}개 프로젝트를 내 작업으로 되돌렸습니다.`, `Returned ${undone.affectedIds.length} project(s) to My work.`),
+          message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 내 작업으로 되돌렸습니다.", "Returned {value0} project(s) to My work.")), { value0: undone.affectedIds.length }),
         });
       },
     );
@@ -173,11 +182,11 @@ export function useStudioProjectLibraryManagementController() {
     const result = trashStudioProjectsBulk(window.localStorage, ids, { target: window });
     showBulkResult(
       result,
-      translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${result.affectedIds.length}개 프로젝트를 휴지통으로 옮겼습니다.`, `Moved ${result.affectedIds.length} project(s) to Trash.`),
+      formatI18nTemplate(String(bi("{value0}개 프로젝트를 휴지통으로 옮겼습니다.", "Moved {value0} project(s) to Trash.")), { value0: result.affectedIds.length }),
       () => {
         const undone = restoreStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window });
         setNotice({
-          message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${undone.affectedIds.length}개 프로젝트를 원래 위치로 복구했습니다.`, `Restored ${undone.affectedIds.length} project(s) to their previous location.`),
+          message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 원래 위치로 복구했습니다.", "Restored {value0} project(s) to their previous location.")), { value0: undone.affectedIds.length }),
         });
       },
     );
@@ -190,13 +199,13 @@ export function useStudioProjectLibraryManagementController() {
       : restoreStudioProjectsBulk(window.localStorage, ids, { target: window });
     showBulkResult(
       result,
-      translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${result.affectedIds.length}개 프로젝트를 복구했습니다.`, `Restored ${result.affectedIds.length} project(s).`),
+      formatI18nTemplate(String(bi("{value0}개 프로젝트를 복구했습니다.", "Restored {value0} project(s).")), { value0: result.affectedIds.length }),
       () => {
         const undone = view === "archived"
           ? archiveStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window })
           : trashStudioProjectsBulk(window.localStorage, result.affectedIds, { target: window });
         setNotice({
-          message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${undone.affectedIds.length}개 프로젝트를 이전 위치로 되돌렸습니다.`, `Moved ${undone.affectedIds.length} project(s) back.`),
+          message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 이전 위치로 되돌렸습니다.", "Moved {value0} project(s) back.")), { value0: undone.affectedIds.length }),
         });
       },
     );
@@ -214,7 +223,7 @@ export function useStudioProjectLibraryManagementController() {
     setDeleteRequest(null);
     setSelectedIds(new Set());
     setNotice({
-      message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `${result.affectedIds.length}개 프로젝트를 완전히 삭제했습니다.`, `Permanently deleted ${result.affectedIds.length} project(s).`),
+      message: formatI18nTemplate(String(bi("{value0}개 프로젝트를 완전히 삭제했습니다.", "Permanently deleted {value0} project(s).")), { value0: result.affectedIds.length }),
     });
   };
 
@@ -235,7 +244,7 @@ export function useStudioProjectLibraryManagementController() {
       createVersions: true,
     });
     setNotice({
-      message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `“${project.title}”의 임시 복사본을 만들었습니다.`, `Created a temporary copy of “${project.title}”.`),
+      message: formatI18nTemplate(String(bi("“{value0}”의 임시 복사본을 만들었습니다.", "Created a temporary copy of “{value0}”.")), { value0: project.title }),
     });
   };
 
@@ -275,13 +284,13 @@ export function useStudioProjectLibraryManagementController() {
       setSaveTarget(null);
       setNotice({
         message: method === "file-picker"
-          ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `“${project.title}”을 선택한 파일·동기화 폴더에 저장했습니다.`, `Saved “${project.title}” to the selected file or synced folder.`)
-          : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", `“${project.title}” 프로젝트 파일을 다운로드했습니다.`, `Downloaded the “${project.title}” project file.`),
+          ? formatI18nTemplate(String(bi("“{value0}”을 선택한 파일·동기화 폴더에 저장했습니다.", "Saved “{value0}” to the selected file or synced folder.")), { value0: project.title })
+          : formatI18nTemplate(String(bi("“{value0}” 프로젝트 파일을 다운로드했습니다.", "Downloaded the “{value0}” project file.")), { value0: project.title }),
       });
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         setNotice({
-          message: translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectLibraryManagementController", "프로젝트 파일을 저장하지 못했습니다. 임시 자동저장본은 그대로 유지됩니다.", "The project file could not be saved. The temporary autosave remains intact."),
+          message: bi("프로젝트 파일을 저장하지 못했습니다. 임시 자동저장본은 그대로 유지됩니다.", "The project file could not be saved. The temporary autosave remains intact."),
         });
       }
     } finally {

@@ -12,6 +12,13 @@ import type {
   StudioProjectKind,
   StudioProjectLibraryEntry,
 } from "../studio-project-library-store";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("studio-project-library-management-model", ko, en);
 
 export type StudioProjectLibraryLocale = string;
 type StudioProjectLibraryAuthoredLocale = "ko" | "en";
@@ -56,8 +63,8 @@ export const STUDIO_PROJECT_KIND_LABELS: Readonly<
   animation: { ko: "애니메이션", en: "Animation" },
 };
 
-export function studioProjectLibraryLocale(language: string): StudioProjectLibraryLocale {
-  return resolveUiLocale(language);
+export function studioProjectLibraryLocale(_language): StudioProjectLibraryLocale {
+  return getActiveI18nLocale();
 }
 
 export function resolveStudioProjectLibraryManagementView(
@@ -75,12 +82,12 @@ export function studioProjectLibraryManagementViewHref(
 
 export function studioProjectLibraryDateLabel(
   value: string | null,
-  locale: StudioProjectLibraryLocale,
+  _locale,
 ): string {
   if (!value || !Number.isFinite(Date.parse(value))) {
-    return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.studio.project.library.management.model", "아직 없음", "Not yet");
+    return bi("아직 없음", "Not yet");
   }
-  return new Intl.DateTimeFormat(getCurrentUiLocale(), {
+  return new Intl.DateTimeFormat(getActiveI18nLocale(), {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -94,12 +101,12 @@ export function studioProjectIsTemporaryWork(profile: StudioSaveProfile): boolea
 
 export function studioProjectLibrarySearchText(
   project: StudioProjectLibraryEntry,
-  locale: StudioProjectLibraryLocale,
+  _locale,
 ): string {
   return [
     project.title,
     project.description,
-    translateLocaleBranchForLocale(locale, "domains.creator.studio.shell.studio.project.library.management.model", STUDIO_PROJECT_KIND_LABELS[project.kind]),
+    bi((STUDIO_PROJECT_KIND_LABELS[project.kind]).ko, (STUDIO_PROJECT_KIND_LABELS[project.kind]).en),
   ].join(" ").toLocaleLowerCase();
 }
 

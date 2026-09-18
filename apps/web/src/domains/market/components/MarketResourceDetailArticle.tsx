@@ -615,7 +615,7 @@ export function MarketResourceDetailArticle({
                 })}
               >
                 <Download className="size-3.5" />
-                <span>{translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "ko", "무료 소장하기 (보관함 추가)")}</span>
+                <span>내 에셋에 추가하기</span>
               </button>
             )}
             <button

@@ -16,6 +16,7 @@ import {
 import { currentStudio2dPreview, studio2dImageSource, studio2dSceneIdentity } from "./studio-2d-image-source";
 import { Studio2dContentFilters } from "./Studio2dContentFilters";
 import { Studio2dScenePreview } from "./Studio2dScenePreview";
+import { StudioSurfaceState } from "./StudioSurfaceState";
 import { useStudio2dImageReadiness } from "./useStudio2dImageReadiness";
 
 import type { Studio2dEnvironment, Studio2dOrientation, Studio2dQualityFilter, Studio2dScene, Studio2dSort, Studio2dTimeOfDay } from "./studio-2d-asset-quality";
@@ -55,7 +56,7 @@ function SceneCard({ scene, disabled, onPick, onPreview }: {
     <div className="space-y-1.5 p-2">
       <p className="line-clamp-2 min-h-8 text-[0.7rem] font-semibold leading-4 text-fg" title={title}>{title}</p>
       <p className="text-[0.64rem] text-fg-3">{studio2dResolutionLabel(scene)}</p>
-      {asset && <p className="text-[0.64rem] text-fg-3">{asset.environment} · {asset.timeOfDay}{asset.provenance.licenseStatus === "cc0-verified" ? translateCurrentStaticSourceText("domains.creator.Studio2dSceneBrowser", "en", " · CC0") : ""}</p>}
+      {asset && <p className="text-[0.64rem] text-fg-3">{asset.environment} · {asset.timeOfDay}{asset.provenance.licenseStatus === "cc0-verified" ? " · CC0" : asset.provenance.licenseStatus === "first-party-generated" ? " · Studio 생성" : ""}</p>}
       {asset && (asset.containsPeople || asset.containsText) && <p className="text-[0.64rem] leading-relaxed text-fg-3">
         {[asset.containsPeople ? "인물 포함" : null, asset.containsText ? "문자 형태 포함" : null].filter(Boolean).join(" · ")}
       </p>}
@@ -146,10 +147,26 @@ export function Studio2dSceneBrowser({ groups, query, onQueryChange, genre, onGe
       <p role="status" aria-live="polite" className="text-fg-3">{loading ? translateCurrentStaticSourceText("domains.creator.Studio2dSceneBrowser", "ko", "배경을 불러오는 중…") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dSceneBrowser", "ko", "{v0}개 장면"), { v0: String(results.length) })}</p>
       <button type="button" className="rounded px-2 py-1 text-fg-3 underline" onClick={reset}>{translateCurrentStaticSourceText("domains.creator.Studio2dSceneBrowser", "ko", "필터 초기화")}</button>
     </div>
-    {error && <p role="alert" className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-xs text-bad">{error}</p>}
-    {disabled && <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.Studio2dSceneBrowser", "ko", "현재 편집 상태에서는 삽입할 수 없습니다. 미리보기는 사용할 수 있습니다.")}</p>}
-    {!loading && !error && results.length === 0 && <div className="rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-3">
-      {translateCurrentStaticSourceText("domains.creator.Studio2dSceneBrowser", "ko", "조건에 맞는 배경이 없습니다. 검색어나 필터를 바꿔 주세요.")}</div>}
+    {loading && !error ? <StudioSurfaceState
+      state="loading" announce="none" compact
+      visual={{ src: "/brand/theme-scenes/starlight-studio.svg", objectPosition: "center 42%" }}
+      title="장면을 준비하고 있어요"
+      description="검수된 2D 배경과 원본 크기 정보를 함께 불러오고 있습니다."
+    /> : null}
+    {error ? <StudioSurfaceState
+      state="error" compact
+      visual={{ src: "/brand/theme-scenes/graphite-studio.svg", objectPosition: "center 44%" }}
+      title="배경 목록을 불러오지 못했어요"
+      description={error}
+    /> : null}
+    {disabled && <p className="text-xs text-fg-3">현재 편집 상태에서는 삽입할 수 없습니다. 미리보기는 사용할 수 있습니다.</p>}
+    {!loading && !error && results.length === 0 ? <StudioSurfaceState
+      state="empty" announce="none" compact
+      visual={{ src: "/brand/theme-scenes/ink-studio.svg", objectPosition: "center 46%" }}
+      title="조건에 맞는 배경이 없습니다."
+      description="검색어나 필터를 바꾸거나 모든 장면으로 돌아가 보세요."
+      action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={reset}>모든 장면 보기</button>}
+    /> : null}
     <div ref={gridRef} data-studio-2d-grid="true" className={cn("grid max-h-[min(52dvh,32rem)] grid-cols-2 gap-2 overflow-y-auto pr-1", loading && "opacity-70")}>
       {results.slice(0, visibleCount).map((scene) => <SceneCard key={studio2dSceneIdentity(scene)} scene={scene} disabled={disabled} onPick={onPick} onPreview={setPreview} />)}
       {visibleCount < results.length && <button type="button" onClick={() => setVisibleCount((count) => count + 48)}

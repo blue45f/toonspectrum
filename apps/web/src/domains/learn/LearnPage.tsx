@@ -8,14 +8,17 @@ import { EducationDirectoryPage } from "./EducationDirectoryPage";
 import { LearnPage as LearnContent } from "./LearnContent";
 import { LearningHome, LearningPathPage } from "./LearningHome";
 import { LearningClassroomPage } from "./LearningClassroomPage";
-import { LearningResourceHub } from "./LearningResourceHub";
+import { LearningResourcesPage } from "./LearningResourcesPage";
 import { LearningRecordsPage } from "./LearningRecordsPage";
 import { WebtoonCareerPage } from "./WebtoonCareerPage";
 import { WebtoonProcessPage } from "./WebtoonProcessPage";
 
 import "./learning-enhancements.css";
+import "./learning-academy.css";
 
 const REFERENCE_LINKS = [
+  { path: "/learn/resources", label: "강좌·자료" },
+  { path: "/learn/classroom", label: "Classroom" },
   { path: "/learn/process", label: "웹툰 제작 과정" },
   { path: "/learn/careers", label: "진로·직무 안내" },
   { path: "/learn/education", label: "교육기관 찾기" },
@@ -25,8 +28,8 @@ const REFERENCE_LINKS = [
 
 function LearningReferenceNavigation({ pathname }: { readonly pathname: string }) {
   return (
-    <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 pt-4 sm:px-6" lang="ko" aria-label={translateCurrentStaticSourceText("domains.learn.LearnPage", "ko", "웹툰 제작·진로·교육 안내")}>
-      <span className="mr-1 text-xs font-bold tracking-[.12em] text-fg-2">{translateCurrentStaticSourceText("domains.learn.LearnPage", "ko", "제작·진로 안내")}</span>
+    <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 pt-4 sm:px-6" lang="ko" aria-label="웹툰 제작·진로·교육 안내">
+      <span className="mr-1 text-xs font-bold tracking-[.12em] text-fg-2">ACADEMY</span>
       {REFERENCE_LINKS.map((item) => (
         <Link
           key={item.path}
@@ -61,6 +64,11 @@ export function LearnPage() {
   const resourceHub = normalizedPath === "/learn/resources" ? <LearningResourceHub /> : null;
   const classroomPage = normalizedPath === "/learn/classroom" ? <LearningClassroomPage /> : null;
   const pathMatch = normalizedPath.match(/^\/learn\/paths\/([^/]+)$/u);
+  const academyPage = normalizedPath === "/learn/resources"
+    ? <LearningResourcesPage />
+    : normalizedPath === "/learn/classroom"
+      ? <LearningClassroomPage />
+      : null;
   const referencePage = normalizedPath === "/learn/process"
     ? <WebtoonProcessPage />
     : normalizedPath === "/learn/careers"
@@ -73,7 +81,7 @@ export function LearnPage() {
     <>
       <LearningReferenceNavigation pathname={normalizedPath} />
       <LearningRecordShortcut />
-      {referencePage ?? resourceHub ?? classroomPage ?? (isHome ? <LearningHome /> : pathMatch ? <LearningPathPage pathId={pathMatch[1]} /> : <LearnContent />)}
+      {academyPage ?? referencePage ?? (isHome ? <LearningHome /> : pathMatch ? <LearningPathPage pathId={pathMatch[1]} /> : <LearnContent />)}
     </>
   );
 }

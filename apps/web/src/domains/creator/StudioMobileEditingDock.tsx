@@ -667,7 +667,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     searchAria: localizeStudioText(t, "기능·설정 찾기", "studio.commandSearch.label"),
     searchTitle: localizeStudioText(
       t,
-      "기능·설정 찾기 · CSP·Photoshop 용어로도 검색",
+      "기능·설정 찾기 · 다른 앱 용어로도 검색",
       "studio.mobileDock.tool.search.title",
     ),
     select: localizeStudioText(t, "선택", "studio.settings.tool.select"),

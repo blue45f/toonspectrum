@@ -16,6 +16,7 @@ import {
   STUDIO_ICON_STROKE,
   StudioToolbarDivider,
 } from "./studio-chrome-ui";
+import { STUDIO_FLOATING_MENU_LAYOUTS } from "./studio-floating-menu-layouts";
 import { writeStudioInsertDragPayload } from "./studio-insert-drag-writer";
 import { studioToolButtonClass } from "./studio-panel-ui";
 import {
@@ -136,6 +137,17 @@ export const StudioToolBeltCreateModeInsertTools = memo(
               open={menu === "bubble"}
               id="bubble-menu"
               className="fixed inset-x-2 top-[4.5rem] z-[70] max-h-[calc(100dvh-13rem)] w-auto overflow-y-auto rounded-2xl border border-line/70 bg-panel p-0 shadow-xl lg:inset-x-auto lg:left-3 lg:top-[4.5rem] lg:max-h-[min(42rem,calc(100dvh-7rem))] lg:w-[22rem] lg:max-w-[calc(100vw-1.5rem)]"
+              desktopWindow={{
+                label: "말풍선",
+                surfaceId: "toolbar-bubble",
+                defaultLayout: STUDIO_FLOATING_MENU_LAYOUTS.bubble,
+                onClose: () => setMenu(null),
+                minWidth: 380,
+                minHeight: 320,
+                maxWidth: 760,
+                maxHeight: 900,
+                contentClassName: "overflow-y-auto",
+              }}
             >
               <Suspense
                 fallback={

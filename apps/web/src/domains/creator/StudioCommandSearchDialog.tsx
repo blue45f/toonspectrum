@@ -196,7 +196,7 @@ function matchNote(result: StudioSearchResult): string | null {
     const vendor = result.matchedAlias.vendor;
     const vendorLabel =
       vendor === "csp"
-        ? "CSP"
+        ? "Clip Studio"
         : vendor === "photoshop"
           ? "Photoshop"
           : vendor === "krita"
@@ -506,7 +506,7 @@ export function StudioCommandSearchDialog({
             value={query}
             autoComplete="off"
             onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder={translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "기능 이름 또는 CSP·Photoshop 용어 (예: Paint Bucket, 레벨, 서브 도구)")}
+            placeholder="기능 이름 또는 다른 앱 용어 (예: 채우기, 레벨, 서브 도구)"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-fg-3"
           />
           <button
@@ -565,8 +565,10 @@ export function StudioCommandSearchDialog({
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
           {query.trim().length === 0 ? (
             <p className="px-2 py-6 text-center text-xs leading-relaxed text-fg-3">
-              {translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "쓰던 프로그램의 이름 그대로 찾아보세요.")}<br />
-              {translateCurrentStaticSourceText("domains.creator.StudioCommandSearchDialog", "ko", "CSP·Photoshop·Krita·Procreate 용어를 우리 기능으로 이어 줍니다.")}</p>
+              쓰던 프로그램의 이름 그대로 찾아보세요.
+              <br />
+              다른 앱에서 쓰던 용어를 우리 기능으로 이어 줍니다.
+            </p>
           ) : outcome.sections.length === 0 ? (
             <div className="px-2 py-6 text-center text-xs text-fg-3">
               <p>

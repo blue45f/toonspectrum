@@ -4,6 +4,7 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Heart, Layers } from "lucide-react";
 
+import { useCommerceConfig } from "../hooks/use-commerce-config";
 import { useMarketWishlist } from "../hooks/use-market-wishlist";
 import { formatMarketDate, marketKindMeta, marketLicenseMeta } from "../models/market-kind";
 import {
@@ -99,6 +100,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
   const templatePreview = templatePreviewData(record)?.[0];
   const recipe = recipePreviewData(record)?.[0];
   const { isWishlisted, toggleWishlist } = useMarketWishlist();
+  const { isPaidMode } = useCommerceConfig();
   const wishlisted = isWishlisted(record.id);
 
   return (
@@ -254,7 +256,8 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
             {record.name}
           </Link>
           <span className="shrink-0 rounded bg-good/15 px-1.5 py-0.5 text-[0.62rem] font-bold text-good">
-            {translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "무료")}</span>
+            {isPaidMode ? "유료 운영" : "무료"}
+          </span>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs text-fg-2">
           <span className="truncate">{record.publisher.name}</span>

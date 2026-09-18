@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { LESSONS, TERMS } from "./learning-content";
+import { LEARNING_ROLES, ROLE_LABELS, type LearningRole } from "./learning-resources";
 import { matchesSearch, type Lesson } from "./learning-model";
 import {
   LEARNING_GOALS,
@@ -67,11 +68,13 @@ function browserStorage(): Storage | null {
 
 function LearningNavigation({ active }: { active: "home" | "paths" }) {
   return (
-    <nav className="learn-navigation" aria-label={translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "웹툰 학습")}>
-      <Link to="/learn" aria-current={active === "home" ? translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "page") : undefined}>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "학습 홈")}</Link>
-      <Link to="/learn#learning-paths" aria-current={active === "paths" ? translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "page") : undefined}>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "학습 경로")}</Link>
-      <Link to="/learn/glossary">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "용어 사전")}</Link>
-      <Link to="/learn/studio">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "툰스튜디오 실습")}</Link>
+    <nav className="learn-navigation" aria-label="웹툰 학습">
+      <Link to="/learn" aria-current={active === "home" ? "page" : undefined}>학습 홈</Link>
+      <Link to="/learn#learning-paths" aria-current={active === "paths" ? "page" : undefined}>학습 경로</Link>
+      <Link to="/learn/resources">강좌·자료</Link>
+      <Link to="/learn/classroom">Classroom</Link>
+      <Link to="/learn/glossary">용어 사전</Link>
+      <Link to="/learn/studio">툰스튜디오 실습</Link>
     </nav>
   );
 }
@@ -273,7 +276,16 @@ export function LearningHome() {
         </div>
         <div className="learn-plan-layout">
           <div className="learn-plan-controls">
-            <label htmlFor="learn-goal">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "지금 가장 중요한 목표")}<select id="learn-goal" value={profile.goal} onChange={(event) => {
+            <label htmlFor="learn-role">나의 역할
+              <select id="learn-role" value={profile.role} onChange={(event) => {
+                const value = event.currentTarget.value as LearningRole;
+                updateProfile({ ...profile, role: LEARNING_ROLES.includes(value) ? value : DEFAULT_LEARNING_PROFILE.role });
+              }}>
+                {LEARNING_ROLES.map((role) => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
+              </select>
+            </label>
+            <label htmlFor="learn-goal">지금 가장 중요한 목표
+              <select id="learn-goal" value={profile.goal} onChange={(event) => {
                 const value = event.currentTarget.value as LearningGoal;
                 updateProfile({ ...profile, goal: LEARNING_GOALS.includes(value) ? value : DEFAULT_LEARNING_PROFILE.goal });
               }}>
@@ -408,12 +420,14 @@ export function LearningHome() {
         )}
       </section>
 
-      <section className="learn-resource-grid" aria-label={translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "학습 도구")}>
-        <article><span className="learn-eyebrow">{translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "GLOSSARY")}</span><h2>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "낯선 용어를 바로 찾기")}</h2><p>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "한국어·영문·다른 이름으로 36개 핵심 용어를 검색하고 저장합니다.")}</p><Link to="/learn/glossary">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "용어 사전 열기 →")}</Link></article>
-        <article><span className="learn-eyebrow">{translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "PRACTICE")}</span><h2>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "작업 화면에서 직접 해보기")}</h2><p>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "기존 작업을 바꾸지 않는 자기주도 툰스튜디오 실습으로 연결합니다.")}</p><Link to="/learn/studio">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "실습 과정 보기 →")}</Link></article>
-        <article><span className="learn-eyebrow">{translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "RECORDS")}</span><h2>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "메모와 완료 기록 지키기")}</h2><p>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "현재 브라우저의 학습 기록을 점검하고 파일로 백업하거나 복원합니다.")}</p><Link to="/learn/records">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "학습 기록 관리 →")}</Link></article>
-        <article><span className="learn-eyebrow">{translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "RESOURCE HUB")}</span><h2>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "외부 강좌와 공식 자료 함께 찾기")}</h2><p>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "에듀코카, WEBTOON Academy, 공식 제작 팁과 YouTube 탐색 링크를 주제별로 모았습니다.")}</p><Link to="/learn/resources">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "교육 자료 허브 →")}</Link></article>
-        <article><span className="learn-eyebrow">{translateCurrentStaticSourceText("domains.learn.LearningHome", "en", "CLASSROOM")}</span><h2>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "교육기관용 수업 흐름 보기")}</h2><p>{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "10주 기본 커리큘럼과 직군별 학습 축을 실제 강좌·Studio 실습에 연결합니다.")}</p><Link to="/learn/classroom">{translateCurrentStaticSourceText("domains.learn.LearningHome", "ko", "교육기관 활용 →")}</Link></article>
+      <section className="learn-resource-grid" aria-label="학습 도구">
+        <article><span className="learn-eyebrow">RESOURCE HUB</span><h2>외부 강좌까지 한 번에 찾기</h2><p>공식·공공 교육 자료와 자체 실습 강좌를 직군과 제작 단계별로 모아봅니다.</p><Link to={`/learn/resources?role=${profile.role}`}>내 역할에 맞는 자료 →</Link></article>
+        <article><span className="learn-eyebrow">CLASSROOM</span><h2>교육기관용 수업 설계</h2><p>주차별 커리큘럼에 강좌·자료·실습 과제를 묶고 수업 계획을 저장합니다.</p><Link to="/learn/classroom">Classroom 열기 →</Link></article>
+        <article><span className="learn-eyebrow">GLOSSARY</span><h2>낯선 용어를 바로 찾기</h2><p>한국어·영문·다른 이름으로 36개 핵심 용어를 검색하고 저장합니다.</p><Link to="/learn/glossary">용어 사전 열기 →</Link></article>
+        <article><span className="learn-eyebrow">PRACTICE</span><h2>작업 화면에서 직접 해보기</h2><p>기존 작업을 바꾸지 않는 자기주도 툰스튜디오 실습으로 연결합니다.</p><Link to="/learn/studio">실습 과정 보기 →</Link></article>
+        <article><span className="learn-eyebrow">RECORDS</span><h2>메모와 완료 기록 지키기</h2><p>현재 브라우저의 학습 기록을 점검하고 파일로 백업하거나 복원합니다.</p><Link to="/learn/records">학습 기록 관리 →</Link></article>
+        <article><span className="learn-eyebrow">RESOURCE HUB</span><h2>외부 강좌와 공식 자료 함께 찾기</h2><p>에듀코카, WEBTOON Academy, 공식 제작 팁과 YouTube 탐색 링크를 주제별로 모았습니다.</p><Link to="/learn/resources">교육 자료 허브 →</Link></article>
+        <article><span className="learn-eyebrow">CLASSROOM</span><h2>교육기관용 수업 흐름 보기</h2><p>10주 기본 커리큘럼과 직군별 학습 축을 실제 강좌·Studio 실습에 연결합니다.</p><Link to="/learn/classroom">교육기관 활용 →</Link></article>
       </section>
 
       <footer className="learn-local-footer">

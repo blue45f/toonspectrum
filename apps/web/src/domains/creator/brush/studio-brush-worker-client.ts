@@ -9,6 +9,8 @@ import {
   type StudioBrushWorkerPlanResponse,
 } from "./studio-brush-worker-protocol";
 
+export const STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS = 10_000;
+
 let globalBrushWorker: Worker | null = null;
 const pendingRequests = new Map<
   string,
@@ -16,8 +18,12 @@ const pendingRequests = new Map<
     worker: Worker;
     resolve: (res: StudioBrushWorkerPlanResponse) => void;
     reject: (err: unknown) => void;
+    timeout: ReturnType<typeof setTimeout>;
   }
->();
+  deferred.abortSignal = null;
+  deferred.abortListener = null;
+  return true;
+}
 
 function retireBrushWorker(worker: Worker, reason: unknown): void {
   if (globalBrushWorker === worker) globalBrushWorker = null;
@@ -31,8 +37,9 @@ function retireBrushWorker(worker: Worker, reason: unknown): void {
     // A crashed or already-terminated Worker is still considered retired.
   }
 
-  for (const [id, deferred] of pendingRequests.entries()) {
+  for (const [id, deferred] of [...pendingRequests.entries()]) {
     if (deferred.worker !== worker) continue;
+    clearTimeout(deferred.timeout);
     pendingRequests.delete(id);
     deferred.reject(reason);
   }
@@ -55,6 +62,7 @@ function getOrCreateBrushWorker(): Worker | null {
       // A late response from a retired generation must never settle a request
       // that belongs to a replacement Worker.
       if (!deferred || deferred.worker !== worker) return;
+      clearTimeout(deferred.timeout);
       pendingRequests.delete(data.id);
       deferred.resolve(data);
     };
@@ -90,8 +98,11 @@ export async function processFreehandPointsInWorker(
   minDistance?: number,
   brushId = "pen",
   strokeWidth = 6,
-  seed = 42
+  seed = 42,
+  options: StudioBrushWorkerRequestOptions = {},
 ): Promise<number[]> {
+  if (options.signal?.aborted) return processFreehandPoints(points, minDistance);
+
   const worker = getOrCreateBrushWorker();
   if (!worker) {
     return processFreehandPoints(points, minDistance);
@@ -109,8 +120,17 @@ export async function processFreehandPointsInWorker(
   };
 
   return new Promise<number[]>((resolve) => {
+    const timeout = globalThis.setTimeout(() => {
+      const deferred = pendingRequests.get(id);
+      if (!deferred || deferred.worker !== worker) return;
+      retireBrushWorker(
+        worker,
+        new Error(`Studio brush Worker request timed out after ${STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS}ms`),
+      );
+    }, STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS);
     pendingRequests.set(id, {
       worker,
+      timeout,
       resolve: (res) => resolve(res.ok ? res.points : processFreehandPoints(points, minDistance)),
       reject: () => resolve(processFreehandPoints(points, minDistance)),
     });

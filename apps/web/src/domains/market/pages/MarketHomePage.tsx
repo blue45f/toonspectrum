@@ -19,6 +19,7 @@ import { MarketMaterialPreview } from "../components/MarketMaterialPreview";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { MarketResourceFamilyExplorer } from "../components/MarketResourceFamilyExplorer";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
+import { useCommerceConfig } from "../hooks/use-commerce-config";
 import { useMarketResources } from "../hooks/use-market-resources";
 import { marketHomeJsonLd } from "../models/market-jsonld";
 import { MARKET_LICENSES } from "../models/market-kind";
@@ -43,6 +44,7 @@ const MARKET_HOME_DESCRIPTION =
 
 export function MarketHomePage() {
   const latest = useMarketResources({ limit: 12, sort: "newest" });
+  const { isPaidMode } = useCommerceConfig();
   const hasLatestItems = latest.items.length > 0;
   const hasFatalLatestError = Boolean(latest.error) && !hasLatestItems;
 
@@ -106,7 +108,8 @@ export function MarketHomePage() {
                   <Upload className="h-4 w-4" aria-hidden="true" />
                   {translateCurrentStaticSourceText("domains.market.pages.MarketHomePage", "ko", "Studio에서 공유")}</Link>
                 <span className="rounded-full bg-good/15 px-2.5 py-1 text-xs font-medium text-good">
-                  {translateCurrentStaticSourceText("domains.market.pages.MarketHomePage", "ko", "현재 모든 소재 무료")}</span>
+                  {isPaidMode ? "현재 유료 운영 모드" : "현재 무료 운영 모드"}
+                </span>
               </div>
             </div>
 

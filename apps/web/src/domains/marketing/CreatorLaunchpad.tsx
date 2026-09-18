@@ -49,6 +49,13 @@ import {
   requestPwaInstall,
   subscribePwaInstall,
 } from "@/shared/lib/pwa-install-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorLaunchpad", ko, en);
 
 const GOALS: readonly CreatorLaunchGoal[] = ["draw", "comic", "character", "materials"];
 const PACES: readonly CreatorLaunchPace[] = ["quick", "project"];
@@ -65,7 +72,8 @@ function rememberHref(href: string): void {
 }
 
 export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }) {
-  const copy = translateLocaleBranchForLocale(locale, "domains.marketing.CreatorLaunchpad", CREATOR_LAUNCHPAD_COPY);
+  useBilingualI18nRevision();
+  const copy = bi((CREATOR_LAUNCHPAD_COPY).ko, (CREATOR_LAUNCHPAD_COPY).en);
   const continuity = useSyncExternalStore(
     subscribeCreatorContinuity,
     getCreatorContinuitySnapshot,
@@ -138,8 +146,8 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
       ? copy.install
       : copy.installHelp;
   const swReady = pwa.serviceWorkerStatus === "active" || pwa.serviceWorkerStatus === "update-waiting";
-  const drawingInstallLabel = translateBilingualValueForLocale(locale, "domains.marketing.CreatorLaunchpad", "순수 드로잉 앱 설치", "Install ToonStudio Draw");
-  const drawingInstallBody = translateBilingualValueForLocale(locale, "domains.marketing.CreatorLaunchpad", "별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다.", "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.");
+  const drawingInstallLabel = bi("순수 드로잉 앱 설치", "Install ToonStudio Draw");
+  const drawingInstallBody = bi("별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다.", "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.");
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">

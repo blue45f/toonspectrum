@@ -32,7 +32,7 @@ import {
 } from "@/shared/lib/catalog-discovery-state";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { genreColor, genreTextColor } from "@/shared/lib/genre-color";
-import { useI18n } from "@/shared/lib/i18n";
+
 import {
   clearRecommendationFeedback,
   diversifyRecommendations,
@@ -51,6 +51,9 @@ import {
 } from "@/shared/lib/title-filters";
 import { useRememberedFilters } from "@/shared/lib/use-remembered-filters";
 import { cn } from "@/shared/lib/utils";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 const DIVERSITY_OPTIONS = ["focused", "balanced", "wide"] as const;
 
@@ -59,6 +62,7 @@ export function RecommendView({
 }: {
   initialGenres?: string[];
 }) {
+  useBilingualI18nRevision();
   const hydrated = useHydrated();
   const ratings = useApp((s) => s.ratings);
   const reads = useApp((s) => s.reads);
@@ -78,9 +82,9 @@ export function RecommendView({
   const picked = [...routeState.tasteGenres];
   const seedId = routeState.seedId;
   const diversity = routeState.diversity;
-  const language = useI18n((state) => state.lang);
+
   const locale =
-    resolveUiLocale(language);
+    getActiveI18nLocale();
 
   const [data, setData] = useState<RecommendPayload | null>(null);
   const [loading, setLoading] = useState(true);

@@ -27,6 +27,13 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("EngineeringLicensesPage", ko, en);
 
 const RIGHTS_LAYERS: readonly {
   readonly title: LocalizedText;
@@ -122,8 +129,12 @@ const OPEN_SOURCE_ROLES: readonly {
 ] as const;
 
 export function EngineeringLicensesPage() {
-  const locale = useEngineeringLocale();  useDocumentTitle(
-    translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "ToonStudio 오픈소스와 라이선스 · 코드부터 생성 결과까지", "ToonStudio open source and licensing · From code to generated output"),
+  useBilingualI18nRevision();
+
+
+
+  useDocumentTitle(
+    bi("ToonStudio 오픈소스와 라이선스 · 코드부터 생성 결과까지", "ToonStudio open source and licensing · From code to generated output"),
   );
 
   return (
@@ -134,19 +145,19 @@ export function EngineeringLicensesPage() {
       <EngineeringPageIntro
         eyebrow="OPEN SOURCE · RIGHTS · NOTICES"
         title={
-          translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "라이선스는 패키지 이름이 아니라 배포 방식과 자산의 권리까지 함께 봅니다.", "Licensing is reviewed with distribution and asset rights, not package names alone.")
+          bi("라이선스는 패키지 이름이 아니라 배포 방식과 자산의 권리까지 함께 봅니다.", "Licensing is reviewed with distribution and asset rights, not package names alone.")
         }
         description={
-          translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "ToonStudio는 실행 코드, 개발 도구, 폰트·이미지·브러시·3D, 외부 API, AI 모델과 생성 결과를 별도의 권리 계층으로 관리합니다. 이 페이지는 법률 자문을 대신하지 않으며, 실제 배포 시점의 버전과 약관을 다시 확인합니다.", "ToonStudio tracks runtime code, development tools, fonts, images, brushes, 3D assets, external APIs, AI models and generated output as separate rights layers. This page is not legal advice; versions and terms are rechecked at distribution time.")
+          bi("ToonStudio는 실행 코드, 개발 도구, 폰트·이미지·브러시·3D, 외부 API, AI 모델과 생성 결과를 별도의 권리 계층으로 관리합니다. 이 페이지는 법률 자문을 대신하지 않으며, 실제 배포 시점의 버전과 약관을 다시 확인합니다.", "ToonStudio tracks runtime code, development tools, fonts, images, brushes, 3D assets, external APIs, AI models and generated output as separate rights layers. This page is not legal advice; versions and terms are rechecked at distribution time.")
         }
         aside={
           <div className="rounded-3xl border border-accent/25 bg-accent-soft/30 p-5">
             <PackageCheck size={21} className="text-accent" aria-hidden="true" />
             <p className="mt-4 text-sm font-black text-fg">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "고지 생성과 라이선스 audit를 CI에 포함", "Notice generation and license audit run in CI")}
+              {bi("고지 생성과 라이선스 audit를 CI에 포함", "Notice generation and license audit run in CI")}
             </p>
             <p className="mt-2 text-xs leading-6 text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "자동 수집 결과는 출발점이며, 자산과 외부 약관은 사람이 검토한 기록을 함께 유지합니다.", "Automated inventory is the starting point; human review records are retained for assets and external terms.")
+              {bi("자동 수집 결과는 출발점이며, 자산과 외부 약관은 사람이 검토한 기록을 함께 유지합니다.", "Automated inventory is the starting point; human review records are retained for assets and external terms.")
               }
             </p>
           </div>
@@ -156,13 +167,13 @@ export function EngineeringLicensesPage() {
       <section aria-labelledby="open-source-map-title">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "OPEN-SOURCE ROLE MAP")}</p>
         <h2 id="open-source-map-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-          {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "사용한 기술과 소유하지 않는 역할을 함께 공개합니다.", "Document what each technology does—and what it does not own.")}
+          {bi("사용한 기술과 소유하지 않는 역할을 함께 공개합니다.", "Document what each technology does—and what it does not own.")}
         </h2>
         <div className="mt-7 grid gap-4 lg:grid-cols-3">
           {OPEN_SOURCE_ROLES.map((item) => (
             <article key={item.role.en} className="rounded-[1.75rem] border border-line/70 bg-panel/60 p-6 shadow-sm">
               <Boxes size={21} className="text-accent" aria-hidden="true" />
-              <h3 className="mt-4 text-lg font-black text-fg">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", item.role)}</h3>
+              <h3 className="mt-4 text-lg font-black text-fg">{bi((item.role).ko, (item.role).en)}</h3>
               <div className="mt-4 flex flex-wrap gap-2">
                 {item.examples.map((example) => (
                   <span key={example} className="rounded-full border border-line bg-card px-3 py-1.5 font-display text-[0.67rem] font-bold text-fg-2">
@@ -171,7 +182,7 @@ export function EngineeringLicensesPage() {
                 ))}
               </div>
               <p className="mt-5 border-t border-line/70 pt-4 text-xs leading-6 text-fg-2">
-                {translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", item.boundary)}
+                {bi((item.boundary).ko, (item.boundary).en)}
               </p>
             </article>
           ))}
@@ -181,7 +192,7 @@ export function EngineeringLicensesPage() {
       <section className="mt-16" aria-labelledby="rights-layers-title">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "RIGHTS LAYERS")}</p>
         <h2 id="rights-layers-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-          {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "코드 라이선스 하나로 모든 권리를 판단하지 않습니다.", "One code license cannot answer every rights question.")}
+          {bi("코드 라이선스 하나로 모든 권리를 판단하지 않습니다.", "One code license cannot answer every rights question.")}
         </h2>
         <div className="mt-7 grid gap-4 md:grid-cols-2">
           {RIGHTS_LAYERS.map((layer, index) => (
@@ -191,8 +202,8 @@ export function EngineeringLicensesPage() {
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h3 className="text-lg font-black text-fg">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", layer.title)}</h3>
-                  <p className="mt-3 text-sm leading-7 text-fg-2">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", layer.rule)}</p>
+                  <h3 className="text-lg font-black text-fg">{bi((layer.title).ko, (layer.title).en)}</h3>
+                  <p className="mt-3 text-sm leading-7 text-fg-2">{bi((layer.rule).ko, (layer.rule).en)}</p>
                 </div>
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
@@ -210,41 +221,41 @@ export function EngineeringLicensesPage() {
       <section className="mt-16" aria-labelledby="license-groups-title">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "LICENSE FAMILIES")}</p>
         <h2 id="license-groups-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
-          {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "종류별 기본 의무와 추가 확인 지점", "Baseline obligations and review points by license family")}
+          {bi("종류별 기본 의무와 추가 확인 지점", "Baseline obligations and review points by license family")}
         </h2>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2">
-          {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "아래 내용은 빠른 분류 기준입니다. 정확한 의무는 설치한 버전의 원문, 수정·결합·배포 방식과 관할 법률에 따라 검토합니다.", "These are triage rules. Exact obligations depend on the installed version's text, modification, combination and distribution model, and applicable law.")
+          {bi("아래 내용은 빠른 분류 기준입니다. 정확한 의무는 설치한 버전의 원문, 수정·결합·배포 방식과 관할 법률에 따라 검토합니다.", "These are triage rules. Exact obligations depend on the installed version's text, modification, combination and distribution model, and applicable law.")
           }
         </p>
         <div className="mt-7 overflow-hidden rounded-[1.75rem] border border-line/70 bg-panel/55">
           <div className="hidden grid-cols-[0.8fr_1.1fr_1.45fr_1.45fr] gap-5 border-b border-line bg-raised/70 px-6 py-3 font-display text-[0.64rem] font-black uppercase tracking-[0.12em] text-fg-3 lg:grid">
-            <span>{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "종류", "Family")}</span>
-            <span>{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "예시", "Examples")}</span>
-            <span>{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "기본 의무", "Baseline obligation")}</span>
-            <span>{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "주의", "Caution")}</span>
+            <span>{bi("종류", "Family")}</span>
+            <span>{bi("예시", "Examples")}</span>
+            <span>{bi("기본 의무", "Baseline obligation")}</span>
+            <span>{bi("주의", "Caution")}</span>
           </div>
           {ENGINEERING_LICENSE_GROUPS.map((group) => (
             <article key={group.id} className="grid gap-4 border-b border-line/70 px-5 py-6 last:border-b-0 sm:px-6 lg:grid-cols-[0.8fr_1.1fr_1.45fr_1.45fr] lg:gap-5">
               <div>
-                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "종류", "Family")}</span>
-                <h3 className="mt-1 font-black text-fg lg:mt-0">{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", group.title)}</h3>
+                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{bi("종류", "Family")}</span>
+                <h3 className="mt-1 font-black text-fg lg:mt-0">{bi((group.title).ko, (group.title).en)}</h3>
               </div>
               <div>
-                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "예시", "Examples")}</span>
+                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{bi("예시", "Examples")}</span>
                 <p className="mt-1 text-xs leading-6 text-fg-2 lg:mt-0">{group.examples.join(" · ")}</p>
               </div>
               <div>
-                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "기본 의무", "Baseline obligation")}</span>
+                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{bi("기본 의무", "Baseline obligation")}</span>
                 <p className="mt-1 flex items-start gap-2 text-xs leading-6 text-fg-2 lg:mt-0">
                   <CheckCircle2 size={14} className="mt-1 shrink-0 text-success" aria-hidden="true" />
-                  <span>{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", group.obligation)}</span>
+                  <span>{bi((group.obligation).ko, (group.obligation).en)}</span>
                 </p>
               </div>
               <div>
-                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "주의", "Caution")}</span>
+                <span className="lg:hidden text-[0.62rem] font-black uppercase tracking-[0.12em] text-fg-3">{bi("주의", "Caution")}</span>
                 <p className="mt-1 flex items-start gap-2 text-xs leading-6 text-fg-2 lg:mt-0">
                   <AlertTriangle size={14} className="mt-1 shrink-0 text-accent" aria-hidden="true" />
-                  <span>{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", group.caution)}</span>
+                  <span>{bi((group.caution).ko, (group.caution).en)}</span>
                 </p>
               </div>
             </article>
@@ -257,7 +268,7 @@ export function EngineeringLicensesPage() {
           <FileCheck2 size={23} className="text-accent" aria-hidden="true" />
           <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "AUTOMATED + HUMAN REVIEW")}</p>
           <h2 id="license-pipeline-title" className="mt-3 text-2xl font-black tracking-tight text-fg">
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "고지는 자동화하고, 판단은 검토 기록으로 남깁니다.", "Automate notices and record human judgment.")}
+            {bi("고지는 자동화하고, 판단은 검토 기록으로 남깁니다.", "Automate notices and record human judgment.")}
           </h2>
           <ol className="mt-6 space-y-3">
             {REVIEW_PIPELINE.map((step, index) => (
@@ -265,7 +276,7 @@ export function EngineeringLicensesPage() {
                 <span className="grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft font-display text-[0.64rem] font-black text-accent">
                   {index + 1}
                 </span>
-                <span>{translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", step)}</span>
+                <span>{bi((step).ko, (step).en)}</span>
               </li>
             ))}
           </ol>
@@ -276,7 +287,7 @@ export function EngineeringLicensesPage() {
             <FileText size={21} className="text-accent" aria-hidden="true" />
             <h3 className="mt-4 text-lg font-black text-fg">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "THIRD_PARTY_NOTICES.generated.md")}</h3>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "빌드 후 배포물에 포함되는 제3자 코드 고지를 생성합니다. 생성 결과가 현재 의존성과 달라지면 audit가 실패해 고지 누락을 조기에 드러냅니다.", "The build generates third-party code notices for distribution. License audit exposes missing updates when the generated result diverges from current dependencies.")
+              {bi("빌드 후 배포물에 포함되는 제3자 코드 고지를 생성합니다. 생성 결과가 현재 의존성과 달라지면 audit가 실패해 고지 누락을 조기에 드러냅니다.", "The build generates third-party code notices for distribution. License audit exposes missing updates when the generated result diverges from current dependencies.")
               }
             </p>
             <code className="mt-5 block overflow-x-auto rounded-2xl border border-line bg-[#101612] p-4 font-mono text-xs leading-6 text-[#dfe9dc]">
@@ -287,10 +298,10 @@ export function EngineeringLicensesPage() {
           <article className="rounded-[1.75rem] border border-line/70 bg-card/70 p-6">
             <Scale size={21} className="text-accent" aria-hidden="true" />
             <h3 className="mt-4 text-lg font-black text-fg">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "Remotion은 일반적인 permissive 패키지로 단정하지 않습니다.", "Remotion is not assumed to be an ordinary permissive package.")}
+              {bi("Remotion은 일반적인 permissive 패키지로 단정하지 않습니다.", "Remotion is not assumed to be an ordinary permissive package.")}
             </h3>
             <p className="mt-3 text-sm leading-7 text-fg-2">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "조직 규모, 제작 방식과 자동 렌더 사용량에 따라 적용 조건이 달라질 수 있으므로 영상 제작 또는 렌더 인프라 변경 시 공식 라이선스 정책을 다시 확인합니다.", "Applicable terms can depend on organization size, production mode and automated rendering volume, so the official policy is rechecked when authoring or render infrastructure changes.")
+              {bi("조직 규모, 제작 방식과 자동 렌더 사용량에 따라 적용 조건이 달라질 수 있으므로 영상 제작 또는 렌더 인프라 변경 시 공식 라이선스 정책을 다시 확인합니다.", "Applicable terms can depend on organization size, production mode and automated rendering volume, so the official policy is rechecked when authoring or render infrastructure changes.")
               }
             </p>
             <a
@@ -299,21 +310,21 @@ export function EngineeringLicensesPage() {
               rel="noreferrer"
               className="mt-5 inline-flex min-h-10 items-center rounded-xl border border-line-strong bg-panel px-4 py-2 text-xs font-black text-fg-2 hover:border-accent/40 hover:text-accent"
             >
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "Remotion 공식 라이선스 확인", "Review Remotion licensing")}
+              {bi("Remotion 공식 라이선스 확인", "Review Remotion licensing")}
             </a>
           </article>
 
           <article className="rounded-[1.75rem] border border-accent/25 bg-accent-soft/25 p-6">
             <ShieldCheck size={21} className="text-accent" aria-hidden="true" />
             <h3 className="mt-4 text-lg font-black text-fg">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "출시 전 반드시 사람이 확인할 항목", "Human review required before release")}
+              {bi("출시 전 반드시 사람이 확인할 항목", "Human review required before release")}
             </h3>
             <ul className="mt-4 space-y-2 text-sm leading-7 text-fg-2">
               {[
-                translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "WASM·정적 링크와 copyleft 결합 방식", "WASM, static linking and copyleft combination"),
-                translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "상업 폰트·이미지·브러시·3D·사운드의 프로젝트별 사용권", "Project-specific rights for commercial fonts, images, brushes, 3D and sound"),
-                translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "AI 모델·API 약관, 입력 권리와 생성 결과의 배포 범위", "AI model/API terms, input rights and generated-output distribution"),
-                translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "외부 서비스의 로고·브랜딩·심사·데이터 보존 조건", "External-service logo, branding, review and data-retention conditions"),
+                bi("WASM·정적 링크와 copyleft 결합 방식", "WASM, static linking and copyleft combination"),
+                bi("상업 폰트·이미지·브러시·3D·사운드의 프로젝트별 사용권", "Project-specific rights for commercial fonts, images, brushes, 3D and sound"),
+                bi("AI 모델·API 약관, 입력 권리와 생성 결과의 배포 범위", "AI model/API terms, input rights and generated-output distribution"),
+                bi("외부 서비스의 로고·브랜딩·심사·데이터 보존 조건", "External-service logo, branding, review and data-retention conditions"),
               ].map((item) => (
                 <li key={item} className="flex items-start gap-2">
                   <CheckCircle2 size={14} className="mt-1.5 shrink-0 text-accent" aria-hidden="true" />
@@ -328,9 +339,9 @@ export function EngineeringLicensesPage() {
       <aside className="mt-12 flex items-start gap-4 rounded-3xl border border-line/70 bg-raised/70 p-5" role="note">
         <Scale size={22} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
         <div>
-          <p className="font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "검토 기준", "Review standard")}</p>
+          <p className="font-black text-fg">{bi("검토 기준", "Review standard")}</p>
           <p className="mt-2 text-xs leading-6 text-fg-2">
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringLicensesPage", "페이지의 예시는 기술 교육을 위한 분류이며 법률 의견이 아닙니다. 실제 출시에서는 라이선스 원문, 계약, 배포 국가와 조직 정책에 따라 담당자 또는 법률 전문가의 검토를 거칩니다.", "Examples are engineering education categories, not legal opinions. A real release is reviewed against original license text, contracts, distribution jurisdictions and organizational policy by accountable owners or legal counsel.")
+            {bi("페이지의 예시는 기술 교육을 위한 분류이며 법률 의견이 아닙니다. 실제 출시에서는 라이선스 원문, 계약, 배포 국가와 조직 정책에 따라 담당자 또는 법률 전문가의 검토를 거칩니다.", "Examples are engineering education categories, not legal opinions. A real release is reviewed against original license text, contracts, distribution jurisdictions and organizational policy by accountable owners or legal counsel.")
             }
           </p>
         </div>

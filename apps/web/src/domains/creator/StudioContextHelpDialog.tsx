@@ -61,16 +61,30 @@ interface QuickActionProps {
   readonly eyebrow: string;
   readonly title: string;
   readonly description: string;
+  readonly visual: string;
+  readonly visualPosition?: string;
   readonly onClick: () => void;
 }
 
-function QuickAction({ icon, eyebrow, title, description, onClick }: QuickActionProps) {
+function QuickAction({ icon, eyebrow, title, description, visual, visualPosition, onClick }: QuickActionProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-36 flex-col rounded-2xl border border-border/70 bg-card/70 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="group flex min-h-52 flex-col overflow-hidden rounded-2xl border border-border/70 bg-card/70 p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transform-none"
     >
+      <span data-studio-help-visual="true" className="relative -mx-4 -mt-4 mb-4 block h-24 overflow-hidden border-b border-border/60 bg-muted">
+        <img
+          src={visual}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-cover opacity-90 transition-transform duration-500 ease-out group-hover:scale-[1.035] motion-reduce:transform-none"
+          style={{ objectPosition: visualPosition ?? "center" }}
+        />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/60 via-transparent to-white/[0.04]" />
+      </span>
       <span className="mb-4 inline-flex size-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
         {icon}
       </span>
@@ -109,7 +123,7 @@ function HomePanel({
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8 px-5 py-6 sm:px-8 sm:py-8">
-      <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/12 via-card to-card p-6 sm:p-8">
+      <section className="relative grid overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/12 via-card to-card p-6 sm:p-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,.9fr)] lg:items-center lg:gap-8">
         <div className="pointer-events-none absolute -right-16 -top-16 size-52 rounded-full bg-primary/10 blur-3xl" />
         <div className="relative max-w-2xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -135,6 +149,22 @@ function HomePanel({
             >
               <Wrench className="size-4" aria-hidden="true" />
               {translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "증상으로 해결하기")}</button>
+          </div>
+        </div>
+        <div data-studio-help-hero-visual="true" className="relative mt-6 hidden min-h-56 overflow-hidden rounded-2xl border border-primary/20 bg-muted shadow-lg lg:block">
+          <img
+            src="/brand/production-os-workspace.svg"
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
+          <span aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-white/[0.05]" />
+          <div className="absolute inset-x-3 bottom-3 flex flex-wrap gap-1.5">
+            {["30초 가이드", "문제 진단", "작업 복구"].map((label) => (
+              <span key={label} className="rounded-full border border-white/20 bg-black/55 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">{label}</span>
+            ))}
           </div>
         </div>
       </section>
@@ -179,6 +209,8 @@ function HomePanel({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <QuickAction
             icon={<BookOpen className="size-4" aria-hidden="true" />}
+            visual="/brand/theme-scenes/ink-studio.svg"
+            visualPosition="center 46%"
             eyebrow="Learn"
             title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "현재 도구 익히기")}
             description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "핵심 결과, 3단계 사용법, 자주 발생하는 문제를 현재 도구 기준으로 봅니다.")}
@@ -186,6 +218,8 @@ function HomePanel({
           />
           <QuickAction
             icon={<Wrench className="size-4" aria-hidden="true" />}
+            visual="/brand/theme-scenes/graphite-studio.svg"
+            visualPosition="center 45%"
             eyebrow="Solve"
             title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "문제 해결 레시피")}
             description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "증상을 검색하고 재현 가능한 점검 순서대로 원인을 좁힙니다.")}
@@ -193,6 +227,8 @@ function HomePanel({
           />
           <QuickAction
             icon={<Command className="size-4" aria-hidden="true" />}
+            visual="/brand/theme-scenes/contrast-studio.svg"
+            visualPosition="center 47%"
             eyebrow="Find"
             title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "기능·설정 검색")}
             description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "메뉴 위치를 외우지 않고 기능 이름이나 별칭으로 명령을 찾습니다.")}
@@ -200,6 +236,8 @@ function HomePanel({
           />
           <QuickAction
             icon={<Stethoscope className="size-4" aria-hidden="true" />}
+            visual="/brand/theme-scenes/midnight-studio.svg"
+            visualPosition="center 43%"
             eyebrow="Inspect"
             title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "시스템 진단")}
             description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "입력 이벤트, 렌더러, GPU와 브라우저 상태를 한 번에 확인합니다.")}
@@ -207,6 +245,8 @@ function HomePanel({
           />
           <QuickAction
             icon={<LifeBuoy className="size-4" aria-hidden="true" />}
+            visual="/brand/theme-scenes/paper-studio.svg"
+            visualPosition="center 48%"
             eyebrow="Recover"
             title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "작업 복구")}
             description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "저장·자동 복구 후보를 확인하고 안전하게 이전 상태로 돌아갑니다.")}
@@ -214,6 +254,8 @@ function HomePanel({
           />
           <QuickAction
             icon={<BookOpen className="size-4" aria-hidden="true" />}
+            visual="/brand/theme-scenes/aurora-studio.svg"
+            visualPosition="center 44%"
             eyebrow="Reference"
             title={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "사용자 설명서")}
             description={translateCurrentStaticSourceText("domains.creator.StudioContextHelpDialog", "ko", "개념과 전체 작업 흐름을 길게 읽어야 할 때 별도 설명서를 엽니다.")}

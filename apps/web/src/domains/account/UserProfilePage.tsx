@@ -33,7 +33,7 @@ import {
   creatorText,
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
-import { useI18n, useT } from "@/shared/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
@@ -50,6 +50,9 @@ import {
   type WorkSummary,
 } from "@/infrastructure/creator-client";
 import { useApiResource } from "@/infrastructure/use-api-resource";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 
 // 회원 공개 프로필 — 리뷰 카드의 작성자명을 누르면 오는 /u/:userId.
@@ -74,6 +77,7 @@ function isTab(value: string | null): value is ProfileTab {
 
 // ── 창작 작품 탭 ──────────────────────────────────────────────────────
 function ProfileWorksTab({ userId }: { userId: string }) {
+  useBilingualI18nRevision();
   const t = useT();
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +122,7 @@ function ProfileWorksTab({ userId }: { userId: string }) {
 
 // ── 시리즈 탭 ─────────────────────────────────────────────────────────
 function ProfileSeriesTab({ userId }: { userId: string }) {
+  useBilingualI18nRevision();
   const t = useT();
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,8 +180,9 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
 }
 
 export function UserProfilePage() {
+  useBilingualI18nRevision();
   const t = useT();
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang);
+  const locale: CreatorRoleLocale = getActiveI18nLocale();
   const { userId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");

@@ -35,6 +35,10 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { cx } from "@/shared/lib/cx";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("EngineeringDeckPage", ko, en);
 
 const AUDIENCES = [
   { id: "investor", ko: "투자자 10장", en: "Investor · 10 slides" },
@@ -81,20 +85,20 @@ const chapterById = new Map<string, (typeof ENGINEERING_CHAPTERS)[number]>(
   ENGINEERING_CHAPTERS.map((chapter) => [chapter.id, chapter]),
 );
 
-function chapterSlide(chapterId: string, locale: EngineeringLocale): DeckSlide {
+function chapterSlide(chapterId: string, _locale): DeckSlide {
   const chapter = chapterById.get(chapterId);
   if (!chapter) throw new Error(`Unknown engineering chapter: ${chapterId}`);
   return {
     id: chapter.id,
     eyebrow: chapter.eyebrow,
-    title: translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", chapter.title),
-    body: translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", chapter.thesis),
+    title: bi((chapter.title).ko, (chapter.title).en),
+    body: bi((chapter.thesis).ko, (chapter.thesis).en),
     points: [
-      translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", chapter.problem),
-      translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", chapter.decision),
-      translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", chapter.userValue),
+      bi((chapter.problem).ko, (chapter.problem).en),
+      bi((chapter.decision).ko, (chapter.decision).en),
+      bi((chapter.userValue).ko, (chapter.userValue).en),
     ],
-    note: translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", chapter.tradeoff),
+    note: bi((chapter.tradeoff).ko, (chapter.tradeoff).en),
     status: chapter.status,
   };
 }
@@ -103,28 +107,29 @@ const fieldNoteById = new Map<string, (typeof ENGINEERING_FIELD_NOTES)[number]>(
   ENGINEERING_FIELD_NOTES.map((note) => [note.id, note]),
 );
 
-function fieldNoteSlide(noteId: string, locale: EngineeringLocale): DeckSlide {
+function fieldNoteSlide(noteId: string, _locale): DeckSlide {
   const note = fieldNoteById.get(noteId);
   if (!note) throw new Error(`Unknown engineering field note: ${noteId}`);
   return {
     id: `field-${note.id}`,
     eyebrow: note.eyebrow,
-    title: translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.title),
-    body: translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.summary),
-    points: [translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.problem), translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.pattern), translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.boundary)],
-    note: translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.reuseSteps[0]) ?? translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", note.boundary),
+    title: bi((note.title).ko, (note.title).en),
+    body: bi((note.summary).ko, (note.summary).en),
+    points: [bi((note.problem).ko, (note.problem).en), bi((note.pattern).ko, (note.pattern).en), bi((note.boundary).ko, (note.boundary).en)],
+    note: bi((note.reuseSteps[0]).ko, (note.reuseSteps[0]).en) ?? bi((note.boundary).ko, (note.boundary).en),
     status: note.status,
   };
 }
 
 function buildSlides(audience: Audience, locale: EngineeringLocale): readonly DeckSlide[] {
+
   const opening: DeckSlide = {
     id: "opening",
     eyebrow: "TOONSTUDIO ENGINEERING STORY",
-    title: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "브라우저에서 웹툰 제작 스튜디오를 만들기까지", "Building a webtoon production studio in the browser"),
-    body: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "기획, 드로잉, 3D, 저장, 협업, AI와 연재 운영을 하나의 제작 맥락으로 연결한 기술 이야기입니다.", "An engineering story connecting planning, drawing, 3D, storage, collaboration, AI and serialization into one production context."),
-    points: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", ["제품 문제부터 시작", "실제 상태와 설계 상태 구분", "코드·테스트·워크플로 근거 연결"], ["Start with the product problem", "Separate live and designed scope", "Connect code, tests and workflow evidence"]),
-    note: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "기술 목록을 읽는 발표가 아니라 왜 이 경계를 선택했는지 설명하는 발표입니다.", "This presentation explains why boundaries were chosen instead of reading a technology list."),
+    title: bi("브라우저에서 웹툰 제작 스튜디오를 만들기까지", "Building a webtoon production studio in the browser"),
+    body: bi("기획, 드로잉, 3D, 저장, 협업, AI와 연재 운영을 하나의 제작 맥락으로 연결한 기술 이야기입니다.", "An engineering story connecting planning, drawing, 3D, storage, collaboration, AI and serialization into one production context."),
+    points: bi(["제품 문제부터 시작", "실제 상태와 설계 상태 구분", "코드·테스트·워크플로 근거 연결"], ["Start with the product problem", "Separate live and designed scope", "Connect code, tests and workflow evidence"]),
+    note: bi("기술 목록을 읽는 발표가 아니라 왜 이 경계를 선택했는지 설명하는 발표입니다.", "This presentation explains why boundaries were chosen instead of reading a technology list."),
   };
 
   if (audience === "investor") {
@@ -141,10 +146,10 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       {
         id: "investor-close",
         eyebrow: "DEFENSIBILITY · SCALE · TRUST",
-        title: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "기술은 기능 수가 아니라 연결된 제작 맥락을 지킵니다.", "The defensible asset is connected production context, not a feature count."),
-        body: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "도메인 계약, 로컬 우선 데이터, 전문 엔진 경계와 검증 증거를 유지하면 기능을 추가해도 프로젝트의 맥락이 분해되지 않습니다.", "Domain contracts, local-first data, specialist engine boundaries and verification evidence keep project context intact as capability grows."),
-        points: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", ["단계적 전문 기능 확장", "무료 우선에서 승인된 유료 승격", "권리와 provenance를 기능과 함께 관리"], ["Incremental specialist capability", "Approved promotion from free-first infrastructure", "Rights and provenance managed with features"]),
-        note: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "과장된 완성도 주장보다 검증 가능한 현재 상태와 확장 경로를 강조합니다.", "Emphasize verifiable present state and expansion path instead of exaggerated completeness claims."),
+        title: bi("기술은 기능 수가 아니라 연결된 제작 맥락을 지킵니다.", "The defensible asset is connected production context, not a feature count."),
+        body: bi("도메인 계약, 로컬 우선 데이터, 전문 엔진 경계와 검증 증거를 유지하면 기능을 추가해도 프로젝트의 맥락이 분해되지 않습니다.", "Domain contracts, local-first data, specialist engine boundaries and verification evidence keep project context intact as capability grows."),
+        points: bi(["단계적 전문 기능 확장", "무료 우선에서 승인된 유료 승격", "권리와 provenance를 기능과 함께 관리"], ["Incremental specialist capability", "Approved promotion from free-first infrastructure", "Rights and provenance managed with features"]),
+        note: bi("과장된 완성도 주장보다 검증 가능한 현재 상태와 확장 경로를 강조합니다.", "Emphasize verifiable present state and expansion path instead of exaggerated completeness claims."),
       },
     ];
   }
@@ -190,10 +195,10 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
     {
       id: "study-close",
       eyebrow: "STUDY QUESTIONS",
-      title: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "우리 프로젝트에서 먼저 검증할 경계는 무엇인가", "Which boundary should our project verify first?"),
-      body: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "패키지 선택보다 데이터 권위, 실패 범위, 대체 경로와 완료 기준을 먼저 토론해 보세요.", "Discuss data authority, failure scope, fallback and completion criteria before package selection."),
-      points: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", ["무엇이 최종 결과를 소유하는가", "어떤 실패를 사용자에게 숨기지 않을 것인가", "측정 가능한 품질 예산은 무엇인가"], ["What owns the final result?", "Which failure will remain visible to the user?", "What quality budget is measurable?"]),
-      note: translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "마지막 10분은 참가자의 시스템에 적용할 한 가지 경계를 정하는 토론으로 사용합니다.", "Use the final ten minutes to choose one boundary to apply in participants' systems."),
+      title: bi("우리 프로젝트에서 먼저 검증할 경계는 무엇인가", "Which boundary should our project verify first?"),
+      body: bi("패키지 선택보다 데이터 권위, 실패 범위, 대체 경로와 완료 기준을 먼저 토론해 보세요.", "Discuss data authority, failure scope, fallback and completion criteria before package selection."),
+      points: bi(["무엇이 최종 결과를 소유하는가", "어떤 실패를 사용자에게 숨기지 않을 것인가", "측정 가능한 품질 예산은 무엇인가"], ["What owns the final result?", "Which failure will remain visible to the user?", "What quality budget is measurable?"]),
+      note: bi("마지막 10분은 참가자의 시스템에 적용할 한 가지 경계를 정하는 토론으로 사용합니다.", "Use the final ten minutes to choose one boundary to apply in participants' systems."),
     },
   ];
 }
@@ -211,6 +216,7 @@ function SlideCanvas({
   readonly locale: EngineeringLocale;
   readonly compact?: boolean;
 }) {
+  useBilingualI18nRevision();
   return (
     <article
       data-deck-slide="true"
@@ -271,8 +277,8 @@ function SlideCanvas({
       </div>
 
       <footer className="flex items-end justify-between gap-5 text-[0.58rem] text-[#627b63] sm:text-[0.68rem]">
-        <span>{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "제품 경계 · 검증 근거 · 재사용 가이드", "Product boundary · Evidence · Reuse guide")}</span>
-        <span>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringDeckPage", "en", "toonstudio.cloud")}</span>
+        <span>{bi("제품 경계 · 검증 근거 · 재사용 가이드", "Product boundary · Evidence · Reuse guide")}</span>
+        <span>toonstudio.cloud</span>
       </footer>
       <div className="absolute inset-x-0 bottom-0 h-1.5 bg-[#d5dfc2]" aria-hidden="true">
         <div className="h-full bg-[#739552]" style={{ width: `${((index + 1) / total) * 100}%` }} />
@@ -282,7 +288,9 @@ function SlideCanvas({
 }
 
 export function EngineeringDeckPage() {
+  useBilingualI18nRevision();
   const locale = useEngineeringLocale();
+
   const initialDeckState = useRef(readInitialDeckState()).current;
   const [audience, setAudience] = useState<Audience>(initialDeckState.audience);
   const [index, setIndex] = useState(initialDeckState.index);
@@ -295,7 +303,7 @@ export function EngineeringDeckPage() {
   const current = slides[index] ?? slides[0]!;
 
   useDocumentTitle(
-    translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "ToonStudio 기술 발표 모드 · 투자·세미나·스터디", "ToonStudio engineering presentation · Investor, seminar and study"),
+    bi("ToonStudio 기술 발표 모드 · 투자·세미나·스터디", "ToonStudio engineering presentation · Investor, seminar and study"),
   );
 
   useEffect(() => {
@@ -342,9 +350,9 @@ export function EngineeringDeckPage() {
     const href = window.location.href;
     try {
       await navigator.clipboard.writeText(href);
-      setShareNotice(translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "현재 슬라이드 링크를 복사했어요.", "Current slide link copied."));
+      setShareNotice(bi("현재 슬라이드 링크를 복사했어요.", "Current slide link copied."));
     } catch {
-      setShareNotice(translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", `복사할 링크: ${href}`, `Copy this link: ${href}`));
+      setShareNotice(formatI18nTemplate(String(bi("복사할 링크: {value0}", "Copy this link: {value0}")), { value0: href }));
     }
   };
 
@@ -376,19 +384,19 @@ export function EngineeringDeckPage() {
       <EngineeringPageIntro
         eyebrow="WEB PRESENTATION"
         title={
-          translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "같은 기술 사실을 투자자·세미나·스터디 깊이로 발표합니다.", "Present the same engineering facts at investor, seminar or study depth.")
+          bi("같은 기술 사실을 투자자·세미나·스터디 깊이로 발표합니다.", "Present the same engineering facts at investor, seminar or study depth.")
         }
         description={
-          translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "키보드, 전체 화면, 발표자 노트와 인쇄를 지원합니다. 슬라이드 내용은 기술 스토리 데이터에서 파생되어 웹 설명과 서로 다른 상태를 주장하지 않습니다.", "Use keyboard navigation, fullscreen, speaker notes and print. Slides derive from the engineering-story data so the deck cannot claim a different status from the website.")
+          bi("키보드, 전체 화면, 발표자 노트와 인쇄를 지원합니다. 슬라이드 내용은 기술 스토리 데이터에서 파생되어 웹 설명과 서로 다른 상태를 주장하지 않습니다.", "Use keyboard navigation, fullscreen, speaker notes and print. Slides derive from the engineering-story data so the deck cannot claim a different status from the website.")
         }
         aside={
           <div className="rounded-3xl border border-line/70 bg-card/70 p-5">
             <p className="flex items-center gap-2 text-xs font-black text-fg">
               <MonitorPlay size={16} className="text-accent" aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표 조작", "Presentation controls")}
+              {bi("발표 조작", "Presentation controls")}
             </p>
             <p className="mt-3 text-xs leading-6 text-fg-3">
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "← → · Page Up/Down · Space · Home · End", "← → · Page Up/Down · Space · Home · End")}
+              {bi("← → · Page Up/Down · Space · Home · End", "← → · Page Up/Down · Space · Home · End")}
             </p>
           </div>
         }
@@ -396,11 +404,11 @@ export function EngineeringDeckPage() {
 
       <section data-engineering-deck-shell="true" aria-labelledby="deck-preview-title">
         <h2 id="deck-preview-title" className="sr-only">
-          {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표 미리보기", "Presentation preview")}
+          {bi("발표 미리보기", "Presentation preview")}
         </h2>
 
         <div data-deck-controls="true" className="mb-4 flex flex-col gap-3 rounded-3xl border border-line/70 bg-panel/65 p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2" role="group" aria-label={translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표 대상", "Presentation audience")}>
+          <div className="flex flex-wrap gap-2" role="group" aria-label={bi("발표 대상", "Presentation audience")}>
             {AUDIENCES.map((item) => (
               <button
                 key={item.id}
@@ -417,12 +425,12 @@ export function EngineeringDeckPage() {
                     : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-accent",
                 )}
               >
-                {translateLocaleBranchForLocale(locale, "domains.legal.technology.EngineeringDeckPage", item)}
+                {bi((item).ko, (item).en)}
               </button>
             ))}
           </div>
           <div className="flex flex-wrap gap-2">
-            <div className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-line bg-card p-1" aria-label={translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표 타이머", "Presentation timer")}>
+            <div className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-line bg-card p-1" aria-label={bi("발표 타이머", "Presentation timer")}>
               <button
                 type="button"
                 aria-pressed={timerStartedAt !== null}
@@ -431,12 +439,12 @@ export function EngineeringDeckPage() {
               >
                 <Clock3 size={14} aria-hidden="true" />
                 {formatElapsed(elapsedSeconds)}
-                <span className="sr-only">{timerStartedAt === null ? (translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "타이머 시작", "Start timer")) : (translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "타이머 일시정지", "Pause timer"))}</span>
+                <span className="sr-only">{timerStartedAt === null ? (bi("타이머 시작", "Start timer")) : (bi("타이머 일시정지", "Pause timer"))}</span>
               </button>
               <button
                 type="button"
                 onClick={resetTimer}
-                aria-label={translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표 타이머 초기화", "Reset presentation timer")}
+                aria-label={bi("발표 타이머 초기화", "Reset presentation timer")}
                 className="grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent"
               >
                 <RotateCcw size={13} aria-hidden="true" />
@@ -448,7 +456,7 @@ export function EngineeringDeckPage() {
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
             >
               <Copy size={15} aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "슬라이드 링크", "Slide link")}
+              {bi("슬라이드 링크", "Slide link")}
             </button>
             <button
               type="button"
@@ -457,7 +465,7 @@ export function EngineeringDeckPage() {
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
             >
               <StickyNote size={15} aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표자 노트", "Speaker notes")}
+              {bi("발표자 노트", "Speaker notes")}
             </button>
             <button
               type="button"
@@ -465,7 +473,7 @@ export function EngineeringDeckPage() {
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
             >
               <Maximize2 size={15} aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "전체 화면", "Fullscreen")}
+              {bi("전체 화면", "Fullscreen")}
             </button>
             <button
               type="button"
@@ -473,7 +481,7 @@ export function EngineeringDeckPage() {
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-xs font-bold text-fg-2 hover:text-accent"
             >
               <Printer size={15} aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "인쇄·PDF", "Print · PDF")}
+              {bi("인쇄·PDF", "Print · PDF")}
             </button>
           </div>
         </div>
@@ -494,7 +502,7 @@ export function EngineeringDeckPage() {
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-line bg-card px-4 text-sm font-bold text-fg-2 transition-colors enabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChevronLeft size={18} aria-hidden="true" />
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "이전", "Previous")}
+              {bi("이전", "Previous")}
             </button>
 
             <div className="flex min-h-12 items-center justify-center rounded-2xl border border-line/70 bg-panel px-4">
@@ -515,21 +523,21 @@ export function EngineeringDeckPage() {
               onClick={() => setIndex((value) => Math.min(slides.length - 1, value + 1))}
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-line bg-card px-4 text-sm font-bold text-fg-2 transition-colors enabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "다음", "Next")}
+              {bi("다음", "Next")}
               <ChevronRight size={18} aria-hidden="true" />
             </button>
           </div>
         </div>
 
         {showNotes ? (
-          <aside className="mt-4 rounded-3xl border border-line/70 bg-card/65 p-5" aria-label={translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "현재 슬라이드 발표자 노트", "Current slide speaker notes")}>
+          <aside className="mt-4 rounded-3xl border border-line/70 bg-card/65 p-5" aria-label={bi("현재 슬라이드 발표자 노트", "Current slide speaker notes")}>
             <div className="flex items-start gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
                 <StickyNote size={16} aria-hidden="true" />
               </span>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.12em] text-fg-3">
-                  {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표자 노트", "Speaker note")}
+                  {bi("발표자 노트", "Speaker note")}
                 </p>
                 <p className="mt-2 text-sm leading-7 text-fg-2">{current.note}</p>
               </div>
@@ -538,26 +546,26 @@ export function EngineeringDeckPage() {
         ) : null}
       </section>
 
-      <section className="mt-10 grid gap-4 lg:grid-cols-3" aria-label={translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "발표 대상별 사용법", "Audience guidance")}>
+      <section className="mt-10 grid gap-4 lg:grid-cols-3" aria-label={bi("발표 대상별 사용법", "Audience guidance")}>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
           <Presentation size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "투자자", "Investor")}</h2>
+          <h2 className="mt-4 text-lg font-black text-fg">{bi("투자자", "Investor")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "문제, 기술 방어력, 확장·비용·권리 통제를 10장으로 요약합니다.", "Summarizes problem, defensibility, scale, cost and rights control in ten slides.")}
+            {bi("문제, 기술 방어력, 확장·비용·권리 통제를 10장으로 요약합니다.", "Summarizes problem, defensibility, scale, cost and rights control in ten slides.")}
           </p>
         </article>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
           <UsersRound size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "기술 세미나", "Engineering seminar")}</h2>
+          <h2 className="mt-4 text-lg font-black text-fg">{bi("기술 세미나", "Engineering seminar")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "주요 시스템 경계와 실패·검증 설계를 30~45분 분량으로 설명합니다.", "Covers key system boundaries, failure and verification design for a 30–45 minute session.")}
+            {bi("주요 시스템 경계와 실패·검증 설계를 30~45분 분량으로 설명합니다.", "Covers key system boundaries, failure and verification design for a 30–45 minute session.")}
           </p>
         </article>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
           <StickyNote size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", "스터디", "Study")}</h2>
+          <h2 className="mt-4 text-lg font-black text-fg">{bi("스터디", "Study")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
-            {translateBilingualValueForLocale(locale, "domains.legal.technology.EngineeringDeckPage", `${ENGINEERING_CHAPTERS.length}개 챕터를 모두 사용하고 각 시스템에 적용할 경계를 토론합니다.`, `Uses all ${ENGINEERING_CHAPTERS.length} chapters and turns each boundary into a discussion for participants' systems.`)}
+            {formatI18nTemplate(String(bi("{value0}개 챕터를 모두 사용하고 각 시스템에 적용할 경계를 토론합니다.", "Uses all {value0} chapters and turns each boundary into a discussion for participants' systems.")), { value0: ENGINEERING_CHAPTERS.length })}
           </p>
         </article>
       </section>

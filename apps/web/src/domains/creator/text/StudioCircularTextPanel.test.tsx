@@ -30,8 +30,8 @@ describe("StudioCircularTextPanel", () => {
       />,
     );
 
-    expect(screen.getByText("원형 텍스트 (Circular Text)")).toBeDefined();
-    expect(screen.getByText("원형 배치 Off")).toBeDefined();
+    expect(screen.getByText("원형 글자 배치")).toBeDefined();
+    expect(screen.getByText("사용 안 함")).toBeDefined();
   });
 
   it("calls onToggleEnabled when toggle clicked", () => {
@@ -46,7 +46,7 @@ describe("StudioCircularTextPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByText("원형 배치 Off"));
+    fireEvent.click(screen.getByText("사용 안 함"));
     expect(onToggleEnabled).toHaveBeenCalledWith(true);
   });
 
@@ -62,8 +62,8 @@ describe("StudioCircularTextPanel", () => {
       />,
     );
 
-    expect(screen.getByText("원형 배치 On")).toBeDefined();
-    expect(screen.getByText("원형 반경 (Radius)")).toBeDefined();
+    expect(screen.getByText("사용 중")).toBeDefined();
+    expect(screen.getByText("반경")).toBeDefined();
 
     // Change direction to counter-clockwise
     fireEvent.click(screen.getByText("반시계방향"));

@@ -167,10 +167,14 @@ export function ProductionRecoveryScenarioPanel({
     if (changes.length !== scenario.taskUpdates.length || changes.length === 0) return;
     setApplyingScenarioId(scenario.id);
     try {
-      await execute({
-        type: "upsert-task-batch",
-        tasks: changes.map((change) => change.next),
-      }, `${scenario.title} 복구 시나리오를 원자적으로 적용했습니다.`);
+      for (const [index, change] of changes.entries()) {
+        await execute({
+          type: "upsert-task",
+          task: change.next,
+        }, index === changes.length - 1
+          ? `${scenario.title} 복구 시나리오를 적용했습니다.`
+          : `${scenario.title} 변경 ${index + 1}/${changes.length}을 적용했습니다.`);
+      }
       setLastApplied({
         scenarioId: scenario.id,
         title: scenario.title,
@@ -185,10 +189,11 @@ export function ProductionRecoveryScenarioPanel({
     if (!canEdit || !lastApplied || applyingScenarioId || undoing) return;
     setUndoing(true);
     try {
-      await execute({
-        type: "upsert-task-batch",
-        tasks: lastApplied.originalTasks,
-      }, `${lastApplied.title} 복구 시나리오를 원자적으로 되돌렸습니다.`);
+      for (const [index, task] of lastApplied.originalTasks.entries()) {
+        await execute({ type: "upsert-task", task }, index === lastApplied.originalTasks.length - 1
+          ? `${lastApplied.title} 복구 시나리오를 되돌렸습니다.`
+          : `${lastApplied.title} 복원 ${index + 1}/${lastApplied.originalTasks.length}을 적용했습니다.`);
+      }
       setLastApplied(null);
     } finally {
       setUndoing(false);
@@ -201,7 +206,6 @@ export function ProductionRecoveryScenarioPanel({
       aria-labelledby="production-recovery-scenarios-heading"
       className="scroll-mt-4 overflow-hidden rounded-2xl border border-line bg-card"
       data-production-recovery-scenarios
-      aria-busy={applyingScenarioId !== null || undoing}
     >
       <header className="border-b border-line bg-panel p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">

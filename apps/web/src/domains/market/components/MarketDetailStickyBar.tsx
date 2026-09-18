@@ -87,7 +87,7 @@ export function MarketDetailStickyBar({
               </span>
             </div>
             <p className="text-[0.68rem] text-fg-3">
-              {record.publisher.name} · <span className="text-good font-semibold">{translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "무료 라이선스")}</span>
+              {record.publisher.name} · <span className="text-good font-semibold">라이선스 조건 확인</span>
             </p>
           </div>
         </div>
@@ -128,7 +128,7 @@ export function MarketDetailStickyBar({
               })}
             >
               <Download className="size-3.5" />
-              <span>{translateCurrentStaticSourceText("domains.market.components.MarketDetailStickyBar", "ko", "무료 소장")}</span>
+              <span>내 에셋에 추가</span>
             </button>
           )}
 

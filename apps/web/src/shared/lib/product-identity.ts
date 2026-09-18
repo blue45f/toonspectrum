@@ -1,6 +1,7 @@
-import { resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
-export type ProductLocale = string;
-export type ProductAuthoredLocale = "ko" | "en";
+
+import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
+
+export type ProductLocale = "ko" | "en";
 
 export interface ProductIdentityCopy {
   readonly brand: string;
@@ -85,6 +86,6 @@ export const PRODUCT_START_DESTINATIONS = [
 
 export type ProductStartDestinationId = (typeof PRODUCT_START_DESTINATIONS)[number]["id"];
 
-export function resolveProductLocale(language: string): ProductLocale {
-  return resolveUiLocale(language);
+export function resolveProductLocale(_language): ProductLocale {
+  return getActiveI18nLocale();
 }

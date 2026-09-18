@@ -3,6 +3,9 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useT } from "@/shared/lib/i18n";
+import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
 import {
   STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT,
   archiveStudioProjectDocument,
@@ -21,8 +24,10 @@ import {
   type StudioProjectDocumentEntry,
   type StudioProjectDocumentState,
 } from "../studio-project-document-store";
-
-type Locale = string;
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 export interface StudioProjectDocumentsController {
   readonly state: StudioProjectDocumentState | null;
@@ -42,9 +47,12 @@ export interface StudioProjectDocumentsController {
   ) => StudioProjectDocumentEntry | null;
 }
 
-function storageError(locale: Locale): string {
-  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.useStudioProjectDocuments", "이 기기에서 문서 목록을 저장하지 못했습니다. 현재 원고는 편집기 복구 기능으로 계속 보호됩니다.", "The document list could not be stored on this device. Editor recovery still protects the current manuscript.");
-}
+const STORAGE_ERROR = defineBilingualText(
+  "studioProjectDocuments",
+  "storageError",
+  "이 기기에서 문서 목록을 저장하지 못했습니다. 현재 원고는 편집기 복구 기능으로 계속 보호됩니다.",
+  "The document list could not be stored on this device. Editor recovery still protects the current manuscript.",
+);
 
 function eventState(value: unknown, projectId: string): StudioProjectDocumentState | null {
   if (!value || typeof value !== "object") return null;
@@ -58,9 +66,10 @@ function eventState(value: unknown, projectId: string): StudioProjectDocumentSta
 
 export function useStudioProjectDocuments(
   projectId: string,
-  locale: Locale,
+  _locale: string,
   status?: StudioDocumentStatus,
 ): StudioProjectDocumentsController {
+  const t = useT();
   const [state, setState] = useState<StudioProjectDocumentState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,9 +79,9 @@ export function useStudioProjectDocuments(
       setState(readStudioProjectDocuments(window.localStorage, projectId));
       setError(null);
     } catch {
-      setError(storageError(locale));
+      setError(t(STORAGE_ERROR));
     }
-  }, [locale, projectId]);
+  }, [projectId, t]);
 
   useEffect(() => {
     reload();
@@ -106,10 +115,10 @@ export function useStudioProjectDocuments(
       setError(null);
       return value;
     } catch {
-      setError(storageError(locale));
+      setError(t(STORAGE_ERROR));
       return null;
     }
-  }, [locale]);
+  }, [t]);
 
   const create = useCallback((input: CreateStudioProjectDocumentInput) => run(() => (
     createStudioProjectDocument(window.localStorage, projectId, input, { target: window })

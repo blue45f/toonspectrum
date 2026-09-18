@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { PersonalCloudProviderId } from "../save-first/personal-cloud-client";
@@ -21,14 +22,17 @@ import {
   PERSONAL_CLOUD_CONNECTION_PROVIDER_ORDER,
   type PersonalCloudConnectionsController,
 } from "./usePersonalCloudConnections";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
-
-function timeLabel(value: string | null, locale: Locale): string {
+function timeLabel(value: string | null, locale: string, bt: (ko: string, en: string) => string): string {
   if (!value || !Number.isFinite(Date.parse(value))) {
-    return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "아직 사용하지 않음", "Not used yet");
+    return bt("아직 사용하지 않음", "Not used yet");
   }
-  return new Intl.DateTimeFormat(getCurrentUiLocale(), {
+  return new Intl.DateTimeFormat(locale || "en", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -37,24 +41,25 @@ function timeLabel(value: string | null, locale: Locale): string {
 }
 function providerDescription(
   provider: PersonalCloudProviderId,
-  locale: Locale,
+  bt: (ko: string, en: string) => string,
 ): string {
   if (provider === "google-drive") {
-    return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "ToonStudio에서 만든 파일만 다루는 개인 Drive 연결", "Personal Drive access limited to files created by ToonStudio");
+    return bt("ToonStudio에서 만든 파일만 다루는 개인 Drive 연결", "Personal Drive access limited to files created by ToonStudio");
   }
   if (provider === "dropbox") {
-    return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "개인 Dropbox에 프로젝트 원본과 제출 파일 저장", "Store project originals and submission files in personal Dropbox");
+    return bt("개인 Dropbox에 프로젝트 원본과 제출 파일 저장", "Store project originals and submission files in personal Dropbox");
   }
-  return translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "개인 OneDrive 앱 폴더에 프로젝트 원본 저장", "Store project originals in the personal OneDrive app folder");
+  return bt("개인 OneDrive 앱 폴더에 프로젝트 원본 저장", "Store project originals in the personal OneDrive app folder");
 }
 
 export function PersonalCloudConnectionPanel({
-  locale,
+  locale: _locale,
   controller,
 }: {
-  readonly locale: Locale;
+  readonly locale: string;
   readonly controller: PersonalCloudConnectionsController;
 }) {
+  const bt = useBilingual("PersonalCloudConnectionPanel");
   return (
     <section className="rounded-2xl border border-line bg-card p-5" aria-labelledby="personal-cloud-title">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -62,10 +67,13 @@ export function PersonalCloudConnectionPanel({
           <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.14em] text-accent">
             <Cloud size={15} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.studio.shell.PersonalCloudConnectionPanel", "en", "PERSONAL CLOUD")}</p>
           <h2 id="personal-cloud-title" className="mt-2 text-lg font-black text-fg">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "개인 계정 연결", "Connect personal accounts")}
+            {bt("개인 계정 연결", "Connect personal accounts")}
           </h2>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-fg-3">
-            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "프로젝트 원본은 연결한 개인 저장소로 직접 전송됩니다. 접근 토큰은 브라우저 저장소에 남기지 않습니다.", "Project originals upload directly to your connected storage. Access tokens are not kept in browser storage.")}
+            {bt(
+              "프로젝트 원본은 연결한 개인 저장소로 직접 전송됩니다. 접근 토큰은 브라우저 저장소에 남기지 않습니다.",
+              "Project originals upload directly to your connected storage. Access tokens are not kept in browser storage.",
+            )}
           </p>
         </div>
         <button
@@ -77,7 +85,7 @@ export function PersonalCloudConnectionPanel({
           {controller.loading
             ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
             : <RefreshCw size={14} aria-hidden="true" />}
-          {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "상태 새로고침", "Refresh status")}
+          {bt("상태 새로고침", "Refresh status")}
         </button>
       </div>
 
@@ -115,7 +123,7 @@ export function PersonalCloudConnectionPanel({
                 <div className="min-w-0 flex-1">
                   <h3 className="font-black text-fg">{status?.label ?? provider}</h3>
                   <p className="mt-1 text-[0.68rem] leading-5 text-fg-3">
-                    {providerDescription(provider, locale)}
+                    {providerDescription(provider, bt)}
                   </p>
                   {connected ? (
                     <div className="mt-3 rounded-lg bg-card/80 px-2.5 py-2">
@@ -123,7 +131,7 @@ export function PersonalCloudConnectionPanel({
                         {status?.accountLabel}
                       </p>
                       <p className="mt-1 text-[0.64rem] text-fg-3">
-                        {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "마지막 사용", "Last used")} {timeLabel(status?.lastUsedAt ?? null, locale)}
+                        {bt("마지막 사용", "Last used")} {timeLabel(status?.lastUsedAt ?? null, locale, bt)}
                       </p>
                     </div>
                   ) : null}
@@ -139,7 +147,7 @@ export function PersonalCloudConnectionPanel({
                       className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
                     >
                       {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={14} aria-hidden="true" />}
-                      {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "다시 인증", "Reconnect")}
+                      {bt("다시 인증", "Reconnect")}
                     </button>
                     <button
                       type="button"
@@ -148,7 +156,7 @@ export function PersonalCloudConnectionPanel({
                       className={buttonClass({ variant: "quiet", size: "sm", className: "gap-1.5 text-danger" })}
                     >
                       <LogOut size={14} aria-hidden="true" />
-                      {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "연결 해제", "Disconnect")}
+                      {bt("연결 해제", "Disconnect")}
                     </button>
                   </>
                 ) : (
@@ -162,8 +170,8 @@ export function PersonalCloudConnectionPanel({
                       ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
                       : <Link2 size={14} aria-hidden="true" />}
                     {configured
-                      ? translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "개인 계정 연결", "Connect account")
-                      : translateBilingualValueForLocale(locale, "domains.creator.studio.shell.PersonalCloudConnectionPanel", "서버 설정 필요", "Server setup required")}
+                      ? bt("개인 계정 연결", "Connect account")
+                      : bt("서버 설정 필요", "Server setup required")}
                   </button>
                 )}
               </div>
