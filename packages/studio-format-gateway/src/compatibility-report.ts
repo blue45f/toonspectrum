@@ -1,19 +1,10 @@
 import {
-  blobRefSchema,
   isoTimestampSchema,
   sha256Schema,
   studioEntityIdSchema,
 } from "@toonspectrum/studio-project-model";
 import { z } from "zod";
 
-
-import type {
-  ArtifactId,
-  BlobRef,
-  CompatibilityReportId,
-  Sha256,
-  UserId,
-} from "@toonspectrum/studio-project-model";
 
 export const sourceCreativeFormatSchema = z.enum([
   "psd",
@@ -41,187 +32,98 @@ export const sourceCreativeFormatSchema = z.enum([
 ]);
 export type SourceCreativeFormat = z.infer<typeof sourceCreativeFormatSchema>;
 
-export const compatibilityGradeSchema = z.enum(["A", "B", "C", "D"]);
-export type CompatibilityGrade = z.infer<typeof compatibilityGradeSchema>;
-
-export const compatibilityDispositionSchema = z.enum([
+export const compatibilityOutcomeSchema = z.enum([
   "preserved",
   "converted",
-  "approximated",
   "rasterized",
-  "ignored",
-  "opaque-preserved",
-  "blocked",
+  "excluded",
+  "unsupported",
 ]);
-export type CompatibilityDisposition = z.infer<typeof compatibilityDispositionSchema>;
+export type CompatibilityOutcome = z.infer<typeof compatibilityOutcomeSchema>;
 
-export const compatibilitySeveritySchema = z.enum([
-  "info",
-  "warning",
-  "error",
-  "blocker",
+export const compatibilityImpactSchema = z.enum([
+  "none",
+  "minor",
+  "major",
+  "blocking",
 ]);
-export type CompatibilitySeverity = z.infer<typeof compatibilitySeveritySchema>;
-
-export interface CompatibilityItem {
-  readonly id: string;
-  readonly path: string;
-  readonly sourceFeature: string;
-  readonly sourceObjectId?: string;
-  readonly disposition: CompatibilityDisposition;
-  readonly severity: CompatibilitySeverity;
-  readonly targetFeature?: string;
-  readonly message: string;
-  readonly sourceBounds?: {
-    readonly x: number;
-    readonly y: number;
-    readonly width: number;
-    readonly height: number;
-  };
-}
+export type CompatibilityImpact = z.infer<typeof compatibilityImpactSchema>;
 
 export const compatibilityItemSchema = z
   .object({
     id: studioEntityIdSchema,
-    path: z.string().trim().min(1).max(4_096),
-    sourceFeature: z.string().trim().min(1).max(240),
-    sourceObjectId: z.string().trim().min(1).max(1_024).optional(),
-    disposition: compatibilityDispositionSchema,
-    severity: compatibilitySeveritySchema,
-    targetFeature: z.string().trim().min(1).max(240).optional(),
-    message: z.string().trim().min(1).max(4_096),
-    sourceBounds: z
-      .object({
-        x: z.number().finite(),
-        y: z.number().finite(),
-        width: z.number().finite().positive(),
-        height: z.number().finite().positive(),
-      })
-      .strict()
-      .optional(),
+    path: z.string().trim().min(1).max(2_048),
+    feature: z.string().trim().min(1).max(240),
+    outcome: compatibilityOutcomeSchema,
+    impact: compatibilityImpactSchema,
+    message: z.string().trim().min(1).max(8_192),
+    fallback: z.string().trim().min(1).max(8_192).optional(),
   })
-  .strict()
-  .superRefine((item, context) => {
-    const hasTarget = item.targetFeature !== undefined;
-    if (
-      (item.disposition === "preserved"
-        || item.disposition === "converted"
-        || item.disposition === "approximated"
-        || item.disposition === "rasterized")
-      && !hasTarget
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["targetFeature"],
-        message: `${item.disposition} item requires targetFeature`,
-      });
-    }
-    if (item.disposition === "blocked" && item.severity !== "blocker") {
-      context.addIssue({
-        code: "custom",
-        path: ["severity"],
-        message: "blocked item must be a blocker",
-      });
-    }
-    if (item.disposition === "ignored" && item.severity === "info") {
-      context.addIssue({
-        code: "custom",
-        path: ["severity"],
-        message: "ignored content must be at least a warning",
-      });
-    }
-  });
-
-export interface CompatibilitySummary {
-  readonly total: number;
-  readonly preserved: number;
-  readonly converted: number;
-  readonly approximated: number;
-  readonly rasterized: number;
-  readonly ignored: number;
-  readonly opaquePreserved: number;
-  readonly blocked: number;
-}
+  .strict();
+export type CompatibilityItem = z.infer<typeof compatibilityItemSchema>;
 
 export const compatibilitySummarySchema = z
   .object({
     total: z.number().int().nonnegative(),
     preserved: z.number().int().nonnegative(),
     converted: z.number().int().nonnegative(),
-    approximated: z.number().int().nonnegative(),
     rasterized: z.number().int().nonnegative(),
-    ignored: z.number().int().nonnegative(),
-    opaquePreserved: z.number().int().nonnegative(),
-    blocked: z.number().int().nonnegative(),
+    excluded: z.number().int().nonnegative(),
+    unsupported: z.number().int().nonnegative(),
+    blocking: z.number().int().nonnegative(),
+  })
+  .strict();
+export type CompatibilitySummary = z.infer<typeof compatibilitySummarySchema>;
+
+export const compatibilitySourceBlobSchema = z
+  .object({
+    id: studioEntityIdSchema,
+    sha256: sha256Schema,
+    size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    mediaType: z.string().trim().min(1).max(160),
+    role: z.literal("source"),
   })
   .strict();
 
-export interface SourcePreservationManifest {
-  readonly sourceFileName: string;
-  readonly sourceFormat: SourceCreativeFormat;
-  readonly sourceHash: Sha256;
-  readonly sourceSize: number;
-  readonly sourceBlob: BlobRef;
-  readonly immutable: true;
-  readonly importedAt: string;
-}
-
-export const sourcePreservationManifestSchema = z
+export const compatibilitySourceSchema = z
   .object({
     sourceFileName: z.string().trim().min(1).max(1_024),
     sourceFormat: sourceCreativeFormatSchema,
     sourceHash: sha256Schema,
     sourceSize: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-    sourceBlob: blobRefSchema,
+    sourceBlob: compatibilitySourceBlobSchema,
     immutable: z.literal(true),
     importedAt: isoTimestampSchema,
   })
   .strict()
-  .superRefine((manifest, context) => {
-    if (manifest.sourceBlob.role !== "source") {
-      context.addIssue({
-        code: "custom",
-        path: ["sourceBlob", "role"],
-        message: "preserved original must use source blob role",
-      });
-    }
-    if (manifest.sourceBlob.sha256 !== manifest.sourceHash) {
+  .superRefine((source, context) => {
+    if (source.sourceHash !== source.sourceBlob.sha256) {
       context.addIssue({
         code: "custom",
         path: ["sourceBlob", "sha256"],
-        message: "source blob hash must match sourceHash",
+        message: "source blob hash must match source hash",
       });
     }
-    if (manifest.sourceBlob.size !== manifest.sourceSize) {
+    if (source.sourceSize !== source.sourceBlob.size) {
       context.addIssue({
         code: "custom",
         path: ["sourceBlob", "size"],
-        message: "source blob size must match sourceSize",
+        message: "source blob size must match source size",
       });
     }
   });
 
-export interface CompatibilityReport {
-  readonly id: CompatibilityReportId;
-  readonly artifactId?: ArtifactId;
-  readonly source: SourcePreservationManifest;
-  readonly grade: CompatibilityGrade;
-  readonly items: readonly CompatibilityItem[];
-  readonly summary: CompatibilitySummary;
-  readonly requiresApproval: boolean;
-  readonly approvedBy?: UserId;
-  readonly approvedAt?: string;
-  readonly createdAt: string;
-}
+export const compatibilityGradeSchema = z.enum(["A", "B", "C", "D"]);
+export type CompatibilityGrade = z.infer<typeof compatibilityGradeSchema>;
 
 export const compatibilityReportSchema = z
   .object({
     id: studioEntityIdSchema,
     artifactId: studioEntityIdSchema.optional(),
-    source: sourcePreservationManifestSchema,
+    source: compatibilitySourceSchema,
     grade: compatibilityGradeSchema,
-    items: z.array(compatibilityItemSchema).max(1_000_000),
     summary: compatibilitySummarySchema,
+    items: z.array(compatibilityItemSchema).max(1_000_000),
     requiresApproval: z.boolean(),
     approvedBy: studioEntityIdSchema.optional(),
     approvedAt: isoTimestampSchema.optional(),
@@ -229,103 +131,93 @@ export const compatibilityReportSchema = z
   })
   .strict()
   .superRefine((report, context) => {
-    const expectedSummary = summarizeCompatibilityItems(report.items);
-    if (JSON.stringify(expectedSummary) !== JSON.stringify(report.summary)) {
+    if ((report.approvedBy === undefined) !== (report.approvedAt === undefined)) {
       context.addIssue({
         code: "custom",
-        path: ["summary"],
-        message: "compatibility summary does not match item dispositions",
+        path: ["approvedAt"],
+        message: "approvedBy and approvedAt must be supplied together",
       });
     }
-    const safestGrade = deriveCompatibilityGrade(report.items);
-    if (gradeRisk(report.grade) < gradeRisk(safestGrade)) {
-      context.addIssue({
-        code: "custom",
-        path: ["grade"],
-        message: `grade ${report.grade} overclaims item fidelity; expected ${safestGrade}`,
-      });
-    }
-    const requiresApproval = report.items.some((item) =>
-      item.disposition !== "preserved" || item.severity === "blocker",
-    );
-    if (report.requiresApproval !== requiresApproval) {
+    if (report.approvedBy !== undefined && !report.requiresApproval) {
       context.addIssue({
         code: "custom",
         path: ["requiresApproval"],
-        message: "approval requirement must reflect all non-preserved items",
-      });
-    }
-    const approved = report.approvedBy !== undefined || report.approvedAt !== undefined;
-    if (approved && (report.approvedBy === undefined || report.approvedAt === undefined)) {
-      context.addIssue({
-        code: "custom",
-        path: ["approvedAt"],
-        message: "approval actor and timestamp must be stored together",
-      });
-    }
-    if (!report.requiresApproval && approved) {
-      context.addIssue({
-        code: "custom",
-        path: ["approvedAt"],
-        message: "lossless report does not require an approval record",
+        message: "approval metadata is only valid for reports requiring approval",
       });
     }
   });
+export type CompatibilityReport = z.infer<typeof compatibilityReportSchema>;
 
-const DISPOSITIONS: readonly CompatibilityDisposition[] = [
-  "preserved",
-  "converted",
-  "approximated",
-  "rasterized",
-  "ignored",
-  "opaque-preserved",
-  "blocked",
-];
+export const createCompatibilityReportInputSchema = z
+  .object({
+    id: studioEntityIdSchema,
+    artifactId: studioEntityIdSchema.optional(),
+    source: compatibilitySourceSchema,
+    items: z.array(compatibilityItemSchema).max(1_000_000),
+    createdAt: isoTimestampSchema,
+  })
+  .strict();
+export type CreateCompatibilityReportInput = z.infer<
+  typeof createCompatibilityReportInputSchema
+>;
 
-export function summarizeCompatibilityItems(
-  items: readonly CompatibilityItem[],
-): CompatibilitySummary {
-  const count = new Map<CompatibilityDisposition, number>(
-    DISPOSITIONS.map((disposition) => [disposition, 0]),
-  );
-  for (const item of items) count.set(item.disposition, (count.get(item.disposition) ?? 0) + 1);
-  return {
+function summarize(items: readonly CompatibilityItem[]): CompatibilitySummary {
+  const summary: CompatibilitySummary = {
     total: items.length,
-    preserved: count.get("preserved") ?? 0,
-    converted: count.get("converted") ?? 0,
-    approximated: count.get("approximated") ?? 0,
-    rasterized: count.get("rasterized") ?? 0,
-    ignored: count.get("ignored") ?? 0,
-    opaquePreserved: count.get("opaque-preserved") ?? 0,
-    blocked: count.get("blocked") ?? 0,
+    preserved: 0,
+    converted: 0,
+    rasterized: 0,
+    excluded: 0,
+    unsupported: 0,
+    blocking: 0,
   };
+  for (const item of items) {
+    summary[item.outcome] += 1;
+    if (item.impact === "blocking") summary.blocking += 1;
+  }
+  return compatibilitySummarySchema.parse(summary);
 }
 
-export function deriveCompatibilityGrade(
+function gradeCompatibility(
   items: readonly CompatibilityItem[],
 ): CompatibilityGrade {
-  if (items.some((item) => item.disposition === "blocked" || item.disposition === "opaque-preserved")) return "D";
-  if (items.some((item) => item.disposition === "rasterized" || item.disposition === "ignored")) return "C";
-  if (items.some((item) => item.disposition === "converted" || item.disposition === "approximated")) return "B";
+  if (
+    items.some(
+      (item) =>
+        item.impact === "blocking"
+        || item.outcome === "unsupported"
+        || item.outcome === "excluded",
+    )
+  ) {
+    return "D";
+  }
+  if (
+    items.some(
+      (item) => item.impact === "major" || item.outcome === "rasterized",
+    )
+  ) {
+    return "C";
+  }
+  if (
+    items.some(
+      (item) => item.impact === "minor" || item.outcome === "converted",
+    )
+  ) {
+    return "B";
+  }
   return "A";
 }
 
-function gradeRisk(grade: CompatibilityGrade): number {
-  return { A: 0, B: 1, C: 2, D: 3 }[grade];
-}
-
 export function createCompatibilityReport(
-  input: Omit<CompatibilityReport, "grade" | "summary" | "requiresApproval">,
+  rawInput: CreateCompatibilityReportInput,
 ): CompatibilityReport {
-  const grade = deriveCompatibilityGrade(input.items);
-  const summary = summarizeCompatibilityItems(input.items);
-  const requiresApproval = input.items.some((item) =>
-    item.disposition !== "preserved" || item.severity === "blocker",
-  );
+  const input = createCompatibilityReportInputSchema.parse(rawInput);
+  const summary = summarize(input.items);
+  const grade = gradeCompatibility(input.items);
   return compatibilityReportSchema.parse({
     ...input,
     grade,
     summary,
-    requiresApproval,
-  }) as unknown as CompatibilityReport;
+    requiresApproval: grade !== "A",
+  });
 }
