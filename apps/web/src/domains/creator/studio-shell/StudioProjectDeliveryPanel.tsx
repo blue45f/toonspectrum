@@ -308,7 +308,7 @@ export function StudioProjectDeliveryPanel({
       sourceUrl: null,
     }],
     edges: [],
-  }, [documentId]), [documentId, locale]);
+  }, [documentId]), [documentId, l]);
 
   const packagePlan: StudioPublishingPackagePlan | null = useMemo(() => {
     if (!preflight || !state) return null;
