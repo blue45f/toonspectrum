@@ -1,7 +1,6 @@
 import {
   translateCurrentStaticSourceText,
   useBilingual,
-  useBilingualLocalizer,
   type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
