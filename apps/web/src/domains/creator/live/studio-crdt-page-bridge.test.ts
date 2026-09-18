@@ -1773,7 +1773,7 @@ describe("page-owned layer comp synchronization", () => {
       document.upsertPage(studioPageToCrdtPage(page));
       const before = document.encodeStateAsUpdate();
       expect(() => document.upsertPage(studioPageToCrdtPage({ ...page, layerComps: [comp, comp] })))
-        .toThrow(/콤프/u);
+        .toThrow("페이지 레이어 보기 정보가 올바르지 않습니다.");
       const oversized = Array.from({ length: 4 }, (_, index) => ({ ...comp, id: `comp-${index}`, notes: "가".repeat(1000) }));
       expect(() => document.upsertPage(studioPageToCrdtPage({ ...page, layerComps: oversized })))
         .toThrow(/8KiB/u);
