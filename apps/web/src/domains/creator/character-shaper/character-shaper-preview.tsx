@@ -671,15 +671,17 @@ function HairArt({
         <ellipse cx={47.5} cy={50} rx={2} ry={2.6} />
       </g>
       <path d="M36.5 60 q3.5 2.4 7 0" fill="none" stroke={INK} strokeLinecap="round" strokeWidth={1.2} />
-      <g fill={hairFill} stroke={outline} strokeLinejoin="round" strokeWidth={1.1}>
-        {bangs.map((d) => <path key={d} d={d} />)}
-        {style === "hime" ? (
-          <>
-            <path d="M18 42 L26 40 L26 74 L18 74 Z" />
-            <path d="M54 40 L62 42 L62 74 L54 74 Z" />
-          </>
-        ) : null}
-      </g>
+      {style !== "none" ? (
+        <g data-character-hair-front="true" fill={hairFill} stroke={outline} strokeLinejoin="round" strokeWidth={1.1}>
+          {bangs.map((d) => <path key={d} d={d} />)}
+          {style === "hime" ? (
+            <>
+              <path d="M18 42 L26 40 L26 74 L18 74 Z" />
+              <path d="M54 40 L62 42 L62 74 L54 74 Z" />
+            </>
+          ) : null}
+        </g>
+      ) : null}
       {style !== "none" ? (
         <path d="M30 24 C34 20 46 19 51 22" fill="none" opacity={0.35} stroke={selected ? ACCENT : PAPER} strokeLinecap="round" strokeWidth={2.4} />
       ) : null}

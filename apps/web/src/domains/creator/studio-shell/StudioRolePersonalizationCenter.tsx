@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   Bell,
   Bot,
   BriefcaseBusiness,
@@ -19,6 +20,8 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation } from "react-router-dom";
+
+import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
 
 import {
   batchPublicCreatorRoleProfiles,
@@ -49,6 +52,7 @@ import {
   creatorRoleChecklist,
   creatorRoleNotificationSettings,
   creatorRoleStudioWorkspace,
+  creatorWorkspaceStudioUiMode,
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
@@ -61,6 +65,7 @@ import {
   type PublicCreatorRoleCandidate,
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
+import { creatorWorkItemLaunch } from "@/shared/lib/creator-role-experience";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -68,7 +73,20 @@ import {
   type ProductionWorkspace,
 } from "../studio-production/studio-production-workspace";
 import { loadStudioServerProductionWorkspace } from "../studio-production/studio-production-server-client";
+import {
+  creatorProductionAssignmentIdsForUser,
+  creatorRequiredProductionRoles,
+  rankCreatorProductionWork,
+} from "../production-hub/creator-role-production-work";
+import { getProductionProjectByWork } from "../production-hub/production-api";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioRolePersonalizationCenter", ko, en);
 
 const FEATURED_ONBOARDING_ROLES: readonly CreatorRoleId[] = [
   "story",
@@ -76,18 +94,25 @@ const FEATURED_ONBOARDING_ROLES: readonly CreatorRoleId[] = [
   "assistant",
   "planner",
   "producer",
+  "educator",
   "creator",
 ];
 
 const USAGE_GOAL_LABELS: Readonly<
   Record<CreatorRoleUsageGoal, { readonly ko: string; readonly en: string }>
 > = {
+  learning: { ko: "웹툰 제작 배우기", en: "Learn webtoon production" },
+  "first-project": { ko: "첫 작품 만들기", en: "Create my first project" },
   "personal-project": { ko: "개인 작품 제작", en: "Personal project" },
+  serialization: { ko: "연재 작품 제작", en: "Serialized production" },
+  "drawing-practice": { ko: "그림·작화 연습", en: "Drawing practice" },
+  "story-writing": { ko: "스토리·대본 집필", en: "Story writing" },
+  "character-building": { ko: "캐릭터 제작", en: "Character creation" },
   "team-production": { ko: "팀 프로젝트 참여", en: "Team production" },
-  serialization: { ko: "연재 작품 관리", en: "Serialization" },
-  outsourcing: { ko: "외주 작업", en: "Freelance work" },
   portfolio: { ko: "포트폴리오 제작", en: "Portfolio" },
   "studio-management": { ko: "제작사·스튜디오 운영", en: "Studio management" },
+  education: { ko: "학생 교육·수업", en: "Teaching & education" },
+  outsourcing: { ko: "외주 작업", en: "Freelance work" },
 };
 
 const NOTIFICATION_LABELS: Readonly<
@@ -130,8 +155,8 @@ const PRODUCTION_ROLE_LABELS: Readonly<Record<CreatorProductionRole, string>> = 
   publisher: "게시",
 };
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
 }
 
 function Card({
@@ -147,6 +172,7 @@ function Card({
   readonly action?: ReactNode;
   readonly className?: string;
 }) {
+  useBilingualI18nRevision();
   return (
     <section className={cn("rounded-2xl border border-line bg-card p-4", className)}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -174,6 +200,7 @@ function ToggleChip({
   readonly children: ReactNode;
   readonly onClick: () => void;
 }) {
+  useBilingualI18nRevision();
   return (
     <button
       type="button"
@@ -213,7 +240,7 @@ function studioWorkspaceHref(
     preference.workspacePreset
       ?? creatorRoleStudioWorkspace(preference.activeRole),
   );
-  params.set("uiMode", "standard");
+  params.set("uiMode", creatorWorkspaceStudioUiMode(preference.workspaceMode));
   if (projectKey !== "draft" && projectKey !== GLOBAL_CREATOR_ROLE_WORKSPACE_KEY) {
     params.set("scope", projectKey);
   }
@@ -238,6 +265,7 @@ export function StudioRolePersonalizationCenter({
 }: {
   readonly locale: CreatorRoleLocale;
 }) {
+  useBilingualI18nRevision();
   const { status } = useSession();
   const location = useLocation();
   const projectKey = useMemo(
@@ -263,6 +291,8 @@ export function StudioRolePersonalizationCenter({
   });
   const [onboardingSaving, setOnboardingSaving] = useState(false);
   const [productionWorkspace, setProductionWorkspace] = useState<ProductionWorkspace | null>(null);
+  const [productionAggregate, setProductionAggregate] = useState<ProductionProjectAggregate | null>(null);
+  const [productionProjectId, setProductionProjectId] = useState<string | null>(null);
   const [productionLoading, setProductionLoading] = useState(false);
   const [productionError, setProductionError] = useState<string | null>(null);
   const [team, setTeam] = useState<StudioTeamSnapshot | null>(null);
@@ -275,13 +305,16 @@ export function StudioRolePersonalizationCenter({
   const [directoryLoading, setDirectoryLoading] = useState(false);
   const [directoryError, setDirectoryError] = useState<string | null>(null);
 
+  const workspaceSyncEnabled = status === "authenticated";
   const globalWorkspace = useCreatorRoleWorkspace(
     GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
     profile?.creatorRoleProfile,
+    workspaceSyncEnabled,
   );
   const projectWorkspace = useCreatorRoleWorkspace(
     projectKey,
     profile?.creatorRoleProfile,
+    workspaceSyncEnabled,
   );
 
   useEffect(() => {
@@ -321,31 +354,55 @@ export function StudioRolePersonalizationCenter({
   }, [locale, status]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated") {
+      setProductionWorkspace(null);
+      setProductionAggregate(null);
+      setProductionProjectId(null);
+      setProductionLoading(false);
+      setProductionError(null);
+      return;
+    }
     let alive = true;
     const controller = new AbortController();
     setProductionLoading(true);
     setProductionError(null);
-    const request = projectKey.startsWith("work:")
-      ? loadStudioServerProductionWorkspace(projectKey.slice(5), controller.signal)
-        .then((snapshot) => snapshot.document)
-      : projectKey === "draft" || projectKey.startsWith("remix:")
-        ? loadStudioProductionWorkspace(projectKey)
-        : Promise.resolve(null);
-    request
-      .then((workspace) => {
+    setProductionWorkspace(null);
+    setProductionAggregate(null);
+    setProductionProjectId(null);
+    void (async () => {
+      try {
+        if (projectKey.startsWith("work:")) {
+          const workId = projectKey.slice(5);
+          try {
+            const record = await getProductionProjectByWork(workId);
+            if (!alive) return;
+            setProductionAggregate(record.aggregate);
+            setProductionProjectId(record.aggregate.projectId);
+            setProductionWorkspace(null);
+            return;
+          } catch {
+            const snapshot = await loadStudioServerProductionWorkspace(workId, controller.signal);
+            if (!alive) return;
+            setProductionWorkspace(snapshot.document);
+            return;
+          }
+        }
+        const workspace = projectKey === "draft" || projectKey.startsWith("remix:")
+          ? await loadStudioProductionWorkspace(projectKey)
+          : null;
         if (alive) setProductionWorkspace(workspace);
-      })
-      .catch((cause: unknown) => {
+      } catch (cause: unknown) {
         if (!alive || controller.signal.aborted) return;
         setProductionWorkspace(null);
+        setProductionAggregate(null);
+        setProductionProjectId(null);
         setProductionError(cause instanceof Error
           ? cause.message
           : localized(locale, "제작 업무를 불러오지 못했습니다.", "Could not load production work."));
-      })
-      .finally(() => {
+      } finally {
         if (alive) setProductionLoading(false);
-      });
+      }
+    })();
     return () => {
       alive = false;
       controller.abort();
@@ -422,33 +479,57 @@ export function StudioRolePersonalizationCenter({
   const checklist = creatorRoleChecklist(activeRole);
   const aiTools = creatorRoleAiTools(activeRole);
   const notifications = creatorRoleNotificationSettings(activeRole, projectDocument);
-  const workQueue = productionWorkspace
-    ? rankCreatorRoleWork(productionWorkspace, {
+  const workQueue = productionAggregate
+    ? rankCreatorProductionWork(productionAggregate, {
         userId: profile.id,
-        displayName: profile.name,
         activeRole,
         limit: 12,
       })
-    : [];
+    : productionWorkspace
+      ? rankCreatorRoleWork(productionWorkspace, {
+          userId: profile.id,
+          displayName: profile.name,
+          activeRole,
+          limit: 12,
+        })
+      : [];
+  const modernAssignmentIds = productionAggregate
+    ? creatorProductionAssignmentIdsForUser(productionAggregate, profile.id)
+    : new Set<string>();
   const currentAssignments = productionWorkspace?.roleAssignments.filter((assignment) => (
     assignment.memberId === profile.id
     || assignment.displayName.trim().toLocaleLowerCase()
       === (profile.name ?? "").trim().toLocaleLowerCase()
   )) ?? [];
   const currentAssignmentIds = new Set(currentAssignments.map((assignment) => assignment.id));
-  const assignedOpenTasks = productionWorkspace?.tasks.filter((task) => (
-    task.status !== "done"
-    && (task.assigneeIds ?? []).some((id) => currentAssignmentIds.has(id))
-  )).length ?? 0;
-  const unassignedTasks = productionWorkspace?.tasks.filter((task) => (
-    task.status !== "done" && (task.assigneeIds ?? []).length === 0
-  )).length ?? 0;
-  const requiredRoles = productionWorkspace
-    ? [...new Set(productionWorkspace.tasks
-        .filter((task) => task.status !== "done" && (task.assigneeIds ?? []).length === 0)
-        .map((task) => task.role)
-        .filter((role): role is CreatorProductionRole => role !== null))]
-    : [];
+  const assignedOpenTasks = productionAggregate
+    ? productionAggregate.tasks.filter((task) => (
+        !["done", "cancelled", "out-of-scope"].includes(task.status)
+        && (
+          task.assignmentIds.some((id) => modernAssignmentIds.has(id))
+          || task.reviewerAssignmentIds.some((id) => modernAssignmentIds.has(id))
+        )
+      )).length
+    : productionWorkspace?.tasks.filter((task) => (
+        task.status !== "done"
+        && (task.assigneeIds ?? []).some((id) => currentAssignmentIds.has(id))
+      )).length ?? 0;
+  const unassignedTasks = productionAggregate
+    ? productionAggregate.tasks.filter((task) => (
+        !["done", "cancelled", "out-of-scope"].includes(task.status)
+        && task.assignmentIds.length === 0
+      )).length
+    : productionWorkspace?.tasks.filter((task) => (
+        task.status !== "done" && (task.assigneeIds ?? []).length === 0
+      )).length ?? 0;
+  const requiredRoles = productionAggregate
+    ? creatorRequiredProductionRoles(productionAggregate)
+    : productionWorkspace
+      ? [...new Set(productionWorkspace.tasks
+          .filter((task) => task.status !== "done" && (task.assigneeIds ?? []).length === 0)
+          .map((task) => task.role)
+          .filter((role): role is CreatorProductionRole => role !== null))]
+      : [];
   const teamRecommendations = recommendCreatorTeamRoles(
     teamProfiles,
     requiredRoles.length > 0 ? requiredRoles : undefined,
@@ -467,6 +548,15 @@ export function StudioRolePersonalizationCenter({
   ) => {
     await projectWorkspace.save(normalizeCreatorRoleWorkspacePreference({
       ...projectDocument,
+      ...patch,
+    }));
+  };
+
+  const saveGlobalPatch = async (
+    patch: Partial<CreatorRoleWorkspacePreference>,
+  ) => {
+    await globalWorkspace.save(normalizeCreatorRoleWorkspacePreference({
+      ...globalDocument,
       ...patch,
     }));
   };
@@ -633,7 +723,7 @@ export function StudioRolePersonalizationCenter({
                     ? "border-good/30 bg-good/10 text-good"
                     : "border-line bg-panel",
               )}>
-                {locale === "ko" ? label : ["Role", "Specialties", "Goals", "Privacy"][index]}
+                {bi(label, ["Role", "Specialties", "Goals", "Privacy"][index])}
               </li>
             ))}
           </ol>
@@ -716,7 +806,7 @@ export function StudioRolePersonalizationCenter({
                       : [...current, goal]
                   ))}
                 >
-                  {USAGE_GOAL_LABELS[goal][locale]}
+                  {bi((USAGE_GOAL_LABELS[goal]).ko, (USAGE_GOAL_LABELS[goal]).en)}
                 </ToggleChip>
               ))}
             </div>
@@ -952,7 +1042,7 @@ export function StudioRolePersonalizationCenter({
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {item.reasons.map((reason) => (
                           <span key={reason} className="rounded-full border border-line px-2 py-0.5 text-[0.65rem] font-semibold text-fg-2">
-                            {WORK_REASON_LABELS[reason][locale]}
+                            {bi((WORK_REASON_LABELS[reason]).ko, (WORK_REASON_LABELS[reason]).en)}
                           </span>
                         ))}
                       </div>
@@ -961,11 +1051,24 @@ export function StudioRolePersonalizationCenter({
                       {item.productionRole ? PRODUCTION_ROLE_LABELS[item.productionRole] : item.kind}
                     </span>
                   </div>
-                  {item.due ? (
-                    <p className="mt-2 flex items-center gap-1 text-[0.7rem] text-fg-3">
-                      <Clock3 size={12} aria-hidden="true" /> {item.due}
-                    </p>
-                  ) : null}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+                    {item.due ? (
+                      <p className="flex items-center gap-1 text-[0.7rem] text-fg-3">
+                        <Clock3 size={12} aria-hidden="true" /> {item.due}
+                      </p>
+                    ) : <span />}
+                    <Link
+                      href={creatorWorkItemLaunch(item, { activeRole, projectKey, productionProjectId }).href}
+                      className={buttonClass({ variant: "quiet", size: "sm", className: "gap-1.5" })}
+                    >
+                      {localized(
+                        locale,
+                        creatorWorkItemLaunch(item, { activeRole, projectKey, productionProjectId }).labelKo,
+                        creatorWorkItemLaunch(item, { activeRole, projectKey, productionProjectId }).labelEn,
+                      )}
+                      <ArrowRight size={13} aria-hidden="true" />
+                    </Link>
+                  </div>
                 </article>
               ))}
             </div>
@@ -1042,7 +1145,7 @@ export function StudioRolePersonalizationCenter({
                   },
                 })}
               >
-                {NOTIFICATION_LABELS[event][locale]}
+                {bi((NOTIFICATION_LABELS[event]).ko, (NOTIFICATION_LABELS[event]).en)}
               </ToggleChip>
             ))}
           </div>
@@ -1067,6 +1170,50 @@ export function StudioRolePersonalizationCenter({
           </div>
         </Card>
       </div>
+
+      <Card
+        title={localized(locale, "기본 작업환경 개인화", "Default workspace personalization")}
+        description={localized(locale, "활동 목적과 화면 밀도는 기본값으로만 사용되며 프로젝트 역할과 권한을 변경하지 않습니다.", "Goals and workspace density are defaults only and never change project roles or permissions.")}
+        action={<Settings2 className="size-4 text-accent" aria-hidden="true" />}
+      >
+        <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+          <label className="text-xs font-bold text-fg-2">
+            {localized(locale, "작업 화면", "Workspace mode")}
+            <select
+              value={globalDocument.workspaceMode}
+              onChange={(event) => void saveGlobalPatch({
+                workspaceMode: event.currentTarget.value as CreatorRoleWorkspacePreference["workspaceMode"],
+              })}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+            >
+              <option value="guided">Guided · {localized(locale, "안내 중심", "more guidance")}</option>
+              <option value="creator">Creator · {localized(locale, "균형형", "balanced")}</option>
+              <option value="production">Production · {localized(locale, "고밀도", "high density")}</option>
+            </select>
+            <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
+              {localized(locale, "Studio를 열 때 Guided/Creator는 단순 화면, Production은 전체 패널 밀도로 연결됩니다.", "Guided and Creator open a simplified Studio layout, while Production opens the full-density layout.")}
+            </span>
+          </label>
+          <div>
+            <p className="text-xs font-bold text-fg-2">{localized(locale, "주요 사용 목적", "Primary goals")}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {CREATOR_ROLE_USAGE_GOALS.map((goal) => (
+                <ToggleChip
+                  key={goal}
+                  selected={globalDocument.usageGoals.includes(goal)}
+                  onClick={() => void saveGlobalPatch({
+                    usageGoals: globalDocument.usageGoals.includes(goal)
+                      ? globalDocument.usageGoals.filter((entry) => entry !== goal)
+                      : [...globalDocument.usageGoals, goal],
+                  })}
+                >
+                  {bi((USAGE_GOAL_LABELS[goal]).ko, (USAGE_GOAL_LABELS[goal]).en)}
+                </ToggleChip>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <details className="rounded-2xl border border-line bg-card p-4">
         <summary className="cursor-pointer list-none text-sm font-black text-fg">

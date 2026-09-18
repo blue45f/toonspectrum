@@ -15,6 +15,7 @@ import { FortuneStoryPortal, FortuneJourney } from "./FortuneStoryPortal";
 import { FortuneInteractiveDeck } from "./FortuneInteractiveDeck";
 import { FortuneSceneArt } from "./FortuneSceneArt";
 import { fortuneSceneTheme } from "./fortune-cinematic-model";
+import { FortuneAmbientLayer, FortuneExperienceArt } from "./FortuneVisuals";
 import "./fortune-observatory.css";
 import "./fortune-cinematic.css";
 
@@ -54,12 +55,13 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
   };
   const visible = FORTUNE_EXPERIENCES.filter((item) => (group === "전체" || item.group === group) && (!favoritesOnly || preferences.favorites.includes(item.id)) && `${item.title} ${item.subtitle} ${item.tag} ${item.group}`.includes(search.trim()));
   if (requested === "character") return <div className="fortune-observatory fo-legacy"><button type="button" className="fo-button" onClick={() => navigate("")}><ArrowLeft size={16} />운세 관측소로</button><p className="fo-safety">{FORTUNE_DISCLAIMER}</p>{characterContent}</div>;
-  return <div className="fortune-observatory" data-fortune-experience="cinematic-v1">
+  return <div className="fortune-observatory" data-fortune-experience="cinematic-v2">
+    <FortuneAmbientLayer theme={selected ? fortuneSceneTheme(selected.id) : "violet"} />
     <FortuneStoryPortal onNavigate={navigate} compact={Boolean(selected)} cast={cast} onCastChange={changeCast} />
     <p className="fo-safety">{FORTUNE_DISCLAIMER}</p>
     {requested && !selected && <p role="status" className="fo-help">알 수 없는 콘텐츠 주소입니다. 아래에서 원하는 운세를 선택해 주세요.</p>}
-    {selected && <section className="fo-workbench" id="fortune-workbench" data-theme={fortuneSceneTheme(selected.id)} aria-labelledby="fortune-work-title">
-      <div className="fo-work-head"><div><p className="fo-eyebrow">{selected.group} · {selected.tag}</p><h2 id="fortune-work-title" ref={workHeading} tabIndex={-1}>{selected.glyph} {selected.title}</h2><p>{selected.subtitle}</p></div><button type="button" className="fo-icon-button" onClick={() => navigate("")} aria-label="콘텐츠 선택으로 돌아가기"><ArrowLeft size={19} /></button></div>
+    {selected && <section className="fo-workbench" id="fortune-workbench" data-theme={fortuneSceneTheme(selected.id)} data-running={running} aria-labelledby="fortune-work-title">
+      <div className="fo-work-head"><div className="fo-work-copy"><p className="fo-eyebrow">{selected.group} · {selected.tag}</p><h2 id="fortune-work-title" ref={workHeading} tabIndex={-1}>{selected.glyph} {selected.title}</h2><p>{selected.subtitle}</p></div><div className="fo-work-visual"><FortuneExperienceArt experience={selected} compact /></div><button type="button" className="fo-icon-button" onClick={() => navigate("")} aria-label="콘텐츠 선택으로 돌아가기"><ArrowLeft size={19} /></button></div>
       <FortuneJourney hasReading={Boolean(reading)} running={running} />
       {!reading && <ComicDialogue cast={cast}>{comicCast(cast).intro} {selected.title}의 단서를 준비하고, 아래 버튼으로 첫 컷을 열어 주세요.</ComicDialogue>}
       <form onSubmit={run} className="fo-form" aria-busy={running}>
@@ -76,6 +78,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
         </div>
         {selected.id.startsWith("tarot") && <FortuneInteractiveDeck key={selected.id} value={pick} onChange={(value) => { setPick(value); invalidateReading(); }} three={selected.id === "tarot-three"} />}
         <div className="fo-form-actions"><button className="fo-button fo-primary" type="submit" disabled={running}>{running ? "해석을 펼치고 있어요…" : `${selected.title} 열기`}<ArrowRight size={16} /></button><button type="button" className="fo-button" onClick={clearInputs}>입력·결과 지우기</button><span>추가 요금 · API 키 · 가입 없이</span></div>
+        {running && <div className="fo-analysis-sequence" role="status" aria-live="polite"><div className="fo-analysis-sigil"><span>{selected.glyph}</span><i /></div><div><strong>당신의 단서를 한 장면씩 읽고 있어요</strong><p>입력 확인 → 상징 계산 → 관계 연결 → 해석 구성</p><div className="fo-analysis-track"><i /></div></div></div>}
         {error && <p role="alert" className="fo-error">{error}</p>}
       </form>
       {reading && <div className="fo-result-wrap"><div className="fo-result-toolbar"><h2 ref={resultHeading} tabIndex={-1}>나의 해석 리포트</h2><button type="button" className="fo-button" onClick={saveReading}><BookmarkPlus size={16} />해석 보관</button></div><p className="fo-help">‘해석 보관’을 누를 때만 저장합니다. 생일·시간·꿈 원문은 저장하지 않아요.</p><FortuneReadingView key={`${reading.id}-${reading.generatedFor}-${sequence.current}`} reading={reading} cast={cast} onCastChange={changeCast} /></div>}
@@ -84,7 +87,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
       <div className="fo-search-row"><label className="fo-search"><Search size={18} /><span className="sr-only">운세 콘텐츠 검색</span><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="만세력, 궁합, 타로…" type="search" /></label><button type="button" className="fo-button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(!favoritesOnly)}><Star size={16} />즐겨찾기 {preferences.favorites.length}</button></div>
       <div className="fo-filters" aria-label="콘텐츠 카테고리">{FORTUNE_GROUPS.map((name) => <button type="button" key={name} aria-pressed={group === name} onClick={() => setGroup(name)}>{name}</button>)}</div>
       <p className="fo-count" role="status">{visible.length}개의 콘텐츠</p>
-      <div className="fo-catalog">{visible.map((item, i) => <article key={item.id} className="fo-experience" data-group={item.group} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}><button type="button" className="fo-experience-open" onClick={() => navigate(item.id)} aria-label={`${item.title} 살펴보기`}><span className="fo-card-top"><span className="fo-glyph" aria-hidden="true">{item.glyph}</span><small>{item.tag}</small></span><h3>{item.title}</h3><p>{item.subtitle}</p><span className="fo-card-bottom">{item.group}<ArrowRight size={16} /></span></button><button type="button" className="fo-favorite" onClick={() => favorite(item.id)} aria-pressed={preferences.favorites.includes(item.id)} aria-label={`${item.title} 즐겨찾기`}><Star size={16} fill={preferences.favorites.includes(item.id) ? "currentColor" : "none"} /></button></article>)}</div>
+      <div className="fo-catalog">{visible.map((item, i) => <article key={item.id} className="fo-experience" data-group={item.group} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}><button type="button" className="fo-experience-open" onClick={() => navigate(item.id)} aria-label={`${item.title} 살펴보기`}><span className="fo-card-top"><span className="fo-glyph" aria-hidden="true">{item.glyph}</span><small>{item.tag}</small></span><FortuneExperienceArt experience={item} compact /><h3>{item.title}</h3><p>{item.subtitle}</p><span className="fo-card-bottom">{item.group}<ArrowRight size={16} /></span></button><button type="button" className="fo-favorite" onClick={() => favorite(item.id)} aria-pressed={preferences.favorites.includes(item.id)} aria-label={`${item.title} 즐겨찾기`}><Star size={16} fill={preferences.favorites.includes(item.id) ? "currentColor" : "none"} /></button></article>)}</div>
       {!visible.length && <div className="fo-empty"><Sparkles size={28} /><h3>아직 찾지 못한 이야기</h3><p>다른 검색어나 카테고리로 살펴보세요.</p><button className="fo-button" type="button" onClick={() => { setSearch(""); setGroup("전체"); setFavoritesOnly(false); }}>전체 콘텐츠 보기</button></div>}
     </section>
     {notebookOpen && <section className="fo-notebook" id="fo-notebook" tabIndex={-1} aria-label="나의 운세 보관함"><div className="fo-discover-head"><div><h2>나의 보관함</h2><p>이 브라우저에 저장한 해석 텍스트 · 최근 12개</p></div><button type="button" className="fo-button" onClick={clearSaved}><Trash2 size={15} />즐겨찾기·보관함 비우기</button></div>{preferences.notebook.length ? preferences.notebook.map((entry) => <details key={entry.id}><summary>{entry.title} · {entry.savedAt}</summary><pre>{entry.text}</pre><button type="button" className="fo-button" onClick={() => persist({ ...preferences, notebook: preferences.notebook.filter((n) => n.id !== entry.id) })}>이 기록 삭제</button></details>) : <p className="fo-help">결과에서 ‘해석 보관’을 누르면 이곳에 모입니다. 저장은 선택이며 언제든 지울 수 있어요.</p>}</section>}

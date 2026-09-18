@@ -22,6 +22,13 @@ import {
   type EngineeringStatus,
 } from "./engineering-story-content";
 import { useEngineeringLocale } from "./use-engineering-locale";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("EngineeringStoryUi", ko, en);
 
 const NAV_ITEMS = [
   {
@@ -90,13 +97,14 @@ const STATUS_ICONS = {
 
 export function EngineeringStatusBadge({
   status,
-  locale,
+  locale: _locale,
   className,
 }: {
   readonly status: EngineeringStatus;
   readonly locale: EngineeringLocale;
   readonly className?: string;
 }) {
+  useBilingualI18nRevision();
   const Icon = STATUS_ICONS[status];
   const meta = ENGINEERING_STATUS_META[status];
 
@@ -107,21 +115,22 @@ export function EngineeringStatusBadge({
         STATUS_STYLES[status],
         className,
       )}
-      title={meta.description[locale]}
+      title={bi((meta.description).ko, (meta.description).en)}
     >
       <Icon size={12} aria-hidden="true" />
-      {meta.label[locale]}
+      {bi((meta.label).ko, (meta.label).en)}
     </span>
   );
 }
 
 export function EngineeringStoryNav({ className }: { readonly className?: string }) {
+  useBilingualI18nRevision();
   const pathname = usePathname();
-  const locale = useEngineeringLocale();
+
 
   return (
     <nav
-      aria-label={locale === "ko" ? "기술 스토리 세부 메뉴" : "Engineering story sections"}
+      aria-label={bi("기술 스토리 세부 메뉴", "Engineering story sections")}
       className={cx(
         "rounded-3xl border border-line/70 bg-panel/75 p-2 shadow-sm backdrop-blur-xl",
         className,
@@ -154,7 +163,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
               >
                 <Icon size={15} aria-hidden="true" />
               </span>
-              <span>{item[locale]}</span>
+              <span>{bi((item).ko, (item).en)}</span>
             </Link>
           );
         })}
@@ -174,6 +183,7 @@ export function EngineeringPageIntro({
   readonly description: string;
   readonly aside?: ReactNode;
 }) {
+  useBilingualI18nRevision();
   return (
     <header className="grid gap-7 py-10 sm:py-14 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
       <div>

@@ -23,6 +23,7 @@ import {
   AVATAR_FORGE_HAIR_STYLE_OPTIONS,
   AVATAR_FORGE_PRESETS,
   DEFAULT_AVATAR_FORGE_STATE,
+  applyAvatarForgeHairStyleRecipe,
   createAvatarForgeState,
   sanitizeAvatarForgeState,
   serializeAvatarForgeState,
@@ -293,6 +294,17 @@ export function StudioVrmAvatarForgePanel({
     emit({ ...state, presetId: undefined, hair: { ...state.hair, [key]: value } });
   };
 
+  /**
+   * 헤어 카드/캐릭터 레시피는 사용자가 "겹쳐 얹기"가 아니라 "교체"로 인식한다.
+   * 분리 가능한 원본 헤어가 있을 때는 새 실루엣을 고르는 순간 원본을 자동으로 숨긴다.
+   * 아래 비교 토글을 끄면 언제든 원본과 생성 헤어를 함께 볼 수 있다.
+   */
+  const withAutomaticHairReplacement = (next: AvatarForgeState): AvatarForgeState => (
+    detectedOriginalHairCount > 0
+      ? { ...next, hair: { ...next.hair, replaceOriginal: true } }
+      : next
+  );
+
   const updateAccent = (
     id: AvatarForgeFaceAccentId,
     patch: Partial<NonNullable<AvatarForgeState["faceAccents"]>[number]>
@@ -498,7 +510,7 @@ export function StudioVrmAvatarForgePanel({
                       aria-label={`${preset.label} 스타일 적용: ${preset.hint}`}
                       onClick={() => {
                         setHairStyleChosen(false);
-                        emit(createAvatarForgeState(preset.id));
+                        emit(withAutomaticHairReplacement(createAvatarForgeState(preset.id)));
                       }}
                       className={`group min-h-[10.5rem] overflow-hidden rounded-2xl border text-left transition-[border-color,background-color,transform] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40 ${
                         selected
@@ -543,7 +555,7 @@ export function StudioVrmAvatarForgePanel({
                       disabled={disabled}
                       aria-label={`${variant.label} 베리언트: ${variant.description}`}
                       title={variant.tags.join(" · ")}
-                      onClick={() => emit(previewState)}
+                      onClick={() => emit(withAutomaticHairReplacement(previewState))}
                       className="overflow-hidden rounded-xl border border-line bg-card text-left text-fg transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
                     >
                       <span className="block h-20 overflow-hidden border-b border-line/60 bg-panel/60 px-1">
@@ -688,11 +700,7 @@ export function StudioVrmAvatarForgePanel({
               <div className="grid grid-cols-3 gap-1.5">
                 {AVATAR_FORGE_HAIR_STYLE_OPTIONS.map((option) => {
                   const selected = state.hair.style === option.id;
-                  const previewState = sanitizeAvatarForgeState({
-                    ...state,
-                    presetId: undefined,
-                    hair: { ...state.hair, style: option.id },
-                  });
+                  const previewState = applyAvatarForgeHairStyleRecipe(state, option.id);
                   return (
                     <button
                       key={option.id}
@@ -703,7 +711,9 @@ export function StudioVrmAvatarForgePanel({
                       title={option.hint}
                       onClick={() => {
                         setHairStyleChosen(true);
-                        updateHair("style", option.id);
+                        emit(withAutomaticHairReplacement(
+                          applyAvatarForgeHairStyleRecipe(state, option.id),
+                        ));
                       }}
                       className={`min-h-[7.5rem] overflow-hidden rounded-xl border text-[0.62rem] font-bold transition-colors disabled:opacity-40 ${
                         selected ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised"
@@ -913,11 +923,11 @@ export function StudioVrmAvatarForgePanel({
                 className="size-4 accent-accent pointer-coarse:size-5"
               />
               <label htmlFor={`${controlId}-replace-original`} className="min-w-0 flex-1 cursor-pointer">
-                <span className="block text-[0.68rem] font-bold text-fg-2">분리 가능한 원본 헤어 숨기기</span>
+                <span className="block text-[0.68rem] font-bold text-fg-2">선택한 헤어로 원본 교체</span>
                 <span className="block text-[0.6rem] text-fg-3">
                   {detectedOriginalHairCount > 0
-                    ? `${detectedOriginalHairCount}개 메시를 안전하게 탐지했어요.`
-                    : "이 모델은 머리와 헤어가 한 메시라 원본을 유지합니다."}
+                    ? `새 헤어 선택 시 원본 ${detectedOriginalHairCount}개 메시를 자동으로 숨깁니다. 끄면 겹쳐 비교할 수 있어요.`
+                    : "이 모델은 머리와 헤어가 한 메시라 원본을 안전하게 분리할 수 없습니다."}
                 </span>
               </label>
             </div>

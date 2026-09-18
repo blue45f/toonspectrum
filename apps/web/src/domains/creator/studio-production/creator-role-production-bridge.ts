@@ -18,6 +18,7 @@ const ROLE_RECOMMENDATIONS: Readonly<Record<CreatorRoleId, readonly ProductionRo
   lettering: ["lettering"],
   character: ["lineart"],
   "three-d": ["background"],
+  educator: ["story", "reviewer"],
   assistant: ["lineart"],
   editor: ["reviewer", "director"],
   producer: ["director", "publisher"],

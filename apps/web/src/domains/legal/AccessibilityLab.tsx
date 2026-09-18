@@ -6,8 +6,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
-import { useI18n } from "@/shared/lib/i18n";
+
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("AccessibilityLab", ko, en);
 
 const COPY = {
   ko: {
@@ -52,9 +57,10 @@ const LIMITATIONS = {
 } as const;
 
 export function AccessibilityLab() {
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const copy = COPY[locale];
+  useBilingualI18nRevision();
+
+
+  const copy = bi((COPY).ko, (COPY).en);
   const [textScale, setTextScale] = useState(100);
   const [strongContrast, setStrongContrast] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -140,7 +146,7 @@ export function AccessibilityLab() {
           <div className="min-w-0 flex-1">
             <h2 id="accessibility-limitations-title" className="font-display text-lg font-bold text-fg">{copy.limitationsTitle}</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {LIMITATIONS[locale].map(([title, body]) => (
+              {bi((LIMITATIONS).ko, (LIMITATIONS).en).map(([title, body]) => (
                 <article key={title} className="rounded-2xl border border-line bg-card/75 p-4">
                   <h3 className="text-sm font-bold text-fg">{title}</h3>
                   <p className="mt-2 text-xs leading-6 text-fg-3">{body}</p>
@@ -164,6 +170,7 @@ function PreferenceToggle({
   readonly pressed: boolean;
   readonly onToggle: () => void;
 }) {
+  useBilingualI18nRevision();
   return (
     <button
       type="button"
@@ -172,20 +179,7 @@ function PreferenceToggle({
       className="flex min-h-11 w-full items-center justify-between rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
     >
       {label}
-      <span
-        aria-hidden="true"
-        className={cn(
-          "h-6 w-11 rounded-full border p-0.5 transition",
-          pressed ? "border-accent bg-accent" : "border-line-strong bg-canvas",
-        )}
-      >
-        <span
-          className={cn(
-            "block size-4 rounded-full bg-fg transition-transform",
-            pressed && "translate-x-5 bg-on-accent",
-          )}
-        />
-      </span>
+      <SwitchIndicator checked={pressed} />
     </button>
   );
 }

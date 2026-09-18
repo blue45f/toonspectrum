@@ -261,7 +261,7 @@ export const STUDIO_COMMAND_SOURCES: Readonly<
     // 2026-09-03: 텍스트 ▸ 현지화 QA(넘침·문체·MQM 점수) 추가 (190 → 191).
     // 2026-09-04: 3D ▸ 캐릭터 셰이퍼(프리셋 우선 캐릭터 작업실) 추가 (191 → 192).
     // 2026-09-08: editable recent-stroke correction.
-    // 2026-09-17: 독립 Canvas 메뉴의 규격 가이드 + 플랫폼 새 캔버스 4행 추가 (194 → 199).
+    // 2026-09-17: 독립 Canvas 메뉴의 규격 가이드 + 현재 캔버스 플랫폼 규격 4행 추가 (194 → 199).
     measuredCount: 199,
   },
   "edit-menu": {
@@ -362,14 +362,14 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   // canvas (2) — lifted out of view
   "canvas/canvas-rulers",
   "canvas/perspective-guide",
-  // canvas authoring surfaces — current-document controls plus exact platform canvas creators
+  // canvas authoring surfaces — current-document controls plus exact platform resize actions
   "canvas/canvas-settings",
   "canvas/webtoon-guides",
   "canvas/grid",
-  "canvas/new-webtoon-vertical",
-  "canvas/new-webtoon-naver",
-  "canvas/new-webtoon-kakao",
-  "canvas/new-webtoon-canvas",
+  "canvas/apply-webtoon-vertical",
+  "canvas/apply-webtoon-naver",
+  "canvas/apply-webtoon-kakao",
+  "canvas/apply-webtoon-canvas",
   "canvas/sticky-note",
   // layer (9) — lifted out of edit, insert and view; Mask/Clipping is Wave D's own row
   "layer/image",
@@ -2296,28 +2296,28 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
       origins: [menu("canvas/webtoon-guides")],
     }),
     defineCommand({
-      id: "canvas.new-webtoon-vertical",
-      labels: [ko("범용·고화질 웹툰 새 캔버스", "1080 × 8000px 새 작업을 엽니다."), en("New universal high-resolution webtoon canvas")],
-      aliases: [ours("1080 웹툰"), csp("신규 웹툰")],
-      origins: [menu("canvas/new-webtoon-vertical")],
+      id: "canvas.apply-webtoon-vertical",
+      labels: [ko("현재 캔버스 · 범용·고화질 웹툰", "현재 원고를 1080 × 8000px 비율로 재배치합니다."), en("Apply universal high-resolution webtoon size")],
+      aliases: [ours("1080 웹툰"), csp("웹툰 캔버스")],
+      origins: [menu("canvas/apply-webtoon-vertical")],
     }),
     defineCommand({
-      id: "canvas.new-webtoon-naver",
-      labels: [ko("네이버 새 캔버스", "690 × 8000px 새 작업을 엽니다."), en("New Naver webtoon canvas")],
+      id: "canvas.apply-webtoon-naver",
+      labels: [ko("현재 캔버스 · 네이버", "현재 원고를 690 × 8000px 비율로 재배치합니다."), en("Apply Naver webtoon size")],
       aliases: [ours("네이버 690"), csp("웹툰 원고")],
-      origins: [menu("canvas/new-webtoon-naver")],
+      origins: [menu("canvas/apply-webtoon-naver")],
     }),
     defineCommand({
-      id: "canvas.new-webtoon-kakao",
-      labels: [ko("카카오 새 캔버스", "720 × 8000px 새 작업을 엽니다."), en("New Kakao webtoon canvas")],
+      id: "canvas.apply-webtoon-kakao",
+      labels: [ko("현재 캔버스 · 카카오", "현재 원고를 720 × 8000px 비율로 재배치합니다."), en("Apply Kakao webtoon size")],
       aliases: [ours("카카오 720"), csp("웹툰 원고")],
-      origins: [menu("canvas/new-webtoon-kakao")],
+      origins: [menu("canvas/apply-webtoon-kakao")],
     }),
     defineCommand({
-      id: "canvas.new-webtoon-canvas",
-      labels: [ko("WEBTOON Canvas 새 캔버스", "800 × 8000px 새 작업을 엽니다."), en("New WEBTOON Canvas document")],
+      id: "canvas.apply-webtoon-canvas",
+      labels: [ko("현재 캔버스 · WEBTOON Canvas", "현재 원고를 800 × 8000px 비율로 재배치합니다."), en("Apply WEBTOON Canvas size")],
       aliases: [ours("웹툰 캔버스 800"), csp("웹툰 원고")],
-      origins: [menu("canvas/new-webtoon-canvas")],
+      origins: [menu("canvas/apply-webtoon-canvas")],
     }),
     defineCommand({
       id: "canvas.grid",

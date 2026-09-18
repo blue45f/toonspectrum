@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   PRODUCTION_DEPARTMENTS,  PRODUCTION_ROLE_LABELS,
@@ -910,11 +911,17 @@ export function ProductionRoleWorkspace({
   readonly canEdit: boolean;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTaskId = searchParams.get("task");
   const [view, setView] = useState<WorkspaceView>("workcells");
   const [departmentFilter, setDepartmentFilter] = useState<DepartmentFilter>("lens");
   const [episodeFilter, setEpisodeFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(aggregate.tasks[0]?.id ?? null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
+    aggregate.tasks.some((task) => task.id === requestedTaskId)
+      ? requestedTaskId
+      : aggregate.tasks[0]?.id ?? null,
+  );
   const [at] = useState(() => new Date().toISOString());
   const board = useMemo(() => buildProductionRoleWorkcellBoard({ aggregate, at }), [aggregate, at]);
   const lensDepartmentKeys = LENS_DEPARTMENTS[roleLens];
@@ -948,9 +955,27 @@ export function ProductionRoleWorkspace({
       .includes(queryKey);
   }), [aggregate, departmentFilter, episodeTasks, lensDepartmentKeys, queryKey]);
   useEffect(() => {
+    if (!requestedTaskId) return;
+    const requestedTask = aggregate.tasks.find((task) => task.id === requestedTaskId);
+    if (!requestedTask) return;
+    const department = inferProductionTaskDepartment(requestedTask, aggregate.assignments);
+    setSelectedTaskId(requestedTask.id);
+    setView("workcells");
+    setQuery("");
+    setEpisodeFilter(taskEpisodeId(requestedTask) ?? "all");
+    setDepartmentFilter(department ?? "all");
+  }, [aggregate.assignments, aggregate.tasks, requestedTaskId]);
+  useEffect(() => {
+    if (requestedTaskId && aggregate.tasks.some((task) => task.id === requestedTaskId)) return;
     if (selectedTaskId && visibleTasks.some((task) => task.id === selectedTaskId)) return;
     setSelectedTaskId(visibleTasks[0]?.id ?? null);
-  }, [selectedTaskId, visibleTasks]);
+  }, [aggregate.tasks, requestedTaskId, selectedTaskId, visibleTasks]);
+  const selectTask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    const next = new URLSearchParams(searchParams);
+    next.set("task", taskId);
+    setSearchParams(next, { replace: true });
+  };
   const selectedTask = selectedTaskId
     ? aggregate.tasks.find((task) => task.id === selectedTaskId) ?? null
     : null;
@@ -1094,7 +1119,7 @@ export function ProductionRoleWorkspace({
                 .includes(queryKey);
             })}
             selectedTaskId={selectedTaskId}
-            onSelectTask={setSelectedTaskId}
+            onSelectTask={selectTask}
           />
           {selectedTask && selectedGate ? (
             <TaskInspector
@@ -1153,7 +1178,7 @@ export function ProductionRoleWorkspace({
                             task={task}
                             gate={board.taskGates[task.id]}
                             selected={selectedTaskId === task.id}
-                            onSelect={() => setSelectedTaskId(task.id)}
+                            onSelect={() => selectTask(task.id)}
                           />
                         ))}
                         {tasks.length === 0 ? (

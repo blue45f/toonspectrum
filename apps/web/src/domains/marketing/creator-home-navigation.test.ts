@@ -21,6 +21,7 @@ test("the current all-in-one homepage fragments resolve to readable headings", (
   assert.equal(creatorSectionFromHash("#creator-start")?.headingId, "creator-toolkit-title");
   assert.equal(creatorSectionFromHash("#creator-flow")?.headingId, "creator-process-title");
   assert.equal(creatorSectionFromHash("#creator-principles")?.headingId, "creator-principles-title");
+  assert.equal(creatorSectionFromHash("#creator-principles-title")?.headingId, "creator-principles-title");
   assert.equal(creatorSectionFromHash("#creator-support")?.headingId, "creator-support-title");
 });
 

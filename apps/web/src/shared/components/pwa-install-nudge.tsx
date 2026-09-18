@@ -8,9 +8,16 @@ import {
   requestPwaInstall,
   subscribePwaInstall,
 } from "@/shared/lib/pwa-install-store";
-import { useI18n } from "@/shared/lib/i18n";
+
 
 import "./pwa-install-nudge.css";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("pwa-install-nudge", ko, en);
 
 const INSTALL_NUDGE_SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
 
@@ -24,9 +31,10 @@ function readInstallNudgeDismissal(): boolean {
 }
 
 export function PwaInstallNudge() {
+  useBilingualI18nRevision();
   const { pathname } = useLocation();
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().startsWith("ko") ? "ko" : "en";
+
+
   const pwa = useSyncExternalStore(
     subscribePwaInstall,
     getPwaInstallSnapshot,
@@ -39,13 +47,11 @@ export function PwaInstallNudge() {
 
   if (hideOnMarket || pwa.status !== "available" || dismissed) return null;
 
-  const title = locale === "ko" ? "툰스튜디오를 앱처럼 열어보세요" : "Open ToonStudio like an app";
-  const compactTitle = locale === "ko" ? "툰스튜디오 앱 열기" : "Open ToonStudio";
-  const description = locale === "ko"
-    ? "홈 화면과 앱 목록에서 더 빠르게 창작을 시작할 수 있습니다."
-    : "Launch your creative workspace faster from the home screen or app list.";
-  const action = locale === "ko" ? "설치" : "Install";
-  const close = locale === "ko" ? "설치 안내 닫기" : "Dismiss install prompt";
+  const title = bi("툰스튜디오를 앱처럼 열어보세요", "Open ToonStudio like an app");
+  const compactTitle = bi("툰스튜디오 앱 열기", "Open ToonStudio");
+  const description = bi("홈 화면과 앱 목록에서 더 빠르게 창작을 시작할 수 있습니다.", "Launch your creative workspace faster from the home screen or app list.");
+  const action = bi("설치", "Install");
+  const close = bi("설치 안내 닫기", "Dismiss install prompt");
 
   const dismiss = () => {
     setDismissed(true);

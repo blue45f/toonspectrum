@@ -33,6 +33,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 
 import { LearningReferenceLayout } from "./LearningReferenceLayout";
+import { WebtoonProductionSupportGuide } from "./WebtoonProductionSupportGuide";
 import {
   WEBTOON_APPROVAL_GATES,
   WEBTOON_EPISODE_PIPELINE,
@@ -44,6 +45,15 @@ import {
 } from "./webtoon-production-guide";
 
 type GuideView = "lifecycle" | "episode" | "rolling" | "onboarding";
+
+function guideViewFromLocationHash(): GuideView {
+  if (typeof window === "undefined") return "lifecycle";
+  const hash = window.location.hash;
+  if (hash === "#episode-pipeline" || hash === "#site-production-support" || hash.startsWith("#episode-stage-")) return "episode";
+  if (hash === "#rolling-pipeline") return "rolling";
+  if (hash === "#production-onboarding") return "onboarding";
+  return "lifecycle";
+}
 
 const primaryLinkClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-bold text-on-accent hover:bg-accent-2";
 const secondaryLinkClass = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line px-4 py-2 text-sm font-bold text-fg hover:bg-raised";
@@ -409,7 +419,7 @@ function OnboardingGuide({
 }
 
 export function WebtoonProcessPage() {
-  const [activeView, setActiveView] = useState<GuideView>("lifecycle");
+  const [activeView, setActiveView] = useState<GuideView>(guideViewFromLocationHash);
   const [productionModel, setProductionModel] = useState<WebtoonProductionModelId>("solo");
   const [selection, setSelection] = useState<WebtoonOnboardingSelection>(DEFAULT_WEBTOON_ONBOARDING_SELECTION);
 
@@ -491,7 +501,12 @@ export function WebtoonProcessPage() {
         </nav>
         <div className="mt-8">
           {activeView === "lifecycle" ? <LifecycleGuide /> : null}
-          {activeView === "episode" ? <EpisodePipelineGuide /> : null}
+          {activeView === "episode" ? (
+            <div className="space-y-10">
+              <EpisodePipelineGuide />
+              <WebtoonProductionSupportGuide onStartProject={() => jumpToView("onboarding")} />
+            </div>
+          ) : null}
           {activeView === "rolling" ? <RollingPipelineGuide /> : null}
           {activeView === "onboarding" ? <OnboardingGuide selection={selection} onChange={setSelection} /> : null}
         </div>

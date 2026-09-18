@@ -2,10 +2,11 @@ import { ArrowRight, Box, Brush, Image, Library, ShieldCheck, Store, Type, UserR
 import { motion, useReducedMotion } from "motion/react";
 
 import Link from "@/compat/router-link";
+import { useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
-import "./studio-asset-visual-intro.css";
-
-type Locale = "ko" | "en";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 
 const COPY = {
   ko: {
@@ -42,12 +43,13 @@ const COPY = {
 
 const CHIP_ICONS = [Brush, Image, UserRound, Box, Type, ShieldCheck] as const;
 
-export function StudioAssetVisualIntro({ locale }: { readonly locale: Locale }) {
-  const copy = COPY[locale];
+export function StudioAssetVisualIntro({ locale }: { readonly locale: string }) {
+  const t = useT();
+  const copy = translateParallelBilingualCopy(t, "StudioAssetVisualIntro", COPY);
   const reducedMotion = useReducedMotion();
 
   return (
-    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={locale}>
+    <section className="studio-asset-visual-intro" aria-labelledby="studio-asset-visual-title" lang={language}>
       <div className="studio-asset-visual-intro__hero">
         <motion.figure
           initial={reducedMotion ? false : { opacity: 0, y: 14 }}

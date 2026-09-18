@@ -53,6 +53,13 @@ describe("desktop cloud providers", () => {
             rev: "rev-1",
             server_modified: "2026-09-17T00:00:00.000Z",
             size: 4,
+          }, {
+            ".tag": "file",
+            id: "id:trash-page",
+            path_display: "/ToonStudio/Sync/.toonstudio-trash/batch/page.psd",
+            rev: "trash-rev",
+            server_modified: "2026-09-17T00:00:00.000Z",
+            size: 4,
           }],
           has_more: false,
           cursor: "cursor-1",
@@ -89,16 +96,29 @@ describe("desktop cloud providers", () => {
           size: 5,
         });
       }
-      if (url.endsWith("/files/delete_v2")) {
-        return jsonResponse({ metadata: { ".tag": "deleted" } });
+      if (url.endsWith("/files/move_v2")) {
+        const body = requestJson(init);
+        return jsonResponse({
+          metadata: {
+            ".tag": "file",
+            id: "id:page",
+            path_display: String(body.to_path),
+            rev: "rev-2",
+            server_modified: "2026-09-17T00:01:00.000Z",
+            size: 5,
+          },
+        });
       }
       throw new Error(`unexpected Dropbox request: ${url}`);
     });
     const provider = new DropboxDesktopCloudProvider({
       accessToken: "test-access-token",
       fetchImpl,
+      now: () => Date.parse("2026-09-17T00:02:00.000Z"),
     });
-    const [listed] = await provider.listFiles();
+    const listedFiles = await provider.listFiles();
+    expect(listedFiles).toHaveLength(1);
+    const [listed] = listedFiles;
     expect(listed).toMatchObject({
       id: "id:page",
       relativePath: "page.psd",
@@ -126,8 +146,79 @@ describe("desktop cloud providers", () => {
       file: uploaded,
       expectedVersion: "rev-2",
     });
-    expect(calls.some(({ url }) => url.endsWith("/files/delete_v2"))).toBe(true);
+    const moveCall = calls.find(({ url }) => url.endsWith("/files/move_v2"));
+    expect(requestJson(moveCall?.init)).toMatchObject({
+      from_path: "id:page",
+      to_path: expect.stringContaining(
+        "/ToonStudio/Sync/.toonstudio-trash/20260917000200000-",
+      ),
+      autorename: false,
+    });
+    expect(calls.some(({ url }) => url.endsWith("/files/delete_v2"))).toBe(false);
   });
+  it("restores a Dropbox file when its revision changes during soft delete", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    let moveCount = 0;
+    const fetchImpl = vi.fn<typeof fetch>(async (request, init) => {
+      const url = requestUrl(request);
+      calls.push({ url, init });
+      if (url.endsWith("/files/create_folder_v2")) {
+        return jsonResponse({ metadata: { ".tag": "folder" } });
+      }
+      if (url.endsWith("/files/get_metadata")) {
+        return jsonResponse({
+          ".tag": "file",
+          id: "id:page",
+          path_display: "/ToonStudio/Sync/page.psd",
+          rev: "rev-2",
+          server_modified: "2026-09-17T00:01:00.000Z",
+          size: 5,
+        });
+      }
+      if (url.endsWith("/files/move_v2")) {
+        moveCount += 1;
+        const body = requestJson(init);
+        return jsonResponse({
+          metadata: {
+            ".tag": "file",
+            id: "id:page",
+            path_display: String(body.to_path),
+            rev: "rev-3",
+            server_modified: "2026-09-17T00:03:00.000Z",
+            size: 6,
+          },
+        });
+      }
+      throw new Error(`unexpected Dropbox request: ${url}`);
+    });
+    const provider = new DropboxDesktopCloudProvider({
+      accessToken: "test-access-token",
+      fetchImpl,
+      now: () => Date.parse("2026-09-17T00:02:00.000Z"),
+    });
+
+    await expect(provider.deleteFile({
+      file: {
+        id: "id:page",
+        relativePath: "page.psd",
+        size: 5,
+        version: "rev-2",
+        modifiedAt: "2026-09-17T00:01:00.000Z",
+      },
+      expectedVersion: "rev-2",
+    })).rejects.toMatchObject({
+      code: "version-conflict",
+      message: expect.stringContaining("was restored"),
+    });
+    expect(moveCount).toBe(2);
+    const moveCalls = calls.filter(({ url }) => url.endsWith("/files/move_v2"));
+    expect(requestJson(moveCalls[1]?.init)).toMatchObject({
+      from_path: "id:page",
+      to_path: "/ToonStudio/Sync/page.psd",
+      autorename: false,
+    });
+  });
+
   it("uses Google Drive ETag preconditions for download, update and delete", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     let listCall = 0;

@@ -31,6 +31,13 @@ import {
   type ProductStartDestinationId,
 } from "@/shared/lib/product-identity";
 import { useUi } from "@/shared/lib/ui-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("ProductIntentStart", ko, en);
 
 interface IntentVisual {
   readonly icon: LucideIcon;
@@ -56,9 +63,9 @@ const COPY = {
     fallback: "내 프로젝트에서 이어가기",
     fallbackBody: "최근 작품, 공유 작업과 복구할 초안을 한곳에서 확인하세요.",
     all: "모든 프로젝트 보기",
-    watch: "24초로 ToonStudio 이해하기",
-    watchBody: "Remotion으로 만든 짧은 브랜드 필름에서 기획부터 제작·연재까지 흐름을 먼저 확인해 보세요.",
-    filmLabel: "REMOTION · 24 SEC",
+    watch: "8분 24초로 ToonStudio 전체 이해하기",
+    watchBody: "실제 제품 화면을 따라 기획·드로잉·3D·협업·검토·게시 준비까지 9개 챕터로 자세히 살펴보세요.",
+    filmLabel: "FULL PRODUCT TOUR · 08:24",
   },
   en: {
     eyebrow: "Choose what you want to do",
@@ -69,16 +76,17 @@ const COPY = {
     fallback: "Continue from My projects",
     fallbackBody: "Find recent work, shared projects and recoverable drafts in one place.",
     all: "See all projects",
-    watch: "Understand ToonStudio in 24 seconds",
-    watchBody: "Watch the Remotion brand film to see the flow from planning through creation and publishing before reading the details.",
-    filmLabel: "REMOTION · 24 SEC",
+    watch: "Understand all of ToonStudio in 8m24s",
+    watchBody: "Follow real product screens across nine chapters covering planning, drawing, 3D, collaboration, review and publishing preparation.",
+    filmLabel: "FULL PRODUCT TOUR · 08:24",
   },
 } as const;
 
 export function ProductIntentStart() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
-  const copy = COPY[locale];
+  const copy = bi((COPY).ko, (COPY).en);
   const openSearch = useUi((state) => state.openCommandPalette);
   const prefersReducedMotion = useReducedMotion();
   const continuity = useSyncExternalStore(
@@ -121,14 +129,14 @@ export function ProductIntentStart() {
                 transition={{ duration: 0.4, delay: index * 0.045, ease: [0.16, 1, 0.3, 1] }}
                 whileHover={prefersReducedMotion ? undefined : { y: -4 }}
               >
-                <Link href={destination.href} title={destination.description[locale]}>
+                <Link href={destination.href} title={bi((destination.description).ko, (destination.description).en)}>
                   <span className="cf-intent-card-media" aria-hidden="true">
                     <img src={visual.image} alt="" loading="lazy" decoding="async" />
                     <span className="cf-intent-card-icon"><Icon size={18} /></span>
                   </span>
                   <span className="cf-intent-card-copy">
-                    <strong>{destination.label[locale]}</strong>
-                    <small>{destination.description[locale]}</small>
+                    <strong>{bi((destination.label).ko, (destination.label).en)}</strong>
+                    <small>{bi((destination.description).ko, (destination.description).en)}</small>
                   </span>
                   <ArrowRight size={15} aria-hidden="true" />
                 </Link>
@@ -139,7 +147,7 @@ export function ProductIntentStart() {
       </div>
 
       <aside className="cf-intent-side">
-        <Link className="cf-intent-film" href="/brand-film">
+        <Link className="cf-intent-film" href="/product-tour">
           <span className="cf-intent-film-media" aria-hidden="true">
             <img src="/brand/production-os-hero.svg" alt="" loading="lazy" decoding="async" />
             <span className="cf-intent-film-play"><PlayCircle size={28} /></span>

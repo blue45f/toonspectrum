@@ -21,13 +21,7 @@ import {
 
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
-import {
-  PRODUCT_IDENTITY,
-  PRODUCT_START_DESTINATIONS,
-  resolveProductLocale,
-  type ProductLocale,
-  type ProductStartDestinationId,
-} from "@/shared/lib/product-identity";
+import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
@@ -38,8 +32,15 @@ import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
 
-import { focusCreatorSection, isPlainCreatorJump } from "./creator-home-navigation";
+import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorHomeExperience", ko, en);
 
 interface LocalizedText {
   readonly ko: string;
@@ -96,9 +97,9 @@ const START_META: Record<ProductStartDestinationId, StartMeta> = {
 const COPY = {
   ko: {
     primary: "새 작품 시작하기",
-    secondary: "전체 제작 흐름 보기",
+    secondary: "8분 제품 투어 보기",
     projects: "내 프로젝트",
-    brandFilm: "24초 브랜드 필름",
+    brandFilm: "8분 제품 투어 보기",
     trust: ["전문 2D·3D 제작", "자동 저장·버전·복구", "일정·협업·검수·연재"],
     previewAlt: "기획, 2D·3D 제작, 검토와 연재 준비가 한 프로젝트에서 이어지는 ToonStudio 제품 예시 화면",
     previewCaption: "대본 → 콘티 → 2D·3D 제작 → 검토 → 연재 준비가 하나의 작품 기록으로 이어집니다.",
@@ -157,9 +158,9 @@ const COPY = {
   },
   en: {
     primary: "Start a new work",
-    secondary: "See the full workflow",
+    secondary: "Watch the 8-minute product tour",
     projects: "My projects",
-    brandFilm: "24-second brand film",
+    brandFilm: "Watch 8-minute product tour",
     trust: ["Professional 2D and 3D creation", "Autosave, versions and recovery", "Scheduling, collaboration, review and publishing"],
     previewAlt: "A ToonStudio product concept connecting planning, 2D and 3D creation, review and publishing inside one project",
     previewCaption: "Script, storyboard, 2D and 3D creation, review and publishing stay connected to one work.",
@@ -218,17 +219,18 @@ const COPY = {
   },
 } as const;
 
-function localeText(copy: LocalizedText, locale: ProductLocale) {
-  return copy[locale];
+function localeText(copy: LocalizedText, _locale) {
+  return bi((copy).ko, (copy).en);
 }
 
 export function CreatorHomeExperience() {
+  useBilingualI18nRevision();
   useCreatorHomeSectionNavigation();
   const language = useI18n((state) => state.lang);
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const locale = resolveProductLocale(language);
-  const identity = PRODUCT_IDENTITY[locale];
-  const copy = COPY[locale];
+  const identity = bi((PRODUCT_IDENTITY).ko, (PRODUCT_IDENTITY).en);
+  const copy = bi((COPY).ko, (COPY).en);
 
   return (
     <div
@@ -246,13 +248,13 @@ export function CreatorHomeExperience() {
           <p className="cf-lead">{identity.description}</p>
           <div className="cf-actions">
             <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
-            <Link href="/production" className="cf-button cf-secondary">{copy.secondary}</Link>
+            <Link href="/product-tour" className="cf-button cf-secondary">{copy.secondary}</Link>
           </div>
           <div className="cf-hero-links">
             <Link href="/studio/projects">{copy.projects}<ArrowRight size={14} aria-hidden="true" /></Link>
             <Link href="/brand-film">{copy.brandFilm}<ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
-          <div className="cf-trust" aria-label={locale === "ko" ? "핵심 제작 기능" : "Core creation capabilities"}>
+          <div className="cf-trust" aria-label={bi("핵심 제작 기능", "Core creation capabilities")}>
             {copy.trust.map((item) => <span key={item}><Check size={12} aria-hidden="true" />{item}</span>)}
           </div>
         </div>
@@ -265,19 +267,11 @@ export function CreatorHomeExperience() {
 
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
-        <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
-          {([
-            ["creator-start", copy.jumpStart],
-            ["creator-flow", copy.jumpFlow],
-            ["creator-principles", copy.jumpPrinciples],
-            ["creator-support", copy.jumpSupport],
-          ] as const).map(([sectionId, label]) => {
-            const href = `#${sectionId}`;
-            return <a key={sectionId} href={href} onClick={(event) => {
-              if (!isPlainCreatorJump(event) || window.location.hash !== href) return;
-              if (focusCreatorSection(href, (id) => document.getElementById(id), true)) event.preventDefault();
-            }}>{label}</a>;
-          })}
+        <nav className="cf-jump-nav" aria-label={bi("홈 주요 영역", "Home sections")}>
+          <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
         </nav>
       </div>
 
@@ -294,7 +288,7 @@ export function CreatorHomeExperience() {
               <Link key={destination.id} href={destination.href} className="cf-start-card">
                 <span className="cf-start-icon"><Icon size={24} aria-hidden="true" /></span>
                 <span className="cf-start-tag">{localeText(meta.tag, locale)}</span>
-                <strong>{destination.label[locale]}</strong><p>{destination.description[locale]}</p>
+                <strong>{bi((destination.label).ko, (destination.label).en)}</strong><p>{bi((destination.description).ko, (destination.description).en)}</p>
                 <span className="cf-start-action">{localeText(meta.action, locale)}<ArrowRight size={15} aria-hidden="true" /></span>
               </Link>
             );
@@ -304,7 +298,7 @@ export function CreatorHomeExperience() {
 
       <section className="cf-bridge cf-shell" aria-labelledby="creator-bridge-title">
         <figure className="cf-bridge-visual">
-          <img src="/brand/production-os-workspace.svg" alt={locale === "ko" ? "2D·3D 제작, 파일, 일정과 검토가 연결된 ToonStudio 작업공간 예시" : "ToonStudio workspace concept connecting 2D, 3D, files, schedules and review"} width="1600" height="980" loading="lazy" />
+          <img src="/brand/production-os-workspace.svg" alt={bi("2D·3D 제작, 파일, 일정과 검토가 연결된 ToonStudio 작업공간 예시", "ToonStudio workspace concept connecting 2D, 3D, files, schedules and review")} width="1600" height="980" loading="lazy" />
           <figcaption>{copy.previewBadge}</figcaption>
         </figure>
         <div className="cf-bridge-copy">

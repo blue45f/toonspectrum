@@ -128,6 +128,37 @@ describe("Studio Scene3D clean authority", () => {
     expect(plan.qualityTier).toBe("ultra");
   });
 
+  it("allocates different quality budgets for character detail, environment composition and final output", () => {
+    const baseNeeds = {
+      gaussianSplats: false,
+      specialistCadOrBim: false,
+      liveClothOrHair: true,
+      highQualityStill: false,
+    } as const;
+    const character = resolveStudioScene3dRuntimePlan(webGpuDevice, {
+      ...baseNeeds,
+      workload: "character-detail",
+    });
+    const environment = resolveStudioScene3dRuntimePlan(webGpuDevice, {
+      ...baseNeeds,
+      liveClothOrHair: false,
+      workload: "environment-compose",
+    });
+    const output = resolveStudioScene3dRuntimePlan(webGpuDevice, {
+      ...baseNeeds,
+      highQualityStill: true,
+      workload: "webtoon-output",
+    });
+
+    expect(character.workload).toBe("character-detail");
+    expect(character.budget.lodBias).toBeLessThan(0);
+    expect(character.budget.secondaryMotionHz).toBe(60);
+    expect(environment.budget.maxVisibleDrawCalls).toBeGreaterThan(character.budget.maxVisibleDrawCalls);
+    expect(environment.budget.lodBias).toBeGreaterThan(0);
+    expect(output.budget.maxPixelRatio).toBeGreaterThan(character.budget.maxPixelRatio);
+    expect(output.budget.shadowMapSize).toBe(4096);
+  });
+
   it("keeps a deterministic WebGL2 fallback instead of requiring WebGPU", () => {
     const plan = resolveStudioScene3dRuntimePlan({
       ...webGpuDevice,

@@ -44,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(67);
+  expect(manifest).toHaveLength(72);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0067_creator_role_workspace_personalization");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(67);
+  expect(manifest.at(-1).id).toBe("0072_creator_support_program");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(72);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -101,6 +101,29 @@ test("auth identity hardening migration preserves legacy access and enforces nor
   }
   expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
   expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA)/iu);
+});
+
+test("account consolidation migration is additive, auditable, and keeps merged aliases", () => {
+  const migration = loadMigrationManifest().find(
+    ({ id }) => id === "0069_account_consolidation",
+  );
+  expect(migration?.id).toBe("0069_account_consolidation");
+  const sql = migration?.contents ?? "";
+
+  for (const requiredFragment of [
+    'ADD COLUMN IF NOT EXISTS "mergedIntoUserId" text',
+    "'active', 'suspended', 'deleted', 'merged'",
+    'CREATE TABLE IF NOT EXISTS public.account_merge',
+    'account_merge_sourceUserId_user_id_fk',
+    'account_merge_targetUserId_user_id_fk',
+    'account_merge_token_hash_check',
+    'idx_account_merge_source_status',
+    'REVOKE ALL ON TABLE public.account_merge FROM PUBLIC',
+  ]) {
+    expect(sql).toContain(requiredFragment);
+  }
+  expect(sql).toMatch(/^--[\s\S]*BEGIN;[\s\S]*COMMIT;\s*$/u);
+  expect(sql).not.toMatch(/DROP\s+(?:TABLE|SCHEMA|COLUMN)/iu);
 });
 
 test("creator role profile migration is additive, versioned, and structurally guarded", () => {
@@ -719,7 +742,7 @@ test("cloud-save intent migration widens and validates the existing room check",
     "CHECK (\"provisionIntent\" IN ('share-link', 'invite-member', 'cloud-save'))",
   );
   expect(sql).toContain(
-    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_provision_intent_check"',
+    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_state_check"',
   );
   expect(sql).toContain("0026_creator_draft_cloud_save_intent");
   expect(sql).toContain('INSERT INTO "toonspectrum_schema_migration"');
@@ -767,12 +790,22 @@ test("auth runtime ACL is normalized to the exact DML contract", () => {
   const sql = buildAuthRuntimeAclSql("toonspectrum_runtime");
   const violation = buildAuthRuntimeAclViolationSql("toonspectrum_runtime");
 
-  expect(sql).toContain('public."user",\n  public.account\nFROM PUBLIC;');
-  expect(sql).toContain('public."user",\n  public.account\nFROM "toonspectrum_runtime";');
+  expect(sql).toContain('public."user",\n  public.account,\n  public.account_merge\nFROM PUBLIC;');
+  expect(sql).toContain('public."user",\n  public.account,\n  public.account_merge\nFROM "toonspectrum_runtime";');
   expect(sql).toContain(
     'GRANT SELECT, INSERT, UPDATE, DELETE\n  ON TABLE public."user", public.account',
   );
+  expect(sql).toContain(
+    "GRANT SELECT, INSERT\n  ON TABLE public.account_merge",
+  );
+  expect(sql).toContain(
+    'GRANT UPDATE ("targetUserId", status, "completedAt", summary)\n  ON TABLE public.account_merge',
+  );
   expect(sql).not.toMatch(/GRANT[^;]*(?:TRUNCATE|REFERENCES|TRIGGER)/u);
+  expect(violation).toContain("'public.account_merge'");
+  expect(violation).toContain("'SELECT, INSERT'");
+  expect(violation).toContain("'targetUserId', 'status', 'completedAt', 'summary'");
+  expect(violation).toContain("'id', 'sourceUserId', 'tokenHash', 'expiresAt', 'createdAt'");
   expect(violation).toContain("'SELECT, INSERT, UPDATE, DELETE'");
   for (const elevatedPrivilege of ["TRUNCATE", "REFERENCES", "TRIGGER"]) {
     expect(violation).toContain(`'${elevatedPrivilege}'`);
@@ -1252,10 +1285,15 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "admin_content_reports",
     "admin_promos",
     "admin_security_policies",
+    "business_inquiry",
     "community_cafe_ban",
     "community_cafe_invite",
     "community_cafe_join_request",
     "community_cafe_moderation_log",
+    "commerce_entitlement",
+    "commerce_order",
+    "commerce_payment_event",
+    "commerce_product_price",
     "creator_asset_artifact",
     "creator_asset_artifact_set",
     "creator_asset_license_snapshot",
@@ -1341,6 +1379,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_ai_comic_director_job_event",
     "studio_ai_comic_director_session",
     "studio_ai_visual_bible_revision",
+    "creator_support_application",
+    "creator_support_offer",
+    "supporter_funding_setting",
+    "supporter_payment",
   ]);
   const readinessSource = readFileSync(
     new URL(

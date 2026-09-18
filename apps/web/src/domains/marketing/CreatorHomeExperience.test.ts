@@ -39,6 +39,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('id="creator-process-title"');
     expect(source).toContain('import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation"');
     expect(source).toContain("useCreatorHomeSectionNavigation();");
+    expect(source).toContain('<CreatorSectionLink sectionId="creator-principles">');
     expect(source).toContain('data-creator-home="production-first"');
     expect(source).toContain('data-creator-experience="all-in-one-studio-v3"');
     expect(source).toContain("data-theme-art={resolvedTheme}");
@@ -49,7 +50,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('href="/studio/new"');
     expect(source).toContain('href="/studio/projects"');
     expect(source).toContain('href="/brand-film"');
-    expect(source).toContain('href="/production"');
+    expect(source).toContain('href: "/production"');
     expect(identity).toContain('href: "/story-lab"');
     expect(identity).toContain('href: "/studio/bg3d"');
     expect(identity).toContain('href: "/studio/assets"');

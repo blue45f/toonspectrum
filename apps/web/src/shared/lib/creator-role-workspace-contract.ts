@@ -51,14 +51,23 @@ export type CreatorRoleNotificationPreset =
   (typeof CREATOR_ROLE_NOTIFICATION_PRESETS)[number];
 
 export const CREATOR_ROLE_USAGE_GOALS = [
+  "learning",
+  "first-project",
   "personal-project",
-  "team-production",
   "serialization",
-  "outsourcing",
+  "drawing-practice",
+  "story-writing",
+  "character-building",
+  "team-production",
   "portfolio",
   "studio-management",
+  "education",
+  "outsourcing",
 ] as const;
 export type CreatorRoleUsageGoal = (typeof CREATOR_ROLE_USAGE_GOALS)[number];
+
+export const CREATOR_WORKSPACE_MODES = ["guided", "creator", "production"] as const;
+export type CreatorWorkspaceMode = (typeof CREATOR_WORKSPACE_MODES)[number];
 
 export const CREATOR_ROLE_NOTIFICATION_EVENTS = [
   "assignment",
@@ -128,6 +137,7 @@ export interface CreatorRoleWorkspacePreference {
     Partial<Record<CreatorRoleNotificationEvent, boolean>>
   >;
   readonly usageGoals: readonly CreatorRoleUsageGoal[];
+  readonly workspaceMode: CreatorWorkspaceMode;
   readonly capacity: CreatorRoleCapacity;
   readonly visibility: CreatorRoleVisibility;
   readonly customRoleLabel: string | null;
@@ -248,6 +258,7 @@ const LENS_SET = new Set<string>(CREATOR_DETAILED_ROLE_LENSES);
 const WORKSPACE_PRESET_SET = new Set<string>(CREATOR_ROLE_WORKSPACE_PRESETS);
 const NOTIFICATION_PRESET_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_PRESETS);
 const USAGE_GOAL_SET = new Set<string>(CREATOR_ROLE_USAGE_GOALS);
+const WORKSPACE_MODE_SET = new Set<string>(CREATOR_WORKSPACE_MODES);
 const NOTIFICATION_EVENT_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_EVENTS);
 const PRODUCTION_ROLE_SET = new Set<string>(CREATOR_PRODUCTION_ROLES);
 
@@ -274,6 +285,7 @@ export const EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE: CreatorRoleWorkspacePrefer
     notificationPreset: "balanced",
     notificationOverrides: Object.freeze({}),
     usageGoals: Object.freeze([]),
+    workspaceMode: "creator",
     capacity: EMPTY_CREATOR_ROLE_CAPACITY,
     visibility: EMPTY_CREATOR_ROLE_VISIBILITY,
     customRoleLabel: null,
@@ -431,6 +443,9 @@ export function normalizeCreatorRoleWorkspacePreference(
       USAGE_GOAL_SET,
       CREATOR_ROLE_USAGE_GOALS.length,
     ),
+    workspaceMode:
+      normalizeEnum<CreatorWorkspaceMode>(value.workspaceMode, WORKSPACE_MODE_SET)
+      ?? "creator",
     capacity: normalizeCapacity(value.capacity),
     visibility: normalizeVisibility(value.visibility),
     customRoleLabel,
@@ -521,6 +536,7 @@ const ROLE_LENSES: Readonly<Record<CreatorRoleId, CreatorDetailedRoleLens>> = {
   lettering: "lettering",
   character: "drawing",
   "three-d": "background",
+  educator: "story",
   assistant: "drawing",
   editor: "review",
   producer: "production",
@@ -547,6 +563,7 @@ const ROLE_WORKSPACES: Readonly<
   lettering: "lettering",
   character: "lineart",
   "three-d": "pose-3d",
+  educator: "quick-sketch",
   assistant: "lineart",
   editor: "review",
   producer: "publish",
@@ -558,6 +575,12 @@ export function creatorRoleStudioWorkspace(
   role: CreatorRoleId | null | undefined,
 ): CreatorRoleWorkspacePreset {
   return role ? ROLE_WORKSPACES[role] : "quick-sketch";
+}
+
+export function creatorWorkspaceStudioUiMode(mode: CreatorWorkspaceMode): "basic" | "standard" | "full" {
+  if (mode === "guided") return "basic";
+  if (mode === "production") return "full";
+  return "standard";
 }
 
 const ROLE_PRODUCTION_ROLES: Readonly<
@@ -573,6 +596,7 @@ const ROLE_PRODUCTION_ROLES: Readonly<
   lettering: ["lettering"],
   character: ["lineart"],
   "three-d": ["background"],
+  educator: ["story", "reviewer"],
   assistant: ["lineart", "color", "background"],
   editor: ["reviewer", "director"],
   producer: ["director", "publisher"],
@@ -1231,15 +1255,20 @@ export function recommendCreatorTeamRoles(
     for (const role of allowed) {
       let score = 0;
       const reasons: string[] = [];
-      if (primaryRoles.has(role)) {
+      const hasPrimaryRole = primaryRoles.has(role);
+      const hasSecondaryRole = secondaryRoles.has(role);
+      const hasSpecialtyRole = specialtyRoles.has(role);
+      const hasRoleEvidence = hasPrimaryRole || hasSecondaryRole || hasSpecialtyRole;
+      if (!hasRoleEvidence) continue;
+      if (hasPrimaryRole) {
         score += 70;
         reasons.push("대표 직무와 일치");
       }
-      if (secondaryRoles.has(role)) {
+      if (hasSecondaryRole) {
         score += 35;
         reasons.push("보조 직무와 일치");
       }
-      if (specialtyRoles.has(role)) {
+      if (hasSpecialtyRole) {
         score += 30;
         reasons.push("전문 분야와 일치");
       }
@@ -1264,15 +1293,13 @@ export function recommendCreatorTeamRoles(
         score -= 80;
         reasons.push("현재 협업 불가");
       }
-      if (score > 0) {
-        recommendations.push({
-          userId: candidate.userId,
-          name: candidate.name,
-          productionRole: role,
-          score,
-          reasons,
-        });
-      }
+      recommendations.push({
+        userId: candidate.userId,
+        name: candidate.name,
+        productionRole: role,
+        score,
+        reasons,
+      });
     }
   }
 

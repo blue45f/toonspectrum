@@ -14,12 +14,14 @@ import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-mu
 const mocks = vi.hoisted(() => ({
   ownerId: "owner-a",
   load: vi.fn(), save: vi.fn(), remove: vi.fn(), generate: vi.fn(), status: vi.fn(), error: vi.fn(), lyrics: vi.fn(),
+  getWork: vi.fn(), updateWork: vi.fn(),
 }));
 vi.mock("./studio-music-client", () => ({ generateMusic: mocks.generate, getMusicStatus: mocks.status }));
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
 vi.mock("@/domains/creator/studio-server-ai-client", () => ({ completeAutomaticFreeText: mocks.lyrics }));
 vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: mocks.error }));
+vi.mock("@/infrastructure/creator-client", () => ({ getWork: mocks.getWork, updateWork: mocks.updateWork }));
 
 function output(index = 1, ownerId = "owner-a", workId = "work-a"): LocalMusicTrack {
   return {
@@ -54,11 +56,13 @@ function Harness({ initial = "/music?workId=work-a" }: { initial?: string }) {
   </Routes></MemoryRouter></StrictMode>;
 }
 const consent = () => screen.getByRole("checkbox", { name: /입력한 장면·가사를 사용할 권한/ });
-const submit = () => screen.getByRole("form", { name: "AI 음악 만들기" });
-const generateButton = () => screen.getByRole("button", { name: "AI 음악 생성" });
+const submit = () => screen.getByRole("form", { name: "오리지널 애니 OST 만들기" });
+const generateButton = () => screen.getByRole("button", { name: /AI (?:오리지널 OST|장면 BGM) 생성/u });
 function fillBrief() {
   fireEvent.change(screen.getByLabelText("음악 제목"), { target: { value: "새 음악" } });
   fireEvent.change(screen.getByLabelText("장면 설명"), { target: { value: "조용한 역에서 두 사람이 재회한다." } });
+  const lyrics = screen.queryByLabelText(/직접 작성한 가사 또는 AI 초안/u);
+  if (lyrics) fireEvent.change(lyrics, { target: { value: "[Verse] 다시 만난 밤\n[Chorus] 우리의 페이지를 열어" } });
   fireEvent.click(consent());
 }
 async function ready() {
@@ -93,6 +97,8 @@ beforeEach(() => {
   mocks.load.mockReset().mockResolvedValue([]);
   mocks.save.mockReset().mockResolvedValue(undefined);
   mocks.remove.mockReset().mockResolvedValue(undefined);
+  mocks.getWork.mockReset().mockResolvedValue({ id: "work-a", doc: {}, isOwner: true, revision: 3 });
+  mocks.updateWork.mockReset().mockResolvedValue({ id: "work-a" });
   mocks.status.mockReset().mockResolvedValue({ enabled: true, reason: "ready", provider: "elevenlabs", maxSeconds: 60 });
   mocks.generate.mockReset().mockImplementation(async (brief: MusicBrief, ownerId: string, requestId: string) => {
     const result = output(1, ownerId, brief.workId);
@@ -263,10 +269,39 @@ describe("music workspace rendered recovery and route regression", () => {
     });
   });
 
+  it("publishes a work-linked soundtrack into the reader BGM document path", async () => {
+    mocks.load.mockResolvedValue([output()]);
+    mocks.getWork.mockResolvedValue({
+      id: "work-a",
+      doc: { fx: { reveal: "fade-up", ambient: "none", bgmMood: "calm", bgmUrl: "", bgmVolume: 0.4, cuts: [] } },
+      isOwner: true,
+      revision: 3,
+    });
+    render(<Harness />); await ready();
+    const publication = await screen.findByRole("complementary", { name: "독자용 BGM 게시 연결" });
+    fireEvent.change(within(publication).getByLabelText("배포용 HTTPS MP3 URL"), {
+      target: { value: "https://cdn.example.test/work-a-opening.mp3" },
+    });
+    fireEvent.click(within(publication).getByRole("button", { name: "작품 독자용 BGM으로 저장" }));
+    await waitFor(() => expect(mocks.updateWork).toHaveBeenCalledTimes(1));
+    expect(mocks.getWork).toHaveBeenCalledWith("work-a");
+    expect(mocks.updateWork).toHaveBeenCalledWith("work-a", expect.objectContaining({
+      baseRevision: 3,
+      doc: expect.objectContaining({
+        fx: expect.objectContaining({
+          bgmMood: "",
+          bgmUrl: "https://cdn.example.test/work-a-opening.mp3",
+          bgmVolume: 0.4,
+        }),
+      }),
+    }));
+    expect(await within(publication).findByText(/독자용 BGM을 저장했습니다/)).toBeTruthy();
+  });
+
   it("preserves original lyric text when toggling vocals off and on", async () => {
     render(<Harness />); await ready();
     const vocals = screen.getByRole("checkbox", { name: "보컬이 있는 주제가 만들기" });
-    fireEvent.click(vocals);
+    expect(vocals).toHaveProperty("checked", true);
     fireEvent.change(screen.getByLabelText(/직접 작성한 가사/), { target: { value: "우리의 내일을 노래해" } });
     fireEvent.click(vocals); fireEvent.click(vocals);
     expect(screen.getByLabelText(/직접 작성한 가사/)).toHaveProperty("value", "우리의 내일을 노래해");

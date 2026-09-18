@@ -306,12 +306,21 @@ export function createStudioMannequinScene(
     depthTest: false,
   });
   const handleGeometry = new THREE.SphereGeometry(1, 20, 14);
+  // 툰 데생 모드는 화면 공간 post-process 없이도 깨끗한 실루엣을 얻도록 inverted hull을 쓴다.
+  // body geometry를 공유하므로 별도 삼각형 메모리를 만들지 않고, 마네킹 rebuild 때 같이 수명 관리한다.
+  const outlineMaterial = new THREE.MeshBasicMaterial({
+    color: 0x241f1a,
+    side: THREE.BackSide,
+    transparent: true,
+    opacity: 0.82,
+  });
 
   const mannequinRoot = new THREE.Group();
   scene.add(mannequinRoot);
 
   let joints = new Map<StudioMannequinJointId, THREE.Group>();
   let bodyMeshes: THREE.Mesh[] = [];
+  let outlineMeshes: THREE.Mesh[] = [];
   let effectorHandles: THREE.Mesh[] = [];
   let pelvisRestOffset = new THREE.Vector3();
   let selectedJointId: StudioMannequinJointId | null = null;
@@ -385,6 +394,9 @@ export function createStudioMannequinScene(
   // ── 마네킹 빌드 ──────────────────────────────────────────────────────────
 
   function disposeMannequinGraph(): void {
+    // outline은 body geometry를 공유하므로 먼저 scene에서만 분리하고 geometry는 body가 한 번만 dispose한다.
+    for (const outline of outlineMeshes) outline.removeFromParent();
+    outlineMeshes = [];
     for (const mesh of [...bodyMeshes, ...effectorHandles]) {
       mesh.geometry.dispose();
       mesh.removeFromParent();
@@ -428,11 +440,23 @@ export function createStudioMannequinScene(
     const to = toVec3(primitive.to);
     const segment = new THREE.Vector3().subVectors(to, from);
     const segmentLength = segment.length();
+    const endRadius = primitive.endRadius;
+    const hasAnatomicalTaper = typeof endRadius === "number"
+      && Number.isFinite(endRadius)
+      && endRadius > 0
+      && Math.abs(endRadius - primitive.radius) > 1e-6;
     const middleLength = Math.max(0.001, segmentLength - primitive.radius * 2);
-    const mesh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28),
-      bodyMaterial,
-    );
+    const geometry = hasAnatomicalTaper
+      ? new THREE.CylinderGeometry(
+          endRadius,
+          primitive.radius,
+          Math.max(0.001, segmentLength),
+          32,
+          2,
+          false,
+        )
+      : new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28);
+    const mesh = new THREE.Mesh(geometry, bodyMaterial);
     mesh.position.copy(from).addScaledVector(segment, 0.5);
     if (segmentLength > 1e-9) {
       mesh.quaternion.setFromUnitVectors(
@@ -465,6 +489,17 @@ export function createStudioMannequinScene(
       mesh.receiveShadow = true;
       jointGroup.add(mesh);
       bodyMeshes.push(mesh);
+
+      const outline = new THREE.Mesh(mesh.geometry, outlineMaterial);
+      outline.position.copy(mesh.position);
+      outline.quaternion.copy(mesh.quaternion);
+      outline.scale.copy(mesh.scale).multiplyScalar(1.026);
+      outline.visible = currentMaterialStyle === "shaded";
+      outline.castShadow = false;
+      outline.receiveShadow = false;
+      outline.renderOrder = -1;
+      jointGroup.add(outline);
+      outlineMeshes.push(outline);
     }
 
     // 손목/발목 IK 핸들 — 항상 위에 그려지는 반투명 구.
@@ -917,6 +952,17 @@ export function createStudioMannequinScene(
           clearcoat: 0.65,
           clearcoatRoughness: 0.18,
         });
+      } else if (style === "skin") {
+        nextMaterial = new THREE.MeshPhysicalMaterial({
+          color: 0xd7a07d,
+          metalness: 0,
+          roughness: 0.48,
+          clearcoat: 0.08,
+          clearcoatRoughness: 0.58,
+          sheen: 0.24,
+          sheenRoughness: 0.72,
+          sheenColor: new THREE.Color(0xffd6c2),
+        });
       } else {
         nextMaterial = new THREE.MeshStandardMaterial({
           color: 0xc58b57,
@@ -930,6 +976,9 @@ export function createStudioMannequinScene(
         if (mesh.userData.studioMannequinJointId !== selectedJointId) {
           mesh.material = bodyMaterial;
         }
+      }
+      for (const outline of outlineMeshes) {
+        outline.visible = style === "shaded";
       }
       invalidate();
     },
@@ -1006,6 +1055,7 @@ export function createStudioMannequinScene(
       bodyMaterial.dispose();
       selectedMaterial.dispose();
       handleMaterial.dispose();
+      outlineMaterial.dispose();
       gradientMap.dispose();
       grid.geometry.dispose();
       gridMaterial.dispose();

@@ -15,6 +15,8 @@ import {
   CREATOR_ROLE_MAX_SECONDARY,
   CREATOR_ROLE_MAX_SPECIALTIES,
   CREATOR_SPECIALTY_DEFINITIONS,
+  CREATOR_STAGE_IDS,
+  CREATOR_STAGE_LABELS,
   creatorRoleDefinition,
   creatorRoleSelection,
   creatorText,
@@ -27,9 +29,18 @@ import {
   type CreatorRoleLocale,
   type CreatorRoleProfile,
   type CreatorSpecialtyId,
+  type CreatorStage,
 } from "@/shared/lib/creator-role-contract";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { cn } from "@/shared/lib/utils";
+import {
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorRoleProfileEditor", ko, en);
 
 const FEATURED_ROLES: readonly CreatorRoleId[] = [
   "story",
@@ -37,6 +48,7 @@ const FEATURED_ROLES: readonly CreatorRoleId[] = [
   "assistant",
   "planner",
   "producer",
+  "educator",
   "creator",
 ];
 
@@ -47,8 +59,8 @@ const ROLE_GROUP_LABELS: Readonly<Record<CreatorRoleGroup, { ko: string; en: str
   production: { ko: "편집·운영", en: "Editorial & operations" },
 };
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
 }
 
 function roleLabel(role: CreatorRoleId, locale: CreatorRoleLocale): string {
@@ -72,7 +84,8 @@ export function CreatorRoleProfileEditor({
   readonly onChange: (next: CreatorRoleProfile) => void;
   readonly disabled?: boolean;
 }) {
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang) === "ko" ? "ko" : "en";
+  useBilingualI18nRevision();
+  const locale: CreatorRoleLocale = getActiveI18nLocale();
   const selectedRoles = creatorRoleSelection(value);
   const recommendedSpecialtySet = useMemo(
     () => new Set(recommendedCreatorSpecialties(selectedRoles)),
@@ -139,6 +152,26 @@ export function CreatorRoleProfileEditor({
         ) : null}
       </header>
 
+      <label className="block text-xs font-semibold text-fg">
+        {localized(locale, "현재 활동 단계", "Current creator stage")}
+        <select
+          disabled={disabled}
+          value={value.creatorStage ?? ""}
+          onChange={(event) => onChange(withProfilePatch(value, {
+            creatorStage: (event.target.value || null) as CreatorStage | null,
+          }))}
+          className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent"
+        >
+          <option value="">{localized(locale, "선택 안 함", "Not specified")}</option>
+          {CREATOR_STAGE_IDS.map((id) => (
+            <option key={id} value={id}>{creatorText(CREATOR_STAGE_LABELS[id], locale)}</option>
+          ))}
+        </select>
+        <span className="mt-1 block text-[0.68rem] font-normal leading-5 text-fg-3">
+          {localized(locale, "학생·아마추어·프로 여부는 능력 평가가 아니라 홈과 도움말의 우선순위를 정하는 데만 사용합니다.", "This is not a skill rating. It only tunes home content and guidance priority.")}
+        </span>
+      </label>
+
       <fieldset disabled={disabled}>
         <legend className="text-xs font-black text-fg">
           {localized(locale, "대표 직무", "Primary role")}
@@ -183,7 +216,7 @@ export function CreatorRoleProfileEditor({
           >
             <option value="">{localized(locale, "직무를 선택해 주세요", "Select a role")}</option>
             {Object.keys(ROLE_GROUP_LABELS).map((group) => (
-              <optgroup key={group} label={ROLE_GROUP_LABELS[group as CreatorRoleGroup][locale]}>
+              <optgroup key={group} label={bi((ROLE_GROUP_LABELS[group as CreatorRoleGroup]).ko, (ROLE_GROUP_LABELS[group as CreatorRoleGroup]).en)}>
                 {CREATOR_ROLE_DEFINITIONS.filter((entry) => entry.group === group).map((entry) => (
                   <option key={entry.id} value={entry.id}>{creatorText(entry.label, locale)}</option>
                 ))}

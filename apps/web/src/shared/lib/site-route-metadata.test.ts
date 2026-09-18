@@ -3,12 +3,54 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalSitePath,
   resolveSiteRouteMetadata,
+  resolveSiteRouteNavigationContext,
   SITE_ROUTE_ALIASES,
 } from "./site-route-metadata";
 
 describe("site route metadata", () => {
   it.each(Object.entries(SITE_ROUTE_ALIASES))("normalizes alias %s to %s", (alias, canonical) => {
     expect(canonicalSitePath(`${alias}?from=old#section`)).toBe(canonical);
+  });
+
+
+  it("treats the creator-first home as Studio product metadata", () => {
+    expect(resolveSiteRouteMetadata("/")).toMatchObject({
+      product: "studio",
+      purpose: "discover",
+      access: "public",
+    });
+  });
+
+  it("projects navigation context from canonical metadata and narrow docs exceptions", () => {
+    for (const pathname of [
+      "/",
+      "/studio",
+      "/production/projects/sample-project/review",
+      "/market",
+      "/showcase",
+      "/collaborate",
+      "/now",
+      "/references",
+      "/research/assets",
+      "/learn/webtoon",
+      "/about/technology/story",
+      "/help/getting-started",
+    ]) {
+      expect(resolveSiteRouteNavigationContext(pathname), pathname).toBe("studio");
+    }
+    for (const pathname of ["/discover", "/ranking", "/community", "/fortune", "/privacy"]) {
+      expect(resolveSiteRouteNavigationContext(pathname), pathname).toBe("spectrum");
+    }
+  });
+
+  it.each([
+    ["/make", "/studio/new"],
+    ["/publishing", "/studio/publish"],
+    ["/shaper", "/studio/assets/characters/new"],
+    ["/music", "/studio/assets/audio"],
+    ["/brush-lab", "/studio/assets/brushes/new"],
+  ])("keeps legacy creator alias %s in Studio navigation through canonical %s", (alias) => {
+    expect(resolveSiteRouteNavigationContext(alias)).toBe("studio");
   });
 
   it("classifies a project-bound desktop Studio surface", () => {

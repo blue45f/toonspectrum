@@ -2,7 +2,6 @@ import {
   BarChart3,
   BookOpen,
   CalendarDays,
-  Code2,
   Compass,
   Gamepad2,
   Home,
@@ -29,6 +28,10 @@ import {
   primarySiteRouteAuthority,
   type SitePrimaryRouteId,
 } from "@/shared/lib/site-route-authority";
+import { resolveSiteRouteNavigationContext } from "@/shared/lib/site-route-metadata";
+import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 export type SiteNavigationLocale = "ko" | "en";
 export type SiteNavigationContext = "studio" | "spectrum";
@@ -115,7 +118,7 @@ export const SITE_NAVIGATION_ITEMS = {
   technology: item(
     "technology",
     "/about/technology",
-    Code2,
+    Workflow,
     "제작 기술",
     "Engineering",
     "제작 과정·아키텍처·오픈소스·적용 가이드",
@@ -215,10 +218,10 @@ export const SITE_NAVIGATION_ITEMS = {
     "research",
     "/research",
     BookOpen,
-    "참고자료",
-    "References",
-    "출처가 있는 자료를 한곳에",
-    "Collect sourced references in one place",
+    "리서치 데스크",
+    "Research desk",
+    "출처·작품·트렌드 자료를 창작 소재와 판단으로 연결",
+    "Turn sourced references, works and trends into creative direction",
   ),
   opportunities: item(
     "opportunities",
@@ -310,8 +313,8 @@ const I = SITE_NAVIGATION_ITEMS;
 export const TOONSTUDIO_PRIMARY_NAVIGATION = [
   I.production,
   I.studio,
-  I.studioAssets,
-  I.publish,
+  I.research,
+  I.market,
 ] as const;
 
 /** Reader navigation remains separate from the creation product. */
@@ -336,10 +339,10 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "production-resources",
     label: { ko: "작품 준비", en: "Prepare the work" },
     description: {
-      ko: "작품 재료와 참고자료를 작업 가까이에",
-      en: "Keep assets and references close to the work",
+      ko: "리서치·소재·작품 재료를 작업 가까이에",
+      en: "Keep research, marketplace assets and project materials close to the work",
     },
-    items: [I.studioAssets, I.research, I.learn, I.technology],
+    items: [I.research, I.market, I.studioAssets, I.learn, I.technology],
   },
   {
     id: "production-delivery",
@@ -369,7 +372,7 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "영감·자료·기회를 실제 작업으로",
       en: "Connect inspiration, research and opportunity",
     },
-    items: [I.now, I.fortune, I.research, I.opportunities, I.insights, I.technology],
+    items: [I.now, I.fortune, I.research, I.market, I.opportunities, I.insights, I.technology],
   },
   {
     id: "connect",
@@ -415,35 +418,9 @@ export const MOBILE_SITE_TABS = TOONSPECTRUM_MOBILE_TABS;
 
 export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
 
-const STUDIO_CONTEXT_PREFIXES = [
-  "/",
-  "/brand-film",
-  "/about/technology",
-  "/studio",
-  "/production",
-  "/make",
-  "/brush-lab",
-  "/shaper",
-  "/music",
-  "/story-lab",
-  "/publishing",
-  "/research",
-  "/opportunities",
-  "/market",
-  "/learn",
-  "/help",
-] as const;
-
-/** Match a pathname against an exact route prefix or one of its descendants. */
-function matchesPathPrefix(pathname: string, prefix: string): boolean {
-  return pathname === prefix || pathname.startsWith(`${prefix}/`);
-}
-
-/** Select the Studio or Spectrum navigation context for a pathname. */
+/** Select the Studio or Spectrum navigation context from the canonical route metadata projection. */
 export function siteNavigationContextForPath(pathname: string): SiteNavigationContext {
-  return STUDIO_CONTEXT_PREFIXES.some((prefix) => matchesPathPrefix(pathname, prefix))
-    ? "studio"
-    : "spectrum";
+  return resolveSiteRouteNavigationContext(pathname);
 }
 
 /** Return the primary navigation destinations for the pathname's product context. */
@@ -467,8 +444,8 @@ export function mobileSiteTabsForPath(pathname: string): readonly SiteNavigation
     : TOONSPECTRUM_MOBILE_TABS;
 }
 
-export function siteNavigationLocale(locale: string): SiteNavigationLocale {
-  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+export function siteNavigationLocale(_locale): SiteNavigationLocale {
+  return getActiveI18nLocale();
 }
 
 export function siteNavigationText(text: SiteNavigationText, locale: string): string {

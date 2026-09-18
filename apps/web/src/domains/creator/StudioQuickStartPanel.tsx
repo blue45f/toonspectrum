@@ -297,8 +297,8 @@ export function StudioQuickStartPanel({
     },
     {
       id: "background-3d",
-      label: localizeText(t, "3D 배경 열기", "studio.quickStart.step.background3d.label"),
-      hint: localizeText(t, "장면과 소품 배치", "studio.quickStart.step.background3d.hint"),
+      label: localizeText(t, "3D로 장면 잡기", "studio.quickStart.step.background3d.label"),
+      hint: localizeText(t, "배경·포즈·구도를 먼저 구성", "studio.quickStart.step.background3d.hint"),
       icon: Boxes,
       onClick: onOpenBackground3d,
     },
@@ -328,7 +328,7 @@ export function StudioQuickStartPanel({
         data-studio-shortcut-boundary="true"
         aria-labelledby="studio-quick-start-title"
         aria-describedby="studio-quick-start-description"
-        className="pointer-events-auto flex max-h-[min(60dvh,calc(100svh-5rem))] flex-col overflow-hidden rounded-lg border border-line bg-panel/95 shadow-xl backdrop-blur-md sm:max-h-[min(66dvh,calc(100svh-2rem))]"
+        className="pointer-events-auto flex max-h-[min(20rem,40dvh)] flex-col overflow-hidden rounded-lg border border-line bg-panel/95 shadow-xl backdrop-blur-md sm:max-h-[min(66dvh,calc(100svh-2rem))]"
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-3 py-2.5">
           <div className="min-w-0">

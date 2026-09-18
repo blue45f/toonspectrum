@@ -1,15 +1,48 @@
 import { MonitorUp, WifiOff } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-import { RoutePurposeScene } from "./RoutePurposeScene";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
-import { resolveProductLocale } from "@/shared/lib/product-identity";
+import {
+  defineBilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
-import { useI18n } from "@/shared/lib/i18n";
+
+const COPY = {
+  desktopTitle: defineBilingualText(
+    "siteRouteBoundary",
+    "desktopTitle",
+    "정밀 편집은 큰 화면에서 지원됩니다.",
+    "Precision editing requires a larger screen.",
+  ),
+  desktopBody: defineBilingualText(
+    "siteRouteBoundary",
+    "desktopBody",
+    "모바일에서는 보기와 검토를 중심으로 사용할 수 있습니다. 키보드·펜을 사용할 수 있는 환경에서 편집을 이어가세요.",
+    "Use mobile for viewing and review, then continue editing with a keyboard or pen on a larger screen.",
+  ),
+  viewSupport: defineBilingualText(
+    "siteRouteBoundary",
+    "viewSupport",
+    "지원 범위 보기",
+    "View support",
+  ),
+  offlineBody: defineBilingualText(
+    "siteRouteBoundary",
+    "offlineBody",
+    "저장 상태 표시에서 현재 변경 내용이 이 기기에 보관됐는지 확인하세요. 연결이 돌아오면 지원되는 작업은 다시 동기화됩니다.",
+    "Check the workspace save status to confirm whether current changes are stored on this device. Supported work can sync after reconnection.",
+  ),
+} as const;
+
+const RoutePurposeScene = lazy(async () => {
+  const module = await import("./RoutePurposeScene");
+  return { default: module.RoutePurposeScene };
+});
 
 function useNarrowViewport() {
   const [narrow, setNarrow] = useState(false);
@@ -50,9 +83,8 @@ export function SiteRouteExperienceBoundary({
   readonly children: ReactNode;
   readonly routeTitle: string;
 }) {
+  const t = useT();
   const { pathname, search } = useLocation();
-  const language = useI18n((state) => state.lang);
-  const locale = resolveProductLocale(language);
   const experience = useMemo(
     () => resolveSiteRouteExperience(`${pathname}${search}`),
     [pathname, search],
@@ -93,16 +125,17 @@ export function SiteRouteExperienceBoundary({
   return (
     <>
       <p className="sr-only" role="status" aria-live="polite" key={experience.canonicalPath}>
-        {experience.pagePurpose[locale]}
+        {t(experience.pagePurpose)}
       </p>
 
       {routePurposeSceneSupported ? (
-        <RoutePurposeScene
-          title={routeTitle}
-          locale={locale}
-          experience={experience}
-          profile={visual}
-        />
+        <Suspense fallback={null}>
+          <RoutePurposeScene
+            title={routeTitle}
+            experience={experience}
+            profile={visual}
+          />
+        </Suspense>
       ) : null}
 
       {desktopRequired ? (
@@ -113,17 +146,13 @@ export function SiteRouteExperienceBoundary({
         >
           <MonitorUp className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <strong className="block break-words">
-              {locale === "ko" ? "정밀 편집은 큰 화면에서 지원됩니다." : "Precision editing requires a larger screen."}
-            </strong>
+            <strong className="block break-words">{t(COPY.desktopTitle)}</strong>
             <p className="mt-1 break-words text-xs leading-5 text-fg-2">
-              {locale === "ko"
-                ? "모바일에서는 보기와 검토를 중심으로 사용할 수 있습니다. 키보드·펜을 사용할 수 있는 환경에서 편집을 이어가세요."
-                : "Use mobile for viewing and review, then continue editing with a keyboard or pen on a larger screen."}
+              {t(COPY.desktopBody)}
             </p>
           </div>
           <Link className="inline-flex min-h-11 shrink-0 items-center rounded-xl border border-line px-3 text-xs font-semibold text-fg hover:bg-raised" to={experience.helpPath}>
-            {locale === "ko" ? "지원 범위 보기" : "View support"}
+            {t(COPY.viewSupport)}
           </Link>
         </aside>
       ) : null}
@@ -137,11 +166,9 @@ export function SiteRouteExperienceBoundary({
         >
           <WifiOff className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <WorkflowTrustBadge state="offline-pending" locale={locale} />
+            <WorkflowTrustBadge state="offline-pending" />
             <p className="mt-2 break-words text-xs leading-5 text-fg-2">
-              {locale === "ko"
-                ? "저장 상태 표시에서 현재 변경 내용이 이 기기에 보관됐는지 확인하세요. 연결이 돌아오면 지원되는 작업은 다시 동기화됩니다."
-                : "Check the workspace save status to confirm whether current changes are stored on this device. Supported work can sync after reconnection."}
+              {t(COPY.offlineBody)}
             </p>
           </div>
         </aside>

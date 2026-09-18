@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import {
   runStudioExportPreflight,
@@ -20,11 +21,23 @@ import {
   type StudioExportDraftInput,
 } from "../studio-project-export-snapshot";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
-type Locale = "ko" | "en";
+type Locale = string;
+
+const EXPORT_TARGET_VISUALS: Readonly<Record<StudioExportTargetId, string>> = {
+  "webtoon-platform": "/brand/theme-scenes/ink-studio.svg",
+  social: "/brand/theme-scenes/blossom-studio.svg",
+  print: "/brand/theme-scenes/paper-studio.svg",
+  "image-pdf": "/brand/theme-scenes/sepia-studio.svg",
+  editable: "/brand/theme-scenes/graphite-studio.svg",
+  ebook: "/brand/theme-scenes/aurora-studio.svg",
+  video: "/brand/theme-scenes/starlight-studio.svg",
+  archive: "/brand/theme-scenes/midnight-studio.svg",
+};
 
 function numberValue(value: string, fallback: number): number {
   const parsed = Number(value);
@@ -57,8 +70,9 @@ export function StudioExportPanel({
   locale,
 }: {
   readonly projectId: string;
-  readonly locale: Locale;
+  readonly locale: "ko" | "en";
 }) {
+  const bt = useBilingual("StudioExportPanel");
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const [target, setTarget] = useState<StudioExportTargetId>("webtoon-platform");
   const [draft, setDraft] = useState<StudioExportDraftInput>(() => recommendedStudioExportDraft(projectId, "webtoon-platform"));
@@ -98,7 +112,7 @@ export function StudioExportPanel({
 
   const runPreflight = () => {
     if (!workspace.state) {
-      setError(locale === "ko" ? "프로젝트 상태를 불러온 뒤 다시 검사해 주세요." : "Reload project state before running preflight.");
+      setError(bt("프로젝트 상태를 불러온 뒤 다시 검사해 주세요.", "Reload project state before running preflight."));
       return;
     }
     try {
@@ -112,12 +126,12 @@ export function StudioExportPanel({
       }));
       if (!updated) throw new Error("Project preflight could not be stored.");
       setResult(next);
-      setMessage(locale === "ko" ? "현재 프로젝트 상태로 사전검사를 저장했습니다." : "Saved preflight from the current project state.");
+      setMessage(bt("현재 프로젝트 상태로 사전검사를 저장했습니다.", "Saved preflight from the current project state."));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : (locale === "ko" ? "사전검사를 실행하지 못했습니다." : "Preflight could not be completed."));
+        : (bt("사전검사를 실행하지 못했습니다.", "Preflight could not be completed.")));
     }
   };
 
@@ -131,16 +145,14 @@ export function StudioExportPanel({
             <FileCheck2 size={14} aria-hidden="true" /> EXPORT PREFLIGHT
           </p>
           <h2 id="project-export-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
-            {locale === "ko" ? "사용할 곳을 고르면 필요한 검사를 자동으로" : "Choose a destination and check everything required"}
+            {bt("사용할 곳을 고르면 필요한 검사를 자동으로", "Choose a destination and check everything required")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "권리·현지화·미해결 검토와 대상 규격을 함께 확인합니다. 여기서는 프로젝트 수준을 검사하고, 실제 파일 생성 직전 편집기에서 캔버스 수치를 다시 확인합니다."
-              : "Check rights, localization, unresolved review items and destination rules together. This is the project-level check; the editor verifies exact canvas data before rendering."}
+            {bt("권리·현지화·미해결 검토와 대상 규격을 함께 확인합니다. 여기서는 프로젝트 수준을 검사하고, 실제 파일 생성 직전 편집기에서 캔버스 수치를 다시 확인합니다.", "Check rights, localization, unresolved review items and destination rules together. This is the project-level check; the editor verifies exact canvas data before rendering.")}
           </p>
         </div>
         <span className="inline-flex min-h-9 items-center rounded-full border border-line bg-panel px-3 text-xs font-bold text-fg-2">
-          {locale === "ko" ? `정책 ${profile.policyVersion}` : `Policy ${profile.policyVersion}`}
+          {bt(`정책 ${profile.policyVersion}`, `Policy ${profile.policyVersion}`)}
         </span>
       </div>
 
@@ -155,7 +167,7 @@ export function StudioExportPanel({
         </p>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap gap-2" aria-label={locale === "ko" ? "내보내기 목적" : "Export destinations"}>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label={bt("내보내기 목적", "Export destinations")}>
         {STUDIO_EXPORT_TARGETS.map((candidate) => {
           const candidateProfile = STUDIO_EXPORT_TARGET_PROFILES[candidate];
           const active = candidate === target;
@@ -166,14 +178,27 @@ export function StudioExportPanel({
               aria-pressed={active}
               onClick={() => selectTarget(candidate)}
               className={cn(
-                "min-h-11 rounded-xl border px-3 text-xs font-bold transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+                "group min-w-0 overflow-hidden rounded-xl border text-left text-xs font-bold transition-all",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transform-none",
                 active
-                  ? "border-accent bg-accent text-on-accent"
-                  : "border-line bg-panel text-fg-2 hover:border-accent/40 hover:text-fg",
+                  ? "border-accent bg-accent-soft/50 shadow-sm"
+                  : "border-line bg-panel text-fg-2 hover:-translate-y-0.5 hover:border-accent/40 hover:bg-raised hover:text-fg",
               )}
             >
-              {locale === "ko" ? candidateProfile.labelKo : candidateProfile.labelEn}
+              <span className="relative block h-20 overflow-hidden bg-canvas">
+                <img
+                  src={EXPORT_TARGET_VISUALS[candidate]}
+                  alt=""
+                  aria-hidden="true"
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.035] motion-reduce:transform-none"
+                />
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-white/[0.04]" aria-hidden="true" />
+              </span>
+              <span className={cn("flex min-h-11 items-center px-3", active ? "text-accent" : "text-fg-2")}>
+                {bt(candidateProfile.labelKo, candidateProfile.labelEn)}
+              </span>
             </button>
           );
         })}
@@ -181,39 +206,39 @@ export function StudioExportPanel({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "형식" : "Format"}
+          {bt("형식", "Format")}
           <select value={draft.format} onChange={(event) => patch("format", event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg">
             {profile.allowedFormats.map((format) => <option key={format} value={format}>{format.toUpperCase()}</option>)}
           </select>
         </label>
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "가로 폭" : "Width"}
+          {bt("가로 폭", "Width")}
           <input type="number" min={1} value={draft.width} onChange={(event) => patch("width", numberValue(event.target.value, draft.width))} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg" />
         </label>
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "전체 높이" : "Height"}
+          {bt("전체 높이", "Height")}
           <input type="number" min={1} value={draft.height} onChange={(event) => patch("height", numberValue(event.target.value, draft.height))} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg" />
         </label>
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "예상 용량 (MB)" : "Estimated size (MB)"}
+          {bt("예상 용량 (MB)", "Estimated size (MB)")}
           <input type="number" min={0.1} step={0.1} value={Math.round(draft.estimatedFileSizeBytes / 1024 / 1024 * 10) / 10} onChange={(event) => patch("estimatedFileSizeBytes", numberValue(event.target.value, 1) * 1024 * 1024)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg" />
         </label>
         <label className="text-xs font-bold text-fg-2">
           DPI
-          <input type="number" min={1} value={draft.dpi ?? ""} onChange={(event) => patch("dpi", event.target.value ? numberValue(event.target.value, 72) : null)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg" placeholder={locale === "ko" ? "웹은 자동" : "Automatic for web"} />
+          <input type="number" min={1} value={draft.dpi ?? ""} onChange={(event) => patch("dpi", event.target.value ? numberValue(event.target.value, 72) : null)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg" placeholder={bt("웹은 자동", "Automatic for web")} />
         </label>
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "색 공간" : "Color space"}
+          {bt("색 공간", "Color space")}
           <select value={draft.colorSpace} onChange={(event) => patch("colorSpace", event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg">
             {(profile.allowedColorSpaces ?? ["srgb"]).map((space) => <option key={space} value={space}>{space.toUpperCase()}</option>)}
           </select>
         </label>
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "가장 작은 글자" : "Smallest text"}
+          {bt("가장 작은 글자", "Smallest text")}
           <input type="number" min={1} value={draft.minimumTextPx ?? ""} onChange={(event) => patch("minimumTextPx", event.target.value ? numberValue(event.target.value, 12) : null)} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg" />
         </label>
         <label className="text-xs font-bold text-fg-2">
-          {locale === "ko" ? "대체 텍스트 범위" : "Alt text coverage"}
+          {bt("대체 텍스트 범위", "Alt text coverage")}
           <select value={String(draft.altTextCoverage)} onChange={(event) => patch("altTextCoverage", Number(event.target.value))} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg">
             <option value="0">0%</option><option value="0.5">50%</option><option value="1">100%</option>
           </select>
@@ -221,13 +246,13 @@ export function StudioExportPanel({
       </div>
 
       <details className="mt-5 rounded-2xl border border-line bg-panel/45 p-4">
-        <summary className="min-h-11 cursor-pointer text-sm font-black text-fg">{locale === "ko" ? "전문 확인 항목" : "Advanced checks"}</summary>
+        <summary className="min-h-11 cursor-pointer text-sm font-black text-fg">{bt("전문 확인 항목", "Advanced checks")}</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {([
-            ["readingOrderComplete", locale === "ko" ? "읽기 순서 완료" : "Reading order complete"],
-            ["aiDisclosurePrepared", locale === "ko" ? "AI 사용 표시 준비" : "AI disclosure prepared"],
-            ["captionsComplete", locale === "ko" ? "자막 완료" : "Captions complete"],
-            ["editableStructurePreserved", locale === "ko" ? "편집 구조 유지" : "Editable structure preserved"],
+            ["readingOrderComplete", bt("읽기 순서 완료", "Reading order complete")],
+            ["aiDisclosurePrepared", bt("AI 사용 표시 준비", "AI disclosure prepared")],
+            ["captionsComplete", bt("자막 완료", "Captions complete")],
+            ["editableStructurePreserved", bt("편집 구조 유지", "Editable structure preserved")],
           ] as const).map(([key, label]) => (
             <label key={key} className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2">
               <input type="checkbox" checked={draft[key]} onChange={(event) => patch(key, event.target.checked)} />
@@ -238,10 +263,10 @@ export function StudioExportPanel({
       </details>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{locale === "ko" ? "사용 불가 에셋" : "Blocked assets"}</p><b className="mt-1 block text-lg text-fg">{projectFacts.blockedAssets}</b></div>
-        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{locale === "ko" ? "조건 확인 에셋" : "Asset warnings"}</p><b className="mt-1 block text-lg text-fg">{projectFacts.warningAssets}</b></div>
-        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{locale === "ko" ? "현지화 오류" : "Localization blocks"}</p><b className="mt-1 block text-lg text-fg">{projectFacts.localization}</b></div>
-        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{locale === "ko" ? "열린 검토" : "Open review"}</p><b className="mt-1 block text-lg text-fg">{projectFacts.comments}</b></div>
+        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{bt("사용 불가 에셋", "Blocked assets")}</p><b className="mt-1 block text-lg text-fg">{projectFacts.blockedAssets}</b></div>
+        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{bt("조건 확인 에셋", "Asset warnings")}</p><b className="mt-1 block text-lg text-fg">{projectFacts.warningAssets}</b></div>
+        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{bt("현지화 오류", "Localization blocks")}</p><b className="mt-1 block text-lg text-fg">{projectFacts.localization}</b></div>
+        <div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.65rem] text-fg-3">{bt("열린 검토", "Open review")}</p><b className="mt-1 block text-lg text-fg">{projectFacts.comments}</b></div>
       </div>
 
       <div className={cn("mt-5 rounded-2xl border p-4", resultTone(displayedResult))}>
@@ -250,14 +275,14 @@ export function StudioExportPanel({
             <h3 className="flex items-center gap-2 text-sm font-black text-fg">
               {displayedResult?.status === "pass" ? <CheckCircle2 size={17} className="text-success" aria-hidden="true" /> : <ShieldAlert size={17} className={displayedResult?.status === "blocked" ? "text-danger" : "text-warning"} aria-hidden="true" />}
               {displayedResult
-                ? (locale === "ko" ? displayedResult.summaryKo : displayedResult.summaryEn)
-                : (locale === "ko" ? "현재 설정으로 검사해 보세요" : "Run preflight for these settings")}
+                ? bt(displayedResult.summaryKo, displayedResult.summaryEn)
+                : (bt("현재 설정으로 검사해 보세요", "Run preflight for these settings"))}
             </h3>
-            {displayedResult ? <p className="mt-1 text-xs text-fg-3">{locale === "ko" ? `차단 ${displayedResult.blockingCount} · 확인 ${displayedResult.warningCount}` : `${displayedResult.blockingCount} blocking · ${displayedResult.warningCount} warnings`}</p> : null}
+            {displayedResult ? <p className="mt-1 text-xs text-fg-3">{bt(`차단 ${displayedResult.blockingCount} · 확인 ${displayedResult.warningCount}`, `${displayedResult.blockingCount} blocking · ${displayedResult.warningCount} warnings`)}</p> : null}
           </div>
           <button type="button" onClick={runPreflight} className={buttonClass({ className: "gap-2" })}>
             <FileCheck2 size={16} aria-hidden="true" />
-            {locale === "ko" ? "현재 상태 검사" : "Run preflight"}
+            {bt("현재 상태 검사", "Run preflight")}
           </button>
         </div>
 
@@ -265,8 +290,8 @@ export function StudioExportPanel({
           <ul className="mt-4 space-y-2">
             {displayedResult.findings.map((finding) => (
               <li key={finding.code} className="rounded-xl border border-line bg-card/70 p-3 text-xs leading-5 text-fg-2">
-                <b className={finding.severity === "error" ? "text-danger" : finding.severity === "warning" ? "text-warning" : "text-fg"}>{locale === "ko" ? finding.messageKo : finding.messageEn}</b>
-                <span className="mt-1 block text-fg-3">{locale === "ko" ? finding.suggestedActionKo : finding.suggestedActionEn}</span>
+                <b className={finding.severity === "error" ? "text-danger" : finding.severity === "warning" ? "text-warning" : "text-fg"}>{bt(finding.messageKo, finding.messageEn)}</b>
+                <span className="mt-1 block text-fg-3">{bt(finding.suggestedActionKo, finding.suggestedActionEn)}</span>
               </li>
             ))}
           </ul>
@@ -274,9 +299,9 @@ export function StudioExportPanel({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs leading-5 text-fg-3">{locale === "ko" ? "실제 분할·레이어·파일 용량은 편집기에서 최종 렌더 직전에 다시 확인합니다." : "The editor rechecks exact segmentation, layers and file size immediately before rendering."}</p>
+        <p className="text-xs leading-5 text-fg-3">{bt("실제 분할·레이어·파일 용량은 편집기에서 최종 렌더 직전에 다시 확인합니다.", "The editor rechecks exact segmentation, layers and file size immediately before rendering.")}</p>
         <Link href={editorHref} className={buttonClass({ variant: displayedResult?.status === "blocked" ? "outline" : "solid", className: "gap-2" })}>
-          {locale === "ko" ? "편집기에서 최종 출력" : "Finalize in editor"}
+          {bt("편집기에서 최종 출력", "Finalize in editor")}
           <ArrowRight size={15} aria-hidden="true" />
         </Link>
       </div>

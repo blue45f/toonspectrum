@@ -1,6 +1,6 @@
 # ToonStudio 올인원 구현 상태 원장
 
-- 기준일: 2026-09-17
+- 기준일: 2026-09-18
 - 제품 정의: **기획부터 연재까지 외부 제작 도구 없이 완결하는 올인원 웹툰 제작 스튜디오**
 - 사용자 문장: **기획부터 연재까지, 웹툰 제작의 모든 것을 한곳에서.**
 
@@ -132,7 +132,23 @@
 - 52개 구현, 4개 검증 harness, 1개 외부 전문 창작자 검증 상태를 구분하며 외부 서명 증거 전에는 대체 완료 문구를 차단한다.
 - 전문 창작자 12명 대상 블라인드 제작 과제·성능·PSD·3D·검수·게시 패키지 평가 기준을 명시했다.
 
-이 증분의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport다. 브라우저 OAuth 로그인·refresh token·OS Keychain, 프로세스 재시작 이후 upload session 재개, OS 서명 설치 패키지와 충돌 GUI는 별도 release gate로 유지한다.
+이 시점의 완료 범위는 파일시스템·마운트 폴더와 Google Drive·Dropbox·OneDrive direct access-token transport였다. 당시 후속 release gate였던 브라우저 OAuth 로그인·refresh token·OS 자격 증명 보관, 프로세스 재시작 이후 upload session 재개, 검증 가능한 서명 배포 패키지와 충돌 검토 UI는 아래 2026-09-18 증분에서 코드 경로와 자동 검증을 완료했다.
+
+## 2026-09-18 데스크톱 동기화 릴리스 게이트 완료 증분
+
+이번 증분에서 다음 코드 경로와 자동 검증을 완료했다.
+
+- Google Drive·Dropbox·OneDrive의 public-client PKCE 브라우저 OAuth, loopback callback state 검증, 계정 확인, access token 갱신과 refresh token rotation을 구현했다.
+- OAuth 자격 증명을 macOS Keychain, Windows Credential Manager, Linux Secret Service에 저장하며 토큰을 명령행·로그·journal·sidecar index에 남기지 않는다.
+- 공급자별 대용량 upload session을 OS credential vault에 보존해 프로세스 재시작 뒤 이어서 전송하고, 원본 digest·크기·원격 version이 달라지면 폐기 후 안전하게 다시 시작한다.
+- 충돌 파일의 양쪽 메타데이터·지원 형식 미리보기를 loopback 전용 UI에서 비교하고 로컬 유지·원격 유지·둘 다 보존을 파일별로 결정하며, 적용 영수증을 남긴다.
+- Dropbox는 조건부 삭제 API가 없는 한계를 영구 삭제로 우회하지 않고 revision 확인 후 `.toonstudio-trash`로 이동한다. 이동 중 revision이 바뀌면 원래 경로로 복원하거나 보존 위치를 포함한 충돌로 중단한다.
+- 심볼릭 링크 경로로 실행된 배포 CLI가 아무 작업 없이 종료되던 entrypoint 판정 오류를 realpath 기준으로 수정하고 회귀 테스트에 고정했다.
+- Linux·macOS·Windows별 독립 Node runtime, production dependency, 라이선스, CycloneDX SBOM, SHA-256 manifest·영수증을 포함하는 결정론적 배포 패키지를 생성한다.
+- 동일 소스·버전의 두 패키지가 byte-for-byte 같은 archive hash를 내는지, 경로 탈출 signing evidence·파일 변조·서명 누락을 차단하는지 자동 검증한다.
+- 태그 릴리스는 macOS codesign, Windows Authenticode, Linux GPG 서명과 native verification을 통과하지 못하면 산출물을 업로드하지 않는 3-OS CI를 사용한다.
+
+실제 배포 인증서로 만든 서명·공증 산출물, 실제 공급자 계정의 장시간 장애·권한 회수 시험, 현 커밋의 실기기 soak와 12명 전문 창작자 서명 검증은 저장소가 자체 생성할 수 없는 운영 증거로 계속 분리한다.
 
 ## 2026-09-17 기준 프로젝트 A–D 자동 인증 증분
 
@@ -163,42 +179,8 @@
 - 일정 화면에서 이미 늦은 작업, 예측 위험, 단순 주의와 정상 상태를 텍스트와 시각 표현으로 함께 구분한다.
 - 마감 2일 재조정, 적합한 지원 인력 추가, 차단 입력 해소, 병목 선행 작업 우선 완료, 작업 범위 20% 분리 시나리오를 원본을 바꾸지 않고 비교한다.
 - 각 복구안은 위험 점수·예상 지연·프로젝트 고위험 건수·예측 초과 작업 수의 전후 값을 함께 보여준다.
-- 마감·지원 배정처럼 되돌릴 수 있는 변경만 사용자 클릭 후 원자적 배치로 적용하며, 근거 없는 차단 해소·완료 처리·범위 축소는 미리보기 전용으로 제한한다.
-- 같은 자동화 조건을 다시 실행해도 결정적 실행 키로 동일 업무·알림을 복제하지 않고, 시간 기반 경고는 날짜가 바뀐 경우에만 새 발생으로 처리한다.
-- 외부 검수 비밀 값은 URL 쿼리와 요청 본문에 남기지 않고 프래그먼트에서 한 번 회수한 뒤 주소창을 정리하며, API에는 Authorization 헤더로만 전달한다.
-- 규칙 기반 예측 모델, 위험 등록 권한, 복구 시나리오, 자동화 멱등성, 외부 검수 비밀 처리와 적용 권한을 단위·컴포넌트·모바일 브라우저 테스트로 회귀 방지한다.
-
-## 2026-09-17 자체 연재·게시 자동 인증 증분
-
-이번 증분에서 완료한 범위는 다음과 같다.
-
-- 시리즈 상태를 연재중·휴재·완결로 확장하고 API 입력 정규화, 웹 타입, 목록·상세 배지, 생성·수정 폼과 데이터베이스 제약을 일치시켰다.
-- 예약 게시, 승인된 immutable release, 기존 회차 supersede, 공개 취소와 독자 공개 범위를 release-governance 인증 lane으로 묶었다.
-- 공개·링크 공개·비공개 정책, 댓글·리믹스·메타데이터 투영을 reader-policy lane에서 검증한다.
-- 범용·WEBTOON·Tapas 패키지 3종을 고정 입력으로 생성하고 24개 artifact의 파일명·MIME·크기·SHA-256·공개 manifest를 Golden corpus로 보존한다.
-- 내부 canvas ID, 로컬 경로와 작업 파일명이 외부 manifest에 노출되지 않는지 byte-for-byte 확인한다.
-- 사용자 제공 CSV·수동 입력 통계는 원격 플랫폼 telemetry를 사용했다고 주장하지 않고 로컬에서만 정규화·비교한다.
-- 5개 publishing lane, 16개 실행 증거 파일, 총 134개 테스트를 통과하고 receipt를 CI 산출물로 남긴다.
-- 자동 인증이 통과해도 WEBTOON·Tapas 계정에 직접 게시했다고 주장하지 않도록 claim policy를 분리했다.
-
-직접 외부 플랫폼 계정 게시, 플랫폼 정책의 최신성, 대량 예약 연재와 실제 알림 전달은 별도 운영 release gate로 유지한다.
-
-## 2026-09-17 운영 안정성 자동 인증 증분
-
-이번 증분에서 완료한 범위는 다음과 같다.
-
-- performance-and-soak, file-roundtrip-integrity, fault-and-collaboration-recovery, accessibility-and-security의 4개 operational lane을 저장소 CI에 추가했다.
-- 18개 실행 테스트 파일에서 총 215개 테스트를 통과하며, 각 파일과 bounded artifact의 SHA-256을 receipt에 기록한다.
-- 리소스 예산 초과 시 원본을 평탄화하거나 삭제하지 않고 proxy·LOD·미리보기 품질 저하·live effect 일시 정지를 제안하는 계약을 검증한다.
-- 2026-08-07 Apple M2 Max 역사적 8시간 soak는 727,739 cycle, 29,109,560 command, 1,455,478 render, 오류 0과 최대 RSS 증가 167.6 MiB를 기록한다.
-- 동일 8시간 leak negative control은 RSS 1,628.1 MiB 증가와 11개 allocation failure를 보존해 검증기가 정상·비정상을 구분하는지 확인한다.
-- PSD·텍스트·조정 그래프·CLIP selection·workspace interchange의 5개 round-trip 파일에서 110개 테스트를 통과한다.
-- GPU device loss, Worker termination, queue completion inversion, torn journal, corrupt snapshot·blob, quota reject, offline retry의 7종 deterministic fault를 검증한다.
-- device loss 100회, Worker 종료 1,000회, reverse queue completion 64회와 crash reopen 64회에서 lost command·duplicate commit·stale apply가 0인지 확인한다.
-- 대비·대체 텍스트·읽기 순서·키보드·터치 타깃·모바일 focus isolation과 CSP·dependency advisory 예외 금지를 같은 lane에서 검증한다.
-- historical soak와 deterministic fault를 현재 commit의 실제 장치 인증으로 오인하지 않도록 currentCommitEightHourSoakCertified, realHardwareBrowserCertificationAllowed, professionalReplacementClaimAllowed를 false로 고정한다.
-
-현재 release commit의 8시간 soak, 물리 GPU·브라우저 process crash·OPFS quota, 실제 네트워크 분할, 실기기 스크린리더·펜 장치와 외부 전문 창작자 서명은 저장소 자동화가 대체하지 않는 release gate다.
+- 마감·지원 배정처럼 되돌릴 수 있는 변경만 사용자 클릭 후 적용하며, 근거 없는 차단 해소·완료 처리·범위 축소는 미리보기 전용으로 제한한다.
+- 규칙 기반 예측 모델, 위험 등록 권한, 복구 시나리오와 적용 권한을 단위·컴포넌트·모바일 브라우저 테스트로 회귀 방지한다.
 
 ## 올인원 공개 문구 사용 게이트
 

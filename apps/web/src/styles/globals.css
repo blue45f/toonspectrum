@@ -1741,3 +1741,86 @@ body[data-studio-app="true"] .route-stage::before,
     backdrop-filter: none;
   }
 }
+
+
+/* Studio asset workspace: respond to the floating window itself, not the browser viewport.
+   Desktop surfaces can be resized independently from the viewport, so viewport lg/2xl
+   breakpoints caused the three-pane workspace to overflow a narrow 420–860px window. */
+[data-studio-unified-asset-workspace="true"] {
+  container-name: studio-asset-workspace;
+  container-type: inline-size;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+}
+
+[data-studio-asset-workspace-grid="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+[data-studio-asset-results-grid="true"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@container studio-asset-workspace (min-width: 30rem) {
+  [data-studio-asset-results-grid="true"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container studio-asset-workspace (min-width: 46rem) {
+  [data-studio-asset-workspace-grid="true"] {
+    grid-template-columns: 11rem minmax(0, 1fr);
+  }
+
+  [data-studio-asset-sidebar="true"] {
+    max-block-size: min(68dvh, 46rem);
+    overflow-y: auto;
+  }
+
+  [data-studio-asset-facet-list="true"],
+  [data-studio-asset-collection-list="true"] {
+    display: grid;
+    gap: 0.25rem;
+    overflow-x: visible;
+  }
+
+  [data-studio-asset-facet-list="true"] > button,
+  [data-studio-asset-collection-list="true"] > button {
+    inline-size: 100%;
+  }
+
+  [data-studio-asset-sidebar-label="true"] {
+    display: block;
+  }
+
+  [data-studio-asset-detail-pane="true"] {
+    grid-column: 1 / -1;
+  }
+
+  [data-studio-asset-results-grid="true"][data-density="compact"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container studio-asset-workspace (min-width: 64rem) {
+  [data-studio-asset-workspace-grid="true"] {
+    grid-template-columns: 11rem minmax(20rem, 1fr) minmax(17rem, 19rem);
+  }
+
+  [data-studio-asset-detail-pane="true"] {
+    grid-column: auto;
+    max-block-size: min(68dvh, 46rem);
+    overflow-y: auto;
+  }
+}
+
+@container studio-asset-workspace (min-width: 72rem) {
+  [data-studio-asset-results-grid="true"][data-density="visual"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  [data-studio-asset-results-grid="true"][data-density="compact"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

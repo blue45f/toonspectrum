@@ -3,6 +3,7 @@ import { useId } from "react";
 
 import type { StudioCompanionWindowLayoutSurface } from "./studio-companion-window-layout";
 
+import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 
 export type StudioCompanionWindowSurface = StudioCompanionWindowLayoutSurface;
@@ -161,20 +162,7 @@ export function StudioCompanionWindowLayoutControls({
           <span className="min-w-0 text-[0.68rem] font-semibold leading-tight">
             위치·크기 기억
           </span>
-          <span
-            aria-hidden
-            className={cn(
-              "flex h-6 w-10 shrink-0 items-center rounded-full border px-0.5 transition-colors duration-150 motion-reduce:transition-none",
-              enabled ? "border-accent bg-accent" : "border-line-strong bg-panel"
-            )}
-          >
-            <span
-              className={cn(
-                "size-4 rounded-full shadow-sm transition-transform duration-150 motion-reduce:transition-none",
-                enabled ? "translate-x-4 bg-on-accent" : "translate-x-0 bg-fg-3"
-              )}
-            />
-          </span>
+          <SwitchIndicator checked={enabled} />
         </button>
 
         <button
