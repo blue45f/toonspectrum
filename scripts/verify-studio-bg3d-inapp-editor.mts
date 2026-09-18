@@ -212,7 +212,7 @@ async function verifyFramingProfile(
       throw new Error(`Framing fixture canvas has not painted (${initialCanvas.distinctColors} colours)`);
     }
     const dialog = page.getByTestId("studio-bg3d-dialog");
-    await dialog.getByRole("tab", { name: "도형", exact: true }).click();
+    await dialog.getByRole("tab", { name: /^(?:도형|소품)$/u }).click();
     await dialog.getByRole("button", { name: "상자 추가", exact: true }).first().click();
     for (const [axis, value] of [["X", "0.8"], ["Y", "6"], ["Z", "0.4"]]) {
       const field = dialog.getByRole("spinbutton", { name: `크기 ${axis}`, exact: true }).first();
@@ -530,6 +530,8 @@ async function verifyNativeTouchScroll(
   const handle = page.locator(selector);
   diagnostics.phase = "measure";
   await handle.waitFor({ state: "visible", timeout: 10_000 });
+  await handle.scrollIntoViewIfNeeded({ timeout: 5_000 });
+  await page.waitForTimeout(100);
   const geometry = await readNativeTouchScrollGeometry(handle);
   diagnostics.initialGeometry = geometry;
   if (Math.min(geometry.width, geometry.height) < MIN_TOUCH_TARGET_PX) {
@@ -878,7 +880,7 @@ async function main(): Promise<void> {
   const baseUrl = externalOrigin ?? `http://127.0.0.1:${port}`;
   let browser: Browser | null = null;
   try {
-    await waitForServer(`${baseUrl}/studio`, { timeoutMs: 60_000, requestInit: { method: "GET" } });
+    await waitForServer(`${baseUrl}/studio/canvas`, { timeoutMs: 60_000, requestInit: { method: "GET" } });
     browser = await chromium.launch({
       headless: true,
       executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,

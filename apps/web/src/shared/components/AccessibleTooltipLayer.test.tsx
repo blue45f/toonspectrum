@@ -150,6 +150,21 @@ describe("AccessibleTooltipLayer", () => {
     expect(button.hasAttribute("aria-describedby")).toBe(false);
   });
 
+  it("dismisses ordinary hover help as soon as its action is clicked", () => {
+    vi.useFakeTimers();
+    const onClick = vi.fn();
+    renderLayer(
+      <button type="button" aria-label="필터 열기" onClick={onClick}>
+        <svg aria-hidden="true" />
+      </button>,
+    );
+    const button = screen.getByRole("button", { name: "필터 열기" });
+    revealByHover(button);
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
   it("falls back to rendered child geometry when an inline wrapper reports zero size", () => {
     vi.useFakeTimers();
     renderLayer(

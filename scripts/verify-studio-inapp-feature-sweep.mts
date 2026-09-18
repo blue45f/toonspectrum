@@ -29,6 +29,7 @@ import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosa
 
 import {
   collectStudioInAppRuntimeErrors,
+  dismissStudioInAppFirstRunSurfaces,
   installStudioInAppFirstRunState,
   installStudioInAppGuestBoundary,
   launchStudioInAppBrowser,
@@ -289,7 +290,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
     label: "굵기·투명도 조절",
     run: async (page) => {
       const sheet = await openDrawSettings(page);
-      for (const name of ["브러시 굵기", "브러시 투명도"]) {
+      for (const name of ["브러시 굵기", "브러시 불투명도"]) {
         const number = sheet.getByRole("spinbutton", { name: `${name} 숫자`, exact: true });
         const slider = sheet.getByRole("slider", { name: `${name} 슬라이더`, exact: true });
         await number.fill("40");
@@ -299,7 +300,7 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
         if (await number.inputValue() !== "41") throw new Error(`${name}: slider keyboard input did not update the value`);
       }
       await sheet.getByRole("spinbutton", { name: "브러시 굵기 숫자", exact: true }).fill("8");
-      await sheet.getByRole("spinbutton", { name: "브러시 투명도 숫자", exact: true }).fill("100");
+      await sheet.getByRole("spinbutton", { name: "브러시 불투명도 숫자", exact: true }).fill("100");
       await settle(page);
       return "ok";
     },
@@ -363,11 +364,17 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await search.fill("펜");
       if (await search.inputValue() !== "펜") throw new Error("brush library search did not retain the query");
       await settle(page);
-      return clickLocator(
-        page,
-        library.getByRole("button", { name: /선택$/u }),
-        "selectable brush",
-      );
+      const selectable = library
+        .locator('button[data-studio-brush-select]:not([aria-pressed="true"])')
+        .first();
+      await selectable.waitFor({ state: "visible" });
+      await selectable.scrollIntoViewIfNeeded();
+      await selectable.click({ timeout: 5_000 });
+      await settle(page);
+      if (await selectable.getAttribute("aria-pressed") !== "true") {
+        throw new Error("selected brush did not become active");
+      }
+      return "ok";
     },
   },
 
@@ -888,6 +895,9 @@ async function sweepProfile(
 
   const outcomes: StudioInAppStepOutcome[] = [];
   await page.goto(`${baseUrl}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await dock(page).waitFor({ state: "visible", timeout: 25_000 });
+  await dismissStudioInAppFirstRunSurfaces(page);
+  await settle(page);
 
   for (const step of steps) {
     currentStep = step.id;

@@ -52,7 +52,7 @@ describe("studio shell floating integration", () => {
     expect(offline).toContain('const shouldShowPanel = connectivity.mode !== "online"');
     expect(offline).toContain("if (!shouldShowPanel) return null;");
     expect(huddle).toContain("var(--studio-canvas-bottom-inset,7rem)+4.25rem");
-    expect(manager).toContain("var(--studio-canvas-bottom-inset,0px)+0.75rem");
+    expect(manager).toContain("var(--studio-canvas-bottom-inset,7rem)+0.75rem");
     expect(manager).toContain("보기 설정");
     expect(manager).toContain("{visibleCount}개");
   });

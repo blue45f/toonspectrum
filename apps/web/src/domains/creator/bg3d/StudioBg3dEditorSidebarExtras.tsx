@@ -6,7 +6,7 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { Studio3dAssetQualityPanel } from "../Studio3dAssetQualityPanel";
 
-import { useEffect as useReactEffect, useMemo, useState as useReactState } from "react";
+import { useEffect as useReactEffect, useState as useReactState } from "react";
 
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { StudioBg3dSceneOutliner } from "./StudioBg3dSceneOutliner";
@@ -212,7 +212,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     setTemplateLibraryStatus, isSavingTemplate, setIsSavingTemplate, applyingTemplateId,
     setApplyingTemplateId, generateId, handleSaveSceneAsTemplate, handleDeleteTemplate,
     failedCloneIds, setFailedCloneIds, readyCloneIds, setReadyCloneIds, unbatchableModelIds,
-    setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument, savedShots,
+    setUnbatchableModelIds, sceneBaseDocument, setSceneBaseDocument, canonicalRevision, savedShots,
     shotBatchSelectedIds, selectedShotBatchPasses, deviceSignals, setDeviceSignals, skyPresetId,
     insertBackgroundIntent, transparentInsert, captureRef, modalDialogRef, modalRootRef,
     viewportApiRef, pendingInitialCameraRef, cameraLensGestureBeforeViewRef,
@@ -324,7 +324,13 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     ltUserPresetLibraryStatus, physicsGravityPreset, setPhysicsGravityPreset,
     LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, engineFrameTimeMs, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
   } = { ...R, ...h };
-  const professionalReadinessInput = useMemo(() => {
+  const [professionalRuntimeReadiness, setProfessionalRuntimeReadiness] = useReactState();
+  useReactEffect(() => {
+    if (!open || viewEditorSection !== "prosuite") {
+      setProfessionalRuntimeReadiness(undefined);
+      return undefined;
+    }
+
     const viewportWidth = viewportBoxSize?.width ?? documentCanvasSize?.width ?? 0;
     const viewportHeight = viewportBoxSize?.height ?? documentCanvasSize?.height ?? 0;
     const viewportAspectRatio = viewportWidth > 0 && viewportHeight > 0
@@ -350,8 +356,8 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
             recoverable: false,
           }
         : undefined;
-    return {
-      authorityId: `bg3d:${sharedStageSessionScopeKey ?? "editor-session"}`,
+    const professionalReadinessInput = {
+      authorityId: "bg3d:" + (sharedStageSessionScopeKey ?? "editor-session"),
       primitives,
       customModels,
       attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
@@ -370,32 +376,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
       babylonSpecialistAvailable: babylonDiagnosticState.status === "success",
       runtimeFailure,
     };
-  }, [
-    attachmentByStorageModelIdRef,
-    babylonDiagnosticState.status,
-    canonicalRevision,
-    customModels,
-    deviceSignals,
-    documentCanvasSize?.height,
-    documentCanvasSize?.width,
-    engineRuntime.deviceLostMessage,
-    engineRuntime.plan,
-    engineRuntime.probe,
-    primitives,
-    sceneBaseDocument,
-    sharedCharacterGroundings,
-    sharedCharacters,
-    sharedSceneSession,
-    sharedStageSessionScopeKey,
-    viewportBoxSize?.height,
-    viewportBoxSize?.width,
-  ]);
-  const [professionalRuntimeReadiness, setProfessionalRuntimeReadiness] = useReactState();
-  useReactEffect(() => {
-    if (!open || viewEditorSection !== "prosuite") {
-      setProfessionalRuntimeReadiness(undefined);
-      return undefined;
-    }
+
     let cancelled = false;
     setProfessionalRuntimeReadiness(undefined);
     void import("./studio-bg3d-professional-runtime-readiness").then((module) => {
@@ -426,7 +407,28 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     return () => {
       cancelled = true;
     };
-  }, [open, professionalReadinessInput, viewEditorSection]);
+  }, [
+    attachmentByStorageModelIdRef,
+    babylonDiagnosticState.status,
+    canonicalRevision,
+    customModels,
+    deviceSignals,
+    documentCanvasSize?.height,
+    documentCanvasSize?.width,
+    engineRuntime.deviceLostMessage,
+    engineRuntime.plan,
+    engineRuntime.probe,
+    open,
+    primitives,
+    sceneBaseDocument,
+    sharedCharacterGroundings,
+    sharedCharacters,
+    sharedSceneSession,
+    sharedStageSessionScopeKey,
+    viewEditorSection,
+    viewportBoxSize?.height,
+    viewportBoxSize?.width,
+  ]);
   return (
     <>
               <Studio3dAssetQualityPanel

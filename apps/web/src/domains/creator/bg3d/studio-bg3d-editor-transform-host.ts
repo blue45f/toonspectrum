@@ -985,10 +985,12 @@ export function attachStudioBg3dEditorTransformHost(h) {
     }
   }
   h.focusSelectedEntity = focusSelectedEntity;
-  const registerPrimitiveRef = (id: string, obj: THREE.Group | null) => {
+  const registerPrimitiveRef = useCallback((id: string, obj: THREE.Group | null) => {
+    const current = primitiveObjectsRef.current.get(id) ?? null;
+    if (current === obj) return;
     if (obj) primitiveObjectsRef.current.set(id, obj);
     else primitiveObjectsRef.current.delete(id);
     setRefTick((n) => n + 1);
-  };
+  }, [primitiveObjectsRef, setRefTick]);
   h.registerPrimitiveRef = registerPrimitiveRef;
 }

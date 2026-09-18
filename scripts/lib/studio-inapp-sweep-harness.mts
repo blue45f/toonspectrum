@@ -59,6 +59,7 @@ const ENVIRONMENT_NOISE = [
   "/api/studio-ai/status",
   "/api/analytics/traffic/",
   "/api/auth/session",
+  "/api/me",
   "fonts.googleapis.com",
   "fonts.gstatic.com",
   "cdn.jsdelivr.net",
@@ -252,6 +253,31 @@ export async function installStudioInAppGuestBoundary(page: Page): Promise<void>
       status: 200,
     });
   });
+  await page.route("**/api/health/ready", async (route) => {
+    await route.fulfill({
+      body: JSON.stringify({ ready: true }),
+      contentType: "application/json; charset=utf-8",
+      status: 200,
+    });
+  });
+}
+
+export async function dismissStudioInAppFirstRunSurfaces(page: Page): Promise<void> {
+  const quickStart = page.locator('[data-studio-creative-starter="true"]');
+  const mounted = await quickStart
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (mounted) {
+    const dismiss = quickStart.locator('[data-studio-quickstart-dismiss="true"]');
+    await dismiss.click({ timeout: 3_000 });
+    await quickStart.waitFor({ state: "detached", timeout: 3_000 });
+  }
+
+  const mobileHintDismiss = page.getByRole("button", { name: "안내 닫기", exact: true });
+  if (await mobileHintDismiss.isVisible().catch(() => false)) {
+    await mobileHintDismiss.click({ timeout: 3_000 });
+  }
 }
 
 /** Storage keys the Studio reads on boot to decide whether to show first-run surfaces. */
