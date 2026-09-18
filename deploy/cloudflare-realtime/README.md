@@ -326,6 +326,29 @@ for saved projects and durable comment history. Production client integration
 must use the same idempotency key when coordinating a canonical comment write
 with its realtime notification.
 
+### Durable Object cost guardrails
+
+These invariants keep realtime behavior intact while preventing storage-cost
+amplification:
+
+- Presence cursor traffic remains replayable and hibernation-safe. Do not make
+  `presence.cursor` ephemeral unless the protocol, resume behavior, and snapshot
+  recovery contract are changed together and covered by integration tests.
+- Cleanup scheduling must prefer an already-scheduled alarm that fires inside
+  the cleanup window. Avoid scanning SQLite merely to rediscover that cleanup is
+  already guaranteed.
+- Boolean storage probes must use `EXISTS`/bounded lookups rather than
+  `COUNT(*)` over growing replay or receipt tables.
+- `rate_budget` is intentionally not indexed by `expires_at_ms`: the table is
+  bounded by actor × channel, while every accepted publish updates its expiry.
+  Reintroducing that index adds a hot-path index write to every publish.
+- Actor-directory preflight plus final registration is a revocation race
+  defense, not duplicate work. Do not collapse it without preserving the
+  admission fence semantics.
+- High-frequency cursor tuning belongs in the adaptive cursor transport. Do not
+  reduce durable comment, screen-signaling, CRDT, or ink guarantees to save
+  cursor traffic.
+
 ## Local verification
 
 Pure protocol/store checks run in Node, including an actual in-memory SQLite

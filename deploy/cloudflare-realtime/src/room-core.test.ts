@@ -9,6 +9,7 @@ import {
   planReplay,
   resolveHibernatableBufferedAmount,
   resolveRealtimeRoomLimits,
+  selectAlarmCoveringCleanupWindow,
   selectNextAlarmAt,
 } from "./room-core";
 
@@ -178,5 +179,36 @@ describe("realtime room core", () => {
     expect(
       selectNextAlarmAt(1_000, 60_000, true, []),
     ).toBe(61_000);
+  });
+
+  it("reuses an alarm that already covers the cleanup window", () => {
+    expect(
+      selectAlarmCoveringCleanupWindow(1_000, 60_000, 30_000, []),
+    ).toBe(30_000);
+    expect(
+      selectAlarmCoveringCleanupWindow(
+        1_000,
+        60_000,
+        50_000,
+        [20_000, 80_000],
+      ),
+    ).toBe(20_000);
+  });
+
+  it("requires a storage probe when no known alarm covers cleanup", () => {
+    expect(
+      selectAlarmCoveringCleanupWindow(1_000, 60_000, 90_000, []),
+    ).toBeNull();
+    expect(
+      selectAlarmCoveringCleanupWindow(
+        1_000,
+        60_000,
+        null,
+        [80_000, 120_000],
+      ),
+    ).toBeNull();
+    expect(
+      selectAlarmCoveringCleanupWindow(1_000, 60_000, null, []),
+    ).toBeNull();
   });
 });
