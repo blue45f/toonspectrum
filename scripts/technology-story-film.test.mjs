@@ -5,7 +5,7 @@ const { test } = process.env.VITEST ? await import("vitest") : await import("nod
 
 const index = readFileSync("media/brand-film/src/index.tsx", "utf8");
 const renderer = readFileSync("media/brand-film/render-technology.mjs", "utf8");
-const composition = readFileSync("media/brand-film/src/TechnologyStoryFilm.tsx", "utf8");
+const film = readFileSync("media/brand-film/src/TechnologyStoryFilm.tsx", "utf8");
 const workflow = readFileSync(".github/workflows/technology-story-film.yml", "utf8");
 
 test("technology film compositions and renderer share the published identifiers", () => {
@@ -36,8 +36,23 @@ test("renderer emits review metadata, captions and transcripts", () => {
 });
 
 
+test("technology film covers Worker, PWA, 3D, free AI, Open API and troubleshooting", () => {
+  for (const marker of [
+    "WORKER · PWA · LOCAL-FIRST",
+    "WEB 3D · BLENDER · MCP",
+    "FREE-FIRST AI · COST",
+    "OPEN API · PROVENANCE",
+    "TROUBLESHOOTING · EVIDENCE",
+  ]) {
+    assert(film.includes(marker), `missing film marker: ${marker}`);
+  }
+  assert(renderer.includes("Worker, PWA, OPFS"));
+  assert(renderer.includes("Blender QA"));
+  assert(renderer.includes("중복 추론"));
+});
+
 test("overview film keeps browser execution in sync with the field notes", () => {
-  assert(composition.includes('kicker: "04 · BROWSER EXECUTION"'));
-  assert(composition.includes('points: ["Workers", "PWA", "ONNX", "MediaPipe"]'));
-  assert(composition.includes('kicker: "07 · REUSABLE ENGINEERING"'));
+  assert(film.includes('kicker: "04 · WORKER · PWA · LOCAL-FIRST · BROWSER EXECUTION"'));
+  assert(film.includes('points: ["Workers", "PWA", "ONNX", "MediaPipe"]'));
+  assert(film.includes('kicker: "11 · REUSABLE ENGINEERING"'));
 });

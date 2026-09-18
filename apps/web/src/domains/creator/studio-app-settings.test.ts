@@ -36,20 +36,20 @@ describe("studio-app-settings", () => {
     const defaults = defaultStudioAppSettings();
     expect(defaults.general.densityMode).toBe("simple");
     expect(defaults.toolbar.visibleIds).toEqual(DEFAULT_STUDIO_RAIL_VISIBLE_IDS);
-    expect(DEFAULT_STUDIO_RAIL_VISIBLE_IDS).toHaveLength(9);
+    expect(DEFAULT_STUDIO_RAIL_VISIBLE_IDS).toHaveLength(8);
     expect(DEFAULT_STUDIO_RAIL_VISIBLE_IDS).toEqual([
       "select",
       "pen",
       "eraser",
       "fill",
-      "eyedropper",
+      "marquee-rect",
+      "smart-shape",
       "text",
-      "bubble",
       "image",
-      "zoom-fit",
     ]);
     expect(Object.keys(defaults.shortcuts).length).toBe(STUDIO_SHORTCUT_ACTIONS.length);
     expect(defaults.shortcuts["toggle-chrome"]).toBe("`");
+    expect(defaults.shortcuts["quick-hud"]).toBe("Shift+Space");
     expect(defaults.shortcuts["flip-canvas"]).toBe("H");
     expect(defaults.shortcuts["tool-crop"]).toBe("C");
     expect(defaults.shortcuts["toggle-transparent-color"]).toBe("Shift+C");

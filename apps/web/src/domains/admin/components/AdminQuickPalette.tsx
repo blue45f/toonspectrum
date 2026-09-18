@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Command } from "cmdk";
 import { Download, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -166,7 +167,7 @@ export function AdminQuickPalette({ userId }: AdminQuickPaletteProps) {
                     className="border-t border-line px-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-3"
                   >
                     <Command.Item
-                      value={`${t("admin.palette.exportUsers")} csv members`}
+                      value={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminQuickPalette", "en", "{v0} csv members"), { v0: String(t("admin.palette.exportUsers")) })}
                       onSelect={() => {
                         setOpen(false);
                         void exportCsv(
@@ -181,7 +182,7 @@ export function AdminQuickPalette({ userId }: AdminQuickPaletteProps) {
                       {t("admin.palette.exportUsers")}
                     </Command.Item>
                     <Command.Item
-                      value={`${t("admin.palette.exportRevenue")} csv revenue`}
+                      value={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminQuickPalette", "en", "{v0} csv revenue"), { v0: String(t("admin.palette.exportRevenue")) })}
                       onSelect={() => {
                         setOpen(false);
                         void exportCsv(

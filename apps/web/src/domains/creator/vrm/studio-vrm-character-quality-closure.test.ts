@@ -24,7 +24,9 @@ describe("VRM character quality closure", () => {
     expect(forge).toContain("ToonSpectrumAvatarForgeHair_AuthoredMerged");
     expect(forge).toContain("ToonSpectrumAvatarForgeHairOutline_AuthoredMerged");
     expect(forge).not.toContain("for (const part of buildAvatarForgeHairParts(state))");
-    expect(authoredHair).toContain("CLUMP_CROSS_SEGMENTS = 6");
+    expect(authoredHair).toContain("CLUMP_CROSS_SEGMENTS = 8");
+    expect(authoredHair).toContain("clipCapForehead");
+    expect(authoredHair).toContain("shapeBackShellToDrape");
     expect(authoredHair).toContain("mergeGeometries(geometries, false)");
     expect(authoredHair).toContain("part.shadowColor");
   });

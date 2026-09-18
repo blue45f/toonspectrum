@@ -82,6 +82,74 @@ describe("Studio Scene3D asset admission", () => {
     expect(result.status).toBe("reject");
   });
 
+  it("rejects declared LODs when measured triangle evidence is missing or fake", () => {
+    const missing = evaluateStudioScene3dAssetAdmission(asset, {
+      ...excellentEvidence,
+      technical: {
+        ...excellentEvidence.technical,
+        lodCount: 3,
+        trianglesByLod: [120_000],
+      },
+    });
+    expect(missing.status).toBe("reject");
+    expect(missing.blockers).toContain("LOD 선언과 실제 삼각형 증거가 일치하지 않습니다.");
+
+    const flat = evaluateStudioScene3dAssetAdmission(asset, {
+      ...excellentEvidence,
+      technical: {
+        ...excellentEvidence.technical,
+        trianglesByLod: [120_000, 120_000, 120_000],
+      },
+    });
+    expect(flat.status).toBe("reject");
+    expect(flat.blockers).toContain("LOD별 삼각형 수가 근거리에서 원거리로 엄격히 감소하지 않습니다.");
+  });
+
+  it("warns when far LODs technically decrease but do not save enough geometry", () => {
+    const result = evaluateStudioScene3dAssetAdmission(asset, {
+      ...excellentEvidence,
+      technical: {
+        ...excellentEvidence.technical,
+        trianglesByLod: [120_000, 96_000, 72_000],
+      },
+    });
+
+    expect(result.status).toBe("review");
+    expect(result.warnings).toContain(
+      "최원거리 LOD가 LOD0의 50%를 초과해 실제 스트리밍/렌더 절감 효과가 작습니다.",
+    );
+  });
+
+  it("rejects impossible runtime measurement receipts", () => {
+    const result = evaluateStudioScene3dAssetAdmission(asset, {
+      ...excellentEvidence,
+      technical: {
+        ...excellentEvidence.technical,
+        gpuBytesEstimate: 0,
+        drawCalls: -1,
+      },
+    });
+
+    expect(result.status).toBe("reject");
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      "GPU 메모리 추정치가 유효한 양수로 측정되지 않았습니다.",
+      "draw call 측정값이 유효하지 않습니다.",
+    ]));
+  });
+
+  it("rejects malformed LOD count receipts instead of treating them as review-only metadata", () => {
+    const result = evaluateStudioScene3dAssetAdmission(asset, {
+      ...excellentEvidence,
+      technical: {
+        ...excellentEvidence.technical,
+        lodCount: Number.NaN,
+      },
+    });
+
+    expect(result.status).toBe("reject");
+    expect(result.blockers).toContain("LOD 단계 수 측정값이 유효하지 않습니다.");
+  });
+
   it("keeps non-KTX2 or uncompressed geometry out of automatic production promotion", () => {
     const result = evaluateStudioScene3dAssetAdmission(asset, {
       ...excellentEvidence,

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   BadgeCheck,
   Check,
   ChevronDown,
@@ -147,11 +151,10 @@ function PackageLibraryButton({
           `${pkg.name}을(를) 이 기기의 스타터 라이브러리에서 제거했습니다.`
         )}
         className={cx(CONTROL, "inline-flex flex-1 items-center justify-center gap-1.5")}
-        aria-label={`${pkg.name} 로컬 라이브러리에서 제거`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "{v0} 로컬 라이브러리에서 제거"), { v0: String(pkg.name) })}
       >
         <Trash2 size={13} aria-hidden />
-        저장됨 · 제거
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "저장됨 · 제거")}</button>
     );
   }
 
@@ -175,7 +178,7 @@ function PackageLibraryButton({
       {resolution.status === "update"
         ? <RefreshCw size={13} aria-hidden />
         : <Library size={13} aria-hidden />}
-      {resolution.status === "update" ? "업데이트" : "내 라이브러리"}
+      {resolution.status === "update" ? translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "업데이트") : translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "내 라이브러리")}
     </button>
   );
 }
@@ -202,7 +205,7 @@ function OriginalAssetTile({
         draggable
         onDragStart={(event) => dragOriginalAsset(event, asset)}
         aria-describedby={helpId}
-        aria-label={`${asset.name} 상세 미리보기. 캔버스로 끌어 배치할 수 있습니다.`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "{v0} 상세 미리보기. 캔버스로 끌어 배치할 수 있습니다."), { v0: String(asset.name) })}
         className={cx(
           "relative block aspect-[4/3] w-full overflow-hidden bg-[oklch(0.94_0.01_78)]",
           CONTROL_FOCUS
@@ -217,33 +220,29 @@ function OriginalAssetTile({
           className="size-full object-contain transition-transform duration-200 group-hover:scale-[1.025] motion-reduce:transition-none"
         />
         <span className="absolute left-1.5 top-1.5 inline-flex min-h-6 items-center rounded-full border border-good/35 bg-panel/95 px-2 text-[0.55rem] font-black text-good">
-          FREE
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "FREE")}</span>
         <span className="absolute right-1.5 top-1.5 grid size-8 place-items-center rounded-md border border-line bg-panel/95 text-fg-2">
           <Eye size={13} aria-hidden />
         </span>
         <span className="absolute bottom-1.5 right-1.5 inline-flex min-h-7 items-center gap-1 rounded-md border border-line bg-panel/95 px-2 text-[0.55rem] font-semibold text-fg-2">
           <Grip size={11} aria-hidden />
-          끌어 놓기
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "끌어 놓기")}</span>
       </button>
       <div className="p-2">
         <p className="truncate text-[0.66rem] font-bold text-fg">{asset.name}</p>
         <p className="mt-0.5 truncate text-[0.55rem] text-fg-3">
-          원본 절차형 · CC0 · SVG
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "원본 절차형 · CC0 · SVG")}</p>
         <button
           type="button"
           onClick={() => onUse(asset)}
-          aria-label={`${asset.name} 선택한 컷 또는 현재 보이는 위치에 추가`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "{v0} 선택한 컷 또는 현재 보이는 위치에 추가"), { v0: String(asset.name) })}
           className={cx(
             PRIMARY_CONTROL,
             "mt-2 inline-flex w-full items-center justify-center gap-1.5"
           )}
         >
           <Plus size={13} aria-hidden />
-          현재 화면에 추가
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "현재 화면에 추가")}</button>
       </div>
     </article>
   );
@@ -294,7 +293,7 @@ function AssetPreviewDialog({
             onClick={onClose}
             data-autofocus="true"
             className={cx(CONTROL, "grid size-11 shrink-0 place-items-center p-0")}
-            aria-label="무료 에셋 상세 미리보기 닫기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "무료 에셋 상세 미리보기 닫기")}
           >
             <X size={16} aria-hidden />
           </button>
@@ -308,14 +307,13 @@ function AssetPreviewDialog({
           >
             <img
               src={encodeStudioOriginalAssetSvg(asset.svg)}
-              alt={`${asset.name} 벡터 미리보기`}
+              alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "{v0} 벡터 미리보기"), { v0: String(asset.name) })}
               draggable={false}
               className="max-h-[28rem] size-full object-contain"
             />
             <span className="absolute bottom-2 right-2 inline-flex min-h-8 items-center gap-1 rounded-md border border-line bg-panel/95 px-2 text-[0.6rem] font-semibold text-fg-2">
               <Grip size={12} aria-hidden />
-              포인터 위치로 끌기
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "포인터 위치로 끌기")}</span>
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap gap-1.5">
@@ -329,25 +327,24 @@ function AssetPreviewDialog({
             </div>
             <dl className="mt-3 grid gap-2 text-[0.65rem]">
               <div>
-                <dt className="font-semibold text-fg-3">제작·출처</dt>
-                <dd className="mt-0.5 text-fg-2">ToonSpectrum Lab · original-procedural</dd>
+                <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "제작·출처")}</dt>
+                <dd className="mt-0.5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "ToonSpectrum Lab · original-procedural")}</dd>
               </div>
               <div>
-                <dt className="font-semibold text-fg-3">사용권</dt>
+                <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "사용권")}</dt>
                 <dd className="mt-0.5 leading-relaxed text-fg-2">
-                  상업 작품 사용·수정·재배포 가능, 저작자 표시 불필요
-                </dd>
+                  {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "상업 작품 사용·수정·재배포 가능, 저작자 표시 불필요")}</dd>
               </div>
               <div>
-                <dt className="font-semibold text-fg-3">호환</dt>
-                <dd className="mt-0.5 text-fg-2">Canvas 2D · SVG · 데스크톱·태블릿·모바일</dd>
+                <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "호환")}</dt>
+                <dd className="mt-0.5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "Canvas 2D · SVG · 데스크톱·태블릿·모바일")}</dd>
               </div>
               <div>
-                <dt className="font-semibold text-fg-3">권장 배치</dt>
+                <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "권장 배치")}</dt>
                 <dd className="mt-0.5 text-fg-2">
                   {asset.placementPresets.includes("background-cover")
-                    ? "배경 덮기 또는 현재 화면"
-                    : "포인터 위치 또는 현재 화면"}
+                    ? translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "배경 덮기 또는 현재 화면")
+                    : translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "포인터 위치 또는 현재 화면")}
                 </dd>
               </div>
             </dl>
@@ -360,8 +357,7 @@ function AssetPreviewDialog({
               )}
             >
               <Plus size={14} aria-hidden />
-              현재 화면에 추가
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "현재 화면에 추가")}</button>
           </div>
         </div>
       </section>
@@ -537,7 +533,7 @@ export function StudioOriginalAssetMarketplacePanel({
   return (
     <section
       ref={marketplaceRootRef}
-      aria-label="ToonSpectrum 독자 무료 스타터 마켓"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "ToonSpectrum 독자 무료 스타터 마켓")}
       data-studio-original-marketplace="local-phase-1"
       className="mb-3 overflow-hidden rounded-lg border border-line bg-panel"
     >
@@ -556,14 +552,13 @@ export function StudioOriginalAssetMarketplacePanel({
           </span>
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-1.5">
-              <strong className="text-xs text-fg">독자 무료 스타터 마켓</strong>
+              <strong className="text-xs text-fg">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "독자 무료 스타터 마켓")}</strong>
               <span className="rounded-full border border-good/35 bg-good/10 px-2 py-0.5 text-[0.55rem] font-black text-good">
-                {`${STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.reduce((count, pkg) => count + pkg.includedItems.length, 0)} FREE`}
+                {formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "{v0} FREE"), { v0: String(STUDIO_ORIGINAL_FREE_ASSET_PACKAGES.reduce((count, pkg) => count + pkg.includedItems.length, 0)) })}
               </span>
             </span>
             <span className="mt-0.5 block truncate text-[0.58rem] text-fg-3">
-              ToonSpectrum 원본 SVG · 기기 로컬
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "ToonSpectrum 원본 SVG · 기기 로컬")}</span>
           </span>
           <ChevronDown
             size={15}
@@ -581,24 +576,22 @@ export function StudioOriginalAssetMarketplacePanel({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
-              <h3 className="text-xs font-black text-fg">로컬 원본 카탈로그</h3>
+              <h3 className="text-xs font-black text-fg">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "로컬 원본 카탈로그")}</h3>
               <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.55rem] font-semibold text-fg-3">
-                LOCAL PHASE 1
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "LOCAL PHASE 1")}</span>
             </div>
             <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-              선택 가능한 원본 SVG는 외부 마켓 상품을 복제하지 않은 ToonSpectrum 자체 에셋입니다. 결제·클라우드 동기화 없이 이 기기에서 즉시 배치합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "선택 가능한 원본 SVG는 외부 마켓 상품을 복제하지 않은 ToonSpectrum 자체 에셋입니다. 결제·클라우드 동기화 없이 이 기기에서 즉시 배치합니다.")}</p>
           </div>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-accent/20 bg-accent-soft/35 p-1.5 text-[0.58rem] leading-snug text-fg-2">
           <span id={placementHelpId} className="flex min-h-11 items-center gap-1.5 rounded-md bg-panel/70 px-2">
             <Plus size={12} className="shrink-0 text-accent" aria-hidden />
-            <span><strong className="font-bold text-fg">클릭·탭</strong><br />선택 컷·현재 화면</span>
+            <span><strong className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "클릭·탭")}</strong><br />{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "선택 컷·현재 화면")}</span>
           </span>
           <span className="flex min-h-11 items-center gap-1.5 rounded-md bg-panel/70 px-2">
             <Grip size={12} className="shrink-0 text-accent" aria-hidden />
-            <span><strong className="font-bold text-fg">끌어 놓기</strong><br />포인터 위치에 배치</span>
+            <span><strong className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "끌어 놓기")}</strong><br />{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "포인터 위치에 배치")}</span>
           </span>
         </div>
       </header>
@@ -615,8 +608,8 @@ export function StudioOriginalAssetMarketplacePanel({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value.slice(0, 120))}
-              placeholder="배경·소품·날씨·장르 검색"
-              aria-label="독자 무료 스타터 에셋 검색"
+              placeholder={translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "배경·소품·날씨·장르 검색")}
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "독자 무료 스타터 에셋 검색")}
               className={cx(
                 CONTROL,
                 "w-full pl-8 pr-10 font-normal text-fg placeholder:text-fg-3"
@@ -630,7 +623,7 @@ export function StudioOriginalAssetMarketplacePanel({
                   "absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised",
                   CONTROL_FOCUS
                 )}
-                aria-label="독자 무료 스타터 에셋 검색어 지우기"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "독자 무료 스타터 에셋 검색어 지우기")}
               >
                 <X size={14} aria-hidden />
               </button>
@@ -648,8 +641,7 @@ export function StudioOriginalAssetMarketplacePanel({
             )}
           >
             <Filter size={13} aria-hidden />
-            필터
-            {selectedCategories.length > 0 ? (
+            {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "필터")}{selectedCategories.length > 0 ? (
               <span className="grid size-5 place-items-center rounded-full bg-accent text-[0.55rem] text-on-accent">
                 {selectedCategories.length}
               </span>
@@ -662,7 +654,7 @@ export function StudioOriginalAssetMarketplacePanel({
           hidden={!filtersOpen}
           className="mt-2 rounded-lg border border-line bg-card p-2"
         >
-          <p className="text-[0.58rem] font-bold text-fg-3">카테고리 · 복수 선택</p>
+          <p className="text-[0.58rem] font-bold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "카테고리 · 복수 선택")}</p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {CATEGORY_FILTERS.map((category) => {
               const selected = selectedCategories.includes(category.id);
@@ -687,8 +679,7 @@ export function StudioOriginalAssetMarketplacePanel({
             })}
           </div>
           <label className="mt-2 block text-[0.58rem] font-bold text-fg-3">
-            이용 방식
-            <select
+            {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "이용 방식")}<select
               value={access}
               onChange={(event) => setAccess(
                 event.target.value as StudioMarketplaceAccessModel | "all"
@@ -710,8 +701,7 @@ export function StudioOriginalAssetMarketplacePanel({
             </select>
           </label>
           <p className="mt-1 text-[0.55rem] leading-relaxed text-fg-3">
-            유료·구독 필터는 공통 마켓 모델과 배지 규칙만 준비되어 있습니다. 현재 번들에는 결제 상품이 없으며 결제 기능도 비활성입니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "유료·구독 필터는 공통 마켓 모델과 배지 규칙만 준비되어 있습니다. 현재 번들에는 결제 상품이 없으며 결제 기능도 비활성입니다.")}</p>
         </div>
 
         <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg border border-line bg-card p-1">
@@ -753,7 +743,7 @@ export function StudioOriginalAssetMarketplacePanel({
                 : "border-line bg-card text-fg-2 hover:bg-raised"
             )}
           >
-            모든 팩 · {filteredPackages.length}
+            {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "모든 팩 · ")}{filteredPackages.length}
           </button>
           {filteredPackages.map((pkg) => (
             <button
@@ -771,7 +761,7 @@ export function StudioOriginalAssetMarketplacePanel({
             >
               <span className="block text-[0.62rem] font-bold text-fg">{pkg.name}</span>
               <span className="mt-0.5 block text-[0.54rem] text-fg-3">
-                {pkg.includedItems.length}개 · v{pkg.version}
+                {pkg.includedItems.length}{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "개 · v")}{pkg.version}
               </span>
             </button>
           ))}
@@ -800,13 +790,11 @@ export function StudioOriginalAssetMarketplacePanel({
                     {installed ? (
                       <span className="inline-flex min-h-6 items-center gap-1 rounded-full border border-cool/35 bg-cool/10 px-2 text-[0.55rem] font-semibold text-cool">
                         <Check size={10} aria-hidden />
-                        로컬
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "로컬")}</span>
                     ) : null}
                   </span>
                   <span className="mt-0.5 block truncate text-[0.55rem] text-fg-3">
-                    ToonSpectrum Lab · v{pkg.version} · {pkg.includedItems.length}개
-                  </span>
+                    {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "ToonSpectrum Lab · v")}{pkg.version} · {pkg.includedItems.length}{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "개")}</span>
                 </span>
                 <ChevronDown
                   size={14}
@@ -818,30 +806,30 @@ export function StudioOriginalAssetMarketplacePanel({
                 <p className="text-[0.62rem] leading-relaxed text-fg-2">{pkg.summary}</p>
                 <dl className="mt-2 grid grid-cols-2 gap-1 text-[0.57rem]">
                   <div className="rounded-md bg-panel px-2 py-1.5">
-                    <dt className="font-semibold text-fg-3">출처·라이선스</dt>
-                    <dd className="mt-0.5 text-fg-2">original-procedural · CC0</dd>
+                    <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "출처·라이선스")}</dt>
+                    <dd className="mt-0.5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "original-procedural · CC0")}</dd>
                   </div>
                   <div className="rounded-md bg-panel px-2 py-1.5">
-                    <dt className="font-semibold text-fg-3">호환</dt>
-                    <dd className="mt-0.5 text-fg-2">Canvas 2D · SVG · 모든 기기</dd>
+                    <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "호환")}</dt>
+                    <dd className="mt-0.5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "Canvas 2D · SVG · 모든 기기")}</dd>
                   </div>
                   <div className="rounded-md bg-panel px-2 py-1.5">
-                    <dt className="font-semibold text-fg-3">업데이트 상태</dt>
+                    <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "업데이트 상태")}</dt>
                     <dd className="mt-0.5 text-fg-2">
                       {importResolution.status === "duplicate"
-                        ? "최신"
+                        ? translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "최신")
                         : importResolution.status === "update"
                           ? `${installed?.version} → ${pkg.version}`
-                          : "미설치"}
+                          : translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "미설치")}
                     </dd>
                   </div>
                   <div className="rounded-md bg-panel px-2 py-1.5">
-                    <dt className="font-semibold text-fg-3">저장 경계</dt>
-                    <dd className="mt-0.5 text-fg-2">기기 로컬 · 클라우드 미지원</dd>
+                    <dt className="font-semibold text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "저장 경계")}</dt>
+                    <dd className="mt-0.5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "기기 로컬 · 클라우드 미지원")}</dd>
                   </div>
                 </dl>
                 <div className="mt-2 rounded-md bg-panel px-2 py-1.5">
-                  <p className="text-[0.57rem] font-semibold text-fg-3">v{pkg.version} 변경 사항</p>
+                  <p className="text-[0.57rem] font-semibold text-fg-3">v{pkg.version} {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "변경 사항")}</p>
                   <p className="mt-0.5 text-[0.57rem] leading-relaxed text-fg-2">
                     {pkg.changelog[0]?.changes.join(" · ")}
                   </p>
@@ -855,13 +843,12 @@ export function StudioOriginalAssetMarketplacePanel({
                   <button
                     type="button"
                     onClick={() => downloadManifest(pkg)}
-                    title="에셋 파일이 아닌 버전·권리·호환 메타데이터만 JSON으로 내보냅니다."
+                    title={translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "에셋 파일이 아닌 버전·권리·호환 메타데이터만 JSON으로 내보냅니다.")}
                     className={cx(CONTROL, "inline-flex items-center justify-center gap-1.5")}
-                    aria-label={`${pkg.name} 메타데이터 전용 로컬 명세 내보내기`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "{v0} 메타데이터 전용 로컬 명세 내보내기"), { v0: String(pkg.name) })}
                   >
                     <FileJson2 size={13} aria-hidden />
-                    명세
-                  </button>
+                    {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "명세")}</button>
                 </div>
               </div>
             </details>
@@ -872,9 +859,9 @@ export function StudioOriginalAssetMarketplacePanel({
           <>
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[0.62rem] font-bold text-fg-2">
-                배치 가능한 원본 <span className="tabular-nums text-accent">{visibleAssets.length}</span>
+                {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "배치 가능한 원본 ")}<span className="tabular-nums text-accent">{visibleAssets.length}</span>
               </p>
-              <p className="text-[0.55rem] text-fg-3">클릭 또는 드래그</p>
+              <p className="text-[0.55rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "클릭 또는 드래그")}</p>
             </div>
             <div className="grid max-h-[30rem] grid-cols-2 gap-2 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
               {visibleAssets.map((asset) => (
@@ -896,11 +883,9 @@ export function StudioOriginalAssetMarketplacePanel({
             <div>
               <Search size={20} className="mx-auto text-fg-3" aria-hidden />
               <p className="mt-2 text-xs font-bold text-fg-2">
-                조건에 맞는 원본 에셋이 없습니다
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "조건에 맞는 원본 에셋이 없습니다")}</p>
               <p className="mt-1 text-[0.6rem] leading-relaxed text-fg-3">
-                검색어·카테고리·라이브러리 보기를 바꿔보세요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "검색어·카테고리·라이브러리 보기를 바꿔보세요.")}</p>
             </div>
           </div>
         )}
@@ -908,35 +893,32 @@ export function StudioOriginalAssetMarketplacePanel({
         <details className="group/rights mt-3 rounded-lg border border-warn/25 bg-warn/5">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-2.5 text-[0.62rem] font-bold text-warn [&::-webkit-details-marker]:hidden">
             <ShieldCheck size={14} aria-hidden />
-            업로드·공유 권리 체크
-            <ChevronDown size={13} className="ml-auto transition-transform group-open/rights:rotate-180" aria-hidden />
+            {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "업로드·공유 권리 체크")}<ChevronDown size={13} className="ml-auto transition-transform group-open/rights:rotate-180" aria-hidden />
           </summary>
           <div className="border-t border-warn/20 px-2.5 py-2 text-[0.58rem] leading-relaxed text-fg-2">
             <ul className="grid gap-1">
-              <li className="flex gap-1.5"><BadgeCheck size={12} className="mt-0.5 shrink-0 text-good" aria-hidden />직접 만든 원본·절차형 자료</li>
-              <li className="flex gap-1.5"><BadgeCheck size={12} className="mt-0.5 shrink-0 text-good" aria-hidden />CC0 또는 재배포를 명시적으로 허용한 라이선스</li>
-              <li className="flex gap-1.5"><BadgeCheck size={12} className="mt-0.5 shrink-0 text-good" aria-hidden />권리자의 명시적 재배포 허가와 증빙이 있는 자료</li>
+              <li className="flex gap-1.5"><BadgeCheck size={12} className="mt-0.5 shrink-0 text-good" aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "직접 만든 원본·절차형 자료")}</li>
+              <li className="flex gap-1.5"><BadgeCheck size={12} className="mt-0.5 shrink-0 text-good" aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "CC0 또는 재배포를 명시적으로 허용한 라이선스")}</li>
+              <li className="flex gap-1.5"><BadgeCheck size={12} className="mt-0.5 shrink-0 text-good" aria-hidden />{translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "권리자의 명시적 재배포 허가와 증빙이 있는 자료")}</li>
             </ul>
             <p className="mt-2 border-t border-warn/20 pt-2 text-warn">
               {STUDIO_MARKETPLACE_REDISTRIBUTION_NOTICE}
             </p>
             <p className="mt-1 text-fg-3">
-              현재 체크는 로컬 사전 점검입니다. 서버 판매·정산·권리 인증 기능은 아직 제공하지 않습니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "현재 체크는 로컬 사전 점검입니다. 서버 판매·정산·권리 인증 기능은 아직 제공하지 않습니다.")}</p>
           </div>
         </details>
 
         <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.57rem] leading-relaxed text-fg-3">
           <CloudOff size={13} className="mt-0.5 shrink-0" aria-hidden />
           <span>
-            패키지 획득 상태는 이 브라우저에만 저장됩니다. 로그인 동기화·결제·구독·판매자 정산은 Phase 1 범위에 포함되지 않습니다.
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "ko", "패키지 획득 상태는 이 브라우저에만 저장됩니다. 로그인 동기화·결제·구독·판매자 정산은 Phase 1 범위에 포함되지 않습니다.")}</span>
         </div>
 
         {status ? (
           <p
             id={statusId}
-            role={status.error ? "alert" : "status"}
+            role={status.error ? translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioOriginalAssetMarketplacePanel", "en", "status")}
             className={cx(
               "mt-2 rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed",
               status.error

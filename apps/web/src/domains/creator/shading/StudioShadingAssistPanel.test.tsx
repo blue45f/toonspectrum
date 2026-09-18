@@ -14,9 +14,9 @@ describe("StudioShadingAssistPanel", () => {
     render(<StudioShadingAssistPanel />);
 
     expect(
-      screen.getByText("자동 음영 어시스트 (Shading Assist)"),
+      screen.getByText("자동 명암"),
     ).toBeDefined();
-    expect(screen.getByText("CSP 2.0")).toBeDefined();
+    expect(screen.queryByText(/CSP/i)).toBeNull();
     expect(screen.getByText("좌상단")).toBeDefined();
     expect(screen.getByText("새벽 햇살")).toBeDefined();
   });
@@ -33,7 +33,7 @@ describe("StudioShadingAssistPanel", () => {
     fireEvent.click(screen.getByText("우상단"));
 
     // Click generate button
-    fireEvent.click(screen.getByText("음영 어시스트 레이어 생성 (CSP 2.0)"));
+    fireEvent.click(screen.getByText("명암 레이어 만들기"));
 
     expect(onGenerateShadingLayer).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -5,7 +5,7 @@ import {
   episodeScope,
   projectScope,
   type ProductionProjectAggregate,
-  type ProductionRisk,
+  type ProductionStudioRevisionLink,
   type RevisionRef,
   type ScopeRef,
 } from "@toonspectrum/core/production";
@@ -776,6 +776,39 @@ export function createProductionDemoProject(): ProductionProjectAggregate {
     },
   ];
 
+  const studioRevisionLinks: readonly ProductionStudioRevisionLink[] = [
+    {
+      id: "studio-link-thumbnail-12-r2",
+      projectId: PROJECT_ID,
+      workId: WORK_ID,
+      episodeId: "episode-12",
+      studioDocumentRef: "document-episode-12-thumbnail",
+      documentRole: "thumbnail",
+      studioRevisionRef: visualRevision,
+      deliverableId: "deliverable-thumbnail-12",
+      submissionId: "submission-thumbnail-12-r2",
+      linkedByAssignmentId: "assignment-art",
+      status: "submitted",
+      linkedAt: "2026-09-15T03:35:00.000Z",
+      approvedAt: null,
+    },
+    {
+      id: "studio-link-background-sample-12-r1",
+      projectId: PROJECT_ID,
+      workId: WORK_ID,
+      episodeId: "episode-12",
+      studioDocumentRef: "document-episode-12-background-sample",
+      documentRole: "background",
+      studioRevisionRef: submissions[1]!.revisionRef,
+      deliverableId: "deliverable-background-sample-12",
+      submissionId: "submission-background-sample-r1",
+      linkedByAssignmentId: "assignment-background-vendor",
+      status: "approved",
+      linkedAt: "2026-09-18T02:10:00.000Z",
+      approvedAt: "2026-09-18T02:10:00.000Z",
+    },
+  ];
+
   const proposal = {
     id: "proposal-background-vendor-r1",
     projectId: PROJECT_ID,
@@ -1239,6 +1272,7 @@ export function createProductionDemoProject(): ProductionProjectAggregate {
     ],
     deliverables,
     submissions,
+    studioRevisionLinks,
     changeRequests: [{
       id: "change-ending-dialogue-12",
       projectId: PROJECT_ID,

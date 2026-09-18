@@ -89,6 +89,34 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   }
 });
 
+test("fails when an exported workspace subpath was not compiled", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-subpath-missing-"));
+  try {
+    await compiledPackage(
+      root,
+      "packages/core/src/index.js",
+      '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/studio-project-model/src/index.js",
+      '"use strict"; module.exports = { model: "v3" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/studio-format-gateway/src/index.js",
+      '"use strict"; module.exports = { gateway: "compatibility" };\n',
+    );
+
+    await assert.rejects(
+      stageApiWorkspaceRuntime(root),
+      /packages\/core\/src\/production\/index\.js/u,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("fails instead of staging a missing compiled package", async () => {
   const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-missing-"));
   try {

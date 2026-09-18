@@ -348,6 +348,34 @@ describe("StudioFloatingSurface", () => {
     });
   });
 
+  it("offers safe minimum, recommended, and maximum window sizes", () => {
+    render(<Harness />);
+    const surface = screen.getByRole("dialog", { name: "테스트 팔레트" });
+    const menuButton = screen.getByRole("button", {
+      name: "테스트 팔레트 창 배치 메뉴",
+    });
+
+    expect(surface.querySelector('[data-studio-floating-content="true"]')).toBeTruthy();
+
+    fireEvent.click(menuButton);
+    fireEvent.click(within(screen.getByRole("menu", { name: "테스트 팔레트 창 배치" }))
+      .getByRole("menuitem", { name: "테스트 팔레트 최소 크기" }));
+    expect(surface.style.width).toBe("240px");
+    expect(surface.style.height).toBe("200px");
+    expect(surface.dataset.studioFloatingSize).toBe("compact");
+
+    fireEvent.click(menuButton);
+    fireEvent.click(within(screen.getByRole("menu", { name: "테스트 팔레트 창 배치" }))
+      .getByRole("menuitem", { name: "테스트 팔레트 권장 크기" }));
+    expect(surface.style.width).toBe("300px");
+    expect(surface.style.height).toBe("400px");
+
+    fireEvent.click(screen.getByRole("button", { name: "테스트 팔레트 최대 크기" }));
+    expect(surface.style.width).toBe("600px");
+    expect(surface.style.height).toBe("700px");
+    expect(surface.dataset.studioFloatingSize).toBe("comfortable");
+  });
+
   it("brings the most recently interacted window above its peers below modal z-index", () => {
     render(
       <>

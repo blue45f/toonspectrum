@@ -108,6 +108,7 @@ describe("Studio live cluster adapter configuration", () => {
 
   it("matches node-postgres' parser for the accepted authority and TLS contract", () => {
     const connectionString =
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic parser fixture
       "postgresql://artist:s3cret@ep-direct.example.net:5433/toonspectrum?sslmode=verify-full&channel_binding=require";
     const resolved = resolveStudioLiveClusterAdapterConfig({
       NODE_ENV: "production",
@@ -130,6 +131,7 @@ describe("Studio live cluster adapter configuration", () => {
 
   it("rejects query overrides that node-postgres would otherwise apply to authority and credentials", () => {
     const unsafe =
+      // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic query-override fixture
       "postgresql://good:original@direct.example.net:5432/toonspectrum?host=evil.example.net&port=6543&user=attacker&password=stolen&ssl=true";
     const parsed = new Client({ connectionString: unsafe }).connectionParameters;
     expect(parsed).toMatchObject({
@@ -631,6 +633,7 @@ describe("Studio live PostgreSQL IoAdapter lifecycle", () => {
   it("redacts PostgreSQL URI userinfo and known credentials from factory and logger errors", async () => {
     const harness = poolHarness();
     const testLogger = logger();
+    // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic redaction fixture
     const rawFailure = `${DIRECT_URL} password=secret postgresql://other:other-secret@db.example/test`;
 
     const failure = await createStudioLivePostgresIoAdapter(

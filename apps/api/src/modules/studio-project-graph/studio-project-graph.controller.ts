@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Delete,
   ForbiddenException,
   Get,
   Header,
@@ -12,7 +11,6 @@ import {
   HttpStatus,
   Inject,
   Param,
-  Patch,
   Post,
 } from "@nestjs/common";
 
@@ -23,7 +21,6 @@ import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 import {
   CommitStudioRevisionDto,
   CreateCompatibilityReportDto,
-  CreateStudioExternalFileBindingDto,
   CreateStudioProjectGraphDto,
   CreateStudioArtifactDto,
   DecideStudioReviewDto,
@@ -33,14 +30,12 @@ import {
   RegisterStudioBlobDto,
   RestoreStudioRevisionDto,
   StudioArtifactParamsDto,
-  StudioExternalBindingParamsDto,
   StudioRevisionParamsDto,
   StudioProjectParamsDto,
   StudioReportParamsDto,
   StudioReviewParamsDto,
   StudioReviewCommentParamsDto,
   StudioWorkParamsDto,
-  UpdateStudioExternalFileBindingDto,
 } from "./studio-project-graph.dto";
 import { StudioProjectGraphService } from "./studio-project-graph.service";
 
@@ -277,66 +272,6 @@ export class StudioProjectGraphController {
       parseStudioIfMatch(ifMatch),
       requireStudioIdempotencyKey(idempotencyKey),
       body,
-    );
-  }
-
-  @Get("/artifacts/:artifactId/external-bindings")
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  listExternalFileBindings(
-    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
-    params: StudioArtifactParamsDto,
-    @Headers("x-user-id") userId?: string,
-  ) {
-    return this.service.listExternalFileBindings(
-      authenticatedStudioUserId(userId),
-      params.artifactId,
-    );
-  }
-
-  @Post("/artifacts/:artifactId/external-bindings")
-  @HttpCode(HttpStatus.CREATED)
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  createExternalFileBinding(
-    @Param(new ZodValidationPipe(StudioArtifactParamsDto))
-    params: StudioArtifactParamsDto,
-    @Body(new ZodValidationPipe(CreateStudioExternalFileBindingDto))
-    body: CreateStudioExternalFileBindingDto,
-    @Headers("x-user-id") userId?: string,
-  ) {
-    return this.service.createExternalFileBinding(
-      authenticatedStudioUserId(userId),
-      params.artifactId,
-      body,
-    );
-  }
-
-  @Patch("/external-bindings/:bindingId")
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  updateExternalFileBinding(
-    @Param(new ZodValidationPipe(StudioExternalBindingParamsDto))
-    params: StudioExternalBindingParamsDto,
-    @Body(new ZodValidationPipe(UpdateStudioExternalFileBindingDto))
-    body: UpdateStudioExternalFileBindingDto,
-    @Headers("x-user-id") userId?: string,
-  ) {
-    return this.service.updateExternalFileBinding(
-      authenticatedStudioUserId(userId),
-      params.bindingId,
-      body,
-    );
-  }
-
-  @Delete("/external-bindings/:bindingId")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @Header("Cache-Control", "private, no-store, max-age=0")
-  removeExternalFileBinding(
-    @Param(new ZodValidationPipe(StudioExternalBindingParamsDto))
-    params: StudioExternalBindingParamsDto,
-    @Headers("x-user-id") userId?: string,
-  ) {
-    return this.service.removeExternalFileBinding(
-      authenticatedStudioUserId(userId),
-      params.bindingId,
     );
   }
 

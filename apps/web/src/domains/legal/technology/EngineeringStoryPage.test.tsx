@@ -7,6 +7,7 @@ import { EngineeringDeckPage } from "./EngineeringDeckPage";
 import { EngineeringFieldNotesPage } from "./EngineeringFieldNotesPage";
 import { EngineeringGuidesPage } from "./EngineeringGuidesPage";
 import { EngineeringLicensesPage } from "./EngineeringLicensesPage";
+import { EngineeringReferencesPage } from "./EngineeringReferencesPage";
 import { EngineeringStoryPage } from "./EngineeringStoryPage";
 import { EngineeringVideosPage } from "./EngineeringVideosPage";
 
@@ -28,7 +29,7 @@ describe("engineering story pages", () => {
       .toBe("location");
     expect(screen.getByRole("link", { name: /제작 스토리|Story/u }).getAttribute("aria-current"))
       .toBe("page");
-    expect(document.querySelectorAll("article[id]")).toHaveLength(15);
+    expect(document.querySelectorAll("article[id]")).toHaveLength(25);
     expect(screen.getByRole("link", { name: /적용 가이드 열기|Open implementation guides/u }).getAttribute("href"))
       .toBe("/about/technology/guides");
   });
@@ -48,6 +49,23 @@ describe("engineering story pages", () => {
     fireEvent.click(liveFilter);
     expect(liveFilter.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("heading", { name: /성능 예산|Performance budget/u })).toBeTruthy();
+  });
+
+  it("searches and filters reference products while keeping troubleshooting evidence available", () => {
+    render(
+      <MemoryRouter initialEntries={["/about/technology/references"]}>
+        <EngineeringReferencesPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: /참고·장애 기록|References/u }).getAttribute("aria-current"))
+      .toBe("page");
+    expect(document.querySelectorAll("[data-reference-card]").length).toBeGreaterThanOrEqual(10);
+    expect(screen.getByRole("heading", { name: /재현 가능한 트러블슈팅|Reproducible troubleshooting/u })).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Blender MCP" } });
+    expect(screen.getByRole("heading", { name: "Blender MCP" })).toBeTruthy();
+    expect(document.querySelectorAll("[data-reference-card]")).toHaveLength(1);
   });
 
   it("filters field notes while retaining Open API, troubleshooting and reference evidence", () => {
@@ -78,7 +96,6 @@ describe("engineering story pages", () => {
     expect(document.querySelectorAll("[data-engineering-field-note]")).toHaveLength(1);
     expect(screen.getByText(/1개 \/ 전체 12개 노트|1 of 12 notes/u)).toBeTruthy();
   });
-
   it("supports presentation navigation and exact nested current-location semantics", () => {
     render(
       <MemoryRouter initialEntries={["/about/technology/deck"]}>
@@ -105,8 +122,8 @@ describe("engineering story pages", () => {
     fireEvent.keyDown(document, { key: "Home" });
     expect(previous.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: /기술 세미나 · 20장|Engineering seminar · 20 slides/u }));
-    for (let step = 0; step < 11; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: /기술 세미나 · 29장|Engineering seminar · 29 slides/u }));
+    for (let step = 0; step < 20; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
     expect(
       document.querySelector('[data-engineering-deck-shell] [data-deck-slide] h2')?.textContent,
     ).toMatch(/Worker를 하나의 만능|Workers are task-specific/u);

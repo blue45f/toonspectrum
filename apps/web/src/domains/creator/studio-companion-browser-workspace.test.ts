@@ -48,6 +48,7 @@ describe("browser workspace portable profile", () => {
     expect(await saveStudioBrowserWorkspace(defaultStudioBrowserWorkspace(), store)).toBe(false);
   });
   it("creates a work-only URL without credentials, query or fragment", () => {
+  // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     const href = studioBrowserWorkspaceEditorHref("work-123", "https://user:pass@example.test/path?session=secret#token");
     expect(href).toBe(`https://example.test${studioCanvasPathname("work-123")}`);
   });

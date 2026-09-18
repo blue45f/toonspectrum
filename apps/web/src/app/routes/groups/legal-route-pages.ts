@@ -30,6 +30,12 @@ export const EngineeringGuidesPage = lazyRetry(
   })),
   "EngineeringGuidesPage",
 );
+export const EngineeringReferencesPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringReferencesPage").then((module) => ({
+    default: module.EngineeringReferencesPage,
+  })),
+  "EngineeringReferencesPage",
+);
 export const EngineeringFieldNotesPage = lazyRetry(
   () => import("@/domains/legal/technology/EngineeringFieldNotesPage").then((module) => ({
     default: module.EngineeringFieldNotesPage,
@@ -119,6 +125,24 @@ export const ContactPage = lazyRetry(
     default: module.ContactPage,
   })),
   "ContactPage",
+);
+export const BusinessPage = lazyRetry(
+  () => import("@/domains/legal/BusinessPage").then((module) => ({
+    default: module.BusinessPage,
+  })),
+  "BusinessPage",
+);
+export const CreatorSupportPage = lazyRetry(
+  () => import("@/domains/legal/CreatorSupportPage").then((module) => ({
+    default: module.CreatorSupportPage,
+  })),
+  "CreatorSupportPage",
+);
+export const SupportUsPage = lazyRetry(
+  () => import("@/domains/legal/SupportUsPage").then((module) => ({
+    default: module.SupportUsPage,
+  })),
+  "SupportUsPage",
 );
 export const SupportPage = lazyRetry(
   () => import("@/domains/legal/SupportPage").then((module) => ({

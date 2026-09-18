@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio 검수·미리보기 진입점 — "프로젝트 센터" 시트의 한 섹션.
  *
@@ -150,10 +151,9 @@ export function StudioProjectReviewActions({
   return (
     <>
       <div className="col-span-2 border-t border-line/60 px-2 pb-1 pt-2 sm:col-span-3">
-        <span className="block text-xs font-bold text-fg">검수 · 미리보기</span>
+        <span className="block text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioProjectReviewActions", "ko", "검수 · 미리보기")}</span>
         <span className="mt-0.5 block text-[0.65rem] text-fg-3">
-          타임라인 · 스토리보드 · 독자 시점 · 검토와 댓글
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioProjectReviewActions", "ko", "타임라인 · 스토리보드 · 독자 시점 · 검토와 댓글")}</span>
       </div>
       {actions.map((action) => {
         const Icon = action.icon;

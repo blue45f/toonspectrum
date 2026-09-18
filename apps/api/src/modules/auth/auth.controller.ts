@@ -22,6 +22,13 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 
 import {
+  AccountMergeError,
+  confirmAccountMerge,
+  issueAccountMergeToken,
+  normalizeAccountMergeProfilePreference,
+  previewAccountMerge,
+} from "../../server/account-merge";
+import {
   hashPassword,
   isPasswordVerificationInputBounded,
   passwordPolicyError,
@@ -51,8 +58,12 @@ import {
   revokeAuthOneTimeTokens,
 } from "../../server/auth-one-time-token";
 import {
+  oauthLinkSessionCookieName,
   oauthPkceVerifierCookieName,
   oauthStateCookieName,
+  resolveOAuthLinkSessionCookieClearOptions,
+  resolveOAuthLinkSessionCookieOptions,
+  resolveOAuthLinkSessionCookieValue,
   resolveOAuthPkceVerifierCookieClearOptions,
   resolveOAuthPkceVerifierCookieOptions,
   resolveOAuthPkceVerifierCookieValue,
@@ -322,6 +333,16 @@ export class AuthController {
         error: "이 제공자의 계정 연결을 시작하지 못했어요.",
       });
     }
+    if (provider === "apple") {
+      const linkSessionToken = resolveSessionCookieValue(request.headers.cookie);
+      const linkPrincipal = verifySessionToken(linkSessionToken);
+      if (!linkSessionToken || !linkPrincipal || linkPrincipal.userId !== userId) {
+        throw new UnauthorizedException({
+          error: "Apple 계정을 연결하려면 다시 로그인해 주세요.",
+        });
+      }
+      applyOAuthLinkSessionCookie(response, provider, linkSessionToken);
+    }
     applyOAuthStateCookie(response, provider, state);
     if (pkceVerifier) {
       applyOAuthPkceVerifierCookie(response, provider, pkceVerifier);
@@ -340,6 +361,7 @@ export class AuthController {
     @Query("error") error: unknown,
     @Req() request: Request,
     @Res() res: Response,
+    appleUser?: unknown,
   ) {
     const web = webAppBaseUrl();
     if (!isOAuthProvider(provider))
@@ -386,11 +408,15 @@ export class AuthController {
     // Consume browser-bound material only after the callback proves it owns the
     // current flow. A stale callback must not erase a newer tab's valid state.
     clearOAuthStateCookie(res, provider);
+    if (provider === "apple") clearOAuthLinkSessionCookie(res, provider);
     if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
     let linkToUserId: string | undefined;
     if (stateContext.purpose === "link") {
       const principal = verifySessionToken(
-        resolveSessionCookieValue(request.headers.cookie),
+        resolveSessionCookieValue(request.headers.cookie)
+          ?? (provider === "apple"
+            ? resolveOAuthLinkSessionCookieValue(request.headers.cookie, provider)
+            : null),
       );
       if (!principal || principal.userId !== stateContext.userId) {
         return res.redirect(`${web}/auth/callback#error=bad_state`);
@@ -440,14 +466,24 @@ export class AuthController {
             code,
             state,
             browserPkceVerifier ?? undefined,
-            { linkToUserId },
+            provider === "apple"
+              ? { linkToUserId, appleUser }
+              : { linkToUserId },
           )
-        : await handleOAuthCallback(
-            provider,
-            code,
-            state,
-            browserPkceVerifier ?? undefined,
-          );
+        : provider === "apple"
+          ? await handleOAuthCallback(
+              provider,
+              code,
+              state,
+              browserPkceVerifier ?? undefined,
+              { appleUser },
+            )
+          : await handleOAuthCallback(
+              provider,
+              code,
+              state,
+              browserPkceVerifier ?? undefined,
+            );
       const token = signSession(
         user.id,
         normalizeSessionVersion(user.sessionVersion),
@@ -476,6 +512,27 @@ export class AuthController {
       );
       return res.redirect(`${web}/auth/callback#error=oauth_failed`);
     }
+  }
+
+  @Post("oauth/apple/callback")
+  async oauthAppleCallback(
+    @Body() body: Record<string, unknown>,
+    @Req() request: Request,
+    @Res() response: Response,
+  ) {
+    // Apple sends web authorization responses as application/x-www-form-urlencoded
+    // form_post when name/email scopes are requested. Reuse the same browser-bound
+    // state/session checks as every other provider and only pass the one-time user
+    // name payload through for first-authorization profile seeding.
+    return this.oauthCallback(
+      "apple",
+      body.code,
+      body.state,
+      body.error,
+      request,
+      response,
+      body.user,
+    );
   }
 
   // GIS(Google Identity Services) ID 토큰 로그인 — 프론트 GIS 버튼이 받은 ID 토큰을 서버 검증.
@@ -1080,6 +1137,144 @@ export class AuthController {
     };
   }
 
+  @Post("account-merge/code")
+  async issueAccountMergeCode(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 통합 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-merge", request, userId);
+    try {
+      const issued = await issueAccountMergeToken(userId);
+      this.logger.log({ event: "auth.account-merge.code-issued" });
+      return { ok: true, ...issued };
+    } catch (error: unknown) {
+      this.throwAccountMergeError(error, "code");
+    }
+  }
+
+  @Post("account-merge/preview")
+  async previewAccountMergeRequest(
+    @Body() body: { token?: unknown },
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 통합 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-merge", request, userId);
+    try {
+      const preview = await previewAccountMerge(
+        userId,
+        typeof body?.token === "string" ? body.token.trim() : "",
+      );
+      return {
+        ok: true,
+        source: {
+          name: preview.source.name,
+          email: preview.source.email,
+          providers: preview.source.providers,
+          profile: preview.source.profile,
+        },
+        target: {
+          name: preview.target.name,
+          email: preview.target.email,
+          providers: preview.target.providers,
+          profile: preview.target.profile,
+        },
+        affectedRecordCount: preview.affectedRecordCount,
+        deduplicatedRecordCount: preview.deduplicatedRecordCount,
+        expiresAt: preview.expiresAt,
+        warnings: preview.warnings,
+      };
+    } catch (error: unknown) {
+      this.throwAccountMergeError(error, "preview");
+    }
+  }
+
+  @Post("account-merge/confirm")
+  async confirmAccountMergeRequest(
+    @Body() body: { token?: unknown; profilePreference?: unknown },
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 통합 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-merge", request, userId);
+    try {
+      const merged = await confirmAccountMerge(
+        userId,
+        typeof body?.token === "string" ? body.token.trim() : "",
+        {
+          profilePreference: normalizeAccountMergeProfilePreference(
+            body?.profilePreference,
+          ),
+        },
+      );
+      invalidateSessionUser(merged.sourceUserId);
+      invalidateSessionUser(merged.targetUserId);
+      const revocations = await Promise.allSettled([
+        this.realtimeRevocation.revokeSessionVersion(
+          merged.sourceUserId,
+          merged.sourceSessionVersion,
+        ),
+        this.realtimeRevocation.revokeSessionVersion(
+          merged.targetUserId,
+          merged.targetSessionVersion,
+        ),
+      ]);
+      if (revocations.some((entry) => entry.status === "rejected")) {
+        this.logger.error({
+          event: "auth.account-merge.realtime-revocation-failed",
+        });
+      }
+
+      applyAuthSessionCookie(
+        response,
+        signSession(merged.targetUserId, merged.targetSessionVersion),
+      );
+      this.logger.log({
+        event: "auth.account-merge.completed",
+        transferredRecordCount: merged.transferredRecordCount,
+        deduplicatedRecordCount: merged.deduplicatedRecordCount,
+        consolidatedQuotaRecordCount: merged.consolidatedQuotaRecordCount,
+        profilePreference: merged.profilePreference,
+      });
+      return {
+        ok: true,
+        transferredRecordCount: merged.transferredRecordCount,
+        deduplicatedRecordCount: merged.deduplicatedRecordCount,
+        consolidatedQuotaRecordCount: merged.consolidatedQuotaRecordCount,
+        profilePreference: merged.profilePreference,
+        providers: merged.providers,
+      };
+    } catch (error: unknown) {
+      this.throwAccountMergeError(error, "confirm");
+    }
+  }
+
   @Post("logout")
   async logout(
     @Headers("x-user-id") userId: string | undefined,
@@ -1113,6 +1308,26 @@ export class AuthController {
         error: "로그아웃 세션 정리를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
       });
     }
+  }
+
+  private throwAccountMergeError(
+    error: unknown,
+    phase: "code" | "preview" | "confirm",
+  ): never {
+    if (error instanceof AccountMergeError) {
+      throw new HttpException(
+        { code: error.code, error: error.publicMessage },
+        error.status,
+      );
+    }
+    this.logger.error({
+      event: "auth.account-merge.failure",
+      phase,
+      reasonCode: "unexpected",
+    });
+    throw new ServiceUnavailableException({
+      error: "계정 통합을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.",
+    });
   }
 
   private async enforceRateLimit(
@@ -1204,6 +1419,22 @@ function applyOAuthStateCookie(
   );
 }
 
+function applyOAuthLinkSessionCookie(
+  response: Response,
+  provider: OAuthProviderId,
+  token: string,
+): void {
+  response.cookie(
+    oauthLinkSessionCookieName(provider),
+    token,
+    {
+      ...resolveOAuthLinkSessionCookieOptions(provider),
+      httpOnly: true,
+      secure: true,
+    },
+  );
+}
+
 function applyOAuthPkceVerifierCookie(
   response: Response,
   provider: OAuthProviderId,
@@ -1227,6 +1458,16 @@ function clearOAuthStateCookie(
   response.clearCookie(
     oauthStateCookieName(provider),
     resolveOAuthStateCookieClearOptions(provider),
+  );
+}
+
+function clearOAuthLinkSessionCookie(
+  response: Response,
+  provider: OAuthProviderId,
+): void {
+  response.clearCookie(
+    oauthLinkSessionCookieName(provider),
+    resolveOAuthLinkSessionCookieClearOptions(provider),
   );
 }
 

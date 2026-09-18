@@ -12,11 +12,12 @@ export type AuthProviderInfo = {
 };
 
 export type AuthProviderDiscovery = Partial<
-  Record<"google" | "kakao" | "naver" | "github", AuthProviderInfo>
+  Record<"google" | "apple" | "kakao" | "naver" | "github", AuthProviderInfo>
 >;
 
 const PROVIDER_LABELS = {
   google: "Google",
+  apple: "Apple",
   kakao: "카카오",
   naver: "네이버",
   github: "GitHub",
@@ -52,7 +53,7 @@ export function parseAuthProviderDiscovery(
   if (!isRecord(value)) return {};
   const result: AuthProviderDiscovery = {};
 
-  for (const id of ["google", "kakao", "naver", "github"] as const) {
+  for (const id of ["google", "apple", "kakao", "naver", "github"] as const) {
     const raw = value[id];
     if (!isRecord(raw) || !isProviderMode(raw.mode)) continue;
     const label =
@@ -84,9 +85,9 @@ export function parseAuthProviderDiscovery(
       continue;
     }
 
-    if (id === "github") {
+    if (id === "github" || id === "apple") {
       if (raw.mode === "oauth" && raw.redirectAvailable === true) {
-        result.github = {
+        result[id] = {
           label,
           mode: "oauth",
           redirectAvailable: true,

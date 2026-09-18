@@ -17,12 +17,7 @@ export const TRAFFIC_SHARE_CHANNELS = [
   "copy",
   "qr",
 ] as const;
-export const TRAFFIC_SHARE_OUTCOMES = [
-  "opened",
-  "completed",
-  "cancelled",
-  "failed",
-] as const;
+export const TRAFFIC_SHARE_OUTCOMES = ["success", "cancelled", "failed"] as const;
 
 export type TrafficShareChannel = (typeof TRAFFIC_SHARE_CHANNELS)[number];
 export type TrafficShareOutcome = (typeof TRAFFIC_SHARE_OUTCOMES)[number];
@@ -60,10 +55,11 @@ export type TrafficHeartbeatPayload = {
   engagedSeconds?: unknown;
 };
 
-export type TrafficShareEventPayload = {
+export type TrafficSharePayload = {
   visitorId?: unknown;
   sessionId?: unknown;
-  path?: unknown;
+  sourcePath?: unknown;
+  targetPath?: unknown;
   channel?: unknown;
   outcome?: unknown;
 };
@@ -116,6 +112,30 @@ export function normalizeTrafficCampaignToken(value: unknown): string | null {
   const token = raw.replace(/[^A-Za-z0-9._~:-]+/gu, "-");
   const normalized = token.replace(/^-+|-+$/gu, "");
   return normalized || null;
+}
+
+export function normalizeTrafficShareChannel(
+  value: unknown,
+): TrafficShareChannel {
+  if (
+    typeof value !== "string"
+    || !TRAFFIC_SHARE_CHANNELS.includes(value as TrafficShareChannel)
+  ) {
+    throw new BadRequestException("공유 채널이 올바르지 않습니다.");
+  }
+  return value as TrafficShareChannel;
+}
+
+export function normalizeTrafficShareOutcome(
+  value: unknown,
+): TrafficShareOutcome {
+  if (
+    typeof value !== "string"
+    || !TRAFFIC_SHARE_OUTCOMES.includes(value as TrafficShareOutcome)
+  ) {
+    throw new BadRequestException("공유 결과가 올바르지 않습니다.");
+  }
+  return value as TrafficShareOutcome;
 }
 
 export function normalizeTrafficScreenClass(value: unknown): string {

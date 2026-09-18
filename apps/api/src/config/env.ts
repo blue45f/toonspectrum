@@ -459,6 +459,12 @@ const envSchema = z.object({
   NAVER_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
   GITHUB_OAUTH_CLIENT_ID: z.string().min(1).max(4_096).optional(),
   GITHUB_OAUTH_CLIENT_SECRET: z.string().min(1).max(4_096).optional(),
+  // Sign in with Apple web: Services ID + Team/Key identifiers + downloaded ES256 private key.
+  APPLE_SERVICE_ID: z.string().min(3).max(255).regex(/^[A-Za-z0-9.-]+$/u).optional(),
+  APPLE_CLIENT_ID: z.string().min(3).max(255).regex(/^[A-Za-z0-9.-]+$/u).optional(),
+  APPLE_TEAM_ID: z.string().regex(/^[A-Z0-9]{10}$/u).optional(),
+  APPLE_KEY_ID: z.string().regex(/^[A-Z0-9]{10}$/u).optional(),
+  APPLE_PRIVATE_KEY: z.string().min(100).max(20_000).optional(),
   // 만화규장각 서버 보강. 인증키는 URL query에 들어가므로 반드시 서버 secret으로만 보관한다.
   KMAS_PRV_KEY: z.string().min(1).max(4_096).optional(),
   KMAS_BASE_URL: z.url({ protocol: /^https$/u }).optional(),
@@ -552,6 +558,7 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "NAVER_CLIENT_SECRET",
   "GITHUB_OAUTH_CLIENT_ID",
   "GITHUB_OAUTH_CLIENT_SECRET",
+  "APPLE_PRIVATE_KEY",
   "KMAS_PRV_KEY",
 ];
 
@@ -614,6 +621,11 @@ function assertProductionAuthSecrets(source: NodeJS.ProcessEnv): void {
     source.NAVER_CLIENT_SECRET,
     source.GITHUB_OAUTH_CLIENT_ID,
     source.GITHUB_OAUTH_CLIENT_SECRET,
+    source.APPLE_SERVICE_ID,
+    source.APPLE_CLIENT_ID,
+    source.APPLE_TEAM_ID,
+    source.APPLE_KEY_ID,
+    source.APPLE_PRIVATE_KEY,
   ].some((value) => Boolean(value?.trim()));
   if (stateSecret !== null || authorizationCodeFlowConfigured) {
     assertStrongProductionHmacSecret(

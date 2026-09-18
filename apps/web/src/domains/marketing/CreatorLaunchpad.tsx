@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Brush,
@@ -24,7 +29,7 @@ import Link from "@/compat/router-link";
 import {
   clearCreatorLaunchPlan,
   clearCreatorRecentDestinations,
-  creatorDestinationDescription,
+  creatorRecentDestinationDescription,
   creatorDestinationLabel,
   formatCreatorRelativeTime,
   getCreatorContinuityServerSnapshot,
@@ -44,6 +49,13 @@ import {
   requestPwaInstall,
   subscribePwaInstall,
 } from "@/shared/lib/pwa-install-store";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("CreatorLaunchpad", ko, en);
 
 const GOALS: readonly CreatorLaunchGoal[] = ["draw", "comic", "character", "materials"];
 const PACES: readonly CreatorLaunchPace[] = ["quick", "project"];
@@ -60,7 +72,8 @@ function rememberHref(href: string): void {
 }
 
 export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }) {
-  const copy = CREATOR_LAUNCHPAD_COPY[locale];
+  useBilingualI18nRevision();
+  const copy = bi((CREATOR_LAUNCHPAD_COPY).ko, (CREATOR_LAUNCHPAD_COPY).en);
   const continuity = useSyncExternalStore(
     subscribeCreatorContinuity,
     getCreatorContinuitySnapshot,
@@ -133,6 +146,8 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
       ? copy.install
       : copy.installHelp;
   const swReady = pwa.serviceWorkerStatus === "active" || pwa.serviceWorkerStatus === "update-waiting";
+  const drawingInstallLabel = bi("순수 드로잉 앱 설치", "Install ToonStudio Draw");
+  const drawingInstallBody = bi("별도 간이 편집기가 아니라 현재 Studio와 동일한 문서·브러시·레이어·저장 엔진을 캔버스 중심 앱 UI로 설치합니다.", "Installs the same Studio document, brush, layer and save engine with canvas-first app chrome — not a separate lightweight editor.");
 
   return (
     <section className="clp" aria-labelledby="creator-continuity-title" data-creator-launchpad="v1">
@@ -218,9 +233,9 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
               <>
                 <ul>
                   {continuity.recent.slice(0, 3).map((item) => (
-                    <li key={item.id}>
+                    <li key={`${item.id}:${item.href}`}>
                       <Link href={item.href} onClick={() => rememberHref(item.href)}>
-                        <span><strong>{creatorDestinationLabel(item.id, locale)}</strong><small>{creatorDestinationDescription(item.id, locale)}</small></span>
+                        <span><strong>{creatorDestinationLabel(item.id, locale)}</strong><small>{creatorRecentDestinationDescription(item, locale)}</small></span>
                         <span className="clp-recent-meta">{now > 0 ? formatCreatorRelativeTime(item.visitedAt, locale, now) : ""}<ArrowRight size={15} aria-hidden="true" /></span>
                       </Link>
                     </li>
@@ -238,7 +253,7 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
             </div>
             <p>{copy.installBody}</p>
             <div className="clp-statuses">
-              <span className={pwa.online ? "is-ready" : "is-warning"}>{pwa.online ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}{pwa.online ? copy.online : copy.offline}</span>
+              <span className={pwa.online ? translateCurrentStaticSourceText("domains.marketing.CreatorLaunchpad", "en", "is-ready") : translateCurrentStaticSourceText("domains.marketing.CreatorLaunchpad", "en", "is-warning")}>{pwa.online ? <Wifi size={14} aria-hidden="true" /> : <WifiOff size={14} aria-hidden="true" />}{pwa.online ? copy.online : copy.offline}</span>
               {swReady && <span className="is-ready"><Check size={14} aria-hidden="true" />{pwa.serviceWorkerStatus === "update-waiting" ? copy.updateReady : copy.offlineReady}</span>}
               {pwa.status === "available" && <span className="is-ready"><Download size={14} aria-hidden="true" />{copy.installReady}</span>}
             </div>
@@ -246,6 +261,14 @@ export function CreatorLaunchpad({ locale }: { locale: CreatorContinuityLocale }
               <Download size={17} aria-hidden="true" />{installLabel}
             </button>
             {showInstallHelp && <p className="clp-install-help" role="status">{copy.installUnavailable}</p>}
+            <button
+              type="button"
+              className="clp-install-button"
+              onClick={() => window.location.assign("/draw-app/install.html?source=site")}
+            >
+              <Brush size={17} aria-hidden="true" />{drawingInstallLabel}
+            </button>
+            <p className="clp-install-help">{drawingInstallBody}</p>
           </section>
         </aside>
       </div>

@@ -11,6 +11,7 @@ import {
 
 import {
   analyzeProductionChangeImpact,
+  applyProductionStudioRevisionLink,
   applySubmissionToDeliverable,
   commitProductionAggregate,
   createImmutableScopePackage,
@@ -23,7 +24,7 @@ import {
   evaluateAutomationRule,
   evaluateProductionRisks,
   evaluateHandoffReadiness,
-  evaluateReleaseReadiness,
+  evaluateProductionStudioRevisionCoverage,
   evaluateReviewApproval,
   resolveDecisionAuthority,
   preflightCreditManifest,
@@ -59,6 +60,7 @@ import {
   validateSeasonPlan,
   validateSeriesMaster,
   validateSubmission,
+  validateProductionStudioRevisionLink,
   type CompensationPlan,
   type ContributionRecord,
   type CreditManifest,
@@ -158,6 +160,8 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "deliverable", id: command.deliverable.id };
     case "upsert-submission":
       return { type: "submission", id: command.submission.id };
+    case "upsert-studio-revision-link":
+      return { type: "studio-revision-link", id: command.link.id };
     case "upsert-review-policy":
       return { type: "review-policy", id: command.policy.id };
     case "record-review-decision":
@@ -207,22 +211,7 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
 
 function commandCapability(command: ProductionCommand): "comment" | "edit" | "manage" {
   if (command.type === "record-review-decision") return "comment";
-  if (command.type === "upsert-operations-record") {
-    return [
-      "resource-calendar",
-      "external-review-access",
-      "automation-rule",
-      "notification-policy",
-    ].includes(command.record.kind) ? "manage" : "edit";
-  }
-  if (
-    command.type === "update-risk-policy"
-    || command.type === "rebaseline-task"
-    || command.type === "suppress-risk-signal"
-    || (command.type === "transition-risk" && ["accepted", "dismissed", "closed"].includes(command.toStatus))
-    || (command.type === "transition-risk-response" && command.toStatus === "approved")
-    || (command.type === "upsert-risk" && ["accepted", "dismissed", "closed"].includes(command.risk.status))
-  ) return "manage";
+  if (command.type === "upsert-studio-revision-link" && command.link.status === "approved") return "manage";
   if (command.type === "upsert-commercial-record") {
     const record = command.record;
     if (record.kind === "proposal") {
@@ -952,6 +941,29 @@ function applyCommand(
             applySubmissionToDeliverable(deliverable, command.submission),
           ),
         },
+      };
+    }
+    case "upsert-studio-revision-link": {
+      assertProjectIdentity(aggregate, command.link);
+      assertAssignmentCanAct(aggregate, actorUserId, command.link.linkedByAssignmentId);
+      const issues = validateProductionStudioRevisionLink({
+        aggregate,
+        link: command.link,
+      });
+      if (issues.length > 0) {
+        throw new BadRequestException({
+          message: "Studio 원고 revision을 제작 산출물에 연결할 수 없습니다.",
+          issues,
+        });
+      }
+      const next = applyProductionStudioRevisionLink(aggregate, command.link);
+      return {
+        aggregate: next,
+        derived: command.link.episodeId
+          ? {
+              coverage: evaluateProductionStudioRevisionCoverage(next, command.link.episodeId),
+            }
+          : undefined,
       };
     }
     case "upsert-review-policy": {

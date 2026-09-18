@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CircleUserRound,
   RefreshCw,
   Settings2,
@@ -87,8 +90,8 @@ export function AiRecoveryNotice({
   return (
     <section
       data-ai-recovery-notice={recoveryCode}
-      role={assertive ? "alert" : "status"}
-      aria-live={assertive ? "assertive" : "polite"}
+      role={assertive ? translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "en", "alert") : translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "en", "status")}
+      aria-live={assertive ? translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "en", "assertive") : translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "en", "polite")}
       aria-atomic="true"
       className={cn(
         "rounded-xl border text-fg",
@@ -118,8 +121,7 @@ export function AiRecoveryNotice({
                   className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent hover:bg-accent/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <CircleUserRound size={13} aria-hidden />
-                  로그인하고 계속
-                </button>
+                  {translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "ko", "로그인하고 계속")}</button>
               ) : null}
               {showSettings ? (
                 <a
@@ -129,7 +131,7 @@ export function AiRecoveryNotice({
                   className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-bold text-fg-2 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <Settings2 size={13} aria-hidden />
-                  {recoveryCode === "login_required" ? "개인 무료 키 연결" : "AI 설정 열기"}
+                  {recoveryCode === "login_required" ? translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "ko", "개인 무료 키 연결") : translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "ko", "AI 설정 열기")}
                 </a>
               ) : null}
               {showRetry ? (
@@ -138,8 +140,7 @@ export function AiRecoveryNotice({
                   onClick={onRetry}
                   className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 text-xs font-bold text-fg-2 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  <RefreshCw size={13} aria-hidden /> 다시 시도
-                </button>
+                  <RefreshCw size={13} aria-hidden /> {translateCurrentStaticSourceText("shared.ai.AiRecoveryNotice", "ko", "다시 시도")}</button>
               ) : null}
             </div>
           ) : null}

@@ -64,6 +64,7 @@ export function createProductionProjectAggregate(input: {
     tasks: Object.freeze([]),
     deliverables: Object.freeze([]),
     submissions: Object.freeze([]),
+    studioRevisionLinks: Object.freeze([]),
     changeRequests: Object.freeze([]),
     scopePackages: Object.freeze([]),
     scopePackageRevisionArchive: Object.freeze([]),

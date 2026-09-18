@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, memo } from "react";
 import { Layer } from "react-konva/lib/ReactKonvaCore";
 
@@ -213,7 +214,7 @@ export const StudioCanvasInteractiveOverlays = memo(function StudioCanvasInterac
               sourceAnchor={healCloneSourceAnchor}
               drag={healCloneDragPreview}
               radiusPx={healCloneRadius}
-              mode={healCloneTool ?? "clone"}
+              mode={healCloneTool ?? translateCurrentStaticSourceText("domains.creator.canvas.StudioCanvasInteractiveOverlays", "en", "clone")}
             />
           </Suspense>
         </Layer>

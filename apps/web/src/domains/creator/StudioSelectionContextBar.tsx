@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlignCenterHorizontal,
   AlignCenterVertical,
   AlignEndHorizontal,
@@ -262,7 +266,7 @@ export const StudioSelectionContextBar = memo(function StudioSelectionContextBar
     <div
       ref={barRef}
       role="toolbar"
-      aria-label={multiple ? `선택 ${selectionCount}개 명령` : "선택 명령"}
+      aria-label={multiple ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionContextBar", "ko", "선택 {v0}개 명령"), { v0: String(selectionCount) }) : translateCurrentStaticSourceText("domains.creator.StudioSelectionContextBar", "ko", "선택 명령")}
       data-studio-selection-context-bar="true"
       data-studio-selection-count={selectionCount}
       data-studio-shortcut-boundary="true"
@@ -298,14 +302,14 @@ export const StudioSelectionContextBar = memo(function StudioSelectionContextBar
       {multiple ? (
         <div
           role="group"
-          aria-label="선택 정렬"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSelectionContextBar", "ko", "선택 정렬")}
           className="flex items-center gap-0.5 border-t border-line/70 pt-1"
         >
           {ALIGN_COMMANDS.map((command) => (
             <button
               key={command.mode}
               type="button"
-              data-studio-selection-command={`align-${command.mode}`}
+              data-studio-selection-command={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSelectionContextBar", "en", "align-{v0}"), { v0: String(command.mode) })}
               aria-label={command.label}
               title={command.label}
               disabled={readOnly}

@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
@@ -159,7 +163,7 @@ function HealthBadge({ health }: { readonly health: EpisodeDeadlineHealth }) {
 
 function ProgressBar({ value }: { readonly value: number }) {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-raised" aria-label={`공정 진행률 ${value}%`}>
+    <div className="h-2 overflow-hidden rounded-full bg-raised" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "공정 진행률 {v0}%"), { v0: String(value) })}>
       <div
         className={cn("h-full rounded-full", value >= 100 ? "bg-good" : value >= 70 ? "bg-accent" : "bg-warn")}
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
@@ -211,7 +215,7 @@ function EpisodeOperationsCard({
   const episodeHref = `/production/projects/${encodeURIComponent(aggregate.projectId)}/episodes/${encodeURIComponent(row.episode.episodeId)}`;
 
   return (
-    <article aria-label={`${episodeLabel} 연재 운영`} className={cn(
+    <article aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0} 연재 운영"), { v0: String(episodeLabel) })} className={cn(
       "rounded-2xl border bg-card p-4 sm:p-5",
       row.health === "critical" ? "border-bad/45" : row.health === "risk" ? "border-warn/45" : "border-line",
     )}>
@@ -224,15 +228,14 @@ function EpisodeOperationsCard({
           </div>
           <h3 className="mt-2 truncate text-lg font-black text-fg">{row.title}</h3>
           <p className="mt-1 text-xs text-fg-2">
-            {formatDateTime(row.releaseAt)} · <span className={attention ? "font-bold text-warn" : "font-semibold text-fg"}>{relativeDeadline(row.daysUntilRelease)}</span>
+            {formatDateTime(row.releaseAt)} · <span className={attention ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "font-bold text-warn") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "font-semibold text-fg")}>{relativeDeadline(row.daysUntilRelease)}</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link className={buttonClass({ variant: "outline", size: "sm" })} to={musicHref}>
-            <Disc3 className="size-3.5" aria-hidden="true" /> 회차 음악
-          </Link>
+            <Disc3 className="size-3.5" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "회차 음악")}</Link>
           <Link className={buttonClass({ variant: "outline", size: "sm" })} to={episodeHref}>
-            공동 작업실 <ChevronRight className="size-3.5" aria-hidden="true" />
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "공동 작업실 ")}<ChevronRight className="size-3.5" aria-hidden="true" />
           </Link>
         </div>
       </div>
@@ -240,20 +243,20 @@ function EpisodeOperationsCard({
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(16rem,0.6fr)]">
         <div className="rounded-xl border border-line bg-panel p-3">
           <div className="flex items-center justify-between gap-3 text-xs">
-            <span className="font-bold text-fg">공정 진행률</span>
+            <span className="font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "공정 진행률")}</span>
             <span className="font-black text-fg">{row.progressPercent}%</span>
           </div>
           <div className="mt-2"><ProgressBar value={row.progressPercent} /></div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-[0.6875rem] sm:grid-cols-4">
-            <div><p className="text-fg-3">완료 작업</p><p className="mt-1 font-bold text-fg">{row.completedTasks}/{row.totalTasks}</p></div>
-            <div><p className="text-fg-3">잔여 공수</p><p className="mt-1 font-bold text-fg">{row.remainingHours}h</p></div>
-            <div><p className="text-fg-3">지연 작업</p><p className={cn("mt-1 font-bold", row.overdueTasks.length ? "text-bad" : "text-fg")}>{row.overdueTasks.length}건</p></div>
-            <div><p className="text-fg-3">가용량 대비</p><p className={cn("mt-1 font-bold", (row.loadRatio ?? 0) > 1 ? "text-bad" : "text-fg")}>{row.loadRatio === null ? "—" : `${Math.round(row.loadRatio * 100)}%`}</p></div>
+            <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "완료 작업")}</p><p className="mt-1 font-bold text-fg">{row.completedTasks}/{row.totalTasks}</p></div>
+            <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "잔여 공수")}</p><p className="mt-1 font-bold text-fg">{row.remainingHours}h</p></div>
+            <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "지연 작업")}</p><p className={cn("mt-1 font-bold", row.overdueTasks.length ? "text-bad" : "text-fg")}>{row.overdueTasks.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "건")}</p></div>
+            <div><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "가용량 대비")}</p><p className={cn("mt-1 font-bold", (row.loadRatio ?? 0) > 1 ? "text-bad" : "text-fg")}>{row.loadRatio === null ? "—" : `${Math.round(row.loadRatio * 100)}%`}</p></div>
           </div>
         </div>
 
         <div className="rounded-xl border border-line bg-panel p-3">
-          <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-fg-3">PM 확인 사유</p>
+          <p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "PM 확인 사유")}</p>
           <ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">
             {row.healthReasons.map((reason) => (
               <li key={reason} className="flex gap-2">
@@ -264,7 +267,7 @@ function EpisodeOperationsCard({
             {row.missingProcessKeys.length > 0 ? (
               <li className="flex gap-2">
                 <Layers3 className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden="true" />
-                <span>표준 공정 {row.missingProcessKeys.length}개 미등록</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "표준 공정 ")}{row.missingProcessKeys.length}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "개 미등록")}</span>
               </li>
             ) : null}
           </ul>
@@ -285,9 +288,8 @@ function EpisodeOperationsCard({
         <div className="mt-4 rounded-xl border border-line bg-panel p-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
             <label className="min-w-0 flex-1 text-xs font-semibold text-fg-2">
-              게시 마감
-              <input
-                aria-label={`${episodeLabel} 게시 마감`}
+              {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "게시 마감")}<input
+                aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0} 게시 마감"), { v0: String(episodeLabel) })}
                 className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 type="datetime-local"
                 value={releaseDraft}
@@ -302,12 +304,11 @@ function EpisodeOperationsCard({
               disabled={!canEdit || saving || !releaseDraft || (!releaseChanged && row.missingProcessKeys.length === 0)}
             >
               <RefreshCw className={cn("size-3.5", saving && "animate-spin")} aria-hidden="true" />
-              {saving ? "일정 재배치 중…" : row.missingProcessKeys.length > 0 ? "표준 공정 구성" : "미완료 공정 재배치"}
+              {saving ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "일정 재배치 중…") : row.missingProcessKeys.length > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "표준 공정 구성") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "미완료 공정 재배치")}
             </button>
           </div>
           <p className="mt-2 text-[0.6875rem] leading-5 text-fg-3">
-            게시일을 기준으로 대본·콘티·선화·배경·채색·식자·권리 검수·공동 교정·게시 준비를 역산합니다. 완료된 작업의 마감은 바꾸지 않습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "게시일을 기준으로 대본·콘티·선화·배경·채색·식자·권리 검수·공동 교정·게시 준비를 역산합니다. 완료된 작업의 마감은 바꾸지 않습니다.")}</p>
         </div>
       ) : null}
     </article>
@@ -408,19 +409,18 @@ function NewEpisodeForm({
   };
 
   return (
-    <form className="rounded-2xl border border-dashed border-accent/40 bg-accent-soft p-4 sm:p-5" onSubmit={(event) => void submit(event)} aria-label="다음 회차 추가">
+    <form className="rounded-2xl border border-dashed border-accent/40 bg-accent-soft p-4 sm:p-5" onSubmit={(event) => void submit(event)} aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "다음 회차 추가")}>
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-on-accent"><CirclePlus className="size-5" aria-hidden="true" /></span>
         <div>
-          <h2 className="font-black text-fg">다음 회차와 전체 공정을 한 번에 만들기</h2>
-          <p className="mt-1 text-xs leading-5 text-fg-2">회차 기획 문서와 9단계 표준 작업, 담당 역할, 의존성, 게시 마감을 하나의 저장으로 생성합니다.</p>
+          <h2 className="font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "다음 회차와 전체 공정을 한 번에 만들기")}</h2>
+          <p className="mt-1 text-xs leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "회차 기획 문서와 9단계 표준 작업, 담당 역할, 의존성, 게시 마감을 하나의 저장으로 생성합니다.")}</p>
         </div>
       </div>
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,0.55fr)_auto] lg:items-end">
         <label className="text-xs font-semibold text-fg-2">
-          회차 제목
-          <input
-            aria-label="새 회차 제목"
+          {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "회차 제목")}<input
+            aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "새 회차 제목")}
             className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -429,9 +429,8 @@ function NewEpisodeForm({
           />
         </label>
         <label className="text-xs font-semibold text-fg-2">
-          첫 게시 마감
-          <input
-            aria-label="새 회차 게시 마감"
+          {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "첫 게시 마감")}<input
+            aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "새 회차 게시 마감")}
             className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-card px-3 text-sm text-fg outline-none focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             type="datetime-local"
             value={releaseDraft}
@@ -440,7 +439,7 @@ function NewEpisodeForm({
           />
         </label>
         <button type="submit" className={buttonClass({ size: "sm" })} disabled={!canEdit || submitting || !title.trim() || !releaseDraft}>
-          <Sparkles className="size-3.5" aria-hidden="true" />{submitting ? "회차 생성 중…" : `${episodeNumber}화 생성`}
+          <Sparkles className="size-3.5" aria-hidden="true" />{submitting ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "회차 생성 중…") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0}화 생성"), { v0: String(episodeNumber) })}
         </button>
       </div>
     </form>
@@ -472,11 +471,11 @@ export function ProductionEpisodeOperationsWorkspace({
       <header className="rounded-3xl border border-line bg-panel p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent"><ListChecks className="size-4" aria-hidden="true" /> Serialization operations</div>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-fg">연재·회차 운영실</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">작가와 PD가 회차별 제작 상태, 게시 마감, 공수와 버퍼를 같은 기준으로 보고 위험을 조기에 조정합니다.</p>
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent"><ListChecks className="size-4" aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "Serialization operations")}</div>
+            <h2 className="mt-2 text-2xl font-black tracking-tight text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "연재·회차 운영실")}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "작가와 PD가 회차별 제작 상태, 게시 마감, 공수와 버퍼를 같은 기준으로 보고 위험을 조기에 조정합니다.")}</p>
           </div>
-          <div className="flex rounded-xl border border-line bg-card p-1" role="group" aria-label="회차 표시 범위">
+          <div className="flex rounded-xl border border-line bg-card p-1" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "회차 표시 범위")}>
             {(["active", "attention", "all"] as const).map((value) => (
               <button
                 key={value}
@@ -485,7 +484,7 @@ export function ProductionEpisodeOperationsWorkspace({
                 onClick={() => setFilter(value)}
                 aria-pressed={filter === value}
               >
-                {value === "active" ? "진행 회차" : value === "attention" ? "주의 필요" : "전체"}
+                {value === "active" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "진행 회차") : value === "attention" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "주의 필요") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "전체")}
               </button>
             ))}
           </div>
@@ -494,16 +493,16 @@ export function ProductionEpisodeOperationsWorkspace({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
-          label="다음 게시"
-          value={nextRelease ? relativeDeadline(nextRelease.daysUntilRelease) : "미정"}
-          detail={nextRelease ? `${nextRelease.episodeNumber ? `${nextRelease.episodeNumber}화` : nextRelease.episode.episodeId} · ${formatDateTime(nextRelease.releaseAt)}` : "게시 마감이 있는 회차가 없습니다."}
+          label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "다음 게시")}
+          value={nextRelease ? relativeDeadline(nextRelease.daysUntilRelease) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "미정")}
+          detail={nextRelease ? `${nextRelease.episodeNumber ? `${nextRelease.episodeNumber}화` : nextRelease.episode.episodeId} · ${formatDateTime(nextRelease.releaseAt)}` : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "게시 마감이 있는 회차가 없습니다.")}
           icon={CalendarClock}
-          tone={nextRelease?.health === "critical" ? "danger" : "accent"}
+          tone={nextRelease?.health === "critical" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "accent")}
         />
-        <MetricCard label="연재 주기" value={overview.cadenceDays ? `${overview.cadenceDays}일` : "미정"} detail="시즌 계획 또는 게시 간격 기준" icon={TimerReset} />
-        <MetricCard label="준비 버퍼" value={`${overview.readyBufferCount}화`} detail="다음 게시 외 공개 준비 완료 회차" icon={Layers3} tone={overview.readyBufferCount > 0 ? "success" : "warning"} />
-        <MetricCard label="주의 회차" value={`${overview.criticalCount + overview.riskCount}화`} detail={`즉시 조치 ${overview.criticalCount} · 주의 ${overview.riskCount}`} icon={ShieldAlert} tone={overview.criticalCount > 0 ? "danger" : overview.riskCount > 0 ? "warning" : "success"} />
-        <MetricCard label="잔여 공수" value={`${overview.remainingHours}h`} detail={`지연 ${overview.overdueTaskCount}건 · 차단 질문 ${overview.openBlockerCount}건`} icon={Clock3} tone={overview.overdueTaskCount > 0 ? "warning" : "neutral"} />
+        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "연재 주기")} value={overview.cadenceDays ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0}일"), { v0: String(overview.cadenceDays) }) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "미정")} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "시즌 계획 또는 게시 간격 기준")} icon={TimerReset} />
+        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "준비 버퍼")} value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0}화"), { v0: String(overview.readyBufferCount) })} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "다음 게시 외 공개 준비 완료 회차")} icon={Layers3} tone={overview.readyBufferCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "warning")} />
+        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "주의 회차")} value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0}화"), { v0: String(overview.criticalCount + overview.riskCount) })} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "즉시 조치 {v0} · 주의 {v1}"), { v0: String(overview.criticalCount), v1: String(overview.riskCount) })} icon={ShieldAlert} tone={overview.criticalCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "danger") : overview.riskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "success")} />
+        <MetricCard label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "잔여 공수")} value={`${overview.remainingHours}h`} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "지연 {v0}건 · 차단 질문 {v1}건"), { v0: String(overview.overdueTaskCount), v1: String(overview.openBlockerCount) })} icon={Clock3} tone={overview.overdueTaskCount > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "en", "neutral")} />
       </div>
 
       <div className={cn(
@@ -511,26 +510,26 @@ export function ProductionEpisodeOperationsWorkspace({
         warningTone === "danger" ? "border-bad/35 bg-bad/10" : warningTone === "warning" ? "border-warn/35 bg-warn/10" : "border-good/35 bg-good/10",
       )} role="status">
         {warningTone === "success" ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-good" aria-hidden="true" /> : <AlertTriangle className={cn("mt-0.5 size-5 shrink-0", warningTone === "danger" ? "text-bad" : "text-warn")} aria-hidden="true" />}
-        <div><p className="text-sm font-black text-fg">오늘의 운영 판단</p><p className="mt-1 text-xs leading-5 text-fg-2">{operationsWarning}</p></div>
+        <div><p className="text-sm font-black text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "오늘의 운영 판단")}</p><p className="mt-1 text-xs leading-5 text-fg-2">{operationsWarning}</p></div>
       </div>
 
       <NewEpisodeForm aggregate={aggregate} execute={execute} canEdit={canEdit} suggestedDate={suggestedReleaseAt(overview)} />
 
-      <section className="space-y-3" aria-label="회차 운영 목록">
+      <section className="space-y-3" aria-label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "회차 운영 목록")}>
         {rows.map((row) => <EpisodeOperationsCard key={row.episode.id} aggregate={aggregate} row={row} execute={execute} canEdit={canEdit} />)}
         {rows.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-line p-8 text-center"><Gauge className="mx-auto size-6 text-fg-3" aria-hidden="true" /><p className="mt-3 font-bold text-fg">표시할 회차가 없습니다</p><p className="mt-1 text-xs text-fg-2">필터를 바꾸거나 다음 회차를 생성하세요.</p></div>
+          <div className="rounded-2xl border border-dashed border-line p-8 text-center"><Gauge className="mx-auto size-6 text-fg-3" aria-hidden="true" /><p className="mt-3 font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "표시할 회차가 없습니다")}</p><p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "필터를 바꾸거나 다음 회차를 생성하세요.")}</p></div>
         ) : null}
       </section>
 
       <details className="rounded-2xl border border-line bg-card p-4">
-        <summary className="cursor-pointer text-sm font-black text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">표준 웹툰 제작 공정 보기</summary>
+        <summary className="cursor-pointer text-sm font-black text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "표준 웹툰 제작 공정 보기")}</summary>
         <div className="mt-4 grid gap-2 md:grid-cols-3">
           {WEBTOON_EPISODE_PIPELINE.map((step, index) => (
             <div key={step.processKey} className="rounded-xl border border-line bg-panel p-3">
-              <div className="flex items-center justify-between gap-2"><span className="text-[0.6875rem] font-black text-accent">{String(index + 1).padStart(2, "0")}</span><span className="text-[0.6875rem] text-fg-3">게시 {step.daysBeforeRelease ? `${step.daysBeforeRelease}일 전` : "당일"}</span></div>
+              <div className="flex items-center justify-between gap-2"><span className="text-[0.6875rem] font-black text-accent">{String(index + 1).padStart(2, "0")}</span><span className="text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "게시 ")}{step.daysBeforeRelease ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "{v0}일 전"), { v0: String(step.daysBeforeRelease) }) : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "당일")}</span></div>
               <p className="mt-1 text-sm font-bold text-fg">{step.label}</p>
-              <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">기준 공수 {step.likelyHours}h · 선행 {step.dependencyProcessKeys.length ? step.dependencyProcessKeys.join(", ") : "없음"}</p>
+              <p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "기준 공수 ")}{step.likelyHours}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "h · 선행 ")}{step.dependencyProcessKeys.length ? step.dependencyProcessKeys.join(", ") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionEpisodeOperationsWorkspace", "ko", "없음")}</p>
             </div>
           ))}
         </div>

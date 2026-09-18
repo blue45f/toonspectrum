@@ -4,6 +4,7 @@ import {
   jsonObject,
   normalizeCloudRelativePath,
   numberField,
+  sha256Bytes,
   stringField,
 } from "./http.js";
 import {
@@ -12,10 +13,19 @@ import {
   type DesktopCloudProvider,
 } from "./types.js";
 
+import type { DesktopCloudAccessTokenSource } from "../oauth.js";
+import type {
+  DesktopUploadSessionIdentity,
+  DesktopUploadSessionRecord,
+  DesktopUploadSessionStore,
+} from "../upload-session-store.js";
+
 export interface GoogleDriveDesktopCloudProviderOptions {
-  readonly accessToken: string;
+  readonly accessToken: string | DesktopCloudAccessTokenSource;
   readonly rootPath?: string;
   readonly fetchImpl?: typeof fetch;
+  readonly credentialProfile?: string;
+  readonly uploadSessionStore?: DesktopUploadSessionStore;
 }
 
 const GOOGLE_API = "https://www.googleapis.com/drive/v3";
@@ -95,12 +105,16 @@ export class GoogleDriveDesktopCloudProvider implements DesktopCloudProvider {
   readonly rootLabel: string;
   private readonly rootSegments: readonly string[];
   private readonly http: DesktopCloudHttpClient;
+  private readonly credentialProfile: string;
+  private readonly uploadSessionStore?: DesktopUploadSessionStore;
   private rootFolderId: string | null = null;
 
   constructor(options: GoogleDriveDesktopCloudProviderOptions) {
     const root = normalizeCloudRelativePath(options.rootPath ?? "ToonStudio/Sync");
     this.rootLabel = root;
     this.rootSegments = cloudPathSegments(root);
+    this.credentialProfile = options.credentialProfile?.trim() || "default";
+    this.uploadSessionStore = options.uploadSessionStore;
     this.http = new DesktopCloudHttpClient({
       provider: this.id,
       accessToken: options.accessToken,
@@ -344,6 +358,32 @@ export class GoogleDriveDesktopCloudProvider implements DesktopCloudProvider {
     );
     return new Uint8Array(await response.arrayBuffer());
   }
+  private uploadIdentity(input: {
+    readonly relativePath: string;
+    readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
+    readonly expected: DesktopCloudObject | null;
+  }): DesktopUploadSessionIdentity {
+    const sourceSha256 = input.sourceSha256 ?? sha256Bytes(input.bytes);
+    if (!/^[a-f0-9]{64}$/u.test(sourceSha256)) {
+      throw new DesktopCloudError(
+        this.id,
+        "integrity",
+        `Google Drive upload hash is invalid: ${input.relativePath}`,
+      );
+    }
+    return {
+      provider: this.id,
+      remoteRoot: this.rootLabel,
+      credentialProfile: this.credentialProfile,
+      relativePath: normalizeCloudRelativePath(input.relativePath),
+      sourceSha256,
+      size: input.bytes.byteLength,
+      expectedObjectId: input.expected?.id ?? null,
+      expectedVersion: input.expected?.version ?? null,
+    };
+  }
+
   private async createUploadSession(input: {
     readonly relativePath: string;
     readonly bytes: Uint8Array;
@@ -402,29 +442,117 @@ export class GoogleDriveDesktopCloudProvider implements DesktopCloudProvider {
     return location;
   }
 
+  private async saveUploadSession(
+    identity: DesktopUploadSessionIdentity,
+    handle: string,
+    offset: number,
+    signal?: AbortSignal,
+  ): Promise<DesktopUploadSessionRecord> {
+    const record: DesktopUploadSessionRecord = {
+      ...identity,
+      schemaVersion: 1,
+      kind: "google-resumable",
+      handle,
+      offset,
+      expiresAt: null,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.uploadSessionStore?.save(record, signal);
+    return record;
+  }
+
+  private async queryUploadSession(
+    record: DesktopUploadSessionRecord,
+    bytes: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly record: DesktopUploadSessionRecord;
+    readonly metadata: GoogleDriveMetadata | null;
+  }> {
+    const response = await this.http.request(record.handle, {
+      method: "PUT",
+      headers: {
+        "Content-Length": "0",
+        "Content-Range": `bytes */${bytes.byteLength}`,
+      },
+    }, { allow: [308], anonymous: true, signal });
+    if (response.status !== 308) {
+      const metadata = googleMetadata(await jsonObject(response, this.id));
+      if (!metadata?.version) {
+        throw new DesktopCloudError(
+          this.id,
+          "invalid-response",
+          "Google Drive upload status did not return metadata",
+        );
+      }
+      return { record, metadata };
+    }
+    const range = response.headers.get("Range");
+    const match = range ? /bytes=0-(\d+)/u.exec(range) : null;
+    const offset = match ? Number(match[1]) + 1 : 0;
+    if (!Number.isSafeInteger(offset) || offset > bytes.byteLength) {
+      throw new DesktopCloudError(
+        this.id,
+        "integrity",
+        "Google Drive upload session returned an invalid offset",
+      );
+    }
+    return {
+      record: await this.saveUploadSession(
+        record,
+        record.handle,
+        offset,
+        signal,
+      ),
+      metadata: null,
+    };
+  }
+
   private async uploadChunks(
-    uploadUrl: string,
+    recordValue: DesktopUploadSessionRecord,
     bytes: Uint8Array,
     signal?: AbortSignal,
   ): Promise<GoogleDriveMetadata> {
-    let offset = 0;
-    while (offset < bytes.byteLength) {
+    let record = recordValue;
+    if (record.offset > 0) {
+      const status = await this.queryUploadSession(record, bytes, signal);
+      if (status.metadata) return status.metadata;
+      record = status.record;
+    }
+    while (record.offset < bytes.byteLength) {
       const endExclusive = Math.min(
         bytes.byteLength,
-        offset + GOOGLE_CHUNK_BYTES,
+        record.offset + GOOGLE_CHUNK_BYTES,
       );
-      const response = await this.http.request(uploadUrl, {
+      const response = await this.http.request(record.handle, {
         method: "PUT",
         headers: {
           "Content-Type": "application/octet-stream",
-          "Content-Range": `bytes ${offset}-${endExclusive - 1}/${bytes.byteLength}`,
+          "Content-Range": `bytes ${record.offset}-${endExclusive - 1}/${bytes.byteLength}`,
         },
-        body: bytes.slice(offset, endExclusive),
+        body: bytes.slice(record.offset, endExclusive),
       }, { allow: [308], anonymous: true, signal });
       if (response.status === 308) {
         const range = response.headers.get("Range");
         const match = range ? /bytes=0-(\d+)/u.exec(range) : null;
-        offset = match ? Number(match[1]) + 1 : endExclusive;
+        const offset = match ? Number(match[1]) + 1 : endExclusive;
+        if (
+          !Number.isSafeInteger(offset)
+          || offset <= record.offset
+          || offset > bytes.byteLength
+        ) {
+          throw new DesktopCloudError(
+            this.id,
+            "integrity",
+            "Google Drive upload session did not advance safely",
+          );
+        }
+        record = await this.saveUploadSession(
+          record,
+          record.handle,
+          offset,
+          signal,
+        );
         continue;
       }
       const metadata = googleMetadata(await jsonObject(response, this.id));
@@ -437,16 +565,19 @@ export class GoogleDriveDesktopCloudProvider implements DesktopCloudProvider {
       }
       return metadata;
     }
+    const status = await this.queryUploadSession(record, bytes, signal);
+    if (status.metadata) return status.metadata;
     throw new DesktopCloudError(
       this.id,
       "invalid-response",
-      "Google Drive cannot upload an empty file",
+      "Google Drive upload session is incomplete",
     );
   }
 
   async uploadFile(input: {
     readonly relativePath: string;
     readonly bytes: Uint8Array;
+    readonly sourceSha256?: string;
     readonly expected: DesktopCloudObject | null;
     readonly signal?: AbortSignal;
   }): Promise<DesktopCloudObject> {
@@ -457,14 +588,50 @@ export class GoogleDriveDesktopCloudProvider implements DesktopCloudProvider {
         "empty Google Drive uploads are not supported",
       );
     }
-    const session = await this.createUploadSession(input);
-    const metadata = await this.uploadChunks(
-      session,
-      input.bytes,
+    const identity = this.uploadIdentity(input);
+    let record = await this.uploadSessionStore?.load(
+      identity,
       input.signal,
-    );
-    return cloudObject(input.relativePath, metadata);
+    ) ?? null;
+    if (record && record.kind !== "google-resumable") {
+      await this.uploadSessionStore?.delete(identity, input.signal);
+      record = null;
+    }
+    let restarted = false;
+    while (true) {
+      if (!record) {
+        const handle = await this.createUploadSession(input);
+        record = await this.saveUploadSession(
+          identity,
+          handle,
+          0,
+          input.signal,
+        );
+      }
+      try {
+        const metadata = await this.uploadChunks(
+          record,
+          input.bytes,
+          input.signal,
+        );
+        await this.uploadSessionStore?.delete(identity, input.signal);
+        return cloudObject(input.relativePath, metadata);
+      } catch (error) {
+        if (
+          !restarted
+          && error instanceof DesktopCloudError
+          && error.code === "not-found"
+        ) {
+          await this.uploadSessionStore?.delete(identity, input.signal);
+          record = null;
+          restarted = true;
+          continue;
+        }
+        throw error;
+      }
+    }
   }
+
   async deleteFile(input: {
     readonly file: DesktopCloudObject;
     readonly expectedVersion: string;

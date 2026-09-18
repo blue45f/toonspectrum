@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Text Effect Panel
  * 효과음(SFX)/대사 텍스트 연출 원클릭 프리셋 칩 — 외곽선/그림자/그라디언트 스타일을
@@ -64,21 +68,19 @@ export function StudioTextEffectPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Type className="size-3.5" />
-          텍스트 연출 프리셋
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEffectPanel", "ko", "텍스트 연출 프리셋")}</p>
         <button
           type="button"
           onClick={() => onApply(textFxResetPatch())}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="모든 텍스트 효과를 제거하고 원본 스타일로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEffectPanel", "ko", "모든 텍스트 효과를 제거하고 원본 스타일로 되돌립니다.")}
           // 고급 조판 디스클로저 안에서만 보이므로 advanced. 선언이 없으면 밀도 감사가
           // unclassified-control 로 잡는다(그게 이 속성이 있는 이유다).
           data-inspector-control-id="typography.fx.reset"
           data-inspector-priority="advanced"
         >
           <RotateCcw className="size-3.5" />
-          기본
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEffectPanel", "ko", "기본")}</button>
       </div>
 
       {/* 프리셋 칩 — reset 후 적용해 절대값으로 덮어쓴다(누적 아님). */}
@@ -89,7 +91,7 @@ export function StudioTextEffectPanel({
             type="button"
             onClick={() => onApply({ ...textFxResetPatch(), ...preset.patch })}
             title={preset.tip}
-            data-inspector-control-id={`typography.fx.preset.${preset.id}`}
+            data-inspector-control-id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioTextEffectPanel", "en", "typography.fx.preset.{v0}"), { v0: String(preset.id) })}
             data-inspector-priority="advanced"
             // 그라디언트 프리셋 칩은 라벨이 transparent라 살짝 굵게 보이도록 폰트 가중치를 준다.
             className={cn(CHIP_CLASS, preset.patch.fillType === "gradient" && "font-semibold")}

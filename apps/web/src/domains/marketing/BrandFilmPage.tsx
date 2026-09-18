@@ -1,3 +1,7 @@
+import {
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonspectrum/core";
 import {
   ArrowLeft,
@@ -9,6 +13,7 @@ import {
   Subtitles,
 } from "lucide-react";
 
+import { BrandFilmStoryboard } from "./BrandFilmStoryboard";
 import { CreatorBrandFilm } from "./CreatorHomePage";
 import { CREATOR_FILM, HOME_COPY, creatorHomeLocale } from "./creator-home-content";
 
@@ -19,11 +24,20 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { useI18n } from "@/shared/lib/i18n";
+import {
+  defineBilingualText,
+  translateBilingualValueForActiveLocale,
+  translateParallelBilingualCopy,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 
 import "./creator-home.css";
 import "./creator-film.css";
 import "./brand-film-page.css";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("BrandFilmPage", ko, en);
 
 const PAGE_COPY = {
   ko: {
@@ -110,14 +124,23 @@ const PAGE_COPY = {
   },
 } as const;
 
+const FULL_TOUR_KEY = defineBilingualText(
+  "brandFilmPage",
+  "fullProductTour",
+  "8분 전체 제품 투어",
+  "8-minute full product tour",
+);
 const PRODUCTION_ICONS = [Clapperboard, Ratio, Subtitles] as const;
 const BRAND_FILM_POSTER = `${SITE_URL}/brand/toonstudio-film-poster.jpg`;
 
 export function BrandFilmPage() {
+  useBilingualI18nRevision();
+  const t = useT();
   const language = useI18n((state) => state.lang);
   const locale = creatorHomeLocale(language);
-  const copy = PAGE_COPY[locale];
-  const filmCopy = HOME_COPY[locale];
+  const documentLocale = normalizeLocaleCode(language) || "en";
+  const copy = translateParallelBilingualCopy(t, "brandFilmPage", PAGE_COPY);
+  const filmCopy = bi((HOME_COPY).ko, (HOME_COPY).en);
 
   useDocumentTitle(copy.pageTitle);
   useMetaDescription(copy.metaDescription);
@@ -137,7 +160,7 @@ export function BrandFilmPage() {
     contentUrl: `${SITE_URL}${CREATOR_FILM.src}`,
     embedUrl: `${SITE_URL}/brand-film#creator-film`,
     duration: "PT24S",
-    inLanguage: locale === "ko" ? "ko-KR" : "en",
+    inLanguage: documentLocale,
     isFamilyFriendly: true,
   });
 
@@ -145,7 +168,7 @@ export function BrandFilmPage() {
     <div
       className="creator-home brand-film-page"
       data-brand-film="remotion"
-      lang={locale}
+      lang={documentLocale}
     >
       <header className="brand-film-page__hero">
         <div className="brand-film-page__hero-copy">
@@ -155,8 +178,7 @@ export function BrandFilmPage() {
           </Link>
           <p className="ch-eyebrow">
             <Sparkles size={14} aria-hidden="true" />
-            TOONSTUDIO BRAND FILM
-          </p>
+            {translateCurrentStaticSourceText("domains.marketing.BrandFilmPage", "en", "TOONSTUDIO BRAND FILM")}</p>
           <h1>
             {copy.title[0]}
             <br />
@@ -183,6 +205,8 @@ export function BrandFilmPage() {
           ))}
         </dl>
       </header>
+
+      <BrandFilmStoryboard />
 
       <div className="brand-film-page__film-shell">
         <CreatorBrandFilm copy={filmCopy} locale={locale} />
@@ -216,7 +240,7 @@ export function BrandFilmPage() {
         aria-labelledby="brand-film-closing-title"
       >
         <div>
-          <p className="ch-eyebrow">CREATE YOUR NEXT STORY</p>
+          <p className="ch-eyebrow">{translateCurrentStaticSourceText("domains.marketing.BrandFilmPage", "en", "CREATE YOUR NEXT STORY")}</p>
           <h2 id="brand-film-closing-title">{copy.closingTitle}</h2>
           <p>{copy.closingBody}</p>
         </div>
@@ -227,6 +251,9 @@ export function BrandFilmPage() {
           </Link>
           <Link href="/showcase/promo" className="ch-button ch-button--quiet">
             {copy.promo}
+          </Link>
+          <Link href="/product-tour" className="ch-button ch-button--quiet">
+            {t(FULL_TOUR_KEY)}
           </Link>
         </div>
       </section>

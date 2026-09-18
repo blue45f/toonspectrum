@@ -4,17 +4,17 @@
 
 `toonstudio-sync`는 ToonStudio 작업 폴더를 별도의 파일시스템 폴더 또는 Google Drive·Dropbox·OneDrive와 양방향으로 맞추는 충돌 안전 CLI다. 파일시스템 원격은 다른 디스크, NAS, 또는 사용자가 직접 마운트한 동기화 폴더일 수 있다.
 
-클라우드 모드는 공급자 API에 직접 연결한다. 현재 CLI는 사용자가 환경 변수로 전달한 OAuth access token을 사용하며 토큰 자체를 로그·journal·sidecar index에 기록하지 않는다. OAuth 로그인·refresh token·OS Keychain 관리는 별도 설치 앱 범위다.
+클라우드 모드는 공급자 API에 직접 연결한다. 기본 경로는 PKCE와 loopback callback을 사용하는 브라우저 OAuth 로그인이다. access token·refresh token·계정 식별자는 macOS Keychain, Windows Credential Manager, Linux Secret Service에 저장되며 로그·journal·sidecar index에는 기록하지 않는다. 기존 자동화와 응급 복구를 위해 환경 변수 access token도 명시적으로 선택할 수 있다.
 
 ## 먼저 확인할 것
 
 - 파일시스템 모드에서는 로컬 폴더와 원격 폴더가 서로 다른 실제 디렉터리여야 한다.
-- 클라우드 모드에서는 첫 실행 전에 access token의 최소 파일 읽기·쓰기 범위를 확인한다.
+- 클라우드 모드에서는 공급자별 public OAuth client ID와 최소 파일 읽기·쓰기 범위를 준비한다.
 - 첫 실행은 반드시 `--dry-run`으로 계획을 확인한다.
 - 두 위치에서 같은 파일이 따로 변경되면 자동으로 승자를 선택하지 않는다.
 - `.toonstudio`, `.git`, `node_modules`와 심볼릭 링크 경로는 동기화 대상에서 제외된다.
 - 로컬 삭제 전파는 `.toonstudio/trash`로 이동되어 복구 가능하다.
-- 원격 삭제는 compare-and-swap 버전 검사를 통과한 파일에만 적용된다.
+- Google Drive·OneDrive 삭제는 공급자 version·ETag 조건을 통과해야 하고, Dropbox 삭제는 revision 확인 후 숨김 보존 폴더로 이동한다.
 
 ## 빌드
 
@@ -30,19 +30,31 @@ apps/desktop-sync/dist/cli.js
 
 ## 클라우드 자격 증명
 
-기본 환경 변수는 다음과 같다.
+공급자 콘솔에서 데스크톱·native app용 public OAuth client를 만들고 client ID만 환경 변수에 둔다. client secret은 사용하지 않는다.
 
-| 공급자 | 기본 환경 변수 |
+| 공급자 | OAuth client ID 환경 변수 | 주요 범위 |
+|---|---|---|
+| Google Drive | `TOONSTUDIO_GOOGLE_DRIVE_OAUTH_CLIENT_ID` | `drive.file`, OpenID 프로필 |
+| Dropbox | `TOONSTUDIO_DROPBOX_OAUTH_CLIENT_ID` | 파일 콘텐츠·메타데이터 읽기/쓰기 |
+| OneDrive | `TOONSTUDIO_ONEDRIVE_OAUTH_CLIENT_ID` | `Files.ReadWrite.AppFolder`, `offline_access` |
+
+로그인·상태 확인·로그아웃은 다음처럼 실행한다.
+
+```bash
+pnpm desktop:sync -- login --cloud-provider dropbox
+pnpm desktop:sync -- auth-status --cloud-provider dropbox
+pnpm desktop:sync -- logout --cloud-provider dropbox
+```
+
+로그인은 기본 브라우저와 임시 loopback callback을 사용하며 state와 PKCE를 검증한다. 공급자가 갱신한 refresh token은 이전 값과 원자적으로 교체한다. 여러 계정을 구분하려면 `--credential-profile`을 사용하고, OneDrive tenant는 `--onedrive-tenant`로 제한할 수 있다.
+
+기존 CI 또는 응급 복구에서는 access token 환경 변수를 사용할 수 있다. 토큰은 명령행 인자로 받지 않는다.
+
+| 공급자 | legacy access token 환경 변수 |
 |---|---|
 | Google Drive | `TOONSTUDIO_GOOGLE_DRIVE_ACCESS_TOKEN` |
 | Dropbox | `TOONSTUDIO_DROPBOX_ACCESS_TOKEN` |
 | OneDrive | `TOONSTUDIO_ONEDRIVE_ACCESS_TOKEN` |
-
-토큰은 명령행 인자로 전달하지 않는다. 셸 history와 프로세스 목록에 노출되지 않도록 환경 변수만 사용한다.
-
-```bash
-export TOONSTUDIO_DROPBOX_ACCESS_TOKEN='...'
-```
 
 다른 환경 변수 이름을 사용하려면 `--access-token-env`를 지정한다.
 
@@ -122,6 +134,19 @@ pnpm desktop:sync -- \
 
 `SIGINT` 또는 `SIGTERM`을 받으면 새 주기를 예약하지 않고 현재 실행 경계를 마친 뒤 종료한다. 감시 중 충돌이 발견되면 자동 적용을 중단하고 종료 시 코드 `2`를 반환한다.
 
+## 충돌 검토
+
+충돌은 loopback 전용 검토 화면에서 양쪽 메타데이터와 지원 형식의 미리보기를 비교한 뒤 파일별로 로컬 유지, 원격 유지, 둘 다 보존 중 하나를 선택한다.
+
+```bash
+pnpm desktop:sync -- resolve \
+  --local /path/to/toonstudio-projects \
+  --cloud-provider dropbox \
+  --cloud-root ToonStudio/Projects/MySeries
+```
+
+검토 URL은 무작위 capability token을 포함하며 localhost에서만 수신한다. 모든 결정과 확인을 제출하기 전에는 원격·로컬 파일을 변경하지 않고, 적용 후에는 결정·digest·session ID가 포함된 영수증을 남긴다.
+
 ## 동작 원리
 
 1. 로컬 파일을 SHA-256, 크기, 수정 시각으로 스캔한다.
@@ -130,9 +155,9 @@ pnpm desktop:sync -- \
 4. 로컬 `.toonstudio/sync-journal.json`의 마지막 성공 상태와 비교한다.
 5. `upload`, `download`, `delete-local`, `delete-remote`, `record`, `conflict` 계획을 만든다.
 6. 충돌이 하나라도 있으면 해당 주기 전체의 변경을 막는다.
-7. 다운로드와 업로드는 digest 검증과 임시 파일·atomic rename 경계를 사용한다.
-8. Google Drive는 version+ETag, Dropbox는 revision, OneDrive는 eTag를 수정·삭제 조건으로 사용한다.
-9. 성공한 작업만 journal과 cloud index에 반영한다.
+7. 다운로드는 digest 검증과 임시 파일·atomic rename을 사용하고, 대용량 업로드 session은 OS credential vault에 저장해 프로세스 재시작 뒤 이어서 전송한다.
+8. Google Drive는 version+ETag, Dropbox는 revision, OneDrive는 eTag를 수정 조건으로 사용한다. Dropbox 삭제는 영구 삭제 대신 `.toonstudio-trash`로 이동하며 동시 변경이 감지되면 복원하거나 보존 위치를 포함한 충돌로 중단한다.
+9. 성공한 작업만 journal과 cloud index에 반영하며, OAuth 갱신·업로드 session·충돌 영수증은 서로 분리된 저장 권위를 사용한다.
 
 ## 종료 코드
 
@@ -142,17 +167,26 @@ pnpm desktop:sync -- \
 | `1` | 인자, 파일시스템, 무결성 또는 런타임 오류 |
 | `2` | 사용자가 해결해야 하는 양방향 충돌 |
 
+## 배포 패키지와 서명
+
+`desktop:sync:release:package`는 현재 OS용 Node runtime, production dependency, 라이선스, CycloneDX SBOM, SHA-256 manifest와 영수증을 포함한 재현 가능한 `tar.gz`를 만든다.
+
+```bash
+pnpm desktop:sync:release:package -- --version 1.0.0
+pnpm desktop:sync:release:verify -- --allow-unsigned
+```
+
+태그 `desktop-sync-v*`의 릴리스 워크플로는 Linux·macOS·Windows에서 각각 패키징한다. 운영 릴리스는 플랫폼 인증서 또는 GPG 키가 없으면 실패하며, `codesign`, Authenticode, GPG 검증을 통과한 뒤에만 산출물을 업로드한다. 서명 증거는 대상 파일과 서명 파일의 SHA-256을 포함하고 패키지 finalization에서 다시 대조한다.
+
 ## 운영 제한
 
-현재 CLI가 완료한 클라우드 범위는 access token을 사용한 Google Drive·Dropbox·OneDrive 직접 파일 API, 청크 업로드, version 충돌 차단과 SHA-256 sidecar index다.
+코드 경로가 완료된 범위는 브라우저 OAuth·토큰 갱신·OS 자격 증명 보관, 재시작 가능한 대용량 업로드, 시각적 충돌 해결, Dropbox 보존 삭제, 결정론적 패키징·SBOM·플랫폼 서명 검증이다.
 
-다음 항목은 서명된 데스크톱 설치 앱과 운영 검증 단계에 남아 있다.
+저장소 내부 자동화가 대신할 수 없어 운영 증거로 남는 항목은 다음과 같다.
 
-- 브라우저 OAuth 로그인, refresh token 회전과 OS Keychain 저장
-- 프로세스 재시작 뒤에도 이어지는 네트워크 upload session 영속화
-- OS 로그인 시 자동 시작하는 서명·공증 설치 패키지
-- 충돌 내용을 시각적으로 비교·병합하는 GUI
-- Dropbox 삭제 API의 metadata 확인과 delete 사이 경쟁을 제거할 서버 중계 또는 보존 정책
-- 팀 소유권과 서버 권한에 따른 파일 잠금
+- 실제 배포 인증서로 생성한 macOS 서명·공증, Windows Authenticode, Linux GPG 산출물과 설치 검증
+- 실제 Google Drive·Dropbox·OneDrive 계정의 장시간 중단·재개·권한 회수·용량 제한 시험
+- 조직 소유 외부 폴더의 서버 권한·잠금 정책 검증
+- 현 릴리스 커밋의 실기기 장시간 soak와 전문 창작자 서명 검증
 
-따라서 이 도구의 완료 범위는 **파일시스템·Google Drive·Dropbox·OneDrive를 직접 사용하는 충돌 안전 CLI transport**다. OAuth 수명주기, OS 배포와 실제 대규모 계정 검증은 별도 release gate를 따른다.
+따라서 기능 코드는 **파일시스템·Google Drive·Dropbox·OneDrive의 OAuth 수명주기, 충돌 안전 transport, 복구 가능한 삭제와 검증 가능한 배포물 생성**까지 완료한다. 실제 인증서와 외부 계정으로 남기는 운영 영수증은 별도 release gate다.
