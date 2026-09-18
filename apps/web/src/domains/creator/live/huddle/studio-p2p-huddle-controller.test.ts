@@ -51,12 +51,12 @@ describe("P2P huddle consent and delivery", () => {
     expect(a.snapshot().messages[0]?.received).toEqual(["b"]);
   });
   it("keeps a proximity-scoped huddle limited to eligible direct peers", () => {
-    let receive: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
-    const send = vi.fn(() => true);
+    const receiveRef: { current: ((sender: StudioLiveParticipant, raw: string) => void) | null } = { current: null };
+    const send = vi.fn((_target: string, _raw: string) => true);
     const port: StudioLiveDirectPort = {
       getPeers: () => [B, C],
       send,
-      subscribe: (listener) => { receive = listener; return () => undefined; },
+      subscribe: (listener) => { receiveRef.current = listener; return () => undefined; },
     };
     const controller = new StudioP2pHuddleController(A, port, {
       peerFilter: (peer) => peer.sessionId === B.sessionId,
@@ -66,8 +66,8 @@ describe("P2P huddle consent and delivery", () => {
     const state = (epoch: string) => JSON.stringify({
       kind: "state", epoch, muted: true, camera: false, sharing: false, hand: false,
     });
-    receive?.(B, state("peer-b"));
-    receive?.(C, state("peer-c"));
+    receiveRef.current?.(B, state("peer-b"));
+    receiveRef.current?.(C, state("peer-c"));
     controller.refreshPeers();
 
     expect(controller.snapshot().availablePeers).toBe(1);
@@ -195,7 +195,7 @@ describe("P2P huddle consent and delivery", () => {
   });
 
   it("restarts ICE after a disconnected media link and keeps the session alive", () => {
-    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const inboundRef: { current: ((sender: StudioLiveParticipant, raw: string) => void) | null } = { current: null };
     let connectionState: RTCPeerConnectionState = "new";
     const restartIce = vi.fn();
     const replaceTrack = vi.fn(async () => undefined);
@@ -217,7 +217,7 @@ describe("P2P huddle consent and delivery", () => {
     } as unknown as RTCPeerConnection;
     const port: StudioLiveDirectPort = {
       getPeers: () => [B],
-      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      subscribe: (listener) => { inboundRef.current = listener; return () => { inboundRef.current = null; }; },
       send: () => true,
     };
     const controller = new StudioP2pHuddleController(A, port, {
@@ -225,7 +225,7 @@ describe("P2P huddle consent and delivery", () => {
     });
     sessions.push(controller);
     controller.start();
-    inbound?.(B, JSON.stringify({
+    inboundRef.current?.(B, JSON.stringify({
       kind: "state", epoch: "epoch-b", muted: false, camera: false, sharing: false, hand: false,
     }));
 
@@ -238,7 +238,7 @@ describe("P2P huddle consent and delivery", () => {
   });
 
   it("creates media peer connections only for the current proximity scope", () => {
-    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const inboundRef: { current: ((sender: StudioLiveParticipant, raw: string) => void) | null } = { current: null };
     const close = vi.fn();
     const replaceTrack = vi.fn(async () => undefined);
     const peer = {
@@ -259,14 +259,14 @@ describe("P2P huddle consent and delivery", () => {
     const createPeerConnection = vi.fn(() => peer);
     const port: StudioLiveDirectPort = {
       getPeers: () => [B],
-      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      subscribe: (listener) => { inboundRef.current = listener; return () => { inboundRef.current = null; }; },
       send: () => true,
     };
     const controller = new StudioP2pHuddleController(A, port, { createPeerConnection });
     sessions.push(controller);
     controller.start();
     controller.setMediaPeerScope([]);
-    inbound?.(B, JSON.stringify({
+    inboundRef.current?.(B, JSON.stringify({
       kind: "state", epoch: "epoch-b", muted: false, camera: false, sharing: false, hand: false,
     }));
     expect(createPeerConnection).not.toHaveBeenCalled();
@@ -280,10 +280,10 @@ describe("P2P huddle consent and delivery", () => {
   });
 
   it("re-sends the pending local offer when a delayed proximity link causes glare", async () => {
-    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const inboundRef: { current: ((sender: StudioLiveParticipant, raw: string) => void) | null } = { current: null };
     let signalingState: RTCSignalingState = "stable";
     let localDescription: RTCSessionDescription | null = null;
-    const send = vi.fn(() => true);
+    const send = vi.fn((_target: string, _raw: string) => true);
     const setRemoteDescription = vi.fn(async () => undefined);
     const replaceTrack = vi.fn(async () => undefined);
     const peer = {
@@ -303,7 +303,7 @@ describe("P2P huddle consent and delivery", () => {
     } as unknown as RTCPeerConnection;
     const port: StudioLiveDirectPort = {
       getPeers: () => [B],
-      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      subscribe: (listener) => { inboundRef.current = listener; return () => { inboundRef.current = null; }; },
       send,
     };
     const controller = new StudioP2pHuddleController(A, port, {
@@ -312,14 +312,14 @@ describe("P2P huddle consent and delivery", () => {
     });
     sessions.push(controller);
     controller.start();
-    inbound?.(B, JSON.stringify({
+    inboundRef.current?.(B, JSON.stringify({
       kind: "state", epoch: "epoch-b", muted: false, camera: false, sharing: false, hand: false,
     }));
 
     signalingState = "have-local-offer";
     localDescription = { type: "offer", sdp: "local-offer" } as RTCSessionDescription;
     send.mockClear();
-    inbound?.(B, JSON.stringify({
+    inboundRef.current?.(B, JSON.stringify({
       kind: "description",
       epoch: "epoch-b",
       toEpoch: "epoch-a",
