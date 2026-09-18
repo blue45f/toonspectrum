@@ -4,7 +4,9 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("creator-role-contract", ko, en);export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
+  translateBilingualValueForActiveLocale("creator-role-contract", ko, en);
+
+export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
 
@@ -476,7 +478,7 @@ const STAGE_SET = new Set<string>(CREATOR_STAGE_IDS);
 const EXPERIENCE_SET = new Set<string>(CREATOR_EXPERIENCE_LEVELS);
 const COLLABORATION_SET = new Set<string>(CREATOR_COLLABORATION_STATUSES);
 
-export function creatorText(value: LocalizedCreatorText, _locale): string {
+export function creatorText(value: LocalizedCreatorText, _locale: CreatorRoleLocale): string {
   return bi((value).ko, (value).en);
 }
 
@@ -604,6 +606,32 @@ export function parseCreatorRoleProfileInput(value: unknown): CreatorRoleProfile
     if (!requestedActiveRole || !selected.has(requestedActiveRole)) return null;
   }
   return profile;
+}
+
+export function normalizePublicCreatorRoleProfile(
+  value: unknown,
+): PublicCreatorRoleProfile | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const primaryRole = normalizeCreatorRoleId(record.primaryRole);
+  if (!primaryRole) return null;
+
+  return {
+    version: CREATOR_ROLE_PROFILE_VERSION,
+    primaryRole,
+    secondaryRoles: normalizeDistinctValues(
+      record.secondaryRoles,
+      normalizeCreatorRoleId,
+      CREATOR_ROLE_MAX_SECONDARY,
+    ).filter((role) => role !== primaryRole),
+    specialties: normalizeDistinctValues(
+      record.specialties,
+      normalizeCreatorSpecialtyId,
+      CREATOR_ROLE_MAX_SPECIALTIES,
+    ),
+    experienceLevel: normalizeCreatorExperienceLevel(record.experienceLevel),
+    collaborationStatus: normalizeCreatorCollaborationStatus(record.collaborationStatus),
+  };
 }
 
 export function publicCreatorRoleProfile(value: unknown): PublicCreatorRoleProfile | null {
