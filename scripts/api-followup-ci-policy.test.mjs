@@ -5,6 +5,7 @@ import { loadRequiredTargets } from "./run-core-vitest.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const shardRunner = readFileSync(new URL("./ci-core-regression-shards-impl.mjs", import.meta.url), "utf8");
 const required = JSON.parse(readFileSync(new URL("./api-followup-test-files.json", import.meta.url), "utf8"));
 const requiredPortfolio = new Set(
   readFileSync(new URL("./ci-required-vitest-targets.txt", import.meta.url), "utf8")
@@ -14,15 +15,17 @@ const requiredPortfolio = new Set(
 );
 
 test("runtime follow-up tests and the long-running API artifact remain mandatory", () => {
-  const marker = "      - name: API runtime follow-up policy\n";
-  assert.ok(workflow.includes(marker));
-  const step = workflow.split(marker)[1].split("      - name:")[0];
-  assert.match(step, /set -euo pipefail/);
-  assert.doesNotMatch(step, /continue-on-error|\bif:/);
-  assert.ok(step.includes("scripts/api-followup-unit.test.mjs"));
-  assert.ok(step.includes("scripts/api-followup-ci-policy.test.mjs"));
-  assert.match(workflow, /mapfile -t targets < scripts\/ci-required-vitest-targets\.txt/);
-  assert.match(workflow, /pnpm exec vitest run "\$\{targets\[@\]\}"/);
+  assert.match(
+    workflow,
+    /node scripts\/ci-core-regression-shards\.mjs "\$\{\{ matrix\.shard \}\}"/,
+  );
+  assert.ok(shardRunner.includes("API follow-up and repository contracts"));
+  assert.ok(shardRunner.includes("scripts/api-followup-unit.test.mjs"));
+  assert.ok(shardRunner.includes("scripts/api-followup-ci-policy.test.mjs"));
+  assert.ok(shardRunner.includes("pnpm run validate:architecture"));
+  assert.ok(shardRunner.includes("pnpm run verify:csp"));
+  assert.ok(shardRunner.includes("pnpm run verify:toolchain-coverage"));
+  assert.doesNotMatch(shardRunner, /continue-on-error|\|\| true/);
   for (const file of required) {
     assert.ok(requiredPortfolio.has(file), `Missing regression from required portfolio: ${file}`);
   }

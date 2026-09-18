@@ -449,7 +449,7 @@ function StudioCloudLibraryUnavailableCard({
         </span>
       </div>
       <p
-        role={issue ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "status")}
+        role={issue ? "alert" : "status"}
         className="mt-2 rounded-md border border-warn/25 bg-warn/10 px-2 py-1.5 text-[0.55rem] leading-relaxed text-warn"
       >
         {reason} {translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "ko", "기존 계정 취득·설치 확인 이력은 보존되지만 이 카드에서는 설치할 수 없습니다.")}</p>
@@ -1692,7 +1692,7 @@ export function ShareResourceForm({
         </button>
       {status ? (
         <p
-          role={status.error ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "status")}
+          role={status.error ? "alert" : "status"}
           className={cx(
             "rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed",
             status.error
@@ -2573,7 +2573,7 @@ export function StudioCommunityMarketplacePanel({
             )}
             {status ? (
               <p
-                role={status.error ? translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "alert") : translateCurrentStaticSourceText("domains.creator.StudioCommunityMarketplacePanel", "en", "status")}
+                role={status.error ? "alert" : "status"}
                 className={cx(
                   "mt-2 rounded-lg border px-2.5 py-2 text-[0.6rem] leading-relaxed",
                   status.error

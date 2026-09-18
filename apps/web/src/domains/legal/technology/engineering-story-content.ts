@@ -6,7 +6,7 @@ import {
   ENGINEERING_DEEP_DIVE_GUIDES,
 } from "./engineering-story-deep-dive-content";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("engineering-story-content", ko, en);
 
 export type EngineeringLocale = string;

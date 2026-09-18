@@ -34,15 +34,16 @@ describe("Studio BG3D accessibility boundary", () => {
     expect(viewPanelSource).toContain('event.key === "ArrowLeft" || event.key === "ArrowUp"');
     expect(viewPanelSource).toContain('event.key === "Home"');
     expect(viewPanelSource).toContain('event.key === "End"');
-    expect(viewPanelSource).toContain('id={`bg3d-view-tab-${section.id}`}');
+    expect(viewPanelSource).toContain('"bg3d-view-tab-{v0}"');
+    expect(viewPanelSource).toContain('{ v0: String(section.id) }');
     expect(viewPanelSource).toContain('aria-labelledby="bg3d-view-tab-physics"');
     expect(viewPanelSource).toContain('aria-labelledby="bg3d-view-tab-camera"');
     expect(viewPanelSource).toContain("?.focus();");
   });
 
   it("exposes Camera vNext values and gesture completion with mobile-size controls", () => {
-    expect(viewPanelSource).toContain('label="근접 절단"');
-    expect(viewPanelSource).toContain('label="더치 앵글"');
+    expect(viewPanelSource).toMatch(/label=\{translateCurrentStaticSourceText\([^\n]*"근접 절단"\)\}/u);
+    expect(viewPanelSource).toMatch(/label=\{translateCurrentStaticSourceText\([^\n]*"더치 앵글"\)\}/u);
     expect(viewPanelSource).toContain("valueText={`${currentDutchRollDegrees}°`}");
     expect(viewPanelSource).toContain("절단 초기화");
     expect(viewPanelSource).toContain("수평 맞춤");
@@ -54,9 +55,10 @@ describe("Studio BG3D accessibility boundary", () => {
   });
 
   it("names imported model files and template deletion with a touch-size target", () => {
-    expect(assetLibrarySource).toContain('aria-label="3D 모델 및 연결 파일 선택"');
-    expect(userTemplateLibrarySource).toContain('aria-label={`${entry.name} 템플릿 삭제`}');
-    expect(userTemplateLibrarySource).toContain('title="템플릿 삭제"');
+    expect(assetLibrarySource).toMatch(/aria-label=\{translateCurrentStaticSourceText\([^\n]*"3D 모델 및 연결 파일 선택"\)\}/u);
+    expect(userTemplateLibrarySource).toContain('"{v0} 템플릿 삭제"');
+    expect(userTemplateLibrarySource).toContain('{ v0: String(entry.name) }');
+    expect(userTemplateLibrarySource).toMatch(/title=\{translateCurrentStaticSourceText\([^\n]*"템플릿 삭제"\)\}/u);
     expect(userTemplateLibrarySource).toMatch(/템플릿 삭제[\s\S]*?className="[^"]*size-11[^"]*sm:size-7/u);
   });
 

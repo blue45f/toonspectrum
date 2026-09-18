@@ -152,8 +152,8 @@ describe("Studio BG3D Camera vNext and surface snap integration", () => {
     expect(source).toContain("alignRotationToNormal");
     expect(source).toContain("surfaceSnapAlignNormal");
     expect(source).toContain('data-testid="bg3d-surface-snap-align-normal"');
-    expect(source).toContain('aria-label="법선 정렬"');
-    expect(source).toContain('aria-label="배치 정리"');
+    expect(source).toMatch(/aria-label=\{translateCurrentStaticSourceText\([^\n]*"법선 정렬"\)\}/u);
+    expect(source).toMatch(/aria-label=\{translateCurrentStaticSourceText\([^\n]*"배치 정리"\)\}/u);
     expect(source).toContain("STUDIO_BG3D_SURFACE_SNAP_MAX_MULTI_INPUTS");
     expect(source).toContain("planStudioBg3dMultiSurfaceSnap");
     expect(source).toContain("canPlaceSelectedModelRecipe");

@@ -3,7 +3,7 @@ import {
   translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("creator-role-contract", ko, en);export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;

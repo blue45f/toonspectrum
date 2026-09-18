@@ -24,7 +24,7 @@ import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
 import { ErrorState } from "@/components/error-state";
-import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/domains/creator/creator-community-ui";
+import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/domains/creator/public/community-ui";
 import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
 import {
   getCreatorProfile,

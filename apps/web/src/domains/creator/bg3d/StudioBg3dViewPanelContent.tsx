@@ -380,8 +380,8 @@ export function StudioBg3dBabylonDiagnostic({
         <div
           id={statusId}
           data-testid="studio-bg3d-babylon-diagnostic-status"
-          role={state.status === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "en", "alert") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "en", "status")}
-          aria-live={state.status === "error" ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "en", "polite")}
+          role={state.status === "error" ? "alert" : "status"}
+          aria-live={state.status === "error" ? "assertive" : "polite"}
           className={cx(
             "mt-2 flex min-h-11 items-start gap-2 rounded-lg border px-2.5 py-2 text-[0.72rem] leading-relaxed",
             statusTone,

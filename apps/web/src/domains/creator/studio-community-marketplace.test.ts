@@ -729,7 +729,7 @@ describe("reviewed marketplace image and model delivery", () => {
   it("installs only the exact reviewed 3D reference with matching source identity", () => {
     for (const [id, valid] of [
       ["polyhaven-painted-wooden-chair-01", true],
-      ["polyhaven-sofa-02", true],
+      ["polyhaven-wooden-display-shelves-01", true],
       ["missing", false],
       ["polyhaven-background-wide-street-01", false],
     ] as const) {

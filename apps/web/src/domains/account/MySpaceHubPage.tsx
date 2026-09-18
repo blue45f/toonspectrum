@@ -29,7 +29,7 @@ import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("MySpaceHubPage", ko, en);
 
 const COPY = {

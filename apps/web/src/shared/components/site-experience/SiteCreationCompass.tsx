@@ -14,7 +14,7 @@ import Link from "@/compat/router-link";
 
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteCreationCompass", ko, en);
 
 /** A compact contextual brief. Expanded guidance is opt-in, not another hero. */

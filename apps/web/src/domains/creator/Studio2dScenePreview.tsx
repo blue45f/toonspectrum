@@ -84,16 +84,16 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
             {status === "error" ? <StudioSurfaceState
               state="error" compact
               visual={{ src: "/brand/theme-scenes/graphite-studio.svg", objectPosition: "center 48%" }}
-              title={state.reason === "timeout" ? "이미지 연결이 오래 걸리고 있어요" : "원본을 불러오지 못했어요"}
+              title={state.reason === "timeout" ? "이미지 연결 시간이 초과됐어요" : "원본을 불러오지 못했어요"}
               description={state.reason === "timeout" ? "연결 상태를 확인한 뒤 원본을 다시 불러와 주세요." : "원본을 다시 불러오면 현재 미리보기 설정은 그대로 유지됩니다."}
-              action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={retryImage}>원본 다시 불러오기</button>}
+              action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={retryImage}>다시 불러오기</button>}
             /> : null}
             {mismatch ? <StudioSurfaceState
               state="blocked" announce="assertive" compact
               visual={{ src: "/brand/theme-scenes/contrast-studio.svg", objectPosition: "center 46%" }}
               title="원본 정보가 검수 기록과 달라요"
               description={`실제 이미지 크기(${actualSize})가 검수 기록과 다릅니다. 이 파일은 재검수 전 삽입할 수 없습니다.`}
-              action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={retryImage}>원본 다시 확인하기</button>}
+              action={<button type="button" className="rounded-lg border border-current/25 bg-card/80 px-3 py-1.5 text-xs font-semibold text-fg hover:bg-raised" onClick={retryImage}>다시 불러오기</button>}
             /> : null}
             {metadata && <p className="text-fg-3">{metadata.environment} · {metadata.timeOfDay} · {metadata.containsPeople ? "인물 포함" : "인물 없는 배경"} · {isLargeStudio2dAsset(metadata) ? "큰 원본" : "소형 컷용 원본"}</p>}
             {metadata?.review.notes.map((note) => <p key={note} className="rounded-lg border border-line bg-raised p-2">{note}</p>)}

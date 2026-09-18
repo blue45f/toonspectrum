@@ -9,7 +9,7 @@ import {
   translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("recommendation-feedback", ko, en);
 
 const STORAGE_KEY = "toonspectrum:recommendation-feedback:v1";
