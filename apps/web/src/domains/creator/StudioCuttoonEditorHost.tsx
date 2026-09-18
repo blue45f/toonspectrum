@@ -15454,32 +15454,15 @@ No text, logo, watermark, or copyrighted character.`;
         requestedSize: parseStudioAiRequestedSize(useByok ? byokSize : assetPromptSize),
         references: [],
       });
-
-      let generated: { dataUrl: string; width: number; height: number; model: string };
-      if (useByok) {
-        const result = await generateBackgroundImage(aiSettings, providerPrompt, { size: byokSize });
-        if (!canApplyStudioMutation(mutationTicket)) return;
-        settleTrackedStudioAiOperation(operationId, result);
-        operationId = null;
-        if (!result.ok) throw new Error(result.error);
-        generated = result.data;
-      } else {
-        const { generateAsset } = await import("@/infrastructure/creator-client");
-        const result = await generateAsset({
-          prompt: providerPrompt,
-          name: generatedName,
-          size: assetPromptSize,
-          quality: assetPromptQuality,
-        });
-        if (!canApplyStudioMutation(mutationTicket)) return;
-        settleTrackedStudioAiOperation(operationId, { ok: true }, {
-          provider: "openai",
-          model: result.model,
-        });
-        operationId = null;
-        generated = result;
-      }
-
+      const result = await generateBackgroundImage(aiSettings, providerPrompt, { size });
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      settleTrackedStudioAiOperation(operationId, result);
+      operationId = null;
+      if (!result.ok) throw new Error(result.error);
+      const generated = result.data;
+      const generatedName = assetPromptName.trim()
+        || prompt.split("\n")[0]?.trim().slice(0, 80)
+        || "AI 에셋";
       const saved = await saveStudioAssetMutation({
         name: generatedName,
         dataUrl: generated.dataUrl,

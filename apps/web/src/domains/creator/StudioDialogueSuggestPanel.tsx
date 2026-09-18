@@ -71,7 +71,7 @@ export function StudioDialogueSuggestPanel({
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message={translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "상황과 기존 대사 맥락은 먼저 준비할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
+          message="상황과 기존 대사 맥락은 먼저 준비할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
           compact
         />
       ) : null}
@@ -104,11 +104,11 @@ export function StudioDialogueSuggestPanel({
         type="button"
         onClick={onGenerate}
         disabled={!canGenerate}
-        title={!configured ? translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요.") : undefined}
+        title={!configured ? "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요." : undefined}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Sparkles size={14} />}
-        {busy ? translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "구상하는 중…") : translateCurrentStaticSourceText("domains.creator.StudioDialogueSuggestPanel", "ko", "대사 제안 받기")}
+        {busy ? "구상하는 중…" : "대사 제안 받기"}
       </button>
 
       <div ref={feedbackRef}>

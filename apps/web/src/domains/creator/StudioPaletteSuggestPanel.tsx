@@ -58,7 +58,7 @@ export function StudioPaletteSuggestPanel({
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message={translateCurrentStaticSourceText("domains.creator.StudioPaletteSuggestPanel", "ko", "장르와 분위기 문장은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
+          message="장르와 분위기 문장은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
           compact
         />
       ) : null}
@@ -79,11 +79,11 @@ export function StudioPaletteSuggestPanel({
         type="button"
         onClick={onGenerate}
         disabled={!canGenerate}
-        title={!configured ? translateCurrentStaticSourceText("domains.creator.StudioPaletteSuggestPanel", "ko", "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요.") : undefined}
+        title={!configured ? "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요." : undefined}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Sparkles size={14} />}
-        {busy ? translateCurrentStaticSourceText("domains.creator.StudioPaletteSuggestPanel", "ko", "배색을 구상하는 중…") : translateCurrentStaticSourceText("domains.creator.StudioPaletteSuggestPanel", "ko", "팔레트 추천받기")}
+        {busy ? "배색을 구상하는 중…" : "팔레트 추천받기"}
       </button>
 
       <div ref={feedbackRef}>

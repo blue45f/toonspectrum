@@ -975,6 +975,8 @@ test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () 
   );
   expect(sql).not.toMatch(/GRANT UPDATE \([^)]*rootGraphHash/u);
   expect(sql).not.toMatch(/GRANT UPDATE \([^)]*operation/u);
+  expect(sql).not.toMatch(/GRANT UPDATE[^;]*studio_review_reviewer/u);
+  expect(sql).not.toContain('GRANT UPDATE ("decision", "decidedAt")');
   expect(sql).not.toMatch(/GRANT INSERT[^;]*studio_capability_ledger/u);
   expect(sql).not.toContain(
     'GRANT UPDATE ("decision", "decidedAt")\n  ON TABLE public.studio_review_reviewer',

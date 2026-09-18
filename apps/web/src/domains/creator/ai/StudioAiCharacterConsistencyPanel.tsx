@@ -52,7 +52,7 @@ export function StudioAiCharacterConsistencyPanel({
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 생성하려면 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결하세요.")}
+          message="기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 생성하려면 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결하세요."
           compact
         />
       ) : null}

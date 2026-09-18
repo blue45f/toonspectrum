@@ -116,7 +116,7 @@ export function StudioAiCompositionPanel({
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "장면 초안은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
+          message="장면 초안은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
           compact
         />
       ) : null}
@@ -137,11 +137,11 @@ export function StudioAiCompositionPanel({
         type="button"
         onClick={() => void run()}
         disabled={!configured || busy || !sceneTextValue.trim()}
-        title={!configured ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요.") : undefined}
+        title={!configured ? "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요." : undefined}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Clapperboard size={14} />}
-        {busy ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "구상하는 중…") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "구도 제안 받기")}
+        {busy ? "구상하는 중…" : "구도 제안 받기"}
       </button>
 
       <div ref={feedbackRef}>

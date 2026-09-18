@@ -47,7 +47,7 @@ export function StudioAiBackgroundPanel({
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiBackgroundPanel", "ko", "프롬프트와 크기는 먼저 준비할 수 있어요. 이미지 생성은 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결한 뒤 실행됩니다.")}
+          message="프롬프트와 크기는 먼저 준비할 수 있어요. 이미지 생성은 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결한 뒤 실행됩니다."
           compact
         />
       ) : null}

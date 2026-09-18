@@ -461,7 +461,7 @@ export function StudioDialogueTranslatePanel({
           {!configured ? (
             <AiRecoveryNotice
               code="not_configured"
-              message={translateCurrentStaticSourceText("domains.creator.StudioDialogueTranslatePanel", "ko", "번역 초안은 유지됩니다. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
+              message="번역 초안은 유지됩니다. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요."
               compact
             />
           ) : null}

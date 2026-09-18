@@ -340,7 +340,7 @@ export function StudioAiToolPopoverBody({
                   {serverLoginRequired ? (
                     <AiRecoveryNotice
                       code="login_required"
-                      message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "로그인하면 현재 입력을 유지한 채 자동 무료 AI를 사용할 수 있어요. 로그인 없이 쓰려면 개인 무료 API 키를 연결하세요.")}
+                      message="로그인하면 현재 입력을 유지한 채 자동 무료 AI를 사용할 수 있어요. 로그인 없이 쓰려면 개인 무료 API 키를 연결하세요."
                       compact
                     />
                   ) : null}
@@ -395,11 +395,11 @@ export function StudioAiToolPopoverBody({
                 <>
                   <section
                     className="rounded-xl border border-line bg-card/55 p-2"
-                    aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "AI 번역·검수 바로가기")}
+                    aria-label="AI 번역·검수 바로가기"
                   >
                     <div className="flex items-center justify-between gap-2 px-1">
-                      <strong className="text-[0.64rem] font-black text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "번역·검수")}</strong>
-                      <span className="text-[0.56rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "현재 문서 기준")}</span>
+                      <strong className="text-[0.64rem] font-black text-fg-2">번역·검수</strong>
+                      <span className="text-[0.56rem] text-fg-3">현재 문서 기준</span>
                     </div>
                     <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                       <button
@@ -412,8 +412,8 @@ export function StudioAiToolPopoverBody({
                           <Languages size={14} aria-hidden />
                         </span>
                         <span className="min-w-0">
-                          <strong className="block truncate text-[0.66rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "대사 번역")}</strong>
-                          <span className="block truncate text-[0.55rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "검토 후 적용")}</span>
+                          <strong className="block truncate text-[0.66rem] font-black text-fg">대사 번역</strong>
+                          <span className="block truncate text-[0.55rem] text-fg-3">검토 후 적용</span>
                         </span>
                       </button>
                       <button
@@ -426,8 +426,8 @@ export function StudioAiToolPopoverBody({
                           <ScanText size={14} aria-hidden />
                         </span>
                         <span className="min-w-0">
-                          <strong className="block truncate text-[0.66rem] font-black text-fg">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "현지화 QA")}</strong>
-                          <span className="block truncate text-[0.55rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiToolPopoverBody", "ko", "넘침·문체 검사")}</span>
+                          <strong className="block truncate text-[0.66rem] font-black text-fg">현지화 QA</strong>
+                          <span className="block truncate text-[0.55rem] text-fg-3">넘침·문체 검사</span>
                         </span>
                       </button>
                     </div>

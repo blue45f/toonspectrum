@@ -1,8 +1,4 @@
 import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
   ChevronRight,
   Clapperboard,
   ImagePlus,
@@ -840,17 +836,17 @@ export function StudioAiComicDirectorPanel({
           </div>
         ) : null}
         <footer className="flex min-h-14 flex-wrap items-center gap-2 border-t border-line bg-panel px-3 py-2 text-[0.65rem] text-fg-3">
-          <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "en", "Activity")}</span>
+          <span className="font-semibold text-fg-2">Activity</span>
           {busy ? (
             <span role="status" aria-live="polite" className="inline-flex items-center gap-1.5">
               <Loader2 size={12} className="animate-spin motion-reduce:animate-none" aria-hidden />
-              {stageLabel ?? translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "작업 중")}{progress ? ` (${progress.done}/${progress.total})` : ""}
+              {stageLabel ?? "작업 중"}{progress ? ` (${progress.done}/${progress.total})` : ""}
             </span>
           ) : (
-            <span>{localJobs.length ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "{v0}개 durable 작업 기록"), { v0: String(localJobs.length) }) : translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "대기 중")}</span>
+            <span>{localJobs.length ? `${localJobs.length}개 durable 작업 기록` : "대기 중"}</span>
           )}
-          <button type="button" onClick={onDiscard} disabled={busy} className="ml-auto min-h-11 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised disabled:opacity-45">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "초안 버리기")}</button>
-          {stage !== "finish" ? <button type="button" onClick={() => setStage(STAGES[Math.min(STAGES.length - 1, STAGES.findIndex((item) => item.id === stage) + 1)]!.id)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "ko", "다음 단계")}<ChevronRight size={13} aria-hidden /></button> : null}
+          <button type="button" onClick={onDiscard} disabled={busy} className="ml-auto min-h-11 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised disabled:opacity-45">초안 버리기</button>
+          {stage !== "finish" ? <button type="button" onClick={() => setStage(STAGES[Math.min(STAGES.length - 1, STAGES.findIndex((item) => item.id === stage) + 1)]!.id)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-card px-3 text-xs font-semibold hover:bg-raised">다음 단계<ChevronRight size={13} aria-hidden /></button> : null}
         </footer>
       </div>
     </div>

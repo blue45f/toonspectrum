@@ -41,7 +41,7 @@ export function StudioAiColorizePanel({
       {!configured ? (
         <AiRecoveryNotice
           code="not_configured"
-          message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiColorizePanel", "ko", "채색 지시를 먼저 준비할 수 있어요. 실행하려면 통합 AI 설정에서 개인 이미지 API 키와 편집 모델을 연결하세요.")}
+          message="채색 지시를 먼저 준비할 수 있어요. 실행하려면 통합 AI 설정에서 개인 이미지 API 키와 편집 모델을 연결하세요."
           compact
         />
       ) : null}

@@ -902,6 +902,8 @@ const STUDIO_PROJECT_GRAPH_RUNTIME_ACL = Object.freeze([
     relation: "studio_review_reviewer",
     insert: true,
     delete: false,
+    // Reviewer membership is immutable evidence. The final decision is stored on studio_review;
+    // this relation has no decision/decidedAt columns and must never receive UPDATE grants.
     mutableColumns: [],
   },
   {
