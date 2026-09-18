@@ -14,7 +14,7 @@ import { CREATOR_ESSENTIALS, ESSENTIALS_KINDS, ESSENTIALS_LABELS, essentialsByte
 import { downloadCreatorEssential } from "./creator-essentials-download";
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorEssentialsPage", ko, en);
 
 const ModelPreview = lazy(() => import("./CreatorEssentialModelPreview"));
