@@ -1,3 +1,7 @@
+import { z } from "zod";
+
+import { studioEntityIdSchema } from "./ids";
+
 export const STUDIO_SCOPE_LEVELS = [
   "project",
   "series",
@@ -123,4 +127,68 @@ export function studioScopeContains(
     const expected = container[field];
     return expected === undefined || expected === candidate[field];
   });
+}
+
+
+export interface ScopeRef {
+  readonly projectId: string;
+  readonly seasonId?: string;
+  readonly episodeId?: string;
+  readonly sequenceId?: string;
+  readonly sceneId?: string;
+  readonly panelId?: string;
+  readonly elementId?: string;
+}
+
+export const scopeRefSchema = z
+  .object({
+    projectId: studioEntityIdSchema,
+    seasonId: studioEntityIdSchema.optional(),
+    episodeId: studioEntityIdSchema.optional(),
+    sequenceId: studioEntityIdSchema.optional(),
+    sceneId: studioEntityIdSchema.optional(),
+    panelId: studioEntityIdSchema.optional(),
+    elementId: studioEntityIdSchema.optional(),
+  })
+  .strict()
+  .superRefine((scope, context) => {
+    if ((scope.sequenceId !== undefined || scope.sceneId !== undefined || scope.panelId !== undefined)
+      && scope.episodeId === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["episodeId"],
+        message: "sequence, scene and panel scopes require an episode parent",
+      });
+    }
+    if (scope.elementId !== undefined && scope.panelId === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["panelId"],
+        message: "element scopes require a panel parent",
+      });
+    }
+  });
+
+const SCOPE_REF_KEYS = [
+  "projectId",
+  "seasonId",
+  "episodeId",
+  "sequenceId",
+  "sceneId",
+  "panelId",
+  "elementId",
+] as const satisfies readonly (keyof ScopeRef)[];
+
+export function scopeRefKey(scope: ScopeRef): string {
+  const parsed = scopeRefSchema.parse(scope) as ScopeRef;
+  return SCOPE_REF_KEYS
+    .filter((key) => parsed[key] !== undefined)
+    .map((key) => `${key}:${parsed[key]}`)
+    .join("/");
+}
+
+export function scopeRefContains(container: ScopeRef, candidate: ScopeRef): boolean {
+  const parent = scopeRefSchema.parse(container) as ScopeRef;
+  const child = scopeRefSchema.parse(candidate) as ScopeRef;
+  return SCOPE_REF_KEYS.every((key) => parent[key] === undefined || parent[key] === child[key]);
 }
