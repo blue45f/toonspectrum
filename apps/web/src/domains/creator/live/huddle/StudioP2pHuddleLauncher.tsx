@@ -3,6 +3,7 @@ import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, 
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
 import { StudioP2pCreativeHuddleController as StudioP2pHuddleController, type CreativeHuddleSnapshot as HuddleSnapshot } from "./studio-p2p-creative-huddle-controller";
 import { HUDDLE_REACTIONS, HUDDLE_TEXT_LIMIT } from "./studio-p2p-huddle-protocol";
+import { STUDIO_P2P_HUDDLE_OPEN_EVENT, type StudioP2pHuddleOpenDetail } from "./studio-p2p-huddle-events";
 import { StudioP2pMediaTile as MediaTile, P2P_CONTROL_CLASS as controlClass } from "./StudioP2pMediaTile";
 import { StudioP2pActivitiesPanel } from "./StudioP2pActivitiesPanel";
 import { StudioP2pVirtualStudio } from "./StudioP2pVirtualStudio";
@@ -17,6 +18,7 @@ export default function StudioP2pHuddleLauncher() {
   );
   const controller = useRef<StudioP2pHuddleController | null>(null);
   const cleanup = useRef<(() => void) | null>(null);
+  const proximityPeerIds = useRef<Set<string> | null>(null);
   const [open, setOpen] = useState(false);
   const [snapshot, setSnapshot] = useState<HuddleSnapshot | null>(null);
   const [draft, setDraft] = useState("");
@@ -33,6 +35,7 @@ export default function StudioP2pHuddleLauncher() {
       && current.every((id, index) => id === sessionIds[index]) ? current : sessionIds);
   }, []);
   useEffect(() => {
+    proximityPeerIds.current = null;
     setSnapshot(null); setDraft(""); setBusy(false); setNearbyPeerIds([]); setProximityMedia(true);
     return () => {
       cleanup.current?.(); cleanup.current = null;
@@ -42,6 +45,25 @@ export default function StudioP2pHuddleLauncher() {
   useEffect(() => {
     if (strokeFocusPhase === "drawing") setOpen(false);
   }, [strokeFocusPhase]);
+  useEffect(() => {
+    const handleOpen = (event: Event) => {
+      const detail = (event as CustomEvent<StudioP2pHuddleOpenDetail>).detail;
+      const requestedIds = detail?.peerIds ? [...detail.peerIds] : null;
+      proximityPeerIds.current = requestedIds ? new Set(requestedIds) : null;
+      if (requestedIds) {
+        setNearbyPeerIds(requestedIds);
+        setProximityMedia(true);
+        controller.current?.setMediaPeerScope(requestedIds);
+      } else {
+        setProximityMedia(false);
+        controller.current?.setMediaPeerScope(null);
+      }
+      controller.current?.refreshPeers();
+      setOpen(true);
+    };
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, handleOpen);
+    return () => globalThis.removeEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, handleOpen);
+  }, []);
   useEffect(() => {
     if (!active) return;
     controller.current?.setMediaPeerScope(proximityMedia ? nearbyPeerIds : null);
@@ -70,11 +92,14 @@ export default function StudioP2pHuddleLauncher() {
   function leave() {
     cleanup.current?.(); cleanup.current = null;
     controller.current?.close(); controller.current = null;
+    proximityPeerIds.current = null;
     setSnapshot(null); setDraft(""); setBusy(false); setDeafened(false); setNearbyPeerIds([]); setProximityMedia(true);
   }
   function join() {
     if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current) return;
-    const next = new StudioP2pHuddleController(room.participant, room.direct);
+    const next = new StudioP2pHuddleController(room.participant, room.direct, {
+      peerFilter: (peer) => proximityPeerIds.current?.has(peer.sessionId) ?? true,
+    });
     controller.current = next;
     const unsubscribe = next.subscribe(() => setSnapshot(next.snapshot()));
     const terminate = () => {
