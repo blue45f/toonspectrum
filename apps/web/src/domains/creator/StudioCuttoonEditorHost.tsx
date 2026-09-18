@@ -16636,36 +16636,20 @@ No text, logo, watermark, or copyrighted character.`;
     const nextElements = computeMagicResize(elements, from, to, magicResizeStrategy);
     commit(nextElements as El[], { canvasH: to.height });
   }
-  // 캔버스 제스처를 무장(armed)해 가로채는 도구를 한꺼번에 끈다. 새 도구 하나를 켤 때마다
-  // 나머지를 개별적으로 끄는 코드를 매번 대칭으로 맞추는 대신 이 함수 하나만 먼저 호출하면
-  // 된다 — 개별 상호배제 누락이 이 세션에서 실제 버그로 여러 번 재발했다(예: eyedropper/
-  // bubbleAnchorPick/quickShape 토글이 다른 armed 도구를 안 껐고, pixelTool도 crop을 안 껐음).
+  // 캔버스 제스처를 가로채는 도구는 여기서 한 번에 해제한다. 새 도구는 이 경계를
+  // 먼저 호출해야 하며, 미적용 advanced-fill preview는 의도적으로 보존한다.
   function disarmAllPixelTools() {
-    cancelStudioRasterPreparation();
-    cancelLiquifyPointerSession();
-    smudgeAbortRef.current?.abort();
-    smudgeAbortRef.current = null;
-    dodgeBurnAbortRef.current?.abort();
-    dodgeBurnAbortRef.current = null;
-    wetMixAbortRef.current?.abort();
-    wetMixAbortRef.current = null;
-    liquifyAbortRef.current?.abort();
-    liquifyAbortRef.current = null;
-    healCloneAbortRef.current?.abort();
-    healCloneAbortRef.current = null;
-    setSmudgeBusy(false);
-    setDodgeBurnBusy(false);
-    setWetMixBusy(false);
-    setLiquifyBusy(false);
-    setHealCloneBusy(false);
-    smudgeDragRef.current = null;
-    dodgeBurnDragRef.current = null;
-    wetMixDragRef.current = null;
-    clearPaintRetouchStrokePreview();
-    cancelPixelSelectionPointerSession();
-    clearPendingPixelSelectionRasterGesture();
-    pixelMarqueeRasterPreparationRunIdRef.current += 1;
-    pixelMarqueeRasterPreparationAbortRef.current?.abort();
+    cancelStudioRasterPreparation(); cancelLiquifyPointerSession();
+    smudgeAbortRef.current?.abort(); smudgeAbortRef.current = null;
+    dodgeBurnAbortRef.current?.abort(); dodgeBurnAbortRef.current = null;
+    wetMixAbortRef.current?.abort(); wetMixAbortRef.current = null;
+    liquifyAbortRef.current?.abort(); liquifyAbortRef.current = null;
+    healCloneAbortRef.current?.abort(); healCloneAbortRef.current = null;
+    setSmudgeBusy(false); setDodgeBurnBusy(false); setWetMixBusy(false);
+    setLiquifyBusy(false); setHealCloneBusy(false);
+    smudgeDragRef.current = null; dodgeBurnDragRef.current = null; wetMixDragRef.current = null;
+    clearPaintRetouchStrokePreview(); cancelPixelSelectionPointerSession(); clearPendingPixelSelectionRasterGesture();
+    pixelMarqueeRasterPreparationRunIdRef.current += 1; pixelMarqueeRasterPreparationAbortRef.current?.abort();
     pixelMarqueeRasterPreparationAbortRef.current = null;
     if (pixelWandActiveRunIdRef.current !== null) {
       pixelWandRunIdRef.current += 1;
@@ -16679,78 +16663,35 @@ No text, logo, watermark, or copyrighted character.`;
       colorRangeActiveRunIdRef.current = null;
       setPixelBusy(false);
     }
-    advancedFillRunIdRef.current += 1;
-    advancedFillAbortRef.current?.abort();
-    advancedFillAbortRef.current = null;
-    advancedFillTapGestureRef.current = null;
-    advancedFillTapPayloadRef.current = null;
+    advancedFillRunIdRef.current += 1; advancedFillAbortRef.current?.abort(); advancedFillAbortRef.current = null;
+    advancedFillTapGestureRef.current = null; advancedFillTapPayloadRef.current = null;
     advancedFillTouchPanRef.current = null;
-    // 아직 적용하지 않은 채우기 미리보기는 **도구를 내린다고 버리지 않는다.**
-    //
-    // 예전에는 여기서 preview 와 status 를 함께 null 로 만들었다. 이 함수는 도구 전환마다
-    // (executeStudioPrimaryCanvasToolTransition·스포이드 등) 무조건 불리므로, 채우기를 계산해
-    // 놓고 지우개나 스포이드를 한 번 거치면 "채우기 미리보기 · 적용/취소" 배너가 안내 한 줄 없이
-    // 사라졌다 — 사용자는 자기가 만든 결과를 잃은 줄도 몰랐다.
-    //
-    // 미적용 미리보기가 도구와 무관하게 살아 있는 것은 이미 이 저장소의 설계다:
-    // 캔버스 렌더는 `advancedFillPreview.targetId`/`historyIndex` 만 보고 그리고(도구·활성 여부를
-    // 보지 않는다), 상태 레일의 배너도 `hasAdvancedFillPreview` 만 본다. `toggleAdvancedFill` 이
-    // 스스로 도구를 내릴 때도 재사용 가능한 미리보기는 그대로 두고 "적용하거나 취소할 수 있어요"
-    // 라고 안내한다. 여기만 그 계약을 어기고 있었다.
-    //
-    // 그래서 도구만 내리고 미리보기·가상 타깃은 남긴다. 문서가 실제로 바뀌는 경로(페이지·선택
-    // 변경, undo/redo, commit, 문서 교체)는 각자 따로 미리보기를 무효화하므로 낡은 미리보기가
-    // 남지 않고, 적용 시점의 stale 가드(targetId·originalSrc·historyIndex)가 마지막 방어선이다.
     const hasUnappliedAdvancedFillPreview = advancedFillPreviewRef.current !== null;
-    setAdvancedFillActive(false);
-    setAdvancedFillBusy(false);
+    setAdvancedFillActive(false); setAdvancedFillBusy(false);
     if (!hasUnappliedAdvancedFillPreview) {
       setAdvancedFillVirtualTarget(null);
       advancedFillVirtualReferenceRef.current = null;
       setAdvancedFillStatus(null);
     } else {
-      setAdvancedFillStatus(
-        "다른 도구로 전환했어요. 채우기 미리보기는 아직 적용하거나 취소할 수 있어요.",
-      );
+      setAdvancedFillStatus("다른 도구로 전환했어요. 채우기 미리보기는 아직 적용하거나 취소할 수 있어요.");
     }
     advancedFillAutoArmTargetRef.current = null;
-    setCropRect(null);
-    setPixelTool(null);
-    setPixelForceCircle(false);
-    clearPolyLassoDraft();
-    setPanelSplitActive(false);
-    setNodeEditTool(null);
-    setSmudgeActive(false);
-    setDodgeBurnActive(false); // ← 추가(닷지/번 무장 해제 — 설정값은 유지)
-    setWetMixActive(false); // ← 추가(혼색 브러시 무장 해제 — 설정값은 유지)
-    setLiquifyActive(false);
-    setHealCloneTool(null);
-    healCloneDragRef.current = null;
-    clearHealCloneDragPreview();
+    setCropRect(null); setPixelTool(null); setPixelForceCircle(false); clearPolyLassoDraft();
+    setPanelSplitActive(false); setNodeEditTool(null);
+    setSmudgeActive(false); setDodgeBurnActive(false); setWetMixActive(false); setLiquifyActive(false);
+    setHealCloneTool(null); healCloneDragRef.current = null; clearHealCloneDragPreview();
     inspectorColorSampleApplyRef.current = null;
-    setEyedropperActive(false);
-    setBubbleAnchorPickActive(false);
-    setColorRangePickActive(false); // ← 추가(샘플/허용량은 유지 — healClone "모드는 유지" 정책과 동일)
-    setAutoColorScribbleCanvasArmed(false);
-    setAutoColorCanvasSeedHit(null);
-    setAutoColorCanvasSeedHits(null);
+    setEyedropperActive(false); setBubbleAnchorPickActive(false); setColorRangePickActive(false);
+    setAutoColorScribbleCanvasArmed(false); setAutoColorCanvasSeedHit(null); setAutoColorCanvasSeedHits(null);
     autoColorScribbleStrokeRef.current = null;
-    setQuickShapeActive(false);
-    setColorWheelOpen(false);
-    setLayerMaskPaintActive(false);
-    setFilterMaskPaintActive(false); // ← 추가(필터 마스크 브러시 — 레이어 마스크와 동일 상호배제 정책)
-    filterMaskDragRef.current = null;
-    clearFilterMaskDragPreview();
-    setQuickMaskActive(false); // ← 추가(퀵 마스크 세션 — 편집 중 마스크는 폐기, 타 도구 전환과 동일 정책)
-    quickMaskSessionRef.current = null;
-    quickMaskDragRef.current = null;
-    clearQuickMaskDragPreview();
-    setQuickMaskTintCanvas(null);
-    setHistoryBrushActive(false); // ← 추가(소스 지정 상태는 그대로 둔다)
-    setBubbleShapeEditActive(false); // ← 추가(말풍선 커스텀 모양 점 편집)
-    setPuppetWarpActive(false); // ← 추가
-    setPuppetWarpPins((current) => current.length === 0 ? current : []); // ← 추가(핀도 함께 폐기 — 다른 도구로 전환 시 세션 종료)
-    stopStudioCommentPlacementSession(); // ← 추가(자유 위치 댓글 핀 세션 해제)
+    setQuickShapeActive(false); setColorWheelOpen(false);
+    setLayerMaskPaintActive(false); setFilterMaskPaintActive(false);
+    filterMaskDragRef.current = null; clearFilterMaskDragPreview();
+    setQuickMaskActive(false); quickMaskSessionRef.current = null; quickMaskDragRef.current = null;
+    clearQuickMaskDragPreview(); setQuickMaskTintCanvas(null);
+    setHistoryBrushActive(false); setBubbleShapeEditActive(false); setPuppetWarpActive(false);
+    setPuppetWarpPins((current) => current.length === 0 ? current : []);
+    stopStudioCommentPlacementSession();
   }
   disarmAllPixelToolsRef.current = disarmAllPixelTools;
 
@@ -24351,88 +24292,32 @@ No text, logo, watermark, or copyrighted character.`;
       return;
     }
     await runStudioPageSavePipeline(status, {
-      studioAuthUserId,
-      workId,
-      remixId,
-      loggedIn,
-      autosaveKey,
-      linkedTitleId,
-      linkedSeriesId,
-      linkedChallengeId,
-      location,
-      navigate,
-      currentStudioDocumentScopeRef,
-      editorMountedRef,
-      captureStudioMutationTicket,
-      canApplyStudioMutation,
-      markStudioDocumentChanged,
-      lockStudioMutationsNow,
-      documentSaveInFlightRef,
-      sharedDocument,
-      setSharedDocumentScope,
-      collaborationDocumentLocked,
-      collaborationOperationSyncRequired,
-      collaborationLockMessage,
-      studioCrdtAuthoritativeSaveBarrierRef,
-      studioCrdtSceneRuntimeRef,
-      studioCrdtDocumentRef,
-      sharedDocumentSaveAbortRef,
-      ownerDetailAbortRef,
-      setSharedDocumentNotice,
-      setFxPanelOpen,
-      pages,
-      pagesHistoryRef,
-      pagesHiRef,
-      master,
-      currentPageId,
-      setCurrentPageId,
-      masterEditMode,
-      setMasterEditMode,
-      pendingStrokeCommitsRef,
-      flushPendingStrokeCommitsRef,
-      publishProfile,
-      publishAiUsage,
-      publishAiDisclosure,
-      publishCompliance,
-      effectivePublishPackageSettings,
-      publishPackageCredits,
-      publishComplianceResult,
-      collectPublishPreflightProvenance,
-      buildPublishPreflightInput,
-      setPageReviewOpen,
-      setPublishPreflightOpen,
-      openWorkMetadataStep,
-      clearPendingSaveIntent: () => setPendingSaveIntent(null),
-      captureReadyStageForPage,
-      preserveStudioViewBeforeCapture,
-      hideStrokeGuide,
-      setIsExporting,
-      setSelectedId,
-      effScale,
-      title,
-      description,
-      tagsText,
-      characterBible,
-      writerRoom,
-      aiProvenance,
-      scenarioImageReferenceDocument,
-      studioComments,
-      releaseSchedule,
-      publicationAnalytics,
-      referenceBoard,
-      webtoonTheme,
-      panelGutter,
-      draftCollaboration,
-      setDraftCollaboration,
-      draftCollaborationProvisionAbortRef,
-      loadedWork,
-      setLoadedWork,
-      clearAutosaveDurableAuthority,
-      studioLifecycleDurableGenerationRef,
-      studioRevisionProjectGenerationRef,
-      studioLifecycleDurablePendingFingerprintRef,
-      setSaving,
-      setError,
+      studioAuthUserId, workId, remixId, loggedIn, autosaveKey,
+      linkedTitleId, linkedSeriesId, linkedChallengeId, location, navigate,
+      currentStudioDocumentScopeRef, editorMountedRef,
+      captureStudioMutationTicket, canApplyStudioMutation,
+      markStudioDocumentChanged, lockStudioMutationsNow, documentSaveInFlightRef,
+      sharedDocument, setSharedDocumentScope, collaborationDocumentLocked,
+      collaborationOperationSyncRequired, collaborationLockMessage,
+      studioCrdtAuthoritativeSaveBarrierRef, studioCrdtSceneRuntimeRef,
+      studioCrdtDocumentRef, sharedDocumentSaveAbortRef, ownerDetailAbortRef,
+      setSharedDocumentNotice, setFxPanelOpen,
+      pages, pagesHistoryRef, pagesHiRef, master, currentPageId, setCurrentPageId,
+      masterEditMode, setMasterEditMode, pendingStrokeCommitsRef,
+      flushPendingStrokeCommitsRef, publishProfile, publishAiUsage,
+      publishAiDisclosure, publishCompliance, effectivePublishPackageSettings,
+      publishPackageCredits, publishComplianceResult, collectPublishPreflightProvenance,
+      buildPublishPreflightInput, setPageReviewOpen, setPublishPreflightOpen,
+      openWorkMetadataStep, clearPendingSaveIntent: () => setPendingSaveIntent(null),
+      captureReadyStageForPage, preserveStudioViewBeforeCapture, hideStrokeGuide,
+      setIsExporting, setSelectedId, effScale, title, description, tagsText,
+      characterBible, writerRoom, aiProvenance, scenarioImageReferenceDocument,
+      studioComments, releaseSchedule, publicationAnalytics, referenceBoard,
+      webtoonTheme, panelGutter, draftCollaboration, setDraftCollaboration,
+      draftCollaborationProvisionAbortRef, loadedWork, setLoadedWork,
+      clearAutosaveDurableAuthority, studioLifecycleDurableGenerationRef,
+      studioRevisionProjectGenerationRef, studioLifecycleDurablePendingFingerprintRef,
+      setSaving, setError,
     });
   }
 
