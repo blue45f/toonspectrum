@@ -142,8 +142,10 @@ describe("Studio virtual space P2P presence", () => {
     expect(b.snapshot().nearbyPeers).toHaveLength(0);
 
     a.setMoving(false);
+    a.setAvatarIndex(7);
     a.refresh();
     expect(b.snapshot().peers[0]?.state.moving).toBe(false);
+    expect(b.snapshot().peers[0]?.state.avatarIndex).toBe(7);
 
     a.sendReaction("wave");
     expect(a.snapshot().selfReaction).toBe("wave");

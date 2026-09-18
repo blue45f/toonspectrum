@@ -5,6 +5,8 @@ export const STUDIO_VIRTUAL_SPACE_HEIGHT = 720;
 export const STUDIO_VIRTUAL_SPACE_NEARBY_RADIUS = 230;
 export const STUDIO_VIRTUAL_SPACE_MAX_NEARBY_PEERS = 3;
 export const STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS = 24;
+export const STUDIO_VIRTUAL_SPACE_AVATAR_COUNT = 12;
+export const STUDIO_VIRTUAL_SPACE_AUTO_AVATAR = -1;
 
 export type StudioVirtualSpaceZoneId =
   | "lounge"
@@ -42,6 +44,7 @@ export interface StudioVirtualSpacePresenceState extends StudioVirtualSpacePoint
   readonly facing: StudioVirtualSpaceFacing;
   readonly activity: StudioVirtualSpaceActivity;
   readonly moving: boolean;
+  readonly avatarIndex: number;
 }
 
 export interface StudioVirtualSpacePeer {
@@ -197,14 +200,21 @@ export function studioVirtualSpaceState(
   facing: StudioVirtualSpaceFacing = "down",
   activity: StudioVirtualSpaceActivity = "available",
   moving = false,
+  avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
 ): StudioVirtualSpacePresenceState {
   const bounded = clampStudioVirtualSpacePoint(point);
+  const safeAvatarIndex = Number.isInteger(avatarIndex)
+    && avatarIndex >= 0
+    && avatarIndex < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+    ? avatarIndex
+    : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
   return Object.freeze({
     ...bounded,
     zoneId: studioVirtualSpaceZoneAt(bounded),
     facing,
     activity,
     moving,
+    avatarIndex: safeAvatarIndex,
   });
 }
 

@@ -54,6 +54,8 @@ import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-co
 import { openStudioP2pHuddle } from "../live/huddle/studio-p2p-huddle-events";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
+  STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
+  STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
   STUDIO_VIRTUAL_SPACE_HEIGHT,
   STUDIO_VIRTUAL_SPACE_WIDTH,
   STUDIO_VIRTUAL_SPACE_ZONES,
@@ -90,6 +92,7 @@ import "./studio-virtual-space.css";
 const KEYBOARD_MOVEMENT_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown", "a", "d", "w", "s"]);
 const MOBILE_CAMERA_SCALE = 0.72;
 const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v1";
+const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
   readonly id: StudioVirtualSpaceReaction;
   readonly emoji: string;
@@ -138,22 +141,20 @@ function writeVirtualSpaceSessionPoint(projectId: string, point: StudioVirtualSp
     // Storage can be unavailable in privacy-constrained browsers; movement still works in memory.
   }
 }
-const VIRTUAL_AVATAR_ART = [
-  "/assets/3d/characters/thumbnails/refined-v2/fumi.png",
-  "/assets/3d/characters/thumbnails/refined-v2/mio.png",
-  "/assets/3d/characters/thumbnails/refined-v2/anna.png",
-  "/assets/3d/characters/thumbnails/refined-v2/moon-girl.png",
-  "/assets/3d/characters/thumbnails/refined-v2/megan-the-fox.png",
-  "/assets/3d/characters/thumbnails/refined-v2/teddy.png",
-  "/assets/3d/characters/thumbnails/refined-v2/bot-bunny.png",
-  "/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png",
-  "/assets/3d/characters/thumbnails/refined-v2/lady-koi.png",
-  "/assets/3d/characters/thumbnails/refined-v2/blue-pixie.png",
-  "/assets/3d/characters/thumbnails/refined-v2/cute-saurus.png",
-  "/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png",
+const VIRTUAL_AVATARS = [
+  { src: "/assets/3d/characters/thumbnails/refined-v2/fumi.png", labelKo: "후미", labelEn: "Fumi" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/mio.png", labelKo: "미오", labelEn: "Mio" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/anna.png", labelKo: "안나", labelEn: "Anna" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/moon-girl.png", labelKo: "루나", labelEn: "Luna" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/megan-the-fox.png", labelKo: "메건", labelEn: "Megan" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/teddy.png", labelKo: "테디", labelEn: "Teddy" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/bot-bunny.png", labelKo: "버니", labelEn: "Bunny" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/strawberry-princess.png", labelKo: "베리", labelEn: "Berry" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/lady-koi.png", labelKo: "코이", labelEn: "Koi" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/blue-pixie.png", labelKo: "픽시", labelEn: "Pixie" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/cute-saurus.png", labelKo: "사우루스", labelEn: "Saurus" },
+  { src: "/assets/3d/characters/thumbnails/refined-v2/cosmic-bot.png", labelKo: "코스믹", labelEn: "Cosmic" },
 ] as const;
-
-const VIRTUAL_SCENE_AVATAR_ART = VIRTUAL_AVATAR_ART;
 
 function virtualAvatarIndex(identity: string): number {
   let hash = 2166136261;
@@ -161,15 +162,45 @@ function virtualAvatarIndex(identity: string): number {
     hash ^= identity.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
-  return (hash >>> 0) % VIRTUAL_AVATAR_ART.length;
+  return (hash >>> 0) % VIRTUAL_AVATARS.length;
 }
 
-function virtualAvatarArt(identity: string): string {
-  return VIRTUAL_AVATAR_ART[virtualAvatarIndex(identity)] ?? VIRTUAL_AVATAR_ART[0];
+function resolveVirtualAvatarIndex(identity: string, preferredIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR): number {
+  return Number.isInteger(preferredIndex)
+    && preferredIndex >= 0
+    && preferredIndex < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+    ? preferredIndex
+    : virtualAvatarIndex(identity);
 }
 
-function virtualSceneAvatarArt(identity: string): string {
-  return VIRTUAL_SCENE_AVATAR_ART[virtualAvatarIndex(identity)] ?? VIRTUAL_SCENE_AVATAR_ART[0];
+function virtualAvatarArt(identity: string, preferredIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR): string {
+  return VIRTUAL_AVATARS[resolveVirtualAvatarIndex(identity, preferredIndex)]?.src ?? VIRTUAL_AVATARS[0].src;
+}
+
+function readVirtualSpaceAvatarIndex(): number {
+  if (typeof window === "undefined") return STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
+  try {
+    const raw = window.localStorage.getItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
+    const index = raw == null ? NaN : Number(raw);
+    return Number.isInteger(index) && index >= 0 && index < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+      ? index
+      : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
+  } catch {
+    return STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
+  }
+}
+
+function writeVirtualSpaceAvatarIndex(index: number): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (index >= 0 && index < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT) {
+      window.localStorage.setItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY, String(index));
+    } else {
+      window.localStorage.removeItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
+    }
+  } catch {
+    // Local avatar choice is optional; a deterministic fallback remains available.
+  }
 }
 
 const ZONE_ICONS: Readonly<Record<StudioVirtualSpaceZoneId, typeof Coffee>> = {
@@ -366,6 +397,7 @@ function ChibiAvatar({
   moving = false,
   nearby = false,
   reaction = null,
+  avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
 }: {
   readonly identity: string;
   readonly name: string;
@@ -376,10 +408,11 @@ function ChibiAvatar({
   readonly moving?: boolean;
   readonly nearby?: boolean;
   readonly reaction?: StudioVirtualSpaceReaction | null;
+  readonly avatarIndex?: number;
 }) {
   const profile = useMemo(() => studioVirtualAvatarProfile(identity), [identity]);
-  const art = useMemo(() => virtualAvatarArt(identity), [identity]);
-  const sceneArt = useMemo(() => virtualSceneAvatarArt(identity), [identity]);
+  const art = useMemo(() => virtualAvatarArt(identity, avatarIndex), [avatarIndex, identity]);
+  const sceneArt = art;
   const activityTone = activity === "away"
     ? "bg-fg-3"
     : activity === "focused"
@@ -665,8 +698,9 @@ function VirtualSpaceExperience({
     const fallback = studioVirtualSpaceInitialPoint(fallbackIdentity);
     return readVirtualSpaceSessionPoint(projectId, fallback);
   }, [fallbackIdentity, projectId]);
+  const initialAvatarIndex = useMemo(() => readVirtualSpaceAvatarIndex(), []);
   const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
-    self: studioVirtualSpaceState(initial),
+    self: studioVirtualSpaceState(initial, "down", "available", false, initialAvatarIndex),
     peers: [],
     nearbyPeers: [],
     selfReaction: null,
@@ -674,6 +708,7 @@ function VirtualSpaceExperience({
     direct: false,
   }));
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
+  const [avatarIndex, setAvatarIndex] = useState(initialAvatarIndex);
   const [moving, setMoving] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const selfRef = useRef(snapshot.self);
@@ -743,6 +778,7 @@ function VirtualSpaceExperience({
       selfRef.current,
     );
     controllerRef.current = controller;
+    controller.setAvatarIndex(selfRef.current.avatarIndex);
     const refresh = () => setSnapshot(controller.snapshot());
     const unsubscribe = controller.subscribe(refresh);
     controller.start();
@@ -759,11 +795,17 @@ function VirtualSpaceExperience({
     facing: StudioVirtualSpaceFacing,
   ) => {
     const bounded = clampStudioVirtualSpacePoint(point);
-    const nextState = studioVirtualSpaceState(bounded, facing, activity, movingRef.current);
+    const nextState = studioVirtualSpaceState(
+      bounded,
+      facing,
+      activity,
+      movingRef.current,
+      selfRef.current.avatarIndex,
+    );
     selfRef.current = nextState;
     const controller = controllerRef.current;
     if (controller) {
-      controller.update(bounded, facing, activity, movingRef.current);
+      controller.update(bounded, facing, activity, movingRef.current, selfRef.current.avatarIndex);
       setSnapshot(controller.snapshot());
       return;
     }
@@ -802,7 +844,13 @@ function VirtualSpaceExperience({
       }
       setSnapshot((current) => ({
         ...current,
-        self: studioVirtualSpaceState(current.self, current.self.facing, activity, next),
+        self: studioVirtualSpaceState(
+          current.self,
+          current.self.facing,
+          activity,
+          next,
+          current.self.avatarIndex,
+        ),
       }));
     };
 
@@ -1007,9 +1055,42 @@ function VirtualSpaceExperience({
     controllerRef.current?.setActivity(next);
     setSnapshot((current) => ({
       ...current,
-      self: studioVirtualSpaceState(current.self, current.self.facing, next, current.self.moving),
+      self: studioVirtualSpaceState(
+        current.self,
+        current.self.facing,
+        next,
+        current.self.moving,
+        current.self.avatarIndex,
+      ),
     }));
   };
+
+  const selectAvatar = useCallback((nextIndex: number) => {
+    if (
+      !Number.isInteger(nextIndex)
+      || nextIndex < STUDIO_VIRTUAL_SPACE_AUTO_AVATAR
+      || nextIndex >= STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+    ) return;
+    setAvatarIndex(nextIndex);
+    writeVirtualSpaceAvatarIndex(nextIndex);
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.setAvatarIndex(nextIndex);
+      setSnapshot(controller.snapshot());
+      return;
+    }
+    setSnapshot((current) => {
+      const self = studioVirtualSpaceState(
+        current.self,
+        current.self.facing,
+        current.self.activity,
+        current.self.moving,
+        nextIndex,
+      );
+      selfRef.current = self;
+      return { ...current, self };
+    });
+  }, []);
 
   return (
     <main className="min-h-screen bg-canvas pb-16 text-fg">
@@ -1168,6 +1249,7 @@ function VirtualSpaceExperience({
                         moving={peer.state.moving}
                         nearby={nearby}
                         reaction={reaction}
+                        avatarIndex={peer.state.avatarIndex}
                       />
                     </button>
                   );
@@ -1184,6 +1266,7 @@ function VirtualSpaceExperience({
                     facing={snapshot.self.facing}
                     moving={moving}
                     reaction={snapshot.selfReaction}
+                    avatarIndex={snapshot.self.avatarIndex}
                   />
                 </div>
                 </div>
@@ -1321,6 +1404,7 @@ function VirtualSpaceExperience({
                       name={peer.participant.displayName}
                       compact
                       activity={peer.state.activity}
+                      avatarIndex={peer.state.avatarIndex}
                     />
                     <div className="min-w-0">
                       <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
@@ -1360,7 +1444,13 @@ function VirtualSpaceExperience({
               </div>
               <div className="mt-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <ChibiAvatar identity={fallbackIdentity} name={localName} compact activity={snapshot.self.activity} />
+                  <ChibiAvatar
+                    identity={fallbackIdentity}
+                    name={localName}
+                    compact
+                    activity={snapshot.self.activity}
+                    avatarIndex={snapshot.self.avatarIndex}
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold">{localName} · {bt("나", "Me")}</p>
                     <p className="truncate text-[0.68rem] text-accent">{bt(currentZone.labelKo, currentZone.labelEn)}</p>
@@ -1370,7 +1460,13 @@ function VirtualSpaceExperience({
                   const following = followingPeerId === peer.participant.sessionId;
                   return (
                     <div key={peer.participant.sessionId} className="flex items-center gap-2 rounded-xl px-1 py-1">
-                      <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName} compact activity={peer.state.activity} />
+                      <ChibiAvatar
+                        identity={peer.participant.sessionId}
+                        name={peer.participant.displayName}
+                        compact
+                        activity={peer.state.activity}
+                        avatarIndex={peer.state.avatarIndex}
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
                         <p className="truncate text-[0.68rem] text-fg-3">
@@ -1397,6 +1493,65 @@ function VirtualSpaceExperience({
                   );
                 })}
               </div>
+
+              <fieldset className="mt-4 border-t border-line/70 pt-4">
+                <legend className="px-1 text-[0.68rem] font-black text-fg-2">
+                  {bt("내 캐릭터", "My character")}
+                </legend>
+                <p className="mt-1 text-[0.62rem] leading-5 text-fg-3">
+                  {bt(
+                    "이 선택은 이 브라우저에만 저장되고 P2P로 팀원에게 공유됩니다.",
+                    "This choice stays in this browser and is shared with teammates over P2P.",
+                  )}
+                </p>
+                <div className="mt-2 grid grid-cols-4 gap-1.5">
+                  <button
+                    type="button"
+                    aria-pressed={avatarIndex === STUDIO_VIRTUAL_SPACE_AUTO_AVATAR}
+                    className={cn(
+                      "relative grid aspect-square place-items-center rounded-xl border text-[0.55rem] font-black transition",
+                      avatarIndex === STUDIO_VIRTUAL_SPACE_AUTO_AVATAR
+                        ? "border-accent bg-accent-soft text-accent ring-2 ring-accent/20"
+                        : "border-line bg-card text-fg-3 hover:border-accent/40 hover:text-accent",
+                    )}
+                    title={bt("자동 캐릭터", "Automatic character")}
+                    onClick={() => selectAvatar(STUDIO_VIRTUAL_SPACE_AUTO_AVATAR)}
+                  >
+                    <Sparkles size={17} aria-hidden />
+                    <span>{bt("자동", "Auto")}</span>
+                  </button>
+                  {VIRTUAL_AVATARS.map((avatar, index) => (
+                    <button
+                      key={avatar.src}
+                      type="button"
+                      aria-pressed={avatarIndex === index}
+                      className={cn(
+                        "group relative aspect-square overflow-hidden rounded-xl border bg-[radial-gradient(circle_at_50%_35%,oklch(0.35_0.05_300),oklch(0.18_0.02_260)_72%)] transition",
+                        avatarIndex === index
+                          ? "border-accent ring-2 ring-accent/25"
+                          : "border-line hover:border-accent/45",
+                      )}
+                      title={bt(avatar.labelKo, avatar.labelEn)}
+                      aria-label={bt(`${avatar.labelKo} 캐릭터 선택`, `Select ${avatar.labelEn} character`)}
+                      onClick={() => selectAvatar(index)}
+                    >
+                      <img
+                        src={avatar.src}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="size-full object-contain object-bottom transition-transform group-hover:scale-105"
+                      />
+                      {avatarIndex === index ? (
+                        <span className="absolute bottom-1 right-1 grid size-4 place-items-center rounded-full bg-accent text-[0.5rem] font-black text-on-accent shadow">
+                          ✓
+                        </span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
               <label className="mt-4 block text-[0.68rem] font-bold text-fg-3">
                 {bt("내 상태", "My status")}
                 <select
