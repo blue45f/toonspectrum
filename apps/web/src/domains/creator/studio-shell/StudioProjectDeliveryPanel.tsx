@@ -373,7 +373,7 @@ export function StudioProjectDeliveryPanel({
     } catch {
       return null;
     }
-  }, [connector.id, connector.policyVersion, documentId, locale, platformId, preflight, projectId, requestedAt, rights, state]);
+  }, [connector.id, connector.policyVersion, documentId, l, platformId, preflight, projectId, requestedAt, rights, state]);
 
   const packageDeliveryStatus = packagePlan === null
     ? null
@@ -517,7 +517,7 @@ export function StudioProjectDeliveryPanel({
                 {sourceLabel(
                   platformDeliveryPlan.sourceStatus,
                   platformDeliveryPlan.requiresOfficialRecheck,
-                  locale,
+                  l,
                 )}
               </span>
             </div>
