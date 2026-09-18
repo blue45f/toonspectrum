@@ -1,6 +1,7 @@
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   PreconditionFailedException,
@@ -34,7 +35,12 @@ import {
 
 @Injectable()
 export class StudioProjectGraphService {
-  constructor(private readonly repository: StudioProjectGraphRepository) {}
+  constructor(
+    @Inject(StudioProjectGraphRepository)
+    private readonly repository: StudioProjectGraphRepository,
+    @Inject(StudioExternalFileBindingRepository)
+    private readonly externalBindings: StudioExternalFileBindingRepository,
+  ) {}
 
   private async execute<T>(operation: () => Promise<T>): Promise<T> {
     try {

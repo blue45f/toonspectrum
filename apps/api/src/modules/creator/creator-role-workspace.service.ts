@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
 } from "@nestjs/common";
 
@@ -19,6 +20,7 @@ import {
 @Injectable()
 export class CreatorRoleWorkspaceService {
   constructor(
+    @Inject(CreatorRoleWorkspaceRepository)
     private readonly repository: CreatorRoleWorkspaceRepository,
   ) {}
 

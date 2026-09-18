@@ -7,6 +7,7 @@ import {
   ForbiddenException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -124,7 +125,9 @@ export class ProductionIntegrationService {
   private readonly config: ProductionIntegrationConfig;
 
   constructor(
+    @Inject(ProductionCollaborationService)
     private readonly productionService: ProductionCollaborationService,
+    @Inject(ProductionIntegrationRepository)
     private readonly repository: ProductionIntegrationRepository,
   ) {
     this.config = resolveProductionIntegrationConfig(process.env);

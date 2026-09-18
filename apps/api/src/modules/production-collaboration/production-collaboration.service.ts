@@ -4,6 +4,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -1511,7 +1512,10 @@ function externalReviewProjection(
 
 @Injectable()
 export class ProductionCollaborationService {
-  constructor(private readonly repository: ProductionCollaborationRepository) {}
+  constructor(
+    @Inject(ProductionCollaborationRepository)
+    private readonly repository: ProductionCollaborationRepository,
+  ) {}
 
   async getProject(actorUserId: string, projectIdValue: string): Promise<ProductionProjectRecord> {
     const { projectId } = ProductionProjectParamsSchema.parse({ projectId: projectIdValue });

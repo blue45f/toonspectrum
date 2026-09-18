@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 
 import {
   personalCloudProviderConfig,
@@ -86,7 +86,10 @@ function splitScope(value: string): readonly string[] {
 
 @Injectable()
 export class PersonalCloudService {
-  constructor(private readonly repository: PersonalCloudRepository) {}
+  constructor(
+    @Inject(PersonalCloudRepository)
+    private readonly repository: PersonalCloudRepository,
+  ) {}
 
   async status(userId: string): Promise<readonly PersonalCloudConnectionStatus[]> {
     const connections = new Map(
