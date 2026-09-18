@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Stroke-width adjustment controls.
  * Uses ToonStudio task language and the shared Studio visual tokens.

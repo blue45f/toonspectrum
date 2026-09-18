@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Eye, Globe2, Images, ShieldCheck } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -63,10 +64,10 @@ export function StudioPublishVisualJourney({
 }) {
   const reducedMotion = useReducedMotion();
   return (
-    <section className="studio-publish-visual-journey" aria-label="게시 흐름 미리보기">
+    <section className="studio-publish-visual-journey" aria-label={translateCurrentStaticSourceText("domains.creator.StudioPublishVisualJourney", "ko", "게시 흐름 미리보기")}>
       <div className="studio-publish-visual-journey__intro">
-        <span><ShieldCheck size={14} aria-hidden="true" /> 결과를 보면서 3단계로 게시해요</span>
-        <p>기술 설정을 한꺼번에 보여주지 않고, 원고 → 공개 방식 → 독자 화면 순서로 필요한 결정만 꺼냅니다.</p>
+        <span><ShieldCheck size={14} aria-hidden="true" /> {translateCurrentStaticSourceText("domains.creator.StudioPublishVisualJourney", "ko", "결과를 보면서 3단계로 게시해요")}</span>
+        <p>{translateCurrentStaticSourceText("domains.creator.StudioPublishVisualJourney", "ko", "기술 설정을 한꺼번에 보여주지 않고, 원고 → 공개 방식 → 독자 화면 순서로 필요한 결정만 꺼냅니다.")}</p>
       </div>
       <div className="studio-publish-visual-journey__grid">
         {STEPS.map((step, index) => {

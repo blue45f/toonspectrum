@@ -1,9 +1,7 @@
 import { nextExperienceDestinations } from "./site-experience-model";
 
 export type AtelierScene = "ink" | "layers" | "panels" | "motion" | "materials";
-export type AtelierLocale = "ko" | "en";
-
-export const ATELIER_SCENES = {
+export type AtelierLocale = string;export const ATELIER_SCENES = {
   ink: {
     ko: ["선의 감각", "선을 쌓아, 표정을 만들다.", "펜선의 굵기와 질감이 만드는 인상을 살펴보세요. 아래 선은 브러시 표현을 설명하는 그래픽입니다.", "브러시로 그리기"],
     en: ["Inking", "Every line has a voice.", "Explore how line weight and texture shape an impression. The marks below are graphics illustrating brush expression.", "Draw with brushes"],

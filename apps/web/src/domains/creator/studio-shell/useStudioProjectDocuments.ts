@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useT } from "@/shared/lib/i18n";

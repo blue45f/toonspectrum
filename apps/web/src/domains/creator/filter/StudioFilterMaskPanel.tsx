@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Filter Mask Panel — 필터 마스크(비파괴 필터 부분 적용) 컨트롤. 마스크가 없으면 추가
  * 액션(흰/검정)만 보여주고, 있으면 켬/끔·삭제·반전(즉시 굽기 액션 4종) + 브러시로 직접 그리기
@@ -108,15 +112,14 @@ export function StudioFilterMaskPanel({
 
   return (
     <section
-      aria-label="필터 마스크"
+      aria-label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크")}
       aria-busy={busy}
       className="mt-2.5 space-y-2 rounded-xl border border-line bg-card/45 p-2.5"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Blend size={12} aria-hidden />
-          필터 마스크
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크")}</p>
         {busy && (
           <Loader2
             size={13}
@@ -133,23 +136,21 @@ export function StudioFilterMaskPanel({
             onClick={() => onAddMask("reveal")}
             disabled={busy}
             aria-describedby={statusId}
-            title="전체에 필터가 적용되는 흰 마스크를 추가합니다(기본 — 이후 검정으로 칠한 부분만 원본으로 남습니다)."
+            title={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "전체에 필터가 적용되는 흰 마스크를 추가합니다(기본 — 이후 검정으로 칠한 부분만 원본으로 남습니다).")}
             className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             <Plus className="size-3" aria-hidden />
-            마스크 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "마스크 추가")}</button>
           <button
             type="button"
             onClick={() => onAddMask("conceal")}
             disabled={busy}
             aria-describedby={statusId}
-            title="전체가 원본으로 남는 검정 마스크를 추가합니다(이후 흰색으로 칠한 부분에만 필터가 적용됩니다)."
+            title={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "전체가 원본으로 남는 검정 마스크를 추가합니다(이후 흰색으로 칠한 부분에만 필터가 적용됩니다).")}
             className={cn(PANEL_CHIP_CLASS, "flex min-w-0 items-center justify-center gap-1")}
           >
             <EyeOff className="size-3" aria-hidden />
-            원본으로 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "원본으로 추가")}</button>
         </div>
       ) : (
         <>
@@ -164,49 +165,47 @@ export function StudioFilterMaskPanel({
               onClick={onToggleEnabled}
               disabled={busy}
               aria-describedby={statusId}
-              title={enabled ? "필터 마스크를 끕니다(데이터는 보존 — 잠깐 전체 적용을 보고 싶을 때)." : "필터 마스크를 다시 켭니다."}
+              title={enabled ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크를 끕니다(데이터는 보존 — 잠깐 전체 적용을 보고 싶을 때).") : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크를 다시 켭니다.")}
             >
-              {enabled ? "사용 중" : "꺼짐"}
+              {enabled ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "사용 중") : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "꺼짐")}
             </StudioToggleChip>
             <button
               type="button"
               onClick={onInvert}
               disabled={busy}
               aria-describedby={statusId}
-              title="필터 적용/원본 유지 영역을 뒤집습니다(즉시 적용, ⌘Z로 되돌리기 가능)."
+              title={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 적용/원본 유지 영역을 뒤집습니다(즉시 적용, ⌘Z로 되돌리기 가능).")}
               className={cn(PANEL_CHIP_CLASS, "flex items-center gap-1")}
             >
               <Contrast className="size-3" aria-hidden />
-              반전
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "반전")}</button>
             <button
               type="button"
               onClick={onDeleteMask}
               disabled={busy}
               aria-describedby={statusId}
-              title="필터 마스크를 삭제합니다(필터가 다시 전체에 적용됩니다 — 원본 이미지는 영향 없음)."
+              title={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크를 삭제합니다(필터가 다시 전체에 적용됩니다 — 원본 이미지는 영향 없음).")}
               className={cn(PANEL_CHIP_CLASS, "ml-auto flex items-center gap-1 text-fg-3 hover:text-fg")}
             >
               <Trash2 className="size-3" aria-hidden />
-              삭제
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "삭제")}</button>
           </div>
 
           <StudioToggleChip
             active={paintActive}
             disabled={busy && !paintActive}
             onClick={onTogglePaintActive}
-            aria-label={paintActive ? "필터 마스크 그리기 종료" : "필터 마스크에 그리기"}
+            aria-label={paintActive ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크 그리기 종료") : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크에 그리기")}
             aria-describedby={statusId}
             title={
               paintActive
-                ? "필터 마스크 그리기 도구를 종료합니다."
-                : "켜고 이미지를 드래그하면 필터 적용 범위를 직접 칠할 수 있습니다."
+                ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "필터 마스크 그리기 도구를 종료합니다.")
+                : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "켜고 이미지를 드래그하면 필터 적용 범위를 직접 칠할 수 있습니다.")
             }
           >
             <span className="inline-flex items-center gap-1">
               <Blend className="size-3" aria-hidden />
-              {paintActive ? "그리기 종료" : "마스크에 그리기"}
+              {paintActive ? translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "그리기 종료") : translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "마스크에 그리기")}
             </span>
           </StudioToggleChip>
 
@@ -232,17 +231,17 @@ export function StudioFilterMaskPanel({
           </div>
 
           <StudioSliderRow
-            label="브러시 크기"
+            label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "브러시 크기")}
             min={FILTER_MASK_BRUSH_RADIUS_RANGE.min}
             max={FILTER_MASK_BRUSH_RADIUS_RANGE.max}
             step={FILTER_MASK_BRUSH_RADIUS_RANGE.step}
             value={radiusPx}
             onChange={onRadiusChange}
             disabled={busy}
-            readout={`${radiusPx}px`}
+            readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "en", "{v0}px"), { v0: String(radiusPx) })}
           />
           <StudioSliderRow
-            label="경도"
+            label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "경도")}
             min={FILTER_MASK_BRUSH_HARDNESS_RANGE.min}
             max={FILTER_MASK_BRUSH_HARDNESS_RANGE.max}
             step={FILTER_MASK_BRUSH_HARDNESS_RANGE.step}
@@ -252,7 +251,7 @@ export function StudioFilterMaskPanel({
             readout={`${Math.round(hardness * 100)}%`}
           />
           <StudioSliderRow
-            label="강도"
+            label={translateCurrentStaticSourceText("domains.creator.filter.StudioFilterMaskPanel", "ko", "강도")}
             min={FILTER_MASK_BRUSH_STRENGTH_RANGE.min}
             max={FILTER_MASK_BRUSH_STRENGTH_RANGE.max}
             step={FILTER_MASK_BRUSH_STRENGTH_RANGE.step}

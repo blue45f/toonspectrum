@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Brush,
   Command,
   Layers3,
@@ -42,17 +46,17 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           <Brush size={17} aria-hidden="true" />
         </span>
         <div className="hidden min-w-0 sm:block">
-          <strong className="block truncate text-xs font-black tracking-[-0.02em] text-fg">ToonStudio Draw</strong>
-          <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.name || "Untitled"}</span>
+          <strong className="block truncate text-xs font-black tracking-[-0.02em] text-fg">{translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "en", "ToonStudio Draw")}</strong>
+          <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.name || translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "en", "Untitled")}</span>
         </div>
       </div>
 
-      <div className="hidden min-w-0 flex-1 items-center gap-1.5 md:flex" aria-label="현재 드로잉 설정">
+      <div className="hidden min-w-0 flex-1 items-center gap-1.5 md:flex" aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "현재 드로잉 설정")}>
         <button
           type="button"
           className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          aria-label={`브러시 라이브러리 열기, 현재 ${brushName}`}
-          title="브러시 라이브러리"
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "브러시 라이브러리 열기, 현재 {v0}"), { v0: String(brushName) })}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "브러시 라이브러리")}
           onClick={(event) => {
             if (s.isMobile) {
               s.setMobileSheet?.("draw");
@@ -71,22 +75,22 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           {percent(s.brushOpacity)}
         </span>
         <span className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-semibold tabular-nums text-fg-2">
-          Stabilizer {stabilizer}
+          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "en", "Stabilizer ")}{stabilizer}
         </span>
         <span
           className="size-6 rounded-full border-2 border-card shadow ring-1 ring-line"
           style={{ backgroundColor: typeof s.color === "string" ? s.color : "#000000" }}
-          aria-label={`현재 색상 ${String(s.color ?? "")}`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "현재 색상 {v0}"), { v0: String(String(s.color ?? "")) })}
         />
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1" aria-label="드로잉 빠른 도구">
+      <div className="ml-auto flex shrink-0 items-center gap-1" aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "드로잉 빠른 도구")}>
         <button
           type="button"
           className={buttonClass({ variant: "quiet", size: "icon" })}
           disabled={Boolean(s.menuEditUndoDisabled)}
-          aria-label="실행 취소"
-          title="실행 취소 · Ctrl/⌘ Z"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "실행 취소")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "실행 취소 · Ctrl/⌘ Z")}
           onClick={() => s.undo?.()}
         >
           <Undo2 size={17} aria-hidden="true" />
@@ -95,8 +99,8 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           type="button"
           className={buttonClass({ variant: "quiet", size: "icon" })}
           disabled={Boolean(s.menuEditRedoDisabled)}
-          aria-label="다시 실행"
-          title="다시 실행 · Ctrl/⌘ Shift Z"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "다시 실행")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "다시 실행 · Ctrl/⌘ Shift Z")}
           onClick={() => s.redo?.()}
         >
           <Redo2 size={17} aria-hidden="true" />
@@ -105,8 +109,8 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           type="button"
           className={cn(buttonClass({ variant: s.colorWheelOpen ? "solid" : "quiet", size: "icon" }))}
           aria-pressed={Boolean(s.colorWheelOpen)}
-          aria-label="컬러 휠"
-          title="컬러 휠"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "컬러 휠")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "컬러 휠")}
           onClick={() => s.setColorWheelOpen?.((value: boolean) => !value)}
         >
           <Palette size={17} aria-hidden="true" />
@@ -115,8 +119,8 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           type="button"
           className={cn(buttonClass({ variant: s.quickAccessPaletteOpen ? "solid" : "quiet", size: "icon" }))}
           aria-pressed={Boolean(s.quickAccessPaletteOpen)}
-          aria-label="퀵 액세스"
-          title="퀵 액세스 · 자주 쓰는 명령"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "퀵 액세스")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "퀵 액세스 · 자주 쓰는 명령")}
           onClick={() => s.setQuickAccessPaletteOpen?.((value: boolean) => !value)}
         >
           <Command size={17} aria-hidden="true" />
@@ -125,8 +129,8 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           type="button"
           className={cn(buttonClass({ variant: s.visibleLeftPanelOpen ? "solid" : "quiet", size: "icon" }), "hidden sm:inline-flex")}
           aria-pressed={Boolean(s.visibleLeftPanelOpen)}
-          aria-label="페이지 패널"
-          title="페이지 패널"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "페이지 패널")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "페이지 패널")}
           onClick={() => s.setLeftPanelOpenWithOverride?.(!s.visibleLeftPanelOpen)}
         >
           <PanelLeft size={17} aria-hidden="true" />
@@ -135,8 +139,8 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           type="button"
           className={cn(buttonClass({ variant: s.visibleRightPanelOpen ? "solid" : "quiet", size: "icon" }), "hidden sm:inline-flex")}
           aria-pressed={Boolean(s.visibleRightPanelOpen)}
-          aria-label="레이어·속성 패널"
-          title="레이어·속성 패널"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "레이어·속성 패널")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "레이어·속성 패널")}
           onClick={() => s.setRightPanelOpenWithOverride?.(!s.visibleRightPanelOpen)}
         >
           <Layers3 size={17} aria-hidden="true" />
@@ -145,8 +149,8 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           type="button"
           className={buttonClass({ variant: s.canvasOnlyMode ? "solid" : "quiet", size: "icon" })}
           aria-pressed={Boolean(s.canvasOnlyMode)}
-          aria-label="캔버스만 보기"
-          title="캔버스만 보기 · 4손가락 탭"
+          aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "캔버스만 보기")}
+          title={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "캔버스만 보기 · 4손가락 탭")}
           onClick={() => s.setCanvasOnlyMode?.((value: boolean) => !value)}
         >
           <Maximize2 size={17} aria-hidden="true" />
@@ -156,8 +160,7 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
           className={cn(buttonClass({ variant: "outline", size: "sm" }), "ml-1 hidden min-h-9 gap-1.5 px-2.5 text-[0.7rem] font-bold lg:inline-flex")}
         >
           <PanelRight size={15} aria-hidden="true" />
-          전체 스튜디오
-        </Link>
+          {translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioDrawingAppBar", "ko", "전체 스튜디오")}</Link>
       </div>
     </header>
   );

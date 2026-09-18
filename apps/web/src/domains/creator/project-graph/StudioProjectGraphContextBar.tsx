@@ -1,4 +1,11 @@
 import {
+  formatI18nTemplate,
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Cloud,
   CloudOff,
   GitBranch,
@@ -28,7 +35,7 @@ import {
 
 type Locale = string;
 
-const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, Readonly<Record<Locale, string>>>> = {
+const STATUS_LABELS: Readonly<Record<StudioProjectGraphStatus, Readonly<Record<AuthoredLocale, string>>>> = {
   loading: { ko: "작품 연결 확인 중", en: "Checking project connection" },
   synced: { ko: "클라우드와 동기화됨", en: "Synced with cloud" },
   cached: { ko: "최근 동기화 상태", en: "Last synced state" },
@@ -159,7 +166,7 @@ export function StudioProjectGraphContextBar({
           ) : null}
           {artifact ? (
             <Link
-              href={`/studio/p/${encodeURIComponent(projectId)}/review?view=versions&artifact=${encodeURIComponent(artifact.id)}`}
+              href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.project.graph.StudioProjectGraphContextBar", "en", "/studio/p/{v0}/review?view=versions&artifact={v1}"), { v0: String(encodeURIComponent(projectId)), v1: String(encodeURIComponent(artifact.id)) })}
               className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
             >
               <History size={14} aria-hidden="true" />
@@ -175,7 +182,7 @@ export function StudioProjectGraphContextBar({
             <RefreshCcw
               size={14}
               aria-hidden="true"
-              className={controller.status === "loading" ? "animate-spin" : undefined}
+              className={controller.status === "loading" ? translateCurrentStaticSourceText("domains.creator.project.graph.StudioProjectGraphContextBar", "en", "animate-spin") : undefined}
             />
             {bt("상태 새로고침", "Refresh status")}
           </button>

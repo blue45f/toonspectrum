@@ -1,4 +1,8 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   FileWarning,
@@ -102,8 +106,7 @@ export function StudioCompatibilityReportsPanel({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            IMPORT COMPATIBILITY
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.project.graph.StudioCompatibilityReportsPanel", "en", "IMPORT COMPATIBILITY")}</p>
           <h2 id="studio-compatibility-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("PSD·PNG·CLIP 원본과 변환 손실", "PSD, PNG and CLIP source fidelity")}
           </h2>

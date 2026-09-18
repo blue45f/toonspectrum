@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Heart, Layers } from "lucide-react";
 
 import { useCommerceConfig } from "../hooks/use-commerce-config";
@@ -116,11 +120,11 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         )}
       >
         <Link
-          href={`/market/resource/${record.id}`}
-          aria-label={`${record.name} 상세 보기`}
+          href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "en", "/market/resource/{v0}"), { v0: String(record.id) })}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "{v0} 상세 보기"), { v0: String(record.name) })}
           className="absolute inset-0 z-[1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/70"
         >
-          <span className="sr-only">{record.name} 상세 보기</span>
+          <span className="sr-only">{record.name} {translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "상세 보기")}</span>
         </Link>
 
         {paletteColors ? (
@@ -147,7 +151,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
                 key={`${brush.name}-${index}`}
                 d={`M 12 ${34 + index * 27} C 58 ${8 + index * 18}, 103 ${72 + index * 8}, 148 ${35 + index * 16} S 207 ${28 + index * 22}, 230 ${42 + index * 23}`}
                 fill="none"
-                stroke={brush.color ?? `oklch(0.82 0.12 ${kind.hue + index * 24})`}
+                stroke={brush.color ?? formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "en", "oklch(0.82 0.12 {v0})"), { v0: String(kind.hue + index * 24) })}
                 strokeOpacity={brush.opacity ?? 0.82}
                 strokeWidth={Math.max(3, Math.min(16, (brush.size ?? 8) * (0.7 + index * 0.14)))}
                 strokeLinecap="round"
@@ -174,7 +178,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           return referenceImage ? (
             <div aria-hidden="true" className="absolute inset-0 overflow-hidden">
               <img src={referenceImage} alt="" loading="lazy" decoding="async" className="size-full object-cover opacity-90 transition-transform duration-300 group-hover:scale-[1.035]" />
-              <span className="absolute bottom-2 right-2 rounded bg-canvas/85 px-2 py-1 text-[0.58rem] font-semibold text-fg-2 shadow-sm backdrop-blur-sm">씬 참고</span>
+              <span className="absolute bottom-2 right-2 rounded bg-canvas/85 px-2 py-1 text-[0.58rem] font-semibold text-fg-2 shadow-sm backdrop-blur-sm">{translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "씬 참고")}</span>
             </div>
           ) : null;
         })() : null}
@@ -182,7 +186,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
         {record.kind === "3d-asset" && !paletteColors && recipe ? (
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,var(--color-raised),var(--color-panel))]">
             <ProceduralAssetCardArtwork recipeId={recipe.recipeId} />
-            <span className="absolute bottom-2 right-2 rounded bg-canvas/80 px-2 py-1 text-[0.58rem] font-semibold text-fg-3 shadow-sm backdrop-blur-sm">레시피</span>
+            <span className="absolute bottom-2 right-2 rounded bg-canvas/80 px-2 py-1 text-[0.58rem] font-semibold text-fg-3 shadow-sm backdrop-blur-sm">{translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "레시피")}</span>
           </div>
         ) : null}
 
@@ -202,7 +206,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           <button
             type="button"
             onClick={() => toggleWishlist(record)}
-            aria-label={wishlisted ? `${record.name} 찜 해제` : `${record.name} 찜하기`}
+            aria-label={wishlisted ? formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "{v0} 찜 해제"), { v0: String(record.name) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "{v0} 찜하기"), { v0: String(record.name) })}
             aria-pressed={wishlisted}
             className={cn(
               "flex size-7 items-center justify-center rounded-full bg-card/80 shadow-sm backdrop-blur-sm transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -240,14 +244,13 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
 
         <span className="numeral tnum absolute right-3.5 top-3 z-[2] inline-flex min-h-6 items-center gap-1 rounded-md bg-canvas px-1.5 text-[0.65rem] font-semibold text-fg shadow-sm">
           <Layers className="h-3 w-3" aria-hidden="true" />
-          {record.entries.length}개
-        </span>
+          {record.entries.length}{translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "개")}</span>
       </div>
 
       <div className="flex flex-1 flex-col gap-2 border-t border-line p-3.5">
         <div className="flex items-start justify-between gap-2">
           <Link
-            href={`/market/resource/${record.id}`}
+            href={formatI18nTemplate(translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "en", "/market/resource/{v0}"), { v0: String(record.id) })}
             className="line-clamp-2 text-pretty text-sm font-semibold leading-snug text-fg transition-colors duration-150 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
           >
             {record.name}
@@ -280,8 +283,7 @@ export function MarketResourceCard({ record, className }: MarketResourceCardProp
           </div>
         ) : null}
         <time dateTime={record.updatedAt} className="text-[0.65rem] text-fg-3">
-          {formatMarketDate(record.updatedAt)} 업데이트
-        </time>
+          {formatMarketDate(record.updatedAt)} {translateCurrentStaticSourceText("domains.market.components.MarketResourceCard", "ko", "업데이트")}</time>
       </div>
     </article>
   );

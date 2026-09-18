@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -46,27 +50,27 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
     <div className="fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-6">
       <button type="button" tabIndex={-1} aria-hidden="true" data-studio-modal-backdrop="true"
         className="absolute inset-0 bg-black/75" onClick={onClose} />
-      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`}
-        aria-describedby={`${id}-description`} data-studio-shortcut-boundary="true" tabIndex={-1}
+      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "en", "{v0}-title"), { v0: String(id) })}
+        aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "en", "{v0}-description"), { v0: String(id) })} data-studio-shortcut-boundary="true" tabIndex={-1}
         className="relative flex max-h-[92dvh] w-full min-w-0 max-w-5xl flex-col overflow-hidden rounded-2xl border border-line bg-card text-fg shadow-2xl">
         <header className="flex items-start justify-between gap-3 border-b border-line p-4">
           <div className="min-w-0">
-            <h2 id={`${id}-title`} className="text-sm font-bold">{title}</h2>
-            <p id={`${id}-description`} className="mt-1 text-xs text-fg-3">{studio2dResolutionLabel(scene)} · {formatLabel}</p>
+            <h2 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "en", "{v0}-title"), { v0: String(id) })} className="text-sm font-bold">{title}</h2>
+            <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "en", "{v0}-description"), { v0: String(id) })} className="mt-1 text-xs text-fg-3">{studio2dResolutionLabel(scene)} · {formatLabel}</p>
           </div>
-          <button type="button" aria-label="배경 미리보기 닫기" onClick={onClose}
+          <button type="button" aria-label={translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "배경 미리보기 닫기")} onClick={onClose}
             className="rounded-lg p-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"><X size={18} /></button>
         </header>
         <div className="min-h-0 overflow-y-auto p-3 sm:p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="text-fg-3">삽입 전에 구도·인물·문자 형태를 확인하세요.</span>
+            <span className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "삽입 전에 구도·인물·문자 형태를 확인하세요.")}</span>
             <button type="button" aria-pressed={pixelView} disabled={status !== "ready"} onClick={() => { setPixelView((value) => !value); if (!pixelView) viewportRef.current?.focus(); }}
-              className="rounded-lg border border-line px-3 py-1.5 disabled:opacity-40">{pixelView ? "화면에 맞추기" : "원본 픽셀 보기"}</button>
+              className="rounded-lg border border-line px-3 py-1.5 disabled:opacity-40">{pixelView ? translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "화면에 맞추기") : translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "원본 픽셀 보기")}</button>
           </div>
           <div ref={viewportRef} role="region" className="max-h-[55dvh] overflow-auto rounded-lg bg-neutral-950" tabIndex={-1}
-            aria-label="배경 원본 이미지 영역">
+            aria-label={translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "배경 원본 이미지 영역")}>
             <img key={imageKey} ref={imageRef} src={studio2dImageSource(scene)} alt={title} decoding="async"
-              className={pixelView ? "block max-w-none" : "mx-auto block max-h-[55dvh] max-w-full object-contain"}
+              className={pixelView ? translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "en", "block max-w-none") : translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "en", "mx-auto block max-h-[55dvh] max-w-full object-contain")}
               style={pixelView && actualPixels ? { width: actualPixels.width, height: actualPixels.height } : undefined}
               />
           </div>
@@ -99,10 +103,10 @@ export function Studio2dScenePreview({ scene, disabled, onPick, onClose }: {
           </div>
         </div>
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line p-4">
-          <p className="text-xs text-fg-3">기존 패널 선택 범위에 삽입됩니다. 원본보다 크게 확대하면 흐려질 수 있습니다.</p>
+          <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "기존 패널 선택 범위에 삽입됩니다. 원본보다 크게 확대하면 흐려질 수 있습니다.")}</p>
           <button type="button" disabled={disabled || status !== "ready" || mismatch}
             onClick={() => { if (!disabled && status === "ready" && !mismatch) { onPick(scene); onClose(); } }}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">이 배경 삽입</button>
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{translateCurrentStaticSourceText("domains.creator.Studio2dScenePreview", "ko", "이 배경 삽입")}</button>
         </footer>
       </section>
     </div>, document.body,

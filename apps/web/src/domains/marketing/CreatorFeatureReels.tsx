@@ -1,4 +1,9 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Box,
   Brush,
@@ -203,7 +208,7 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
   const ActiveIcon = active.icon;
 
   return (
-    <section className={`creator-feature-reels${embedded ? " creator-feature-reels--embedded" : ""}`} aria-labelledby={embedded ? undefined : "creator-feature-reels-title"} lang={locale}>
+    <section className={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "en", "creator-feature-reels{v0}"), { v0: String(embedded ? " creator-feature-reels--embedded" : "") })} aria-labelledby={embedded ? undefined : translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "en", "creator-feature-reels-title")} lang={locale}>
       <div className="creator-feature-reels__shell">
         {!embedded ? (
           <header className="creator-feature-reels__heading">
@@ -260,7 +265,7 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
 
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={`${active.id}-copy`}
+                key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "en", "{v0}-copy"), { v0: String(active.id) })}
                 className="creator-feature-reels__copy"
                 initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -325,14 +330,14 @@ export function CreatorFeatureReels({ showFilm = true, embedded = false }: { rea
                 aria-label={copy.filmTitle}
               >
                 <source src="/brand/toonstudio-intro.mp4" type="video/mp4" />
-                <track kind="captions" src="/brand/toonstudio-intro.ko.vtt" srcLang="ko" label="한국어" default={locale === "ko"} />
-                <track kind="captions" src="/brand/toonstudio-intro.en.vtt" srcLang="en" label="English" default={locale === "en"} />
+                <track kind="captions" src="/brand/toonstudio-intro.ko.vtt" srcLang="ko" label={translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "ko", "한국어")} default={locale.split("-")[0] === "ko"} />
+                <track kind="captions" src="/brand/toonstudio-intro.en.vtt" srcLang="en" label={translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "en", "English")} default={locale.split("-")[0] !== "ko"} />
               </video>
             ) : (
               <button type="button" className="creator-feature-reels__poster" onClick={() => setFilmMounted(true)} aria-label={copy.filmPlay}>
                 <img src="/brand/toonstudio-film-poster.jpg" alt="" loading="lazy" decoding="async" />
                 <span><Play size={25} fill="currentColor" aria-hidden="true" /></span>
-                <small>REMOTION · 24 SEC · 30 FPS</small>
+                <small>{translateCurrentStaticSourceText("domains.marketing.CreatorFeatureReels", "en", "REMOTION · 24 SEC · 30 FPS")}</small>
               </button>
             )}
           </div>

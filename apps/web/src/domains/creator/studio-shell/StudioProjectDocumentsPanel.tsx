@@ -1,4 +1,10 @@
 import {
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Archive,
   Copy,
   FilePlus2,
@@ -282,7 +288,7 @@ export function StudioProjectDocumentsPanel({
     <section className="rounded-3xl border border-line bg-card p-4 shadow-sm sm:p-6" aria-labelledby="project-documents-title">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">PROJECT DOCUMENTS</p>
+          <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectDocumentsPanel", "en", "PROJECT DOCUMENTS")}</p>
           <h2 id="project-documents-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("문서와 작업공간", "Documents and workspaces")}
           </h2>

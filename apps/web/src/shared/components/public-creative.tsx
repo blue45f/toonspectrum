@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, BookOpen, Brush, Layers3, Search } from "lucide-react";
 
 import Link from "@/compat/router-link";
@@ -20,7 +26,7 @@ const JOURNEY = [
 
 /** Public-page navigation: every step opens an existing working product surface. */
 export function CreativeJourneyLinks({ locale = "ko", current, compact = false }: {
-  locale?: "ko" | "en";
+  locale?: string;
   current?: "research" | "learn" | "market" | "discover" | "community" | "about";
   compact?: boolean;
 }) {

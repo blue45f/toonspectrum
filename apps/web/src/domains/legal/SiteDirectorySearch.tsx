@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Heart, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -156,8 +162,8 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
   );
 
   return (
-    <section className="directory-search" aria-labelledby={`${id}-label`}>
-      <form role="search" aria-labelledby={`${id}-label`} onSubmit={(event) => {
+    <section className="directory-search" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-label"), { v0: String(id) })}>
+      <form role="search" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-label"), { v0: String(id) })} onSubmit={(event) => {
         event.preventDefault();
         resultRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
       }}>
@@ -184,7 +190,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
               aria-label={`${copy.favorites}: ${favorites.length}`}
               onClick={() => updateParam("saved", favoritesOnly ? "" : "1", "")}
             >
-              <Heart size={16} fill={favoritesOnly ? "currentColor" : "none"} aria-hidden="true" />{copy.favorites}
+              <Heart size={16} fill={favoritesOnly ? translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "currentColor") : translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "none")} aria-hidden="true" />{copy.favorites}
               <span>{favorites.length}</span>
             </button>
           </div>
@@ -220,7 +226,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
                 aria-pressed={favorite}
                 onClick={() => toggleFavorite(metadata.canonicalPath)}
               >
-                <Heart size={17} fill={favorite ? "currentColor" : "none"} aria-hidden="true" />
+                <Heart size={17} fill={favorite ? translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "currentColor") : translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "none")} aria-hidden="true" />
               </button>
             </li>;
           })}

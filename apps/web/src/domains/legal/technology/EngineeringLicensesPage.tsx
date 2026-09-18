@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   Boxes,
   CheckCircle2,
@@ -160,7 +165,7 @@ export function EngineeringLicensesPage() {
       />
 
       <section aria-labelledby="open-source-map-title">
-        <p className="eyebrow text-accent">OPEN-SOURCE ROLE MAP</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "OPEN-SOURCE ROLE MAP")}</p>
         <h2 id="open-source-map-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("사용한 기술과 소유하지 않는 역할을 함께 공개합니다.", "Document what each technology does—and what it does not own.")}
         </h2>
@@ -185,7 +190,7 @@ export function EngineeringLicensesPage() {
       </section>
 
       <section className="mt-16" aria-labelledby="rights-layers-title">
-        <p className="eyebrow text-accent">RIGHTS LAYERS</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "RIGHTS LAYERS")}</p>
         <h2 id="rights-layers-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("코드 라이선스 하나로 모든 권리를 판단하지 않습니다.", "One code license cannot answer every rights question.")}
         </h2>
@@ -214,7 +219,7 @@ export function EngineeringLicensesPage() {
       </section>
 
       <section className="mt-16" aria-labelledby="license-groups-title">
-        <p className="eyebrow text-accent">LICENSE FAMILIES</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "LICENSE FAMILIES")}</p>
         <h2 id="license-groups-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("종류별 기본 의무와 추가 확인 지점", "Baseline obligations and review points by license family")}
         </h2>
@@ -261,7 +266,7 @@ export function EngineeringLicensesPage() {
       <section className="mt-16 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]" aria-labelledby="license-pipeline-title">
         <div className="rounded-[2rem] border border-line/70 bg-panel/65 p-6 shadow-sm sm:p-8">
           <FileCheck2 size={23} className="text-accent" aria-hidden="true" />
-          <p className="mt-5 eyebrow text-accent">AUTOMATED + HUMAN REVIEW</p>
+          <p className="mt-5 eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "AUTOMATED + HUMAN REVIEW")}</p>
           <h2 id="license-pipeline-title" className="mt-3 text-2xl font-black tracking-tight text-fg">
             {bi("고지는 자동화하고, 판단은 검토 기록으로 남깁니다.", "Automate notices and record human judgment.")}
           </h2>
@@ -280,7 +285,7 @@ export function EngineeringLicensesPage() {
         <div className="space-y-4">
           <article className="rounded-[1.75rem] border border-line/70 bg-card/70 p-6">
             <FileText size={21} className="text-accent" aria-hidden="true" />
-            <h3 className="mt-4 text-lg font-black text-fg">THIRD_PARTY_NOTICES.generated.md</h3>
+            <h3 className="mt-4 text-lg font-black text-fg">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringLicensesPage", "en", "THIRD_PARTY_NOTICES.generated.md")}</h3>
             <p className="mt-3 text-sm leading-7 text-fg-2">
               {bi("빌드 후 배포물에 포함되는 제3자 코드 고지를 생성합니다. 생성 결과가 현재 의존성과 달라지면 audit가 실패해 고지 누락을 조기에 드러냅니다.", "The build generates third-party code notices for distribution. License audit exposes missing updates when the generated result diverges from current dependencies.")
               }

@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
 

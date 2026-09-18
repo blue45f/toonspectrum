@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Check, CheckCircle2, Circle, Compass, Flag, ListChecks } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -103,7 +107,7 @@ export function StudioWebtoonOnboardingPanel({
               <Compass size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">PROJECT ONBOARDING</p>
+              <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioWebtoonOnboardingPanel", "en", "PROJECT ONBOARDING")}</p>
               <h2 id="webtoon-project-onboarding-title" className="mt-1 break-words text-xl font-black text-fg sm:text-2xl">
                 {bt(plan.titleKo, plan.titleEn)}
               </h2>

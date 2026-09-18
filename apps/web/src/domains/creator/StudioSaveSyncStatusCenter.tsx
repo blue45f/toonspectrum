@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio save status: plain-language safety first, implementation diagnostics on demand.
  */
@@ -83,30 +87,29 @@ export function StudioSaveSyncStatusCenter({
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        aria-label={`저장 상태 열기: ${saveLabel}`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "저장 상태 열기: {v0}"), { v0: String(saveLabel) })}
         className="flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-card/90 px-2.5 py-1 text-[0.75rem] font-medium text-fg shadow-sm backdrop-blur transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent pointer-coarse:min-h-11"
       >
-        <StatusIcon className={`size-3.5 ${statusTone}`} aria-hidden />
+        <StatusIcon className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "en", "size-3.5 {v0}"), { v0: String(statusTone) })} aria-hidden />
         <span>{saveLabel}</span>
       </button>
 
       {open ? (
         <div
           role="dialog"
-          aria-label="저장 상태 상세"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "저장 상태 상세")}
           className="absolute right-0 top-full z-50 mt-1.5 w-[min(22rem,calc(100vw-1rem))] rounded-xl border border-line bg-card p-3.5 text-fg shadow-xl"
         >
           <div className="flex items-center justify-between border-b border-line/50 pb-2">
             <div>
-              <p className="font-semibold text-fg">저장 상태</p>
+              <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "저장 상태")}</p>
               <p className="mt-0.5 text-[0.72rem] text-fg-3">
-                내 작업이 어디까지 안전하게 보관됐는지 확인해요.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "내 작업이 어디까지 안전하게 보관됐는지 확인해요.")}</p>
             </div>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="저장 상태 닫기"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "저장 상태 닫기")}
               className="grid min-h-8 min-w-8 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
               <X className="size-4" aria-hidden />
@@ -118,11 +121,11 @@ export function StudioSaveSyncStatusCenter({
               <div className="flex items-start gap-2">
                 <HardDrive className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
                 <div>
-                  <p className="font-semibold text-fg">이 기기</p>
+                  <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "이 기기")}</p>
                   <p className="mt-0.5 leading-relaxed text-fg-3">
                     {status.localDurable
-                      ? "최근 작업을 이 기기에 안전하게 보관하고 있어요."
-                      : "이 기기에 복구 가능한 작업을 남기지 못하고 있어요. 이 화면을 닫기 전에 프로젝트를 내보내 주세요."}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "최근 작업을 이 기기에 안전하게 보관하고 있어요.")
+                      : translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "이 기기에 복구 가능한 작업을 남기지 못하고 있어요. 이 화면을 닫기 전에 프로젝트를 내보내 주세요.")}
                   </p>
                 </div>
               </div>
@@ -136,11 +139,11 @@ export function StudioSaveSyncStatusCenter({
                   <Cloud className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
                 )}
                 <div>
-                  <p className="font-semibold text-fg">서버</p>
+                  <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "서버")}</p>
                   <p className="mt-0.5 leading-relaxed text-fg-3">
                     {cloudStatusCopy(status.cloudSyncStatus)}
                     {status.pendingOperationsCount > 0
-                      ? ` 서버에 아직 반영되지 않은 변경 ${status.pendingOperationsCount}개가 있어요.`
+                      ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", " 서버에 아직 반영되지 않은 변경 {v0}개가 있어요."), { v0: String(status.pendingOperationsCount) })
                       : ""}
                   </p>
                 </div>
@@ -151,10 +154,9 @@ export function StudioSaveSyncStatusCenter({
               <div className="flex items-start gap-2">
                 <Clock className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
                 <div>
-                  <p className="font-semibold text-fg">복구</p>
+                  <p className="font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "복구")}</p>
                   <p className="mt-0.5 leading-relaxed text-fg-3">
-                    마지막 복구 지점은 {new Date(status.lastCheckpointAt).toLocaleTimeString()}에 만들어졌어요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "마지막 복구 지점은 ")}{new Date(status.lastCheckpointAt).toLocaleTimeString()}{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "에 만들어졌어요.")}</p>
                 </div>
               </div>
             </section>
@@ -168,30 +170,28 @@ export function StudioSaveSyncStatusCenter({
                 className="flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 text-[0.72rem] font-semibold text-fg-2 hover:bg-accent-soft hover:text-accent pointer-coarse:min-h-11"
               >
                 <RefreshCw className="size-3.5" aria-hidden />
-                <span>복구 지점 만들기</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "복구 지점 만들기")}</span>
               </button>
             ) : null}
           </div>
 
           <details className="mt-3 rounded-lg border border-line bg-panel/35">
             <summary className="cursor-pointer px-2.5 py-2 text-[0.72rem] font-semibold text-fg-2">
-              고급 진단 보기
-            </summary>
+              {translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "고급 진단 보기")}</summary>
             <div className="space-y-2 border-t border-line/60 px-2.5 py-2 text-[0.68rem] text-fg-3">
               <p className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5">
                   <Database className="size-3.5" aria-hidden />
-                  로컬 저장 방식
-                </span>
-                <span>{status.localDurable ? "OPFS" : "메모리 전용"}</span>
+                  {translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "로컬 저장 방식")}</span>
+                <span>{status.localDurable ? translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "en", "OPFS") : translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "메모리 전용")}</span>
               </p>
               <p className="flex items-center justify-between gap-3">
-                <span>최근 작업 번호</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "최근 작업 번호")}</span>
                 <span className="font-mono">#{journal.lastSequence}</span>
               </p>
               <p className="flex items-center justify-between gap-3">
-                <span>복구 지점 이후 변경</span>
-                <span>{status.pendingOperationsCount}개</span>
+                <span>{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "복구 지점 이후 변경")}</span>
+                <span>{status.pendingOperationsCount}{translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "개")}</span>
               </p>
               <button
                 type="button"
@@ -201,10 +201,10 @@ export function StudioSaveSyncStatusCenter({
                 <Copy className="size-3.5" aria-hidden />
                 <span aria-live="polite">
                   {diagnosticsCopyStatus === "copied"
-                    ? "진단 정보를 복사했어요"
+                    ? translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "진단 정보를 복사했어요")
                     : diagnosticsCopyStatus === "failed"
-                      ? "진단 정보를 복사하지 못했어요"
-                      : "진단 정보 복사"}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "진단 정보를 복사하지 못했어요")
+                      : translateCurrentStaticSourceText("domains.creator.StudioSaveSyncStatusCenter", "ko", "진단 정보 복사")}
                 </span>
               </button>
             </div>

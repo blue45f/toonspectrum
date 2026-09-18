@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Archive,
   ArrowLeft,
   BellOff,
@@ -145,7 +148,7 @@ function ThreadListItem({
         "group flex min-h-[76px] items-center gap-3 border-b border-line px-4 py-3 transition-colors last:border-b-0 hover:bg-raised/70",
         selected && "bg-accent-soft/70"
       )}
-      aria-current={selected ? "page" : undefined}
+      aria-current={selected ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "en", "page") : undefined}
     >
       <UserAvatar user={thread.otherUser} />
       <span className="min-w-0 flex-1">
@@ -153,10 +156,10 @@ function ThreadListItem({
           <strong className="truncate text-sm text-fg">{thread.otherUser.name}</strong>
           {thread.state === "pending" && (
             <span className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-[0.6875rem] font-semibold text-warn">
-              {thread.incomingRequest ? "요청" : "수락 대기"}
+              {thread.incomingRequest ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "요청") : translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "수락 대기")}
             </span>
           )}
-          {thread.blocked && <CircleSlash2 size={13} className="shrink-0 text-danger" aria-label="차단됨" />}
+          {thread.blocked && <CircleSlash2 size={13} className="shrink-0 text-danger" aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단됨")} />}
           <time className="ml-auto shrink-0 text-[0.6875rem] text-fg-3" dateTime={thread.lastMessageAt}>
             {formatTime(thread.lastMessageAt)}
           </time>
@@ -201,7 +204,7 @@ function MessageBubble({
             "mb-1 rounded-xl border border-line bg-panel px-3 py-2 text-left text-xs",
             message.mine ? "ml-auto" : "mr-auto"
           )}>
-            <p className="font-semibold text-fg">{message.type === "project_card" ? "프로젝트" : "작품"}</p>
+            <p className="font-semibold text-fg">{message.type === "project_card" ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "프로젝트") : translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "작품")}</p>
             {href ? (
               <Link href={href} className="mt-0.5 block truncate text-accent hover:underline">
                 {label}
@@ -221,13 +224,13 @@ function MessageBubble({
         </div>
         <div className={cn("mt-1 flex items-center gap-1.5 text-[0.6875rem] text-fg-3", message.mine ? "justify-end" : "justify-start")}>
           <time dateTime={message.createdAt}>{formatTime(message.createdAt)}</time>
-          {message.mine && message.readByOther && <span>읽음</span>}
+          {message.mine && message.readByOther && <span>{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "읽음")}</span>}
           {!message.mine && (
             <button
               type="button"
               onClick={() => onReport(message)}
               className="opacity-0 transition-opacity hover:text-danger focus:opacity-100 group-hover:opacity-100"
-              aria-label="메시지 신고"
+              aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지 신고")}
             >
               <Flag size={11} />
             </button>
@@ -313,10 +316,10 @@ function MessagingSettingsPanel({ onClose }: { onClose: () => void }) {
       <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between">
           <div>
-            <p className="eyebrow text-accent">MESSAGE SETTINGS</p>
-            <h2 className="mt-1 text-xl font-bold">메시지 설정</h2>
+            <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "en", "MESSAGE SETTINGS")}</p>
+            <h2 className="mt-1 text-xl font-bold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지 설정")}</h2>
           </div>
-          <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-xl hover:bg-raised" aria-label="설정 닫기">
+          <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-xl hover:bg-raised" aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "설정 닫기")}>
             <X size={18} />
           </button>
         </div>
@@ -328,28 +331,28 @@ function MessagingSettingsPanel({ onClose }: { onClose: () => void }) {
             {error && <p role="alert" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>}
             {preferences && (
               <section className="rounded-2xl border border-line bg-card p-5">
-                <h3 className="font-semibold">새 메시지 요청</h3>
-                <p className="mt-1 text-xs leading-relaxed text-fg-2">처음 연락하는 회원 중 누구의 요청을 받을지 정합니다.</p>
+                <h3 className="font-semibold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "새 메시지 요청")}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "처음 연락하는 회원 중 누구의 요청을 받을지 정합니다.")}</p>
                 <select
-                  aria-label="새 메시지 요청 수신 범위"
+                  aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "새 메시지 요청 수신 범위")}
                   value={preferences.receiveFrom}
                   onChange={(event) => void updatePreference({ receiveFrom: event.target.value as MessagingPreferences["receiveFrom"] })}
                   disabled={saving}
                   className="mt-4 h-11 w-full rounded-xl border border-line bg-bg px-3 text-sm outline-none focus:border-accent"
                 >
-                  <option value="everyone">모든 인증 회원</option>
-                  <option value="followers">나를 팔로우한 회원</option>
-                  <option value="mutuals">서로 팔로우한 회원</option>
-                  <option value="nobody">새 요청 받지 않기</option>
+                  <option value="everyone">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "모든 인증 회원")}</option>
+                  <option value="followers">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "나를 팔로우한 회원")}</option>
+                  <option value="mutuals">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "서로 팔로우한 회원")}</option>
+                  <option value="nobody">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "새 요청 받지 않기")}</option>
                 </select>
                 <label
                   htmlFor="message-read-receipt"
-                  aria-label="읽음 표시 공유"
+                  aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "읽음 표시 공유")}
                   className="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4"
                 >
                   <span>
-                    <span className="block text-sm font-medium">읽음 표시 공유</span>
-                    <span className="mt-0.5 block text-xs text-fg-2">내가 메시지를 읽었는지 상대에게 보여 줍니다.</span>
+                    <span className="block text-sm font-medium">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "읽음 표시 공유")}</span>
+                    <span className="mt-0.5 block text-xs text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "내가 메시지를 읽었는지 상대에게 보여 줍니다.")}</span>
                   </span>
                   <input
                     id="message-read-receipt"
@@ -364,10 +367,10 @@ function MessagingSettingsPanel({ onClose }: { onClose: () => void }) {
             )}
 
             <section className="rounded-2xl border border-line bg-card p-5">
-              <h3 className="font-semibold">차단한 회원</h3>
-              <p className="mt-1 text-xs text-fg-2">차단한 회원과는 새 요청이나 메시지를 주고받을 수 없습니다.</p>
+              <h3 className="font-semibold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단한 회원")}</h3>
+              <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단한 회원과는 새 요청이나 메시지를 주고받을 수 없습니다.")}</p>
               {blocks.length === 0 ? (
-                <p className="mt-4 rounded-xl bg-panel px-4 py-5 text-center text-sm text-fg-2">차단한 회원이 없습니다.</p>
+                <p className="mt-4 rounded-xl bg-panel px-4 py-5 text-center text-sm text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단한 회원이 없습니다.")}</p>
               ) : (
                 <ul className="mt-4 divide-y divide-line">
                   {blocks.map((item) => (
@@ -379,8 +382,7 @@ function MessagingSettingsPanel({ onClose }: { onClose: () => void }) {
                         onClick={() => void unblock(item.user.id)}
                         className={buttonClass({ size: "sm", variant: "outline" })}
                       >
-                        차단 해제
-                      </button>
+                        {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단 해제")}</button>
                     </li>
                   ))}
                 </ul>
@@ -694,7 +696,7 @@ export function MessagesPage() {
       <div data-route-pending="" role="status" className="grid min-h-[55vh] place-items-center px-6 text-center">
         <div>
           <LoaderCircle className="mx-auto animate-spin text-accent" aria-hidden="true" />
-          <p className="mt-3 text-sm text-fg-2">로그인 상태를 확인하고 있어요.</p>
+          <p className="mt-3 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "로그인 상태를 확인하고 있어요.")}</p>
         </div>
       </div>
     );
@@ -705,9 +707,9 @@ export function MessagesPage() {
       <Container size="prose" className="py-16 sm:py-24">
         <div role="alert" className="rounded-3xl border border-warn/35 bg-card p-8 text-center shadow-sm sm:p-12">
           <Mail size={36} className="mx-auto text-warn" aria-hidden="true" />
-          <h1 className="mt-4 text-2xl font-bold">메시지</h1>
-          <p className="mt-2 text-sm leading-relaxed text-fg-2">로그인 상태를 확인하지 못했어요. 현재 주소는 유지되며 연결이 돌아오면 다시 확인할 수 있습니다.</p>
-          <button type="button" onClick={() => window.location.reload()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}>다시 확인</button>
+          <h1 className="mt-4 text-2xl font-bold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지")}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "로그인 상태를 확인하지 못했어요. 현재 주소는 유지되며 연결이 돌아오면 다시 확인할 수 있습니다.")}</p>
+          <button type="button" onClick={() => window.location.reload()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-5" })}>{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "다시 확인")}</button>
         </div>
       </Container>
     );
@@ -718,8 +720,8 @@ export function MessagesPage() {
       <Container size="prose" className="py-16 sm:py-24">
         <div className="rounded-3xl border border-line bg-card p-8 text-center shadow-sm sm:p-12">
           <Mail size={36} className="mx-auto text-accent" />
-          <h1 className="mt-4 text-2xl font-bold">로그인 후 메시지를 확인할 수 있어요.</h1>
-          <p className="mt-2 text-sm leading-relaxed text-fg-2">상단의 로그인 버튼으로 로그인한 뒤 다시 열어 주세요.</p>
+          <h1 className="mt-4 text-2xl font-bold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "로그인 후 메시지를 확인할 수 있어요.")}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "상단의 로그인 버튼으로 로그인한 뒤 다시 열어 주세요.")}</p>
         </div>
       </Container>
     );
@@ -729,9 +731,9 @@ export function MessagesPage() {
     <Container size="wide" className="py-5 sm:py-8">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow text-accent">PRIVATE MESSAGES</p>
-          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">메시지</h1>
-          <p className="mt-1 text-sm text-fg-2">작품 피드백과 협업 제안을 안전하게 주고받으세요.</p>
+          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "en", "PRIVATE MESSAGES")}</p>
+          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지")}</h1>
+          <p className="mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "작품 피드백과 협업 제안을 안전하게 주고받으세요.")}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -739,23 +741,21 @@ export function MessagesPage() {
             onClick={() => void Promise.all([refreshThreads(), refreshDetail()])}
             className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
           >
-            <RefreshCw size={14} className={(listLoading || detailLoading) ? "animate-spin" : ""} />
-            새로고침
-          </button>
+            <RefreshCw size={14} className={(listLoading || detailLoading) ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "en", "animate-spin") : ""} />
+            {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "새로고침")}</button>
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
             className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
           >
             <Settings2 size={14} />
-            설정
-          </button>
+            {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "설정")}</button>
         </div>
       </div>
 
       <div className="relative min-h-[620px] overflow-hidden rounded-3xl border border-line bg-panel shadow-sm lg:grid lg:grid-cols-[22rem_minmax(0,1fr)]">
         <aside className={cn("border-r border-line bg-card", showMobileList ? "block" : "hidden lg:block")}>
-          <div role="tablist" aria-label="메시지함" className="grid grid-cols-3 border-b border-line p-2">
+          <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지함")} className="grid grid-cols-3 border-b border-line p-2">
             {TAB_OPTIONS.map((option) => {
               const Icon = option.icon;
               const active = option.value === tab;
@@ -803,8 +803,8 @@ export function MessagesPage() {
             <div className="grid min-h-[620px] place-items-center p-8 text-center">
               <div>
                 <MessageSquareText size={38} className="mx-auto text-fg-3" />
-                <h2 className="mt-4 text-lg font-semibold">대화를 선택해 주세요.</h2>
-                <p className="mt-1 text-sm text-fg-2">메시지 요청은 수락하기 전까지 추가 메시지가 오지 않습니다.</p>
+                <h2 className="mt-4 text-lg font-semibold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "대화를 선택해 주세요.")}</h2>
+                <p className="mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지 요청은 수락하기 전까지 추가 메시지가 오지 않습니다.")}</p>
               </div>
             </div>
           ) : detailLoading ? (
@@ -814,13 +814,13 @@ export function MessagesPage() {
               <div>
                 <ShieldAlert size={34} className="mx-auto text-danger" />
                 <p className="mt-3 text-sm text-danger">{detailError}</p>
-                <button type="button" onClick={() => void refreshDetail()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}>다시 시도</button>
+                <button type="button" onClick={() => void refreshDetail()} className={buttonClass({ size: "sm", variant: "outline", className: "mt-4" })}>{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "다시 시도")}</button>
               </div>
             </div>
           ) : detail && selectedThread ? (
             <div className="flex min-h-[620px] flex-col">
               <header className="flex min-h-16 items-center gap-3 border-b border-line bg-card px-3 py-2 sm:px-5">
-                <Link href="/messages" className="grid size-9 shrink-0 place-items-center rounded-xl hover:bg-raised lg:hidden" aria-label="대화 목록으로">
+                <Link href="/messages" className="grid size-9 shrink-0 place-items-center rounded-xl hover:bg-raised lg:hidden" aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "대화 목록으로")}>
                   <ArrowLeft size={17} />
                 </Link>
                 <UserAvatar user={selectedThread.otherUser} />
@@ -833,19 +833,19 @@ export function MessagesPage() {
                     {selectedThread.context.label ? ` · ${selectedThread.context.label}` : ""}
                   </p>
                 </div>
-                <button type="button" onClick={() => void toggleMute()} disabled={Boolean(busy)} className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label={selectedThread.mutedUntil ? "알림 켜기" : "8시간 알림 끄기"}>
+                <button type="button" onClick={() => void toggleMute()} disabled={Boolean(busy)} className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label={selectedThread.mutedUntil ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "알림 켜기") : translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "8시간 알림 끄기")}>
                   {selectedThread.mutedUntil ? <VolumeX size={17} /> : <Volume2 size={17} />}
                 </button>
-                <button type="button" onClick={() => void toggleArchive()} disabled={Boolean(busy)} className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label={selectedThread.archivedAt ? "보관 해제" : "대화 보관"}>
+                <button type="button" onClick={() => void toggleArchive()} disabled={Boolean(busy)} className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label={selectedThread.archivedAt ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "보관 해제") : translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "대화 보관")}>
                   <Archive size={17} />
                 </button>
                 <div className="relative group/actions">
-                  <button type="button" className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label="대화 메뉴">
+                  <button type="button" className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "대화 메뉴")}>
                     <MoreHorizontal size={18} />
                   </button>
                   <div className="invisible absolute right-0 top-9 z-10 w-36 translate-y-1 rounded-xl border border-line bg-card p-1 opacity-0 shadow-lg transition group-focus-within/actions:visible group-focus-within/actions:translate-y-0 group-focus-within/actions:opacity-100 group-hover/actions:visible group-hover/actions:translate-y-0 group-hover/actions:opacity-100">
                     <button type="button" onClick={() => void blockOtherUser()} disabled={selectedThread.blocked || Boolean(busy)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-danger hover:bg-danger-soft disabled:opacity-50">
-                      <CircleSlash2 size={14} />{selectedThread.blocked ? "차단됨" : "회원 차단"}
+                      <CircleSlash2 size={14} />{selectedThread.blocked ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단됨") : translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "회원 차단")}
                     </button>
                   </div>
                 </div>
@@ -857,21 +857,19 @@ export function MessagesPage() {
 
               {selectedThread.incomingRequest && (
                 <section className="border-b border-line bg-warn-soft/60 px-4 py-4 sm:px-6">
-                  <p className="text-sm font-semibold">{selectedThread.otherUser.name} 님의 메시지 요청입니다.</p>
-                  <p className="mt-1 text-xs text-fg-2">수락한 뒤에만 서로 추가 메시지를 보낼 수 있습니다.</p>
+                  <p className="text-sm font-semibold">{selectedThread.otherUser.name} {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "님의 메시지 요청입니다.")}</p>
+                  <p className="mt-1 text-xs text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "수락한 뒤에만 서로 추가 메시지를 보낼 수 있습니다.")}</p>
                   <div className="mt-3 flex gap-2">
                     <button type="button" onClick={() => void acceptRequest()} disabled={Boolean(busy)} className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}>
-                      <Check size={14} /> 수락
-                    </button>
-                    <button type="button" onClick={() => void declineRequest()} disabled={Boolean(busy)} className={buttonClass({ size: "sm", variant: "outline" })}>거절</button>
+                      <Check size={14} /> {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "수락")}</button>
+                    <button type="button" onClick={() => void declineRequest()} disabled={Boolean(busy)} className={buttonClass({ size: "sm", variant: "outline" })}>{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "거절")}</button>
                   </div>
                 </section>
               )}
 
               {selectedThread.blocked && (
                 <div className="flex items-center gap-2 border-b border-danger/20 bg-danger-soft px-4 py-2 text-xs text-danger">
-                  <BellOff size={14} /> 차단 관계에서는 새 메시지를 보낼 수 없습니다.
-                </div>
+                  <BellOff size={14} /> {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단 관계에서는 새 메시지를 보낼 수 없습니다.")}</div>
               )}
 
               <div
@@ -895,8 +893,7 @@ export function MessagesPage() {
                       ) : (
                         <RefreshCw size={14} />
                       )}
-                      이전 메시지 불러오기
-                    </button>
+                      {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "이전 메시지 불러오기")}</button>
                   </div>
                 ) : null}
                 {messages.map((message) => (
@@ -911,20 +908,20 @@ export function MessagesPage() {
                     onChange={(event) => setText(event.target.value.slice(0, 2_000))}
                     disabled={!selectedThread.canReply || Boolean(busy)}
                     rows={2}
-                    placeholder={selectedThread.state === "pending" ? "요청이 수락되면 답장할 수 있어요." : selectedThread.blocked ? "차단 관계에서는 메시지를 보낼 수 없어요." : "메시지를 입력하세요."}
+                    placeholder={selectedThread.state === "pending" ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "요청이 수락되면 답장할 수 있어요.") : selectedThread.blocked ? translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "차단 관계에서는 메시지를 보낼 수 없어요.") : translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지를 입력하세요.")}
                     className="min-h-11 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-fg-3 disabled:cursor-not-allowed"
                   />
                   <button
                     type="submit"
                     disabled={!selectedThread.canReply || !text.trim() || Boolean(busy)}
                     className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-on-accent transition hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-40"
-                    aria-label="메시지 보내기"
+                    aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지 보내기")}
                   >
                     {busy === "send" ? <LoaderCircle size={17} className="animate-spin" /> : <Send size={17} />}
                   </button>
                 </div>
                 <div className="mt-1.5 flex justify-between px-1 text-[0.6875rem] text-fg-3">
-                  <span>외부 링크를 열기 전 주소를 확인하세요.</span>
+                  <span>{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "외부 링크를 열기 전 주소를 확인하세요.")}</span>
                   <span>{text.length.toLocaleString("ko-KR")}/2,000</span>
                 </div>
               </form>
@@ -941,25 +938,23 @@ export function MessagesPage() {
         }}>
           <form onSubmit={submitReport} className="w-full max-w-md rounded-2xl border border-line bg-card p-5 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="message-report-title">
             <div className="flex items-center justify-between">
-              <h2 id="message-report-title" className="text-lg font-bold">메시지 신고</h2>
-              <button type="button" onClick={() => setReportTarget(null)} className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label="신고 창 닫기"><X size={17} /></button>
+              <h2 id="message-report-title" className="text-lg font-bold">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "메시지 신고")}</h2>
+              <button type="button" onClick={() => setReportTarget(null)} className="grid size-9 place-items-center rounded-xl hover:bg-raised" aria-label={translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "신고 창 닫기")}><X size={17} /></button>
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-fg-2">신고한 메시지와 주변 대화가 운영 검토용 증거로 안전하게 보관됩니다.</p>
+            <p className="mt-2 text-xs leading-relaxed text-fg-2">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "신고한 메시지와 주변 대화가 운영 검토용 증거로 안전하게 보관됩니다.")}</p>
             <label className="mt-4 block text-sm font-medium">
-              신고 사유
-              <select value={reportReason} onChange={(event) => setReportReason(event.target.value as MessagingReportReason)} className="mt-2 h-11 w-full rounded-xl border border-line bg-bg px-3 text-sm outline-none focus:border-accent">
+              {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "신고 사유")}<select value={reportReason} onChange={(event) => setReportReason(event.target.value as MessagingReportReason)} className="mt-2 h-11 w-full rounded-xl border border-line bg-bg px-3 text-sm outline-none focus:border-accent">
                 {REPORT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
             <label className="mt-4 block text-sm font-medium">
-              상세 내용 <span className="font-normal text-fg-3">(선택)</span>
+              {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "상세 내용 ")}<span className="font-normal text-fg-3">{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "(선택)")}</span>
               <textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value.slice(0, 1_000))} rows={4} className="mt-2 w-full resize-none rounded-xl border border-line bg-bg px-3 py-2 text-sm outline-none focus:border-accent" />
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setReportTarget(null)} className={buttonClass({ size: "sm", variant: "outline" })}>취소</button>
+              <button type="button" onClick={() => setReportTarget(null)} className={buttonClass({ size: "sm", variant: "outline" })}>{translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "취소")}</button>
               <button type="submit" disabled={busy === "report"} className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}>
-                {busy === "report" ? <LoaderCircle size={14} className="animate-spin" /> : <Flag size={14} />} 신고 접수
-              </button>
+                {busy === "report" ? <LoaderCircle size={14} className="animate-spin" /> : <Flag size={14} />} {translateCurrentStaticSourceText("domains.messages.MessagesPage", "ko", "신고 접수")}</button>
             </div>
           </form>
         </div>

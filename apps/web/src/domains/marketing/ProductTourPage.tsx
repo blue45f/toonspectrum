@@ -1,3 +1,9 @@
+import {
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonspectrum/core";
 import {
   ArrowLeft,
@@ -102,7 +108,7 @@ export function ProductTourPage() {
         </div>
         <div className="product-tour-page__hero-visual">
           <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" fetchPriority="high" />
-          <span>LONG-FORM REMOTION TOUR · 08:24</span>
+          <span>{translateCurrentStaticSourceText("domains.marketing.ProductTourPage", "en", "LONG-FORM REMOTION TOUR · 08:24")}</span>
         </div>
         <dl className="product-tour-page__facts" aria-label={bi("제품 투어 정보", "Product tour facts")}>
           {copy.facts.map(([label, value]) => (
@@ -202,7 +208,7 @@ export function ProductTourPage() {
 
       <section className="product-tour-page__closing" aria-labelledby="product-tour-closing-title">
         <div>
-          <p className="ch-eyebrow">CREATE YOUR NEXT STORY</p>
+          <p className="ch-eyebrow">{translateCurrentStaticSourceText("domains.marketing.ProductTourPage", "en", "CREATE YOUR NEXT STORY")}</p>
           <h2 id="product-tour-closing-title">{copy.closingTitle}</h2>
           <p>{copy.closingBody}</p>
         </div>

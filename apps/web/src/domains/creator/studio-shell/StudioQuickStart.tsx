@@ -1,3 +1,7 @@
+import {
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, PanelsTopLeft, PencilLine, Plus, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -59,7 +63,7 @@ export function StudioQuickStart({ locale: _locale }: { readonly locale: "ko" | 
         title: bi(item.titleKo, item.titleEn),
         kind: item.kind,
         templateId: item.templateId,
-        primaryLocale: locale === "ko" ? "ko-KR" : "en-US",
+        primaryLocale: getCurrentUiLocale(),
         document: {
           kind: plan.document.kind,
           defaultWorkspace: plan.document.workspace,
@@ -93,9 +97,7 @@ export function StudioQuickStart({ locale: _locale }: { readonly locale: "ko" | 
             {bi("바로 시작하기", "Start right away")}
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "웹툰은 컷·말풍선 중심 작업공간으로, 그림은 브러시·레이어 중심 작업공간으로 바로 엽니다."
-              : "Webtoons open panel-and-balloon first; drawings open brush-and-layer first."}
+            {translateBilingualValueForLocale(locale, "domains.creator.studio.shell.StudioQuickStart", "웹툰은 컷·말풍선 중심 작업공간으로, 그림은 브러시·레이어 중심 작업공간으로 바로 엽니다.", "Webtoons open panel-and-balloon first; drawings open brush-and-layer first.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

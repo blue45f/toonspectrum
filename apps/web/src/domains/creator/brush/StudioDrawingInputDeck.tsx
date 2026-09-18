@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Activity, BookMarked } from "lucide-react";
 import {
   Suspense,
@@ -97,8 +100,8 @@ export function StudioDrawingInputDeck(
           type="button"
           aria-controls="studio-drawing-input-deck"
           aria-expanded={open}
-          aria-label="펜 입력 센터 열기"
-          title="펜 입력 센터 · 장치 진단과 작업별 보정 프로필"
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "펜 입력 센터 열기")}
+          title={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "펜 입력 센터 · 장치 진단과 작업별 보정 프로필")}
           data-studio-drawing-input-deck-trigger="true"
           onClick={() => {
             setProfileLibraryOpen(false);
@@ -113,15 +116,15 @@ export function StudioDrawingInputDeck(
           )}
         >
           <Activity size={15} aria-hidden="true" />
-          <span className={props.mobile ? "sr-only" : undefined}>입력</span>
+          <span className={props.mobile ? translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "en", "sr-only") : undefined}>{translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "입력")}</span>
         </button>
         <button
           ref={profileTriggerRef}
           type="button"
           aria-controls="studio-drawing-input-profile-library"
           aria-expanded={profileLibraryOpen}
-          aria-label="내 입력 프로필 열기"
-          title="내 입력 프로필 · 현재 입력감을 저장하고 다시 적용"
+          aria-label={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "내 입력 프로필 열기")}
+          title={translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "내 입력 프로필 · 현재 입력감을 저장하고 다시 적용")}
           data-studio-drawing-input-profile-library-trigger="true"
           onClick={() => {
             setOpen(false);
@@ -147,8 +150,7 @@ export function StudioDrawingInputDeck(
               className="fixed bottom-[calc(8rem+env(safe-area-inset-bottom))] z-[73] w-[min(24rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-card/95 p-4 text-xs font-semibold text-fg-3 shadow-2xl backdrop-blur-xl"
               style={{ right }}
             >
-              펜 입력 센터를 불러오는 중…
-            </div>
+              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "펜 입력 센터를 불러오는 중…")}</div>
           }
         >
           <StudioDrawingInputDeckPanel {...props} onClose={close} />
@@ -162,8 +164,7 @@ export function StudioDrawingInputDeck(
               className="fixed bottom-[calc(8rem+env(safe-area-inset-bottom))] z-[73] w-[min(23rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-card/95 p-4 text-xs font-semibold text-fg-3 shadow-2xl backdrop-blur-xl"
               style={{ right }}
             >
-              내 입력 프로필을 불러오는 중…
-            </div>
+              {translateCurrentStaticSourceText("domains.creator.brush.StudioDrawingInputDeck", "ko", "내 입력 프로필을 불러오는 중…")}</div>
           }
         >
           <StudioDrawingInputProfileLibraryPanel {...props} onClose={closeProfileLibrary} />

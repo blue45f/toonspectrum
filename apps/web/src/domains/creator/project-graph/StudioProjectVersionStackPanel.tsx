@@ -1,4 +1,11 @@
 import {
+  formatI18nTemplate,
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   CheckCircle2,
   GitCompareArrows,
   History,
@@ -35,7 +42,7 @@ import {
 
 type Locale = string;
 
-const KIND_LABELS: Readonly<Record<StudioRevisionRecord["kind"], Readonly<Record<Locale, string>>>> = {
+const KIND_LABELS: Readonly<Record<StudioRevisionRecord["kind"], Readonly<Record<AuthoredLocale, string>>>> = {
   autosave: { ko: "자동 저장", en: "Autosave" },
   checkpoint: { ko: "체크포인트", en: "Checkpoint" },
   submission: { ko: "검수 제출본", en: "Submission" },
@@ -194,8 +201,7 @@ export function StudioProjectVersionStackPanel({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
-            VERSION STACK
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.project.graph.StudioProjectVersionStackPanel", "en", "VERSION STACK")}</p>
           <h2 id="studio-version-stack-title" className="mt-2 text-2xl font-black tracking-tight text-fg">
             {bt("작업본·검수본·승인본·게시본", "Working, review, approved and release versions")}
           </h2>
@@ -277,7 +283,7 @@ export function StudioProjectVersionStackPanel({
 
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    href={`/studio/work/${encodeURIComponent(projectId)}/versions?artifact=${encodeURIComponent(artifact.id)}&revision=${encodeURIComponent(revision.id)}`}
+                    href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.project.graph.StudioProjectVersionStackPanel", "en", "/studio/work/{v0}/versions?artifact={v1}&revision={v2}"), { v0: String(encodeURIComponent(projectId)), v1: String(encodeURIComponent(artifact.id)), v2: String(encodeURIComponent(revision.id)) })}
                     className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5" })}
                   >
                     <GitCompareArrows size={14} aria-hidden="true" />

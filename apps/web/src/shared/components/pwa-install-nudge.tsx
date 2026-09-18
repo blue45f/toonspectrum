@@ -1,3 +1,8 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Download, X } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { useLocation } from "react-router-dom";
@@ -69,7 +74,7 @@ export function PwaInstallNudge() {
       aria-describedby="pwa-install-nudge-description"
       className="pwa-install-nudge"
       data-pwa-install-nudge="true"
-      data-surface={pathname === "/" ? "home" : "route"}
+      data-surface={pathname === "/" ? translateCurrentStaticSourceText("shared.components.pwa.install.nudge", "en", "home") : translateCurrentStaticSourceText("shared.components.pwa.install.nudge", "en", "route")}
     >
       <div className="pwa-install-nudge__body">
         <span className="pwa-install-nudge__icon" aria-hidden="true">

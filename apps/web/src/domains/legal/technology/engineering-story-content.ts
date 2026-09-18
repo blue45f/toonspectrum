@@ -1,4 +1,7 @@
 import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ENGINEERING_DEEP_DIVE_CHAPTERS,
   ENGINEERING_DEEP_DIVE_GUIDES,
 } from "./engineering-story-deep-dive-content";
@@ -9,7 +12,7 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("engineering-story-content", ko, en);
 
-export type EngineeringLocale = "ko" | "en";
+export type EngineeringLocale = string;
 
 export interface LocalizedText {
   readonly ko: string;

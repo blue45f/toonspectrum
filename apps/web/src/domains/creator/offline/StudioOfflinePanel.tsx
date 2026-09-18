@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -165,7 +169,7 @@ export function StudioOfflinePanel() {
       <details
         className="rounded-xl border border-line bg-panel p-3 text-xs text-fg shadow-lg"
         data-studio-offline-panel="true"
-        data-studio-local-only={connectivity.localOnly ? "true" : "false"}
+        data-studio-local-only={connectivity.localOnly ? translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "en", "true") : translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "en", "false")}
       >
         <summary className="min-h-9 cursor-pointer content-center font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
           {summary}
@@ -173,19 +177,19 @@ export function StudioOfflinePanel() {
         <div className="mt-2 max-h-[60dvh] space-y-3 overflow-y-auto overscroll-contain leading-relaxed">
           <p>
             {connectivity.localOnly
-              ? "드로잉·레이어 편집·로컬 자동 저장·파일 내보내기는 이 화면에서 계속 사용할 수 있습니다. 서버 원고 불러오기·클라우드 저장·협업·게시·서버 AI는 연결 복구 전 일시 중지됩니다."
-              : "스튜디오 전체 기능을 사용 중입니다. 연결이 끊기거나 서버가 응답하지 않으면 같은 화면에서 로컬 저장 가능한 기능만 자동으로 유지합니다."}
+              ? translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "드로잉·레이어 편집·로컬 자동 저장·파일 내보내기는 이 화면에서 계속 사용할 수 있습니다. 서버 원고 불러오기·클라우드 저장·협업·게시·서버 AI는 연결 복구 전 일시 중지됩니다.")
+              : translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "스튜디오 전체 기능을 사용 중입니다. 연결이 끊기거나 서버가 응답하지 않으면 같은 화면에서 로컬 저장 가능한 기능만 자동으로 유지합니다.")}
           </p>
           {device?.navigationFallback ? (
-            <p>서버 응답 대신 이 기기에 저장된 스튜디오 화면으로 열었습니다. 원고의 로컬 저장 완료 여부는 저장센터에서 확인해 주세요.</p>
+            <p>{translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "서버 응답 대신 이 기기에 저장된 스튜디오 화면으로 열었습니다. 원고의 로컬 저장 완료 여부는 저장센터에서 확인해 주세요.")}</p>
           ) : null}
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
           <p className="text-fg-2">
-            {device?.persisted === true ? "지속 저장 허용" : "프로젝트 파일 백업 권장"}
-            {storagePercent !== null ? ` · 저장 공간 약 ${storagePercent}% 사용` : ""}
+            {device?.persisted === true ? translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "지속 저장 허용") : translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "프로젝트 파일 백업 권장")}
+            {storagePercent !== null ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", " · 저장 공간 약 {v0}% 사용"), { v0: String(storagePercent) }) : ""}
           </p>
           {storagePercent !== null && storagePercent >= 90 ? (
-            <p role="alert">저장 공간이 부족합니다. 원고를 파일로 백업하고 저장센터 상태를 확인해 주세요.</p>
+            <p role="alert">{translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "저장 공간이 부족합니다. 원고를 파일로 백업하고 저장센터 상태를 확인해 주세요.")}</p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <button
@@ -195,7 +199,7 @@ export function StudioOfflinePanel() {
               className="min-h-11 rounded-lg border border-line px-3 font-semibold disabled:opacity-50"
               aria-busy={busy}
             >
-              {busy ? "확인 중…" : ready ? "오프라인 준비 다시 확인" : "오프라인 준비 다시 시도"}
+              {busy ? translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "확인 중…") : ready ? translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "오프라인 준비 다시 확인") : translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "오프라인 준비 다시 시도")}
             </button>
             <button
               type="button"
@@ -203,18 +207,16 @@ export function StudioOfflinePanel() {
               disabled={busy || !device?.supported}
               className="min-h-11 rounded-lg border border-line px-3 disabled:opacity-50"
             >
-              지속 저장 요청
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "지속 저장 요청")}</button>
           </div>
           {dataSaverEnabled() && !ready ? (
-            <p>데이터 절약 모드가 켜져 있어 대용량 자동 준비를 건너뛰었습니다. 필요할 때 위 버튼으로 직접 준비할 수 있습니다.</p>
+            <p>{translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "데이터 절약 모드가 켜져 있어 대용량 자동 준비를 건너뛰었습니다. 필요할 때 위 버튼으로 직접 준비할 수 있습니다.")}</p>
           ) : null}
           {device && !device.controlled ? (
-            <p>온라인에서 스튜디오를 한 번 연 뒤 서비스 워커가 활성화되면 자동 준비를 시작합니다. 편집과 로컬 저장은 지원 범위에서 계속 사용할 수 있습니다.</p>
+            <p>{translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "온라인에서 스튜디오를 한 번 연 뒤 서비스 워커가 활성화되면 자동 준비를 시작합니다. 편집과 로컬 저장은 지원 범위에서 계속 사용할 수 있습니다.")}</p>
           ) : null}
           <p className="text-fg-2">
-            오프라인 리소스 캐시는 원고 저장과 별개입니다. 원고는 OPFS·SQLite 로컬 저장소에 보관되고, 서버 반영 여부는 저장센터에서 확인합니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.offline.StudioOfflinePanel", "ko", "오프라인 리소스 캐시는 원고 저장과 별개입니다. 원고는 OPFS·SQLite 로컬 저장소에 보관되고, 서버 반영 여부는 저장센터에서 확인합니다.")}</p>
         </div>
       </details>
     </aside>

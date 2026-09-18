@@ -1,4 +1,10 @@
 import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   CheckCircle2,
   Code2,
@@ -61,7 +67,7 @@ export function EngineeringStoryPage() {
       <EngineeringStoryNav className="mt-3" />
 
       <EngineeringPageIntro
-        eyebrow={`ENGINEERING STORY · ${ENGINEERING_CHAPTERS.length} CHAPTERS`}
+        eyebrow={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.technology.EngineeringStoryPage", "en", "ENGINEERING STORY · {v0} CHAPTERS"), { v0: String(ENGINEERING_CHAPTERS.length) })}
         title={
           bi("기술 이름이 아니라, 문제와 판단의 순서로 설명합니다.", "The story follows problems and decisions, not a list of technology names.")
         }

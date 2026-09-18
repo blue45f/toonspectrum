@@ -1,3 +1,7 @@
+import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 

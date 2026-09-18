@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -39,7 +42,7 @@ function eventState(value: unknown, projectId: string): StudioProjectFeatureSuit
 /** One UI controller for storyboard, quality, 3D, voice, template, analytics and automation state. */
 export function useStudioProjectFeatureSuite(
   projectId: string,
-  locale: "ko" | "en",
+  locale: string,
 ): StudioProjectFeatureSuiteController {
   useBilingualI18nRevision();
   const [state, setState] = useState<StudioProjectFeatureSuiteState | null>(null);

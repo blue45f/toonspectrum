@@ -1,4 +1,7 @@
 import {
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   normalizeStudioSearchText,
   studioSearchTextMatches,
   tokenizeStudioSearchQuery,
@@ -12,8 +15,7 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("studio-help-knowledge", ko, en);
 
-export type StudioHelpLocale = "ko" | "en";
-export type StudioHelpCategory =
+export type StudioHelpLocale = string;export type StudioHelpCategory =
   | "start"
   | "draw"
   | "compose"

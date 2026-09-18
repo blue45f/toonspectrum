@@ -1,4 +1,10 @@
 import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   CircleHelp,
   FolderOpen,
@@ -162,15 +168,14 @@ export function SitemapPage() {
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">01 · START HERE</p>
+            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "01 · START HERE")}</p>
             <h2 id="sitemap-core-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
               {copy.core}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-3">{copy.coreDescription}</p>
           </div>
           <span className="hidden font-display text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-fg-3 sm:block">
-            Create · Learn · Discover · Connect
-          </span>
+            {translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "Create · Learn · Discover · Connect")}</span>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -178,14 +183,14 @@ export function SitemapPage() {
             <section
               key={group.id}
               className="rounded-3xl border border-line/70 bg-panel/45 p-4 shadow-sm sm:p-5"
-              aria-labelledby={`sitemap-${group.id}`}
+              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-{v0}"), { v0: String(group.id) })}
             >
               <div className="flex items-start gap-3 px-1 pb-4 sm:px-2">
                 <span aria-hidden="true" className="pt-0.5 font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
                   {String(groupIndex + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h3 id={`sitemap-${group.id}`} className="font-display text-lg font-bold text-fg">
+                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-{v0}"), { v0: String(group.id) })} className="font-display text-lg font-bold text-fg">
                     {siteNavigationText(group.label, locale)}
                   </h3>
                   <p className="mt-1 text-sm leading-6 text-fg-3">
@@ -258,7 +263,7 @@ export function SitemapPage() {
 
       <section className="mt-12 border-t border-line/70 pt-12 sm:mt-16 sm:pt-16" aria-labelledby="sitemap-extended-title">
         <div>
-          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">02 · COMPLETE DIRECTORY</p>
+          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "02 · COMPLETE DIRECTORY")}</p>
           <h2 id="sitemap-extended-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
             {copy.extended}
           </h2>
@@ -272,14 +277,14 @@ export function SitemapPage() {
               <section
                 key={group.id}
                 className="rounded-3xl border border-line/70 bg-panel/35 p-4 sm:p-5"
-                aria-labelledby={`sitemap-extended-${group.id}`}
+                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-extended-{v0}"), { v0: String(group.id) })}
               >
                 <div className="flex items-start gap-3 px-1 pb-4 sm:px-2">
                   <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3">
                     <GroupIcon size={17} aria-hidden="true" />
                   </span>
                   <div>
-                    <h3 id={`sitemap-extended-${group.id}`} className="font-display text-base font-bold text-fg">
+                    <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-extended-{v0}"), { v0: String(group.id) })} className="font-display text-base font-bold text-fg">
                       {siteNavigationText(group.label, locale)}
                     </h3>
                     <p className="mt-1 text-xs leading-5 text-fg-3">

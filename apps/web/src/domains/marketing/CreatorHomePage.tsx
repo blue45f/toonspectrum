@@ -1,3 +1,9 @@
+import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowDown, ArrowRight, Box, Brush, Check, Layers, LayoutGrid, MousePointer2, Play, Plus, Square, Type } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -24,11 +30,11 @@ const FEATURE_ICONS = [Brush, LayoutGrid, Box, Layers] as const;
 function StudioPreview({ copy, stage }: { copy: CreatorHomeCopy; stage: number }) {
   useBilingualI18nRevision();
   return (
-    <figure className={`ch-workspace ch-workspace--${copy.stages[stage].id}`} aria-label={copy.previewNote}>
+    <figure className={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "ch-workspace ch-workspace--{v0}"), { v0: String(copy.stages[stage].id) })} aria-label={copy.previewNote}>
       <div className="ch-windowbar"><span className="ch-windowdots" aria-hidden="true"><i /><i /><i /></span><span>{copy.preview}</span><span className="ch-window-status"><Check size={12} aria-hidden="true" /> ToonStudio</span></div>
       <div className="ch-editor">
         <div className="ch-tools" aria-hidden="true"><MousePointer2 size={17} /><span><Brush size={17} /></span><Square size={17} /><Type size={17} /><Layers size={17} /><Plus size={17} /></div>
-        <div className="ch-canvas"><div className="ch-art-title"><span>CHAPTER 01</span><span>{copy.example}</span></div><img className="ch-scene" src="/brand/studio-scene.svg" alt="" width={720} height={560} fetchPriority="high" /><div className="ch-caption" aria-hidden="true">{stage === 1 ? "Every story starts with a little courage." : "MAKE SOMETHING ONLY YOU CAN MAKE."}</div></div>
+        <div className="ch-canvas"><div className="ch-art-title"><span>{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "CHAPTER 01")}</span><span>{copy.example}</span></div><img className="ch-scene" src="/brand/studio-scene.svg" alt="" width={720} height={560} fetchPriority="high" /><div className="ch-caption" aria-hidden="true">{stage === 1 ? translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "Every story starts with a little courage.") : translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "MAKE SOMETHING ONLY YOU CAN MAKE.")}</div></div>
         <div className="ch-inspector" aria-hidden="true"><span>{copy.layer}</span><div className="ch-swatches"><i /><i /><i /><i /></div><div className="ch-layer"><span />{copy.scene} 03</div><div className="ch-layer"><span />{copy.scene} 02</div><div className="ch-layer is-selected"><span />{copy.scene} 01</div><div className="ch-inspector-lines"><i /><i /><i /></div></div>
       </div>
       <figcaption className="ch-workspace-footer"><span>{copy.previewNote}</span><span>100%</span></figcaption>
@@ -137,7 +143,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
           <button ref={posterRef} type="button" className="ch-film-poster" onClick={() => playAt(0, true)} aria-label={copy.filmPlay} data-testid="creator-film-play">
             <img src={CREATOR_FILM.poster} width={1280} height={720} loading="lazy" alt="" />
             <span className="ch-play-disc"><Play size={27} fill="currentColor" aria-hidden="true" /></span>
-            <span className="ch-film-caption">TOONSTUDIO BRAND FILM <span>00:24</span></span>
+            <span className="ch-film-caption">{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "TOONSTUDIO BRAND FILM ")}<span>00:24</span></span>
           </button>
         )}
       </div>
@@ -145,7 +151,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
       {mode === "error" && <p className="ch-film-error" role="alert">{copy.filmError} <button type="button" onClick={() => playAt(0, true)}>{copy.retry}</button></p>}
       <div className="ch-film-chapters" aria-label={copy.filmLabel}>
         {CREATOR_FILM.chapters.map((seconds, index) => (
-          <button type="button" key={seconds} onClick={() => playAt(seconds)} aria-controls={mode === "playing" ? "creator-brand-video" : undefined} aria-current={mode === "playing" && activeChapter === index ? "step" : undefined}>
+          <button type="button" key={seconds} onClick={() => playAt(seconds)} aria-controls={mode === "playing" ? translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "creator-brand-video") : undefined} aria-current={mode === "playing" && activeChapter === index ? translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "step") : undefined}>
             <span>00:{String(seconds).padStart(2, "0")}</span>{copy.chapterLabels[index]}
           </button>
         ))}
@@ -179,10 +185,10 @@ export function CreatorHomePage() {
       <div className="ch-shell">
         <section className="ch-hero" aria-labelledby="creator-home-title">
           <div className="ch-hero-copy"><p className="ch-eyebrow"><span className="ch-live-dot" />{copy.eyebrow}</p><h1 id="creator-home-title">{copy.title[0]}<br /><span>{copy.title[1]}</span></h1><p className="ch-lead">{copy.description}</p><div className="ch-actions"><Link href="/studio" className="ch-button ch-button--primary">{copy.start}<ArrowRight size={19} aria-hidden="true" /></Link><CreatorSectionLink sectionId="creator-film" className="ch-button ch-button--quiet"><Play size={15} aria-hidden="true" />{copy.watch}</CreatorSectionLink></div><p className="ch-hero-note"><Check size={14} aria-hidden="true" />{copy.note}</p></div>
-          <div className="ch-hero-visual"><span className="ch-visual-label" aria-hidden="true">A LITTLE IDEA. A WHOLE NEW WORLD.</span><StudioPreview copy={copy} stage={stage} /><CreatorWorkflowPicker copy={copy} stage={stage} onChange={setStage} /></div>
+          <div className="ch-hero-visual"><span className="ch-visual-label" aria-hidden="true">{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "A LITTLE IDEA. A WHOLE NEW WORLD.")}</span><StudioPreview copy={copy} stage={stage} /><CreatorWorkflowPicker copy={copy} stage={stage} onChange={setStage} /></div>
         </section>
         <CreatorHomeNavigation locale={locale} />
-        <div className="ch-capabilities" aria-label={copy.tools}><span>ONE CREATIVE SPACE</span>{copy.strip.map((item) => <span key={item}><Check size={14} aria-hidden="true" />{item}</span>)}</div>
+        <div className="ch-capabilities" aria-label={copy.tools}><span>{translateCurrentStaticSourceText("domains.marketing.CreatorHomePage", "en", "ONE CREATIVE SPACE")}</span>{copy.strip.map((item) => <span key={item}><Check size={14} aria-hidden="true" />{item}</span>)}</div>
         <section className="ch-process" aria-labelledby="creator-process-title"><div><p className="ch-eyebrow">{copy.processEyebrow}</p><h2 id="creator-process-title" tabIndex={-1}>{copy.processTitle}</h2><p className="ch-section-body">{copy.processBody}</p><CreatorWorkflowPicker copy={copy} stage={stage} onChange={setStage} placement="process" /></div><div className="ch-stage-card" id="creator-stage-description" data-creator-stage={selectedStage.id} aria-live="polite"><span className="ch-stage-number" aria-hidden="true">0{stage + 1}</span><div><p className="ch-eyebrow">{selectedStage.label}</p><h3>{selectedStage.title}</h3><p>{selectedStage.body}</p><Link href={selectedStage.href} className="ch-text-link">{selectedStage.action}<ArrowRight size={17} aria-hidden="true" /></Link></div></div></section>
         <section className="ch-toolkit" aria-labelledby="creator-toolkit-title"><div className="ch-section-heading"><div><p className="ch-eyebrow">{copy.toolkitEyebrow}</p><h2 id="creator-toolkit-title" tabIndex={-1}>{copy.toolkitTitle}</h2></div><ArrowDown size={30} aria-hidden="true" /></div><div className="ch-feature-grid">{copy.features.map((feature, index) => { const Icon = FEATURE_ICONS[index]; return <article className="ch-feature" key={feature.tag}><div className="ch-feature-top"><Icon size={25} strokeWidth={1.5} aria-hidden="true" /><span>{feature.tag}</span></div><h3>{feature.title}</h3><p>{feature.body}</p><Link href={feature.href} className="ch-text-link">{feature.action}<ArrowRight size={17} aria-hidden="true" /></Link></article>; })}</div></section>
         <CreatorBrandFilm copy={copy} locale={locale} />

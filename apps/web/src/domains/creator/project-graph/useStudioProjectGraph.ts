@@ -1,3 +1,6 @@
+import {
+  translateBilingualValueForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { httpStatus } from "@/infrastructure/api";
@@ -59,7 +62,7 @@ function readableError(_locale): string {
 
 export function useStudioProjectGraph(
   identifier: string,
-  locale: "ko" | "en",
+  locale: string,
 ): StudioProjectGraphController {
   useBilingualI18nRevision();
   const [project, setProject] = useState<StudioProjectRecord | null>(null);

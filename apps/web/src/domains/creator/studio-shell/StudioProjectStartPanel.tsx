@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { FileText, FileUp, Lightbulb, PlayCircle, UsersRound } from "lucide-react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -96,7 +100,7 @@ export function StudioProjectStartPanel({ locale }: { readonly locale: StudioPro
     <section className="mt-7 min-w-0 rounded-3xl border border-line bg-panel/55 p-4 shadow-sm sm:p-6" aria-labelledby="studio-starting-point-title">
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">START FROM WHAT YOU HAVE</p>
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectStartPanel", "en", "START FROM WHAT YOU HAVE")}</p>
           <h2 id="studio-starting-point-title" className="mt-1 break-words text-2xl font-black tracking-tight text-fg">
             {bt("지금 무엇을 가지고 있나요?", "What do you have right now?")}
           </h2>

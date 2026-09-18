@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AlertTriangle,
   CheckCircle2,
   RefreshCw,
@@ -33,7 +38,8 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioProjectReadinessPanel", ko, en);
 
-export type StudioProjectReadinessLocale = "ko" | "en";
+export type StudioProjectReadinessLocale = string;
+type StudioProjectReadinessAuthoredLocale = "ko" | "en";
 
 interface DiagnosticsFailureDetail {
   readonly projectId: string;
@@ -42,7 +48,7 @@ interface DiagnosticsFailureDetail {
 }
 
 const SECTION_LABELS: Readonly<
-  Record<StudioProjectReadinessSectionId, Readonly<Record<StudioProjectReadinessLocale, string>>>
+  Record<StudioProjectReadinessSectionId, Readonly<Record<StudioProjectReadinessAuthoredLocale, string>>>
 > = Object.freeze({
   story: { ko: "스토리", en: "Story" },
   production: { ko: "제작", en: "Production" },
@@ -177,8 +183,8 @@ export function StudioProjectReadinessPanel({
           "mt-5 rounded-2xl border bg-card p-4 sm:p-5",
           failure ? "border-warning/40" : "border-line",
         )}
-        aria-live={failure ? "assertive" : "polite"}
-        role={failure ? "alert" : undefined}
+        aria-live={failure ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectReadinessPanel", "en", "assertive") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectReadinessPanel", "en", "polite")}
+        role={failure ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectReadinessPanel", "en", "alert") : undefined}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

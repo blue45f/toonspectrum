@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   CheckCircle2,
   Cloud,
@@ -145,7 +150,7 @@ export function StudioProjectLibraryModal({
       />
       <section
         ref={dialogRef}
-        role={danger ? "alertdialog" : "dialog"}
+        role={danger ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementUi", "en", "alertdialog") : translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementUi", "en", "dialog")}
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}

@@ -1,4 +1,10 @@
 import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   Boxes,
@@ -48,14 +54,15 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioFrontDoorPages", ko, en);
 
-type StudioFrontDoorLocale = "ko" | "en";
+type StudioFrontDoorLocale = string;
+type StudioFrontDoorAuthoredLocale = "ko" | "en";
 
 type FrontDoorCard = Readonly<{
   href: string;
   icon: LucideIcon;
-  title: Readonly<Record<StudioFrontDoorLocale, string>>;
-  description: Readonly<Record<StudioFrontDoorLocale, string>>;
-  badge?: Readonly<Record<StudioFrontDoorLocale, string>>;
+  title: Readonly<Record<StudioFrontDoorAuthoredLocale, string>>;
+  description: Readonly<Record<StudioFrontDoorAuthoredLocale, string>>;
+  badge?: Readonly<Record<StudioFrontDoorAuthoredLocale, string>>;
 }>;
 
 /** Normalize an application language tag to a supported Studio front-door locale. */
@@ -385,7 +392,7 @@ export function StudioHomePage() {
       <section className="mt-8 min-w-0" aria-labelledby="studio-starting-point-title">
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">START FROM WHAT YOU HAVE</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioFrontDoorPages", "en", "START FROM WHAT YOU HAVE")}</p>
             <h2 id="studio-starting-point-title" className="mt-1 break-words text-2xl font-bold tracking-tight text-fg">
               {bi("지금 무엇을 가지고 있나요?", "What do you have right now?")}
             </h2>
@@ -413,7 +420,7 @@ export function StudioHomePage() {
       <section className="mt-8 min-w-0" aria-labelledby="studio-production-flow-title">
         <div className="flex min-w-0 flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">ONE PROJECT FLOW</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioFrontDoorPages", "en", "ONE PROJECT FLOW")}</p>
             <h2 id="studio-production-flow-title" className="mt-1 break-words text-2xl font-bold tracking-tight text-fg">
               {bi("한 작품 안에서 끝까지 이어집니다", "Stay in one project from start to finish")}
             </h2>
@@ -429,7 +436,7 @@ export function StudioHomePage() {
 
       <section className="mt-10 min-w-0" aria-labelledby="studio-home-actions">
         <div className="min-w-0">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">WORKSPACE</p>
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.16em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioFrontDoorPages", "en", "WORKSPACE")}</p>
           <h2 id="studio-home-actions" className="mt-1 break-words text-2xl font-bold tracking-tight text-fg">
             {bi("내 작업 관리", "Manage my work")}
           </h2>

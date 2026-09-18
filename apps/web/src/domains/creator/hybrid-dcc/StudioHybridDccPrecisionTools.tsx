@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId, useMemo, useState } from "react";
 
 import { hashStudioHybridDccObjectTransform, type StudioHybridDccObjectTransform } from "./studio-hybrid-dcc-object-transform";
@@ -93,62 +97,59 @@ function PrecisionEditor(props: StudioHybridDccViewportProps) {
   };
   return (
     <div className="space-y-3 border-t border-line p-3" data-studio-hybrid-dcc-precision-editor="true">
-      <p className="text-[11px] leading-relaxed text-fg-3" id={`${id}-help`}>
-        단위 수식 예: 1m+25cm · 90deg/2 · 110%. 이동은 거리, 회전은 증분, 크기는 배율입니다.
-        목표 치수는 월드 경계 기준이며 비율을 유지합니다. 원본 메시를 굽지 않고 기존 되돌리기 명령으로 적용합니다.
-      </p>
+      <p className="text-[11px] leading-relaxed text-fg-3" id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-help"), { v0: String(id) })}>
+        {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "단위 수식 예: 1m+25cm · 90deg/2 · 110%. 이동은 거리, 회전은 증분, 크기는 배율입니다. 목표 치수는 월드 경계 기준이며 비율을 유지합니다. 원본 메시를 굽지 않고 기존 되돌리기 명령으로 적용합니다.")}</p>
       {unavailable ? <p role="status" className="text-xs text-fg-3">{unavailable}</p> : null}
       <form onSubmit={(event) => {
         event.preventDefault();
         if (candidate.transform) commit(() => candidate.transform!);
-      }} aria-label="정밀 오브젝트 변환" aria-describedby={`${id}-help`}>
+      }} aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 오브젝트 변환")} aria-describedby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-help"), { v0: String(id) })}>
         <fieldset disabled={Boolean(unavailable)} className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          <legend className="sr-only">정밀 변환 설정</legend>
+          <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 변환 설정")}</legend>
           <div className="grid gap-1">
-            <label htmlFor={`${id}-kind`} className="text-[11px] text-fg-2">정밀 작업</label>
-            <select id={`${id}-kind`} className={CONTROL} value={kind} onChange={(event) => changeKind(event.target.value as StudioHybridDccPrecisionKind)}>
-              <option value="translate">거리 이동</option><option value="rotate">각도 회전</option>
-              <option value="scale">배율 조절</option><option value="dimension">목표 치수 맞춤</option>
+            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-kind"), { v0: String(id) })} className="text-[11px] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 작업")}</label>
+            <select id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-kind"), { v0: String(id) })} className={CONTROL} value={kind} onChange={(event) => changeKind(event.target.value as StudioHybridDccPrecisionKind)}>
+              <option value="translate">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "거리 이동")}</option><option value="rotate">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "각도 회전")}</option>
+              <option value="scale">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "배율 조절")}</option><option value="dimension">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "목표 치수 맞춤")}</option>
             </select>
           </div>
           <div className="grid gap-1">
-            <label htmlFor={`${id}-axis`} className="text-[11px] text-fg-2">정밀 변환 축</label>
-            <select id={`${id}-axis`} className={CONTROL} value={axis} onChange={(event) => setAxis(event.target.value as StudioHybridDccPrecisionAxis)}>
+            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-axis"), { v0: String(id) })} className="text-[11px] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 변환 축")}</label>
+            <select id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-axis"), { v0: String(id) })} className={CONTROL} value={axis} onChange={(event) => setAxis(event.target.value as StudioHybridDccPrecisionAxis)}>
               <option value="x">X</option><option value="y">Y</option><option value="z">Z</option>
-              {kind === "scale" ? <option value="all">XYZ 균일</option> : null}
+              {kind === "scale" ? <option value="all">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "XYZ 균일")}</option> : null}
             </select>
           </div>
           <div className="grid gap-1">
-            <label htmlFor={`${id}-space`} className="text-[11px] text-fg-2">정밀 좌표계</label>
-            <select id={`${id}-space`} className={CONTROL} value={space} disabled={kind === "dimension" || kind === "scale"} onChange={(event) => setSpace(event.target.value as "world" | "local")}>
-              <option value="world">월드 축</option><option value="local">로컬 축</option>
+            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-space"), { v0: String(id) })} className="text-[11px] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 좌표계")}</label>
+            <select id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-space"), { v0: String(id) })} className={CONTROL} value={space} disabled={kind === "dimension" || kind === "scale"} onChange={(event) => setSpace(event.target.value as "world" | "local")}>
+              <option value="world">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "월드 축")}</option><option value="local">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "로컬 축")}</option>
             </select>
           </div>
           <div className="grid gap-1">
-            <label htmlFor={`${id}-amount`} className="text-[11px] text-fg-2">{kind === "scale" ? "배율 수식" : kind === "rotate" ? "각도 수식" : "길이 수식"}</label>
-            <input id={`${id}-amount`} className={CONTROL} value={amount} maxLength={96} autoComplete="off" spellCheck={false}
-              aria-invalid={Boolean(candidate.error)} aria-describedby={candidate.error ? `${id}-error` : `${id}-help`}
+            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-amount"), { v0: String(id) })} className="text-[11px] text-fg-2">{kind === "scale" ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "배율 수식") : kind === "rotate" ? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "각도 수식") : translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "길이 수식")}</label>
+            <input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-amount"), { v0: String(id) })} className={CONTROL} value={amount} maxLength={96} autoComplete="off" spellCheck={false}
+              aria-invalid={Boolean(candidate.error)} aria-describedby={candidate.error ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-error"), { v0: String(id) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-help"), { v0: String(id) })}
               onChange={(event) => { setAmount(event.target.value); setActionError(""); }} />
           </div>
           <div className="grid gap-1">
-            <label htmlFor={`${id}-pivot`} className="text-[11px] text-fg-2">변환 피벗</label>
-            <select id={`${id}-pivot`} className={CONTROL} value={pivotMode} disabled={kind === "translate"}
+            <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-pivot"), { v0: String(id) })} className="text-[11px] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "변환 피벗")}</label>
+            <select id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-pivot"), { v0: String(id) })} className={CONTROL} value={pivotMode} disabled={kind === "translate"}
               onChange={(event) => setPivotMode(event.target.value as typeof pivotMode)}>
-              <option value="object">오브젝트 원점</option><option value="center">표시 메시 중심</option>
-              <option value="world">월드 원점</option><option value="custom">사용자 피벗</option>
+              <option value="object">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "오브젝트 원점")}</option><option value="center">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "표시 메시 중심")}</option>
+              <option value="world">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "월드 원점")}</option><option value="custom">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "사용자 피벗")}</option>
             </select>
           </div>
-          <button type="submit" className={`${CONTROL} self-end bg-accent-soft font-semibold text-accent`} disabled={Boolean(candidate.error) || !candidate.transform}>
-            정밀 변환 적용
-          </button>
+          <button type="submit" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0} self-end bg-accent-soft font-semibold text-accent"), { v0: String(CONTROL) })} disabled={Boolean(candidate.error) || !candidate.transform}>
+            {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 변환 적용")}</button>
         </fieldset>
         {pivotMode === "custom" && kind !== "translate" ? (
           <fieldset disabled={Boolean(unavailable)} className="mt-2 grid grid-cols-3 gap-2">
-            <legend className="mb-1 text-[11px] text-fg-3">사용자 피벗 · 월드 좌표 (m)</legend>
+            <legend className="mb-1 text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "사용자 피벗 · 월드 좌표 (m)")}</legend>
             {([0, 1, 2] as const).map((index) => (
               <div className="grid gap-1" key={index}>
-                <label htmlFor={`${id}-pivot-${index}`} className="text-[11px] text-fg-2">피벗 {"XYZ"[index]}</label>
-                <input id={`${id}-pivot-${index}`} className={CONTROL} value={pivotFields[index]} maxLength={96} autoComplete="off"
+                <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-pivot-{v1}"), { v0: String(id), v1: String(index) })} className="text-[11px] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "피벗 ")}{"XYZ"[index]}</label>
+                <input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-pivot-{v1}"), { v0: String(id), v1: String(index) })} className={CONTROL} value={pivotFields[index]} maxLength={96} autoComplete="off"
                   onChange={(event) => {
                   const value = event.target.value;
                   setPivotFields((previous) => {
@@ -162,29 +163,26 @@ function PrecisionEditor(props: StudioHybridDccViewportProps) {
           </fieldset>
         ) : null}
       </form>
-      {candidate.error && !unavailable ? <p id={`${id}-error`} role="alert" className="text-xs text-fg-2">{candidate.error}</p> : null}
+      {candidate.error && !unavailable ? <p id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-error"), { v0: String(id) })} role="alert" className="text-xs text-fg-2">{candidate.error}</p> : null}
       {candidate.transform && !unavailable ? (
-        <output className="block rounded-lg bg-raised px-2 py-1.5 font-mono text-[10px] text-fg-2" aria-live="polite" aria-label="정밀 변환 결과 미리보기">
-          위치 [{candidate.transform.position.map(format).join(", ")}] m · 회전 [{candidate.transform.rotationEulerRad.map((value) => format(value * 180 / Math.PI)).join(", ")}] ° · 크기 [{candidate.transform.scale.map(format).join(", ")}]
+        <output className="block rounded-lg bg-raised px-2 py-1.5 font-mono text-[10px] text-fg-2" aria-live="polite" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 변환 결과 미리보기")}>
+          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "위치 [")}{candidate.transform.position.map(format).join(", ")}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "] m · 회전 [")}{candidate.transform.rotationEulerRad.map((value) => format(value * 180 / Math.PI)).join(", ")}{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "] ° · 크기 [")}{candidate.transform.scale.map(format).join(", ")}]
         </output>
       ) : null}
       <fieldset disabled={Boolean(unavailable)} className="flex flex-wrap items-end gap-2 border-t border-line pt-2">
-        <legend className="sr-only">정밀 배치</legend>
+        <legend className="sr-only">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 배치")}</legend>
         <div className="grid gap-1">
-          <label htmlFor={`${id}-grid`} className="text-[11px] text-fg-2">월드 그리드 간격</label>
-          <input id={`${id}-grid`} className={`${CONTROL} w-28`} value={grid} maxLength={96} onChange={(event) => setGrid(event.target.value)} />
+          <label htmlFor={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-grid"), { v0: String(id) })} className="text-[11px] text-fg-2">{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "월드 그리드 간격")}</label>
+          <input id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "{v0}-grid"), { v0: String(id) })} className={`${CONTROL} w-28`} value={grid} maxLength={96} onChange={(event) => setGrid(event.target.value)} />
         </div>
         <button type="button" className={CONTROL} onClick={() => commit(() => snapStudioHybridDccPrecisionToGrid(measurement.transform!, parseStudioHybridDccPrecisionInput(grid, "length")))}>
-          그리드에 정렬
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "그리드에 정렬")}</button>
         <button type="button" className={CONTROL} onClick={() => commit(() => alignStudioHybridDccPrecisionBounds(measurement.transform!, measurement.bounds!, "ground"))}>
-          바닥 Y=0에 놓기
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "바닥 Y=0에 놓기")}</button>
         <button type="button" className={CONTROL} onClick={() => commit(() => alignStudioHybridDccPrecisionBounds(measurement.transform!, measurement.bounds!, "center"))}>
-          메시 중심을 원점으로
-        </button>
-        {measurement.bounds ? <span className="text-[10px] text-fg-3" aria-label="현재 표시 메시 치수">
-          XYZ {measurement.bounds.max.map((value, index) => format(value - measurement.bounds!.min[index]!)).join(" × ")} m
+          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "메시 중심을 원점으로")}</button>
+        {measurement.bounds ? <span className="text-[10px] text-fg-3" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "현재 표시 메시 치수")}>
+          {translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "XYZ ")}{measurement.bounds.max.map((value, index) => format(value - measurement.bounds!.min[index]!)).join(" × ")} m
         </span> : null}
       </fieldset>
       {actionError ? <p role="alert" className="text-xs text-fg-2">{actionError}</p> : null}
@@ -197,13 +195,13 @@ export function StudioHybridDccPrecisionTools(props: StudioHybridDccViewportProp
   const [open, setOpen] = useState(false);
   const id = useId();
   return (
-    <section className="mt-2 overflow-hidden rounded-xl border border-line bg-panel" aria-label="정밀 변환 작업대">
+    <section className="mt-2 overflow-hidden rounded-xl border border-line bg-panel" aria-label={translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 변환 작업대")}>
       <button type="button" className="flex min-h-11 w-full items-center justify-between gap-3 px-3 text-left text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>
-        <span>정밀 변환 · 피벗 · 치수 · 배치</span><span aria-hidden="true">{open ? "−" : "+"}</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "ko", "정밀 변환 · 피벗 · 치수 · 배치")}</span><span aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
       <div id={id} hidden={!open}>
-        {open ? <PrecisionEditor key={props.workspace.activeAssetId ?? "no-selection"} {...props} /> : null}
+        {open ? <PrecisionEditor key={props.workspace.activeAssetId ?? translateCurrentStaticSourceText("domains.creator.hybrid.dcc.StudioHybridDccPrecisionTools", "en", "no-selection")} {...props} /> : null}
       </div>
     </section>
   );

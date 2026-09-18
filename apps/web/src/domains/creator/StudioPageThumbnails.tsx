@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Page Thumbnails — 페이지 스트립 "실내용" 미니 썸네일 + HTML5 드래그 재배열 훅.
  *
@@ -44,11 +48,11 @@ function StudioThumbImage({ node }: { readonly node: StudioThumbImageNode }): Re
     return (
       <g
         data-raster-source-placeholder="true"
-        data-work-asset-placeholder={parseStudioWorkAssetSourceUri(node.src) ? "true" : undefined}
+        data-work-asset-placeholder={parseStudioWorkAssetSourceUri(node.src) ? translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "true") : undefined}
         transform={transform}
         opacity={node.opacity}
       >
-        <title>검증된 이미지 바이트를 안전하게 불러오는 중</title>
+        <title>{translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "ko", "검증된 이미지 바이트를 안전하게 불러오는 중")}</title>
         <rect
           x={node.x}
           y={node.y}
@@ -78,7 +82,7 @@ function StudioThumbImage({ node }: { readonly node: StudioThumbImageNode }): Re
       y={node.y}
       width={node.w}
       height={node.h}
-      preserveAspectRatio={node.cover ? "xMidYMid slice" : "none"}
+      preserveAspectRatio={node.cover ? translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "xMidYMid slice") : translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "none")}
       style={node.filterCss ? { filter: node.filterCss } : undefined}
       transform={transform}
       opacity={node.opacity}
@@ -98,7 +102,7 @@ function renderThumbNode(node: ThumbNode): ReactElement {
           width={node.w}
           height={node.h}
           rx={node.rx || undefined}
-          fill={node.fill ?? "none"}
+          fill={node.fill ?? translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "none")}
           fillOpacity={node.fillOpacity !== 1 ? node.fillOpacity : undefined}
           stroke={node.stroke ?? undefined}
           strokeWidth={node.stroke ? node.strokeWidth : undefined}
@@ -115,7 +119,7 @@ function renderThumbNode(node: ThumbNode): ReactElement {
           cy={node.cy}
           rx={node.rx}
           ry={node.ry}
-          fill={node.fill ?? "none"}
+          fill={node.fill ?? translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "none")}
           stroke={node.stroke ?? undefined}
           strokeWidth={node.stroke ? node.strokeWidth : undefined}
           transform={transform}
@@ -127,7 +131,7 @@ function renderThumbNode(node: ThumbNode): ReactElement {
         <polygon
           key={node.key}
           points={node.points}
-          fill={node.fill ?? "none"}
+          fill={node.fill ?? translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "none")}
           stroke={node.stroke ?? undefined}
           strokeWidth={node.stroke ? node.strokeWidth : undefined}
           strokeLinejoin="round"
@@ -154,7 +158,7 @@ function renderThumbNode(node: ThumbNode): ReactElement {
         <path
           key={node.key}
           d={node.d}
-          fill={node.fill ?? "none"}
+          fill={node.fill ?? translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "none")}
           stroke={node.stroke ?? undefined}
           strokeWidth={node.stroke ? node.strokeWidth : undefined}
           strokeDasharray={node.dashed ? "8 5" : undefined}
@@ -258,7 +262,7 @@ export function StudioPageThumbnail({
             </linearGradient>
           </defs>
         ) : null}
-        <rect x={0} y={0} width={CANVAS_W} height={canvasH} fill={hasGradient ? `url(#${gradientId})` : page.bg} />
+        <rect x={0} y={0} width={CANVAS_W} height={canvasH} fill={hasGradient ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "en", "url(#{v0})"), { v0: String(gradientId) }) : page.bg} />
         {nodes.map((node) => node.kind === "image" && !nearViewport
           ? null
           : renderThumbNode(node))}
@@ -273,7 +277,7 @@ export function StudioPageThumbnail({
       {skipped > 0 ? (
         <span
           className="absolute bottom-0.5 right-1 rounded bg-black/55 px-1 text-[8px] font-semibold leading-3 text-white"
-          title={`요소 ${skipped}개는 경량 미리보기에서 생략됨`}
+          title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPageThumbnails", "ko", "요소 {v0}개는 경량 미리보기에서 생략됨"), { v0: String(skipped) })}
         >
           +{skipped}
         </span>

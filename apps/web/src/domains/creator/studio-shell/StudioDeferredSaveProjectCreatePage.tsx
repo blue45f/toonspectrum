@@ -1,4 +1,10 @@
 import {
+  getCurrentUiLocale,
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Box,
   Clapperboard,
   ClipboardCheck,
@@ -266,7 +272,7 @@ export function StudioDeferredSaveProjectCreatePage() {
           <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <p className="flex min-w-0 flex-wrap items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
-                <Sparkles size={14} className="shrink-0" aria-hidden="true" /> <span className="break-words">TOONSTUDIO CREATE</span>
+                <Sparkles size={14} className="shrink-0" aria-hidden="true" /> <span className="break-words">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioDeferredSaveProjectCreatePage", "en", "TOONSTUDIO CREATE")}</span>
               </p>
               <h1 className="mt-2 break-words text-3xl font-black tracking-tight text-fg sm:text-4xl">
                 {bt("바로 만들기 시작하세요", "Start creating right away")}
@@ -400,7 +406,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                     <ClipboardCheck size={18} aria-hidden="true" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">PRODUCTION ONBOARDING</p>
+                    <p className="text-[0.65rem] font-black uppercase tracking-[0.14em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioDeferredSaveProjectCreatePage", "en", "PRODUCTION ONBOARDING")}</p>
                     <h2 id="webtoon-production-onboarding-title" className="mt-1 break-words text-xl font-black text-fg">
                       {bt("실제 제작 단계에 맞춰 시작", "Start from your real production stage")}
                     </h2>
@@ -539,7 +545,7 @@ export function StudioDeferredSaveProjectCreatePage() {
                 <button
                   type="button"
                   disabled={creating || !titleReady}
-                  aria-describedby={!titleReady ? "studio-project-title-help studio-create-disabled-reason" : undefined}
+                  aria-describedby={!titleReady ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioDeferredSaveProjectCreatePage", "en", "studio-project-title-help studio-create-disabled-reason") : undefined}
                   onClick={create}
                   className={buttonClass({ className: "w-full min-w-0 sm:min-w-44 sm:w-auto" })}
                 >

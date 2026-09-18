@@ -1,3 +1,7 @@
+import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import {
   useEffect,
@@ -206,8 +210,7 @@ function Poster({ accent }: { readonly accent: string }) {
             className="mt-3 inline-block rounded-full px-3 py-1 text-[0.45rem] font-black text-white"
             style={{ backgroundColor: accent }}
           >
-            CTA
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.studio.shell.StudioTemplateVisualPreview", "en", "CTA")}</span>
         </div>
       </div>
     </div>

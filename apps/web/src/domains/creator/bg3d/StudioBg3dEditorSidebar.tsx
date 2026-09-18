@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted from StudioBackground3D. Closures keep original identifiers via an `any` host bag. */
 // @ts-nocheck
 "use no memo";
@@ -382,7 +386,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
             ) : null}
             <div
               role="tablist"
-              aria-label="컨트롤 카테고리"
+              aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "ko", "컨트롤 카테고리")}
               inert={physicsInteractionLocked || immersiveSceneActive}
               className="grid shrink-0 grid-cols-6 gap-1 border-b border-line bg-panel/95 px-2 py-2 backdrop-blur sm:px-3"
             >
@@ -392,7 +396,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
                 return (
                   <button
                     key={tab.id}
-                    id={`bg3d-tab-${tab.id}`}
+                    id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "en", "bg3d-tab-{v0}"), { v0: String(tab.id) })}
                     type="button"
                     role="tab"
                     aria-label={tab.label}
@@ -421,7 +425,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
                     )}
                     onClick={() => handlePanelTabChange(tab.id)}
                   >
-                    <TabIcon size={17} aria-hidden className={isActive ? "" : "opacity-80 group-hover:opacity-100"} />
+                    <TabIcon size={17} aria-hidden className={isActive ? "" : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "en", "opacity-80 group-hover:opacity-100")} />
                     {tab.label}
                   </button>
                 );
@@ -432,7 +436,7 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
               ref={panelScrollRef}
               id="bg3d-panel-body"
               role="tabpanel"
-              aria-labelledby={`bg3d-tab-${activePanelTab}`}
+              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "en", "bg3d-tab-{v0}"), { v0: String(activePanelTab) })}
               inert={physicsInteractionLocked}
               className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-5"
             >
@@ -559,13 +563,11 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
               <section hidden={hideOnTab("templates")}>
                 <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-fg">
                   <LayoutTemplate size={15} className="text-accent" aria-hidden />
-                  씬 템플릿
-                </h3>
+                  {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "ko", "씬 템플릿")}</h3>
                 {activePanelTab === "templates" ? (
                   <Suspense fallback={(
                     <p role="status" className="rounded-lg border border-line bg-card px-3 py-4 text-center text-[0.68rem] text-fg-3">
-                      템플릿 도구를 불러오는 중입니다…
-                    </p>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "ko", "템플릿 도구를 불러오는 중입니다…")}</p>
                   )}>
                     <StudioBg3dSceneTemplatePanel
                       templates={BG_SCENE_TEMPLATES}
@@ -611,11 +613,9 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
                       <Home size={15} className="text-accent" aria-hidden />
-                      방 만들기
-                    </h3>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "ko", "방 만들기")}</h3>
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
-                      파라메트릭
-                    </span>
+                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorSidebar", "ko", "파라메트릭")}</span>
                   </div>
                   <StudioBg3dRoomBuilderPanel
                     spec={roomBuilderSpec}

@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Reference-driven color harmonization panel.
  * User-facing language follows ToonStudio's task vocabulary rather than competitor labels.
@@ -193,7 +196,7 @@ export function StudioColorMatchPanel({
         {customRefName && (
           <div className="flex items-center justify-between rounded-lg border border-accent/35 bg-accent-soft/25 px-2 py-1 text-[11px] text-fg-2">
             <span className="truncate max-w-[200px]">
-              사용자 이미지: {customRefName}
+              {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "사용자 이미지: ")}{customRefName}
             </span>
             <button
               type="button"
@@ -203,8 +206,7 @@ export function StudioColorMatchPanel({
               }}
               className="text-[10px] text-fg-3 hover:text-fg"
             >
-              초기화
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "초기화")}</button>
           </div>
         )}
 
@@ -315,7 +317,7 @@ export function StudioColorMatchPanel({
           })}
         >
           <RefreshCw size={11} />
-          <span>재설정</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioColorMatchPanel", "ko", "재설정")}</span>
         </button>
 
         <button

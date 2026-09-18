@@ -1,4 +1,9 @@
 import {
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   Captions,
   FileVideo2,
@@ -123,16 +128,15 @@ export function EngineeringVideosPage() {
           <header className="flex items-start justify-between gap-4">
             <div>
               <p className="font-display text-xs font-black tracking-[-0.03em]">ToonStudio<span className="text-[#b5d782]">✳</span></p>
-              <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-[#b6c9ae]">ENGINEERING STORY FILM</p>
+              <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-[#b6c9ae]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
             </div>
             <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold text-[#d7e7cf]">
-              90 SEC · 30 FPS
-            </span>
+              {translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "90 SEC · 30 FPS")}</span>
           </header>
 
           <div className="my-auto grid h-[70%] items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
             <div>
-              <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[#b5d782]">WHY · HOW · PROOF</p>
+              <p className="text-[0.62rem] font-bold uppercase tracking-[0.2em] text-[#b5d782]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "WHY · HOW · PROOF")}</p>
               <h2 id="film-preview-title" className="mt-4 max-w-xl text-balance text-2xl font-black leading-[1.16] tracking-[-0.04em] sm:text-4xl">
                 {bi("브라우저 제작실을 만든 판단과 검증", "Decisions and evidence behind a browser studio")}
               </h2>
@@ -143,7 +147,7 @@ export function EngineeringVideosPage() {
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
               <div className="flex items-center justify-between text-[0.58rem] text-[#c6d8bf]">
-                <span>ARCHITECTURE MAP</span>
+                <span>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ARCHITECTURE MAP")}</span>
                 <span>01 / 07</span>
               </div>
               <div className="mt-4 space-y-2">
@@ -160,7 +164,7 @@ export function EngineeringVideosPage() {
           <div className="absolute inset-x-0 bottom-0 h-1.5 bg-[#294a33]" aria-hidden="true">
             <div className="h-full w-[16.66%] bg-[#b5d782]" />
           </div>
-          <span className="absolute bottom-5 right-6 text-[0.58rem] text-[#b6c9ae]">toonstudio.cloud</span>
+          <span className="absolute bottom-5 right-6 text-[0.58rem] text-[#b6c9ae]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "toonstudio.cloud")}</span>
         </div>
 
         <div className="space-y-4">
@@ -185,7 +189,7 @@ export function EngineeringVideosPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="storyboard-title">
-        <p className="eyebrow text-accent">90-SECOND STORYBOARD</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "90-SECOND STORYBOARD")}</p>
         <h2 id="storyboard-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("장면마다 하나의 판단만 설명합니다.", "Each scene explains one decision.")}
         </h2>

@@ -1,4 +1,9 @@
 import {
+  formatI18nTemplate,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   AppWindow,
   ArrowUpRight,
   Copy,
@@ -57,7 +62,7 @@ type StudioDocumentResolution = Extract<
 >;
 
 interface StudioDocumentWindowHubProps {
-  readonly locale: "ko" | "en";
+  readonly locale: string;
   readonly resolution: StudioDocumentResolution;
   readonly search: string;
   readonly quickMode: boolean;
@@ -421,7 +426,7 @@ export function StudioDocumentWindowHub({
               {notice}
             </p>
 
-            <section aria-labelledby={`${panelId}-quick`}>
+            <section aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioDocumentWindowHub", "en", "{v0}-quick"), { v0: String(panelId) })}>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <h3 id={`${panelId}-quick`} className="text-sm font-black text-fg">
@@ -471,7 +476,7 @@ export function StudioDocumentWindowHub({
               </div>
             </section>
 
-            <section className="mt-6" aria-labelledby={`${panelId}-open`}>
+            <section className="mt-6" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioDocumentWindowHub", "en", "{v0}-open"), { v0: String(panelId) })}>
               <div className="flex flex-wrap items-end justify-between gap-2">
                 <div>
                   <h3 id={`${panelId}-open`} className="text-sm font-black text-fg">
@@ -537,7 +542,7 @@ export function StudioDocumentWindowHub({
               </div>
             </section>
 
-            <section className="mt-6" aria-labelledby={`${panelId}-presets`}>
+            <section className="mt-6" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioDocumentWindowHub", "en", "{v0}-presets"), { v0: String(panelId) })}>
               <div>
                 <h3 id={`${panelId}-presets`} className="text-sm font-black text-fg">
                   {bi("제작 배치 한 번에 열기", "Open a production layout")}
