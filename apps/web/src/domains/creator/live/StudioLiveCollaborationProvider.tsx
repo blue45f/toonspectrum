@@ -76,6 +76,8 @@ export interface StudioLiveCollaborationProviderProps {
   transportFactory?: StudioLiveTransportFactory;
   /** Prevent an authenticated work from silently becoming an unauthenticated local-tab room. */
   serverRequired?: boolean;
+  /** Presence/media-only session. Skips CRDT/outbox hydration for spaces that do not edit a document. */
+  ephemeralOnly?: boolean;
   onRoomChange?: (room: StudioLiveRoom | null) => void;
   onCrdtDocumentChange?: (
     document: StudioCrdtDocument | null,
@@ -197,6 +199,7 @@ export function StudioLiveCollaborationProvider({
   outboxScope = null,
   transportFactory,
   serverRequired = false,
+  ephemeralOnly = false,
   onRoomChange,
   onCrdtDocumentChange,
   onEditSafetyChange,
@@ -582,6 +585,20 @@ export function StudioLiveCollaborationProvider({
         try {
           await nextRoom.start();
           if (cancelled) return;
+          if (ephemeralOnly) {
+            // Virtual spaces need authenticated discovery + RTC direct lanes, not a document
+            // frontier. Keeping CRDT/outbox modules out of this path avoids server persistence
+            // traffic and a Y.Doc allocation for users who are only talking or moving around.
+            setSyncTelemetry(null);
+            setOperationSyncReady(false);
+            setMode(nextRoom.mode);
+            const readyPeers = nextRoom.getPeers();
+            observedPeerCount = readyPeers.length;
+            setPeers(readyPeers);
+            setLocks([]);
+            exposeReadyRoom(null);
+            return;
+          }
           const [
             documentModule,
             bindingModule,
@@ -784,6 +801,7 @@ export function StudioLiveCollaborationProvider({
     participantName,
     participantRole,
     participantCanEdit,
+    ephemeralOnly,
     onCrdtDocumentChange,
     onAuthoritativeSaveBarrierChange,
     onRoomChange,

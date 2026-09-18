@@ -108,6 +108,12 @@ export const StudioProjectShellPage = lazyRetry(
   })),
   "StudioProjectIntegratedPage",
 );
+export const StudioVirtualSpacePage = lazyRetry(
+  () => import("@/domains/creator/virtual-space/StudioVirtualSpacePage").then((module) => ({
+    default: module.StudioVirtualSpacePage,
+  })),
+  "StudioVirtualSpacePage",
+);
 export const StudioDocumentWorkspaceRoute = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioDocumentWorkspaceRoute").then((module) => ({
     default: module.StudioDocumentWorkspaceRoute,

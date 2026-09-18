@@ -1,11 +1,14 @@
 import { api } from "@/infrastructure/api";
 
 export type EconomyPolicy = {
-  mode: "activity-points";
+  mode: "dual-wallet-beta";
   paymentsEnabled: boolean;
+  studioCreditsEnabled: boolean;
+  membershipCreditsEnabled: boolean;
   creditPurchasesEnabled: boolean;
   publicAsset: "reward_point";
   pointExpiryDays: number | null;
+  purchasedCreditExpiryDays: number | null;
   fairUseLimitsApplyDuringBeta: boolean;
 };
 
@@ -65,6 +68,15 @@ export type MembershipOverview = {
   economy: EconomyPolicy;
   wallet: {
     points: WalletBalanceView;
+    studioCredits: WalletBalanceView;
+  };
+  creditCycle: {
+    monthlyIncluded: number;
+    dailyLimit: number;
+    spentToday: number;
+    remainingToday: number;
+    monthlyResetsAt: string;
+    dailyResetsAt: string;
   };
   levels: {
     creatorLevel: string;
@@ -73,7 +85,18 @@ export type MembershipOverview = {
     trustScore: number;
     updatedAt?: string;
   };
+  creatorProgress: {
+    metrics: {
+      verifiedCreator: boolean;
+      publishedWorks: number;
+      activityPoints: number;
+    };
+    automaticLevel: string;
+    effectiveLevel: string;
+    manuallyManaged: boolean;
+  };
   recentLedger: Array<{
+    asset: "reward_point" | "studio_credit";
     id: string;
     entryType: string;
     amount: number;
