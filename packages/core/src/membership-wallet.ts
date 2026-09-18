@@ -27,6 +27,20 @@ export const MEMBER_CREATOR_LEVELS = [
 ] as const;
 export type MemberCreatorLevel = (typeof MEMBER_CREATOR_LEVELS)[number];
 
+export interface CreatorLevelMetrics {
+  readonly verifiedCreator: boolean;
+  readonly publishedWorks: number;
+  readonly activityPoints: number;
+}
+
+export const CREATOR_LEVEL_AUTO_POLICIES = Object.freeze({
+  new: { verifiedCreator: false, publishedWorks: 0, activityPoints: 0 },
+  verified: { verifiedCreator: true, publishedWorks: 0, activityPoints: 0 },
+  active: { verifiedCreator: true, publishedWorks: 1, activityPoints: 300 },
+  trusted: { verifiedCreator: true, publishedWorks: 5, activityPoints: 1_500 },
+  professional: { verifiedCreator: true, publishedWorks: 20, activityPoints: 5_000 },
+} as const);
+
 export const MEMBER_TRUST_LEVELS = [
   "new",
   "verified",
