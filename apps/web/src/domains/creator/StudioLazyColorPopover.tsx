@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useState } from "react";
 
 import { studioColorPopoverTriggerHint } from "./studio-color-popover-hints";
@@ -52,7 +53,7 @@ function StudioColorPopoverFallback({
   };
 
   return (
-    <span className={className ? `relative inline-block ${className}` : "relative inline-block"}>
+    <span className={className ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioLazyColorPopover", "en", "relative inline-block {v0}"), { v0: String(className) }) : translateCurrentStaticSourceText("domains.creator.StudioLazyColorPopover", "en", "relative inline-block")}>
       <StudioToolHintTarget
         hint={studioColorPopoverTriggerHint(label, purpose)}
         preferredSide="bottom"

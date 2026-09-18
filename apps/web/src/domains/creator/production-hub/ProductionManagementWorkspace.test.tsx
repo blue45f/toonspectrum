@@ -85,3 +85,66 @@ describe("ProductionManagementWorkspace assignment recommendations", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 });
+
+describe("ProductionManagementWorkspace predictive risk intelligence", () => {
+  it("explains predictive signals and registers one only after explicit confirmation", async () => {
+    const aggregate = createProductionDemoProject();
+    const execute = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <ProductionManagementWorkspace
+          aggregate={aggregate}
+          roleLens="producer"
+          execute={execute}
+          canEdit
+          now={NOW}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "예측 리스크 레이더" })).toBeTruthy();
+    expect(screen.getAllByText("왜 위험한가").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("권장 대응").length).toBeGreaterThan(0);
+    expect(execute).not.toHaveBeenCalled();
+
+    const register = screen.getAllByRole("button", { name: /예측 신호를 제작 위험으로 등록/u })[0];
+    if (!register) throw new Error("risk registration button missing");
+    fireEvent.click(register);
+
+    await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
+    expect(execute).toHaveBeenCalledWith({
+      type: "upsert-planning-record",
+      record: {
+        kind: "risk",
+        value: expect.objectContaining({
+          id: expect.stringMatching(/^risk-predictive-/u),
+          title: expect.stringContaining("[예측]"),
+          status: "open",
+        }),
+      },
+    }, expect.stringContaining("제작 위험으로 등록"));
+  });
+
+  it("keeps predictive risk registration read-only without edit permission", () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <ProductionManagementWorkspace
+          aggregate={createProductionDemoProject()}
+          roleLens="producer"
+          execute={execute}
+          canEdit={false}
+          now={NOW}
+        />
+      </MemoryRouter>,
+    );
+
+    const register = screen.getAllByRole("button", { name: /예측 신호를 제작 위험으로 등록/u })[0];
+    if (!register) throw new Error("risk registration button missing");
+    expect((register as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(register);
+    expect(execute).not.toHaveBeenCalled();
+  });
+});

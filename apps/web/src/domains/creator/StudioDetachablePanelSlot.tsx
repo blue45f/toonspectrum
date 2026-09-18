@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { isValidElement } from "react";
 import { createPortal } from "react-dom";
 
@@ -79,7 +80,7 @@ export function StudioDetachablePanelSlot({
         "data-studio-floating-layout-failure": failure ?? undefined,
       }}
       className="border-line-strong"
-      contentClassName="flex min-h-0 flex-1"
+      contentClassName="flex min-h-0 min-w-0 flex-1 overflow-auto"
     >
       {children}
     </StudioFloatingSurface>,
@@ -88,7 +89,7 @@ export function StudioDetachablePanelSlot({
 
   return (
     <StudioWorkspaceRegion
-      surfaceId={`panel-${surfaceId}`}
+      surfaceId={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDetachablePanelSlot", "en", "panel-{v0}"), { v0: String(surfaceId) })}
       label={label}
       disabled={detached || authoredHidden}
       defaultLayout={defaultLayout}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState, type ReactElement } from "react";
 
 import { svgToDataUrl } from "./studio-characters";
@@ -142,7 +146,7 @@ export function StudioSvgAssetPreview({
       className="relative flex h-full w-full items-center justify-center overflow-hidden"
       data-studio-svg-product-preview="true"
       data-studio-svg-preview-provider={providerId}
-      data-studio-svg-preview-route={rejected ? "fail-closed" : decision?.route ?? "pending"}
+      data-studio-svg-preview-route={rejected ? translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "en", "fail-closed") : decision?.route ?? translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "en", "pending")}
       data-studio-svg-preview-gpu-readback-bytes={
         decision?.interactiveGpuReadbackBytes ?? 0
       }
@@ -155,33 +159,28 @@ export function StudioSvgAssetPreview({
         aria-hidden
         loading="lazy"
         decoding="async"
-        data-studio-svg-source-placeholder={sourcePlaceholderVisible ? "visible" : "hidden"}
+        data-studio-svg-source-placeholder={sourcePlaceholderVisible ? translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "en", "visible") : translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "en", "hidden")}
         className={
-          `h-full w-full object-contain transition-transform group-hover:scale-105 ${
-            sourcePlaceholderVisible ? "visible" : "invisible"
-          }`
+          formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "en", "h-full w-full object-contain transition-transform group-hover:scale-105 {v0}"), { v0: String(sourcePlaceholderVisible ? "visible" : "invisible") })
         }
       />
       <canvas
         ref={canvasRef}
         aria-hidden
         className={
-          `absolute inset-0 h-full w-full object-contain transition-transform group-hover:scale-105 ${
-            painted ? "visible" : "invisible"
-          }`
+          formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "en", "absolute inset-0 h-full w-full object-contain transition-transform group-hover:scale-105 {v0}"), { v0: String(painted ? "visible" : "invisible") })
         }
       />
       {rejected ? (
         <span className="absolute inset-0 grid place-items-center text-[0.55rem] font-semibold text-bad">
-          SVG 확인 필요
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "ko", "SVG 확인 필요")}</span>
       ) : null}
       <span className="sr-only" aria-live="polite">
         {failed
-          ? "선택한 Vello SVG 미리보기를 사용할 수 없음"
+          ? translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "ko", "선택한 Vello SVG 미리보기를 사용할 수 없음")
           : requested
             ? decisionLabel(decision)
-            : "SVG 미리보기 대기"}
+            : translateCurrentStaticSourceText("domains.creator.StudioSvgAssetPreview", "ko", "SVG 미리보기 대기")}
       </span>
     </span>
   );

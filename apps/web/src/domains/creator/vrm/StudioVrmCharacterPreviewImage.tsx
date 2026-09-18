@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   type SyntheticEvent,
   useEffect,
@@ -111,7 +112,7 @@ export function StudioVrmCharacterPreviewImage({
   return (
     <span
       className="relative block h-full w-full overflow-hidden"
-      data-preview-ready={isDisplayedReady ? "true" : "false"}
+      data-preview-ready={isDisplayedReady ? translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCharacterPreviewImage", "en", "true") : translateCurrentStaticSourceText("domains.creator.vrm.StudioVrmCharacterPreviewImage", "en", "false")}
     >
       <img
         alt={alt}

@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Box, LoaderCircle, Rotate3d, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -16,17 +19,64 @@ import type {
 
 import { cn } from "@/shared/lib/utils";
 
-const THREE_POSTER_CACHE = new Map<string, string>();
+interface ThreePosterCacheEntry {
+  readonly value: string;
+  readonly estimatedBytes: number;
+}
+
+const THREE_POSTER_CACHE = new Map<string, ThreePosterCacheEntry>();
 const THREE_POSTER_CACHE_LIMIT = 96;
+const THREE_POSTER_CACHE_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
+let threePosterCacheRetainedBytes = 0;
+
+function deleteThreePoster(key: string): void {
+  const cached = THREE_POSTER_CACHE.get(key);
+  if (!cached) return;
+  THREE_POSTER_CACHE.delete(key);
+  threePosterCacheRetainedBytes = Math.max(
+    0,
+    threePosterCacheRetainedBytes - cached.estimatedBytes,
+  );
+}
+
+function getThreePoster(key: string): string | null {
+  return THREE_POSTER_CACHE.get(key)?.value ?? null;
+}
 
 function cacheThreePoster(key: string, value: string): void {
-  if (THREE_POSTER_CACHE.has(key)) THREE_POSTER_CACHE.delete(key);
-  THREE_POSTER_CACHE.set(key, value);
-  while (THREE_POSTER_CACHE.size > THREE_POSTER_CACHE_LIMIT) {
+  deleteThreePoster(key);
+  const estimatedBytes = 192 + value.length * 2;
+  if (estimatedBytes > THREE_POSTER_CACHE_MAX_ESTIMATED_BYTES) return;
+  THREE_POSTER_CACHE.set(key, { value, estimatedBytes });
+  threePosterCacheRetainedBytes += estimatedBytes;
+  while (
+    THREE_POSTER_CACHE.size > THREE_POSTER_CACHE_LIMIT
+    || threePosterCacheRetainedBytes > THREE_POSTER_CACHE_MAX_ESTIMATED_BYTES
+  ) {
     const oldest = THREE_POSTER_CACHE.keys().next().value as string | undefined;
     if (!oldest) break;
-    THREE_POSTER_CACHE.delete(oldest);
+    deleteThreePoster(oldest);
   }
+}
+
+function canvasToDataUrlAsync(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality?: number,
+): Promise<string> {
+  if (typeof canvas.toBlob !== "function") return Promise.resolve(canvas.toDataURL(type, quality));
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("3D preview poster encoding failed"));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error ?? new Error("3D preview poster read failed"));
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.readAsDataURL(blob);
+    }, type, quality);
+  });
 }
 
 function disposeMaterial(material: Material): void {
@@ -198,13 +248,15 @@ function ThreePreview({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
+  const requestRenderRef = useRef<(() => void) | null>(null);
   const active = useIntersectionActivation(hostRef, mode === "interactive");
   const cachedPoster = mode === "thumbnail"
-    ? THREE_POSTER_CACHE.get(preview.cacheKey) ?? null
+    ? getThreePoster(preview.cacheKey)
     : null;
   const [poster, setPoster] = useState<string | null>(cachedPoster);
   const [scrubbing, setScrubbing] = useState(false);
   const thumbnailRotationRef = useRef(Math.PI / 5);
+  const wakeRendererRef = useRef<(() => void) | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "ready" | "error">(
     cachedPoster ? "ready" : "idle",
   );
@@ -218,6 +270,10 @@ function ThreePreview({
   autoRotateRef.current = autoRotate;
 
   useEffect(() => {
+    requestRenderRef.current?.();
+  }, [autoRotate]);
+
+  useEffect(() => {
     if (!active || (mode === "thumbnail" && poster && !scrubbing)) return undefined;
     const hostNode = canvasHostRef.current;
     if (!hostNode) return undefined;
@@ -228,6 +284,7 @@ function ThreePreview({
     let cleanObject: Object3D | null = null;
     let renderer: import("three").WebGLRenderer | null = null;
     let controls: import("three/examples/jsm/controls/OrbitControls.js").OrbitControls | null = null;
+    let detachControlEvents: (() => void) | null = null;
 
     async function start(): Promise<void> {
       setState("loading");
@@ -270,39 +327,49 @@ function ThreePreview({
         rim.position.set(-radius * 2, radius * 1.3, -radius * 1.5);
         scene.add(rim);
 
-        const render = () => {
+        const resize = () => {
           if (!renderer) return;
           const width = Math.max(1, host.clientWidth || (mode === "thumbnail" ? 280 : 420));
           const height = Math.max(1, host.clientHeight || (mode === "thumbnail" ? 210 : 360));
           renderer.setSize(width, height, false);
           camera.aspect = width / height;
           camera.updateProjectionMatrix();
-          renderer.render(scene, camera);
         };
+        const render = () => {
+          renderer?.render(scene, camera);
+        };
+        resize();
 
         if (mode === "thumbnail") {
           if (!poster) {
-            render();
-            const nextPoster = renderer.domElement.toDataURL("image/webp", 0.86);
+            renderFrame();
+            const nextPoster = await canvasToDataUrlAsync(renderer.domElement, "image/webp", 0.86);
+            if (cancelled) return;
             cacheThreePoster(preview.cacheKey, nextPoster);
-            if (!cancelled) {
-              setPoster(nextPoster);
-              setState("ready");
-            }
+            setPoster(nextPoster);
+            setState("ready");
             return;
           }
-          const animateThumbnail = () => {
+          const renderThumbnail = () => {
+            frame = 0;
             if (cancelled || !renderer) return;
             object.rotation.y = thumbnailRotationRef.current;
             render();
-            frame = requestAnimationFrame(animateThumbnail);
           };
+          const requestThumbnailRender = () => {
+            if (cancelled || frame !== 0) return;
+            frame = requestAnimationFrame(renderThumbnail);
+          };
+          requestRenderRef.current = requestThumbnailRender;
           resizeObserver = typeof ResizeObserver === "undefined"
             ? null
-            : new ResizeObserver(render);
+            : new ResizeObserver(() => {
+              resize();
+              requestThumbnailRender();
+            });
           resizeObserver?.observe(host);
           setState("ready");
-          animateThumbnail();
+          requestThumbnailRender();
           return;
         }
 
@@ -316,20 +383,56 @@ function ThreePreview({
         controls.maxDistance = radius * 8;
         controls.autoRotateSpeed = 1.25;
         controls.target.set(0, 0, 0);
+        controlsChangeCleanup = () => controls?.removeEventListener("change", requestRender);
+        controls.addEventListener("change", requestRender);
         controls.update();
-        const animate = () => {
+
+        let interacting = false;
+        let dampingFramesRemaining = 0;
+        const renderInteractiveFrame = (): void => {
+          frame = 0;
           if (cancelled || !renderer || !controls) return;
           controls.autoRotate = autoRotateRef.current;
           controls.update();
           render();
-          frame = requestAnimationFrame(animate);
+          if (interacting) dampingFramesRemaining = 18;
+          else if (!autoRotateRef.current && dampingFramesRemaining > 0) dampingFramesRemaining -= 1;
+          if (autoRotateRef.current || interacting || dampingFramesRemaining > 0) {
+            requestInteractiveRender();
+          }
         };
-        animate();
+        const requestInteractiveRender = (): void => {
+          if (cancelled || frame !== 0) return;
+          frame = requestAnimationFrame(renderInteractiveFrame);
+        };
+        const handleInteractionStart = () => {
+          interacting = true;
+          requestInteractiveRender();
+        };
+        const handleInteractionEnd = () => {
+          interacting = false;
+          dampingFramesRemaining = 18;
+          requestInteractiveRender();
+        };
+        const handleControlsChange = () => render();
+        controls.addEventListener("start", handleInteractionStart);
+        controls.addEventListener("end", handleInteractionEnd);
+        controls.addEventListener("change", handleControlsChange);
+        detachControlEvents = () => {
+          controls?.removeEventListener("start", handleInteractionStart);
+          controls?.removeEventListener("end", handleInteractionEnd);
+          controls?.removeEventListener("change", handleControlsChange);
+        };
+        requestRenderRef.current = requestInteractiveRender;
         resizeObserver = typeof ResizeObserver === "undefined"
           ? null
-          : new ResizeObserver(render);
+          : new ResizeObserver(() => {
+            resize();
+            requestInteractiveRender();
+          });
         resizeObserver?.observe(host);
         setState("ready");
+        requestInteractiveRender();
       } catch {
         if (!cancelled) setState("error");
       }
@@ -338,8 +441,13 @@ function ThreePreview({
     void start();
     return () => {
       cancelled = true;
+      requestRenderRef.current = null;
       cancelAnimationFrame(frame);
+      wakeRendererRef.current = null;
+      visibilityCleanup?.();
+      controlsChangeCleanup?.();
       resizeObserver?.disconnect();
+      detachControlEvents?.();
       controls?.dispose();
       if (cleanObject) disposeObject(cleanObject);
       renderer?.dispose();
@@ -355,7 +463,7 @@ function ThreePreview({
         "relative grid size-full min-h-32 place-items-center overflow-hidden bg-gradient-to-br from-slate-100 via-slate-50 to-slate-200 dark:from-neutral-800 dark:via-neutral-900 dark:to-neutral-900",
         className,
       )}
-      role={mode === "thumbnail" ? "img" : "group"}
+      role={mode === "thumbnail" ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "img") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "group")}
       aria-label={preview.alt}
       onPointerEnter={mode === "thumbnail" ? () => setScrubbing(true) : undefined}
       onPointerLeave={mode === "thumbnail" ? () => setScrubbing(false) : undefined}
@@ -365,11 +473,12 @@ function ThreePreview({
           ? (event.clientX - bounds.left) / bounds.width
           : 0.5;
         thumbnailRotationRef.current = (progress * Math.PI * 2) - Math.PI;
+        requestRenderRef.current?.();
       } : undefined}
       data-studio-three-preview={preview.cacheKey}
       data-preview-mode={mode}
       data-preview-state={state}
-      data-preview-scrubbing={scrubbing ? "true" : "false"}
+      data-preview-scrubbing={scrubbing ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "en", "false")}
     >
       <div ref={canvasHostRef} className="absolute inset-0" aria-hidden />
       {poster && !(mode === "thumbnail" && scrubbing) ? (
@@ -388,8 +497,8 @@ function ThreePreview({
         <div className="absolute inset-0 grid place-items-center p-4 text-center text-xs text-fg-3">
           <div>
             <TriangleAlert size={22} className="mx-auto mb-2 text-warn" aria-hidden />
-            <p className="font-semibold text-fg-2">3D 미리보기를 표시하지 못했습니다</p>
-            <p className="mt-1">선택한 모델은 3D 편집기에서 계속 열 수 있습니다.</p>
+            <p className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "3D 미리보기를 표시하지 못했습니다")}</p>
+            <p className="mt-1">{translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "선택한 모델은 3D 편집기에서 계속 열 수 있습니다.")}</p>
           </div>
         </div>
       ) : null}
@@ -399,18 +508,23 @@ function ThreePreview({
           aria-hidden
         >
           <Rotate3d size={12} />
-          {scrubbing ? "좌우로 움직여 회전" : "360°"}
+          {scrubbing ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "좌우로 움직여 회전") : "360°"}
         </span>
       ) : null}
       {mode === "interactive" && state === "ready" ? (
         <button
           type="button"
-          onClick={() => setAutoRotate((value) => !value)}
+          onClick={() => {
+            const next = !autoRotateRef.current;
+            autoRotateRef.current = next;
+            setAutoRotate(next);
+            wakeRendererRef.current?.();
+          }}
           aria-pressed={autoRotate}
           className="absolute bottom-3 right-3 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-white/70 bg-white/85 px-3 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent dark:border-white/10 dark:bg-black/55 dark:text-white"
         >
           <Rotate3d size={15} aria-hidden />
-          {autoRotate ? "자동 회전 끄기" : "자동 회전"}
+          {autoRotate ? translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "자동 회전 끄기") : translateCurrentStaticSourceText("domains.creator.StudioUnifiedAssetPreviewSurface", "ko", "자동 회전")}
         </button>
       ) : null}
     </div>

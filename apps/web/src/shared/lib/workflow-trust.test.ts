@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { resolveTranslation } from "./i18n-core";
 import {
   resolveWorkflowTrustPresentation,
   type WorkflowTrustState,
@@ -21,23 +22,23 @@ const STATES: readonly WorkflowTrustState[] = [
 describe("workflow trust language", () => {
   it("provides understandable Korean and English copy for every state", () => {
     for (const state of STATES) {
+      const presentation = resolveWorkflowTrustPresentation(state);
       for (const locale of ["ko", "en"] as const) {
-        const presentation = resolveWorkflowTrustPresentation(state, locale);
-        expect(presentation.label.length).toBeGreaterThan(3);
-        expect(presentation.description.length).toBeGreaterThan(12);
+        expect(resolveTranslation(locale, presentation.label).length).toBeGreaterThan(3);
+        expect(resolveTranslation(locale, presentation.description).length).toBeGreaterThan(12);
       }
     }
   });
 
   it("uses assertive announcements only when the user must act", () => {
-    expect(resolveWorkflowTrustPresentation("retry-needed", "ko").live).toBe("assertive");
-    expect(resolveWorkflowTrustPresentation("conflict", "ko").live).toBe("assertive");
-    expect(resolveWorkflowTrustPresentation("synced", "ko").live).toBe("polite");
+    expect(resolveWorkflowTrustPresentation("retry-needed").live).toBe("assertive");
+    expect(resolveWorkflowTrustPresentation("conflict").live).toBe("assertive");
+    expect(resolveWorkflowTrustPresentation("synced").live).toBe("polite");
   });
 
   it("does not collapse review, approval and publishing into a generic saved state", () => {
     const labels = ["review-submitted", "approved", "published"].map((state) =>
-      resolveWorkflowTrustPresentation(state as WorkflowTrustState, "ko").label,
+      resolveWorkflowTrustPresentation(state as WorkflowTrustState).label,
     );
     expect(new Set(labels).size).toBe(3);
   });

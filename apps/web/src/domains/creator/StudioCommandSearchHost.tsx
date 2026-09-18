@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * 통합 Command Search 진입점 — 버튼과 **⌘K / Ctrl+K / F1** 바인딩.
  *
@@ -161,7 +162,7 @@ export function StudioCommandSearchHost({
               onClick={() => openSearch("all")}
               data-testid="studio-command-search-trigger"
               data-inspector-priority="chrome"
-              title="기능·설정 찾기 (⌘K / Ctrl+K / F1)"
+              title={translateCurrentStaticSourceText("domains.creator.StudioCommandSearchHost", "ko", "기능·설정 찾기 (⌘K / Ctrl+K / F1)")}
               className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-xs text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <Search
@@ -171,11 +172,11 @@ export function StudioCommandSearchHost({
                 className={studioChromeIconClass({ tone: "default" })}
               />
               <span className="min-w-0 flex-1 truncate">
-                기능·설정 찾기 · CSP·Photoshop 용어
+                기능·설정 찾기 · 다른 앱 용어도 검색
               </span>
               <span
                 className="flex shrink-0 items-center gap-1"
-                aria-label="단축키 Command K, Control K 또는 F1"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioCommandSearchHost", "ko", "단축키 Command K, Control K 또는 F1")}
               >
                 <kbd className="rounded border border-line bg-card px-1.5 py-px text-[0.6875rem]">
                   ⌘K

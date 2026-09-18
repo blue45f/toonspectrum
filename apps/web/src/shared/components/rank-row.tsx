@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ChevronUp, ChevronDown, Minus, HelpCircle, Sparkles } from "lucide-react";
 import { useId, useState } from "react";
 
@@ -134,7 +138,7 @@ export function RankRow({
           type="button"
           onClick={() => setExpanded(!expanded)}
           title={t("ranking.detailTitle")}
-          aria-label={`${rank}위 ${title.title} · ${t("ranking.detailTitle")}`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rank.row", "ko", "{v0}위 {v1} · {v2}"), { v0: String(rank), v1: String(title.title), v2: String(t("ranking.detailTitle")) })}
           aria-expanded={expanded}
           aria-controls={detailId}
           className={cn(
@@ -160,11 +164,11 @@ export function RankRow({
           )}
         </button>
 
-        <Link href={`/title/${title.slug}`} className="w-9 sm:w-10" aria-label={`${title.title} 작품 상세`}>
+        <Link href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rank.row", "en", "/title/{v0}"), { v0: String(title.slug) })} className="w-9 sm:w-10" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rank.row", "ko", "{v0} 작품 상세"), { v0: String(title.title) })}>
           <MiniPoster title={title} className="w-9 transition-transform group-hover/row:scale-105 sm:w-10" />
         </Link>
 
-        <Link href={`/title/${title.slug}`} className="min-w-0 flex-1">
+        <Link href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.rank.row", "en", "/title/{v0}"), { v0: String(title.slug) })} className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="truncate text-sm font-semibold text-fg transition-colors group-hover/row:text-accent">
               {title.title}
@@ -182,7 +186,7 @@ export function RankRow({
             <PlatformTags availability={title.availability} max={2} />
             {live && (
               <span className="rounded-md border border-good/30 bg-[oklch(0.8_0.15_150/0.1)] px-1.5 py-0.5 text-[0.65rem] font-medium text-good">
-                LIVE #{live.liveRank} · {live.livePlatform}
+                {translateCurrentStaticSourceText("shared.components.rank.row", "en", "LIVE #")}{live.liveRank} · {live.livePlatform}
               </span>
             )}
           </div>

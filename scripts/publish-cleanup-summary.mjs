@@ -31,11 +31,11 @@ export function buildCleanupSummary({ branchReport, actionsReport }) {
       "",
       "### Actions queue cleanup",
       "",
-      `- Active push/PR runs scanned: ${actionsReport.activeRunsScanned}`,
+      `- Active push/PR/dynamic runs scanned: ${actionsReport.activeRunsScanned}`,
       `- Open PR heads protected: ${actionsReport.openPullHeads ?? 0}`,
-      `- Superseded/closed-PR candidates: ${actionsReport.candidateRuns}`,
+      `- Superseded/stale candidates: ${actionsReport.candidateRuns}`,
       `- Cancellation requests accepted: ${actionsReport.cancelled.length}`,
-      `- Already terminal while cleaning: ${actionsReport.skipped.length}`,
+      `- Uncancellable GitHub ghost-state runs: ${actionsReport.skipped.length}`,
     );
   }
   return `${lines.join("\n")}\n`;

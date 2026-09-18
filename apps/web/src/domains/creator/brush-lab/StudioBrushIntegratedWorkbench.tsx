@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { LoaderCircle } from "lucide-react";
 import { useLayoutEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
@@ -55,8 +56,7 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
     return (
       <div className="flex min-h-32 items-center justify-center rounded-2xl border border-line bg-card/55 text-sm text-fg-3" role="status">
         <LoaderCircle size={16} className="mr-2 animate-spin" aria-hidden="true" />
-        브러시 프로그램 연결 중
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushIntegratedWorkbench", "ko", "브러시 프로그램 연결 중")}</div>
     );
   }
 
@@ -70,9 +70,7 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
       <StudioBrushV6Workbench key={`${scope}:${generation}`} scope={scope} />
       <div className="rounded-2xl border border-line bg-card/45 p-4">
         <p className="text-xs leading-5 text-fg-3">
-          완성한 브러시는 ‘스튜디오에 브러시 저장’으로 라이브러리에 추가하세요.
-          원고에서 사용한 재료 설정은 획마다 보존되며, 그리기와 내보내기에 같은 접촉 계산을 사용합니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushIntegratedWorkbench", "ko", "완성한 브러시는 ‘스튜디오에 브러시 저장’으로 라이브러리에 추가하세요. 원고에서 사용한 재료 설정은 획마다 보존되며, 그리기와 내보내기에 같은 접촉 계산을 사용합니다.")}</p>
         <div className="mt-3">
           <MarketplaceBrushStudioBridge snapshot={snapshot} visible={snapshot !== null} />
         </div>

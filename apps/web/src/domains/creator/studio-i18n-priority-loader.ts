@@ -1,6 +1,7 @@
 import { STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import {
   getLang,
+  registerI18nEnglishSourceEntries,
   registerI18nLocaleEntries,
   triggerTranslationBundleUpdate,
 } from "@/shared/lib/i18n-core";
@@ -197,7 +198,11 @@ export async function loadStudioI18nNamespaces(
   }
 
   if (Object.keys(merged).length > 0) {
-    registerI18nLocaleEntries(assetLocale, merged);
+    if (assetLocale === "en") {
+      registerI18nEnglishSourceEntries(merged);
+    } else {
+      registerI18nLocaleEntries(assetLocale, merged);
+    }
     const normalizedRequestedLocale = normalizeLocaleCode(requestedLocale);
     if (
       normalizedRequestedLocale
@@ -263,6 +268,39 @@ export async function retryFailedStudioI18nNamespaces(
   return report;
 }
 
+function shouldLoadStudioEnglishTranslationSource(locale: string): boolean {
+  const normalized = normalizeLocaleCode(locale);
+  if (!normalized) return false;
+  const root = normalized.split("-")[0];
+  if (root === "en" || root === "ko") return false;
+  return resolveStudioAssetLocale(normalized) !== "en";
+}
+
+/**
+ * Loads the canonical Studio English source only after the first route has committed. This keeps
+ * the critical-path invariant (core requests still fetch only the active locale) while giving the
+ * runtime translator an exact English reference for lazy Studio keys whose locale asset still
+ * contains English placeholder copy.
+ */
+async function loadStudioEnglishTranslationSource(
+  options: StudioI18nPriorityLoaderOptions,
+): Promise<void> {
+  const requestedLocale = options.locale ?? getLang();
+  if (!shouldLoadStudioEnglishTranslationSource(requestedLocale)) return;
+
+  const report = await loadStudioI18nNamespaces(STUDIO_I18N_NAMESPACES, {
+    ...options,
+    locale: "en",
+  });
+  if (report.failedNamespaces.length > 0) {
+    console.warn(
+      `[i18n] ${report.failedNamespaces.length} Studio English source namespace(s) failed to load; `
+        + "display fallback remains available and a later navigation can retry.",
+      report.failedNamespaces,
+    );
+  }
+}
+
 export function scheduleStudioI18nDeferredLoad(
   options: StudioI18nPriorityLoaderOptions = {},
 ): () => void {
@@ -304,6 +342,7 @@ export function scheduleStudioI18nDeferredLoad(
   const run = () => {
     idleHandle = null;
     void runAttempt(STUDIO_I18N_DEFERRED_NAMESPACES, 0);
+    void loadStudioEnglishTranslationSource(options);
   };
 
   const scheduler = globalThis as typeof globalThis & IdleScheduler;

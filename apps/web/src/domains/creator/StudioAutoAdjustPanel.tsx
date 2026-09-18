@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Auto Adjust Panel
  * 선택된 이미지의 자동 보정(Auto) 인스펙터 — 원클릭 모드 프리셋 + 강도(strength) 슬라이더.
@@ -42,17 +43,16 @@ export function StudioAutoAdjustPanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">자동 보정 (Auto)</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioAutoAdjustPanel", "ko", "자동 보정 (Auto)")}</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="자동 보정을 제거하고 원본 톤으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioAutoAdjustPanel", "ko", "자동 보정을 제거하고 원본 톤으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioAutoAdjustPanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 모드 프리셋 칩 — 모드+강도를 절대값으로 덮어쓴다(누적 아님). */}
@@ -75,8 +75,7 @@ export function StudioAutoAdjustPanel({
 
       {/* 강도 슬라이더 — 프리셋이 고른 모드를 원본과 어느 비율로 블렌드할지(0..100%). */}
       <label className={LABEL_ROW}>
-        강도
-        <span className="flex items-center gap-1.5">
+        {translateCurrentStaticSourceText("domains.creator.StudioAutoAdjustPanel", "ko", "강도")}<span className="flex items-center gap-1.5">
           <input
             type="range"
             min={AUTO_STRENGTH_RANGE.min}
@@ -91,7 +90,7 @@ export function StudioAutoAdjustPanel({
       </label>
 
       {/* 사용법 힌트 — 프리셋으로 모드를 고른 뒤 강도로 세기 조절. */}
-      <p className="text-[10px] leading-snug text-fg-3">프리셋을 누른 뒤 강도로 세기를 조절하세요.</p>
+      <p className="text-[10px] leading-snug text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioAutoAdjustPanel", "ko", "프리셋을 누른 뒤 강도로 세기를 조절하세요.")}</p>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, useEffect, useRef } from "react";
 
 import { DEFAULT_STUDIO_ADVANCED_FILL_SETTINGS } from "./studio-advanced-fill-settings";
@@ -73,7 +74,7 @@ export function StudioInspectorUnselectedImageTools({
             <div
               id={tabA11y.imagePanels.unselected}
               role="tabpanel"
-              aria-label="전문 픽셀 도구"
+              aria-label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUnselectedImageTools", "ko", "전문 픽셀 도구")}
               aria-labelledby={tabA11y.imageTabs[inspectorLayout.image]}
               className="space-y-3 rounded-xl border border-line bg-panel/40 p-3"
             >
@@ -84,19 +85,16 @@ export function StudioInspectorUnselectedImageTools({
                     tabIndex={-1}
                     className="rounded-sm text-xs font-bold text-fg focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent"
                   >
-                    이미지 편집 대상 준비
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorUnselectedImageTools", "ko", "이미지 편집 대상 준비")}</p>
                   <p className="mt-0.5 text-[0.68rem] leading-snug text-fg-3">
-                    이미지 레이어를 선택하거나 페이지 합성본을 만든 뒤 도구를 실행하세요.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioInspectorUnselectedImageTools", "ko", "이미지 레이어를 선택하거나 페이지 합성본을 만든 뒤 도구를 실행하세요.")}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setUnselectedImageToolsVisible(false)}
                   className="min-h-9 shrink-0 rounded-lg border border-line bg-card px-2 text-[0.68rem] font-semibold text-fg-2 transition-colors hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent pointer-coarse:min-h-11"
                 >
-                  시작 안내
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.StudioInspectorUnselectedImageTools", "ko", "시작 안내")}</button>
               </div>
               {shouldMountImageInspectorTab("quick") ? (
                 <div className="space-y-3" hidden={activeImageInspectorTab !== "quick"}>
@@ -110,7 +108,7 @@ export function StudioInspectorUnselectedImageTools({
               ) : null}
               {shouldMountImageInspectorTab("fill") ? (
                 <div className="space-y-3" hidden={activeImageInspectorTab !== "fill"}>
-                  <Suspense fallback={<StudioPanelLoading label="채우기·선화 도구를 여는 중..." />}>
+                  <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorUnselectedImageTools", "ko", "채우기·선화 도구를 여는 중...")} />}>
                     <StudioFloodFillPanel
                       active={advancedFillActive}
                       busy={advancedFillBusy}

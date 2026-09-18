@@ -39,15 +39,15 @@ import {
 } from "./creator-route-pages";
 
 export const creatorRoutes = defineAppRoutes([
-  { id: "creator-ai-settings", path: "/studio/ai-settings", element: <StudioAiSettingsPage /> },
-  { id: "creator-ai-inference", path: "/studio/ai-lab", element: <PersonalInferencePage /> },
-  { id: "creator-ai-runtime", path: "/studio/ai-runtime", element: <CreatorInferencePage /> },
-  { id: "creator-character-convert", path: "/studio/character-convert", element: <StudioCharacterConversionPage /> },
-  { id: "creator-ecosystem", path: "/studio/ecosystem", element: <CreatorEcosystemPage /> },
-  { id: "creator-ecosystem-viewer", path: "/studio/ecosystem/viewer", element: <CreatorEcosystemViewerPage /> },
+  { id: "creator-ai-settings", path: studioRoutePath("ai-settings"), element: <StudioAiSettingsPage /> },
+  { id: "creator-ai-inference", path: studioRoutePath("ai-lab"), element: <PersonalInferencePage /> },
+  { id: "creator-ai-runtime", path: studioRoutePath("ai-runtime"), element: <CreatorInferencePage /> },
+  { id: "creator-character-convert", path: studioRoutePath("character-convert"), element: <StudioCharacterConversionPage /> },
+  { id: "creator-ecosystem", path: studioRoutePath("ecosystem"), element: <CreatorEcosystemPage /> },
+  { id: "creator-ecosystem-viewer", path: studioRoutePath("ecosystem-viewer"), element: <CreatorEcosystemViewerPage /> },
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
-  { id: "creator-studio-generative", path: "/studio/generate", element: <StudioGenerativePage /> },
+  { id: "creator-studio-generative", path: studioRoutePath("generate"), element: <StudioGenerativePage /> },
   { id: "creator-studio-toolchain", path: studioRoutePath("toolchain"), element: <StudioProductionToolchainPage /> },
   { id: "creator-studio-engines", path: studioRoutePath("engines"), element: <StudioEngineCenterPage /> },
   { id: "creator-studio-jobs", path: studioRoutePath("jobs"), element: <StudioProductionJobsPage /> },

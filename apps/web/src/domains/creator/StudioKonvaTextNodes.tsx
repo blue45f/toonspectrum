@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Group as KGroup, Text as KText, TextPath as KTextPath } from "react-konva/lib/ReactKonvaCore";
 
 import {
@@ -115,9 +116,9 @@ export function StudioKonvaTextNode({
         lineJoin="round"
         rotation={el.rotation}
         opacity={el.opacity ?? 1}
-        fontFamily={el.font ?? "Pretendard, sans-serif"}
-        fontStyle={el.fontStyle ?? "bold"}
-        align={el.align ?? "left"}
+        fontFamily={el.font ?? translateCurrentStaticSourceText("domains.creator.StudioKonvaTextNodes", "en", "Pretendard, sans-serif")}
+        fontStyle={el.fontStyle ?? translateCurrentStaticSourceText("domains.creator.StudioKonvaTextNodes", "en", "bold")}
+        align={el.align ?? translateCurrentStaticSourceText("domains.creator.StudioKonvaTextNodes", "en", "left")}
         letterSpacing={el.letterSpacing ?? 0}
         shadowColor={el.shadowColor}
         shadowBlur={el.shadowBlur}
@@ -220,7 +221,7 @@ export function StudioKonvaTextNode({
         />
         {rubyOverlays.map((placement) => (
           <KText
-            key={`ruby-${placement.start}-${placement.end}-${placement.ruby}`}
+            key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaTextNodes", "en", "ruby-{v0}-{v1}-{v2}"), { v0: String(placement.start), v1: String(placement.end), v2: String(placement.ruby) })}
             text={placement.ruby}
             x={placement.x}
             y={placement.y}
@@ -396,7 +397,7 @@ function StudioKonvaVerticalTextNode({
       )}
       {verticalRuby.placements.map((placement) => (
         <KText
-          key={`vertical-ruby-${placement.spanIndex}-${placement.fragmentIndex}`}
+          key={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioKonvaTextNodes", "en", "vertical-ruby-{v0}-{v1}"), { v0: String(placement.spanIndex), v1: String(placement.fragmentIndex) })}
           name="studio-vertical-ruby"
           text={[...placement.ruby].join("\n")}
           x={placement.x}

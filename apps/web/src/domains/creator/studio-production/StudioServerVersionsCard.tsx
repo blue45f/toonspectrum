@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { RefreshCw, RotateCcw, Server } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -70,11 +74,10 @@ export function StudioServerVersionsCard({ scopeKey }: { readonly scopeKey: stri
         <div>
           <div className="flex items-center gap-2">
             <Server className="size-4 text-accent" aria-hidden="true" />
-            <h2 className="text-sm font-bold text-fg">서버 원고 버전</h2>
+            <h2 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "서버 원고 버전")}</h2>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-fg-2">
-            실제 원고 snapshot의 owner-only 서버 revision입니다. 위 로컬 작업·검수 체크포인트와 별개입니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "실제 원고 snapshot의 owner-only 서버 revision입니다. 위 로컬 작업·검수 체크포인트와 별개입니다.")}</p>
         </div>
         {workId ? (
           <button
@@ -84,42 +87,37 @@ export function StudioServerVersionsCard({ scopeKey }: { readonly scopeKey: stri
             disabled={status === "loading" || status === "restoring"}
           >
             <RefreshCw className="size-4" aria-hidden="true" />
-            새로고침
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "새로고침")}</button>
         ) : null}
       </header>
 
       {!workId ? (
         <div className="rounded-xl border border-dashed border-line p-5 text-sm text-fg-2">
-          서버 버전은 저장된 작품의 <code>work:</code> 범위에서만 제공됩니다. 초안과 리믹스 화면은 로컬 체크포인트만 사용합니다.
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "서버 버전은 저장된 작품의 ")}<code>work:</code> {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "범위에서만 제공됩니다. 초안과 리믹스 화면은 로컬 체크포인트만 사용합니다.")}</div>
       ) : null}
 
       {workId && status === "loading" ? (
         <p className="rounded-xl border border-line bg-panel p-4 text-sm text-fg-2" role="status">
-          서버 revision을 확인하고 있습니다…
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "서버 revision을 확인하고 있습니다…")}</p>
       ) : null}
 
       {error ? (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-fg" role="alert">
           <p>{error}</p>
           <button type="button" className="mt-3 font-semibold text-accent" onClick={() => void refresh()}>
-            다시 확인
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "다시 확인")}</button>
         </div>
       ) : null}
 
       {state ? (
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/30 bg-accent-soft p-3 text-xs">
-            <span className="font-semibold">현재 서버 revision</span>
+            <span className="font-semibold">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "현재 서버 revision")}</span>
             <strong className="font-mono text-sm">r{state.currentRevision}</strong>
           </div>
           {state.revisions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line p-5 text-sm text-fg-2">
-              저장된 서버 revision 이력이 없습니다.
-            </div>
+              {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "저장된 서버 revision 이력이 없습니다.")}</div>
           ) : state.revisions.map((revision) => {
             const current = revision.revision === state.currentRevision;
             return (
@@ -130,11 +128,11 @@ export function StudioServerVersionsCard({ scopeKey }: { readonly scopeKey: stri
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-mono text-sm font-bold">r{revision.revision}</h3>
-                    {current ? <span className="text-xs font-semibold text-accent">현재</span> : null}
+                    {current ? <span className="text-xs font-semibold text-accent">{translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "현재")}</span> : null}
                   </div>
                   <p className="mt-1 text-xs text-fg-2">
                     {DATE_TIME_FORMATTER.format(new Date(revision.createdAt))}
-                    {revision.restoredFromRevision ? ` · r${revision.restoredFromRevision}에서 복원` : ""}
+                    {revision.restoredFromRevision ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", " · r{v0}에서 복원"), { v0: String(revision.restoredFromRevision) }) : ""}
                   </p>
                 </div>
                 <button
@@ -144,8 +142,7 @@ export function StudioServerVersionsCard({ scopeKey }: { readonly scopeKey: stri
                   onClick={() => void restore(revision.revision)}
                 >
                   <RotateCcw className="size-4" aria-hidden="true" />
-                  서버 복원
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.studio.production.StudioServerVersionsCard", "ko", "서버 복원")}</button>
               </article>
             );
           })}
