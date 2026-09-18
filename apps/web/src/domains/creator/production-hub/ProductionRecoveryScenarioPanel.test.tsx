@@ -50,12 +50,12 @@ describe("ProductionRecoveryScenarioPanel", () => {
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(1));
     const original = aggregate.tasks.find((task) => task.id === "task-episode-12-background");
     expect(execute).toHaveBeenNthCalledWith(1, {
-      type: "upsert-task-batch",
-      tasks: expect.arrayContaining([expect.objectContaining({
+      type: "upsert-task",
+      task: expect.objectContaining({
         id: "task-episode-12-background",
         dueAt: expect.not.stringMatching(original?.dueAt ?? ""),
-      })]),
-    }, expect.stringContaining("원자적으로 적용했습니다"));
+      }),
+    }, expect.stringContaining("복구 시나리오를 적용했습니다"));
 
     const undo = await screen.findByRole("button", {
       name: "마감 2일 재조정 복구 시나리오 되돌리기",
@@ -63,12 +63,12 @@ describe("ProductionRecoveryScenarioPanel", () => {
     fireEvent.click(undo);
     await waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
     expect(execute).toHaveBeenNthCalledWith(2, {
-      type: "upsert-task-batch",
-      tasks: expect.arrayContaining([expect.objectContaining({
+      type: "upsert-task",
+      task: expect.objectContaining({
         id: "task-episode-12-background",
         dueAt: original?.dueAt,
-      })]),
-    }, expect.stringContaining("원자적으로 되돌렸습니다"));
+      }),
+    }, expect.stringContaining("복구 시나리오를 되돌렸습니다"));
   });
 
   it("keeps unsafe scenarios preview-only and direct changes disabled without edit permission", () => {
