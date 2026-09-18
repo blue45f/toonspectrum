@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getStudio2dAssetMetadata, studio2dDisplayName } from "./studio-2d-asset-quality";
+import { filterStudio2dScenes, getStudio2dAssetMetadata, studio2dDisplayName } from "./studio-2d-asset-quality";
 import { BG_SCENES, groupBgScenes } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { Studio2dSceneBrowser } from "./Studio2dSceneBrowser";
@@ -11,8 +11,16 @@ import { Studio2dSceneBrowser } from "./Studio2dSceneBrowser";
 import type { Studio2dScene } from "./studio-2d-asset-quality";
 
 const groups = groupBgScenes([...BG_SCENES, ...BG_SCENES_EXTRA]);
-const rooftop = BG_SCENES.find((scene) => scene.id === "webtoon-rooftop-sunset")!;
-const title = studio2dDisplayName(rooftop);
+const PAGE_SIZE = 48;
+const allScenes = filterStudio2dScenes(groups, {});
+const recommendedScenes = filterStudio2dScenes(groups, { quality: "recommended" });
+const romanceRecommendedScenes = filterStudio2dScenes(groups, {
+  quality: "recommended",
+  genre: "로맨스",
+});
+const previewScene = BG_SCENES.find((scene) => scene.id === "webtoon-bedroom")!;
+const title = studio2dDisplayName(previewScene);
+const romanceTitle = studio2dDisplayName(romanceRecommendedScenes[0]!);
 
 function Harness({ onPick = vi.fn(), disabled = false, initialGenre = "all" }: {
   onPick?: (scene: Studio2dScene) => void;
@@ -25,7 +33,7 @@ function Harness({ onPick = vi.fn(), disabled = false, initialGenre = "all" }: {
     loading={false} error={null} disabled={disabled} onPick={onPick} />;
 }
 
-function loadImage(image: HTMLElement, scene = rooftop, overrideWidth?: number) {
+function loadImage(image: HTMLElement, scene = previewScene, overrideWidth?: number) {
   const metadata = getStudio2dAssetMetadata(scene)!;
   Object.defineProperty(image, "naturalWidth", { configurable: true, value: overrideWidth ?? metadata.width });
   Object.defineProperty(image, "naturalHeight", { configurable: true, value: metadata.height });
@@ -41,25 +49,25 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe("2D scene browser", () => {
   it("pages the complete production catalog without counting any scene twice", () => {
     render(<Harness />);
-    expect(screen.getByRole("status").textContent).toBe("68개 장면");
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
-    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (20개 남음)" }));
+    expect(screen.getByRole("status").textContent).toBe(`${allScenes.length}개 장면`);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(Math.min(PAGE_SIZE, allScenes.length));
+    fireEvent.click(screen.getByRole("button", { name: `장면 더 보기 (${allScenes.length - PAGE_SIZE}개 남음)` }));
     const ids = [...document.querySelectorAll("[data-studio-2d-asset]")].map((node) => node.getAttribute("data-studio-2d-asset"));
-    expect(ids).toHaveLength(68);
-    expect(new Set(ids).size).toBe(68);
+    expect(ids).toHaveLength(allScenes.length);
+    expect(new Set(ids).size).toBe(allScenes.length);
     expect(screen.queryByRole("button", { name: /장면 더 보기/u })).toBeNull();
   });
   it("returns to the first results when filters or search change after scrolling", () => {
     render(<Harness />);
-    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (20개 남음)" }));
+    fireEvent.click(screen.getByRole("button", { name: `장면 더 보기 (${allScenes.length - PAGE_SIZE}개 남음)` }));
     const grid = document.querySelector<HTMLElement>("[data-studio-2d-grid]")!;
     grid.scrollTop = 800;
     fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "recommended" } });
     expect(grid.scrollTop).toBe(0);
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(33);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(Math.min(PAGE_SIZE, recommendedScenes.length));
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
-    expect(screen.getByRole("button", { name: "장면 더 보기 (20개 남음)" })).toBeTruthy();
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(Math.min(PAGE_SIZE, allScenes.length));
+    expect(screen.getByRole("button", { name: `장면 더 보기 (${allScenes.length - PAGE_SIZE}개 남음)` })).toBeTruthy();
   });
   it("finds metadata tags and independent genre/recommendation filters", () => {
     render(<Harness />);
@@ -67,10 +75,10 @@ describe("2D scene browser", () => {
     expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "recommended" } });
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(33);
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(Math.min(PAGE_SIZE, recommendedScenes.length));
     fireEvent.change(screen.getByLabelText("장르"), { target: { value: "로맨스" } });
-    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(6);
-    expect(screen.getByText(title)).toBeTruthy();
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(romanceRecommendedScenes.length);
+    expect(screen.getByText(romanceTitle)).toBeTruthy();
   });
   it("recovers obsolete recommendation genre state without emptying the catalog", () => {
     render(<Harness initialGenre="추천" />);
@@ -80,7 +88,8 @@ describe("2D scene browser", () => {
   it("does not silently relax incompatible filters and provides a reset", () => {
     render(<Harness />);
     fireEvent.change(screen.getByLabelText("소재 구분"), { target: { value: "large" } });
-    fireEvent.change(screen.getByLabelText("원본 비율"), { target: { value: "portrait" } });
+    fireEvent.change(screen.getByLabelText("원본 비율"), { target: { value: "square" } });
+    fireEvent.change(screen.getByLabelText("장소"), { target: { value: "실외" } });
     expect(screen.getByText(/조건에 맞는 배경이 없습니다/u)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect(document.querySelectorAll("[data-studio-2d-asset]").length).toBeGreaterThan(0);
@@ -91,7 +100,7 @@ describe("2D scene browser", () => {
     expect(insert.hasAttribute("disabled")).toBe(true);
     fireEvent.click(insert); expect(onPick).not.toHaveBeenCalled();
     loadImage(screen.getByAltText(title));
-    fireEvent.click(insert); expect(onPick).toHaveBeenCalledExactlyOnceWith(rooftop);
+    fireEvent.click(insert); expect(onPick).toHaveBeenCalledExactlyOnceWith(previewScene);
   });
   it("keeps insertion disabled in master/busy mode even after decoding", () => {
     const onPick = vi.fn(); render(<Harness disabled onPick={onPick} />);
@@ -119,8 +128,8 @@ describe("2D scene browser", () => {
     const image = within(dialog).getByAltText(title);
     loadImage(image);
     fireEvent.click(within(dialog).getByRole("button", { name: "원본 픽셀 보기" }));
-    expect(image.style.width).toBe(`${getStudio2dAssetMetadata(rooftop)!.width}px`);
-    expect(within(dialog).getByText(/이용 권리 기록 미확인/u)).toBeTruthy();
+    expect(image.style.width).toBe(`${getStudio2dAssetMetadata(previewScene)!.width}px`);
+    expect(within(dialog).getByText(/Studio 생성 소재/u)).toBeTruthy();
     fireEvent.keyDown(document.activeElement ?? dialog, { key: "Escape" });
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(launcher);
@@ -129,7 +138,7 @@ describe("2D scene browser", () => {
     const onPick = vi.fn(); render(<Harness onPick={onPick} />);
     fireEvent.click(screen.getByRole("button", { name: `${title} 확대 미리보기` }));
     const dialog = screen.getByRole("dialog", { name: title });
-    loadImage(within(dialog).getByAltText(title), rooftop, 200);
+    loadImage(within(dialog).getByAltText(title), previewScene, 200);
     expect(within(dialog).getByRole("alert").textContent).toContain("재검수 전 삽입할 수 없습니다");
     fireEvent.click(within(dialog).getByRole("button", { name: "이 배경 삽입" }));
     expect(onPick).not.toHaveBeenCalled();
@@ -142,7 +151,7 @@ describe("2D scene browser", () => {
     expect(insert.hasAttribute("disabled")).toBe(true);
     loadImage(within(dialog).getByAltText(title));
     fireEvent.click(insert);
-    expect(onPick).toHaveBeenCalledExactlyOnceWith(rooftop);
+    expect(onPick).toHaveBeenCalledExactlyOnceWith(previewScene);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
   it("preserves source aspect ratios and lazy-loads grid images", () => {
