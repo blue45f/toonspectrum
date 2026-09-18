@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { playSfx, triggerParticleBurst } from "@toonspectrum/core/fx";
 
 import { AvailabilityDots, PlatformTags } from "./availability";
@@ -34,7 +38,7 @@ function popOnTitleTap(event: React.PointerEvent<HTMLElement>) {
 function StretchedTitleLink({ title }: { title: Title }) {
   return (
     <Link
-      href={`/title/${title.slug}`}
+      href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.card", "en", "/title/{v0}"), { v0: String(title.slug) })}
       data-no-sfx
       onPointerDown={popOnTitleTap}
       aria-label={title.title}
@@ -110,7 +114,7 @@ export function TitleCard({
               genres={title.genres}
               height={4}
               interactive
-              label={`${title.title} 장르`}
+              label={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.card", "ko", "{v0} 장르"), { v0: String(title.title) })}
               className="mt-1"
             />
           </div>
@@ -170,7 +174,7 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
   const price = bestPricing(title.availability);
   return (
     <Link
-      href={`/title/${title.slug}`}
+      href={formatI18nTemplate(translateCurrentStaticSourceText("shared.components.title.card", "en", "/title/{v0}"), { v0: String(title.slug) })}
       data-no-sfx
       onPointerDown={popOnTitleTap}
       className={cn(

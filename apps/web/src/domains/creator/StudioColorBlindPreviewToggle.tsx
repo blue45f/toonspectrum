@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Check } from "lucide-react";
 import { useRef, type KeyboardEvent } from "react";
 
@@ -75,7 +78,7 @@ export function StudioColorBlindPreviewToggle({
   }
 
   return (
-    <div role="radiogroup" aria-label="흑백·색각 시뮬레이션 미리보기" className="flex items-center gap-1">
+    <div role="radiogroup" aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorBlindPreviewToggle", "ko", "흑백·색각 시뮬레이션 미리보기")} className="flex items-center gap-1">
       {CVD_OPTIONS.map(({ mode, label, accessibleLabel, hint }, index) => (
         <StudioToolHintTarget key={mode} hint={hint} preferredSide="bottom">
           <button
@@ -90,7 +93,7 @@ export function StudioColorBlindPreviewToggle({
             aria-checked={value === mode}
             // 단독 `Q` 는 퀵 마스크의 화음이다 — 흑백 명암은 `⌥Q`
             // (conflict `q-quickmask-vs-grayscale` 해소, 2026-08-08).
-            aria-keyshortcuts={mode === "grayscale" ? "Alt+Q" : undefined}
+            aria-keyshortcuts={mode === "grayscale" ? translateCurrentStaticSourceText("domains.creator.StudioColorBlindPreviewToggle", "en", "Alt+Q") : undefined}
             tabIndex={value === mode ? 0 : -1}
             data-studio-color-vision-mode={mode}
             className={cvdBtnClass(value === mode)}

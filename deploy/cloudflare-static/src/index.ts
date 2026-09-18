@@ -2,6 +2,7 @@ import {
   getStaticPolicyDocument,
   isPolicySlug,
 } from "../../../packages/core/src/legal-policy";
+import { parsePublicSharePath } from "../../../packages/core/src/public-share-path";
 
 import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
@@ -9,6 +10,7 @@ import {
   cloudflareLargeAssetKey,
   cloudflareLargeAssetSidecarPath,
   isCloudflareOversizedAssetPath,
+  supportsCloudflareStaticSidecar,
   type CloudflareLargeAssetEncoding,
 } from "./large-static-assets";
 
@@ -312,6 +314,9 @@ function mapDynamicPath(requestUrl: URL): URLSearchParams | null {
   }
   if (isPromotionOgPath(pathname)) {
     return mappedSegment(pathname, "/community/promote/", "promotionPostId");
+  }
+  if (parsePublicSharePath(requestUrl.pathname)) {
+    return new URLSearchParams({ publicPath: requestUrl.pathname });
   }
   return null;
 }
@@ -651,7 +656,11 @@ async function serveCompressedLargeAsset(
   const incoming = new URL(request.url);
   const descriptor = cloudflareLargeAssetDescriptor(incoming.pathname);
   const encoding = preferredLargeAssetEncoding(request);
-  if (!descriptor || !encoding) return null;
+  if (
+    !descriptor
+    || !encoding
+    || !supportsCloudflareStaticSidecar(incoming.pathname)
+  ) return null;
 
   const sidecarUrl = new URL(incoming);
   sidecarUrl.pathname = cloudflareLargeAssetSidecarPath(

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, Download, Monitor, RefreshCw, WifiOff } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
@@ -113,16 +114,14 @@ export class ErrorBoundary extends Component<Props, State> {
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-semibold text-black hover:bg-amber-400 transition-colors shadow-lg"
                   >
                     <Download size={16} />
-                    브라우저 업데이트 안내 보기
-                  </button>
+                    {translateCurrentStaticSourceText("components.error.boundary", "ko", "브라우저 업데이트 안내 보기")}</button>
                   <button
                     type="button"
                     onClick={() => window.location.reload()}
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 text-xs font-medium text-fg hover:bg-white/10 transition-colors"
                   >
                     <RefreshCw size={14} />
-                    새로고침
-                  </button>
+                    {translateCurrentStaticSourceText("components.error.boundary", "ko", "새로고침")}</button>
                 </div>
               </div>
             </div>
@@ -154,8 +153,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="mt-5 inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 text-xs font-semibold text-white hover:bg-blue-600 transition-colors"
               >
                 <RefreshCw size={14} />
-                연결 재시도
-              </button>
+                {translateCurrentStaticSourceText("components.error.boundary", "ko", "연결 재시도")}</button>
             </div>
           </div>
         );
@@ -171,7 +169,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="mx-auto w-full max-w-[1320px] px-4 py-16 sm:px-6">
               <div className="mx-auto max-w-md rounded-2xl border border-line bg-panel/70 p-12 text-center" role="status">
                 <RefreshCw size={24} className="mx-auto mb-3 animate-spin text-accent" />
-                <p className="text-sm font-medium text-fg">최신 버전으로 새로고침하는 중이에요…</p>
+                <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("components.error.boundary", "ko", "최신 버전으로 새로고침하는 중이에요…")}</p>
               </div>
             </div>
           );
@@ -185,7 +183,7 @@ export class ErrorBoundary extends Component<Props, State> {
             >
               <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
               <p className="text-sm font-medium text-fg">{analysis.message}</p>
-              <p className="mt-1 text-sm text-fg-2">자동으로 복구하지 못했어요. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.</p>
+              <p className="mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("components.error.boundary", "ko", "자동으로 복구하지 못했어요. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")}</p>
               <div className="mt-5 flex items-center justify-center gap-2">
                 <button
                   type="button"
@@ -193,14 +191,12 @@ export class ErrorBoundary extends Component<Props, State> {
                   className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.7rem] border border-line-strong/90 px-3 text-[0.8125rem] font-medium text-fg transition-[background,color,border-color,transform,box-shadow,filter] duration-150 ease-out-expo hover:border-accent/70 hover:bg-accent-soft/80 hover:text-accent active:scale-[0.985] active:bg-accent active:text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   <RefreshCw size={14} />
-                  새로고침
-                </button>
+                  {translateCurrentStaticSourceText("components.error.boundary", "ko", "새로고침")}</button>
                 <a
                   href="/"
                   className="inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-[0.7rem] bg-accent px-3 text-[0.8125rem] font-medium text-on-accent shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset] transition-[background,color,border-color,transform,box-shadow,filter] duration-150 ease-out-expo hover:bg-accent-2 hover:shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset,0_8px_24px_-8px_oklch(0.72_0.185_42/0.55)] active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
-                  홈으로
-                </a>
+                  {translateCurrentStaticSourceText("components.error.boundary", "ko", "홈으로")}</a>
               </div>
             </div>
           </div>
@@ -216,7 +212,7 @@ export class ErrorBoundary extends Component<Props, State> {
           >
             <AlertTriangle size={24} className="mx-auto mb-3 text-bad" />
             <p className="text-sm font-medium text-fg">{analysis.message}</p>
-            <p className="mt-1 text-sm text-fg-2">다시 시도하거나 홈으로 이동해 주세요.</p>
+            <p className="mt-1 text-sm text-fg-2">{translateCurrentStaticSourceText("components.error.boundary", "ko", "다시 시도하거나 홈으로 이동해 주세요.")}</p>
             <div className="mt-5 flex items-center justify-center gap-2">
               <button
                 type="button"
@@ -224,14 +220,12 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.7rem] border border-line-strong/90 px-3 text-[0.8125rem] font-medium text-fg transition-[background,color,border-color,transform,box-shadow,filter] duration-150 ease-out-expo hover:border-accent/70 hover:bg-accent-soft/80 hover:text-accent active:scale-[0.985] active:bg-accent active:text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <RefreshCw size={14} />
-                다시 시도
-              </button>
+                {translateCurrentStaticSourceText("components.error.boundary", "ko", "다시 시도")}</button>
               <a
                 href="/"
                 className="inline-flex h-8 items-center justify-center gap-2 whitespace-nowrap rounded-[0.7rem] bg-accent px-3 text-[0.8125rem] font-medium text-on-accent shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset] transition-[background,color,border-color,transform,box-shadow,filter] duration-150 ease-out-expo hover:bg-accent-2 hover:shadow-[0_1px_0_0_oklch(1_0_0/0.12)_inset,0_8px_24px_-8px_oklch(0.72_0.185_42/0.55)] active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/80 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
-                홈으로
-              </a>
+                {translateCurrentStaticSourceText("components.error.boundary", "ko", "홈으로")}</a>
             </div>
           </div>
         </div>

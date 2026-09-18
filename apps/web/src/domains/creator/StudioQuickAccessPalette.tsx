@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Check,
   ChevronDown,
   ChevronUp,
@@ -383,11 +387,11 @@ export function StudioQuickAccessPalette({
 
   return (
     <section
-      aria-label="빠른 액세스"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스")}
       data-studio-quick-access-palette="true"
       data-display-mode={current.displayMode}
       data-density={current.density}
-      data-customizing={customizing ? "true" : "false"}
+      data-customizing={customizing ? translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "en", "false")}
       className={cn(
         "flex w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-line bg-panel text-fg",
         className,
@@ -405,18 +409,16 @@ export function StudioQuickAccessPalette({
       >
         <div className="min-w-0">
           <h2 className="truncate text-xs font-bold text-fg">
-            빠른 액세스
-          </h2>
+            {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스")}</h2>
           <p className="truncate text-[0.6875rem] text-fg-3">
-            {activeSet.name} · {activeSet.commandIds.length}개
-          </p>
+            {activeSet.name} · {activeSet.commandIds.length}{translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "개")}</p>
         </div>
         <button
           ref={optionsButtonRef}
           type="button"
           aria-pressed={customizing}
-          aria-label={customizing ? "빠른 액세스 편집 완료" : "빠른 액세스 편집"}
-          title={customizing ? "편집 완료" : "명령 편집"}
+          aria-label={customizing ? translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스 편집 완료") : translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스 편집")}
+          title={customizing ? translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "편집 완료") : translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "명령 편집")}
           className={cn(
             "inline-flex size-9 shrink-0 items-center justify-center rounded-lg border",
             "max-lg:size-11 pointer-coarse:size-11",
@@ -446,7 +448,7 @@ export function StudioQuickAccessPalette({
       <div className="min-w-0 border-b border-line p-2">
         <div
           role="tablist"
-          aria-label="빠른 액세스 세트"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스 세트")}
           className="hidden min-w-0 gap-1 overflow-x-auto min-[420px]:flex"
         >
           {current.sets.map((set) => {
@@ -494,9 +496,9 @@ export function StudioQuickAccessPalette({
           })}
         </div>
         <label className="block min-w-0 min-[420px]:hidden">
-          <span className="sr-only">활성 빠른 액세스 세트</span>
+          <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "활성 빠른 액세스 세트")}</span>
           <select
-            aria-label="활성 빠른 액세스 세트"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "활성 빠른 액세스 세트")}
             value={current.activeSetId}
             onChange={changeSet}
             className={cn(
@@ -516,13 +518,13 @@ export function StudioQuickAccessPalette({
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-line px-2 py-1.5">
         <div
           role="group"
-          aria-label="빠른 액세스 표시 방식"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스 표시 방식")}
           className="inline-flex shrink-0 rounded-lg border border-line bg-card p-0.5"
         >
           <button
             type="button"
             aria-pressed={displayAsTiles}
-            aria-label="타일 보기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "타일 보기")}
             className={cn(
               "inline-flex size-8 items-center justify-center rounded-md",
               STUDIO_EASE,
@@ -544,7 +546,7 @@ export function StudioQuickAccessPalette({
           <button
             type="button"
             aria-pressed={!displayAsTiles}
-            aria-label="목록 보기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "목록 보기")}
             className={cn(
               "inline-flex size-8 items-center justify-center rounded-md",
               STUDIO_EASE,
@@ -565,9 +567,9 @@ export function StudioQuickAccessPalette({
           </button>
         </div>
         <label className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] text-fg-3">
-          <span className="shrink-0">간격</span>
+          <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "간격")}</span>
           <select
-            aria-label="빠른 액세스 명령 간격"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "빠른 액세스 명령 간격")}
             value={current.density}
             onChange={(event) =>
               commitState(
@@ -603,10 +605,10 @@ export function StudioQuickAccessPalette({
                 ref={searchInputRef}
                 type="search"
                 role="searchbox"
-                aria-label="추가할 빠른 액세스 명령 검색"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "추가할 빠른 액세스 명령 검색")}
                 value={query}
                 onChange={(event) => setQuery(event.currentTarget.value)}
-                placeholder="명령 이름·단축키 검색"
+                placeholder={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "명령 이름·단축키 검색")}
                 className={cn(
                   "min-h-11 w-full min-w-0 rounded-lg border border-line bg-panel py-2 pl-8 pr-2 text-xs text-fg placeholder:text-fg-2",
                   STUDIO_FOCUS_RING,
@@ -615,8 +617,8 @@ export function StudioQuickAccessPalette({
             </label>
             <button
               type="button"
-              aria-label={`${activeSet.name} 기본 명령 복원`}
-              title="현재 세트 기본 복원"
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 기본 명령 복원"), { v0: String(activeSet.name) })}
+              title={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "현재 세트 기본 복원")}
               className={cn(
                 "inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-line bg-panel text-fg-2 hover:bg-raised hover:text-fg",
                 STUDIO_EASE,
@@ -632,8 +634,7 @@ export function StudioQuickAccessPalette({
             </button>
           </div>
           <p className="mt-1.5 text-[0.6875rem] leading-4 text-fg-3">
-            Alt+방향키로 순서를 바꾸고 Delete로 뺄 수 있어요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "Alt+방향키로 순서를 바꾸고 Delete로 뺄 수 있어요.")}</p>
         </div>
       ) : null}
 
@@ -641,7 +642,7 @@ export function StudioQuickAccessPalette({
         {commands.length > 0 ? (
           <ul
             ref={commandListRef}
-            aria-label={`${activeSet.name} 명령`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 명령"), { v0: String(activeSet.name) })}
             className={cn(
               "min-w-0",
               displayAsTiles
@@ -657,7 +658,7 @@ export function StudioQuickAccessPalette({
                 <li
                   key={command.id}
                   data-command-id={command.id}
-                  data-command-available={command.available ? "true" : "false"}
+                  data-command-available={command.available ? translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "en", "true") : translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "en", "false")}
                   className={cn(
                     "min-w-0",
                     customizing && "rounded-lg border border-line bg-card p-1",
@@ -673,7 +674,7 @@ export function StudioQuickAccessPalette({
                     aria-label={commandAriaLabel(command)}
                     aria-keyshortcuts={
                       customizing
-                        ? "Alt+ArrowUp Alt+ArrowDown Delete"
+                        ? translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "en", "Alt+ArrowUp Alt+ArrowDown Delete")
                         : undefined
                     }
                     title={command.description ?? command.label}
@@ -717,20 +718,19 @@ export function StudioQuickAccessPalette({
                     ) : null}
                     {!command.available ? (
                       <span className="shrink-0 text-[0.625rem] font-semibold text-warn">
-                        사용 불가
-                      </span>
+                        {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "사용 불가")}</span>
                     ) : null}
                   </button>
                   {customizing ? (
                     <div
                       role="group"
-                      aria-label={`${command.label} 배치 편집`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 배치 편집"), { v0: String(command.label) })}
                       className="mt-1 grid grid-cols-3 gap-1"
                     >
                       <button
                         type="button"
                         disabled={index === 0}
-                        aria-label={`${command.label} 앞으로 이동`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 앞으로 이동"), { v0: String(command.label) })}
                         className={cn(
                           "inline-flex size-8 w-full items-center justify-center rounded-md text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-35",
                           STUDIO_EASE,
@@ -744,7 +744,7 @@ export function StudioQuickAccessPalette({
                       <button
                         type="button"
                         disabled={index === commands.length - 1}
-                        aria-label={`${command.label} 뒤로 이동`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 뒤로 이동"), { v0: String(command.label) })}
                         className={cn(
                           "inline-flex size-8 w-full items-center justify-center rounded-md text-fg-3 hover:bg-raised hover:text-fg disabled:opacity-35",
                           STUDIO_EASE,
@@ -757,7 +757,7 @@ export function StudioQuickAccessPalette({
                       </button>
                       <button
                         type="button"
-                        aria-label={`${command.label} 세트에서 제거`}
+                        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 세트에서 제거"), { v0: String(command.label) })}
                         className={cn(
                           "inline-flex size-8 w-full items-center justify-center rounded-md text-fg-3 hover:bg-bad/10 hover:text-bad",
                           STUDIO_EASE,
@@ -781,11 +781,9 @@ export function StudioQuickAccessPalette({
           >
             <Command size={20} aria-hidden className="text-fg-3" />
             <p className="mt-2 text-xs font-semibold text-fg">
-              이 세트가 비어 있어요
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "이 세트가 비어 있어요")}</p>
             <p className="mt-1 text-[0.6875rem] leading-4 text-fg-3">
-              편집을 열고 자주 쓰는 명령을 추가해 보세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "편집을 열고 자주 쓰는 명령을 추가해 보세요.")}</p>
           </div>
         )}
 
@@ -793,15 +791,13 @@ export function StudioQuickAccessPalette({
           <div className="mt-3 min-w-0 border-t border-line pt-2">
             <div className="flex min-w-0 items-center justify-between gap-2">
               <h3 className="truncate text-[0.6875rem] font-bold text-fg-2">
-                추가할 명령
-              </h3>
+                {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "추가할 명령")}</h3>
               <span className="shrink-0 text-[0.625rem] tabular-nums text-fg-3">
-                {candidates.length}개
-              </span>
+                {candidates.length}{translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "개")}</span>
             </div>
             {candidates.length > 0 ? (
               <ul
-                aria-label="추가 가능한 빠른 액세스 명령"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "추가 가능한 빠른 액세스 명령")}
                 className="mt-1.5 flex min-w-0 flex-col gap-1"
               >
                 {candidates.map((candidate) => (
@@ -809,7 +805,7 @@ export function StudioQuickAccessPalette({
                     <button
                       type="button"
                       disabled={candidate.available === false}
-                      aria-label={`${candidate.label} 세트에 추가`}
+                      aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "{v0} 세트에 추가"), { v0: String(candidate.label) })}
                       className={cn(
                         "flex min-h-9 w-full min-w-0 items-center gap-2 rounded-lg border border-transparent px-2 text-left text-xs text-fg-2 hover:border-line hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50",
                         STUDIO_EASE,
@@ -830,8 +826,7 @@ export function StudioQuickAccessPalette({
                       ) : null}
                       {candidate.available === false ? (
                         <span className="shrink-0 text-[0.625rem] text-warn">
-                          사용 불가
-                        </span>
+                          {translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "사용 불가")}</span>
                       ) : null}
                     </button>
                   </li>
@@ -840,8 +835,8 @@ export function StudioQuickAccessPalette({
             ) : (
               <p className="mt-1.5 rounded-lg border border-dashed border-line px-3 py-3 text-center text-[0.6875rem] text-fg-3">
                 {query.trim()
-                  ? "일치하는 추가 명령이 없어요."
-                  : "모든 등록 명령이 현재 세트에 있어요."}
+                  ? translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "일치하는 추가 명령이 없어요.")
+                  : translateCurrentStaticSourceText("domains.creator.StudioQuickAccessPalette", "ko", "모든 등록 명령이 현재 세트에 있어요.")}
               </p>
             )}
           </div>

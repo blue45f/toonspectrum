@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, ChevronDown, Sparkles } from "lucide-react";
 
 import {
@@ -44,7 +47,7 @@ function FamilyCard({
         featured ? "p-5 sm:p-6" : "p-4",
       )}
     >
-      {!compact ? <figure className="relative mb-5 overflow-hidden rounded-lg border border-line"><img src={study.image} alt="" loading="lazy" width={640} height={360} className={cn("w-full object-cover", featured ? "h-40 sm:h-48" : "h-36")} style={{ objectPosition: study.position }} /><figcaption className="absolute inset-x-0 bottom-0 bg-panel/90 px-3 py-2 text-[0.65rem] text-fg-2">{study.label} · 탐색 예시</figcaption></figure> : null}
+      {!compact ? <figure className="relative mb-5 overflow-hidden rounded-lg border border-line"><img src={study.image} alt="" loading="lazy" width={640} height={360} className={cn("w-full object-cover", featured ? "h-40 sm:h-48" : "h-36")} style={{ objectPosition: study.position }} /><figcaption className="absolute inset-x-0 bottom-0 bg-panel/90 px-3 py-2 text-[0.65rem] text-fg-2">{study.label} {translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "· 탐색 예시")}</figcaption></figure> : null}
       <div className="relative flex items-start justify-between gap-3">
         <span
           className={cn(
@@ -53,12 +56,11 @@ function FamilyCard({
           )}
           style={{ color: `oklch(0.76 0.13 ${family.accentHue})` }}
         >
-          <Icon className={featured ? "size-6" : "size-5"} strokeWidth={1.7} aria-hidden="true" />
+          <Icon className={featured ? translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "en", "size-6") : translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "en", "size-5")} strokeWidth={1.7} aria-hidden="true" />
         </span>
         {featured ? (
           <span className="rounded-full border border-accent/30 bg-accent-soft px-2.5 py-1 text-[0.62rem] font-black text-accent">
-            제작 시작 추천
-          </span>
+            {translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "제작 시작 추천")}</span>
         ) : null}
       </div>
 
@@ -88,8 +90,7 @@ function FamilyCard({
         <details className="relative mt-2 group/more">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-xl px-2 text-xs font-semibold text-fg-3 hover:bg-raised hover:text-fg [&::-webkit-details-marker]:hidden">
             <ChevronDown className="size-3.5 transition-transform group-open/more:rotate-180" aria-hidden="true" />
-            카테고리 {rest.length}개 더 보기
-          </summary>
+            {translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "카테고리 ")}{rest.length}{translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "개 더 보기")}</summary>
           <div className={cn("mt-1.5 grid gap-1.5", featured && "sm:grid-cols-3")}>
             {rest.map((subcategory) => (
               <Link
@@ -110,8 +111,7 @@ function FamilyCard({
         className="relative mt-4 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-accent-soft px-3 text-xs font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
       >
         <Sparkles className="size-3.5" aria-hidden="true" />
-        {family.label} 둘러보기
-      </Link>
+        {family.label} {translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "둘러보기")}</Link>
     </article>
   );
 }
@@ -124,14 +124,13 @@ export function MarketResourceFamilyExplorer({ className, compact = false }: Mar
     <section className={cn("min-w-0", className)} aria-labelledby="market-resource-family-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="eyebrow text-accent">Resource Library</p>
-          <h2 id="market-resource-family-title" className="mt-1 text-xl font-bold text-fg sm:text-2xl">장면을 만들 순서대로 고르세요</h2>
+          <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "en", "Resource Library")}</p>
+          <h2 id="market-resource-family-title" className="mt-1 text-xl font-bold text-fg sm:text-2xl">{translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "장면을 만들 순서대로 고르세요")}</h2>
           <p className="mt-1.5 max-w-3xl text-xs leading-5 text-fg-3 sm:text-sm sm:leading-6">
-            템플릿으로 컷과 대사 흐름을 시작하고 2D 에셋으로 장면을 채운 뒤, 필요할 때 3D·브러시·색보정으로 깊이를 더합니다. 파일 형식이나 엔진 이름을 먼저 알 필요가 없습니다.
-          </p>
+            {translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "템플릿으로 컷과 대사 흐름을 시작하고 2D 에셋으로 장면을 채운 뒤, 필요할 때 3D·브러시·색보정으로 깊이를 더합니다. 파일 형식이나 엔진 이름을 먼저 알 필요가 없습니다.")}</p>
         </div>
         <Link href="/market/browse" className="inline-flex min-h-11 items-center gap-1.5 text-xs font-bold text-accent hover:text-accent-2">
-          전체 리소스 보기 <ArrowRight className="size-3.5" aria-hidden="true" />
+          {translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "전체 리소스 보기 ")}<ArrowRight className="size-3.5" aria-hidden="true" />
         </Link>
       </div>
 
@@ -141,8 +140,8 @@ export function MarketResourceFamilyExplorer({ className, compact = false }: Mar
 
       <div className="mt-7 flex items-baseline justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-fg">더 정교하게 만들기</h3>
-          <p className="mt-1 text-xs text-fg-3">구도·선화·채색·마감이 필요할 때 전문 리소스를 추가하세요.</p>
+          <h3 className="text-sm font-bold text-fg">{translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "더 정교하게 만들기")}</h3>
+          <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.market.components.MarketResourceFamilyExplorer", "ko", "구도·선화·채색·마감이 필요할 때 전문 리소스를 추가하세요.")}</p>
         </div>
       </div>
       <div className={cn("mt-3 grid gap-3", compact ? "lg:grid-cols-3" : "md:grid-cols-3")}>

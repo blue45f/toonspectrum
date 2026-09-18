@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Pattern Fill Panel
  * 도형 채우기 패턴 인스펙터 — 검색 가능한 패턴 스와치 그리드(실제 타일 미리보기) +
@@ -179,7 +183,7 @@ function SeamlessTileSection({
   return (
     <div className="space-y-2 border-t border-line/40 pt-2.5">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">심리스 타일</p>
+        <p className="text-[0.72rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "심리스 타일")}</p>
         <button
           type="button"
           aria-pressed={seamlessOn}
@@ -189,11 +193,10 @@ function SeamlessTileSection({
             buttonClass({ size: "sm", variant: "quiet" }),
             seamlessOn && "bg-accent-soft/60 text-fg"
           )}
-          title="타일을 반 칸씩 감아 붙이고 이음새를 feather 폭만큼 섞어 반복 경계를 숨깁니다. 다시 누르면 원본 타일로 돌아가요."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "타일을 반 칸씩 감아 붙이고 이음새를 feather 폭만큼 섞어 반복 경계를 숨깁니다. 다시 누르면 원본 타일로 돌아가요.")}
         >
           <Blend className="size-3.5" aria-hidden />
-          이음새 부드럽게(심리스 변환)
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "이음새 부드럽게(심리스 변환)")}</button>
       </div>
 
       {/* 3×3 반복 미리보기 — 가운데 타일의 네 이음새가 전부 보이는 최소 격자 */}
@@ -201,17 +204,17 @@ function SeamlessTileSection({
         <canvas
           ref={previewCanvasRef}
           role="img"
-          aria-label={seamlessOn ? "심리스 변환 후 3×3 반복 미리보기" : "타일 3×3 반복 미리보기"}
+          aria-label={seamlessOn ? translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "심리스 변환 후 3×3 반복 미리보기") : translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "타일 3×3 반복 미리보기")}
           className="block h-28 w-full rounded-lg border border-line/60 bg-card [image-rendering:pixelated]"
         />
       ) : (
         <div className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[0.62rem] text-fg-3">
-          {status === "loading" ? "타일 픽셀을 분석하는 중..." : "이 환경에서는 타일 픽셀 분석을 사용할 수 없어요."}
+          {status === "loading" ? translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "타일 픽셀을 분석하는 중...") : translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "이 환경에서는 타일 픽셀 분석을 사용할 수 없어요.")}
         </div>
       )}
 
       <StudioSliderRow
-        label="feather 폭"
+        label={translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "feather 폭")}
         min={SEAMLESS_FEATHER_RANGE.min}
         max={SEAMLESS_FEATHER_RANGE.max}
         step={SEAMLESS_FEATHER_RANGE.step}
@@ -229,11 +232,11 @@ function SeamlessTileSection({
       <p className="text-[0.62rem] tabular-nums text-fg-3" role="status" aria-live="polite">
         {analysis == null
           ? status === "loading"
-            ? "이음새 점수를 계산하는 중..."
-            : "이음새 점수를 계산할 수 없어요."
+            ? translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "이음새 점수를 계산하는 중...")
+            : translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "이음새 점수를 계산할 수 없어요.")
           : analysis.after == null
-            ? `이음새 점수 ${formatSeamScore(analysis.before)} — 변환하면 반복 경계가 부드러워져요.`
-            : `이음새 점수 ${formatSeamScore(analysis.before)} → ${formatSeamScore(analysis.after)}`}
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "이음새 점수 {v0} — 변환하면 반복 경계가 부드러워져요."), { v0: String(formatSeamScore(analysis.before)) })
+            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "이음새 점수 {v0} → {v1}"), { v0: String(formatSeamScore(analysis.before)), v1: String(formatSeamScore(analysis.after)) })}
       </p>
     </div>
   );
@@ -262,18 +265,17 @@ export function StudioPatternFillPanel({
           onClick={() => onChange(null)}
           disabled={current == null}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="패턴을 제거합니다 — 그라데이션이 있으면 그라데이션, 없으면 단색 채우기로 돌아갑니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴을 제거합니다 — 그라데이션이 있으면 그라데이션, 없으면 단색 채우기로 돌아갑니다.")}
         >
           <RotateCcw className="size-3.5" />
-          패턴 해제
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴 해제")}</button>
       </div>
 
       {/* 우선순위 규약 힌트 — 패턴 > 그라데이션 > 단색 */}
       <p className="text-[0.72rem] text-fg-3">
         {current == null
-          ? "스와치를 고르면 적용됩니다. 패턴은 그라데이션·단색보다 우선해요."
-          : "패턴이 그라데이션·단색 채우기보다 우선 적용되고 있어요."}
+          ? translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "스와치를 고르면 적용됩니다. 패턴은 그라데이션·단색보다 우선해요.")
+          : translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴이 그라데이션·단색 채우기보다 우선 적용되고 있어요.")}
       </p>
 
       {current != null && (
@@ -283,8 +285,7 @@ export function StudioPatternFillPanel({
 
           {/* 전경(잉크)색 */}
           <label className={PANEL_LABEL_ROW}>
-            무늬 색상
-            <input
+            {translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "무늬 색상")}<input
               type="color"
               value={current.fg}
               onChange={(e) => onChange(setPatternFg(current, e.target.value))}
@@ -294,8 +295,7 @@ export function StudioPatternFillPanel({
 
           {/* 배경 — 투명(아래 요소가 비침) 또는 불투명 단색 */}
           <label className={PANEL_LABEL_ROW}>
-            배경 투명
-            <input
+            {translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "배경 투명")}<input
               type="checkbox"
               checked={current.bg == null}
               onChange={(e) => onChange(setPatternBg(current, e.target.checked ? null : "#ffffff"))}
@@ -304,8 +304,7 @@ export function StudioPatternFillPanel({
           </label>
           {current.bg != null && (
             <label className={PANEL_LABEL_ROW}>
-              배경 색상
-              <input
+              {translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "배경 색상")}<input
                 type="color"
                 value={current.bg}
                 onChange={(e) => onChange(setPatternBg(current, e.target.value))}
@@ -316,7 +315,7 @@ export function StudioPatternFillPanel({
 
           {/* 배율 — 타일 크기(무늬 밀도). 25%면 촘촘, 400%면 성김. */}
           <StudioSliderRow
-            label="배율"
+            label={translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "배율")}
             min={PATTERN_SCALE_RANGE.min}
             max={PATTERN_SCALE_RANGE.max}
             step={PATTERN_SCALE_RANGE.step}
@@ -331,20 +330,20 @@ export function StudioPatternFillPanel({
       )}
 
       <div className="relative">
-        <label htmlFor={searchId} className="sr-only">패턴 검색</label>
+        <label htmlFor={searchId} className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴 검색")}</label>
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-fg-3" aria-hidden />
         <input
           id={searchId}
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="패턴 검색 (하프톤, 속도, 물결…)"
+          placeholder={translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴 검색 (하프톤, 속도, 물결…)")}
           className="min-h-10 w-full rounded-lg border border-line bg-card py-1 pl-8 pr-10 text-xs text-fg outline-none placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/35 pointer-coarse:min-h-11"
         />
         {query ? (
           <button
             type="button"
-            aria-label="패턴 검색어 지우기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴 검색어 지우기")}
             onClick={() => setQuery("")}
             className="absolute right-0 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:size-11"
           >
@@ -354,15 +353,15 @@ export function StudioPatternFillPanel({
       </div>
 
       <p className="text-[0.62rem] tabular-nums text-fg-3" role="status" aria-live="polite">
-        {query ? `검색 결과 ${visiblePatterns.length}개` : `패턴 ${visiblePatterns.length}개`}
+        {query ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "검색 결과 {v0}개"), { v0: String(visiblePatterns.length) }) : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "패턴 {v0}개"), { v0: String(visiblePatterns.length) })}
       </p>
 
       {visiblePatterns.length > 0 ? (
         <PatternSwatchGrid current={current} patterns={visiblePatterns} onChange={onChange} />
       ) : (
         <div className="rounded-lg border border-dashed border-line px-3 py-4 text-center">
-          <p className="text-xs font-semibold text-fg-2">일치하는 패턴이 없습니다</p>
-          <p className="mt-1 text-[0.62rem] text-fg-3">‘번개’, ‘벽돌’, ‘스파클’처럼 모양으로 찾아보세요.</p>
+          <p className="text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "일치하는 패턴이 없습니다")}</p>
+          <p className="mt-1 text-[0.62rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioPatternFillPanel", "ko", "‘번개’, ‘벽돌’, ‘스파클’처럼 모양으로 찾아보세요.")}</p>
         </div>
       )}
     </div>

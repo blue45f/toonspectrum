@@ -1,4 +1,10 @@
-export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
+
+import {
+  translateBilingualValueForActiveLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("creator-role-contract", ko, en);export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
 
@@ -13,6 +19,7 @@ export const CREATOR_ROLE_IDS = [
   "lettering",
   "character",
   "three-d",
+  "educator",
   "assistant",
   "editor",
   "producer",
@@ -23,7 +30,18 @@ export const CREATOR_ROLE_IDS = [
 export type CreatorRoleId = (typeof CREATOR_ROLE_IDS)[number];
 export type CreatorRoleGroup = "story" | "art" | "support" | "production";
 export type CreatorRoleLens = "story" | "art" | "producer";
-export type CreatorRoleLocale = "ko" | "en";
+export type CreatorRoleLocale = string;
+
+export const CREATOR_STAGE_IDS = [
+  "student",
+  "hobbyist",
+  "aspiring",
+  "professional",
+  "studio",
+  "educator",
+  "other",
+] as const;
+export type CreatorStage = (typeof CREATOR_STAGE_IDS)[number];
 
 export const CREATOR_EXPERIENCE_LEVELS = ["beginner", "experienced", "professional"] as const;
 export type CreatorExperienceLevel = (typeof CREATOR_EXPERIENCE_LEVELS)[number];
@@ -98,6 +116,7 @@ export interface CreatorRoleProfile {
   readonly primaryRole: CreatorRoleId | null;
   readonly secondaryRoles: readonly CreatorRoleId[];
   readonly specialties: readonly CreatorSpecialtyId[];
+  readonly creatorStage: CreatorStage | null;
   readonly experienceLevel: CreatorExperienceLevel | null;
   readonly collaborationStatus: CreatorCollaborationStatus | null;
   readonly roleVisibility: boolean;
@@ -126,6 +145,16 @@ const action = (
   label: text(labelKo, labelEn),
   description: text(descriptionKo, descriptionEn),
 });
+
+export const CREATOR_STAGE_LABELS: Readonly<Record<CreatorStage, LocalizedCreatorText>> = {
+  student: text("학생 · 교육생", "Student · learner"),
+  hobbyist: text("취미 · 아마추어", "Hobbyist · amateur"),
+  aspiring: text("데뷔 준비", "Preparing to debut"),
+  professional: text("프로 · 현업 창작자", "Professional creator"),
+  studio: text("스튜디오 · 제작사", "Studio · production company"),
+  educator: text("강사 · 교육기관", "Instructor · education"),
+  other: text("기타", "Other"),
+};
 
 export const CREATOR_ROLE_DEFINITIONS = [
   {
@@ -289,6 +318,22 @@ export const CREATOR_ROLE_DEFINITIONS = [
     ],
   },
   {
+    id: "educator",
+    group: "support",
+    lens: "story",
+    label: text("강사·교육자", "Instructor · educator"),
+    shortLabel: text("교육", "Educator"),
+    description: text("웹툰 제작 과정을 가르치고 실습·과제·피드백을 운영합니다.", "Teach webtoon production and manage practice, assignments and feedback."),
+    workspaceTitle: text("수업과 실습, 피드백을 하나의 흐름으로", "Connect lessons, practice and feedback in one flow"),
+    workspaceSummary: text("교육 자료, 학생 과제, 실습 작업실과 작품 피드백을 우선해서 보여줍니다.", "Prioritize learning resources, assignments, practice workspaces and critique."),
+    recommendedSpecialties: ["storyboard", "composition", "quality-control", "editing"],
+    actions: [
+      action("/learn/classroom", "수업·과제 관리", "Manage classes & assignments", "수업 흐름과 학생 과제를 준비합니다.", "Prepare lessons and student assignments."),
+      action("/learn", "교육 자료", "Learning resources", "작화·스토리 제작 자료를 찾습니다.", "Find drawing and storytelling resources."),
+      action("/studio/projects", "학생 작품·실습", "Student work & practice", "실습 프로젝트와 피드백 대상을 엽니다.", "Open practice projects and critique targets."),
+    ],
+  },
+  {
     id: "assistant",
     group: "support",
     lens: "art",
@@ -418,6 +463,7 @@ export const EMPTY_CREATOR_ROLE_PROFILE: CreatorRoleProfile = Object.freeze({
   primaryRole: null,
   secondaryRoles: Object.freeze([]),
   specialties: Object.freeze([]),
+  creatorStage: null,
   experienceLevel: null,
   collaborationStatus: null,
   roleVisibility: true,
@@ -426,11 +472,12 @@ export const EMPTY_CREATOR_ROLE_PROFILE: CreatorRoleProfile = Object.freeze({
 
 const ROLE_ID_SET = new Set<string>(CREATOR_ROLE_IDS);
 const SPECIALTY_ID_SET = new Set<string>(CREATOR_SPECIALTY_IDS);
+const STAGE_SET = new Set<string>(CREATOR_STAGE_IDS);
 const EXPERIENCE_SET = new Set<string>(CREATOR_EXPERIENCE_LEVELS);
 const COLLABORATION_SET = new Set<string>(CREATOR_COLLABORATION_STATUSES);
 
-export function creatorText(value: LocalizedCreatorText, locale: CreatorRoleLocale): string {
-  return value[locale];
+export function creatorText(value: LocalizedCreatorText, _locale): string {
+  return bi((value).ko, (value).en);
 }
 
 export function normalizeCreatorRoleId(value: unknown): CreatorRoleId | null {
@@ -439,6 +486,10 @@ export function normalizeCreatorRoleId(value: unknown): CreatorRoleId | null {
 
 export function normalizeCreatorSpecialtyId(value: unknown): CreatorSpecialtyId | null {
   return typeof value === "string" && SPECIALTY_ID_SET.has(value) ? value as CreatorSpecialtyId : null;
+}
+
+export function normalizeCreatorStage(value: unknown): CreatorStage | null {
+  return typeof value === "string" && STAGE_SET.has(value) ? value as CreatorStage : null;
 }
 
 export function normalizeCreatorExperienceLevel(value: unknown): CreatorExperienceLevel | null {
@@ -499,6 +550,7 @@ export function normalizeCreatorRoleProfile(value: unknown): CreatorRoleProfile 
     primaryRole,
     secondaryRoles,
     specialties,
+    creatorStage: normalizeCreatorStage(record.creatorStage),
     experienceLevel: normalizeCreatorExperienceLevel(record.experienceLevel),
     collaborationStatus: normalizeCreatorCollaborationStatus(record.collaborationStatus),
     roleVisibility: typeof record.roleVisibility === "boolean" ? record.roleVisibility : true,
@@ -511,6 +563,7 @@ const CREATOR_ROLE_PROFILE_KEYS = new Set([
   "primaryRole",
   "secondaryRoles",
   "specialties",
+  "creatorStage",
   "experienceLevel",
   "collaborationStatus",
   "roleVisibility",
@@ -537,6 +590,7 @@ export function parseCreatorRoleProfileInput(value: unknown): CreatorRoleProfile
   if (!validOptionalEnumValue(record.primaryRole, normalizeCreatorRoleId)) return null;
   if (!validEnumArray(record.secondaryRoles, normalizeCreatorRoleId, CREATOR_ROLE_MAX_SECONDARY)) return null;
   if (!validEnumArray(record.specialties, normalizeCreatorSpecialtyId, CREATOR_ROLE_MAX_SPECIALTIES)) return null;
+  if (!validOptionalEnumValue(record.creatorStage, normalizeCreatorStage)) return null;
   if (!validOptionalEnumValue(record.experienceLevel, normalizeCreatorExperienceLevel)) return null;
   if (!validOptionalEnumValue(record.collaborationStatus, normalizeCreatorCollaborationStatus)) return null;
   if (record.roleVisibility !== undefined && typeof record.roleVisibility !== "boolean") return null;

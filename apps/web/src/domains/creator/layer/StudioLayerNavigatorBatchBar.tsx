@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ChevronsDown,
   ChevronsUp,
   Eye,
@@ -73,7 +77,7 @@ export function StudioLayerNavigatorBatchBar({
 
   return (
     <div
-      aria-label="선택 레이어 일괄 작업"
+      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 레이어 일괄 작업")}
       role="toolbar"
       className="flex max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain border-b border-line/70 bg-accent-soft/20 px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
     >
@@ -84,12 +88,11 @@ export function StudioLayerNavigatorBatchBar({
         )}
         title={
           outsideSelectionCount > 0
-            ? `전체 선택 ${selectedIds.length}개 중 현재 결과 ${batchSelectedIds.length}개만 일괄 작업 대상입니다.`
-            : `선택 ${selectedIds.length}개`
+            ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "전체 선택 {v0}개 중 현재 결과 {v1}개만 일괄 작업 대상입니다."), { v0: String(selectedIds.length), v1: String(batchSelectedIds.length) })
+            : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 {v0}개"), { v0: String(selectedIds.length) })
         }
       >
-        선택 {batchSelectedIds.length}개
-        {outsideSelectionCount > 0 ? ` · 밖 ${outsideSelectionCount}` : ""}
+        {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 ")}{batchSelectedIds.length}{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "개")}{outsideSelectionCount > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", " · 밖 {v0}"), { v0: String(outsideSelectionCount) }) : ""}
       </span>
       <StudioToolHintTarget
         disabled={reorderDisabled}
@@ -114,7 +117,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label={`선택 ${batchSelectedIds.length}개 맨 앞으로`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 {v0}개 맨 앞으로"), { v0: String(batchSelectedIds.length) })}
         >
           <ChevronsUp size={13} />
         </button>
@@ -142,7 +145,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label={`선택 ${batchSelectedIds.length}개 맨 뒤로`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 {v0}개 맨 뒤로"), { v0: String(batchSelectedIds.length) })}
         >
           <ChevronsDown size={13} />
         </button>
@@ -151,11 +154,11 @@ export function StudioLayerNavigatorBatchBar({
         disabled={mutationDisabled || batchShowIds.length === 0}
         unavailableReason={
           readOnly
-            ? "읽기 전용 작업공간에서는 레이어 표시 상태를 바꿀 수 없어요."
+            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "읽기 전용 작업공간에서는 레이어 표시 상태를 바꿀 수 없어요.")
             : batchShowIds.length === 0
               ? batchShowBlockedCount > 0
-                ? `숨긴 상위 그룹 안의 ${batchShowBlockedCount}개는 그룹을 먼저 표시해야 해요.`
-                : "현재 선택에는 다시 표시할 숨긴 레이어가 없어요."
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "숨긴 상위 그룹 안의 {v0}개는 그룹을 먼저 표시해야 해요."), { v0: String(batchShowBlockedCount) })
+                : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "현재 선택에는 다시 표시할 숨긴 레이어가 없어요.")
               : undefined
         }
         preferredSide="top"
@@ -175,9 +178,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label={`현재 결과의 선택 ${batchShowIds.length}개 표시${
-            batchShowBlockedCount > 0 ? `, 숨긴 상위 그룹 ${batchShowBlockedCount}개 제외` : ""
-          }`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "현재 결과의 선택 {v0}개 표시{v1}"), { v0: String(batchShowIds.length), v1: String(batchShowBlockedCount > 0 ? `, 숨긴 상위 그룹 ${batchShowBlockedCount}개 제외` : "") })}
         >
           <Eye size={13} />
         </button>
@@ -186,9 +187,9 @@ export function StudioLayerNavigatorBatchBar({
         disabled={mutationDisabled || batchSelectedIds.length === 0}
         unavailableReason={
           readOnly
-            ? "읽기 전용 작업공간에서는 레이어를 숨길 수 없어요."
+            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "읽기 전용 작업공간에서는 레이어를 숨길 수 없어요.")
             : batchSelectedIds.length === 0
-              ? "먼저 레이어를 하나 이상 선택하세요."
+              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "먼저 레이어를 하나 이상 선택하세요.")
               : undefined
         }
         preferredSide="top"
@@ -209,7 +210,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label={`현재 결과의 선택 ${batchSelectedIds.length}개 숨김`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "현재 결과의 선택 {v0}개 숨김"), { v0: String(batchSelectedIds.length) })}
         >
           <EyeOff size={13} />
         </button>
@@ -218,9 +219,9 @@ export function StudioLayerNavigatorBatchBar({
         disabled={mutationDisabled || batchSelectedIds.length === 0}
         unavailableReason={
           readOnly
-            ? "읽기 전용 작업공간에서는 레이어를 잠글 수 없어요."
+            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "읽기 전용 작업공간에서는 레이어를 잠글 수 없어요.")
             : batchSelectedIds.length === 0
-              ? "먼저 레이어를 하나 이상 선택하세요."
+              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "먼저 레이어를 하나 이상 선택하세요.")
               : undefined
         }
         preferredSide="top"
@@ -240,7 +241,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label={`현재 결과의 선택 ${batchSelectedIds.length}개 잠금`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "현재 결과의 선택 {v0}개 잠금"), { v0: String(batchSelectedIds.length) })}
         >
           <Lock size={13} />
         </button>
@@ -249,11 +250,11 @@ export function StudioLayerNavigatorBatchBar({
         disabled={mutationDisabled || batchUnlockIds.length === 0}
         unavailableReason={
           readOnly
-            ? "읽기 전용 작업공간에서는 레이어 잠금을 해제할 수 없어요."
+            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "읽기 전용 작업공간에서는 레이어 잠금을 해제할 수 없어요.")
             : batchUnlockIds.length === 0
               ? batchUnlockBlockedCount > 0
-                ? `잠긴 상위 그룹 안의 ${batchUnlockBlockedCount}개는 그룹 잠금을 먼저 풀어야 해요.`
-                : "현재 선택에는 잠금을 풀 수 있는 레이어가 없어요."
+                ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "잠긴 상위 그룹 안의 {v0}개는 그룹 잠금을 먼저 풀어야 해요."), { v0: String(batchUnlockBlockedCount) })
+                : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "현재 선택에는 잠금을 풀 수 있는 레이어가 없어요.")
               : undefined
         }
         preferredSide="top"
@@ -273,9 +274,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label={`현재 결과의 선택 ${batchUnlockIds.length}개 잠금 해제${
-            batchUnlockBlockedCount > 0 ? `, 잠긴 상위 그룹 ${batchUnlockBlockedCount}개 제외` : ""
-          }`}
+          aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "현재 결과의 선택 {v0}개 잠금 해제{v1}"), { v0: String(batchUnlockIds.length), v1: String(batchUnlockBlockedCount > 0 ? `, 잠긴 상위 그룹 ${batchUnlockBlockedCount}개 제외` : "") })}
         >
           <LockOpen size={13} />
         </button>
@@ -284,9 +283,9 @@ export function StudioLayerNavigatorBatchBar({
         disabled={mutationDisabled || batchSelectedIds.length < 2}
         unavailableReason={
           readOnly
-            ? "읽기 전용 작업공간에서는 레이어를 병합할 수 없어요."
+            ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "읽기 전용 작업공간에서는 레이어를 병합할 수 없어요.")
             : batchSelectedIds.length < 2
-              ? "병합할 레이어를 두 개 이상 선택하세요."
+              ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "병합할 레이어를 두 개 이상 선택하세요.")
               : undefined
         }
         preferredSide="top"
@@ -309,7 +308,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label="선택 레이어 병합"
+          aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 레이어 병합")}
           aria-describedby={batchMergeFallbackNote ? mergeFallbackNoteId : undefined}
           title={batchMergeFallbackNote ?? undefined}
         >
@@ -319,7 +318,7 @@ export function StudioLayerNavigatorBatchBar({
       <StudioToolHintTarget
         disabled={mutationDisabled}
         unavailableReason={
-          readOnly ? "읽기 전용 작업공간에서는 표시 레이어를 병합할 수 없어요." : undefined
+          readOnly ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "읽기 전용 작업공간에서는 표시 레이어를 병합할 수 없어요.") : undefined
         }
         preferredSide="top"
         hint={{
@@ -341,7 +340,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label="표시 레이어 병합"
+          aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "표시 레이어 병합")}
           aria-describedby={flattenVisibleFallbackNote ? flattenFallbackNoteId : undefined}
           title={flattenVisibleFallbackNote ?? undefined}
         >
@@ -368,7 +367,7 @@ export function StudioLayerNavigatorBatchBar({
             coarseTarget,
             focusRing
           )}
-          aria-label="선택 레이어 일괄 작업 더보기"
+          aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerNavigatorBatchBar", "ko", "선택 레이어 일괄 작업 더보기")}
         >
           <MoreHorizontal size={15} />
         </button>

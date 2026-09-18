@@ -84,12 +84,27 @@ describe("traffic analytics persistence contract", () => {
     );
   });
 
+  it("persists share events without message bodies, query strings, or raw identifiers", () => {
+    const sharing = source.slice(
+      source.indexOf("persistTrafficShareEvent"),
+      source.indexOf("cleanupExpiredTrafficData"),
+    );
+    expect(sharing).toContain("INSERT INTO public.traffic_share_event");
+    expect(sharing).toContain("visitor_hash");
+    expect(sharing).toContain("session_hash");
+    expect(sharing).toContain("channel");
+    expect(sharing).toContain("outcome");
+    expect(sharing).toContain("ON CONFLICT (id) DO NOTHING");
+    expect(sharing).not.toMatch(/ip_address|query_string|message_body/iu);
+  });
+
   it("coordinates retention cleanup with a PostgreSQL advisory lock", () => {
     expect(source).toContain(
       '"toonspectrum:traffic-analytics:retention:v2"',
     );
     expect(source).toContain("pg_try_advisory_xact_lock(hashtext($1))");
     expect(source).toContain("DELETE FROM public.traffic_page_view");
+    expect(source).toContain("DELETE FROM public.traffic_share_event");
     expect(source).toContain("DELETE FROM public.traffic_session");
     expect(source).toContain("occurred_at < $2");
     expect(source).toContain("last_seen_at < $2");

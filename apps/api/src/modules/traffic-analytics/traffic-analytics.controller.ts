@@ -105,4 +105,18 @@ export class TrafficAnalyticsController {
       requestContext(request),
     );
   }
+
+  @Post("share-event")
+  @HttpCode(202)
+  async recordShareEvent(
+    @Req() request: Request,
+    @Headers(TOONSPECTRUM_CSRF_HEADER) proof: string | undefined,
+    @Body() body: unknown,
+  ) {
+    this.requireBrowserProof(request, proof);
+    return this.trafficAnalyticsService.recordShareEvent(
+      recordBody(body),
+      requestContext(request),
+    );
+  }
 }

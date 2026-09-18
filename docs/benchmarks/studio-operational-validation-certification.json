@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "suiteId": "studio-operational-validation-v1",
+  "title": "ToonStudio automated operational validation",
+  "claimPolicy": {
+    "automatedOperationalContractReadinessAllowed": true,
+    "historicalEightHourSoakEvidenceAllowed": true,
+    "currentCommitEightHourSoakCertified": false,
+    "realHardwareBrowserCertificationAllowed": false,
+    "professionalReplacementClaimAllowed": false,
+    "reason": "Deterministic tests and committed historical evidence validate bounded contracts. Current-commit eight-hour soak, physical devices, real browser faults, and signed professional evaluation remain external release gates."
+  },
+  "lanes": [
+    {
+      "id": "performance-and-soak",
+      "title": "Resource budgets and historical eight-hour soak evidence",
+      "outcome": "Performance plans preserve originals, robust leak analysis rejects growth, and the committed eight-hour pass and leak-regression fixture remain distinguishable.",
+      "tests": [
+        "apps/web/src/domains/creator/studio-performance-budget.test.ts",
+        "tests/benchmarks/harness/soak.test.ts"
+      ],
+      "artifacts": [
+        {
+          "id": "eight-hour-soak-pass",
+          "kind": "soak-pass",
+          "path": "tests/benchmarks/results/soak.json"
+        },
+        {
+          "id": "eight-hour-soak-leak-regression",
+          "kind": "soak-leak-regression",
+          "path": "tests/benchmarks/results/soak-leak-regression-2026-08-08.json"
+        }
+      ]
+    },
+    {
+      "id": "drawing-engine-integrity",
+      "title": "Shared professional drawing engine quality",
+      "outcome": "Integrated Studio and ToonStudio Draw share bounded input prediction, stabilizer endpoint completion, pressure dynamics, device input profiles, live stylus feedback, large-canvas brush coverage, selection refinement and compositing semantics without creating a second editor authority.",
+      "tests": [
+        "apps/web/src/domains/creator/studio-drawing-presentation.test.ts",
+        "apps/web/src/domains/creator/brush/studio-drawing-input-deck-model.test.ts",
+        "apps/web/src/domains/creator/brush/studio-drawing-input-profile-library.test.ts",
+        "apps/web/src/domains/creator/brush/studio-brush-cursor-sensor.test.ts",
+        "apps/web/src/domains/creator/brush/studio-brush-velocity-pressure.test.ts",
+        "apps/web/src/domains/creator/brush/studio-stroke-stabilizer.test.ts",
+        "apps/web/src/domains/creator/studio-lowlatency-ingest-adapter.test.ts",
+        "apps/web/src/domains/creator/studio-lowlatency-prediction-budget.test.ts",
+        "apps/web/src/domains/creator/studio-predicted-ink-tail.test.ts",
+        "apps/web/src/domains/creator/studio-dynamic-brush-coverage-renderer.test.ts",
+        "apps/web/src/domains/creator/studio-selection-refinement.test.ts",
+        "apps/web/src/domains/creator/studio-live-adjustment.test.ts"
+      ],
+      "artifacts": []
+    },
+    {
+      "id": "file-roundtrip-integrity",
+      "title": "Loss-visible PSD and CLIP round-trip contracts",
+      "outcome": "PSD import/export, editable text, adjustment graphs, saved CLIP selections and workspace interchange preserve supported editable data and reject silent coercion.",
+      "tests": [
+        "apps/web/src/domains/creator/studio-psd-import.test.ts",
+        "apps/web/src/domains/creator/export/studio-psd-export-text.test.ts",
+        "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
+        "apps/web/src/domains/creator/studio-clip-selection-roundtrip.test.ts",
+        "apps/web/src/domains/creator/studio-workspace-interchange.test.ts"
+      ],
+      "artifacts": []
+    },
+    {
+      "id": "fault-and-collaboration-recovery",
+      "title": "Injected failure and collaboration recovery",
+      "outcome": "Storage rejection, torn journals, corrupt snapshots, device loss, worker termination, queue inversion and offline retry preserve the durable prefix without duplicate commits.",
+      "tests": [
+        "tests/fault-injection/v12-runtime-fault-matrix.test.ts",
+        "tests/fault-injection/journal-faults.test.ts",
+        "packages/studio-project-model/src/__tests__/project-graph-collaboration.test.ts"
+      ],
+      "artifacts": [
+        {
+          "id": "v12-runtime-fault-matrix",
+          "kind": "runtime-fault-matrix",
+          "path": "tests/benchmarks/results/v12-runtime-fault-matrix.json"
+        }
+      ]
+    },
+    {
+      "id": "accessibility-and-security",
+      "title": "Accessibility and security contract gates",
+      "outcome": "Keyboard, touch target, contrast, reading order, mobile focus isolation, CSP and dependency advisory policies fail closed.",
+      "tests": [
+        "apps/web/src/domains/creator/studio-accessibility-audit.test.ts",
+        "apps/web/src/domains/creator/StudioInspectorAsideShell.accessibility-contract.test.ts",
+        "apps/web/src/shared/components/site-shell-mobile-accessibility.test.tsx",
+        "apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx",
+        "scripts/verify-security-advisory-exceptions.test.mjs",
+        "scripts/minimatch-security-compat.test.mjs",
+        "scripts/path-to-regexp-security-compat.test.mjs",
+        "scripts/verify-static-csp.test.mjs"
+      ],
+      "artifacts": []
+    }
+  ],
+  "externalReleaseGates": [
+    "Current-commit eight-hour soak on the release build",
+    "Physical pen-display and tablet sessions covering pressure, tilt, hover, barrel rotation, stylus buttons and palm rejection",
+    "Physical WebGPU device-loss and real browser worker termination matrix",
+    "Browser process crash and OPFS recovery on Safari, Chromium and Firefox release devices",
+    "Real network, Socket.IO and PostgreSQL partition recovery with multiple clients",
+    "Screen-reader, keyboard-only, 200 percent zoom and pen-tablet sessions on physical devices",
+    "Signed professional creator evaluation"
+  ]
+}

@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Type, Sparkles } from "lucide-react";
 import { useState } from "react";
 
@@ -49,8 +53,7 @@ export function StudioBg3dTextExtruderPanel({
       {/* SFX Quick Presets */}
       <div>
         <span className="mb-1.5 block text-[0.7rem] font-semibold text-fg-2">
-          웹툰 액션/감정 효과음 프리셋 (원클릭)
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "웹툰 액션/감정 효과음 프리셋 (원클릭)")}</span>
         <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
           {SFX_ONOPATOPOEIA_PRESETS.map((preset) => (
             <button
@@ -58,11 +61,9 @@ export function StudioBg3dTextExtruderPanel({
               type="button"
               disabled={disabled}
               onClick={() => handleSelectPreset(preset)}
-              className={`flex flex-col items-center justify-center rounded-lg border p-1.5 transition-all ${
-                inputText === preset.text
+              className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "en", "flex flex-col items-center justify-center rounded-lg border p-1.5 transition-all {v0}"), { v0: String(inputText === preset.text
                   ? "border-accent bg-accent/15 text-accent shadow-sm"
-                  : "border-line bg-card text-fg hover:bg-raised"
-              }`}
+                  : "border-line bg-card text-fg hover:bg-raised") })}
             >
               <span className="text-xs font-black">{preset.text}</span>
               <span className="text-[0.6rem] text-fg-3">{preset.category}</span>
@@ -80,14 +81,14 @@ export function StudioBg3dTextExtruderPanel({
             value={inputText}
             disabled={disabled}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="효과음 또는 3D 문구 입력..."
+            placeholder={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "효과음 또는 3D 문구 입력...")}
             className="flex-1 rounded-md border border-line bg-raised px-2 py-1 text-xs font-bold text-fg focus:border-accent focus:outline-none"
           />
         </div>
 
         {/* Style Selector */}
         <div>
-          <span className="mb-1 block text-[0.68rem] text-fg-2">효과음 폰트 스타일:</span>
+          <span className="mb-1 block text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "효과음 폰트 스타일:")}</span>
           <div className="grid grid-cols-3 gap-1">
             {[
               { id: "manga-impact", label: "타격 임팩트 (두꺼움)" },
@@ -102,11 +103,9 @@ export function StudioBg3dTextExtruderPanel({
                 type="button"
                 disabled={disabled}
                 onClick={() => setSelectedStyle(style.id as SfxStyleKind)}
-                className={`rounded border p-1 text-center text-[0.62rem] font-semibold transition-all ${
-                  selectedStyle === style.id
+                className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "en", "rounded border p-1 text-center text-[0.62rem] font-semibold transition-all {v0}"), { v0: String(selectedStyle === style.id
                     ? "border-accent bg-accent text-accent-fg"
-                    : "border-line bg-card text-fg-2 hover:bg-raised"
-                }`}
+                    : "border-line bg-card text-fg-2 hover:bg-raised") })}
               >
                 {style.label}
               </button>
@@ -117,7 +116,7 @@ export function StudioBg3dTextExtruderPanel({
         {/* Sliders: Extrude Depth, Bevel, Letter Spacing & Arc Bending */}
         <div className="mt-1 flex flex-col gap-2 border-t border-line/50 pt-2">
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">입체 두께 (Extrude):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "입체 두께 (Extrude):")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -135,7 +134,7 @@ export function StudioBg3dTextExtruderPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">베벨 모따기 (Bevel):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "베벨 모따기 (Bevel):")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -153,7 +152,7 @@ export function StudioBg3dTextExtruderPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">자간 간격 (Spacing):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "자간 간격 (Spacing):")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -171,7 +170,7 @@ export function StudioBg3dTextExtruderPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">곡선 휘어짐 (Arc):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "곡선 휘어짐 (Arc):")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -198,7 +197,7 @@ export function StudioBg3dTextExtruderPanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90 disabled:opacity-50"
       >
         <Sparkles className="size-3.5" />
-        <span>3D 텍스트 / 효과음 씬에 추가</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dTextExtruderPanel", "ko", "3D 텍스트 / 효과음 씬에 추가")}</span>
       </button>
     </div>
   );

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
 
 import { installStudioDialogFocusReturn } from "./studio-dialog-focus-return";
@@ -181,7 +182,7 @@ export function StudioHelpCenterHost() {
         />
       ) : state.surface === "context" ? (
         <StudioContextHelpDialog
-          key={state.toolCommandId ?? "studio-help-home"}
+          key={state.toolCommandId ?? translateCurrentStaticSourceText("domains.creator.StudioHelpCenterHost", "en", "studio-help-home")}
           open
           toolCommandId={state.toolCommandId}
           onClose={close}

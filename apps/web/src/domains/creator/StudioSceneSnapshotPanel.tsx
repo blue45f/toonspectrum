@@ -1,4 +1,7 @@
 import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   Camera,
   Check,
   Copy,
@@ -245,34 +248,29 @@ export function StudioSceneSnapshotPanel({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="studio-scene-snapshot-title" className="text-sm font-bold text-fg">
-                장면 스냅샷
-              </h2>
+                {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "장면 스냅샷")}</h2>
               <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.68rem] font-semibold text-fg-2">
-                개인 · 이 기기 전용
-              </span>
+                {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "개인 · 이 기기 전용")}</span>
               <span
                 className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.68rem] font-semibold text-fg-3"
                 data-studio-scene-snapshot-authority={storageState}
               >
                 {storageState === "loading"
-                  ? "SQLite/OPFS 확인 중"
+                  ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "SQLite/OPFS 확인 중")
                   : storageState === "sqlite"
-                    ? "SQLite/OPFS 저장"
+                    ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "SQLite/OPFS 저장")
                     : storageState === "unavailable"
-                      ? "저장소 사용 불가"
-                      : "주입 저장소"}
+                      ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "저장소 사용 불가")
+                      : translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "주입 저장소")}
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
-              현재 페이지의 레이어, 배경, 메모, 테마와 애니메이션을 함께 보관합니다.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "현재 페이지의 레이어, 배경, 메모, 테마와 애니메이션을 함께 보관합니다.")}</p>
           </div>
         </div>
         <p className="mt-3 flex items-start gap-2 rounded-xl border border-line bg-card px-3 py-2.5 text-xs leading-relaxed text-fg-2">
           <Users size={16} className="mt-0.5 shrink-0 text-fg-3" aria-hidden="true" />
-          팀 공유와 에셋 마켓 게시는 아직 지원하지 않습니다. 이 브라우저의 개인
-          라이브러리에만 저장됩니다.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "팀 공유와 에셋 마켓 게시는 아직 지원하지 않습니다. 이 브라우저의 개인 라이브러리에만 저장됩니다.")}</p>
       </header>
 
       <div
@@ -288,17 +286,15 @@ export function StudioSceneSnapshotPanel({
         >
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-xs font-bold text-fg">현재 페이지 보관</h3>
+              <h3 className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "현재 페이지 보관")}</h3>
               <p className="mt-0.5 text-[0.7rem] text-fg-3">
-                원본 data URL과 3D 편집 데이터에는 안전 용량 제한이 적용됩니다.
-              </p>
+                {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "원본 data URL과 3D 편집 데이터에는 안전 용량 제한이 적용됩니다.")}</p>
             </div>
             <span className="shrink-0 text-[0.68rem] tabular-nums text-fg-3">
-              레이어 {sourcePage.elements.length}개
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "레이어 ")}{sourcePage.elements.length}{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "개")}</span>
           </div>
           <label htmlFor={nameId} className="block">
-            <span className="mb-1 block text-xs font-semibold text-fg-2">이름</span>
+            <span className="mb-1 block text-xs font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "이름")}</span>
             <input
               id={nameId}
               value={name}
@@ -306,20 +302,19 @@ export function StudioSceneSnapshotPanel({
               required
               onChange={(event) => setName(event.currentTarget.value)}
               className="min-h-11 w-full rounded-xl border border-line-strong bg-card px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              placeholder="예: 옥상 재회 장면"
+              placeholder={translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "예: 옥상 재회 장면")}
             />
           </label>
           <label htmlFor={tagsId} className="block">
             <span className="mb-1 flex items-center gap-1 text-xs font-semibold text-fg-2">
               <Tag size={13} aria-hidden="true" />
-              태그
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "태그")}</span>
             <input
               id={tagsId}
               value={tagsText}
               onChange={(event) => setTagsText(event.currentTarget.value)}
               className="min-h-11 w-full rounded-xl border border-line-strong bg-card px-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              placeholder="로맨스, 옥상, 해질녘"
+              placeholder={translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "로맨스, 옥상, 해질녘")}
             />
           </label>
           <button
@@ -328,24 +323,23 @@ export function StudioSceneSnapshotPanel({
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Camera size={17} aria-hidden="true" />
-            {busyId === "capture" ? "보관 중…" : "현재 페이지 스냅샷 보관"}
+            {busyId === "capture" ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "보관 중…") : translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "현재 페이지 스냅샷 보관")}
           </button>
         </form>
 
         <div className="py-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-bold text-fg">
-              개인 라이브러리 <span className="text-fg-3">{snapshots.length}개</span>
+              {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "개인 라이브러리 ")}<span className="text-fg-3">{snapshots.length}{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "개")}</span>
             </h3>
             <p className="flex items-center gap-1 text-[0.68rem] tabular-nums text-fg-3">
               <HardDrive size={13} aria-hidden="true" />
               {formatBytes(usedBytes)} / {formatBytes(STUDIO_SCENE_SNAPSHOT_TOTAL_MAX_BYTES)}
               {" · "}
-              최대 {STUDIO_SCENE_SNAPSHOT_MAX_ENTRIES}개
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "최대 ")}{STUDIO_SCENE_SNAPSHOT_MAX_ENTRIES}{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "개")}</p>
           </div>
           <label className="relative mt-3 block">
-            <span className="sr-only">장면 스냅샷 검색</span>
+            <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "장면 스냅샷 검색")}</span>
             <Search
               size={16}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3"
@@ -356,7 +350,7 @@ export function StudioSceneSnapshotPanel({
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
               className="min-h-11 w-full rounded-xl border border-line-strong bg-card pl-9 pr-3 text-sm text-fg outline-none placeholder:text-fg-3 focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              placeholder="이름, 태그, 페이지 메모 검색"
+              placeholder={translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "이름, 태그, 페이지 메모 검색")}
             />
           </label>
         </div>
@@ -371,7 +365,7 @@ export function StudioSceneSnapshotPanel({
         ) : null}
 
         {loading ? (
-          <div className="space-y-2" aria-label="장면 스냅샷 불러오는 중">
+          <div className="space-y-2" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "장면 스냅샷 불러오는 중")}>
             {[0, 1, 2].map((index) => (
               <div
                 key={index}
@@ -383,16 +377,16 @@ export function StudioSceneSnapshotPanel({
           <div className="rounded-xl border border-dashed border-line-strong px-4 py-8 text-center">
             <Camera size={24} className="mx-auto text-fg-3" aria-hidden="true" />
             <p className="mt-2 text-sm font-semibold text-fg">
-              {query.trim() ? "검색 결과가 없습니다" : "보관한 장면이 없습니다"}
+              {query.trim() ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "검색 결과가 없습니다") : translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "보관한 장면이 없습니다")}
             </p>
             <p className="mt-1 text-xs leading-relaxed text-fg-3">
               {query.trim()
-                ? "다른 이름이나 태그로 찾아보세요."
-                : "위에서 현재 페이지를 첫 장면 스냅샷으로 보관해 보세요."}
+                ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "다른 이름이나 태그로 찾아보세요.")
+                : translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "위에서 현재 페이지를 첫 장면 스냅샷으로 보관해 보세요.")}
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-line border-y border-line" aria-label="장면 스냅샷 목록">
+          <ul className="divide-y divide-line border-y border-line" aria-label={translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "장면 스냅샷 목록")}>
             {visibleSnapshots.map((snapshot) => {
               const deleting = pendingDeleteId === snapshot.id;
               const busy = busyId === snapshot.id;
@@ -419,7 +413,7 @@ export function StudioSceneSnapshotPanel({
                         </span>
                       </div>
                       <p className="mt-0.5 text-[0.68rem] text-fg-3">
-                        {snapshot.page.elements.length}개 레이어 ·{" "}
+                        {snapshot.page.elements.length}{translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "개 레이어 ·")}{" "}
                         {formatBytes(snapshot.byteSize)} · {formatTimestamp(snapshot.updatedAt)}
                       </p>
                       {snapshot.tags.length > 0 ? (
@@ -438,29 +432,25 @@ export function StudioSceneSnapshotPanel({
                   </div>
 
                   <p className="mt-2 text-[0.68rem] leading-relaxed text-warning">
-                    적용하면 현재 페이지 전체가 이 스냅샷으로 교체됩니다. 최종 확인과
-                    실행은 편집기가 담당합니다.
-                  </p>
+                    {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "적용하면 현재 페이지 전체가 이 스냅샷으로 교체됩니다. 최종 확인과 실행은 편집기가 담당합니다.")}</p>
 
                   {deleting ? (
                     <div className="mt-2 flex gap-2 rounded-xl bg-card p-2">
                       <p className="min-w-0 flex-1 self-center text-xs text-fg-2">
-                        이 장면을 삭제할까요?
-                      </p>
+                        {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "이 장면을 삭제할까요?")}</p>
                       <button
                         type="button"
                         onClick={() => setPendingDeleteId(null)}
                         className="min-h-11 rounded-xl border border-line px-3 text-xs font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
-                        취소
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "취소")}</button>
                       <button
                         type="button"
                         disabled={busy}
                         onClick={() => void deleteSnapshot(snapshot.id)}
                         className="min-h-11 rounded-xl bg-danger px-3 text-xs font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:opacity-50"
                       >
-                        {busy ? "삭제 중…" : "삭제"}
+                        {busy ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "삭제 중…") : translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "삭제")}
                       </button>
                     </div>
                   ) : (
@@ -472,8 +462,7 @@ export function StudioSceneSnapshotPanel({
                         className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl bg-accent px-2 text-xs font-bold text-on-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
                       >
                         <Check size={15} aria-hidden="true" />
-                        적용
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "적용")}</button>
                       <button
                         type="button"
                         onClick={() => void duplicateSnapshot(snapshot.id)}
@@ -481,7 +470,7 @@ export function StudioSceneSnapshotPanel({
                         className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-line bg-card px-2 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
                       >
                         <Copy size={15} aria-hidden="true" />
-                        {busy ? "복제 중…" : "복제"}
+                        {busy ? translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "복제 중…") : translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "복제")}
                       </button>
                       <button
                         type="button"
@@ -490,8 +479,7 @@ export function StudioSceneSnapshotPanel({
                         className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-line bg-card px-2 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger disabled:opacity-50"
                       >
                         <Trash2 size={15} aria-hidden="true" />
-                        삭제
-                      </button>
+                        {translateCurrentStaticSourceText("domains.creator.StudioSceneSnapshotPanel", "ko", "삭제")}</button>
                     </div>
                   )}
                 </li>

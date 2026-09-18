@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Non-Destructive Layer Effects Stack Panel
  *
@@ -69,47 +73,42 @@ export function StudioLayerEffectsStackPanel({
       className="flex flex-col gap-2 rounded-xl border border-line bg-card p-3 text-xs text-fg"
     >
       <div className="flex items-center justify-between border-b border-line/60 pb-2">
-        <span className="font-semibold text-fg-2">레이어 효과 스택 (비파괴)</span>
+        <span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "레이어 효과 스택 (비파괴)")}</span>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => handleAddEffect("glow")}
-            aria-label="발광 효과 추가"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "발광 효과 추가")}
             className="rounded bg-raised px-1.5 py-0.5 text-[0.62rem] font-medium text-fg-2 hover:bg-accent-soft hover:text-accent"
           >
-            + 발광
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "+ 발광")}</button>
           <button
             type="button"
             onClick={() => handleAddEffect("drop-shadow")}
-            aria-label="그림자 효과 추가"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "그림자 효과 추가")}
             className="rounded bg-raised px-1.5 py-0.5 text-[0.62rem] font-medium text-fg-2 hover:bg-accent-soft hover:text-accent"
           >
-            + 그림자
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "+ 그림자")}</button>
           <button
             type="button"
             onClick={() => handleAddEffect("relief")}
-            aria-label="부조 효과 추가"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "부조 효과 추가")}
             className="rounded bg-raised px-1.5 py-0.5 text-[0.62rem] font-medium text-fg-2 hover:bg-accent-soft hover:text-accent"
           >
-            + 부조
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "+ 부조")}</button>
           <button
             type="button"
             onClick={() => handleAddEffect("border")}
-            aria-label="테두리 효과 추가"
+            aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "테두리 효과 추가")}
             className="rounded bg-raised px-1.5 py-0.5 text-[0.62rem] font-medium text-fg-2 hover:bg-accent-soft hover:text-accent"
           >
-            + 테두리
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "+ 테두리")}</button>
         </div>
       </div>
 
       {stack.effects.length === 0 ? (
         <div className="py-4 text-center text-[0.68rem] text-fg-3">
-          적용된 레이어 효과가 없습니다. 위의 버튼으로 효과를 추가하세요.
-        </div>
+          {translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "적용된 레이어 효과가 없습니다. 위의 버튼으로 효과를 추가하세요.")}</div>
       ) : (
         <div className="flex flex-col gap-1.5">
           {stack.effects.map((effect, index) => {
@@ -125,7 +124,7 @@ export function StudioLayerEffectsStackPanel({
                     <button
                       type="button"
                       onClick={() => handleToggle(effect.id)}
-                      aria-label={effect.enabled ? "효과 끄기" : "효과 켜기"}
+                      aria-label={effect.enabled ? translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "효과 끄기") : translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "효과 켜기")}
                       className="text-fg-3 hover:text-fg"
                     >
                       {effect.enabled ? (
@@ -139,10 +138,10 @@ export function StudioLayerEffectsStackPanel({
                       onClick={() => setExpandedEffectId(isExpanded ? null : effect.id)}
                       className="text-left font-medium text-fg-2 hover:underline"
                     >
-                      {effect.kind === "glow" && `발광 (${effect.type === "outer" ? "외곽" : "내부"})`}
-                      {effect.kind === "drop-shadow" && "드롭 섀도"}
-                      {effect.kind === "relief" && "부조 (엠보스)"}
-                      {effect.kind === "border" && `테두리 (${effect.thickness}px)`}
+                      {effect.kind === "glow" && formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "발광 ({v0})"), { v0: String(effect.type === "outer" ? "외곽" : "내부") })}
+                      {effect.kind === "drop-shadow" && translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "드롭 섀도")}
+                      {effect.kind === "relief" && translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "부조 (엠보스)")}
+                      {effect.kind === "border" && formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "테두리 ({v0}px)"), { v0: String(effect.thickness) })}
                     </button>
                   </div>
 
@@ -151,7 +150,7 @@ export function StudioLayerEffectsStackPanel({
                       type="button"
                       disabled={index === 0}
                       onClick={() => handleMove(index, index - 1)}
-                      aria-label="위로 이동"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "위로 이동")}
                       className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
                     >
                       <ChevronUp className="size-3" />
@@ -160,7 +159,7 @@ export function StudioLayerEffectsStackPanel({
                       type="button"
                       disabled={index === stack.effects.length - 1}
                       onClick={() => handleMove(index, index + 1)}
-                      aria-label="아래로 이동"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "아래로 이동")}
                       className="rounded p-0.5 text-fg-3 hover:bg-raised disabled:opacity-30"
                     >
                       <ChevronDown className="size-3" />
@@ -168,7 +167,7 @@ export function StudioLayerEffectsStackPanel({
                     <button
                       type="button"
                       onClick={() => handleRemove(effect.id)}
-                      aria-label="효과 삭제"
+                      aria-label={translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "효과 삭제")}
                       className="rounded p-0.5 text-fg-3 hover:bg-raised hover:text-danger"
                     >
                       <Trash2 className="size-3" />
@@ -181,7 +180,7 @@ export function StudioLayerEffectsStackPanel({
                     {effect.kind === "glow" && (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span>형태</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "형태")}</span>
                           <select
                             value={effect.type}
                             onChange={(e) =>
@@ -191,12 +190,12 @@ export function StudioLayerEffectsStackPanel({
                             }
                             className="rounded border border-line bg-card px-1 text-[0.65rem]"
                           >
-                            <option value="outer">외곽 발광</option>
-                            <option value="inner">내부 발광</option>
+                            <option value="outer">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "외곽 발광")}</option>
+                            <option value="inner">{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "내부 발광")}</option>
                           </select>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>번짐 (Blur)</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "번짐 (Blur)")}</span>
                           <input
                             type="range"
                             min={1}
@@ -215,7 +214,7 @@ export function StudioLayerEffectsStackPanel({
                     {effect.kind === "drop-shadow" && (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span>거리 / 각도</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "거리 / 각도")}</span>
                           <div className="flex items-center gap-1">
                             <input
                               type="number"
@@ -233,7 +232,7 @@ export function StudioLayerEffectsStackPanel({
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>흐림 (Blur)</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "흐림 (Blur)")}</span>
                           <input
                             type="range"
                             min={0}
@@ -249,7 +248,7 @@ export function StudioLayerEffectsStackPanel({
                           <span className="w-8 text-right font-mono">{effect.blur}px</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>불투명도</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "불투명도")}</span>
                           <input
                             type="range"
                             min={0}
@@ -272,7 +271,7 @@ export function StudioLayerEffectsStackPanel({
                     {effect.kind === "relief" && (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span>고도각 (Elevation)</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "고도각 (Elevation)")}</span>
                           <input
                             type="range"
                             min={0}
@@ -288,7 +287,7 @@ export function StudioLayerEffectsStackPanel({
                           <span className="w-8 text-right font-mono">{effect.elevationDeg}°</span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span>깊이 (Depth)</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "깊이 (Depth)")}</span>
                           <input
                             type="range"
                             min={1}
@@ -307,7 +306,7 @@ export function StudioLayerEffectsStackPanel({
                     {effect.kind === "border" && (
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <span>테두리 굵기</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "테두리 굵기")}</span>
                           <input
                             type="range"
                             min={1}
@@ -323,7 +322,7 @@ export function StudioLayerEffectsStackPanel({
                           <span className="w-8 text-right font-mono">{effect.thickness}px</span>
                         </div>
                         <label className="flex cursor-pointer items-center justify-between gap-2 pt-1">
-                          <span>반투명 픽셀 고려 (CSP v5.1)</span>
+                          <span>{translateCurrentStaticSourceText("domains.creator.layer.StudioLayerEffectsStackPanel", "ko", "반투명 픽셀 고려 (CSP v5.1)")}</span>
                           <input
                             type="checkbox"
                             checked={effect.respectTransparency}

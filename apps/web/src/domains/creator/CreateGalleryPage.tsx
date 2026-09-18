@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Bookmark, BookOpen, PenLine, Plus, Sparkles, UserCheck, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -151,8 +155,7 @@ function IllustratedEmptyState({ title, description }: { title: string; descript
         className={buttonClass({ size: "md", variant: "solid", className: "relative mt-5 gap-1.5 shadow-lg shadow-accent/20" })}
       >
         <PenLine size={15} />
-        창작 스튜디오로 만들기
-      </Link>
+        {translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "창작 스튜디오로 만들기")}</Link>
     </div>
   );
 }
@@ -218,7 +221,7 @@ function WorksTab({
   if (error) {
     return (
       <ErrorState
-        title="창작물을 불러오지 못했습니다."
+        title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "창작물을 불러오지 못했습니다.")}
         message={error}
         onRetry={() => setReloadKey((value) => value + 1)}
       />
@@ -229,8 +232,8 @@ function WorksTab({
     return (
       <IconEmptyState
         icon={<Bookmark size={28} />}
-        title="로그인하고 작품을 북마크해 보세요."
-        description="다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다."
+        title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "로그인하고 작품을 북마크해 보세요.")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "다시 보고 싶은 일러스트와 웹툰을 한곳에 모을 수 있습니다.")}
       />
     );
   }
@@ -238,13 +241,13 @@ function WorksTab({
     return bookmarked ? (
       <IconEmptyState
         icon={<Bookmark size={28} />}
-        title="아직 북마크한 작품이 없습니다."
-        description="다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요."
+        title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "아직 북마크한 작품이 없습니다.")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "다시 보고 싶은 일러스트와 웹툰에서 북마크를 눌러 보세요.")}
       />
     ) : (
       <IllustratedEmptyState
-        title={tag ? `#${tag} 태그의 창작물이 아직 없습니다.` : "조건에 맞는 창작물이 아직 없습니다."}
-        description="필터를 바꾸거나 첫 번째 작품을 공개해 창작 커뮤니티를 채워 보세요."
+        title={tag ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "#{v0} 태그의 창작물이 아직 없습니다."), { v0: String(tag) }) : translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "조건에 맞는 창작물이 아직 없습니다.")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "필터를 바꾸거나 첫 번째 작품을 공개해 창작 커뮤니티를 채워 보세요.")}
       />
     );
   }
@@ -307,15 +310,14 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
               onClick={() => setCreating(true)}
               className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
             >
-              <Plus size={14} />새 시리즈 만들기
-            </button>
+              <Plus size={14} />{translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "새 시리즈 만들기")}</button>
           )}
         </div>
       )}
 
       {error ? (
         <ErrorState
-          title="시리즈를 불러오지 못했습니다."
+          title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "시리즈를 불러오지 못했습니다.")}
           message={error}
           onRetry={() => setReloadKey((value) => value + 1)}
         />
@@ -335,8 +337,8 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
       ) : series.length === 0 ? (
         <IconEmptyState
           icon={<BookOpen size={28} />}
-          title="아직 연재 시리즈가 없습니다."
-          description="시리즈를 만들고 작품 상세에서 회차로 연결하면 연재가 시작됩니다."
+          title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "아직 연재 시리즈가 없습니다.")}
+          description={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "시리즈를 만들고 작품 상세에서 회차로 연결하면 연재가 시작됩니다.")}
           action={
             userId ? (
               <button
@@ -344,8 +346,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
                 onClick={() => setCreating(true)}
                 className={buttonClass({ size: "md", variant: "solid", className: "gap-1.5 shadow-lg shadow-accent/20" })}
               >
-                <Plus size={15} />새 시리즈 만들기
-              </button>
+                <Plus size={15} />{translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "새 시리즈 만들기")}</button>
             ) : undefined
           }
         />
@@ -399,15 +400,15 @@ function FollowingTab() {
     return (
       <IconEmptyState
         icon={<UserCheck size={28} />}
-        title="로그인하고 좋아하는 창작자를 팔로우해 보세요."
-        description="팔로우한 창작자의 새 작품이 이곳에 모입니다."
+        title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "로그인하고 좋아하는 창작자를 팔로우해 보세요.")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "팔로우한 창작자의 새 작품이 이곳에 모입니다.")}
       />
     );
   }
   if (error) {
     return (
       <ErrorState
-        title="팔로잉 피드를 불러오지 못했습니다."
+        title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "팔로잉 피드를 불러오지 못했습니다.")}
         message={error}
         onRetry={() => setReloadKey((value) => value + 1)}
       />
@@ -418,8 +419,8 @@ function FollowingTab() {
     return (
       <IconEmptyState
         icon={<UserCheck size={28} />}
-        title="아직 팔로우한 창작자가 없습니다."
-        description="마음에 드는 작품의 작성자 프로필에서 팔로우하면 새 작품을 여기서 볼 수 있어요."
+        title={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "아직 팔로우한 창작자가 없습니다.")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "마음에 드는 작품의 작성자 프로필에서 팔로우하면 새 작품을 여기서 볼 수 있어요.")}
       />
     );
   }
@@ -496,10 +497,10 @@ export function CreateGalleryPage() {
       <WebtoonGalleryIntro />
       <header className="webtoon-gallery-filter mb-7 rounded-2xl border border-line p-5 sm:p-6">
         <div>
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-bold">창작자의 작품을 만나보세요</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-bold">{translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "창작자의 작품을 만나보세요")}</h2><span className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "en", "WEBTOONS · ILLUSTRATIONS · SERIES")}</span></div>
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             {/* 탭: 전체 작품 / 시리즈 / 팔로잉 — 썸 친화 칩, 360px 에서 깔끔히 줄바꿈 */}
-            <div role="tablist" aria-label="보기" className="flex flex-wrap gap-2">
+            <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "보기")} className="flex flex-wrap gap-2">
               {TABS.map((option) => (
                 <ChipButton
                   key={option.value}
@@ -515,7 +516,7 @@ export function CreateGalleryPage() {
             {showSort || showTagChip ? (
               <div className="flex flex-wrap items-center gap-2">
                 {showSort && (
-                  <div role="tablist" aria-label="정렬" className="flex flex-wrap gap-2">
+                  <div role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "정렬")} className="flex flex-wrap gap-2">
                     {SORTS.map((option) => (
                       <ChipButton
                         key={option.value}
@@ -533,7 +534,7 @@ export function CreateGalleryPage() {
                   <button
                     type="button"
                     onClick={() => setParam("tag", null)}
-                    aria-label={`#${tag} 태그 필터 해제`}
+                    aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "#{v0} 태그 필터 해제"), { v0: String(tag) })}
                     className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-full border border-accent/50 bg-accent-soft/70 px-4 text-sm font-medium text-fg transition-colors hover:bg-accent-soft active:scale-[0.96]"
                   >
                     #{tag}
@@ -545,7 +546,7 @@ export function CreateGalleryPage() {
 
             {tab === "works" && (
               <div className="flex flex-wrap items-center gap-2 border-t border-line/70 pt-3">
-                <span className="mr-1 text-[0.7rem] font-medium text-fg-3">작품 유형</span>
+                <span className="mr-1 text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "작품 유형")}</span>
                 {CREATOR_COMMUNITY_CONTENT_GROUPS.map((group) => (
                   <button
                     key={group}
@@ -565,10 +566,10 @@ export function CreateGalleryPage() {
                 <select
                   value={provenance ?? ""}
                   onChange={(event) => setParam("provenance", event.target.value || null)}
-                  aria-label="제작 방식 필터"
+                  aria-label={translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "제작 방식 필터")}
                   className="h-9 rounded-full border border-line bg-card px-3 text-xs text-fg-2"
                 >
-                  <option value="">모든 제작 방식</option>
+                  <option value="">{translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "모든 제작 방식")}</option>
                   {CREATOR_COMMUNITY_PROVENANCES.map((value) => (
                     <option key={value} value={value}>{PROVENANCE_FILTER_LABEL[value]}</option>
                   ))}
@@ -584,8 +585,7 @@ export function CreateGalleryPage() {
                       : "border-line bg-card text-fg-2 hover:bg-raised",
                   )}
                 >
-                  대표 포트폴리오
-                </button>
+                  {translateCurrentStaticSourceText("domains.creator.CreateGalleryPage", "ko", "대표 포트폴리오")}</button>
               </div>
             )}
           </div>

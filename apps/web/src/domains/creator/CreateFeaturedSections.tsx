@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Boxes, Flame, Sparkles, Trophy, WandSparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -119,14 +123,13 @@ export function CreateFeaturedSections() {
               className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
             >
               <Trophy size={14} />
-              바로 참여하기
-            </Link>
+              {translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "바로 참여하기")}</Link>
           }
         >
           <div className="flex flex-wrap items-center gap-2 text-xs text-fg-3">
             <span className="inline-flex items-center gap-1 rounded-full border border-accent/35 bg-accent-soft/50 px-2.5 py-1 text-accent">
               <Trophy size={12} />
-              참여작 <span className="numeral font-semibold">{challenge.entries}</span>
+              {translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "참여작 ")}<span className="numeral font-semibold">{challenge.entries}</span>
             </span>
             {challengeDdayLabel != null && (
               <span
@@ -137,12 +140,11 @@ export function CreateFeaturedSections() {
                     : "border-line bg-raised text-fg-2"
                 )}
               >
-                {challengeDdayLabel === 0 ? "오늘 마감" : `D-${challengeDdayLabel}`}
+                {challengeDdayLabel === 0 ? translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "오늘 마감") : `D-${challengeDdayLabel}`}
               </span>
             )}
-            <Link href={`/create/challenges?c=${encodeURIComponent(challenge.slug)}`} className="ml-auto text-accent hover:underline">
-              참여작 보기
-            </Link>
+            <Link href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "en", "/create/challenges?c={v0}"), { v0: String(encodeURIComponent(challenge.slug)) })} className="ml-auto text-accent hover:underline">
+              {translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "참여작 보기")}</Link>
           </div>
         </SectionShell>
       )}
@@ -150,12 +152,11 @@ export function CreateFeaturedSections() {
       {popular.length > 0 && (
         <SectionShell
           eyebrow="CREATOR PICKS"
-          title="이번 주 인기 창작물"
-          description="좋아요가 많은 작품을 모았습니다."
+          title={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "이번 주 인기 창작물")}
+          description={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "좋아요가 많은 작품을 모았습니다.")}
           action={
             <Link href="/create?sort=likes" className={buttonClass({ size: "sm", variant: "outline" })}>
-              전체 보기
-            </Link>
+              {translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "전체 보기")}</Link>
           }
         >
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -169,14 +170,14 @@ export function CreateFeaturedSections() {
       {trendingTags.length > 0 && (
         <SectionShell
           eyebrow="TAG DISCOVERY"
-          title="요즘 많이 쓰는 태그"
-          description="태그를 눌러 비슷한 분위기의 창작물을 찾아보세요."
+          title={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "요즘 많이 쓰는 태그")}
+          description={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "태그를 눌러 비슷한 분위기의 창작물을 찾아보세요.")}
         >
           <div className="flex flex-wrap gap-2">
             {trendingTags.map(([tag, count]) => (
               <Link
                 key={tag}
-                href={`/create?tag=${encodeURIComponent(tag)}`}
+                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "en", "/create?tag={v0}"), { v0: String(encodeURIComponent(tag)) })}
                 className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3 text-sm text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
               >
                 <Flame size={13} className="text-warn" />#{tag}
@@ -190,13 +191,12 @@ export function CreateFeaturedSections() {
       {remixWorks.length > 0 && (
         <SectionShell
           eyebrow="REMIX LINEAGE"
-          title="리믹스로 이어지는 창작"
-          description="다른 작품을 이어받아 새롭게 그린 작품들입니다."
+          title={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "리믹스로 이어지는 창작")}
+          description={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "다른 작품을 이어받아 새롭게 그린 작품들입니다.")}
           action={
             <span className="inline-flex items-center gap-1 text-xs text-fg-3">
               <WandSparkles size={13} className="text-accent" />
-              상세에서 ‘리믹스’로 참여
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "상세에서 ‘리믹스’로 참여")}</span>
           }
         >
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -209,8 +209,8 @@ export function CreateFeaturedSections() {
 
       <SectionShell
         eyebrow="QUICK START"
-        title="오늘 바로 시작하기"
-        description="그리기가 부담스럽다면 이미지 업로드, 컷 구성이 필요하면 스튜디오로."
+        title={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "오늘 바로 시작하기")}
+        description={translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "그리기가 부담스럽다면 이미지 업로드, 컷 구성이 필요하면 스튜디오로.")}
       >
         <div className="grid gap-2 sm:grid-cols-3">
           <Link
@@ -221,8 +221,8 @@ export function CreateFeaturedSections() {
               <Sparkles size={18} />
             </span>
             <span>
-              <span className="block text-sm font-semibold text-fg">이미지 업로드 게시</span>
-              <span className="mt-0.5 block text-xs text-fg-3">완성 이미지를 순서대로 올리기</span>
+              <span className="block text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "이미지 업로드 게시")}</span>
+              <span className="mt-0.5 block text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "완성 이미지를 순서대로 올리기")}</span>
             </span>
           </Link>
           <Link
@@ -233,8 +233,8 @@ export function CreateFeaturedSections() {
               <Trophy size={18} />
             </span>
             <span>
-              <span className="block text-sm font-semibold text-fg">컷툰 스튜디오</span>
-              <span className="mt-0.5 block text-xs text-fg-3">템플릿·말풍선·VRM으로 제작</span>
+              <span className="block text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "컷툰 스튜디오")}</span>
+              <span className="mt-0.5 block text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "템플릿·말풍선·VRM으로 제작")}</span>
             </span>
           </Link>
           <Link
@@ -245,8 +245,8 @@ export function CreateFeaturedSections() {
               <Boxes size={18} />
             </span>
             <span>
-              <span className="block text-sm font-semibold text-fg">2D → 3D 변환</span>
-              <span className="mt-0.5 block text-xs text-fg-3">원화를 3D 모델·배경으로 세우기</span>
+              <span className="block text-sm font-semibold text-fg">{translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "2D → 3D 변환")}</span>
+              <span className="mt-0.5 block text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.CreateFeaturedSections", "ko", "원화를 3D 모델·배경으로 세우기")}</span>
             </span>
           </Link>
         </div>

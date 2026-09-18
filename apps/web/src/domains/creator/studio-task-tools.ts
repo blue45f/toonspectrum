@@ -9,6 +9,10 @@ const TASK_TOOLS: Partial<Record<StudioDocumentWorkspaceId, readonly StudioRailT
   slides: ["select", "transform", "shape-rect", "shape-ellipse", "text", "image", "zoom-fit"],
   image: ["select", "crop", "lasso", "eraser", "dodge-burn", "liquify", "image", "eyedropper", "zoom-fit"],
   storyboard: ["select", "pen", "eraser", "text", "bubble", "image", "zoom-fit"],
+  "3d": ["select", "transform", "image", "reference", "zoom-fit"],
+  animation: ["select", "transform", "image", "reference", "zoom-fit"],
+  motion: ["select", "transform", "image", "reference", "zoom-fit"],
+  audio: ["select", "zoom-fit"],
 };
 const QUICK_TOOLS: readonly StudioRailToolId[] = ["select", "pen", "eraser", "fill", "eyedropper", "zoom-fit"];
 

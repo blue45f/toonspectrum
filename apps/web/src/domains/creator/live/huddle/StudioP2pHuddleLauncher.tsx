@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { MessageCircle, Mic, MicOff, Video, MonitorUp, PhoneOff, Hand, VolumeX, X } from "lucide-react";
 import { useStudioLiveCollaboration } from "../studio-live-collaboration-context";
@@ -65,82 +69,82 @@ export default function StudioP2pHuddleLauncher() {
   const canJoin = Boolean(room.direct && live.availability === "ready");
   const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
   return <aside
-    className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+env(safe-area-inset-bottom)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3"
-    aria-label="협업 대화"
+    className="fixed bottom-[calc(var(--studio-canvas-bottom-inset,5rem)+0.75rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3"
+    aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "협업 대화")}
     data-studio-shell-floating-target="collaboration"
-    data-studio-shell-force-visible={active ? "true" : undefined}
+    data-studio-shell-force-visible={active ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "en", "true") : undefined}
   >
     <section hidden={!open} className="mb-2 w-[360px] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
       <header className="flex items-center justify-between border-b border-line p-3">
-        <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">채팅·화상통화</h3>
-          <p className="text-[11px] text-fg-3">2–4인 작업팀 · TURN 중계 없음</p></div>
-        <button type="button" className={controlClass} aria-label="대화 패널 접기" onClick={() => setOpen(false)}><X size={16} /></button>
+        <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "채팅·화상통화")}</h3>
+          <p className="text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "2–4인 작업팀 · TURN 중계 없음")}</p></div>
+        <button type="button" className={controlClass} aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화 패널 접기")} onClick={() => setOpen(false)}><X size={16} /></button>
       </header>
       <div className="max-h-[68dvh] space-y-3 overflow-y-auto p-3">
         {!active ? <div className="space-y-3 text-xs leading-relaxed text-fg-2">
-          <p>참여하면 채팅만 시작됩니다. 마이크·카메라는 직접 켜기 전까지 사용하지 않습니다.</p>
-          <p>대화·통화는 브라우저 간 직접 전송하며 기록을 저장하지 않습니다. 상대에게 네트워크 주소가 노출될 수 있으니 신뢰하는 작업자와 사용해 주세요.</p>
-          <p>회사망·일부 모바일망에서는 연결되지 않을 수 있습니다. 실패 시 서버 중계로 전환하지 않습니다. 상대방의 녹화·캡처까지 막지는 못합니다.</p>
-          {!canJoin && <p role="status" className="text-warn">서버에 연결된 공동작업 원고와 WebRTC 지원 브라우저가 필요합니다. 로컬 탭 연결만으로 원격 통화를 시작하지 않습니다.</p>}
-          <button className={controlClass} type="button" disabled={!canJoin} onClick={join}>동의하고 P2P 채팅 참여</button>
+          <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "참여하면 채팅만 시작됩니다. 마이크·카메라는 직접 켜기 전까지 사용하지 않습니다.")}</p>
+          <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화·통화는 브라우저 간 직접 전송하며 기록을 저장하지 않습니다. 상대에게 네트워크 주소가 노출될 수 있으니 신뢰하는 작업자와 사용해 주세요.")}</p>
+          <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "회사망·일부 모바일망에서는 연결되지 않을 수 있습니다. 실패 시 서버 중계로 전환하지 않습니다. 상대방의 녹화·캡처까지 막지는 못합니다.")}</p>
+          {!canJoin && <p role="status" className="text-warn">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "서버에 연결된 공동작업 원고와 WebRTC 지원 브라우저가 필요합니다. 로컬 탭 연결만으로 원격 통화를 시작하지 않습니다.")}</p>}
+          <button className={controlClass} type="button" disabled={!canJoin} onClick={join}>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "동의하고 P2P 채팅 참여")}</button>
         </div> : <>
-          <p className="text-xs text-fg-2" role="status">나 포함 {(snapshot?.peers.length ?? 0) + 1}명 참여 · 연결 가능 {snapshot?.availablePeers ?? 0}명</p>
-          {!mediaAvailable && <p role="status" className="text-xs text-warn">이 브라우저는 카메라·마이크를 지원하지 않습니다. 지원하는 브라우저에서 같은 작업실을 열어 주세요. 채팅·활동은 계속 사용할 수 있습니다.</p>}
+          <p className="text-xs text-fg-2" role="status">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나 포함 ")}{(snapshot?.peers.length ?? 0) + 1}{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "명 참여 · 연결 가능 ")}{snapshot?.availablePeers ?? 0}{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "명")}</p>
+          {!mediaAvailable && <p role="status" className="text-xs text-warn">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "이 브라우저는 카메라·마이크를 지원하지 않습니다. 지원하는 브라우저에서 같은 작업실을 열어 주세요. 채팅·활동은 계속 사용할 수 있습니다.")}</p>}
           <div className="grid grid-cols-3 gap-1.5">
             <button className={controlClass} type="button" disabled={busy || !mediaAvailable} aria-pressed={!snapshot?.muted}
               onClick={() => void capture(() => controller.current?.setMicrophone(Boolean(snapshot?.muted)) ?? Promise.resolve())}>
-              {snapshot?.muted ? <MicOff size={14} /> : <Mic size={14} />}{snapshot?.muted ? "마이크 켜기" : "마이크 끄기"}</button>
+              {snapshot?.muted ? <MicOff size={14} /> : <Mic size={14} />}{snapshot?.muted ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "마이크 켜기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "마이크 끄기")}</button>
             <button className={controlClass} type="button" disabled={busy || !mediaAvailable} aria-pressed={snapshot?.camera}
               onClick={() => void capture(() => controller.current?.setVideo(snapshot?.camera ? null : "camera") ?? Promise.resolve())}>
-              <Video size={14} />{snapshot?.camera ? "카메라 끄기" : "카메라 켜기"}</button>
+              <Video size={14} />{snapshot?.camera ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "카메라 끄기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "카메라 켜기")}</button>
             <button className={controlClass} type="button" disabled={busy || !navigator.mediaDevices?.getDisplayMedia} aria-pressed={snapshot?.sharing}
               onClick={() => void capture(() => controller.current?.setVideo(snapshot?.sharing ? null : "screen") ?? Promise.resolve())}>
-              <MonitorUp size={14} />{snapshot?.sharing ? "공유 중지" : "화면 공유"}</button>
+              <MonitorUp size={14} />{snapshot?.sharing ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "공유 중지") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "화면 공유")}</button>
             <button className={controlClass} type="button" aria-pressed={deafened} onClick={() => setDeafened((v) => !v)}>
-              <VolumeX size={14} />{deafened ? "소리 켜기" : "소리 끄기"}</button>
+              <VolumeX size={14} />{deafened ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "소리 켜기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "소리 끄기")}</button>
             <button className={controlClass} type="button" aria-pressed={snapshot?.hand} onClick={() => controller.current?.setHand(!snapshot?.hand)}>
-              <Hand size={14} />{snapshot?.hand ? "손 내리기" : "손들기"}</button>
-            <button className={controlClass} type="button" onClick={leave}><PhoneOff size={14} />나가기</button>
+              <Hand size={14} />{snapshot?.hand ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "손 내리기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "손들기")}</button>
+            <button className={controlClass} type="button" onClick={leave}><PhoneOff size={14} />{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나가기")}</button>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <MediaTile name="나 · 미리보기" stream={snapshot?.localStream ?? null} muted visual={Boolean(snapshot?.camera || snapshot?.sharing)} />
+            <MediaTile name={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나 · 미리보기")} stream={snapshot?.localStream ?? null} muted visual={Boolean(snapshot?.camera || snapshot?.sharing)} />
             {snapshot?.peers.map((peer) => <div key={peer.participant.sessionId}>
               <MediaTile name={peer.participant.displayName} stream={peer.stream} muted={deafened} visual={peer.camera || peer.sharing} />
-              <p className="mt-1 text-[11px] text-fg-3">{peer.muted ? "마이크 꺼짐" : "마이크 켜짐"} {peer.hand ? "✋" : ""} {peer.reaction ?? ""}
-                {peer.connection === "failed" ? " · 연결 실패" : peer.connection === "connected" ? " · 직접 연결" : ""}</p>
+              <p className="mt-1 text-[11px] text-fg-3">{peer.muted ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "마이크 꺼짐") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "마이크 켜짐")} {peer.hand ? "✋" : ""} {peer.reaction ?? ""}
+                {peer.connection === "failed" ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", " · 연결 실패") : peer.connection === "connected" ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", " · 직접 연결") : ""}</p>
               <button type="button" className="min-h-11 text-[11px] text-fg-3 underline" onClick={() => controller.current?.block(peer.participant.sessionId)}>
-                {peer.participant.displayName} 이 세션에서 차단</button>
+                {peer.participant.displayName} {translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "이 세션에서 차단")}</button>
             </div>)}
           </div>
-          <div className="flex gap-2" aria-label="빠른 리액션">{HUDDLE_REACTIONS.map((emoji) =>
-            <button key={emoji} className={controlClass} type="button" aria-label={`${emoji} 리액션 보내기`}
+          <div className="flex gap-2" aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "빠른 리액션")}>{HUDDLE_REACTIONS.map((emoji) =>
+            <button key={emoji} className={controlClass} type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "{v0} 리액션 보내기"), { v0: String(emoji) })}
               onClick={() => controller.current?.react(emoji)}>{emoji}</button>)}</div>
-          {!snapshot?.peers.length && <p className="text-xs text-fg-3">같은 공동작업 원고에서 상대도 P2P 채팅에 참여해야 연결됩니다. 연결되지 않으면 네트워크를 확인해 주세요.</p>}
+          {!snapshot?.peers.length && <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "같은 공동작업 원고에서 상대도 P2P 채팅에 참여해야 연결됩니다. 연결되지 않으면 네트워크를 확인해 주세요.")}</p>}
           {controller.current && <StudioP2pActivitiesPanel controller={controller.current} />}
-          <div ref={log} role="log" aria-label="P2P 대화 기록" aria-live="polite" aria-relevant="additions" className="max-h-48 space-y-2 overflow-y-auto rounded-xl bg-card p-2 text-xs">
+          <div ref={log} role="log" aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "P2P 대화 기록")} aria-live="polite" aria-relevant="additions" className="max-h-48 space-y-2 overflow-y-auto rounded-xl bg-card p-2 text-xs">
             {snapshot?.messages.map((message) => <div key={message.id} className="break-words">
-              <strong>{message.self ? "나" : message.name}</strong><p className="whitespace-pre-wrap">{message.text}</p>
-              {message.self && <span className="text-[10px] text-fg-3">전송 {message.sent.length}/{message.targets.length} · 수신 확인 {message.received.length}/{message.targets.length}</span>}
+              <strong>{message.self ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나") : message.name}</strong><p className="whitespace-pre-wrap">{message.text}</p>
+              {message.self && <span className="text-[10px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "전송 ")}{message.sent.length}/{message.targets.length} {translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "· 수신 확인 ")}{message.received.length}/{message.targets.length}</span>}
             </div>)}
           </div>
           <form onSubmit={submit} className="flex gap-2">
-            <label className="sr-only" htmlFor="studio-p2p-message">P2P 메시지</label>
+            <label className="sr-only" htmlFor="studio-p2p-message">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "P2P 메시지")}</label>
             <input id="studio-p2p-message" value={draft} maxLength={HUDDLE_TEXT_LIMIT} autoComplete="off"
               className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 text-xs"
-              placeholder="P2P 메시지 · 기록 저장 안 함" onChange={(event) => setDraft(event.target.value)}
+              placeholder={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "P2P 메시지 · 기록 저장 안 함")} onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter" && (event.nativeEvent.isComposing || event.keyCode === 229)) event.preventDefault(); }} />
-            <button type="submit" className={controlClass} disabled={!draft.trim() || !snapshot?.peers.length}>전송</button>
+            <button type="submit" className={controlClass} disabled={!draft.trim() || !snapshot?.peers.length}>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "전송")}</button>
           </form>
-          <p className="text-[10px] leading-relaxed text-fg-3">이 대화는 기존 세션 채팅과 분리되어 있습니다. 수신 확인은 상대 브라우저 도착을 뜻하며 읽음 확인이 아닙니다. 나가면 기록이 지워집니다.</p>
+          <p className="text-[10px] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "이 대화는 기존 세션 채팅과 분리되어 있습니다. 수신 확인은 상대 브라우저 도착을 뜻하며 읽음 확인이 아닙니다. 나가면 기록이 지워집니다.")}</p>
         </>}
         {(notice || snapshot?.error) && <p role="status" className="text-xs leading-relaxed text-warn">{notice ?? snapshot?.error}</p>}
       </div>
     </section>
     <button type="button" aria-expanded={open} className="ml-auto flex min-h-11 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       onClick={() => setOpen((value) => !value)}>
-      <MessageCircle size={16} />{active ? `P2P 대화 중 · ${(snapshot?.peers.length ?? 0) + 1}명` : "채팅·통화"}
-      {active && <span className="size-2 rounded-full bg-good" aria-label="대화 참여 중" />}
+      <MessageCircle size={16} />{active ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "P2P 대화 중 · {v0}명"), { v0: String((snapshot?.peers.length ?? 0) + 1) }) : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "채팅·통화")}
+      {active && <span className="size-2 rounded-full bg-good" aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화 참여 중")} />}
     </button>
   </aside>;
 }

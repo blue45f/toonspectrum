@@ -228,7 +228,7 @@ export function attachStudioBg3dEditorPlacementHost(h) {
     physicsAnimationFrameRef, physicsGenerationRef, physicsPlaybackStartedAtRef,
     physicsPlaybackOffsetRef, physicsLastUiUpdateRef, physicsLastFrameTimestampRef,
     latestPhysicsSamplesRef, physicsSessionRef, physicsWorkerSessionRef,
-    physicsRuntimeSourceRef, physicsStartButtonRef, physicsTransportActionRef,
+    physicsRuntimeSourceRef, replaceCanonicalDocumentState, physicsStartButtonRef, physicsTransportActionRef,
     shouldTransferPhysicsFocusRef, isModalAssetSessionCurrent,
     getModelThumbnailCaptureController, acquireModelThumbnailGpuLease,
     startModelThumbnailCaptureBatch, invalidateModalAssetSession, cancelSurfaceSnap,
@@ -495,8 +495,7 @@ export function attachStudioBg3dEditorPlacementHost(h) {
     };
     const nextCustomModels = [...runtime.customModels, next];
     commitImmediateHistoryTransition(runtime.primitives, nextCustomModels, runtime.document);
-    physicsRuntimeSourceRef.current = { ...runtime, customModels: nextCustomModels };
-    setCustomModels(nextCustomModels);
+    replaceCanonicalDocumentState({ customModels: nextCustomModels });
     setSelectedIds(new Set([next.id]));
     setRefTick((revision) => revision + 1);
     publishPlacementSession(committed.state);
@@ -793,13 +792,10 @@ export function attachStudioBg3dEditorPlacementHost(h) {
           }
           const nextPrimitives = [...current.primitives, ...prepared.primitives];
           const nextCustomModels = [...current.customModels, ...prepared.customModels];
-          physicsRuntimeSourceRef.current = {
-            ...current,
+          replaceCanonicalDocumentState({
             primitives: nextPrimitives,
             customModels: nextCustomModels,
-          };
-          setPrimitives(nextPrimitives);
-          setCustomModels(nextCustomModels);
+          });
           if (insertedIds.length > 0) {
             const insertedEntities = [...prepared.primitives, ...prepared.customModels];
             setSelectedIds(new Set(

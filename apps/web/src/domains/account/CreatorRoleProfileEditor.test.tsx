@@ -39,6 +39,9 @@ describe("CreatorRoleProfileEditor", () => {
   it("대표·보조 직무와 전문 분야, 작업 모드, 공개 여부를 함께 편집한다", () => {
     render(<EditorHarness />);
 
+    fireEvent.change(screen.getByLabelText(/현재 활동 단계/), {
+      target: { value: "professional" },
+    });
     fireEvent.click(within(screen.getByRole("group", { name: "대표 직무" }))
       .getByRole("button", { name: /글작가/ }));
     expect(readProfile()).toMatchObject({
@@ -57,6 +60,7 @@ describe("CreatorRoleProfileEditor", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /공개 프로필에 직무와 전문 분야 표시/ }));
 
     expect(readProfile()).toMatchObject({
+      creatorStage: "professional",
       primaryRole: "story",
       secondaryRoles: ["assistant"],
       specialties: ["dialogue"],

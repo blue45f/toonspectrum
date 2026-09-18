@@ -7,6 +7,7 @@ import {
   normalizeCollectionName,
 } from "../../../../web/src/shared/lib/collection-contract";
 import { parseCreatorRoleProfileInput } from "../../../../web/src/shared/lib/creator-role-contract";
+import { parseRegionSettings } from "../../../../web/src/shared/lib/region-settings";
 import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../db";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
 
@@ -53,6 +54,7 @@ interface ProfilePayload {
   bio?: unknown;
   image?: unknown;
   creatorRoleProfile?: unknown;
+  regionSettings?: unknown;
 }
 
 type MergePayload = {
@@ -246,6 +248,14 @@ export class MeService {
         throw new BadRequestException("직무 프로필 형식이 올바르지 않습니다.");
       }
       input.creatorRoleProfile = creatorRoleProfile;
+    }
+    if (payload.regionSettings !== undefined) {
+      const parsed = parseRegionSettings(payload.regionSettings);
+      if (!parsed) throw new BadRequestException("Invalid regional preference.");
+      input.regionSettings = {
+        ...parsed,
+        updatedAt: new Date().toISOString(),
+      };
     }
     const result = await updateProfile(uid, input);
     if ("error" in result) throw new BadRequestException(result.error);

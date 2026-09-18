@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   useMemo,
   useRef,
   useState,
@@ -159,28 +163,25 @@ export function StudioPressureCalibrationPanel({
           touch ? "min-h-11" : "min-h-9"
         )}
       >
-        <span>필압 테스트 · 자동 보정</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "필압 테스트 · 자동 보정")}</span>
         <span className="text-[0.54rem] font-semibold text-fg-3 group-open:hidden">
-          실제 펜 입력으로 열기
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "실제 펜 입력으로 열기")}</span>
         <span className="hidden text-[0.54rem] font-semibold text-fg-3 group-open:inline">
-          접기
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "접기")}</span>
       </summary>
 
       <div className="mt-2 border-t border-line/45 pt-2">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span className="text-[0.62rem] font-bold text-fg-2">
-            실시간 필압 테스트
-          </span>
+            {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "실시간 필압 테스트")}</span>
           <span className="tabular-nums text-[0.56rem] font-semibold text-fg-3">
-            입력 {pressurePercent(latestRaw)} → 출력 {pressurePercent(latestMapped)}
+            {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "입력 ")}{pressurePercent(latestRaw)} {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "→ 출력 ")}{pressurePercent(latestMapped)}
           </span>
         </div>
 
         <svg
           role="group"
-          aria-label="필압 시험선 입력 영역"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "필압 시험선 입력 영역")}
           viewBox={`0 0 ${TEST_W} ${TEST_H}`}
           data-studio-pressure-test-pad="true"
           className={cn(
@@ -208,8 +209,7 @@ export function StudioPressureCalibrationPanel({
               className="text-fg-3 text-[10px]"
               aria-hidden="true"
             >
-              펜을 약하게→강하게 눌러 시험선을 그리세요
-            </text>
+              {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "펜을 약하게→강하게 눌러 시험선을 그리세요")}</text>
           ) : null}
           <g className="text-accent" aria-hidden="true">
             {testPoints.slice(1).map((point, index) => {
@@ -257,11 +257,11 @@ export function StudioPressureCalibrationPanel({
 
         <div
           className="mt-1.5 grid grid-cols-2 gap-1.5"
-          aria-label="현재 필압 입출력"
+          aria-label={translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "현재 필압 입출력")}
         >
           <div>
             <div className="mb-0.5 flex justify-between text-[0.54rem] text-fg-3">
-              <span>원시 입력</span>
+              <span>{translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "원시 입력")}</span>
               <span>{pressurePercent(latestRaw)}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-raised">
@@ -273,7 +273,7 @@ export function StudioPressureCalibrationPanel({
           </div>
           <div>
             <div className="mb-0.5 flex justify-between text-[0.54rem] text-fg-3">
-              <span>적용 출력</span>
+              <span>{translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "적용 출력")}</span>
               <span>{pressurePercent(latestMapped)}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-raised">
@@ -291,8 +291,8 @@ export function StudioPressureCalibrationPanel({
             aria-live="polite"
           >
             {stats
-              ? `입력 샘플 ${stats.sampleCount}개 · 범위 ${pressurePercent(stats.minimum)}–${pressurePercent(stats.maximum)} · 중앙 ${pressurePercent(stats.median)} · P90 ${pressurePercent(stats.p90)}`
-              : "입력 샘플 없음 · 다양한 압력으로 한 번에 그리면 자동 보정할 수 있습니다."}
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "입력 샘플 {v0}개 · 범위 {v1}–{v2} · 중앙 {v3} · P90 {v4}"), { v0: String(stats.sampleCount), v1: String(pressurePercent(stats.minimum)), v2: String(pressurePercent(stats.maximum)), v3: String(pressurePercent(stats.median)), v4: String(pressurePercent(stats.p90)) })
+              : translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "입력 샘플 없음 · 다양한 압력으로 한 번에 그리면 자동 보정할 수 있습니다.")}
           </p>
           <div className="flex shrink-0 gap-1">
             <button
@@ -304,8 +304,7 @@ export function StudioPressureCalibrationPanel({
                 touch ? "min-h-11" : "min-h-8"
               )}
             >
-              지우기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "지우기")}</button>
             <button
               type="button"
               onClick={() => {
@@ -314,16 +313,15 @@ export function StudioPressureCalibrationPanel({
               disabled={recommendation === null}
               title={
                 recommendation === null
-                  ? "서로 다른 압력의 유효 샘플이 8개 이상 필요합니다"
-                  : `권장 감마 ${recommendation.toFixed(2)} 적용`
+                  ? translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "서로 다른 압력의 유효 샘플이 8개 이상 필요합니다")
+                  : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "권장 감마 {v0} 적용"), { v0: String(recommendation.toFixed(2)) })
               }
               className={cn(
                 "rounded-md border border-accent/45 bg-accent-soft px-2 text-[0.58rem] font-bold text-accent disabled:cursor-not-allowed disabled:opacity-40",
                 touch ? "min-h-11" : "min-h-8"
               )}
             >
-              자동 보정
-              {recommendation === null ? "" : ` γ${recommendation.toFixed(2)}`}
+              {translateCurrentStaticSourceText("domains.creator.StudioPressureCalibrationPanel", "ko", "자동 보정")}{recommendation === null ? "" : ` γ${recommendation.toFixed(2)}`}
             </button>
           </div>
         </div>

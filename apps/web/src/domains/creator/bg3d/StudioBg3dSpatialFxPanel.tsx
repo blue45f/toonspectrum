@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Sparkles, Zap, Volume2, Plus } from "lucide-react";
 import { useState, useId } from "react";
 
@@ -104,32 +108,25 @@ export function StudioBg3dSpatialFxPanel({
           type="button"
           disabled={disabled}
           onClick={() => setActiveTab("sfx")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors ${
-            activeTab === "sfx" ? "bg-raised text-fg shadow-sm" : "text-fg-3 hover:text-fg"
-          }`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "en", "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors {v0}"), { v0: String(activeTab === "sfx" ? "bg-raised text-fg shadow-sm" : "text-fg-3 hover:text-fg") })}
         >
           <Volume2 className="h-3.5 w-3.5" />
-          3D 입체 효과음 (SFX)
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "3D 입체 효과음 (SFX)")}</button>
         <button
           type="button"
           disabled={disabled}
           onClick={() => setActiveTab("speedlines")}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors ${
-            activeTab === "speedlines" ? "bg-raised text-fg shadow-sm" : "text-fg-3 hover:text-fg"
-          }`}
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "en", "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-colors {v0}"), { v0: String(activeTab === "speedlines" ? "bg-raised text-fg shadow-sm" : "text-fg-3 hover:text-fg") })}
         >
           <Zap className="h-3.5 w-3.5" />
-          3D 원근 집중선
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "3D 원근 집중선")}</button>
       </div>
 
       {activeTab === "sfx" ? (
         <div className="flex flex-col gap-3">
           <div>
             <span className="mb-1.5 block text-[0.7rem] font-semibold text-fg-2">
-              웹툰 효과음 프리셋 선택
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "웹툰 효과음 프리셋 선택")}</span>
             <div className="grid grid-cols-4 gap-1.5">
               {SFX_PRESETS.map((preset) => (
                 <button
@@ -137,11 +134,9 @@ export function StudioBg3dSpatialFxPanel({
                   type="button"
                   disabled={disabled}
                   onClick={() => handleApplySfxPreset(preset)}
-                  className={`rounded-lg border px-2 py-1.5 text-center text-xs font-black transition-colors ${
-                    selectedPreset === preset
+                  className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "en", "rounded-lg border px-2 py-1.5 text-center text-xs font-black transition-colors {v0}"), { v0: String(selectedPreset === preset
                       ? "border-accent bg-accent/15 text-accent"
-                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised"
-                  }`}
+                      : "border-line bg-card text-fg hover:border-line-strong hover:bg-raised") })}
                 >
                   {preset}
                 </button>
@@ -151,15 +146,14 @@ export function StudioBg3dSpatialFxPanel({
 
           <div>
             <label htmlFor={customTextId} className="mb-1 block text-[0.7rem] font-semibold text-fg-2">
-              직접 입력 (선택 사항)
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "직접 입력 (선택 사항)")}</label>
             <input
               id={customTextId}
               type="text"
               value={customText}
               disabled={disabled}
               onChange={(e) => setCustomText(e.target.value)}
-              placeholder={`기본값: ${selectedPreset}`}
+              placeholder={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "기본값: {v0}"), { v0: String(selectedPreset) })}
               className="w-full rounded-md border border-line bg-card px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             />
           </div>
@@ -167,8 +161,7 @@ export function StudioBg3dSpatialFxPanel({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label htmlFor={sfxFillId} className="mb-1 block text-[0.7rem] font-medium text-fg-3">
-                채우기 색상
-              </label>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "채우기 색상")}</label>
               <div className="flex items-center gap-2">
                 <input
                   id={sfxFillId}
@@ -183,8 +176,7 @@ export function StudioBg3dSpatialFxPanel({
             </div>
             <div>
               <label htmlFor={sfxOutlineId} className="mb-1 block text-[0.7rem] font-medium text-fg-3">
-                외곽선 색상
-              </label>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "외곽선 색상")}</label>
               <div className="flex items-center gap-2">
                 <input
                   id={sfxOutlineId}
@@ -202,7 +194,7 @@ export function StudioBg3dSpatialFxPanel({
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <label htmlFor={sfxScaleId} className="text-[0.7rem] font-medium text-fg-3">크기 (배율)</label>
+                <label htmlFor={sfxScaleId} className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "크기 (배율)")}</label>
                 <span className="font-mono text-[0.7rem]">{sfxScale.toFixed(1)}x</span>
               </div>
               <input
@@ -219,7 +211,7 @@ export function StudioBg3dSpatialFxPanel({
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <label htmlFor={sfxDepthId} className="text-[0.7rem] font-medium text-fg-3">입체 두께</label>
+                <label htmlFor={sfxDepthId} className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "입체 두께")}</label>
                 <span className="font-mono text-[0.7rem]">{sfxDepth.toFixed(2)}m</span>
               </div>
               <input
@@ -243,15 +235,14 @@ export function StudioBg3dSpatialFxPanel({
             className="flex items-center justify-center gap-1.5 rounded-lg border border-accent bg-accent px-3 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
           >
             <Plus className="h-4 w-4" />
-            3D 씬에 입체 효과음 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "3D 씬에 입체 효과음 추가")}</button>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <label htmlFor={rayCountId} className="text-[0.7rem] font-medium text-fg-3">집중선 가닥 수</label>
-              <span className="font-mono text-[0.7rem]">{rayCount}개</span>
+              <label htmlFor={rayCountId} className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "집중선 가닥 수")}</label>
+              <span className="font-mono text-[0.7rem]">{rayCount}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "개")}</span>
             </div>
             <input
               id={rayCountId}
@@ -269,7 +260,7 @@ export function StudioBg3dSpatialFxPanel({
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <label htmlFor={innerRadiusId} className="text-[0.7rem] font-medium text-fg-3">내부 반경</label>
+                <label htmlFor={innerRadiusId} className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "내부 반경")}</label>
                 <span className="font-mono text-[0.7rem]">{innerRadius.toFixed(1)}m</span>
               </div>
               <input
@@ -286,7 +277,7 @@ export function StudioBg3dSpatialFxPanel({
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <label htmlFor={outerRadiusId} className="text-[0.7rem] font-medium text-fg-3">외부 반경</label>
+                <label htmlFor={outerRadiusId} className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "외부 반경")}</label>
                 <span className="font-mono text-[0.7rem]">{outerRadius.toFixed(1)}m</span>
               </div>
               <input
@@ -306,8 +297,7 @@ export function StudioBg3dSpatialFxPanel({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label htmlFor={lineColorId} className="mb-1 block text-[0.7rem] font-medium text-fg-3">
-                선 색상
-              </label>
+                {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "선 색상")}</label>
               <div className="flex items-center gap-2">
                 <input
                   id={lineColorId}
@@ -322,7 +312,7 @@ export function StudioBg3dSpatialFxPanel({
             </div>
             <div className="flex flex-col gap-1">
               <div className="flex items-center justify-between">
-                <label htmlFor={lineOpacityId} className="text-[0.7rem] font-medium text-fg-3">불투명도</label>
+                <label htmlFor={lineOpacityId} className="text-[0.7rem] font-medium text-fg-3">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "불투명도")}</label>
                 <span className="font-mono text-[0.7rem]">{(lineOpacity * 100).toFixed(0)}%</span>
               </div>
               <input
@@ -346,8 +336,7 @@ export function StudioBg3dSpatialFxPanel({
             className="flex items-center justify-center gap-1.5 rounded-lg border border-accent bg-accent px-3 py-2 text-xs font-bold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-45"
           >
             <Sparkles className="h-4 w-4" />
-            3D 씬에 집중선 배치
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dSpatialFxPanel", "ko", "3D 씬에 집중선 배치")}</button>
         </div>
       )}
     </div>

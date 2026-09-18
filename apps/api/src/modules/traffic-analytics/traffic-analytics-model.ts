@@ -158,6 +158,26 @@ export function requireTrafficIdentifier(
   return normalized;
 }
 
+export function requireTrafficShareChannel(value: unknown): TrafficShareChannel {
+  if (
+    typeof value !== "string"
+    || !TRAFFIC_SHARE_CHANNELS.includes(value as TrafficShareChannel)
+  ) {
+    throw new BadRequestException("공유 채널이 올바르지 않습니다.");
+  }
+  return value as TrafficShareChannel;
+}
+
+export function requireTrafficShareOutcome(value: unknown): TrafficShareOutcome {
+  if (
+    typeof value !== "string"
+    || !TRAFFIC_SHARE_OUTCOMES.includes(value as TrafficShareOutcome)
+  ) {
+    throw new BadRequestException("공유 결과가 올바르지 않습니다.");
+  }
+  return value as TrafficShareOutcome;
+}
+
 export function normalizeTrafficPath(value: unknown): string {
   if (typeof value !== "string") {
     throw new BadRequestException("페이지 경로가 필요합니다.");

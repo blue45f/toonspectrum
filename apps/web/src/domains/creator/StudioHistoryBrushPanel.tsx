@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio History Brush Panel
  * 히스토리 브러시(Photoshop History Brush 대응) 컨트롤 — 켜면 메인 캔버스에서 선택된 이미지 위
@@ -76,8 +80,7 @@ export function StudioHistoryBrushPanel({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">
           <Paintbrush size={12} aria-hidden />
-          히스토리 브러시
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "히스토리 브러시")}</p>
         {busy && <Loader2 size={13} className="animate-spin text-accent" aria-hidden />}
       </div>
 
@@ -86,28 +89,27 @@ export function StudioHistoryBrushPanel({
         disabled={busy}
         onClick={onToggleActive}
         title={busy
-          ? "현재 복원 스트로크를 반영한 뒤 모드를 바꿀 수 있습니다."
-          : "켜고 이미지를 드래그하면 지정한 작업 내역 시점의 픽셀로 그 부분만 되돌아갑니다."}
+          ? translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "현재 복원 스트로크를 반영한 뒤 모드를 바꿀 수 있습니다.")
+          : translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "켜고 이미지를 드래그하면 지정한 작업 내역 시점의 픽셀로 그 부분만 되돌아갑니다.")}
       >
         <span className="inline-flex items-center gap-1">
           <Paintbrush className="size-3" aria-hidden />
-          히스토리 브러시로 복원
-        </span>
+          {translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "히스토리 브러시로 복원")}</span>
       </StudioToggleChip>
 
       <StudioSliderRow
-        label="반경"
+        label={translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "반경")}
         min={HISTORY_BRUSH_RADIUS_RANGE.min}
         max={HISTORY_BRUSH_RADIUS_RANGE.max}
         step={HISTORY_BRUSH_RADIUS_RANGE.step}
         value={radiusPx}
         disabled={busy}
         onChange={onRadiusChange}
-        readout={`${radiusPx}px`}
+        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "en", "{v0}px"), { v0: String(radiusPx) })}
       />
 
       <StudioSliderRow
-        label="경도"
+        label={translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "경도")}
         min={HISTORY_BRUSH_HARDNESS_RANGE.min}
         max={HISTORY_BRUSH_HARDNESS_RANGE.max}
         step={HISTORY_BRUSH_HARDNESS_RANGE.step}
@@ -118,7 +120,7 @@ export function StudioHistoryBrushPanel({
       />
 
       <StudioSliderRow
-        label="불투명도"
+        label={translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "불투명도")}
         min={HISTORY_BRUSH_OPACITY_RANGE.min}
         max={HISTORY_BRUSH_OPACITY_RANGE.max}
         step={HISTORY_BRUSH_OPACITY_RANGE.step}
@@ -133,24 +135,22 @@ export function StudioHistoryBrushPanel({
           type="button"
           onClick={onClearSource}
           disabled={busy}
-          title={busy ? "현재 복원 스트로크를 반영한 뒤 소스를 해제할 수 있습니다." : "지정한 히스토리 소스를 해제합니다."}
+          title={busy ? translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "현재 복원 스트로크를 반영한 뒤 소스를 해제할 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "지정한 히스토리 소스를 해제합니다.")}
           className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
         >
           <Undo2 className="size-3" aria-hidden />
-          소스 해제
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "소스 해제")}</button>
       ) : (
         onOpenHistoryPanel && (
           <button
             type="button"
             onClick={onOpenHistoryPanel}
             disabled={busy}
-            title={busy ? "현재 복원 스트로크를 반영한 뒤 작업 내역을 열 수 있습니다." : "작업 내역 패널을 열어 되돌릴 시점을 고릅니다."}
+            title={busy ? translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "현재 복원 스트로크를 반영한 뒤 작업 내역을 열 수 있습니다.") : translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "작업 내역 패널을 열어 되돌릴 시점을 고릅니다.")}
             className={cn(PANEL_CHIP_CLASS, "flex w-full items-center justify-center gap-1")}
           >
             <HistoryIcon className="size-3" aria-hidden />
-            작업 내역에서 소스 지정하기
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioHistoryBrushPanel", "ko", "작업 내역에서 소스 지정하기")}</button>
         )
       )}
 

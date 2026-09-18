@@ -1,4 +1,10 @@
 import {
+  resolveUiLocale,
+  translateBilingualValueForLocale,
+  translateCurrentStaticSourceText,
+  translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   BookOpen,
   Box,
@@ -19,8 +25,12 @@ import {
   FriendlyQuickGuide,
   PurposeExperienceStage,
 } from "@/shared/components/purpose-experience-stage";
-import { useI18n } from "@/shared/lib/i18n";
+
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("MakeHubPage", ko, en);
 
 const COPY = {
   ko: {
@@ -118,10 +128,11 @@ const FLOW_ICONS = [Lightbulb, BookOpen, Sparkles, Palette, Images] as const;
 const TOOL_ICONS = [Brush, Music, BookOpen, Clock3] as const;
 
 export function MakeHubPage() {
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const copy = COPY[locale];
-  useDocumentTitle(locale === "ko" ? "새로 만들기" : "New");
+  useBilingualI18nRevision();
+
+
+  const copy = bi((COPY).ko, (COPY).en);
+  useDocumentTitle(bi("새로 만들기", "New"));
 
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
@@ -162,7 +173,7 @@ export function MakeHubPage() {
       />
 
       <section className="mt-10" aria-labelledby="make-quick-title">
-        <p className="eyebrow text-accent">01 · QUICK START</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.resources.MakeHubPage", "en", "01 · QUICK START")}</p>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 id="make-quick-title" className="text-2xl font-bold tracking-tight text-fg sm:text-3xl">{copy.quickTitle}</h2>
@@ -186,7 +197,7 @@ export function MakeHubPage() {
       </section>
 
       <section className="mt-12" aria-labelledby="make-flow-title">
-        <p className="eyebrow text-accent">02 · CREATIVE FLOW</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.resources.MakeHubPage", "en", "02 · CREATIVE FLOW")}</p>
         <h2 id="make-flow-title" className="mt-2 text-2xl font-bold tracking-tight text-fg sm:text-3xl">{copy.flowTitle}</h2>
         <p className="mt-1 text-sm text-fg-3">{copy.flowBody}</p>
         <ol className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -207,7 +218,7 @@ export function MakeHubPage() {
       </section>
 
       <section className="mt-12" aria-labelledby="make-tools-title">
-        <p className="eyebrow text-accent">03 · SPECIALIST TOOLS</p>
+        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.creator.resources.MakeHubPage", "en", "03 · SPECIALIST TOOLS")}</p>
         <h2 id="make-tools-title" className="mt-2 text-2xl font-bold tracking-tight text-fg sm:text-3xl">{copy.toolsTitle}</h2>
         <p className="mt-1 text-sm text-fg-3">{copy.toolsBody}</p>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
