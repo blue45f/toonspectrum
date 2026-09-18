@@ -157,7 +157,7 @@ export interface UserReview {
 
 export type FanCafeScope = "title" | "author" | "pencafe" | "cafe";
 export type FanCafeScopeFilter = FanCafeScope | "all";
-export type FanCafePostKind = "talk" | "theory" | "fanart" | "cheer";
+export type FanCafePostKind = "talk" | "theory" | "fanart" | "cosplay" | "event" | "cheer";
 
 export interface CommunityAuthor {
   id?: string;

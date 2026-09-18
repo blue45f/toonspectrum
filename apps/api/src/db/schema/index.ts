@@ -14,5 +14,6 @@ export * from "./studio-project-graph.schema";
 export * from "./business.schema";
 export * from "./supporter-payment.schema";
 export * from "./creator-support-program.schema";
+export * from "./creator-ecosystem.schema";
 
 export * from "./commerce.schema";
