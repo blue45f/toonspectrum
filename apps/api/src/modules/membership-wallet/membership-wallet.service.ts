@@ -447,28 +447,34 @@ export class MembershipWalletService {
   ): Promise<void> {
     if (!Number.isSafeInteger(targetAmount) || targetAmount <= 0) return;
     const { cycleKey, end } = kstMonthBounds();
-    const existing = await dbPool.query<{ granted: string | number }>(
-      `SELECT COALESCE(SUM("grantedAmount"), 0)::bigint AS granted
-       FROM wallet_lot
-       WHERE "userId" = $1
-         AND asset = 'studio_credit'
-         AND source = 'membership'
-         AND "sourceRef" = $2`,
-      [userId, cycleKey],
-    );
-    const granted = asInt(existing.rows[0]?.granted ?? 0);
-    const missing = Math.max(0, targetAmount - granted);
-    if (missing <= 0) return;
-    await this.grantAsset({
-      userId,
-      asset: "studio_credit",
-      amount: missing,
-      source: "membership",
-      sourceKey: "membership-credit:" + cycleKey + ":target:" + targetAmount,
-      sourceRef: cycleKey,
-      expiresAt: end,
-      reason: planId + " monthly Studio Credit",
-      metadata: { planId, cycleKey, targetAmount },
+    await this.transaction(async (client) => {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtext($1))`,
+        ["membership-credit:" + userId + ":" + cycleKey],
+      );
+      const existing = await client.query<{ granted: string | number }>(
+        `SELECT COALESCE(SUM("grantedAmount"), 0)::bigint AS granted
+         FROM wallet_lot
+         WHERE "userId" = $1
+           AND asset = 'studio_credit'
+           AND source = 'membership'
+           AND "sourceRef" = $2`,
+        [userId, cycleKey],
+      );
+      const granted = asInt(existing.rows[0]?.granted ?? 0);
+      const missing = Math.max(0, targetAmount - granted);
+      if (missing <= 0) return;
+      await this.grantLotWithClient(client, {
+        userId,
+        asset: "studio_credit",
+        amount: missing,
+        source: "membership",
+        sourceKey: "membership-credit:" + cycleKey + ":target:" + targetAmount,
+        sourceRef: cycleKey,
+        expiresAt: end,
+        reason: planId + " monthly Studio Credit",
+        metadata: { planId, cycleKey, targetAmount },
+      });
     });
   }
 
