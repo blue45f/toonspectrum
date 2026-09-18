@@ -39,7 +39,7 @@ function mockTranslationResponseForRequest(url: string): Response {
 
 function makeCachedLocalePayload(locale: string, dict: Record<string, string>) {
   return {
-    v: 2,
+    v: 3,
     locale,
     updatedAt: Date.now(),
     complete: true,
@@ -355,7 +355,7 @@ describe("runtime translation bundles", () => {
 
   it("uses cached runtime translation bundle without calling translator", async () => {
     return withLocalStorage(async () => {
-      const cacheKey = "toonspectrum-i18n-runtime:v2:ia";
+      const cacheKey = "toonspectrum-i18n-runtime:v3:ia";
       localStorage.setItem(
         cacheKey,
         JSON.stringify(
