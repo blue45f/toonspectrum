@@ -36,7 +36,7 @@ import {
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioRoleWorkspacePanel", ko, en);
 
 const ACCOUNT_CONTEXT_LABELS = {
