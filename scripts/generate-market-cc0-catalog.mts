@@ -2,71 +2,28 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { parseStudioCc0Catalog } from "../apps/web/src/domains/creator/studio-cc0-asset-delivery";
-import { getStudioCc0ReviewStatus, isStudioCc0EligibleForNewSelection } from "../apps/web/src/domains/creator/studio-cc0-curation";
+import { isStudioCc0MarketplaceReady } from "../apps/web/src/domains/creator/studio-cc0-curation";
 
-const MARKET_CC0_IDS = Object.freeze({
-  backgrounds: [
-    "polyhaven-background-hansaplatz", "polyhaven-background-urban-street-01",
-    "polyhaven-background-urban-street-03", "polyhaven-background-modern-buildings-night",
-    "polyhaven-background-venetian-crossroads", "polyhaven-background-courtyard-night",
-    "polyhaven-background-decor-shop", "polyhaven-background-machine-shop-02",
-    "polyhaven-background-carpentry-shop-02", "polyhaven-background-freight-station",
-    "polyhaven-background-dresden-station-night", "polyhaven-background-subway-entrance",
-    "polyhaven-background-wooden-lounge", "polyhaven-background-ballroom",
-    "polyhaven-background-large-corridor", "polyhaven-background-winter-lake-01",
-    "polyhaven-background-misty-pines", "polyhaven-background-mossy-forest",
-    "polyhaven-background-river-walk-1", "polyhaven-background-small-harbor-01",
-    "polyhaven-background-venice-sunset", "polyhaven-background-leadenhall-market",
-    "polyhaven-background-wide-street-01", "polyhaven-background-rooftop-night",
-    "polyhaven-background-rooitou-park", "polyhaven-background-cayley-interior",
-    "polyhaven-background-autumn-park", "polyhaven-background-empty-warehouse-01",
-  ],
-  props2d: [
-    "polyhaven-coffeecart-01-cutout", "polyhaven-cashregister-01-cutout",
-    "polyhaven-schooldesk-01-cutout", "polyhaven-schoolchair-01-cutout",
-    "polyhaven-barbershopchair-01-cutout", "polyhaven-television-01-cutout",
-    "polyhaven-lantern-01-cutout", "polyhaven-ukulele-01-cutout",
-    "polyhaven-drill-01-cutout", "polyhaven-megaphone-01-cutout",
-    "polyhaven-metal-trash-can-cutout", "polyhaven-covered-car-cutout",
-    "polyhaven-throw-pillows-01-cutout", "polyhaven-coffee-table-round-01-cutout",
-    "polyhaven-side-table-01-cutout", "polyhaven-rockingchair-01-cutout",
-    "polyhaven-gothicbed-01-cutout", "polyhaven-chandelier-03-cutout",
-    "polyhaven-rubber-duck-toy-cutout", "polyhaven-croissant-cutout",
-    "polyhaven-carrot-cake-cutout", "polyhaven-painted-wooden-chair-01-cutout",
-    "polyhaven-wooden-display-shelves-01-cutout", "polyhaven-ceramic-vase-04-cutout",
-  ],
-  models3d: [
-    "polyhaven-coffeecart-01", "polyhaven-cashregister-01", "polyhaven-schooldesk-01",
-    "polyhaven-schoolchair-01", "polyhaven-barbershopchair-01", "polyhaven-television-01",
-    "polyhaven-lantern-01", "polyhaven-ukulele-01", "polyhaven-drill-01",
-    "polyhaven-megaphone-01", "polyhaven-metal-trash-can", "polyhaven-covered-car",
-    "polyhaven-throw-pillows-01", "polyhaven-coffee-table-round-01", "polyhaven-side-table-01",
-    "polyhaven-rockingchair-01", "polyhaven-gothicbed-01", "polyhaven-chandelier-03",
-    "polyhaven-rubber-duck-toy", "polyhaven-croissant", "polyhaven-carrot-cake",
-    "polyhaven-painted-wooden-chair-01", "polyhaven-wooden-display-shelves-01",
-    "polyhaven-ceramic-vase-04",
-  ],
-  materials: [
-    "polyhaven-asphalt-pit-lane", "polyhaven-cobblestone-floor-04", "polyhaven-brick-wall-001",
-    "polyhaven-white-rough-plaster", "polyhaven-stone-tiles-02", "polyhaven-rough-wood",
-    "polyhaven-blue-metal-plate", "polyhaven-snow-02", "polyhaven-marble-tiles",
-    "polyhaven-wood-floor", "polyhaven-denim-fabric", "polyhaven-rusty-metal-04",
-  ],
-  effects: [
-    "kenney-particles-fire-01", "kenney-particles-flame-03", "kenney-particles-magic-01",
-    "kenney-particles-magic-04", "kenney-particles-smoke-03", "kenney-particles-smoke-08",
-    "kenney-particles-spark-02", "kenney-particles-star-05", "kenney-particles-slash-02",
-    "kenney-particles-trace-03", "kenney-particles-muzzle-03", "kenney-particles-twirl-02",
-  ],
-} as const);
-const ids = Object.values(MARKET_CC0_IDS).flat();
+const MARKET_KIND_ORDER = Object.freeze([
+  "background",
+  "prop-image",
+  "model",
+  "surface-texture",
+  "effect-mask",
+] as const);
+const marketKindOrder = new Map(MARKET_KIND_ORDER.map((kind, index) => [kind, index]));
 const root = resolve(import.meta.dirname, "..");
 const catalog = parseStudioCc0Catalog(JSON.parse(await readFile(resolve(root, "apps/web/public/assets/studio/cc0-20260906/manifest.json"), "utf8")));
-const selected = ids.map(id => {
-  const asset = catalog.find(item => item.id === id);
-  if (!asset || !isStudioCc0EligibleForNewSelection(asset) || getStudioCc0ReviewStatus(asset) !== "contact-sheet-reviewed") throw new Error(`Unreviewed asset: ${id}`);
-  return asset;
-});
+const selected = catalog
+  .filter(isStudioCc0MarketplaceReady)
+  .toSorted((left, right) =>
+    (marketKindOrder.get(left.kind) ?? Number.MAX_SAFE_INTEGER)
+      - (marketKindOrder.get(right.kind) ?? Number.MAX_SAFE_INTEGER)
+    || left.category.localeCompare(right.category, "en")
+    || left.name.localeCompare(right.name, "ko")
+    || left.id.localeCompare(right.id, "en"),
+  );
+if (selected.length === 0) throw new Error("No marketplace-ready CC0 assets");
 const output = resolve(root, "apps/web/src/domains/creator/studio-marketplace-cc0-catalog.generated.ts");
 const source = '// Generated by scripts/generate-market-cc0-catalog.mts.\nimport type { StudioCc0Asset } from "./studio-cc0-asset-delivery";\n\n'
   + `export const STUDIO_MARKETPLACE_CC0_ASSETS: readonly StudioCc0Asset[] = ${JSON.stringify(selected, null, 2)};\n`;

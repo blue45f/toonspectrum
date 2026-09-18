@@ -140,6 +140,37 @@ describe("Studio unified asset catalog", () => {
     expect(results[0]?.id).toBe("scene-template:confession-test");
   });
 
+  it("links reviewed backgrounds and scene templates for discovery", () => {
+    const linkedBackground = {
+      ...backgrounds[0],
+      id: "webtoon-romance-cherry-blossom",
+      label: "벚꽃 산책길",
+      genre: "romance",
+    };
+    const linkedTemplate = {
+      ...sceneTemplate,
+      id: "confession",
+      label: "고백 장면",
+    };
+    const items = buildStudioUnifiedAssetCatalog({
+      backgrounds: [linkedBackground],
+      sceneTemplates: [linkedTemplate],
+      localAssets: [],
+      elements: [],
+      objects: [],
+      nativeTools: [],
+    });
+    const background = items.find((item) => item.id === "background:webtoon-romance-cherry-blossom");
+    const template = items.find((item) => item.id === "scene-template:confession");
+
+    expect(background?.badges).toContain("템플릿 연계 1");
+    expect(template?.badges).toContain("추천 배경 1");
+    expect(searchStudioUnifiedAssets(items, { query: "고백 장면" }).map((item) => item.id))
+      .toContain("background:webtoon-romance-cherry-blossom");
+    expect(searchStudioUnifiedAssets(items, { query: "벚꽃 산책길" }).map((item) => item.id))
+      .toContain("scene-template:confession");
+  });
+
   it("curates balanced highlights instead of filling the first category only", () => {
     const highlights = curateStudioUnifiedAssetHighlights(catalog(), { limit: 5 });
     expect(new Set(highlights.map((item) => item.category))).toEqual(

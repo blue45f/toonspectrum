@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { STUDIO_MARKETPLACE_CC0_ASSETS } from "./studio-marketplace-cc0-catalog.generated";
 import { findStudioMarketplaceCc0Asset, studioMarketplaceCc0Reference } from "./studio-marketplace-cc0-catalog";
 import { createStudioCc0ModelFile, parseStudioCc0Catalog } from "./studio-cc0-asset-delivery";
+import { isStudioCc0MarketplaceReady } from "./studio-cc0-curation";
 import { projectCreatorMarketplaceRecordToAssets, projectCreatorMarketplaceRecordToStudioPack } from "./studio-community-marketplace";
 import { resolveStudioCreatorBundledCatalogTarget, validateStudioCreatorPack } from "./studio-creator-pack-runtime";
 import { MARKET_CC0_MANIFESTS } from "../../../../../scripts/seed/market-cc0-manifests.mjs";
@@ -13,11 +14,19 @@ const root = new URL("../../../public/assets/studio/cc0-20260906/", import.meta.
 const hash = (value: Uint8Array | string) => createHash("sha256").update(value).digest("hex");
 afterEach(() => vi.unstubAllGlobals());
 describe("reviewed market CC0 delivery", () => {
-  it("pins 100 distinct entries to the actual delivery manifest and file bytes", () => {
+  it("pins every marketplace-ready entry to the actual delivery manifest and file bytes", () => {
     const catalog = parseStudioCc0Catalog(JSON.parse(readFileSync(new URL("manifest.json", root), "utf8")));
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(100);
-    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(a => a.id)).size).toBe(100);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toHaveLength(338);
+    expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(a => a.id)).size).toBe(338);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS).toEqual(catalog.filter(isStudioCc0MarketplaceReady).toSorted((a, b) =>
+      ["background", "prop-image", "model", "surface-texture", "effect-mask"].indexOf(a.kind)
+        - ["background", "prop-image", "model", "surface-texture", "effect-mask"].indexOf(b.kind)
+      || a.category.localeCompare(b.category, "en")
+      || a.name.localeCompare(b.name, "ko")
+      || a.id.localeCompare(b.id, "en"),
+    ));
     for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
+      expect(isStudioCc0MarketplaceReady(asset)).toBe(true);
       expect(asset).toEqual(catalog.find(item => item.id === asset.id));
       const bytes = readFileSync(new URL(asset.path, root));
       expect(bytes.byteLength).toBe(asset.bytes); expect(hash(bytes)).toBe(asset.sha256);
@@ -26,12 +35,16 @@ describe("reviewed market CC0 delivery", () => {
     expect(new Set(STUDIO_MARKETPLACE_CC0_ASSETS.map(asset => asset.kind))).toEqual(new Set([
       "background", "effect-mask", "model", "prop-image", "surface-texture",
     ]));
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "background")).toHaveLength(28);
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "prop-image")).toHaveLength(24);
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "model")).toHaveLength(24);
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "surface-texture")).toHaveLength(12);
-    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "effect-mask")).toHaveLength(12);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "background")).toHaveLength(39);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "prop-image")).toHaveLength(71);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "model")).toHaveLength(50);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "surface-texture")).toHaveLength(82);
+    expect(STUDIO_MARKETPLACE_CC0_ASSETS.filter(asset => asset.kind === "effect-mask")).toHaveLength(96);
     for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
+      if (asset.kind === "model") {
+        expect(asset.studioRuntimeVerified).toBe(true);
+        expect(asset.browserRenderVerified).toBe(true);
+      }
       if (asset.kind === "background") expect(Math.max(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(2048);
       if (asset.kind === "prop-image") expect(Math.min(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(1536);
       if (asset.kind === "surface-texture") expect(Math.min(asset.width ?? 0, asset.height ?? 0)).toBeGreaterThanOrEqual(1024);
