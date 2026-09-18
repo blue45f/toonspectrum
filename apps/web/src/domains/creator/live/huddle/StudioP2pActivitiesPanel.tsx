@@ -10,6 +10,7 @@ function time(remaining: number): string {
 }
 export function StudioP2pActivitiesPanel({ controller }: { controller: StudioP2pCreativeHuddleController }) {
   const [view, setView] = useState(() => controller.snapshot());
+  const [open, setOpen] = useState(false);
   const [template, setTemplate] = useState<string>(HUDDLE_CHALLENGES[0].id);
   const [question, setQuestion] = useState("어떤 구도가 더 좋을까요?");
   const [options, setOptions] = useState(["A안", "B안", "", ""]);
@@ -21,26 +22,35 @@ export function StudioP2pActivitiesPanel({ controller }: { controller: StudioP2p
     refresh();
     return controller.subscribe(refresh);
   }, [controller]);
+  const hasRunningChallenge = open && view.activities.some(
+    (activity) => Boolean(activity.challenge?.running && activity.challenge.remainingMs > 0),
+  );
   useEffect(() => {
-    if (!open || !hasRunningChallenge) return undefined;
-    let timer: ReturnType<typeof setInterval> | null = null;
+    if (!hasRunningChallenge) return undefined;
     const refresh = () => setView(controller.snapshot());
-    const syncTimer = () => {
-      if (timer !== null) clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const stop = () => {
+      if (timer === null) return;
+      clearInterval(timer);
       timer = null;
-      if (document.visibilityState === "hidden") return;
+    };
+    const start = () => {
+      if (document.hidden || timer !== null) return;
       refresh();
       timer = setInterval(refresh, 1000);
     };
-    document.addEventListener("visibilitychange", syncTimer);
-    syncTimer();
-    return () => {
-      document.removeEventListener("visibilitychange", syncTimer);
-      if (timer !== null) clearInterval(timer);
+    const onVisibilityChange = () => {
+      if (document.hidden) stop();
+      else start();
     };
-  }, [controller, hasRunningChallenge, open]);
-  return <details className="rounded-xl border border-line p-2" data-studio-p2p-activities="true"
-    onToggle={(event) => setOpen(event.currentTarget.open)}>
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    start();
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [controller, hasRunningChallenge]);
+  return <details open={open} onToggle={(event) => setOpen(event.currentTarget.open)} className="rounded-xl border border-line p-2" data-studio-p2p-activities="true">
     <summary className="min-h-11 cursor-pointer content-center text-xs font-bold">함께 그리기·투표</summary>
     <div className="space-y-3 pt-2">
       <label className="block text-xs">드로잉 챌린지<select aria-label="드로잉 챌린지" className={inputClass} value={template}

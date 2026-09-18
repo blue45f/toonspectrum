@@ -447,25 +447,14 @@ export function StudioProjectCenterSearch(): ReactElement {
     );
     rebuildIndex();
 
-    let rebuildFrame: number | null = null;
-    let microtaskQueued = false;
-    let disposed = false;
+    let rebuildFrame = 0;
     const scheduleRebuild = () => {
-      if (disposed || rebuildFrame !== null || microtaskQueued) return;
-      if (typeof requestAnimationFrame === "function") {
-        rebuildFrame = requestAnimationFrame(() => {
-          rebuildFrame = null;
-          if (!disposed) rebuildIndex();
-        });
-        return;
-      }
-      microtaskQueued = true;
-      queueMicrotask(() => {
-        microtaskQueued = false;
-        if (!disposed) rebuildIndex();
+      if (rebuildFrame !== 0) return;
+      rebuildFrame = requestAnimationFrame(() => {
+        rebuildFrame = 0;
+        rebuildIndex();
       });
     };
-
     const observer = typeof MutationObserver === "function"
       ? new MutationObserver((mutations) => {
         if (mutations.every((mutation) => root.contains(mutation.target))) return;
@@ -499,6 +488,7 @@ export function StudioProjectCenterSearch(): ReactElement {
         cancelAnimationFrame(rebuildFrame);
       }
       observer?.disconnect();
+      if (rebuildFrame !== 0) cancelAnimationFrame(rebuildFrame);
       panel.removeEventListener("click", recordAction, true);
     };
   }, [rebuildIndex, rememberRecent]);

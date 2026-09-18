@@ -11,32 +11,14 @@ import {
 
 export const STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS = 10_000;
 
-export interface StudioBrushWorkerRequestOptions {
-  readonly signal?: AbortSignal;
-  readonly timeoutMs?: number;
-}
-
-interface PendingBrushWorkerRequest {
-  readonly worker: Worker;
-  readonly resolve: (res: StudioBrushWorkerPlanResponse) => void;
-  readonly reject: (err: unknown) => void;
-  timeout: ReturnType<typeof setTimeout> | null;
-  abortSignal: AbortSignal | null;
-  abortListener: (() => void) | null;
-}
-
 let globalBrushWorker: Worker | null = null;
-const pendingRequests = new Map<string, PendingBrushWorkerRequest>();
-
-function cleanupPendingRequest(id: string, deferred: PendingBrushWorkerRequest): boolean {
-  if (pendingRequests.get(id) !== deferred) return false;
-  pendingRequests.delete(id);
-  if (deferred.timeout !== null) {
-    clearTimeout(deferred.timeout);
-    deferred.timeout = null;
-  }
-  if (deferred.abortSignal && deferred.abortListener) {
-    deferred.abortSignal.removeEventListener("abort", deferred.abortListener);
+const pendingRequests = new Map<
+  string,
+  {
+    worker: Worker;
+    resolve: (res: StudioBrushWorkerPlanResponse) => void;
+    reject: (err: unknown) => void;
+    timeout: ReturnType<typeof setTimeout>;
   }
   deferred.abortSignal = null;
   deferred.abortListener = null;
@@ -57,7 +39,8 @@ function retireBrushWorker(worker: Worker, reason: unknown): void {
 
   for (const [id, deferred] of [...pendingRequests.entries()]) {
     if (deferred.worker !== worker) continue;
-    if (!cleanupPendingRequest(id, deferred)) continue;
+    clearTimeout(deferred.timeout);
+    pendingRequests.delete(id);
     deferred.reject(reason);
   }
 }
@@ -79,7 +62,8 @@ function getOrCreateBrushWorker(): Worker | null {
       // A late response from a retired generation must never settle a request
       // that belongs to a replacement Worker.
       if (!deferred || deferred.worker !== worker) return;
-      if (!cleanupPendingRequest(data.id, deferred)) return;
+      clearTimeout(deferred.timeout);
+      pendingRequests.delete(data.id);
       deferred.resolve(data);
     };
 
@@ -136,41 +120,20 @@ export async function processFreehandPointsInWorker(
   };
 
   return new Promise<number[]>((resolve) => {
-    const fallback = () => processFreehandPoints(points, minDistance);
-    const deferred: PendingBrushWorkerRequest = {
+    const timeout = globalThis.setTimeout(() => {
+      const deferred = pendingRequests.get(id);
+      if (!deferred || deferred.worker !== worker) return;
+      retireBrushWorker(
+        worker,
+        new Error(`Studio brush Worker request timed out after ${STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS}ms`),
+      );
+    }, STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS);
+    pendingRequests.set(id, {
       worker,
-      timeout: null,
-      abortSignal: options.signal ?? null,
-      abortListener: null,
-      resolve: (res) => resolve(res.ok ? res.points : fallback()),
-      reject: () => resolve(fallback()),
-    };
-    pendingRequests.set(id, deferred);
-
-    const timeoutMs = Number.isFinite(options.timeoutMs)
-      ? Math.max(1, Math.floor(options.timeoutMs ?? STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS))
-      : STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS;
-    deferred.timeout = setTimeout(() => {
-      if (pendingRequests.get(id) !== deferred) return;
-      // A request that never replies usually means the Worker generation is
-      // wedged. Retire the generation so every retained closure is drained and
-      // the next stroke gets a fresh Worker.
-      retireBrushWorker(worker, new DOMException("Studio brush Worker request timed out", "TimeoutError"));
-    }, timeoutMs);
-
-    if (options.signal) {
-      const abort = () => {
-        if (!cleanupPendingRequest(id, deferred)) return;
-        deferred.reject(new DOMException("Studio brush Worker request aborted", "AbortError"));
-      };
-      deferred.abortListener = abort;
-      options.signal.addEventListener("abort", abort, { once: true });
-      if (options.signal.aborted) {
-        abort();
-        return;
-      }
-    }
-
+      timeout,
+      resolve: (res) => resolve(res.ok ? res.points : processFreehandPoints(points, minDistance)),
+      reject: () => resolve(processFreehandPoints(points, minDistance)),
+    });
     try {
       worker.postMessage(request);
     } catch (error) {

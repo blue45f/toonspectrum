@@ -5,6 +5,7 @@ import { processFreehandPoints } from "../studio-brush";
 import {
   disposeStudioBrushWorkerClient,
   processFreehandPointsInWorker,
+  STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS,
 } from "./studio-brush-worker-client";
 import {
   STUDIO_BRUSH_WORKER_PROTOCOL_VERSION,
@@ -95,43 +96,25 @@ describe("studio-brush-worker-protocol & client", () => {
     expect(FakeBrushWorker.instances).toHaveLength(2);
   });
 
-  it("retires a stalled generation after the request deadline and drains retained work", async () => {
+  it("retires a stalled generation after the request deadline and drains it through the fallback", async () => {
     vi.useFakeTimers();
     installFakeWorker();
     const raw = [0, 0, 10, 10, 20, 20];
 
-    const pending = processFreehandPointsInWorker(raw, 2, "pen", 6, 7, { timeoutMs: 25 });
-    const first = FakeBrushWorker.instances[0];
-    expect(first).toBeDefined();
+    const firstPromise = processFreehandPointsInWorker(raw, 2, "pen", 6, 71);
+    const stalled = FakeBrushWorker.instances[0];
+    expect(stalled).toBeDefined();
 
-    await vi.advanceTimersByTimeAsync(25);
-    await expect(pending).resolves.toEqual(processFreehandPoints(raw, 2));
-    expect(first!.terminate).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(STUDIO_BRUSH_WORKER_REQUEST_TIMEOUT_MS);
+    await expect(firstPromise).resolves.toEqual(processFreehandPoints(raw, 2));
+    expect(stalled!.terminate).toHaveBeenCalledTimes(1);
 
-    const next = processFreehandPointsInWorker(raw, 2, "pen", 6, 8, { timeoutMs: 25 });
+    const replacementPromise = processFreehandPointsInWorker(raw, 2, "pen", 6, 72);
     const replacement = FakeBrushWorker.instances[1];
     expect(replacement).toBeDefined();
     const request = replacement!.postMessage.mock.calls[0]?.[0] as { id: string };
     respond(replacement!, request.id, [0, 0, 20, 20]);
-    await expect(next).resolves.toEqual([0, 0, 20, 20]);
-  });
-
-  it("drops an aborted pending request without retiring a healthy worker", async () => {
-    installFakeWorker();
-    const controller = new AbortController();
-    const raw = [0, 0, 10, 10, 20, 20];
-
-    const pending = processFreehandPointsInWorker(raw, 2, "pen", 6, 7, { signal: controller.signal });
-    const worker = FakeBrushWorker.instances[0];
-    controller.abort();
-
-    await expect(pending).resolves.toEqual(processFreehandPoints(raw, 2));
-    expect(worker!.terminate).not.toHaveBeenCalled();
-
-    const next = processFreehandPointsInWorker(raw, 2, "pen", 6, 8);
-    const request = worker!.postMessage.mock.calls[1]?.[0] as { id: string };
-    respond(worker!, request.id, [0, 0, 20, 20]);
-    await expect(next).resolves.toEqual([0, 0, 20, 20]);
+    await expect(replacementPromise).resolves.toEqual([0, 0, 20, 20]);
   });
 
   it("retires the generation when postMessage throws synchronously", async () => {

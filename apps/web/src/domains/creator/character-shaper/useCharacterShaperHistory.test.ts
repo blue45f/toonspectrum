@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   CHARACTER_SHAPER_HISTORY_LIMIT,
+  CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES,
   characterShaperHistoryState,
+  estimateCharacterShaperHistoryEntryBytes,
   createCharacterShaperHistory,
   pushCharacterShaperHistory,
   redoCharacterShaperHistory,
@@ -77,22 +79,22 @@ describe("character shaper history", () => {
     expect(stack.past[stack.past.length - 1]?.label).toBe(`단계 ${CHARACTER_SHAPER_HISTORY_LIMIT + 4}`);
   });
 
-  it("byte budget가 넘으면 가장 오래된 snapshot부터 제거한다", () => {
-    const entries = [
-      { label: "a", snapshot: { value: "a".repeat(40) } },
-      { label: "b", snapshot: { value: "b".repeat(40) } },
-      { label: "c", snapshot: { value: "c".repeat(40) } },
-    ];
-    const trimmed = trimCharacterShaperHistoryEntries(entries, 60, 320);
-    expect(trimmed.length).toBeLessThan(entries.length);
-    expect(trimmed.at(-1)?.label).toBe("c");
-  });
-
-  it("oversized snapshot 하나도 byte budget 밖에서는 retained 하지 않는다", () => {
-    const trimmed = trimCharacterShaperHistoryEntries([
-      { label: "huge", snapshot: { value: "x".repeat(500) } },
-    ], 60, 128);
-    expect(trimmed).toEqual([]);
+  it("also evicts old whole-state snapshots when the byte budget is reached", () => {
+    const payload = "x".repeat(1_100_000);
+    let stack = createCharacterShaperHistory<Snapshot>();
+    for (let index = 0; index < 5; index += 1) {
+      stack = pushCharacterShaperHistory(stack, {
+        label: `large ${index}`,
+        snapshot: { value: `${index}${payload}` },
+      });
+    }
+    expect(stack.past.length).toBeLessThan(5);
+    expect(stack.past.at(-1)?.label).toBe("large 4");
+    const retained = stack.past.reduce(
+      (total, entry) => total + estimateCharacterShaperHistoryEntryBytes(entry),
+      0,
+    );
+    expect(retained).toBeLessThanOrEqual(CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES);
   });
 
   it("never mutates the stack it is given", () => {

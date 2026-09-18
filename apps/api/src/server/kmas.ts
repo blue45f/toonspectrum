@@ -122,11 +122,11 @@ const DEFAULT_LOOKUP_LIMIT = 24;
 const DEFAULT_LOOKUP_CONCURRENCY = 3;
 const DEFAULT_SITE_ACCESS_MERGE_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_LOOKUP_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_LOOKUP_CACHE_MAX_ENTRIES = 512;
-const DEFAULT_LOOKUP_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+export const KMAS_LOOKUP_CACHE_MAX_ENTRIES = 512;
+export const KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
 
 const lookupCache = new Map<string, CachedLookup>();
-let lookupCacheEstimatedBytes = 0;
+let lookupCacheRetainedBytes = 0;
 let siteAccessMergePromise: Promise<{ attempted: number; updated: number }> | null = null;
 let siteAccessMergeCompletedAt = 0;
 let siteAccessMergeLastResult: { attempted: number; updated: number } | null = null;
@@ -428,6 +428,83 @@ export function kmasItemToTitle(item: KmasBookAndWebtoonItem, index = 0): Title 
   };
 }
 
+function estimateLookupCacheEntryBytes(
+  key: string,
+  item: KmasBookAndWebtoonItem | null,
+): number {
+  let payload = "null";
+  try {
+    payload = JSON.stringify(item) ?? "null";
+  } catch {
+    payload = "[unserializable]";
+  }
+  // V8 commonly retains JS strings as one or two-byte representations. Counting
+  // two bytes per code unit plus object/Map overhead is a conservative budget.
+  return 192 + (key.length + payload.length) * 2;
+}
+
+function deleteLookupCacheEntry(key: string, cached = lookupCache.get(key)): void {
+  if (!cached) return;
+  lookupCache.delete(key);
+  lookupCacheRetainedBytes = Math.max(
+    0,
+    lookupCacheRetainedBytes - cached.estimatedBytes,
+  );
+}
+
+function pruneLookupCache(now: number, cacheTtlMs: number): void {
+  for (const [key, cached] of lookupCache.entries()) {
+    if (cacheTtlMs <= 0 || now - cached.fetchedAt >= cacheTtlMs) {
+      deleteLookupCacheEntry(key, cached);
+    }
+  }
+  while (
+    lookupCache.size > KMAS_LOOKUP_CACHE_MAX_ENTRIES
+    || lookupCacheRetainedBytes > KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES
+  ) {
+    const oldestKey = lookupCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    deleteLookupCacheEntry(oldestKey);
+  }
+}
+
+function setLookupCacheEntry(
+  key: string,
+  item: KmasBookAndWebtoonItem | null,
+  fetchedAt: number,
+  cacheTtlMs: number,
+): void {
+  if (cacheTtlMs <= 0) {
+    pruneLookupCache(fetchedAt, cacheTtlMs);
+    return;
+  }
+  deleteLookupCacheEntry(key);
+  const estimatedBytes = estimateLookupCacheEntryBytes(key, item);
+  if (estimatedBytes > KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES) return;
+  lookupCache.set(key, { item, fetchedAt, estimatedBytes });
+  lookupCacheRetainedBytes += estimatedBytes;
+  pruneLookupCache(fetchedAt, cacheTtlMs);
+}
+
+export function clearKmasLookupCache(): void {
+  lookupCache.clear();
+  lookupCacheRetainedBytes = 0;
+}
+
+export function kmasLookupCacheStats(): {
+  entries: number;
+  estimatedBytes: number;
+  maxEntries: number;
+  maxEstimatedBytes: number;
+} {
+  return {
+    entries: lookupCache.size,
+    estimatedBytes: lookupCacheRetainedBytes,
+    maxEntries: KMAS_LOOKUP_CACHE_MAX_ENTRIES,
+    maxEstimatedBytes: KMAS_LOOKUP_CACHE_MAX_ESTIMATED_BYTES,
+  };
+}
+
 async function lookupKmasForTitle(title: Title, env: EnvLike): Promise<KmasBookAndWebtoonItem | null> {
   const key = normalizeLookupKey(title.title);
   if (!key) return null;
@@ -438,7 +515,7 @@ async function lookupKmasForTitle(title: Title, env: EnvLike): Promise<KmasBookA
   const response = await fetchKmasBookAndWebtoon({ title: title.title, pageNo: 1, viewItemCnt: 10 }, env);
   const match = bestKmasMatch(title, kmasItems(response));
   const item = match?.item ?? null;
-  if (cacheTtlMs > 0) setKmasLookupCache(key, item, env, Date.now());
+  setLookupCacheEntry(key, item, Date.now(), cacheTtlMs);
   return item;
 }
 
@@ -451,12 +528,17 @@ function cachedKmasLookupForTitle(title: Title, env: EnvLike): KmasLookupCacheHi
   if (!key) return { hit: false, item: null };
   const cached = lookupCache.get(key);
   const cacheTtlMs = lookupCacheTtlMs(env);
-  if (!cached) return { hit: false, item: null };
-  if (cacheTtlMs <= 0 || Date.now() - cached.fetchedAt >= cacheTtlMs) {
-    deleteKmasLookupCacheEntry(key);
+  const now = Date.now();
+  if (!cached) {
+    if (cacheTtlMs <= 0) pruneLookupCache(now, cacheTtlMs);
     return { hit: false, item: null };
   }
-  // Refresh insertion order so the bounded Map behaves as a true LRU.
+  if (cacheTtlMs <= 0 || now - cached.fetchedAt >= cacheTtlMs) {
+    deleteLookupCacheEntry(key, cached);
+    return { hit: false, item: null };
+  }
+  // Touch without refreshing `fetchedAt`: insertion order is LRU order while
+  // freshness remains controlled solely by the original fetch time.
   lookupCache.delete(key);
   lookupCache.set(key, cached);
   return { hit: true, item: cached.item };

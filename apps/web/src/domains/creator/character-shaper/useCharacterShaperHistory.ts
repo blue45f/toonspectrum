@@ -19,8 +19,8 @@ import type { CharacterShaperHistoryState } from "./character-shaper-ui-contract
 
 /** Maximum number of undo steps kept per dialog session (brief §4). */
 export const CHARACTER_SHAPER_HISTORY_LIMIT = 60;
-/** Whole-host snapshots can grow as the character model evolves, so count alone is not a memory budget. */
-export const CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES = 16 * 1024 * 1024;
+/** Retention budget per undo/redo branch; both branches together stay below ~16 MiB. */
+export const CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES = 8 * 1024 * 1024;
 
 /** How many labels the summary bar tooltip shows. */
 export const CHARACTER_SHAPER_HISTORY_LABEL_PREVIEW = 5;
@@ -43,34 +43,50 @@ export function createCharacterShaperHistory<TSnapshot>(): CharacterShaperHistor
   return { past: [], future: [] };
 }
 
+function estimateHistoryValueBytes(value: unknown, seen: WeakSet<object>): number {
+  if (value == null) return 8;
+  if (typeof value === "string") return 16 + value.length * 2;
+  if (typeof value === "number" || typeof value === "bigint") return 8;
+  if (typeof value === "boolean") return 4;
+  if (typeof value !== "object") return 16;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  if (value instanceof ArrayBuffer) return 64 + value.byteLength;
+  if (ArrayBuffer.isView(value)) return 64 + value.byteLength;
+  if (Array.isArray(value)) {
+    return 64 + value.reduce((total, item) => total + estimateHistoryValueBytes(item, seen), 0);
+  }
+  let total = 64;
+  try {
+    for (const [key, item] of Object.entries(value)) {
+      total += 24 + key.length * 2 + estimateHistoryValueBytes(item, seen);
+    }
+  } catch {
+    total += 128;
+  }
+  return total;
+}
+
 export function estimateCharacterShaperHistoryEntryBytes<TSnapshot>(
   entry: CharacterShaperHistoryEntry<TSnapshot>,
 ): number {
-  try {
-    const serialized = JSON.stringify(entry.snapshot);
-    return Math.max(64, entry.label.length * 2 + (serialized?.length ?? 0) * 2 + 64);
-  } catch {
-    return CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES + 1;
-  }
+  return 96 + entry.label.length * 2 + estimateHistoryValueBytes(entry.snapshot, new WeakSet());
 }
 
-export function trimCharacterShaperHistoryEntries<TSnapshot>(
+function trimCharacterShaperHistory<TSnapshot>(
   entries: readonly CharacterShaperHistoryEntry<TSnapshot>[],
-  maxEntries = CHARACTER_SHAPER_HISTORY_LIMIT,
-  maxEstimatedBytes = CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES,
 ): readonly CharacterShaperHistoryEntry<TSnapshot>[] {
-  if (maxEntries <= 0 || maxEstimatedBytes <= 0 || entries.length === 0) return [];
   const kept: CharacterShaperHistoryEntry<TSnapshot>[] = [];
   let retainedBytes = 0;
-  for (let index = entries.length - 1; index >= 0 && kept.length < maxEntries; index -= 1) {
-    const entry = entries[index];
-    if (!entry) continue;
-    const estimatedBytes = estimateCharacterShaperHistoryEntryBytes(entry);
-    if (estimatedBytes > maxEstimatedBytes || retainedBytes + estimatedBytes > maxEstimatedBytes) break;
-    kept.unshift(entry);
-    retainedBytes += estimatedBytes;
+  for (let index = entries.length - 1; index >= 0 && kept.length < CHARACTER_SHAPER_HISTORY_LIMIT; index -= 1) {
+    const entry = entries[index]!;
+    const entryBytes = estimateCharacterShaperHistoryEntryBytes(entry);
+    if (entryBytes > CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES) continue;
+    if (retainedBytes + entryBytes > CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES) break;
+    retainedBytes += entryBytes;
+    kept.push(entry);
   }
-  return kept;
+  return kept.reverse();
 }
 
 /** Appends one step and drops the oldest entries beyond the count/byte bounds. A push clears redo. */
@@ -79,7 +95,7 @@ export function pushCharacterShaperHistory<TSnapshot>(
   entry: CharacterShaperHistoryEntry<TSnapshot>,
 ): CharacterShaperHistoryStack<TSnapshot> {
   return {
-    past: trimCharacterShaperHistoryEntries([...stack.past, entry]),
+    past: trimCharacterShaperHistory([...stack.past, entry]),
     future: [],
   };
 }
@@ -104,7 +120,7 @@ export function undoCharacterShaperHistory<TSnapshot>(
   return {
     stack: {
       past: stack.past.slice(0, -1),
-      future: trimCharacterShaperHistoryEntries([
+      future: trimCharacterShaperHistory([
         ...stack.future,
         { label: entry.label, snapshot: current },
       ]),
@@ -123,7 +139,7 @@ export function redoCharacterShaperHistory<TSnapshot>(
   if (!entry) return { stack, restore: null, label: null };
   return {
     stack: {
-      past: trimCharacterShaperHistoryEntries([
+      past: trimCharacterShaperHistory([
         ...stack.past,
         { label: entry.label, snapshot: current },
       ]),
