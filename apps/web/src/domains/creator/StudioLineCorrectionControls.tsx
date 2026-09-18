@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useId } from "react";
 
 import {
@@ -70,7 +73,7 @@ export function StudioLineCorrectionControls({
   const detailedControls = (
     <div className={cx("space-y-2.5", touch && "pt-2")}>
       <label className={cx("flex items-center justify-between gap-2 text-fg-3", touch ? "text-[0.7rem]" : "text-xs")}>
-        <span>입력 선 보정</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "입력 선 보정")}</span>
         <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
           <input
             type="range"
@@ -79,7 +82,7 @@ export function StudioLineCorrectionControls({
             step={1}
             value={stabilizer}
             onChange={(event) => onStabilizerChange(Number(event.target.value))}
-            aria-label="입력 선 보정 강도"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "입력 선 보정 강도")}
             aria-describedby={latencyDescriptionId}
             className={cx("cursor-pointer accent-accent", touch ? "h-11 w-full max-w-52" : "w-24")}
           />
@@ -88,7 +91,7 @@ export function StudioLineCorrectionControls({
       </label>
 
       <label className={cx("flex items-center justify-between gap-3 text-fg-3", touch ? "min-h-11 text-[0.7rem]" : "text-xs")}>
-        <span className="shrink-0">보정 방식</span>
+        <span className="shrink-0">{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "보정 방식")}</span>
         <select
           value={mode}
           onChange={(event) => onModeChange(event.target.value as StudioStabilizerMode)}
@@ -109,7 +112,7 @@ export function StudioLineCorrectionControls({
 
       <div
         role="group"
-        aria-label="입력 반응 예상"
+        aria-label={translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "입력 반응 예상")}
         className={cx("flex items-start justify-between gap-2 rounded-lg border px-2.5 py-2", latencyTone)}
       >
         <span className="min-w-0">
@@ -128,8 +131,8 @@ export function StudioLineCorrectionControls({
           aria-pressed={instantResponseActive}
           aria-describedby={latencyDescriptionId}
           aria-label={instantResponseActive
-            ? "즉시 반응 사용 중"
-            : "즉시 반응: 고정 주기 모드와 입력 보정 0으로 전환"}
+            ? translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "즉시 반응 사용 중")
+            : translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "즉시 반응: 고정 주기 모드와 입력 보정 0으로 전환")}
           className={cx(
             "inline-flex shrink-0 items-center justify-center rounded-lg border border-line bg-card px-2.5 font-semibold text-fg-2 transition-colors",
             "hover:border-accent/45 hover:bg-raised hover:text-fg disabled:cursor-default disabled:border-good/30 disabled:bg-good/10 disabled:text-good",
@@ -137,12 +140,11 @@ export function StudioLineCorrectionControls({
             touch ? "min-h-11 text-xs" : "min-h-8 text-[0.68rem]"
           )}
         >
-          즉시 반응
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "즉시 반응")}</button>
       </div>
 
       <label className={cx("flex items-center justify-between gap-2 text-fg-3", touch ? "text-[0.7rem]" : "text-xs")}>
-        <span title="펜을 놓은 뒤 좌표를 한 번 더 정리합니다.">그린 후 보정</span>
+        <span title={translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "펜을 놓은 뒤 좌표를 한 번 더 정리합니다.")}>{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "그린 후 보정")}</span>
         <span className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
           <input
             type="range"
@@ -151,7 +153,7 @@ export function StudioLineCorrectionControls({
             step={1}
             value={postCorrection}
             onChange={(event) => onPostCorrectionChange(Number(event.target.value))}
-            aria-label="그린 후 선 보정 강도"
+            aria-label={translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "그린 후 선 보정 강도")}
             className={cx("cursor-pointer accent-accent", touch ? "h-11 w-full max-w-52" : "w-24")}
           />
           <span className="w-5 text-right tabular-nums">{postCorrection}</span>
@@ -163,8 +165,8 @@ export function StudioLineCorrectionControls({
         touch ? "min-h-11 text-xs" : "min-h-8 text-xs"
       )}>
         <span>
-          <span className="block font-medium">각진 선 보존</span>
-          {touch ? <span className="block text-[0.62rem] leading-relaxed text-fg-3">말풍선·의상 모서리가 둥글어지는 것을 방지</span> : null}
+          <span className="block font-medium">{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "각진 선 보존")}</span>
+          {touch ? <span className="block text-[0.62rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "말풍선·의상 모서리가 둥글어지는 것을 방지")}</span> : null}
         </span>
         <input
           type="checkbox"
@@ -178,18 +180,18 @@ export function StudioLineCorrectionControls({
 
   return (
     <section
-      aria-label="선 보정"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "선 보정")}
       className={cx("border-t border-line/35", touch ? "mt-2.5 space-y-2.5 pt-2.5" : "space-y-2 pt-2", className)}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={cx("font-semibold text-fg-2", touch ? "text-xs" : "text-[0.7rem]")}>선 보정</span>
-        <span className="text-[0.62rem] tabular-nums text-fg-3">입력 {stabilizer} · 후보정 {postCorrection}</span>
+        <span className={cx("font-semibold text-fg-2", touch ? "text-xs" : "text-[0.7rem]")}>{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "선 보정")}</span>
+        <span className="text-[0.62rem] tabular-nums text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "입력 ")}{stabilizer} {translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "· 후보정 ")}{postCorrection}</span>
       </div>
 
       {touch ? (
         <>
-          <p className="text-[0.65rem] leading-relaxed text-fg-3">흔들림을 얼마나 부드럽게 다듬을지 먼저 고르세요.</p>
-          <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="선 보정 강도">
+          <p className="text-[0.65rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "흔들림을 얼마나 부드럽게 다듬을지 먼저 고르세요.")}</p>
+          <div className="grid grid-cols-4 gap-1.5" role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "선 보정 강도")}>
             {CORRECTION_PRESETS.map((preset) => (
               <button
                 key={preset.id}
@@ -213,8 +215,7 @@ export function StudioLineCorrectionControls({
           </div>
           <details className="rounded-lg border border-line bg-card/35 px-2.5">
             <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-fg-2">
-              세부 선 보정 설정
-            </summary>
+              {translateCurrentStaticSourceText("domains.creator.StudioLineCorrectionControls", "ko", "세부 선 보정 설정")}</summary>
             {detailedControls}
           </details>
         </>

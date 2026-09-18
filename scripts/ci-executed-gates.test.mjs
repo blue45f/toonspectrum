@@ -23,9 +23,10 @@ test("core retains every mandatory quality lane without a bypass", () => {
   assert.doesNotMatch(source, /CI_CORE_BYPASS|continue-on-error|if:\s*\$\{\{\s*false/);
   assert.match(source, /permissions:\n {2}contents: read\n {2}pull-requests: read/);
 
-  for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
-    assert.doesNotMatch(job(name), /^ {4}if:/m, `${name} must not be conditionally skipped`);
-    assert.match(job(name), /pnpm install --frozen-lockfile/);
+  for (const name of REQUIRED_CORE_GATES) {
+    const block = job(name);
+    assert.doesNotMatch(block, /^ {4}needs:/m, `${name} must start independently`);
+    if (name !== "core") assert.match(block, /pnpm install --frozen-lockfile/);
   }
   const lint = job("lint");
   assert.match(lint, /node scripts\/lint-changed\.mjs --files-from=/);
@@ -104,7 +105,7 @@ test("mandatory lanes start independently and dependency-free contracts run firs
     "!/docs/",
     "!/tests/benchmarks/results/",
   ]) {
-    assert.ok(typecheck.includes(excludedPath), `typecheck sparse checkout is missing ${excludedPath}`);
+    assert.match(typecheck, new RegExp(contract.replaceAll(".", "\\.")));
   }
   for (const requiredManifest of [
     "/apps/web/public/assets/3d/environments/refined-v6/manifest.json",

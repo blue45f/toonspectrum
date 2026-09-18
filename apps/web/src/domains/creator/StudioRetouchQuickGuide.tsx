@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { BookOpen, CircleCheck, ImageDown, Loader2, MousePointer2 } from "lucide-react";
 
 import {
@@ -89,11 +93,11 @@ export function StudioRetouchQuickGuide({
 
       <details className="group mt-1.5 border-t border-line/40 pt-0.5">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg px-1.5 text-[0.72rem] font-medium text-fg-2 outline-none transition-colors hover:bg-raised/70 focus-visible:ring-2 focus-visible:ring-accent/70 motion-reduce:transition-none [&::-webkit-details-marker]:hidden">
-          <span>처음이라면 · 3단계</span>
-          <span className="text-[0.66rem] font-normal text-fg-3 group-open:hidden">보기</span>
-          <span className="hidden text-[0.66rem] font-normal text-fg-3 group-open:inline">접기</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.StudioRetouchQuickGuide", "ko", "처음이라면 · 3단계")}</span>
+          <span className="text-[0.66rem] font-normal text-fg-3 group-open:hidden">{translateCurrentStaticSourceText("domains.creator.StudioRetouchQuickGuide", "ko", "보기")}</span>
+          <span className="hidden text-[0.66rem] font-normal text-fg-3 group-open:inline">{translateCurrentStaticSourceText("domains.creator.StudioRetouchQuickGuide", "ko", "접기")}</span>
         </summary>
-        <ol className="space-y-2 px-1.5 pb-1.5 pt-1" aria-label={`${help.actionName} 첫 사용 3단계`}>
+        <ol className="space-y-2 px-1.5 pb-1.5 pt-1" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioRetouchQuickGuide", "ko", "{v0} 첫 사용 3단계"), { v0: String(help.actionName) })}>
           {help.steps.map((step, index) => (
             <li key={step.title} className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-1.5">
               <span
@@ -115,12 +119,11 @@ export function StudioRetouchQuickGuide({
           <button
             type="button"
             onClick={onOpenTutorial}
-            aria-label={`${help.actionName} 상세 튜토리얼 열기`}
+            aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioRetouchQuickGuide", "ko", "{v0} 상세 튜토리얼 열기"), { v0: String(help.actionName) })}
             className="mb-1 ml-auto flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-[0.7rem] font-semibold text-accent outline-none transition-colors hover:bg-accent-soft/60 focus-visible:ring-2 focus-visible:ring-accent/70 md:min-h-9 pointer-coarse:min-h-11 motion-reduce:transition-none"
           >
             <BookOpen className="size-3.5" aria-hidden />
-            상세 튜토리얼
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioRetouchQuickGuide", "ko", "상세 튜토리얼")}</button>
         ) : null}
       </details>
     </div>

@@ -1288,6 +1288,7 @@ describe("Cloudflare realtime provider adapter", () => {
   it("rejects malformed origins and an unnegotiated WebSocket protocol", async () => {
     expect(() =>
       studioCloudflareRealtimeRoomUrl(
+        // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
         "https://user:secret@realtime.toonstudio.cloud",
         "work-1",
         "room-1",

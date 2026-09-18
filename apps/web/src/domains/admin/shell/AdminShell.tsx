@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ExternalLink,
   Menu,
@@ -55,10 +56,10 @@ function AdminNavigation({
         <section
           key={group.id}
           className="mb-5"
-          aria-labelledby={`admin-nav-${group.id}`}
+          aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.shell.AdminShell", "en", "admin-nav-{v0}"), { v0: String(group.id) })}
         >
           <h2
-            id={`admin-nav-${group.id}`}
+            id={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.shell.AdminShell", "en", "admin-nav-{v0}"), { v0: String(group.id) })}
             className={cn(
               "mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-fg-3",
               collapsed && "sr-only",
@@ -74,7 +75,7 @@ function AdminNavigation({
                 <Link
                   key={route.id}
                   href={route.path}
-                  aria-current={active ? "page" : undefined}
+                  aria-current={active ? translateCurrentStaticSourceText("domains.admin.shell.AdminShell", "en", "page") : undefined}
                   aria-label={collapsed ? t(route.labelKey) : undefined}
                   title={collapsed ? t(route.labelKey) : undefined}
                   onClick={onNavigate}
@@ -294,7 +295,7 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
                   : "border-good/35 bg-good/10 text-good",
               )}
             >
-              {production ? "PROD" : "DEV"}
+              {production ? translateCurrentStaticSourceText("domains.admin.shell.AdminShell", "en", "PROD") : translateCurrentStaticSourceText("domains.admin.shell.AdminShell", "en", "DEV")}
             </span>
             <AdminQuickPalette userId={userId} />
             <Link

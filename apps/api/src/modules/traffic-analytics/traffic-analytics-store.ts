@@ -1,5 +1,10 @@
 import { dbPool } from "../../db";
 
+import type {
+  TrafficShareChannel,
+  TrafficShareOutcome,
+} from "./traffic-analytics-model";
+
 const RETENTION_ADVISORY_LOCK = "toonspectrum:traffic-analytics:retention:v2";
 
 type TrafficSessionRecord = Readonly<{
@@ -41,6 +46,20 @@ export type TrafficPageViewRecord = Readonly<{
   screenClass: string;
   loadTimeMs: number | null;
   isBot: boolean;
+}>;
+
+export type TrafficShareEventRecord = Readonly<{
+  id: string;
+  occurredAt: Date;
+  visitorHash: string;
+  sessionHash: string;
+  path: string;
+  channel: TrafficShareChannel;
+  outcome: TrafficShareOutcome;
+  countryCode: string | null;
+  deviceType: string;
+  browser: string;
+  os: string;
 }>;
 
 export async function persistTrafficPageView(input: {
@@ -352,6 +371,43 @@ export async function persistTrafficHeartbeat(input: {
   );
 }
 
+export async function persistTrafficShareEvent(
+  event: TrafficShareEventRecord,
+): Promise<void> {
+  await dbPool.query(
+    `
+      INSERT INTO public.traffic_share_event (
+        id,
+        occurred_at,
+        visitor_hash,
+        session_hash,
+        path,
+        channel,
+        outcome,
+        country_code,
+        device_type,
+        browser,
+        os
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (id) DO NOTHING
+    `,
+    [
+      event.id,
+      event.occurredAt,
+      event.visitorHash,
+      event.sessionHash,
+      event.path,
+      event.channel,
+      event.outcome,
+      event.countryCode,
+      event.deviceType,
+      event.browser,
+      event.os,
+    ],
+  );
+}
+
 export async function cleanupExpiredTrafficData(
   retentionDays: number,
   now = new Date(),
@@ -370,6 +426,12 @@ export async function cleanupExpiredTrafficData(
           AND (SELECT acquired FROM maintenance_lock)
         RETURNING 1
       ),
+      deleted_shares AS (
+        DELETE FROM public.traffic_share_event
+        WHERE occurred_at < $2
+          AND (SELECT acquired FROM maintenance_lock)
+        RETURNING 1
+      ),
       deleted_sessions AS (
         DELETE FROM public.traffic_session
         WHERE last_seen_at < $2
@@ -378,6 +440,7 @@ export async function cleanupExpiredTrafficData(
       )
       SELECT
         (SELECT count(*) FROM deleted_events)::integer AS deleted_events,
+        (SELECT count(*) FROM deleted_shares)::integer AS deleted_shares,
         (SELECT count(*) FROM deleted_sessions)::integer AS deleted_sessions
     `,
     [RETENTION_ADVISORY_LOCK, retentionCutoff],

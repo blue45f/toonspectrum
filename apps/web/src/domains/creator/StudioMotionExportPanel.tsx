@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * StudioMotionExportPanel — 작품 상세(작성자 전용)에서 효과툰을 "모션툰 영상(WebM)"으로
  * 내보내는 패널. WorkFxPanel에 저장된 doc.fx 연출(리빌·강조·분위기·BGM)을
@@ -126,22 +130,17 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
         className="flex w-full items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium text-fg-2 transition-colors hover:text-fg"
       >
         <Clapperboard size={13} className="text-accent" />
-        모션툰 영상 내보내기 (WebM)
-        <span className="ml-auto text-[0.7rem] text-fg-3">
-          {work.pages.length > 0 ? `${work.pages.length}컷 · 약 ${formatSeconds(plan.durationSec)}` : "컷 없음"}
+        {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "모션툰 영상 내보내기 (WebM)")}<span className="ml-auto text-[0.7rem] text-fg-3">
+          {work.pages.length > 0 ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "{v0}컷 · 약 {v1}"), { v0: String(work.pages.length), v1: String(formatSeconds(plan.durationSec)) }) : translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "컷 없음")}
         </span>
       </button>
       {open && (
         <div className="flex flex-col gap-3 border-t border-line px-3.5 py-3">
           <p className="rounded-lg border border-line bg-panel/40 px-2.5 py-2 text-[0.7rem] leading-relaxed text-fg-3">
-            효과툰 설정(등장 {revealLabel} · 분위기 {ambientLabel} · BGM {bgmLabel})을 그대로 재생하며
-            영상 한 편으로 인코딩해요. SNS·쇼츠 공유용으로 쓸 수 있어요. 녹화는 실시간이라 영상
-            길이만큼 시간이 걸려요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "효과툰 설정(등장 ")}{revealLabel} {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "· 분위기 ")}{ambientLabel} {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "en", "· BGM ")}{bgmLabel}{translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", ")을 그대로 재생하며 영상 한 편으로 인코딩해요. SNS·쇼츠 공유용으로 쓸 수 있어요. 녹화는 실시간이라 영상 길이만큼 시간이 걸려요.")}</p>
 
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            해상도
-            <select
+            {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "해상도")}<select
               value={resolutionId}
               onChange={(e) => setResolutionId(e.target.value)}
               disabled={exporting}
@@ -156,8 +155,7 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-fg-2">
-            컷 읽기 시간 (영상 길이 결정)
-            <select
+            {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "컷 읽기 시간 (영상 길이 결정)")}<select
               value={holdId}
               onChange={(e) => setHoldId(e.target.value)}
               disabled={exporting}
@@ -180,12 +178,10 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
                 disabled={exporting}
                 className="size-3.5 cursor-pointer accent-[var(--color-accent)] disabled:cursor-not-allowed"
               />
-              음소거로 내보내기 (배경음악 제외)
-            </label>
+              {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "음소거로 내보내기 (배경음악 제외)")}</label>
           ) : (
             <p className="text-[0.7rem] text-fg-3">
-              이 작품엔 배경음악 설정이 없어 무음 영상으로 내보내요. (효과툰 설정에서 BGM을 켤 수 있어요.)
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "이 작품엔 배경음악 설정이 없어 무음 영상으로 내보내요. (효과툰 설정에서 BGM을 켤 수 있어요.)")}</p>
           )}
 
           {exporting && (
@@ -196,7 +192,7 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
               </div>
               <div
                 role="progressbar"
-                aria-label="영상 내보내기 진행률"
+                aria-label={translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "영상 내보내기 진행률")}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={progressPct}
@@ -212,9 +208,7 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
 
           {!supported && (
             <p className="text-xs text-bad">
-              이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. 크롬·엣지·파이어폭스에서
-              시도해주세요.
-            </p>
+              {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "이 브라우저는 영상 녹화(MediaRecorder/WebM)를 지원하지 않아요. 크롬·엣지·파이어폭스에서 시도해주세요.")}</p>
           )}
           {error && <p className="text-xs text-bad">{error}</p>}
           {doneMsg && !error && <p className="text-xs text-good">{doneMsg}</p>}
@@ -228,8 +222,7 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
                 className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
               >
                 <Square size={13} />
-                취소
-              </button>
+                {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "취소")}</button>
             )}
             <button
               type="button"
@@ -238,8 +231,7 @@ export function StudioMotionExportPanel({ work }: { work: WorkDetail }) {
               className={buttonClass({ size: "sm", variant: "solid", className: "gap-1.5" })}
             >
               <Download size={14} />
-              영상 내보내기
-            </button>
+              {translateCurrentStaticSourceText("domains.creator.StudioMotionExportPanel", "ko", "영상 내보내기")}</button>
           </div>
         </div>
       )}

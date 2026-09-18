@@ -1,14 +1,5 @@
-import {
-  BookOpen,
-  BriefcaseBusiness,
-  Mail,
-  PenLine,
-  RefreshCw,
-  Sparkles,
-  UserCheck,
-  UserPlus,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 
@@ -17,7 +8,6 @@ import type { SeedReview, Title } from "@/shared/lib/types";
 import Link from "@/compat/router-link";
 
 import { ReviewCard } from "@/shared/components/review-card";
-import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
@@ -29,7 +19,7 @@ import {
   creatorText,
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
-import { useI18n, useT } from "@/shared/lib/i18n";
+import { useT } from "@/shared/lib/i18n";
 import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
@@ -46,11 +36,19 @@ import {
   type WorkSummary,
 } from "@/infrastructure/creator-client";
 import { useApiResource } from "@/infrastructure/use-api-resource";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 
 // 회원 공개 프로필 — 리뷰 카드의 작성자명을 누르면 오는 /u/:userId.
 // 리뷰는 기존 /api/reviews 응답(피드+통계)을 userId로 필터해 그대로 재사용하고,
 // 창작 활동(팔로우/작품/시리즈)은 /api/creator/users/:id/profile + 목록 API 를 사용한다.
+const SharePageButton = lazy(async () => {
+  const module = await import("@/shared/components/share-page-button");
+  return { default: module.SharePageButton };
+});
+
 interface ReviewsResponse {
   feed: Array<SeedReview & { title: Title }>;
   stats: { total: number; avg: number; spoilerPct: number; distinctTitles: number };
@@ -70,6 +68,7 @@ function isTab(value: string | null): value is ProfileTab {
 
 // ── 창작 작품 탭 ──────────────────────────────────────────────────────
 function ProfileWorksTab({ userId }: { userId: string }) {
+  useBilingualI18nRevision();
   const t = useT();
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +113,7 @@ function ProfileWorksTab({ userId }: { userId: string }) {
 
 // ── 시리즈 탭 ─────────────────────────────────────────────────────────
 function ProfileSeriesTab({ userId }: { userId: string }) {
+  useBilingualI18nRevision();
   const t = useT();
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,8 +171,9 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
 }
 
 export function UserProfilePage() {
+  useBilingualI18nRevision();
   const t = useT();
-  const locale: CreatorRoleLocale = useI18n((state) => state.lang) === "ko" ? "ko" : "en";
+  const locale: CreatorRoleLocale = getActiveI18nLocale();
   const { userId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -326,15 +327,17 @@ export function UserProfilePage() {
             </div>
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {(profile || data) && (
-                <SharePageButton
-                  path={sharePath}
-                  text={`${author} 창작자 프로필`}
-                  description={shareDescription}
-                  imageUrl={shareImage}
-                  label="프로필 공유"
-                  actionLabel="프로필 보기"
-                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
-                />
+                <Suspense fallback={null}>
+                  <SharePageButton
+                    path={sharePath}
+                    text={`${author} 창작자 프로필`}
+                    description={shareDescription}
+                    imageUrl={shareImage}
+                    label="프로필 공유"
+                    actionLabel="프로필 보기"
+                    className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                  />
+                </Suspense>
               )}
               {/* 본인 프로필에서는 연락·팔로우 동작을 숨긴다. */}
               {profile && !isSelf && (
@@ -352,8 +355,7 @@ export function UserProfilePage() {
                       })}
                     >
                       <Mail size={14} aria-hidden="true" />
-                      메시지
-                    </Link>
+                      {translateCurrentStaticSourceText("domains.account.UserProfilePage", "ko", "메시지")}</Link>
                   )}
                   <button
                     type="button"
@@ -434,7 +436,7 @@ export function UserProfilePage() {
               onClick={reload}
               className={buttonClass({ size: "sm", variant: "quiet", className: "ml-auto gap-1.5" })}
             >
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              <RefreshCw size={14} className={loading ? translateCurrentStaticSourceText("domains.account.UserProfilePage", "en", "animate-spin") : ""} />
               {t("userProfile.refresh")}
             </button>
           )}

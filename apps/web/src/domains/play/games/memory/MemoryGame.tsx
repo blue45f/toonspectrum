@@ -1,4 +1,8 @@
 import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   buildBoard,
   flipReducer,
   initState,
@@ -96,7 +100,7 @@ function MemoryTile({
       disabled={disabled || faceUp}
       onClick={onFlip}
       aria-pressed={faceUp}
-      aria-label={faceUp ? tile.name : "뒤집힌 카드"}
+      aria-label={faceUp ? tile.name : translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "뒤집힌 카드")}
       className={cn(
         "relative aspect-[3/4] w-full overflow-hidden rounded-lg border transition",
         matched
@@ -188,7 +192,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
         className="grid min-h-[18rem] place-items-center text-sm text-fg-2"
         aria-live="polite"
       >
-        {loading ? "웹툰 카드를 불러오는 중…" : "보드를 준비하는 중…"}
+        {loading ? translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "웹툰 카드를 불러오는 중…") : translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "보드를 준비하는 중…")}
       </div>
     );
   }
@@ -201,10 +205,10 @@ export function MemoryGame({ onExit }: PlayGameProps) {
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <div className="flex items-center gap-3 text-fg-2">
           <span className="tabular-nums">
-            짝 <span className="font-semibold text-fg">{matchedPairs}</span>/{PAIRS}
+            {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "짝 ")}<span className="font-semibold text-fg">{matchedPairs}</span>/{PAIRS}
           </span>
           <span className="tabular-nums">
-            이동 <span className="font-semibold text-fg">{state.moves}</span>
+            {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "이동 ")}<span className="font-semibold text-fg">{state.moves}</span>
           </span>
           <span className="flex items-center gap-1 tabular-nums">
             <Clock className="h-3.5 w-3.5" />
@@ -215,21 +219,19 @@ export function MemoryGame({ onExit }: PlayGameProps) {
           {best !== null && (
             <span className="flex items-center gap-1 text-[0.72rem] text-fg-3">
               <Trophy className="h-3.5 w-3.5 text-accent" />
-              최고 {best}수
-            </span>
+              {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "최고 ")}{best}{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "수")}</span>
           )}
           <GameHelp
             id="memory"
-            title="웹툰 짝맞추기"
+            title={translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "웹툰 짝맞추기")}
             steps={[
               {
                 emoji: "🎯",
                 title: "목표",
                 desc: (
                   <>
-                    뒤집힌 <b className="text-fg">{PAIRS * 2}장의 카드</b>에서 같은 웹툰 표지{" "}
-                    <b className="text-fg">{PAIRS}쌍</b>을 모두 찾으면 클리어예요.
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "뒤집힌 ")}<b className="text-fg">{PAIRS * 2}{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "장의 카드")}</b>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "에서 같은 웹툰 표지")}{" "}
+                    <b className="text-fg">{PAIRS}{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "쌍")}</b>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "을 모두 찾으면 클리어예요.")}</>
                 ),
               },
               {
@@ -237,9 +239,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
                 title: "맞추기",
                 desc: (
                   <>
-                    카드를 눌러 한 번에 <b className="text-fg">두 장</b>을 뒤집고, 같은 웹툰이면
-                    그대로 <span className="text-accent">고정</span>돼요.
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "카드를 눌러 한 번에 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "두 장")}</b>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "을 뒤집고, 같은 웹툰이면 그대로")}<span className="text-accent">{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "고정")}</span>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "돼요.")}</>
                 ),
               },
               {
@@ -247,9 +247,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
                 title: "안 맞으면",
                 desc: (
                   <>
-                    다르면 잠깐 보여준 뒤 카드가 <b className="text-fg">다시 뒤집혀요</b>. 표지
-                    위치를 기억해 두세요.
-                  </>
+                    {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "다르면 잠깐 보여준 뒤 카드가 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "다시 뒤집혀요")}</b>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", ". 표지 위치를 기억해 두세요.")}</>
                 ),
               },
               {
@@ -257,10 +255,7 @@ export function MemoryGame({ onExit }: PlayGameProps) {
                 title: "점수",
                 desc: (
                   <>
-                    <b className="text-fg">이동 횟수</b>와 <b className="text-fg">시간</b>이
-                    기록되며, 가장 적은 이동 수가 <span className="text-accent">최고 기록</span>으로
-                    남아요.
-                  </>
+                    <b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "이동 횟수")}</b>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "와 ")}<b className="text-fg">{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "시간")}</b>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "이 기록되며, 가장 적은 이동 수가")}<span className="text-accent">{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "최고 기록")}</span>{translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "으로 남아요.")}</>
                 ),
               },
             ]}
@@ -288,24 +283,21 @@ export function MemoryGame({ onExit }: PlayGameProps) {
       {/* 상태 안내(스크린리더 라이브) */}
       <p className="text-center text-[0.72rem] text-fg-3" aria-live="polite">
         {solved
-          ? `🎉 클리어! ${state.moves}수 · ${fmtTime(elapsed)}${
-              best !== null && state.moves <= best ? " — 최고 기록!" : ""
-            }`
+          ? formatI18nTemplate(translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "🎉 클리어! {v0}수 · {v1}{v2}"), { v0: String(state.moves), v1: String(fmtTime(elapsed)), v2: String(best !== null && state.moves <= best ? " — 최고 기록!" : "") })
           : state.locked
-            ? "짝이 아니에요. 카드가 다시 뒤집힙니다…"
+            ? translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "짝이 아니에요. 카드가 다시 뒤집힙니다…")
             : state.flipped.length === 1
-              ? "같은 웹툰을 찾아 카드를 한 장 더 뒤집으세요."
-              : "카드 두 장을 뒤집어 같은 웹툰 표지를 맞추세요."}
+              ? translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "같은 웹툰을 찾아 카드를 한 장 더 뒤집으세요.")
+              : translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "카드 두 장을 뒤집어 같은 웹툰 표지를 맞추세요.")}
       </p>
 
       {/* 컨트롤 */}
       <div className="flex items-center justify-center gap-2">
         <Button variant="solid" size="sm" onClick={restart}>
-          <RotateCcw className="mr-1 h-4 w-4" /> {solved ? "다시 도전" : "새 보드"}
+          <RotateCcw className="mr-1 h-4 w-4" /> {solved ? translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "다시 도전") : translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "새 보드")}
         </Button>
         <Button variant="outline" size="sm" onClick={onExit}>
-          <Sparkles className="mr-1 h-4 w-4" /> 다른 게임
-        </Button>
+          <Sparkles className="mr-1 h-4 w-4" /> {translateCurrentStaticSourceText("domains.play.games.memory.MemoryGame", "ko", "다른 게임")}</Button>
       </div>
     </div>
   );

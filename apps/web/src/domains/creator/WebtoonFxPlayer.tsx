@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * WebtoonFxPlayer — "무빙툰/효과툰" 리더. 정적 페이지 이미지에 동적 효과를 입힌다.
  * - 스크롤 리빌: 페이지가 화면에 들어오면 페이드업·줌 등으로 등장(IntersectionObserver).
@@ -198,8 +202,7 @@ function RevealPage({
           className="block w-full"
           fallback={
             <span className="grid aspect-[3/4] w-full place-items-center bg-raised/40 text-xs text-fg-3">
-              이미지를 불러올 수 없습니다.
-            </span>
+              {translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "이미지를 불러올 수 없습니다.")}</span>
           }
         />
         {seqActive && seqStarted && (
@@ -432,11 +435,10 @@ function FxControlBar({
           "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
           autoPlay ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
         )}
-        title={autoPlay ? "자동 재생 멈춤" : "자동 재생 — 효과와 함께 스스로 스크롤"}
+        title={autoPlay ? translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "자동 재생 멈춤") : translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "자동 재생 — 효과와 함께 스스로 스크롤")}
       >
         {autoPlay ? <Pause size={13} /> : <Play size={13} />}
-        자동 재생
-      </button>
+        {translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "자동 재생")}</button>
       {hasSound && (
         <>
           <span className="h-4 w-px bg-line" />
@@ -448,12 +450,12 @@ function FxControlBar({
               "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-colors",
               soundOn ? "bg-accent text-on-accent" : "bg-card text-fg-2 hover:bg-raised"
             )}
-            title={soundOn ? "소리 끄기 (배경음악·컷 효과음)" : "소리 켜기 (배경음악·컷 효과음)"}
+            title={soundOn ? translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "소리 끄기 (배경음악·컷 효과음)") : translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "소리 켜기 (배경음악·컷 효과음)")}
           >
             <Music size={13} />
             {moodLabel}
           </button>
-          <label className="flex items-center gap-1.5 text-fg-3" title="소리 음량">
+          <label className="flex items-center gap-1.5 text-fg-3" title={translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "소리 음량")}>
             <Volume2 size={13} />
             <input
               type="range"
@@ -468,7 +470,7 @@ function FxControlBar({
                 stingerRef.current?.setVolume(v);
               }}
               className="h-1 w-16 cursor-pointer accent-[var(--color-accent)]"
-              aria-label="소리 음량"
+              aria-label={translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "소리 음량")}
             />
           </label>
         </>
@@ -507,7 +509,7 @@ export function WebtoonFxPlayer({
     <>
       <div className="relative mb-8 overflow-hidden rounded-2xl border border-line bg-panel">
         {pages.length === 0 ? (
-          <p className="px-4 py-16 text-center text-sm text-fg-3">표시할 페이지가 없습니다.</p>
+          <p className="px-4 py-16 text-center text-sm text-fg-3">{translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "표시할 페이지가 없습니다.")}</p>
         ) : (
           pages.map((page, index) => {
             const cut = cutFx(fx, index); // 컷별 리빌(상속 포함) + 강조 + 연출 마크 + 오디오 연출
@@ -515,7 +517,7 @@ export function WebtoonFxPlayer({
               <RevealPage
                 key={`${page}-${index}`}
                 src={page}
-                alt={`${title} ${index + 1}컷`}
+                alt={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.WebtoonFxPlayer", "ko", "{v0} {v1}컷"), { v0: String(title), v1: String(index + 1) })}
                 reveal={cut.reveal}
                 emphasis={cut.emphasis}
                 seqMarks={cut.seq?.marks ?? []}

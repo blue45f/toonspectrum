@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Layers, RotateCw, Grid, Sparkles } from "lucide-react";
 import { useState } from "react";
 
@@ -84,42 +88,36 @@ export function StudioBg3dClonerPanel({
           type="button"
           disabled={disabled}
           onClick={() => setClonerType("linear")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
-            clonerType === "linear"
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(clonerType === "linear"
               ? "border border-line bg-raised text-fg shadow-sm"
-              : "text-fg-3 hover:text-fg"
-          }`}
+              : "text-fg-3 hover:text-fg") })}
         >
           <Layers className="size-3.5 text-accent" />
-          <span>선형 복제 (Linear)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "선형 복제 (Linear)")}</span>
         </button>
 
         <button
           type="button"
           disabled={disabled}
           onClick={() => setClonerType("radial")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
-            clonerType === "radial"
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(clonerType === "radial"
               ? "border border-line bg-raised text-fg shadow-sm"
-              : "text-fg-3 hover:text-fg"
-          }`}
+              : "text-fg-3 hover:text-fg") })}
         >
           <RotateCw className="size-3.5 text-accent" />
-          <span>원형 복제 (Radial)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "원형 복제 (Radial)")}</span>
         </button>
 
         <button
           type="button"
           disabled={disabled}
           onClick={() => setClonerType("grid")}
-          className={`flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all ${
-            clonerType === "grid"
+          className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "en", "flex items-center justify-center gap-1 rounded-md py-1.5 text-[0.7rem] font-bold transition-all {v0}"), { v0: String(clonerType === "grid"
               ? "border border-line bg-raised text-fg shadow-sm"
-              : "text-fg-3 hover:text-fg"
-          }`}
+              : "text-fg-3 hover:text-fg") })}
         >
           <Grid className="size-3.5 text-accent" />
-          <span>격자 복제 (Grid)</span>
+          <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "격자 복제 (Grid)")}</span>
         </button>
       </div>
 
@@ -127,7 +125,7 @@ export function StudioBg3dClonerPanel({
       {clonerType === "linear" && (
         <div className="flex flex-col gap-2.5 rounded-lg border border-line/70 bg-card p-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">복제 개수:</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "복제 개수:")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -142,7 +140,7 @@ export function StudioBg3dClonerPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">X / Z 간격:</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "X / Z 간격:")}</span>
             <div className="flex items-center gap-1">
               <input
                 type="number"
@@ -162,7 +160,7 @@ export function StudioBg3dClonerPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">Y 계단 간격:</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "Y 계단 간격:")}</span>
             <input
               type="number"
               step="0.1"
@@ -173,7 +171,7 @@ export function StudioBg3dClonerPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">회전 스텝(°):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "회전 스텝(°):")}</span>
             <input
               type="number"
               step="5"
@@ -189,7 +187,7 @@ export function StudioBg3dClonerPanel({
       {clonerType === "radial" && (
         <div className="flex flex-col gap-2.5 rounded-lg border border-line/70 bg-card p-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">원주 개수:</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "원주 개수:")}</span>
             <div className="flex items-center gap-2">
               <input
                 type="range"
@@ -204,7 +202,7 @@ export function StudioBg3dClonerPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">반지름 / 각도(°):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "반지름 / 각도(°):")}</span>
             <div className="flex items-center gap-1">
               <input
                 type="number"
@@ -224,7 +222,7 @@ export function StudioBg3dClonerPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">나선 상승 높이:</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "나선 상승 높이:")}</span>
             <input
               type="number"
               step="0.5"
@@ -241,7 +239,7 @@ export function StudioBg3dClonerPanel({
               onChange={(e) => setAlignTangent(e.target.checked)}
               className="size-3.5 rounded border-line accent-accent"
             />
-            <span>원 중심/접선 방향으로 자동 회전 맞춤</span>
+            <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "원 중심/접선 방향으로 자동 회전 맞춤")}</span>
           </label>
         </div>
       )}
@@ -250,7 +248,7 @@ export function StudioBg3dClonerPanel({
       {clonerType === "grid" && (
         <div className="flex flex-col gap-2.5 rounded-lg border border-line/70 bg-card p-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">X × Y × Z 격자수:</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "X × Y × Z 격자수:")}</span>
             <div className="flex items-center gap-1">
               <input
                 type="number"
@@ -282,7 +280,7 @@ export function StudioBg3dClonerPanel({
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="text-[0.68rem] text-fg-2">격자 간격 (X / Z):</span>
+            <span className="text-[0.68rem] text-fg-2">{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "격자 간격 (X / Z):")}</span>
             <div className="flex items-center gap-1.5">
               <input
                 type="number"
@@ -311,7 +309,7 @@ export function StudioBg3dClonerPanel({
         className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90 disabled:opacity-50"
       >
         <Sparkles className="size-3.5" />
-        <span>3D 클로너 인스턴스 배열 생성</span>
+        <span>{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dClonerPanel", "ko", "3D 클로너 인스턴스 배열 생성")}</span>
       </button>
     </div>
   );

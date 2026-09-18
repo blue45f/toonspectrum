@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import type {
   StudioProductionOptionDescriptor,
   StudioProductionOptionValue,
@@ -16,7 +17,7 @@ export function StudioProductionOptionFields({
 
   return (
     <fieldset className="mt-3 rounded-xl border border-line bg-card/55 p-3.5">
-      <legend className="px-1 text-xs font-bold text-fg-2">작업 옵션</legend>
+      <legend className="px-1 text-xs font-bold text-fg-2">{translateCurrentStaticSourceText("domains.creator.toolchain.StudioProductionOptionFields", "ko", "작업 옵션")}</legend>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {descriptors.map((descriptor) => {
           const value = values[descriptor.key] ?? descriptor.defaultValue;

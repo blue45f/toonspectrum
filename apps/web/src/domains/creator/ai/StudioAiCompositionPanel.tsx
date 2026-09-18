@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // 콘티→그림 변환(장면 구성 제안) 패널 — 시나리오/대사 텍스트를 넣으면 구도·카메라앵글·인물배치
 // 제안을 받는다. 완전한 "글→그림 자동생성"은 배경 생성 기능과 중복되므로 의도적으로 텍스트 조언
 // 어시스트로 좁혔다(studio-ai-client.ts suggestSceneComposition 문서 참고).
@@ -13,11 +16,14 @@ import { useEffect, useRef, useState } from "react";
 import {
   suggestSceneComposition,
   studioTextAiTransportForOperation,
+  type StudioAiErrorCode,
   type StudioAiResult,
   type StudioAiSettings,
   type StudioTextAiProvenance,
   type StudioTextAiTransport,
 } from "./studio-ai-client";
+
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 
 export interface StudioAiCompositionOperationSettlement {
   operationId: string;
@@ -52,12 +58,15 @@ export function StudioAiCompositionPanel({
   const sceneTextValue = sceneText ?? localSceneText;
   const setSceneTextValue = onSceneTextChange ?? setLocalSceneText;
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<{
+    code: StudioAiErrorCode;
+    message: string;
+  } | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   // 팔레트·대사 패널과 동일 — 결과·에러가 팝오버 fold 아래에 생기지 않게 도착 시 nearest 스크롤.
   const feedbackRef = useRef<HTMLDivElement | null>(null);
-  const hasFeedback = Boolean(suggestion || error);
+  const hasFeedback = Boolean(suggestion || failure);
   useEffect(() => {
     if (hasFeedback) feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
   }, [hasFeedback]);
@@ -66,7 +75,7 @@ export function StudioAiCompositionPanel({
     const prompt = sceneTextValue.trim();
     if (busy || !configured || !prompt) return;
     setBusy(true);
-    setError(null);
+    setFailure(null);
     setCopyState("idle");
     const operationId = onOperationStart?.(prompt);
     const operationTransport = operationId && transport
@@ -83,7 +92,7 @@ export function StudioAiCompositionPanel({
     if (result.ok) {
       setSuggestion(result.data.suggestion);
     } else {
-      setError(result.error);
+      setFailure({ code: result.code, message: result.error });
     }
     setBusy(false);
   };
@@ -102,15 +111,15 @@ export function StudioAiCompositionPanel({
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium text-fg-1">
         <Clapperboard size={14} />
-        장면 구성 제안 (콘티→그림 보조)
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "장면 구성 제안 (콘티→그림 보조)")}</div>
 
-      {!configured && (
-        <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          장면 초안은 먼저 작성할 수 있어요. 로그인하면 자동 무료 AI를 먼저 사용합니다. 무료 경로를 사용할 수 없으면{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 개인 클라우드 API 키와 모델을 연결하세요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "장면 초안은 먼저 작성할 수 있어요. 로그인해 자동 무료 AI를 사용하거나 통합 AI 설정에서 개인 무료 키를 연결하세요.")}
+          compact
+        />
+      ) : null}
 
       <textarea
         value={sceneTextValue}
@@ -118,7 +127,7 @@ export function StudioAiCompositionPanel({
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && configured) void run();
         }}
-        placeholder="예: 주인공이 교실 문을 벌컥 열고 들어와 반 아이들과 눈이 마주친다. &quot;나 전학왔어.&quot;"
+        placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "예: 주인공이 교실 문을 벌컥 열고 들어와 반 아이들과 눈이 마주친다. &quot;나 전학왔어.&quot;")}
         rows={3}
         disabled={busy}
         className="min-h-[4.5rem] w-full resize-none rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.68rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent focus:ring-1 focus:ring-accent/30 disabled:opacity-60"
@@ -128,14 +137,22 @@ export function StudioAiCompositionPanel({
         type="button"
         onClick={() => void run()}
         disabled={!configured || busy || !sceneTextValue.trim()}
+        title={!configured ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "로그인하거나 무료 AI 경로를 연결하면 실행할 수 있어요.") : undefined}
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {busy ? <Loader2 size={14} className="animate-spin" /> : <Clapperboard size={14} />}
-        {busy ? "구상하는 중…" : "구도 제안 받기"}
+        {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Clapperboard size={14} />}
+        {busy ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "구상하는 중…") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "구도 제안 받기")}
       </button>
 
       <div ref={feedbackRef}>
-        {error && <p className="text-xs text-bad">{error}</p>}
+        {failure ? (
+          <AiRecoveryNotice
+            code={failure.code}
+            message={failure.message}
+            onRetry={() => void run()}
+            compact
+          />
+        ) : null}
 
         {suggestion && (
           <div className="flex flex-col gap-1.5 rounded-lg border border-line bg-card/70 p-2">
@@ -148,16 +165,16 @@ export function StudioAiCompositionPanel({
               >
                 <Copy size={11} />{" "}
                 {copyState === "copied"
-                  ? "복사됨"
+                  ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "복사됨")
                   : copyState === "failed"
-                    ? "복사 실패"
-                    : "복사"}
+                    ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "복사 실패")
+                    : translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "복사")}
               </button>
               <span className="sr-only" role="status" aria-live="polite">
                 {copyState === "copied"
-                  ? "클립보드에 복사했어요."
+                  ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "클립보드에 복사했어요.")
                   : copyState === "failed"
-                    ? "복사하지 못했어요. 텍스트를 직접 선택해 주세요."
+                    ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "복사하지 못했어요. 텍스트를 직접 선택해 주세요.")
                     : ""}
               </span>
               {onInsertAsNote && (
@@ -166,8 +183,7 @@ export function StudioAiCompositionPanel({
                   onClick={() => onInsertAsNote(suggestion)}
                   className="inline-flex min-h-11 items-center gap-1 rounded-md border border-line bg-panel px-2 text-[0.63rem] font-medium text-fg-2 transition-colors hover:bg-raised"
                 >
-                  <StickyNote size={11} /> 캔버스에 메모로 추가
-                </button>
+                  <StickyNote size={11} /> {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "캔버스에 메모로 추가")}</button>
               )}
             </div>
           </div>
@@ -175,8 +191,7 @@ export function StudioAiCompositionPanel({
       </div>
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
-        그림을 자동으로 만들진 않아요 — 구도·카메라앵글·인물 배치 아이디어만 텍스트로 제안해요.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCompositionPanel", "ko", "그림을 자동으로 만들진 않아요 — 구도·카메라앵글·인물 배치 아이디어만 텍스트로 제안해요.")}</p>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -64,6 +65,24 @@ describe("Cloudflare static large asset preparation", () => {
     expect(gunzipSync(readFileSync(gzipPath)).length).toBe(originalBytes);
     expect(readFileSync(join(dist, ".assetsignore"), "utf8")).toBe(
       `${CLOUDFLARE_OVERSIZED_ASSET_IGNORE_PATTERNS.join("\n")}\n`,
+    );
+  });
+
+  it("keeps the reviewed product tour video R2-only without static sidecars", async () => {
+    const dist = temporaryDist();
+    const relativePath = "brand/toonstudio-product-tour.mp4";
+    sparseFile(
+      join(dist, relativePath),
+      CLOUDFLARE_STATIC_MAX_FILE_BYTES + 1,
+    );
+
+    await expect(prepareCloudflareStaticAssets(dist)).resolves.toEqual([
+      relativePath,
+    ]);
+    expect(existsSync(join(dist, `${relativePath}.br`))).toBe(false);
+    expect(existsSync(join(dist, `${relativePath}.gz`))).toBe(false);
+    expect(readFileSync(join(dist, ".assetsignore"), "utf8")).toContain(
+      `${relativePath}\n`,
     );
   });
 

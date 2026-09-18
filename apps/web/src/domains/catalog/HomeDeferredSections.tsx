@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, Layers, LayoutTemplate, MessageCircle, Palette, PersonStanding } from "lucide-react";
 
 import type { Title } from "@/shared/lib/types";
@@ -47,8 +51,8 @@ export function HomeDeferredSections({
           <Section
             live
             eyebrow="TODAY"
-            title={`오늘(${todayDay}) 새로 올라오는`}
-            desc="오늘 새 회차가 공개되는 연재작"
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "오늘({v0}) 새로 올라오는"), { v0: String(todayDay) })}
+            desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "오늘 새 회차가 공개되는 연재작")}
             action={{ label: "연재 캘린더", href: "/calendar" }}
           >
             <Rail>
@@ -64,20 +68,20 @@ export function HomeDeferredSections({
       <Section
         tick
         eyebrow="GENRE SPECTRUM"
-        title="장르로 떠나는 탐색"
-        desc="장르마다 다른 색을 따라 다음 정주행작을 발견하세요."
+        title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "장르로 떠나는 탐색")}
+        desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "장르마다 다른 색을 따라 다음 정주행작을 발견하세요.")}
         action={{ label: "스펙트럼 탐색", href: "/explore" }}
       >
         <GenreSpectrum
           genres={[...GENRES]}
           height={10}
           interactive
-          label={`전체 장르 스펙트럼 (${GENRES.length}개)`}
+          label={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "전체 장르 스펙트럼 ({v0}개)"), { v0: String(GENRES.length) })}
           className="mb-5"
         />
         <div className="flex flex-wrap gap-2">
           {GENRES.map((genre) => (
-            <Link key={genre} href={`/explore?genre=${encodeURIComponent(genre)}`}>
+            <Link key={genre} href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "en", "/explore?genre={v0}"), { v0: String(encodeURIComponent(genre)) })}>
               <span
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium [word-break:keep-all] transition-transform duration-150 hover:scale-105"
                 style={{
@@ -98,15 +102,15 @@ export function HomeDeferredSections({
       <Section
         tick
         eyebrow="ADAPTATION GRAPH"
-        title="원작에서 웹툰까지, 한 우주"
-        desc="웹소설과 웹툰이 이어지는 관계를 같은 이야기의 계보로 묶었습니다."
+        title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "원작에서 웹툰까지, 한 우주")}
+        desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "웹소설과 웹툰이 이어지는 관계를 같은 이야기의 계보로 묶었습니다.")}
       >
         <div className="grid gap-4 lg:grid-cols-3">
           {families.map(({ original, adaptations }) => (
             <div key={original.id} className="rounded-2xl border border-line bg-card p-5 surface-hl">
               <div className="mb-4 flex items-center gap-2 text-fg-3">
                 <Layers size={14} />
-                <span className="eyebrow">{original.title} 유니버스</span>
+                <span className="eyebrow">{original.title} {translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "유니버스")}</span>
               </div>
               <AdaptationGraph original={original} adaptations={adaptations} />
             </div>
@@ -119,8 +123,8 @@ export function HomeDeferredSections({
       <Section
         tick
         eyebrow="EDITOR'S PICK"
-        title="에디터의 발견"
-        desc="수치 너머 작품 설명과 독자 반응을 함께 볼 수 있는 추천 묶음"
+        title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "에디터의 발견")}
+        desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "수치 너머 작품 설명과 독자 반응을 함께 볼 수 있는 추천 묶음")}
         action={{ label: "더 보기", href: "/explore?sort=rating" }}
       >
         <Rail>
@@ -138,8 +142,8 @@ export function HomeDeferredSections({
       <Section
         tick
         eyebrow="TOP RATED"
-        title="평점이 검증한 명작"
-        desc="독자 평점 베이즈 보정 상위작"
+        title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "평점이 검증한 명작")}
+        desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "독자 평점 베이즈 보정 상위작")}
         action={{ label: "평점 랭킹", href: "/ranking?axis=rating" }}
       >
         <Rail>
@@ -154,8 +158,8 @@ export function HomeDeferredSections({
       <Section
         tick
         eyebrow="FREE TO START"
-        title="지금 무료로 시작하기"
-        desc="무료 공개 · 기다리면 무료로 진입 가능한 작품"
+        title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "지금 무료로 시작하기")}
+        desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "무료 공개 · 기다리면 무료로 진입 가능한 작품")}
         action={{ label: "전체 보기", href: "/search?free=1" }}
       >
         <Rail>
@@ -167,12 +171,12 @@ export function HomeDeferredSections({
       </RevealOnScroll>
 
       <RevealOnScroll className="grid gap-12 lg:grid-cols-[0.9fr_1.4fr]">
-        <Section tick eyebrow="BY MOOD" title="코드로 찾기" desc="작품의 결을 나타내는 특성 태그">
+        <Section tick eyebrow="BY MOOD" title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "코드로 찾기")} desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "작품의 결을 나타내는 특성 태그")}>
           <div className="flex flex-wrap gap-2">
             {tags.map(({ tag, count }) => (
               <Link
                 key={tag}
-                href={`/explore?tag=${encodeURIComponent(tag)}`}
+                href={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "en", "/explore?tag={v0}"), { v0: String(encodeURIComponent(tag)) })}
                 className="group inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-2 text-sm text-fg-2 [word-break:keep-all] transition-colors hover:border-accent/50 hover:bg-accent-soft hover:text-accent"
               >
                 <span className="text-fg-3 group-hover:text-accent">#</span>
@@ -186,8 +190,8 @@ export function HomeDeferredSections({
         <Section
           tick
           eyebrow="FRESH"
-          title="신작 발굴"
-          desc="최근 합류한 라이징 작품"
+          title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "신작 발굴")}
+          desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "최근 합류한 라이징 작품")}
           action={{ label: "신작 랭킹", href: "/ranking?axis=rookie" }}
         >
           {/* 리드 1작은 가로 에디토리얼 카드(2칸), 나머지는 그리드 — 균일 매트릭스 탈피 */}
@@ -212,8 +216,8 @@ export function HomeDeferredSections({
       <Section
         tick
         eyebrow="CREATOR STUDIO"
-        title="읽다가, 만들어 보세요"
-        desc="설치 없이 브라우저에서 컷툰을 만들고, 창작 게시판에서 독자 반응을 받아보세요."
+        title={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "읽다가, 만들어 보세요")}
+        desc={translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "설치 없이 브라우저에서 컷툰을 만들고, 창작 게시판에서 독자 반응을 받아보세요.")}
       >
         <div className="grid gap-3.5 sm:grid-cols-3">
           {[
@@ -249,11 +253,9 @@ export function HomeDeferredSections({
         <div className="mt-6 flex flex-wrap items-center gap-3">
           <Link href="/studio" className={buttonClass({ className: "gap-2" })}>
             <Palette size={16} />
-            창작 스튜디오 열기
-          </Link>
+            {translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "창작 스튜디오 열기")}</Link>
           <Link href="/create" className={buttonClass({ variant: "outline", className: "gap-1.5" })}>
-            창작 게시판 둘러보기
-            <ArrowRight size={16} />
+            {translateCurrentStaticSourceText("domains.catalog.HomeDeferredSections", "ko", "창작 게시판 둘러보기")}<ArrowRight size={16} />
           </Link>
         </div>
       </Section>

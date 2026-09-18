@@ -62,6 +62,23 @@ export const MUSIC_LYRIC_LANGUAGES = [
   { id: "ja", label: "일본어", prompt: "Japanese" },
 ] as const;
 
+export const MUSIC_VOCAL_STYLES = [
+  { id: "bright-heroine", label: "청량 여성 보컬", prompt: "clear youthful female lead vocal, bright upper register, confident but natural delivery" },
+  { id: "emotional-heroine", label: "감성 여성 보컬", prompt: "warm expressive female lead vocal, intimate verses, emotionally lifted chorus" },
+  { id: "youthful-hero", label: "청량 남성 보컬", prompt: "clean youthful male lead vocal, energetic phrasing, open and optimistic chorus" },
+  { id: "power-vocal", label: "파워 보컬", prompt: "powerful lead vocal with controlled belts, dramatic dynamics and precise diction" },
+  { id: "dreamy-air", label: "몽환 보컬", prompt: "airy ethereal lead vocal, soft breath texture, floating sustained notes without whispering" },
+  { id: "duet", label: "남녀 듀엣", prompt: "original male and female duet, alternating lines and a blended chorus with balanced presence" },
+] as const;
+
+export const MUSIC_SONG_STRUCTURES = [
+  { id: "anime-op", label: "애니 OP 정석", hint: "짧은 훅 → 벌스 → 프리코러스 → 큰 후렴", flow15: ["Intro", "Chorus", "Outro"], flow30: ["Intro", "Verse", "Chorus", "Outro"], flow45: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Outro"], flow60: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Bridge", "Final Chorus", "Outro"] },
+  { id: "anime-ed", label: "감성 ED", hint: "담담한 벌스 → 감정 후렴 → 잔잔한 여운", flow15: ["Intro", "Chorus", "Outro"], flow30: ["Intro", "Verse", "Chorus", "Outro"], flow45: ["Intro", "Verse", "Chorus", "Bridge", "Outro"], flow60: ["Intro", "Verse", "Chorus", "Verse 2", "Bridge", "Final Chorus", "Outro"] },
+  { id: "character-song", label: "캐릭터 송", hint: "인물의 말투와 감정 → 기억에 남는 캐릭터 후렴", flow15: ["Intro", "Chorus", "Outro"], flow30: ["Intro", "Verse", "Chorus", "Outro"], flow45: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Outro"], flow60: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Verse 2", "Final Chorus", "Outro"] },
+  { id: "battle-insert", label: "전투 삽입곡", hint: "즉시 긴장 → 폭발적 후렴 → 각성 클라이맥스", flow15: ["Intro", "Chorus", "Outro"], flow30: ["Intro", "Verse", "Chorus", "Outro"], flow45: ["Intro", "Verse", "Chorus", "Bridge", "Final Chorus"], flow60: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Bridge", "Final Chorus", "Outro"] },
+  { id: "city-pop", label: "시티팝 캐릭터 송", hint: "도시적 그루브 → 매끈한 벌스 → 밤공기 같은 후렴", flow15: ["Intro", "Chorus", "Outro"], flow30: ["Intro", "Verse", "Chorus", "Outro"], flow45: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Outro"], flow60: ["Intro", "Verse", "Pre-Chorus", "Chorus", "Bridge", "Final Chorus", "Outro"] },
+] as const;
+
 export interface MusicThemePack {
   readonly id: string;
   readonly label: string;
@@ -91,8 +108,12 @@ export const MUSIC_THEME_PACKS: readonly MusicThemePack[] = [
 ] as const;
 
 export const MUSIC_DURATIONS = [15, 30, 45, 60] as const;
-export const MUSIC_MAX_BYTES = 1_500_000;
+export const MUSIC_MAX_BYTES = 2_500_000;
 export const MUSIC_TERMS_URL = "https://elevenlabs.io/eleven-music-model-specific-terms";
+export const MUSIC_OUTPUT_FORMAT_REQUEST = "auto" as const;
+export const MUSIC_OUTPUT_FORMAT = "mp3_48000_192" as const;
+export const MUSIC_LEGACY_OUTPUT_FORMAT = "mp3_44100_128" as const;
+export type MusicOutputFormat = typeof MUSIC_OUTPUT_FORMAT | typeof MUSIC_LEGACY_OUTPUT_FORMAT;
 export type MusicProviderModel = "music_v1" | "music_v2_5";
 
 export interface MusicBrief {
@@ -106,6 +127,9 @@ export interface MusicBrief {
   vocals: boolean;
   lyrics: string;
   lyricsLanguage: string;
+  vocalStyle: string;
+  songStructure: string;
+  lyricTheme: string;
   loop: boolean;
   intensity: string;
   arc: string;
@@ -126,7 +150,9 @@ export interface MusicTrackMetadata {
   createdAt: string;
   provider: "elevenlabs";
   model: MusicProviderModel;
-  format: "mp3_44100_128";
+  format: MusicOutputFormat;
+  c2paRequested?: boolean;
+  storeForInpainting?: boolean;
   songId?: string;
   brief: MusicBrief;
   termsUrl: string;
@@ -144,6 +170,9 @@ export function defaultMusicBrief(): MusicBrief {
     vocals: false,
     lyrics: "",
     lyricsLanguage: "ko",
+    vocalStyle: "bright-heroine",
+    songStructure: "anime-op",
+    lyricTheme: "",
     loop: false,
     intensity: "balanced",
     arc: "steady",
@@ -169,17 +198,22 @@ export function parseMusicBrief(input: unknown): MusicBrief {
   const title = text(b.title, "제목", 80, true);
   const scene = text(b.scene, "장면 설명", 600, true);
   const lyrics = text(b.lyrics, "가사", 1200);
+  const lyricTheme = text(b.lyricTheme ?? defaults.lyricTheme, "가사 핵심 주제", 180);
   const workId = text(b.workId, "작품 ID", 80);
   const episodeId = text(b.episodeId ?? defaults.episodeId, "회차 ID", 80);
   const intensity = b.intensity ?? defaults.intensity;
   const arc = b.arc ?? defaults.arc;
   const lyricsLanguage = b.lyricsLanguage ?? defaults.lyricsLanguage;
+  const vocalStyle = b.vocalStyle ?? defaults.vocalStyle;
+  const songStructure = b.songStructure ?? defaults.songStructure;
   if (workId && !/^[a-zA-Z0-9_-]+$/u.test(workId)) throw new Error("작품 ID 형식을 확인해 주세요.");
   if (episodeId && !/^[a-zA-Z0-9_-]+$/u.test(episodeId)) throw new Error("회차 ID 형식을 확인해 주세요.");
   if (episodeId && !workId) throw new Error("회차 음악은 먼저 작품에 연결해 주세요.");
   if (!MUSIC_MOODS.some((mood) => mood.id === b.mood) || !MUSIC_PURPOSES.some((purpose) => purpose.id === b.purpose)) throw new Error("분위기와 음악 용도를 선택해 주세요.");
   if (!MUSIC_INTENSITIES.some((entry) => entry.id === intensity) || !MUSIC_ARCS.some((entry) => entry.id === arc)) throw new Error("음악 강도와 감정 곡선을 선택해 주세요.");
   if (!MUSIC_LYRIC_LANGUAGES.some((entry) => entry.id === lyricsLanguage)) throw new Error("가사 언어를 선택해 주세요.");
+  if (!MUSIC_VOCAL_STYLES.some((entry) => entry.id === vocalStyle)) throw new Error("보컬 스타일을 선택해 주세요.");
+  if (!MUSIC_SONG_STRUCTURES.some((entry) => entry.id === songStructure)) throw new Error("곡 구조를 선택해 주세요.");
   if (!MUSIC_DURATIONS.some((seconds) => seconds === b.seconds)) throw new Error("음악 길이는 15·30·45·60초 중 선택해 주세요.");
   if (typeof b.bpm !== "number" || !Number.isInteger(b.bpm) || b.bpm < 60 || b.bpm > 180) throw new Error("템포는 60~180 BPM 범위입니다.");
   if (!Array.isArray(b.instruments) || b.instruments.length < 1 || b.instruments.length > 4 || new Set(b.instruments).size !== b.instruments.length || b.instruments.some((instrument) => !MUSIC_INSTRUMENTS.some((knownInstrument) => knownInstrument.id === instrument))) throw new Error("서로 다른 악기를 1~4개 선택해 주세요.");
@@ -197,6 +231,9 @@ export function parseMusicBrief(input: unknown): MusicBrief {
     vocals: b.vocals,
     lyrics,
     lyricsLanguage: lyricsLanguage as string,
+    vocalStyle: vocalStyle as string,
+    songStructure: songStructure as string,
+    lyricTheme,
     loop: b.loop,
     intensity: intensity as string,
     arc: arc as string,
@@ -231,6 +268,8 @@ export function buildMusicPrompt(brief: MusicBrief): string {
   const intensity = MUSIC_INTENSITIES.find((item) => item.id === b.intensity)!;
   const arc = MUSIC_ARCS.find((item) => item.id === b.arc)!;
   const lyricLanguage = MUSIC_LYRIC_LANGUAGES.find((item) => item.id === b.lyricsLanguage)!;
+  const vocalStyle = MUSIC_VOCAL_STYLES.find((item) => item.id === b.vocalStyle)!;
+  const structure = MUSIC_SONG_STRUCTURES.find((item) => item.id === b.songStructure)!;
   return [
     "Compose a fully original soundtrack for a Korean webtoon.",
     "Do not imitate or reference any existing artist, song, franchise theme, copyrighted melody or identifiable voice.",
@@ -240,14 +279,135 @@ export function buildMusicPrompt(brief: MusicBrief): string {
     arc.direction,
     `Featured instruments: ${b.instruments.map((id) => MUSIC_INSTRUMENTS.find((item) => item.id === id)!.prompt).join(", ")}.`,
     `Scene context (creative reference, not literal sound-effect instructions): ${b.scene}`,
+    b.vocals ? `Song structure: ${structure.label} — ${structure.hint}. Lyric theme or hook idea: ${b.lyricTheme || "derive an original theme from the scene"}.` : "",
     b.vocals
-      ? `Use an original singing voice with clear natural ${lyricLanguage.prompt} diction. Sing only these user-provided original lyrics; do not add quoted or copyrighted lyrics:\n${b.lyrics}`
+      ? `Use an original singing voice with clear natural ${lyricLanguage.prompt} diction. Vocal direction: ${vocalStyle.prompt}. For opening, ending and OST uses, shape the song like a concise original animation soundtrack: immediate hook, readable verse-to-chorus lift and a memorable but non-derivative refrain. Sing only these user-provided original lyrics; do not add quoted or copyrighted lyrics:\n${b.lyrics}`
       : "Strictly instrumental. No singing, spoken words, chants, humming or vocal samples.",
     b.loop
       ? "Create a musically seamless loop: match the ending energy, harmony and ambience to the opening; avoid a final hit or long tail."
       : "Give the piece an intentional musical ending without cutting off a note.",
     "Keep loudness controlled, transitions smooth and the mix clean for long-form mobile webtoon reading.",
   ].join("\n");
+}
+
+export interface MusicCompositionChunk {
+  readonly text: string;
+  readonly duration_ms: number;
+  readonly positive_styles: readonly string[];
+  readonly negative_styles: readonly string[];
+  readonly context_adherence: "high";
+}
+
+export interface MusicCompositionPlan {
+  readonly chunks: readonly MusicCompositionChunk[];
+}
+
+function normalizedSectionName(value: string): string {
+  const key = value.toLowerCase().replace(/[\s_-]+/gu, "").replace(/\d+/gu, "");
+  const aliases: Record<string, string> = {
+    intro: "intro", verse: "verse", 벌스: "verse",
+    prechorus: "prechorus", 프리코러스: "prechorus",
+    chorus: "chorus", 후렴: "chorus", finalchorus: "chorus",
+    bridge: "bridge", 브리지: "bridge", outro: "outro", 아웃트로: "outro",
+  };
+  return aliases[key] ?? key;
+}
+
+function parseLyricSections(lyrics: string): Map<string, string[]> {
+  const sections = new Map<string, string[]>();
+  let active = "verse";
+  for (const raw of lyrics.split(/\r?\n/u)) {
+    const line = raw.trim();
+    const header = /^\[([^\]]{1,60})\]$/u.exec(line);
+    if (header) { active = normalizedSectionName(header[1]!); continue; }
+    if (!line) continue;
+    const values = sections.get(active) ?? [];
+    values.push(line);
+    sections.set(active, values);
+  }
+  return sections;
+}
+
+function flowFor(brief: MusicBrief): readonly string[] {
+  const structure = MUSIC_SONG_STRUCTURES.find((entry) => entry.id === brief.songStructure)!;
+  if (brief.seconds <= 15) return structure.flow15;
+  if (brief.seconds <= 30) return structure.flow30;
+  if (brief.seconds <= 45) return structure.flow45;
+  return structure.flow60;
+}
+
+function allocateChunkDurations(seconds: number, flow: readonly string[]): number[] {
+  const weights = flow.map((section) => section.includes("Final Chorus") ? 1.5
+    : section.includes("Chorus") ? 1.35
+      : section.includes("Verse") ? 1.15
+        : section.includes("Pre-Chorus") ? 0.8
+          : section.includes("Bridge") ? 0.95 : 0.65);
+  const total = seconds * 1000;
+  const minimumTotal = flow.length * 3000;
+  const distributable = Math.max(0, total - minimumTotal);
+  const weightTotal = weights.reduce((sum, value) => sum + value, 0);
+  const durations = weights.map((weight) => 3000 + Math.floor(distributable * weight / weightTotal));
+  durations[durations.length - 1]! += total - durations.reduce((sum, value) => sum + value, 0);
+  return durations;
+}
+
+function sectionStyles(section: string): readonly string[] {
+  if (section.includes("Final Chorus")) return ["largest emotional peak", "full-band final chorus", "layered backing harmonies", "decisive original hook"];
+  if (section.includes("Chorus")) return ["memorable original chorus", "clear melodic lift", "fuller arrangement", "singable hook"];
+  if (section.includes("Pre-Chorus")) return ["rising harmony", "building intensity", "drums opening up"];
+  if (section.includes("Bridge")) return ["contrasting bridge", "fresh harmonic color", "brief emotional turn"];
+  if (section.includes("Verse")) return ["clear lead vocal", "story-forward phrasing", "lighter arrangement than chorus"];
+  if (section.includes("Intro")) return ["immediate instrumental hook", "recognizable opening motif"];
+  return ["resolved instrumental ending", "clean final cadence"];
+}
+
+export function buildMusicCompositionPlan(brief: MusicBrief): MusicCompositionPlan {
+  const b = parseMusicBrief(brief);
+  if (!b.vocals) throw new Error("보컬 OST에만 구조화된 곡 구성을 사용할 수 있습니다.");
+  const mood = MUSIC_MOODS.find((item) => item.id === b.mood)!;
+  const purpose = MUSIC_PURPOSES.find((item) => item.id === b.purpose)!;
+  const intensity = MUSIC_INTENSITIES.find((item) => item.id === b.intensity)!;
+  const arc = MUSIC_ARCS.find((item) => item.id === b.arc)!;
+  const vocalStyle = MUSIC_VOCAL_STYLES.find((item) => item.id === b.vocalStyle)!;
+  const flow = flowFor(b);
+  const durations = allocateChunkDurations(b.seconds, flow);
+  const parsed = parseLyricSections(b.lyrics);
+  const allLines = [...parsed.values()].flat();
+  const hasExplicitSections = /\[[^\]]+\]/u.test(b.lyrics);
+  const vocalSectionCount = flow.filter((section) => !section.includes("Intro") && !section.includes("Outro")).length;
+  let vocalIndex = 0;
+  return {
+    chunks: flow.map((section, index) => {
+      const key = normalizedSectionName(section);
+      const instrumental = key === "intro" || key === "outro";
+      let lines = instrumental ? [] : (parsed.get(key) ?? []);
+      if (!instrumental && !hasExplicitSections && allLines.length) {
+        const start = Math.floor(allLines.length * vocalIndex / vocalSectionCount);
+        const end = Math.max(start + 1, Math.floor(allLines.length * (vocalIndex + 1) / vocalSectionCount));
+        lines = allLines.slice(start, end);
+      }
+      if (!instrumental) vocalIndex += 1;
+      const sectionIsInstrumental = instrumental || lines.length === 0;
+      const text = sectionIsInstrumental
+        ? `[${section}]\n{instrumental ${key === "intro" ? "hook" : key === "outro" ? "ending" : "transition"}}`
+        : `[${section}]\n${lines.join("\n")}`;
+      const overallStyles = index === 0 ? [
+        "fully original animation soundtrack", mood.style, purpose.direction, intensity.direction,
+        arc.direction, vocalStyle.prompt, `${b.bpm} BPM`,
+        ...b.instruments.map((id) => MUSIC_INSTRUMENTS.find((item) => item.id === id)!.prompt),
+        "polished studio production",
+      ] : [vocalStyle.prompt, `${b.bpm} BPM`];
+      return {
+        text,
+        duration_ms: durations[index]!,
+        positive_styles: [...overallStyles, ...sectionStyles(section)],
+        negative_styles: sectionIsInstrumental
+          ? ["vocals", "spoken narration", "new improvised lyrics"]
+          : ["spoken narration", "celebrity voice imitation", "copyrighted melody imitation", "new lyrics not written in the section"],
+        context_adherence: "high" as const,
+      };
+    }),
+  };
 }
 
 export function musicFilename(title: string): string {

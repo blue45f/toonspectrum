@@ -1,21 +1,18 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
+  chmod,
+  copyFile,
   lstat,
   mkdir,
-  readFile,
   realpath,
   rename,
   rm,
   stat,
-  writeFile,
 } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import {
-  DesktopSyncPathError,
-  resolveSyncPath,
-} from "./path-policy.js";
-import { scanSyncFolder } from "./scanner.js";
+import { DesktopSyncPathError, resolveSyncPath } from "./path-policy.js";
+import { scanSyncFolder, sha256File } from "./scanner.js";
 
 import type { RemoteFileSnapshot, SyncFileSnapshot } from "./model.js";
 import type { DesktopSyncRemote } from "./runtime.js";
@@ -25,22 +22,21 @@ export interface FileSystemDesktopSyncRemoteOptions extends ScanSyncFolderOption
   readonly createRoot?: boolean;
 }
 
+export type FileSystemDesktopSyncRemoteErrorCode =
+  | "same-root"
+  | "nested-root"
+  | "unsafe-parent"
+  | "hash-mismatch"
+  | "version-conflict";
+
 export class FileSystemDesktopSyncRemoteError extends Error {
   constructor(
-    readonly code:
-      | "same-root"
-      | "unsafe-parent"
-      | "hash-mismatch"
-      | "version-conflict",
+    readonly code: FileSystemDesktopSyncRemoteErrorCode,
     message: string,
   ) {
     super(message);
     this.name = "FileSystemDesktopSyncRemoteError";
   }
-}
-
-function sha256(value: Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
 }
 
 function versionFor(snapshot: SyncFileSnapshot): string {
@@ -56,6 +52,15 @@ function remoteSnapshot(snapshot: SyncFileSnapshot): RemoteFileSnapshot {
   };
 }
 
+function isSameOrNested(parent: string, candidate: string): boolean {
+  const value = relative(parent, candidate);
+  return value === "" || (
+    !isAbsolute(value)
+    && value !== ".."
+    && !value.startsWith(`..${sep}`)
+  );
+}
+
 async function ensureDirectoryChain(root: string, targetDirectory: string): Promise<void> {
   const canonicalRoot = await realpath(root);
   const lexicalRoot = resolve(root);
@@ -64,6 +69,7 @@ async function ensureDirectoryChain(root: string, targetDirectory: string): Prom
   if (relativePath === ".." || relativePath.startsWith(`..${sep}`)) {
     throw new DesktopSyncPathError("outside-root");
   }
+
   let current = lexicalRoot;
   for (const segment of relativePath.split(sep).filter(Boolean)) {
     current = join(current, segment);
@@ -76,8 +82,7 @@ async function ensureDirectoryChain(root: string, targetDirectory: string): Prom
         );
       }
       const canonicalCurrent = await realpath(current);
-      const canonicalRelative = relative(canonicalRoot, canonicalCurrent);
-      if (canonicalRelative === ".." || canonicalRelative.startsWith(`..${sep}`)) {
+      if (!isSameOrNested(canonicalRoot, canonicalCurrent)) {
         throw new FileSystemDesktopSyncRemoteError(
           "unsafe-parent",
           `desktop sync parent escaped the configured root: ${current}`,
@@ -95,6 +100,24 @@ async function ensureDirectoryChain(root: string, targetDirectory: string): Prom
       }
       throw error;
     }
+  }
+}
+
+async function replaceAtomically(source: string, destination: string): Promise<void> {
+  try {
+    await rename(source, destination);
+  } catch (error) {
+    if (
+      process.platform !== "win32"
+      || typeof error !== "object"
+      || error === null
+      || !("code" in error)
+      || (error.code !== "EEXIST" && error.code !== "EPERM")
+    ) {
+      throw error;
+    }
+    await rm(destination, { force: true });
+    await rename(source, destination);
   }
 }
 
@@ -134,6 +157,15 @@ export class FileSystemDesktopSyncRemote implements DesktopSyncRemote {
         "local and remote desktop sync roots must be different",
       );
     }
+    if (
+      isSameOrNested(canonicalLocal, this.root)
+      || isSameOrNested(this.root, canonicalLocal)
+    ) {
+      throw new FileSystemDesktopSyncRemoteError(
+        "nested-root",
+        "local and remote desktop sync roots must not contain one another",
+      );
+    }
   }
 
   async listRemoteFiles(signal?: AbortSignal): Promise<readonly RemoteFileSnapshot[]> {
@@ -150,20 +182,22 @@ export class FileSystemDesktopSyncRemote implements DesktopSyncRemote {
       if (metadata.isSymbolicLink() || !metadata.isFile()) {
         throw new DesktopSyncPathError("symlink");
       }
-      const bytes = new Uint8Array(await readFile(absolutePath));
-      return remoteSnapshot({
+      const snapshot: SyncFileSnapshot = {
         relativePath,
         size: metadata.size,
         modifiedAtMs: Math.trunc(metadata.mtimeMs),
-        sha256: sha256(bytes),
-      });
+        sha256: await sha256File(absolutePath),
+      };
+      return remoteSnapshot(snapshot);
     } catch (error) {
       if (
         typeof error === "object"
         && error !== null
         && "code" in error
         && error.code === "ENOENT"
-      ) return null;
+      ) {
+        return null;
+      }
       throw error;
     }
   }
@@ -189,19 +223,25 @@ export class FileSystemDesktopSyncRemote implements DesktopSyncRemote {
     readonly size: number;
     readonly expectedRemoteVersion: string | null;
   }): Promise<RemoteFileSnapshot> {
-    const current = await this.current(input.relativePath);
+    const initial = await this.current(input.relativePath);
     this.assertExpectedVersion(
       input.relativePath,
-      current,
+      initial,
       input.expectedRemoteVersion,
     );
-    const bytes = new Uint8Array(await readFile(input.absolutePath));
-    if (bytes.byteLength !== input.size || sha256(bytes) !== input.sha256) {
+
+    const sourceMetadata = await lstat(input.absolutePath);
+    if (sourceMetadata.isSymbolicLink() || !sourceMetadata.isFile()) {
+      throw new DesktopSyncPathError("symlink");
+    }
+    const sourceHash = await sha256File(input.absolutePath);
+    if (sourceMetadata.size !== input.size || sourceHash !== input.sha256) {
       throw new FileSystemDesktopSyncRemoteError(
         "hash-mismatch",
         `desktop sync upload source changed while reading ${input.relativePath}`,
       );
     }
+
     const absolutePath = resolveSyncPath(this.root, input.relativePath);
     const directory = dirname(absolutePath);
     await ensureDirectoryChain(this.root, directory);
@@ -211,20 +251,38 @@ export class FileSystemDesktopSyncRemote implements DesktopSyncRemote {
       `.${basename}.${randomUUID()}.toonstudio-sync.tmp`,
     );
     try {
-      await writeFile(temporaryPath, bytes, { mode: 0o600 });
-      const written = new Uint8Array(await readFile(temporaryPath));
-      if (sha256(written) !== input.sha256) {
+      await copyFile(input.absolutePath, temporaryPath);
+      await chmod(temporaryPath, 0o600);
+      const temporaryMetadata = await stat(temporaryPath);
+      const temporaryHash = await sha256File(temporaryPath);
+      if (
+        temporaryMetadata.size !== input.size
+        || temporaryHash !== input.sha256
+      ) {
         throw new FileSystemDesktopSyncRemoteError(
           "hash-mismatch",
           `desktop sync temporary write failed verification for ${input.relativePath}`,
         );
       }
-      await rename(temporaryPath, absolutePath);
+
+      const beforeCommit = await this.current(input.relativePath);
+      this.assertExpectedVersion(
+        input.relativePath,
+        beforeCommit,
+        input.expectedRemoteVersion,
+      );
+      await replaceAtomically(temporaryPath, absolutePath);
     } finally {
       await rm(temporaryPath, { force: true }).catch(() => undefined);
     }
+
     const next = await this.current(input.relativePath);
-    if (next === null) throw new Error(`desktop sync upload disappeared: ${input.relativePath}`);
+    if (next === null || next.sha256 !== input.sha256 || next.size !== input.size) {
+      throw new FileSystemDesktopSyncRemoteError(
+        "hash-mismatch",
+        `desktop sync committed upload failed verification for ${input.relativePath}`,
+      );
+    }
     return next;
   }
 
@@ -238,18 +296,34 @@ export class FileSystemDesktopSyncRemote implements DesktopSyncRemote {
       current,
       input.remote.version,
     );
-    if (current?.sha256 !== input.remote.sha256) {
+    if (
+      current?.sha256 !== input.remote.sha256
+      || current.size !== input.remote.size
+    ) {
       throw new FileSystemDesktopSyncRemoteError(
         "hash-mismatch",
         `desktop sync remote content changed for ${input.remote.relativePath}`,
       );
     }
+
     const source = resolveSyncPath(this.root, input.remote.relativePath);
     await mkdir(dirname(input.temporaryAbsolutePath), { recursive: true });
-    await writeFile(
-      input.temporaryAbsolutePath,
-      await readFile(source),
-      { mode: 0o600 },
+    await copyFile(source, input.temporaryAbsolutePath);
+    await chmod(input.temporaryAbsolutePath, 0o600);
+    const downloadedHash = await sha256File(input.temporaryAbsolutePath);
+    if (downloadedHash !== input.remote.sha256) {
+      await rm(input.temporaryAbsolutePath, { force: true });
+      throw new FileSystemDesktopSyncRemoteError(
+        "hash-mismatch",
+        `desktop sync downloaded bytes failed verification for ${input.remote.relativePath}`,
+      );
+    }
+
+    const afterCopy = await this.current(input.remote.relativePath);
+    this.assertExpectedVersion(
+      input.remote.relativePath,
+      afterCopy,
+      input.remote.version,
     );
   }
 

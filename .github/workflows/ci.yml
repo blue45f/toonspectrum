@@ -15,8 +15,9 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: core-v3-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Only superseded PR heads are disposable; running main and merge-group checks must finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CI: "1"
@@ -31,6 +32,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          fetch-depth: 0
           filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
@@ -71,6 +73,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Conventional commit messages
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - name: Restore ESLint result cache
         uses: actions/cache@v4
         with:
@@ -86,6 +94,10 @@ jobs:
       - name: Strict lint full repository
         if: github.event_name != 'pull_request'
         run: pnpm run lint:strict
+      - name: Import and dependency hygiene
+        run: pnpm run quality:imports
+      - name: Secret scan
+        run: pnpm run quality:secrets
 
   typecheck:
     name: Core preflight and application typecheck
@@ -131,9 +143,18 @@ jobs:
           pnpm run typecheck:cloudflare-realtime
 
   static:
-    name: Core product regressions
+    name: Core regression shard / ${{ matrix.shard }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - product
+          - studio-foundation
+          - studio-editing
+          - studio-3d
+          - studio-character
     steps:
       - uses: actions/checkout@v6
         with:
@@ -210,6 +231,25 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  a11y:
+    name: Core accessibility smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run serious and critical accessibility smoke
+        run: pnpm run test:a11y
+
   build:
     name: Core production build
     runs-on: ubuntu-24.04
@@ -244,8 +284,8 @@ jobs:
 
   core:
     name: core
-    if: ${{ always() }}
-    needs: [lint, typecheck, static, serial, build]
+    if: ${{ always() && !cancelled() }}
+    needs: [lint, typecheck, static, serial, a11y, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -254,7 +294,7 @@ jobs:
           CORE_RESULTS: ${{ toJSON(needs) }}
         run: |
           node --input-type=module <<'NODE'
-          const required = ["lint", "typecheck", "static", "serial", "build"];
+          const required = ["lint", "typecheck", "static", "serial", "a11y", "build"];
           const results = JSON.parse(process.env.CORE_RESULTS ?? "null");
           if (!results || typeof results !== "object" || Array.isArray(results)) {
             throw new Error("core requires the GitHub needs object");
@@ -273,7 +313,7 @@ jobs:
   verify:
     name: verify
     needs: core
-    if: ${{ always() }}
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:

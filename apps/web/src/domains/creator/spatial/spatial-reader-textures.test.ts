@@ -47,6 +47,7 @@ describe("spatial reader image URL boundary", () => {
   it.each([
     "javascript:alert(1)", "java\tscript:alert(1)", "\nJaVaScRiPt:alert(1)",
     "data:text/html;base64,PHN2Zz4=", "data:image/svg+xml;base64,PHN2Zz4=",
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
     "file:///tmp/page.png", "https://user:pass@example.com/page.png",
     "blob:https://other.test/id", "http://other.test/page.png", "https://[invalid",
   ])("rejects %s before allocating an image", async (source) => {

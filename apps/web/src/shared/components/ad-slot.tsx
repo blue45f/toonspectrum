@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { createAdClient, type AdClient } from "@heejun/deskcloud";
 import Autoplay from "embla-carousel-autoplay";
 import useEmblaCarousel from "embla-carousel-react";
@@ -152,8 +153,7 @@ function AdCarousel({
           title={t("ad.slotTitle")}
         >
           <Megaphone size={10} aria-hidden />
-          AD
-        </span>
+          {translateCurrentStaticSourceText("shared.components.ad.slot", "en", "AD")}</span>
       </div>
 
       <div className="overflow-hidden" ref={emblaRef}>
@@ -257,7 +257,7 @@ function HousePlaceholder({ label, className }: { label?: string; className?: st
     >
       <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-card px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-fg-3">
         <Megaphone size={11} aria-hidden />
-        AD · {t("ad.tag")}
+        {translateCurrentStaticSourceText("shared.components.ad.slot", "en", "AD · ")}{t("ad.tag")}
       </span>
       <p className="text-sm text-fg-3">
         {label ?? t("ad.placeholderText")}

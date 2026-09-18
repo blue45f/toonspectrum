@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Dodge/Burn Panel
  * 닷지·번·스펀지 브러시 컨트롤 — 켜면 메인 캔버스에서 선택된 이미지 위 드래그가 톤/채도 보정
@@ -115,11 +119,11 @@ export function StudioDodgeBurnPanel({
         disabled={locked}
         onClick={onToggleActive}
         aria-label={`${help.actionName} ${active ? "끄기" : "켜기"}`}
-        title={`${help.summary} 결과는 손을 뗄 때 한 획으로 반영됩니다.`}
+        title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "ko", "{v0} 결과는 손을 뗄 때 한 획으로 반영됩니다."), { v0: String(help.summary) })}
       >
         <span className="inline-flex items-center gap-1">
           <Contrast className="size-3" aria-hidden />
-          {active ? "밝기·채도 보정 끝내기" : "밝기·채도 보정 시작"}
+          {active ? translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "ko", "밝기·채도 보정 끝내기") : translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "ko", "밝기·채도 보정 시작")}
         </span>
       </StudioToggleChip>
 
@@ -168,18 +172,18 @@ export function StudioDodgeBurnPanel({
       )}
 
       <StudioSliderRow
-        label="브러시 크기"
+        label={translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "ko", "브러시 크기")}
         min={DODGE_BURN_RADIUS_RANGE.min}
         max={DODGE_BURN_RADIUS_RANGE.max}
         step={DODGE_BURN_RADIUS_RANGE.step}
         value={radiusPx}
         disabled={locked}
         onChange={onRadiusChange}
-        readout={`${radiusPx}px`}
+        readout={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "en", "{v0}px"), { v0: String(radiusPx) })}
       />
 
       <StudioSliderRow
-        label="가장자리 단단함"
+        label={translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "ko", "가장자리 단단함")}
         min={DODGE_BURN_HARDNESS_RANGE.min}
         max={DODGE_BURN_HARDNESS_RANGE.max}
         step={DODGE_BURN_HARDNESS_RANGE.step}
@@ -190,7 +194,7 @@ export function StudioDodgeBurnPanel({
       />
 
       <StudioSliderRow
-        label="효과 강도 · 노출"
+        label={translateCurrentStaticSourceText("domains.creator.StudioDodgeBurnPanel", "ko", "효과 강도 · 노출")}
         min={DODGE_BURN_EXPOSURE_RANGE.min}
         max={DODGE_BURN_EXPOSURE_RANGE.max}
         step={DODGE_BURN_EXPOSURE_RANGE.step}

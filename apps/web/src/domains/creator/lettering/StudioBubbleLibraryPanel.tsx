@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Clock3, Search, Star, X } from "lucide-react";
 import {
   useMemo,
@@ -144,7 +145,7 @@ export function StudioBubbleLibraryPanel({
             <Star
               size={14}
               aria-hidden
-              fill={favoritesOnly ? "currentColor" : "none"}
+              fill={favoritesOnly ? translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleLibraryPanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleLibraryPanel", "en", "none")}
             />
             {localizeText(t, "즐겨찾기", "studio.bubble.library.favorites")}
             <span className="tabular-nums text-fg-3">
@@ -194,10 +195,10 @@ export function StudioBubbleLibraryPanel({
             <section
               key={section.id}
               role="group"
-              aria-labelledby={`studio-bubble-section-${sectionIndex}`}
+              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleLibraryPanel", "en", "studio-bubble-section-{v0}"), { v0: String(sectionIndex) })}
             >
               <h3
-                id={`studio-bubble-section-${sectionIndex}`}
+                id={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleLibraryPanel", "en", "studio-bubble-section-{v0}"), { v0: String(sectionIndex) })}
                 className="mb-1.5 flex items-center gap-1.5 px-1 text-[0.62rem] font-semibold text-fg-3"
               >
                 {section.kind === "favorite" ? (
@@ -281,7 +282,7 @@ export function StudioBubbleLibraryPanel({
                         <Star
                           size={15}
                           aria-hidden
-                          fill={favorite ? "currentColor" : "none"}
+                          fill={favorite ? translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleLibraryPanel", "en", "currentColor") : translateCurrentStaticSourceText("domains.creator.lettering.StudioBubbleLibraryPanel", "en", "none")}
                         />
                       </button>
                     </div>

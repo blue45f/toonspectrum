@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Stylize Panel
  * 선택된 이미지의 스타일라이즈(Stylize) 인스펙터 — 원클릭 스타일 프리셋 +
@@ -49,17 +53,16 @@ export function StudioStylizePanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀 */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">스타일라이즈 (Stylize)</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioStylizePanel", "ko", "스타일라이즈 (Stylize)")}</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isIdentity}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="스타일 효과를 제거하고 원본으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioStylizePanel", "ko", "스타일 효과를 제거하고 원본으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioStylizePanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 원클릭 스타일 프리셋 칩 — 절대값으로 덮어쓴다(누적 아님). 항등일 땐 활성 칩 없음. */}
@@ -78,7 +81,7 @@ export function StudioStylizePanel({
             key={t.id}
             active={t.id === value.type}
             onClick={() => onPatch({ type: t.id as StylizeType })}
-            title={`효과를 "${t.label}"로 바꿉니다.`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioStylizePanel", "ko", "효과를 \"{v0}\"로 바꿉니다."), { v0: String(t.label) })}
           >
             {t.label}
           </StudioPanelChip>

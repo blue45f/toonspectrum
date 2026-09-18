@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /* Extracted render tree from StudioCuttoonEditor.
  * Session props are an `any` bag matching the original editor closure. */
 // @ts-nocheck
@@ -21,7 +24,6 @@ import {
   setSelectionFeather,
   toggleSelectionInvert,
 } from "../studio-selection-tools";
-import { StudioSelectionContextBar } from "../StudioSelectionContextBar";
 import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
@@ -361,14 +363,14 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           <div
             id="studio-canvas-workspace"
             role="region"
-            aria-label="캔버스 작업영역"
+            aria-label={translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "ko", "캔버스 작업영역")}
             tabIndex={-1}
             className={cn(
               "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
               showRulers && !canvasOnlyMode && "lg:pl-[22px] lg:pt-[22px]"
             )}
             data-studio-canvas-ruler-layout={
-              showRulers && !canvasOnlyMode ? "inset-top-left" : "off"
+              showRulers && !canvasOnlyMode ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "en", "inset-top-left") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "en", "off")
             }
           >
           {showRulers && !canvasOnlyMode ? (
@@ -728,7 +730,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           brushOpacity={brushOpacity}
           color={color}
           eraserActive={drawMode === "eraser"}
-          handedness={workspaceControlSide === "left" ? "left" : "right"}
+          handedness={workspaceControlSide === "left" ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "en", "left") : translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "en", "right")}
           canvasHostRef={wrapRef}
           stableHandlers={studioOnCanvasSurfaceHandlers}
         />
@@ -783,21 +785,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
             s.commitPixelSelectionState(null, "clear");
           }}
         />
-        <StudioSelectionContextBar
-          visible={
-            tool === "select"
-            && !nodeEditArmed
-            && currentCanvasSelectionCount > 0
-            && !canvasOnlyMode
-            && !canvasInteractionBlocked
-            && !isExporting
-            && !pixelOverlaySel
-          }
-          selectionCount={currentCanvasSelectionCount}
-          readOnly={activeSurfaceReviewLocked || pageEditLocked}
-          canDelete={!activeSurfaceReviewLocked && !pageEditLocked}
-          stableHandlers={studioOnCanvasSurfaceHandlers}
-        />
+
 
         {pointCommentComposer ? (
           <Suspense fallback={null}>
@@ -853,9 +841,9 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
                 studioLegacyCommentThreadIdSet.has(
                   studioCommentThreadSessionView.selectedThread.id
                 )
-                  ? "이전 문서에 보관된 댓글이라 전체 검토함에서 읽기 전용으로 확인할 수 있어요."
+                  ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "ko", "이전 문서에 보관된 댓글이라 전체 검토함에서 읽기 전용으로 확인할 수 있어요.")
                   : studioCommentThreadSessionView.replyBlockedReason === "draft-target-mismatch"
-                    ? "다른 댓글에 작성 중인 답글이 있어요. 해당 핀에서 먼저 마무리해 주세요."
+                    ? translateCurrentStaticSourceText("domains.creator.studio.cuttoon.editor.StudioCuttoonEditorCanvasColumn", "ko", "다른 댓글에 작성 중인 답글이 있어요. 해당 핀에서 먼저 마무리해 주세요.")
                     : undefined
               }
               clusterIndex={studioCommentThreadSessionView.selectedClusterIndex}

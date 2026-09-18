@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { Sparkles, Wand2 } from "lucide-react";
 import { useState } from "react";
 
@@ -45,9 +48,8 @@ export function RecommendOnboarding({
       <div className="flex items-center justify-between text-xs text-fg-3">
         <span className="font-semibold text-accent flex items-center gap-1">
           <Sparkles size={13} />
-          10초 취향 온보딩 테스트
-        </span>
-        <span>Step {onboardingStep} of 3</span>
+          {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "10초 취향 온보딩 테스트")}</span>
+        <span>{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "en", "Step ")}{onboardingStep} {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "en", "of 3")}</span>
       </div>
       <div className="h-1.5 w-full bg-line/40 rounded-full overflow-hidden">
         <div
@@ -59,8 +61,8 @@ export function RecommendOnboarding({
       {onboardingStep === 1 && (
         <div className="space-y-5">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold tracking-tight">좋아하는 장르를 2개 이상 선택해주세요 📚</h2>
-            <p className="text-xs text-fg-3">선호도에 맞게 맞춤 명작을 다이나믹하게 매핑하여 골라 드립니다.</p>
+            <h2 className="text-xl font-bold tracking-tight">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "좋아하는 장르를 2개 이상 선택해주세요 📚")}</h2>
+            <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "선호도에 맞게 맞춤 명작을 다이나믹하게 매핑하여 골라 드립니다.")}</p>
           </div>
           
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -102,8 +104,7 @@ export function RecommendOnboarding({
                 onClick={onCancel}
                 className="inline-flex items-center justify-center rounded-xl border border-line bg-card px-5 py-2.5 text-xs font-semibold text-fg-2 hover:bg-raised cursor-pointer transition-all"
               >
-                닫기
-              </button>
+                {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "닫기")}</button>
             ) : <div />}
             <button
               type="button"
@@ -111,8 +112,7 @@ export function RecommendOnboarding({
               onClick={() => setOnboardingStep(2)}
               className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-on-accent shadow-md hover:bg-accent/90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all"
             >
-              다음 단계로
-            </button>
+              {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "다음 단계로")}</button>
           </div>
         </div>
       )}
@@ -120,8 +120,8 @@ export function RecommendOnboarding({
       {onboardingStep === 2 && (
         <div className="space-y-5">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold tracking-tight">재미있게 보았거나 좋아하는 작품을 골라주세요 🌟</h2>
-            <p className="text-xs text-fg-3">선택한 명작과 유사한 결의 숨겨진 작품들이 가중 추천됩니다. (없으면 바로 넘어가실 수 있습니다)</p>
+            <h2 className="text-xl font-bold tracking-tight">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "재미있게 보았거나 좋아하는 작품을 골라주세요 🌟")}</h2>
+            <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "선택한 명작과 유사한 결의 숨겨진 작품들이 가중 추천됩니다. (없으면 바로 넘어가실 수 있습니다)")}</p>
           </div>
           
           {onboardingTitles.length > 0 ? (
@@ -158,7 +158,7 @@ export function RecommendOnboarding({
               })}
             </div>
           ) : (
-            <p className="text-xs text-fg-3 py-10 text-center">선택 가능한 작품 데이터를 조회하고 있습니다...</p>
+            <p className="text-xs text-fg-3 py-10 text-center">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "선택 가능한 작품 데이터를 조회하고 있습니다...")}</p>
           )}
 
           <div className="flex justify-between pt-4 border-t border-line/45">
@@ -167,14 +167,13 @@ export function RecommendOnboarding({
               onClick={() => setOnboardingStep(1)}
               className="inline-flex items-center justify-center rounded-xl border border-line bg-card px-5 py-2.5 text-xs font-semibold text-fg-2 hover:bg-raised cursor-pointer transition-all"
             >
-              이전으로
-            </button>
+              {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "이전으로")}</button>
             <button
               type="button"
               onClick={() => setOnboardingStep(3)}
               className="inline-flex items-center justify-center rounded-xl bg-accent px-6 py-2.5 text-xs font-semibold text-on-accent shadow-md hover:bg-accent/90 cursor-pointer transition-all"
             >
-              {selectedTitles.length > 0 ? "다음 단계로" : "선택 없이 건너뛰기"}
+              {selectedTitles.length > 0 ? translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "다음 단계로") : translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "선택 없이 건너뛰기")}
             </button>
           </div>
         </div>
@@ -183,13 +182,13 @@ export function RecommendOnboarding({
       {onboardingStep === 3 && (
         <div className="space-y-5">
           <div className="space-y-1">
-            <h2 className="text-xl font-bold tracking-tight">마지막으로, 감상 취향을 입력해주세요 ⚙️</h2>
-            <p className="text-xs text-fg-3">원하는 형식과 연재 형태를 조율하여 정밀한 리스트를 완성합니다.</p>
+            <h2 className="text-xl font-bold tracking-tight">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "마지막으로, 감상 취향을 입력해주세요 ⚙️")}</h2>
+            <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "원하는 형식과 연재 형태를 조율하여 정밀한 리스트를 완성합니다.")}</p>
           </div>
           
           <div className="space-y-4">
             <div className="space-y-2">
-              <span className="block text-xs font-semibold text-fg-3">선호 포맷</span>
+              <span className="block text-xs font-semibold text-fg-3">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "선호 포맷")}</span>
               <div className="flex gap-2">
                 {[
                   { value: "all", label: "웹툰 & 웹소설" },
@@ -214,7 +213,7 @@ export function RecommendOnboarding({
             </div>
 
             <div className="space-y-2">
-              <span className="block text-xs font-semibold text-fg-3">선호 상태</span>
+              <span className="block text-xs font-semibold text-fg-3">{translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "선호 상태")}</span>
               <div className="flex gap-2">
                 {[
                   { value: "all", label: "전체 상태" },
@@ -245,16 +244,14 @@ export function RecommendOnboarding({
               onClick={() => setOnboardingStep(2)}
               className="inline-flex items-center justify-center rounded-xl border border-line bg-card px-5 py-2.5 text-xs font-semibold text-fg-2 hover:bg-raised cursor-pointer transition-all"
             >
-              이전으로
-            </button>
+              {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "이전으로")}</button>
             <button
               type="button"
               onClick={handleComplete}
               className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-6 py-2.5 text-xs font-bold text-on-accent shadow-lg hover:bg-accent/90 cursor-pointer transition-all animate-pulse-soft"
             >
               <Wand2 size={13} />
-              취향 분석 완료 및 추천받기
-            </button>
+              {translateCurrentStaticSourceText("shared.components.recommend.view.onboarding", "ko", "취향 분석 완료 및 추천받기")}</button>
           </div>
         </div>
       )}

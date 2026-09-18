@@ -93,6 +93,14 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(resolveStudioDrawingShortcut({ code: "Backquote", shiftKey: true })).toBeNull();
   });
 
+  it("Shift+Space는 캔버스 근처 퀵 HUD를 열고 반복 입력은 무시한다", () => {
+    expect(resolveStudioDrawingShortcut({ code: "Space", key: " ", shiftKey: true })).toEqual({
+      type: "open-quick-hud",
+    });
+    expect(resolveStudioDrawingShortcut({ code: "Space", key: " ", shiftKey: true, repeat: true })).toBeNull();
+    expect(resolveStudioDrawingShortcut({ code: "Space", key: " " })).toBeNull();
+  });
+
   it("크롬 토글은 명시적 캔버스에서만 허용하고 나머지 문서 포커스를 보존한다", () => {
     expect(shouldPreserveStudioTabNavigation({ tagName: "BUTTON", tabIndex: 0 })).toBe(true);
     expect(shouldPreserveStudioTabNavigation({ tagName: "SPAN", tabIndex: 0 })).toBe(true);
@@ -145,6 +153,9 @@ describe("resolveStudioDrawingShortcut", () => {
     expect(
       resolveStudioDrawingShortcut({ code: "Backquote", key: "`" }, { shortcuts: base })
     ).toEqual({ type: "toggle-chrome" });
+    expect(
+      resolveStudioDrawingShortcut({ code: "Space", key: " ", shiftKey: true }, { shortcuts: base })
+    ).toEqual({ type: "open-quick-hud" });
 
     // Remap pen away from B → K; default B must not fire.
     const remapped = { ...base, "tool-pen": "K" };
@@ -153,6 +164,14 @@ describe("resolveStudioDrawingShortcut", () => {
     ).toEqual({ type: "select-pen" });
     expect(
       resolveStudioDrawingShortcut({ code: "KeyB", key: "b" }, { shortcuts: remapped })
+    ).toBeNull();
+
+    const quickHudRemap = { ...base, "quick-hud": "Alt+Q" };
+    expect(
+      resolveStudioDrawingShortcut({ code: "KeyQ", key: "q", altKey: true }, { shortcuts: quickHudRemap })
+    ).toEqual({ type: "open-quick-hud" });
+    expect(
+      resolveStudioDrawingShortcut({ code: "Space", key: " ", shiftKey: true }, { shortcuts: quickHudRemap })
     ).toBeNull();
 
     // Unbound eraser: hard-code E must not fire.

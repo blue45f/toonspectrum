@@ -62,6 +62,7 @@ const REMOTE_TEST_DATABASE_PATTERN =
 // URL from .env.local. An explicit TEST_DATABASE_URL remains the only supported
 // way to opt the root suite into a remote disposable test database.
 export const VITEST_UNAVAILABLE_DATABASE_URL =
+// secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- deliberately unreachable loopback integration-test default
   "postgresql://toonspectrum_test:unavailable@127.0.0.1:1/toonspectrum_test";
 export const VITEST_VALIDATED_REMOTE_DATABASE_MARKER =
   "TOONSPECTRUM_VITEST_REMOTE_DATABASE_VALIDATED";

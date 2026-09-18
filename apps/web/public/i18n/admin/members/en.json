@@ -21,6 +21,7 @@
   "admin.members.selfTag": "(Me)",
   "admin.members.statusActive": "Active",
   "admin.members.statusDeleted": "Deleted",
+  "admin.members.statusMerged": "Merged",
   "admin.members.statusSuspended": "Suspended",
   "admin.members.suspend": "Suspend",
   "admin.members.title": "Member Management"

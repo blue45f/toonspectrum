@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 export interface WeightedTag {
@@ -35,7 +36,7 @@ export function TagCloud({
               strong ? "text-accent" : "text-fg"
             )}
             style={{ fontSize: `${fontRem}rem`, opacity }}
-            title={`${count}개 작품`}
+            title={formatI18nTemplate(translateCurrentStaticSourceText("domains.catalog.insights.components.tag.cloud", "ko", "{v0}개 작품"), { v0: String(count) })}
           >
             <span className={cn(strong ? "text-accent/60" : "text-fg-3")}>#</span>
             {tag}
