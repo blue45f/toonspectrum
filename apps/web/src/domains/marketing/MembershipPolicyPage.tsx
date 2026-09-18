@@ -31,6 +31,14 @@ import {
 import { useApp } from "@/shared/lib/store";
 
 const number = new Intl.NumberFormat("ko-KR");
+const creatorLevelLabels: Record<string, string> = {
+  new: "New",
+  verified: "Verified",
+  active: "Active Creator",
+  trusted: "Trusted Creator",
+  professional: "Professional",
+  partner: "Partner",
+};
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1_000_000_000) {
