@@ -1,8 +1,7 @@
 import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -27,7 +26,6 @@ import {
 } from "@/shared/components/purpose-experience-stage";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("MakeHubPage", ko, en);
