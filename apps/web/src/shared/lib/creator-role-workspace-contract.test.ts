@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE,
   creatorAccountContextFromLegacyStage,
+  creatorCollaborationUiEnabled,
   creatorDetailedRoleLens,
   creatorExperienceLevelFromLegacyStage,
   creatorRoleAiTools,
@@ -15,6 +16,7 @@ import {
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
   recommendCreatorWorkspaceMode,
+  resolveCreatorCollaborationLevel,
   resolveCreatorRoleProjectKey,
   scoreCreatorRoleMatch,
   type PublicCreatorRoleCandidate,
@@ -54,6 +56,7 @@ describe("creator role workspace contract", () => {
       usageGoals: ["team-production"],
       accountContext: "individual",
       workspaceMode: "creator",
+      collaborationMode: "team",
       capacity: {
         weeklyCapacityHours: 168,
         currentAssignedHours: 0,
@@ -96,6 +99,33 @@ describe("creator role workspace contract", () => {
       experienceLevel: "experienced",
       usageGoals: ["personal-project"],
     })).toBe("creator");
+  });
+
+  it("keeps collaboration preference orthogonal to workspace density", () => {
+    expect(normalizeCreatorRoleWorkspacePreference({}).collaborationMode).toBe("solo");
+    expect(normalizeCreatorRoleWorkspacePreference({
+      usageGoals: ["studio-management"],
+    }).collaborationMode).toBe("team");
+    expect(resolveCreatorCollaborationLevel({
+      collaborationMode: "solo",
+      workspaceMode: "creator",
+      memberCount: 1,
+      serverBacked: false,
+    })).toBe("solo");
+    expect(resolveCreatorCollaborationLevel({
+      collaborationMode: "team",
+      workspaceMode: "creator",
+      memberCount: 1,
+      serverBacked: false,
+    })).toBe("lightweight");
+    expect(resolveCreatorCollaborationLevel({
+      collaborationMode: "solo",
+      workspaceMode: "production",
+      memberCount: 8,
+      serverBacked: true,
+    })).toBe("studio");
+    expect(creatorCollaborationUiEnabled("solo")).toBe(false);
+    expect(creatorCollaborationUiEnabled("lightweight")).toBe(true);
   });
 
   it("resolves project-specific keys without leaking malformed paths", () => {

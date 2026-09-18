@@ -8,6 +8,7 @@ import {
 } from "../../../../web/src/shared/lib/creator-role-contract";
 import {
   CREATOR_ACCOUNT_CONTEXTS,
+  CREATOR_COLLABORATION_MODES,
   CREATOR_DETAILED_ROLE_LENSES,
   CREATOR_ROLE_NOTIFICATION_EVENTS,
   CREATOR_ROLE_NOTIFICATION_PRESETS,
@@ -77,6 +78,7 @@ export const CreatorRoleWorkspaceDocumentSchema = z.object({
     .refine((items) => new Set(items).size === items.length),
   accountContext: z.enum(CREATOR_ACCOUNT_CONTEXTS).default("individual"),
   workspaceMode: z.enum(CREATOR_WORKSPACE_MODES).default("creator"),
+  collaborationMode: z.enum(CREATOR_COLLABORATION_MODES).default("solo"),
   capacity: CapacitySchema,
   visibility: VisibilitySchema,
   customRoleLabel: z.string().trim().min(1).max(48).nullable(),

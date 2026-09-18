@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   Loader2,
   Sparkles,
+  UserRound,
+  UsersRound,
   X,
 } from "lucide-react";
 import {
@@ -47,6 +49,7 @@ import {
   normalizeCreatorRoleWorkspacePreference,
   recommendCreatorWorkspaceMode,
   type CreatorAccountContext,
+  type CreatorCollaborationMode,
   type CreatorRoleUsageGoal,
   type CreatorWorkspaceMode,
 } from "@/shared/lib/creator-role-workspace-contract";
@@ -154,6 +157,7 @@ const STEP_LABELS = [
   { ko: "환경 · 경험", en: "Context" },
   { ko: "역할", en: "Roles" },
   { ko: "목적", en: "Goals" },
+  { ko: "작업 방식", en: "Collaboration" },
   { ko: "화면", en: "Workspace" },
   { ko: "미리보기", en: "Preview" },
 ] as const;
@@ -189,6 +193,8 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
   const [roles, setRoles] = useState<readonly CreatorRoleId[]>([]);
   const [primaryRole, setPrimaryRole] = useState<CreatorRoleId | null>(null);
   const [goals, setGoals] = useState<readonly CreatorRoleUsageGoal[]>([]);
+  const [collaborationMode, setCollaborationMode] =
+    useState<CreatorCollaborationMode>("solo");
   const [workspaceMode, setWorkspaceMode] = useState<CreatorWorkspaceMode>("creator");
   const [modeTouched, setModeTouched] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -247,6 +253,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
     setRoles(selected);
     setPrimaryRole(profile.creatorRoleProfile.primaryRole ?? selected[0] ?? null);
     setGoals(workspace.snapshot.document.usageGoals);
+    setCollaborationMode(workspace.snapshot.document.collaborationMode);
     setWorkspaceMode(workspace.snapshot.document.workspaceMode);
     setModeTouched(completed);
     setInitializedFor(profile.id);
@@ -331,6 +338,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
         workspacePreset: creatorRoleStudioWorkspace(primaryRole),
         usageGoals: goals,
         accountContext,
+        collaborationMode,
         workspaceMode,
         onboardingComplete: true,
       }));
@@ -379,7 +387,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
         </header>
 
         <div className="shrink-0 px-5 pt-4 sm:px-7">
-          <ol className="grid grid-cols-5 gap-1.5" aria-label={localized(locale, "설정 진행 단계", "Setup progress")}>
+          <ol className="grid grid-cols-6 gap-1.5" aria-label={localized(locale, "설정 진행 단계", "Setup progress")}>
             {STEP_LABELS.map((label, index) => (
               <li key={label.en} className="min-w-0">
                 <div className={cn(
@@ -543,6 +551,63 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
           ) : null}
 
           {step === 3 ? (
+            <section aria-labelledby="creator-collaboration-mode-title">
+              <h2 id="creator-collaboration-mode-title" className="text-lg font-black text-fg">
+                {localized(locale, "주로 혼자 작업하나요, 함께 작업하나요?", "Do you mostly create solo or with a team?")}
+              </h2>
+              <p className="mt-1 text-sm text-fg-2">
+                {localized(locale, "계정 종류를 고정하지 않습니다. 개인 프로젝트는 단순하게 유지하고, 사람을 초대하면 협업 기능이 자연스럽게 확장됩니다.", "This never locks your account type. Solo projects stay simple, and collaboration tools expand naturally when you invite people.")}
+              </p>
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {([
+                  {
+                    id: "solo",
+                    titleKo: "혼자 작업해요",
+                    titleEn: "I work solo",
+                    descriptionKo: "멤버·역할·검수·실시간 협업 UI를 최소화해 캔버스와 내 작업에 집중합니다.",
+                    descriptionEn: "Keeps member, role, review and realtime collaboration chrome out of the way so you can focus on your work.",
+                    icon: UserRound,
+                  },
+                  {
+                    id: "team",
+                    titleKo: "함께 작업해요",
+                    titleEn: "I work with a team",
+                    descriptionKo: "초대·역할·댓글·업무 배정·검수·Presence 등 협업 동선을 우선 노출합니다.",
+                    descriptionEn: "Prioritizes invites, roles, comments, assignments, reviews and presence workflows.",
+                    icon: UsersRound,
+                  },
+                ] as const).map((option) => {
+                  const selected = collaborationMode === option.id;
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => setCollaborationMode(option.id)}
+                      className={cn(
+                        "min-h-40 rounded-2xl border p-5 text-left transition-colors",
+                        selected ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/35",
+                      )}
+                    >
+                      <Icon size={22} className={selected ? "text-accent" : "text-fg-3"} aria-hidden="true" />
+                      <span className={cn("mt-4 block text-base font-black", selected ? "text-accent" : "text-fg")}>
+                        {localized(locale, option.titleKo, option.titleEn)}
+                      </span>
+                      <span className="mt-2 block text-xs leading-5 text-fg-2">
+                        {localized(locale, option.descriptionKo, option.descriptionEn)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-fg-3">
+                {localized(locale, "실제 팀 프로젝트에 참여하거나 멤버를 초대하면 Solo 선호여도 필요한 협업 기능은 자동으로 다시 표시됩니다.", "Actual team membership always re-enables required collaboration tools even if your default preference is Solo.")}
+              </p>
+            </section>
+          ) : null}
+
+          {step === 4 ? (
             <section aria-labelledby="creator-workspace-mode-title">
               <h2 id="creator-workspace-mode-title" className="text-lg font-black text-fg">
                 {localized(locale, "어떤 작업 화면을 선호하나요?", "What kind of workspace do you prefer?")}
@@ -586,7 +651,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
             </section>
           ) : null}
 
-          {step === 4 ? (
+          {step === 5 ? (
             <section aria-labelledby="creator-preview-title">
               <h2 id="creator-preview-title" className="text-lg font-black text-fg">
                 {localized(locale, "내 작업 환경 미리보기", "Preview your workspace")}
@@ -599,6 +664,11 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
                   <div className="flex flex-wrap gap-2 text-[0.7rem] font-bold">
                     <span className="rounded-full bg-card px-3 py-1 text-fg-2">{localized(locale, ACCOUNT_CONTEXT_COPY[accountContext].ko, ACCOUNT_CONTEXT_COPY[accountContext].en)}</span>
                     {experienceLevel ? <span className="rounded-full bg-card px-3 py-1 text-fg-2">{localized(locale, EXPERIENCE_COPY[experienceLevel].ko, EXPERIENCE_COPY[experienceLevel].en)}</span> : null}
+                    <span className="rounded-full bg-card px-3 py-1 text-fg-2">
+                      {collaborationMode === "solo"
+                        ? localized(locale, "혼자 작업", "Solo")
+                        : localized(locale, "팀 협업", "Team")}
+                    </span>
                     {primaryDefinition ? <span className="rounded-full bg-accent px-3 py-1 text-on-accent">{creatorText(primaryDefinition.label, locale)}</span> : null}
                     <span className="rounded-full bg-card px-3 py-1 text-fg-2">{bi((MODE_COPY[workspaceMode]).ko, (MODE_COPY[workspaceMode]).en)}</span>
                   </div>

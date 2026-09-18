@@ -71,7 +71,7 @@ afterEach(() => {
 });
 
 describe("CreatorAdaptiveOnboardingGate", () => {
-  it("계정 환경·경험·복수 역할·목적·작업 화면을 분리해 저장한다", async () => {
+  it("계정 환경·경험·복수 역할·목적·협업·작업 화면을 분리해 저장한다", async () => {
     render(<CreatorAdaptiveOnboardingGate />);
 
     expect(await screen.findByRole("heading", { name: "나에게 맞는 작업 환경 만들기" })).toBeTruthy();
@@ -86,6 +86,9 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
 
     fireEvent.click(screen.getByRole("button", { name: "스토리·대본 집필" }));
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /함께 작업해요/ }));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
 
     fireEvent.click(screen.getByRole("button", { name: /Production/ }));
@@ -105,6 +108,7 @@ describe("CreatorAdaptiveOnboardingGate", () => {
       activeRole: "story",
       usageGoals: ["story-writing"],
       accountContext: "studio",
+      collaborationMode: "team",
       workspaceMode: "production",
       onboardingComplete: true,
     }));

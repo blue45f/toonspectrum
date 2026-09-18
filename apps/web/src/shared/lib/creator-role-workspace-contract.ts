@@ -74,6 +74,18 @@ export type CreatorAccountContext = (typeof CREATOR_ACCOUNT_CONTEXTS)[number];
 export const CREATOR_WORKSPACE_MODES = ["guided", "creator", "production"] as const;
 export type CreatorWorkspaceMode = (typeof CREATOR_WORKSPACE_MODES)[number];
 
+export const CREATOR_COLLABORATION_MODES = ["solo", "team"] as const;
+export type CreatorCollaborationMode =
+  (typeof CREATOR_COLLABORATION_MODES)[number];
+
+export const CREATOR_COLLABORATION_LEVELS = [
+  "solo",
+  "lightweight",
+  "studio",
+] as const;
+export type CreatorCollaborationLevel =
+  (typeof CREATOR_COLLABORATION_LEVELS)[number];
+
 export const CREATOR_ROLE_NOTIFICATION_EVENTS = [
   "assignment",
   "handoff-ready",
@@ -144,6 +156,7 @@ export interface CreatorRoleWorkspacePreference {
   readonly usageGoals: readonly CreatorRoleUsageGoal[];
   readonly accountContext: CreatorAccountContext;
   readonly workspaceMode: CreatorWorkspaceMode;
+  readonly collaborationMode: CreatorCollaborationMode;
   readonly capacity: CreatorRoleCapacity;
   readonly visibility: CreatorRoleVisibility;
   readonly customRoleLabel: string | null;
@@ -266,6 +279,7 @@ const NOTIFICATION_PRESET_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_PRESET
 const USAGE_GOAL_SET = new Set<string>(CREATOR_ROLE_USAGE_GOALS);
 const ACCOUNT_CONTEXT_SET = new Set<string>(CREATOR_ACCOUNT_CONTEXTS);
 const WORKSPACE_MODE_SET = new Set<string>(CREATOR_WORKSPACE_MODES);
+const COLLABORATION_MODE_SET = new Set<string>(CREATOR_COLLABORATION_MODES);
 const NOTIFICATION_EVENT_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_EVENTS);
 const PRODUCTION_ROLE_SET = new Set<string>(CREATOR_PRODUCTION_ROLES);
 
@@ -294,6 +308,7 @@ export const EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE: CreatorRoleWorkspacePrefer
     usageGoals: Object.freeze([]),
     accountContext: "individual",
     workspaceMode: "creator",
+    collaborationMode: "solo",
     capacity: EMPTY_CREATOR_ROLE_CAPACITY,
     visibility: EMPTY_CREATOR_ROLE_VISIBILITY,
     customRoleLabel: null,
@@ -424,6 +439,20 @@ export function normalizeCreatorRoleWorkspacePreference(
   const customRoleLabel = typeof value.customRoleLabel === "string"
     ? value.customRoleLabel.trim().slice(0, CREATOR_ROLE_CUSTOM_LABEL_MAX) || null
     : null;
+  const usageGoals = normalizeDistinctEnums<CreatorRoleUsageGoal>(
+    value.usageGoals,
+    USAGE_GOAL_SET,
+    CREATOR_ROLE_USAGE_GOALS.length,
+  );
+  const collaborationMode =
+    normalizeEnum<CreatorCollaborationMode>(
+      value.collaborationMode,
+      COLLABORATION_MODE_SET,
+    )
+    ?? (usageGoals.includes("team-production")
+      || usageGoals.includes("studio-management")
+      ? "team"
+      : "solo");
 
   return {
     version: CREATOR_ROLE_WORKSPACE_VERSION,
@@ -446,17 +475,14 @@ export function normalizeCreatorRoleWorkspacePreference(
     notificationOverrides: normalizeNotificationOverrides(
       value.notificationOverrides,
     ),
-    usageGoals: normalizeDistinctEnums<CreatorRoleUsageGoal>(
-      value.usageGoals,
-      USAGE_GOAL_SET,
-      CREATOR_ROLE_USAGE_GOALS.length,
-    ),
+    usageGoals,
     accountContext:
       normalizeEnum<CreatorAccountContext>(value.accountContext, ACCOUNT_CONTEXT_SET)
       ?? "individual",
     workspaceMode:
       normalizeEnum<CreatorWorkspaceMode>(value.workspaceMode, WORKSPACE_MODE_SET)
       ?? "creator",
+    collaborationMode,
     capacity: normalizeCapacity(value.capacity),
     visibility: normalizeVisibility(value.visibility),
     customRoleLabel,
@@ -647,6 +673,34 @@ export function creatorWorkspaceStudioUiMode(mode: CreatorWorkspaceMode): "basic
   if (mode === "guided") return "basic";
   if (mode === "production") return "full";
   return "standard";
+}
+
+export function resolveCreatorCollaborationLevel(input: {
+  readonly collaborationMode: CreatorCollaborationMode;
+  readonly workspaceMode?: CreatorWorkspaceMode;
+  readonly serverBacked?: boolean;
+  readonly memberCount?: number;
+}): CreatorCollaborationLevel {
+  const memberCount = Number.isFinite(input.memberCount)
+    ? Math.max(0, Math.floor(input.memberCount ?? 0))
+    : 0;
+  if (memberCount >= 6 && input.workspaceMode === "production") {
+    return "studio";
+  }
+  if (
+    input.serverBacked === true
+    || memberCount > 1
+    || input.collaborationMode === "team"
+  ) {
+    return "lightweight";
+  }
+  return "solo";
+}
+
+export function creatorCollaborationUiEnabled(
+  level: CreatorCollaborationLevel,
+): boolean {
+  return level !== "solo";
 }
 
 const ROLE_PRODUCTION_ROLES: Readonly<
