@@ -577,6 +577,7 @@ export const StudioDockButton = forwardRef<
     className,
     disabled,
     type = "button",
+    style,
     swatch,
     hintDescription,
     hintPreview,
@@ -594,6 +595,7 @@ export const StudioDockButton = forwardRef<
       type={type}
       disabled={disabled}
       title={hintDescription ? undefined : title}
+      style={{ minWidth: 44, ...style }}
       className={cn(
         "flex min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl py-1 text-[0.6875rem] font-semibold leading-none",
         STUDIO_EASE,
@@ -647,7 +649,7 @@ export const StudioDockButton = forwardRef<
           : undefined
       }
       preferredSide="top"
-      className="min-w-11 flex-1"
+      className="min-w-11 flex-none"
       hint={hint}
     >
       {button}
@@ -663,6 +665,7 @@ export function StudioDockNavButton({
   className,
   disabled,
   type = "button",
+  style,
   ...rest
 }: {
   active?: boolean;
@@ -674,6 +677,7 @@ export function StudioDockNavButton({
     <button
       type={type}
       disabled={disabled}
+      style={{ minWidth: 44, ...style }}
       className={cn(
         "flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1 text-[0.6875rem] font-medium",
         STUDIO_EASE,

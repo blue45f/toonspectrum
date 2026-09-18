@@ -222,6 +222,13 @@ async function installStudioGuestSessionBoundary(page: Page): Promise<void> {
       body: JSON.stringify({ authenticated: false, user: null }),
     });
   });
+  await page.route("**/api/health/ready", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ ready: true }),
+    });
+  });
 }
 
 async function dismissHydratedQuickStart(page: Page): Promise<void> {
@@ -739,8 +746,22 @@ async function runMode(
   });
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
-  const dock = page.locator('nav[aria-label="스튜디오 모바일 도구막대"]');
-  await dock.waitFor({ state: "visible", timeout: 10000 });
+  const dock = page.locator('[data-studio-mobile-editing-dock="true"]');
+  const dockVisible = await dock
+    .waitFor({ state: "visible", timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!dockVisible) {
+    const diagnostic = await page.evaluate(() => ({
+      href: window.location.href,
+      bodyText: document.body.innerText.slice(0, 1200),
+      editorCount: document.querySelectorAll('[data-studio-editor="true"]').length,
+      mobileDockCount: document.querySelectorAll('[data-studio-mobile-editing-dock="true"]').length,
+    }));
+    throw new Error(
+      `mobile editing dock did not become visible: ${JSON.stringify(diagnostic)}; errors=${JSON.stringify(consoleErrors.slice(0, 8))}`,
+    );
+  }
   await page
     .locator(`[data-studio-editor="true"][data-studio-mobile-immersive="${mode === "immersive"}"]`)
     .waitFor({ state: "attached", timeout: 5000 });
@@ -1039,11 +1060,17 @@ async function runMode(
 async function main() {
   mkdirSync(SCRATCH, { recursive: true });
   const port = await findFreePort();
-  const url = `http://127.0.0.1:${port}/studio`;
+  const url = `http://127.0.0.1:${port}/studio/canvas`;
 
+  const vitePreviewBin = join(
+    process.cwd(),
+    "node_modules",
+    ".bin",
+    process.platform === "win32" ? "vite.cmd" : "vite",
+  );
   const server: ChildProcess = spawn(
-    process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-    ["exec", "vite", "preview", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
+    vitePreviewBin,
+    ["preview", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
     { stdio: "ignore" },
   );
 

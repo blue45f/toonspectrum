@@ -161,7 +161,7 @@ describe("Studio freehand hot-path boundary", () => {
       "const gpuStartEligible =",
       "const liveInkBackendDecision ="
     );
-    expect(gpuStart).toContain("const gpuStartEligible = gpuSelected");
+    expect(gpuStart).toContain('const gpuStartEligible = (selectedMedia.kind === "webgpu")');
     expect(gpuStart).toContain('webGpuBackendRef.current === "webgpu"');
     expect(gpuStart).toContain(
       "const gpuStartPlan = gpuStartEligible ? buildGpuLiveStrokePlan(next) : null"

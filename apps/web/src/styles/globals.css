@@ -1139,8 +1139,8 @@ body[data-studio-app="true"] .route-stage::before,
 /* One shared safe-area contract for every mobile surface that sits above the editing dock. */
 @media (max-width: 63.999rem) {
   [data-studio-editor="true"] {
-    --studio-mobile-dock-compact-height: calc(3.5rem + env(safe-area-inset-bottom));
-    --studio-mobile-dock-expanded-height: calc(7rem + env(safe-area-inset-bottom));
+    --studio-mobile-dock-compact-height: calc(4rem + env(safe-area-inset-bottom));
+    --studio-mobile-dock-expanded-height: calc(7.5rem + env(safe-area-inset-bottom));
     --studio-canvas-bottom-inset: var(--studio-mobile-dock-expanded-height);
   }
 
