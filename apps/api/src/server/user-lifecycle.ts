@@ -39,6 +39,7 @@ async function assertUserLifecycleSchema(): Promise<void> {
       "avatar",
       "bio",
       "creatorRoleProfile",
+      "regionSettings",
       "createdAt"
     FROM "user"
     WHERE FALSE
@@ -142,6 +143,7 @@ export async function softDeleteUserAccount(
       avatar: "#5b5751",
       bio: null,
       creatorRoleProfile: EMPTY_CREATOR_ROLE_PROFILE,
+      regionSettings: null,
     })
     .where(eq(users.id, userId))
     .returning({

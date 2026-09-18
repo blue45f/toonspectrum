@@ -13,6 +13,7 @@ import {
   EMPTY_CREATOR_ROLE_PROFILE,
   type CreatorRoleProfile,
 } from "../../../../web/src/shared/lib/creator-role-contract";
+import type { RegionSettings } from "../../../../web/src/shared/lib/region-settings";
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)
@@ -51,6 +52,7 @@ export const users = pgTable(
       .$type<CreatorRoleProfile>()
       .notNull()
       .default(EMPTY_CREATOR_ROLE_PROFILE),
+    regionSettings: jsonb("regionSettings").$type<RegionSettings>(),
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
   },
   (u) => [index("idx_user_status_created").on(u.status, u.createdAt)]
