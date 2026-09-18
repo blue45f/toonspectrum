@@ -86,6 +86,16 @@ export default function StudioP2pHuddleLauncher() {
     };
   }, [active]);
   useEffect(() => {
+    const handleOpen = (event: Event) => {
+      const detail = (event as CustomEvent<StudioP2pHuddleOpenDetail>).detail;
+      proximityPeerIds.current = detail?.peerIds ? new Set(detail.peerIds) : null;
+      controller.current?.refreshPeers();
+      setOpen(true);
+    };
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, handleOpen);
+    return () => globalThis.removeEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, handleOpen);
+  }, []);
+  useEffect(() => {
     const element = log.current;
     if (element && element.scrollHeight - element.scrollTop - element.clientHeight < 160)
       element.scrollTop = element.scrollHeight;
