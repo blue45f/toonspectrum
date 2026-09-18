@@ -1,13 +1,8 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   diagnoseStudioInAppBrowser,
   type StudioInAppBrowserDiagnosis,
 } from "@/compat/in-app-browser";
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("studio-immersive-capabilities", ko, en);
@@ -178,7 +173,7 @@ export async function inspectStudioImmersiveCapabilities(
 
 export function studioImmersiveSupportLabel(
   state: StudioImmersiveSupport,
-  _locale,
+  _locale: string,
 ): string {
   if (state === "supported") return bi("사용 가능", "Available");
   if (state === "unsupported") return bi("미지원", "Unavailable");

@@ -1,9 +1,4 @@
-import {
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
   BellRing,
@@ -27,7 +22,6 @@ import {
 
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("MySpaceHubPage", ko, en);

@@ -1,7 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, formatI18nTemplate, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Cloud, FileArchive, LoaderCircle, X } from "lucide-react";
 import { useId, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -9,11 +6,6 @@ import { createPortal } from "react-dom";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import { useStudioModalSheet } from "../useStudioModalSheet";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioFormalSaveDialog", ko, en);

@@ -21,12 +21,10 @@ import {
   type StudioExportDraftInput,
 } from "../studio-project-export-snapshot";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
-type Locale = string;
 
 const EXPORT_TARGET_VISUALS: Readonly<Record<StudioExportTargetId, string>> = {
   "webtoon-platform": "/brand/theme-scenes/ink-studio.svg",

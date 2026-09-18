@@ -1,9 +1,4 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Brush, Check, Clapperboard, Layers, LayoutGrid, Pause, Play, SlidersHorizontal, SwatchBook } from "lucide-react";
 import { useId, useState, type CSSProperties, type KeyboardEvent } from "react";
 
@@ -12,10 +7,6 @@ import { useAtelierMotion } from "./use-atelier-motion";
 
 import Link from "@/compat/router-link";
 import "./atelier-workbench.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("AtelierWorkbenchDemo", ko, en);
@@ -31,7 +22,7 @@ const MARKS = [
 ];
 
 /** Lightweight explanatory artwork; never imports editor state, engines or authoring data. */
-export function AtelierWorkbenchDemo({ locale = "ko", initialScene = "ink" }: { locale?: AtelierLocale; initialScene?: AtelierScene }) {
+export function AtelierWorkbenchDemo({ locale: _locale = "ko", initialScene = "ink" }: { locale?: AtelierLocale; initialScene?: AtelierScene }) {
   useBilingualI18nRevision();
   const id = useId();
   const [scene, setScene] = useState<AtelierScene>(initialScene);

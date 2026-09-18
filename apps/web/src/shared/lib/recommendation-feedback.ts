@@ -1,13 +1,7 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import type { Title } from "./types";
 
 import type { RecommendationDiversity } from "./catalog-discovery-state";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("recommendation-feedback", ko, en);
@@ -143,7 +137,7 @@ export function diversifyRecommendations(
 export function recommendationReason(
   title: Title,
   tasteGenres: readonly string[],
-  _locale,
+  _locale: string,
 ): string {
   const matched = tasteGenres.find((genre) => title.genres.includes(genre));
   if (matched) {

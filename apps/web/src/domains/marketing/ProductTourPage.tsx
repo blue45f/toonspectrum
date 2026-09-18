@@ -1,9 +1,4 @@
-import {
-  getCurrentUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { SITE_URL } from "@toonspectrum/core";
 import {
   ArrowLeft,
@@ -33,11 +28,6 @@ import { PRODUCT_ADVANTAGES, PRODUCT_CAPABILITIES, PRODUCT_ROLES, PRODUCT_TOUR, 
 
 import "./creator-home.css";
 import "./product-tour-page.css";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("ProductTourPage", ko, en);

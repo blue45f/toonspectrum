@@ -1,8 +1,4 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { FolderOpen, HardDrive } from "lucide-react";
 
 import type { StudioProjectLibraryEntry } from "../studio-project-library-store";
@@ -12,10 +8,6 @@ import {
 } from "./StudioProjectLibraryManagementUi";
 import { StudioProjectLibraryEmptyVisual } from "./StudioProjectLibraryEmptyVisual";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectLibraryManagementContent", ko, en);

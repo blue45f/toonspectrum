@@ -11,8 +11,8 @@ import { useMemo, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
+
+import { type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -25,12 +25,6 @@ import {
 } from "../studio-project-document-store";
 import { markStudioProjectOpened } from "../studio-project-library-store";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
-import {
-  formatI18nTemplate,
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type DocumentView = "active" | "archived" | "trash";

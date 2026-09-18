@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense } from "react";
 import { SITE_URL } from "@toonspectrum/core";
 import { PenLine } from "lucide-react";

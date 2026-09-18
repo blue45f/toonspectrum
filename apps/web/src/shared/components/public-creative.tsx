@@ -1,18 +1,9 @@
-import {
-  formatI18nTemplate,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowRight, BookOpen, Brush, Layers3, Search } from "lucide-react";
 
 import Link from "@/compat/router-link";
 
 import "./public-creative.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-creative", ko, en);
@@ -25,7 +16,7 @@ const JOURNEY = [
 ] as const;
 
 /** Public-page navigation: every step opens an existing working product surface. */
-export function CreativeJourneyLinks({ locale = "ko", current, compact = false }: {
+export function CreativeJourneyLinks({ locale: _locale = "ko", current, compact = false }: {
   locale?: string;
   current?: "research" | "learn" | "market" | "discover" | "community" | "about";
   compact?: boolean;

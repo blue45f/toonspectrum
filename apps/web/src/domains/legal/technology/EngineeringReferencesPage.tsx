@@ -1,8 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
   ArrowRight,
@@ -35,7 +31,6 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { cx } from "@/shared/lib/cx";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringReferencesPage", ko, en);
@@ -86,7 +81,7 @@ export function EngineeringReferencesPage() {
         ...reference.evidence.map((item) => `${bi((item.label).ko, (item.label).en)} ${item.path}`),
       ].join(" ")).includes(search);
     }),
-    [locale, relation, search],
+    [relation, search],
   );
 
   const troubleshooting = useMemo(
@@ -104,7 +99,7 @@ export function EngineeringReferencesPage() {
         ...item.evidence.map((entry) => `${bi((entry.label).ko, (entry.label).en)} ${entry.path}`),
       ].join(" ")).includes(search);
     }),
-    [locale, search],
+    [search],
   );
 
   return (

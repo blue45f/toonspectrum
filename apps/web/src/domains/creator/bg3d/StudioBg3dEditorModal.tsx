@@ -1,7 +1,6 @@
 import {
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";
-"use no memo";
 // The legacy editor still reuses one mutable host object. Keep this shell out of React Compiler
 // memoization until the remaining document/session controllers stop mutating that identity.
 import { SlidersHorizontal, Sparkles, X } from "lucide-react";
@@ -22,6 +21,7 @@ import {
 
 import type { StudioBg3dSceneOutlinerController } from "./studio-bg3d-scene-outliner-controller";
 import type { StudioBg3dExperienceMode } from "./StudioBackground3DTypes";
+
 
 interface StudioBg3dShotBatchProgress {
   readonly stage: "render" | "contact" | "archive";
@@ -50,6 +50,7 @@ interface StudioBg3dEditorModalProps {
 }
 
 export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
+  "use no memo";
   const {
     open,
     webXrRendererLifetimeRetained,
@@ -69,14 +70,14 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
     <div
       ref={modalDialogRef}
       aria-hidden={!open || undefined}
-      aria-modal={open ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "en", "true") : undefined}
+      aria-modal={open ? "true" : undefined}
       aria-labelledby="studio-bg3d-dialog-title"
       data-testid="studio-bg3d-dialog"
       data-studio-bg3d-workspace="professional-v2"
       hidden={!open}
       inert={!open ? true : undefined}
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.94)] p-2 text-fg sm:p-4"
-      role={open ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dEditorModal", "en", "dialog") : undefined}
+      role={open ? "dialog" : undefined}
       tabIndex={-1}
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",

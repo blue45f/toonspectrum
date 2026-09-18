@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense } from "react";
 import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";

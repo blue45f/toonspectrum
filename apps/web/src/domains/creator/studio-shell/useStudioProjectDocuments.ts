@@ -1,10 +1,7 @@
-import {
-  translateBilingualValueForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useT } from "@/shared/lib/i18n";
-import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
   STUDIO_PROJECT_DOCUMENTS_UPDATED_EVENT,
@@ -26,7 +23,6 @@ import {
 } from "../studio-project-document-store";
 import { removeStudioExactResumeContext } from "../studio-exact-resume-context";
 
-type Locale = "ko" | "en";
 
 export interface StudioProjectDocumentsController {
   readonly state: StudioProjectDocumentState | null;

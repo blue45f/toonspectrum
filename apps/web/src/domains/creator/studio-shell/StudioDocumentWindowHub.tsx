@@ -67,7 +67,7 @@ interface StudioDocumentWindowHubProps {
   readonly onToggleQuickMode: () => void;
 }
 
-function workspaceLabel(workspace: StudioDocumentWorkspaceId, _locale): string {
+function workspaceLabel(workspace: StudioDocumentWorkspaceId, _locale: string): string {
   const definition = studioDocumentWorkspaceById(workspace);
   return bi(definition.labelKo, definition.labelEn);
 }
@@ -104,7 +104,7 @@ async function copyText(value: string): Promise<boolean> {
   }
 }
 
-function peerStatus(peer: StudioDocumentWindowPresence, _locale): string {
+function peerStatus(peer: StudioDocumentWindowPresence, _locale: string): string {
   if (peer.focused) return bi("활성", "Active");
   if (peer.visible) return bi("표시 중", "Visible");
   return bi("백그라운드", "Background");
@@ -112,7 +112,7 @@ function peerStatus(peer: StudioDocumentWindowPresence, _locale): string {
 
 function transportLabel(
   transport: "broadcast" | "storage" | "isolated",
-  _locale,
+  _locale: string,
 ): string {
   if (transport === "broadcast") {
     return bi("탭 자동 감지", "Automatic tab discovery");

@@ -1,6 +1,6 @@
 import {
   translateCurrentStaticSourceText,
-  useBilingualI18nRevision,
+  useBilingualI18nRevision, useBilingual
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -33,7 +33,6 @@ import {
   STUDIO_PLUGIN_PERMISSIONS,
   type StudioPluginPermission,
 } from "../studio-plugin-registry";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";

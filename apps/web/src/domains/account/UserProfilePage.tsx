@@ -1,4 +1,4 @@
-import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
+import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus, BriefcaseBusiness, Sparkles } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -36,7 +36,9 @@ import {
   type WorkSummary,
 } from "@/infrastructure/creator-client";
 import { useApiResource } from "@/infrastructure/use-api-resource";
-import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { getActiveI18nLocale, useBilingualI18nRevision,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 
 

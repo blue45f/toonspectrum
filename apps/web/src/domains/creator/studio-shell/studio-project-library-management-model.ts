@@ -1,9 +1,4 @@
-import {
-  getCurrentUiLocale,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { getActiveI18nLocale, translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
 import {
   studioSaveProfileNeedsDestination,
   type StudioSaveProfile,
@@ -12,10 +7,6 @@ import type {
   StudioProjectKind,
   StudioProjectLibraryEntry,
 } from "../studio-project-library-store";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("studio-project-library-management-model", ko, en);
@@ -63,7 +54,7 @@ export const STUDIO_PROJECT_KIND_LABELS: Readonly<
   animation: { ko: "애니메이션", en: "Animation" },
 };
 
-export function studioProjectLibraryLocale(_language): StudioProjectLibraryLocale {
+export function studioProjectLibraryLocale(_language: string): StudioProjectLibraryLocale {
   return getActiveI18nLocale();
 }
 
@@ -82,7 +73,7 @@ export function studioProjectLibraryManagementViewHref(
 
 export function studioProjectLibraryDateLabel(
   value: string | null,
-  _locale,
+  _locale: string,
 ): string {
   if (!value || !Number.isFinite(Date.parse(value))) {
     return bi("아직 없음", "Not yet");
@@ -101,7 +92,7 @@ export function studioProjectIsTemporaryWork(profile: StudioSaveProfile): boolea
 
 export function studioProjectLibrarySearchText(
   project: StudioProjectLibraryEntry,
-  _locale,
+  _locale: string,
 ): string {
   return [
     project.title,

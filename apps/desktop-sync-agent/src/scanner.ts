@@ -4,6 +4,7 @@ import { lstat, opendir } from "node:fs/promises";
 import path from "node:path";
 
 import { safeBindingRoot, safeRelativePath } from "./path-safety.js";
+
 import type { DesktopFileSnapshot, DesktopSyncBinding } from "./types.js";
 
 const RESERVED_DIRECTORY = ".toonstudio-sync";

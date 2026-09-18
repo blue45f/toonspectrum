@@ -1,16 +1,8 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Search, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorReferenceSearch", ko, en);

@@ -1,7 +1,7 @@
 import { Image as ImageIcon, LoaderCircle } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import {
@@ -12,11 +12,6 @@ import {
 import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import type { ThumbElement, ThumbPageLike } from "../studio-page-thumbs";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const MAX_PREVIEW_DOCUMENTS = 6;
 
@@ -27,7 +22,6 @@ const LazyStudioPageThumbnail = lazyRetry(
   "StudioProjectCardThumbnail",
 );
 
-type Locale = string;
 type PreviewPhase = "idle" | "loading" | "ready" | "empty";
 
 interface PreviewCandidate {
@@ -180,7 +174,7 @@ function useNearViewport(): {
 }
 
 function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
-  const l = useBilingualLocalizer("studioProjectThumbnail.loading");
+  const bt = useBilingual("StudioProjectCardThumbnail.loading");
   return (
     <div className="grid h-full place-items-center bg-panel/70 text-fg-3">
       <div className="flex items-center gap-2 text-xs font-semibold">
@@ -192,7 +186,7 @@ function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
 }
 
 function PreviewEmpty({ locale: _locale }: { readonly locale: string }) {
-  const l = useBilingualLocalizer("studioProjectThumbnail.empty");
+  const bt = useBilingual("StudioProjectCardThumbnail.empty");
   return (
     <div className="grid h-full place-items-center bg-panel/70 px-5 text-center text-fg-3">
       <div>
@@ -214,7 +208,7 @@ export function StudioProjectCardThumbnail({
   readonly locale: string;
   readonly project: StudioProjectLibraryEntry;
 }): ReactElement {
-  const l = useBilingualLocalizer("studioProjectThumbnail");
+  const bt = useBilingual("StudioProjectCardThumbnail");
   const { nearViewport, rootRef } = useNearViewport();
   const [preview, setPreview] = useState<PreviewCandidate | null>(null);
   const [phase, setPhase] = useState<PreviewPhase>("idle");
@@ -228,7 +222,6 @@ export function StudioProjectCardThumbnail({
     if (!nearViewport) return;
     const storage = localStorageOrNull();
     if (!storage) {
-  const bt = useBilingual("StudioProjectCardThumbnail");
       setPhase("empty");
       return;
     }

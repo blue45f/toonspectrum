@@ -1,16 +1,9 @@
-import {
-  translateBilingualValueForLocale,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
 
 import { boundedStorageRead, creatorServiceWorker, creatorStoragePressure, inspectCreatorDrawingDependencies, inspectCreatorOfflineReadiness, type CreatorOfflineDrawingCheck, type CreatorOfflineSnapshot } from "./creator-offline-readiness";
 import Link from "@/compat/router-link";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorWorkspaceReadiness", ko, en);
