@@ -56,27 +56,29 @@ export function SharePageButton({
   if (!dialogRequested) return trigger();
 
   return (
-    <ShareDialog
-      payload={{
-        title: text,
-        text: description || `${text} · ${t("app.name")}`,
-        url: path,
-        imageUrl,
-        buttonLabel: actionLabel || t("share.viewContent"),
-      }}
-      trigger={
-        <button
-          type="button"
-          aria-label={`${triggerLabel}: ${text}`}
-          className={cn(
-            "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-fg-2 transition-colors hover:border-accent/55 hover:bg-accent-soft/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
-            className,
-          )}
-        >
-          <Share2 size={14} className="text-accent" aria-hidden="true" />
-          {triggerLabel}
-        </button>
-      }
-    />
+    <Suspense fallback={trigger(true)}>
+      <LazyShareDialog
+        payload={{
+          title: text,
+          text: description || `${text} · ${t("app.name")}`,
+          url: path,
+          imageUrl,
+          buttonLabel: actionLabel || t("share.viewContent"),
+        }}
+        trigger={
+          <button
+            type="button"
+            aria-label={`${triggerLabel}: ${text}`}
+            className={cn(
+              "inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-line bg-card px-3.5 py-1.5 text-xs text-fg-2 transition-colors hover:border-accent/55 hover:bg-accent-soft/40 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              className,
+            )}
+          >
+            <Share2 size={14} className="text-accent" aria-hidden="true" />
+            {triggerLabel}
+          </button>
+        }
+      />
+    </Suspense>
   );
 }
