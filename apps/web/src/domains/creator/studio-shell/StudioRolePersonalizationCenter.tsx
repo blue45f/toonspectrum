@@ -80,6 +80,13 @@ import {
 } from "../production-hub/creator-role-production-work";
 import { getProductionProjectByWork } from "../production-hub/production-api";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioRolePersonalizationCenter", ko, en);
 
 const FEATURED_ONBOARDING_ROLES: readonly CreatorRoleId[] = [
   "story",
@@ -148,8 +155,8 @@ const PRODUCTION_ROLE_LABELS: Readonly<Record<CreatorProductionRole, string>> = 
   publisher: "게시",
 };
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
 }
 
 function Card({
@@ -165,6 +172,7 @@ function Card({
   readonly action?: ReactNode;
   readonly className?: string;
 }) {
+  useBilingualI18nRevision();
   return (
     <section className={cn("rounded-2xl border border-line bg-card p-4", className)}>
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -192,6 +200,7 @@ function ToggleChip({
   readonly children: ReactNode;
   readonly onClick: () => void;
 }) {
+  useBilingualI18nRevision();
   return (
     <button
       type="button"
@@ -256,6 +265,7 @@ export function StudioRolePersonalizationCenter({
 }: {
   readonly locale: CreatorRoleLocale;
 }) {
+  useBilingualI18nRevision();
   const { status } = useSession();
   const location = useLocation();
   const projectKey = useMemo(
@@ -713,7 +723,7 @@ export function StudioRolePersonalizationCenter({
                     ? "border-good/30 bg-good/10 text-good"
                     : "border-line bg-panel",
               )}>
-                {locale === "ko" ? label : ["Role", "Specialties", "Goals", "Privacy"][index]}
+                {bi(label, ["Role", "Specialties", "Goals", "Privacy"][index])}
               </li>
             ))}
           </ol>
@@ -796,7 +806,7 @@ export function StudioRolePersonalizationCenter({
                       : [...current, goal]
                   ))}
                 >
-                  {USAGE_GOAL_LABELS[goal][locale]}
+                  {bi((USAGE_GOAL_LABELS[goal]).ko, (USAGE_GOAL_LABELS[goal]).en)}
                 </ToggleChip>
               ))}
             </div>
@@ -1032,7 +1042,7 @@ export function StudioRolePersonalizationCenter({
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {item.reasons.map((reason) => (
                           <span key={reason} className="rounded-full border border-line px-2 py-0.5 text-[0.65rem] font-semibold text-fg-2">
-                            {WORK_REASON_LABELS[reason][locale]}
+                            {bi((WORK_REASON_LABELS[reason]).ko, (WORK_REASON_LABELS[reason]).en)}
                           </span>
                         ))}
                       </div>
@@ -1135,7 +1145,7 @@ export function StudioRolePersonalizationCenter({
                   },
                 })}
               >
-                {NOTIFICATION_LABELS[event][locale]}
+                {bi((NOTIFICATION_LABELS[event]).ko, (NOTIFICATION_LABELS[event]).en)}
               </ToggleChip>
             ))}
           </div>
@@ -1197,7 +1207,7 @@ export function StudioRolePersonalizationCenter({
                       : [...globalDocument.usageGoals, goal],
                   })}
                 >
-                  {USAGE_GOAL_LABELS[goal][locale]}
+                  {bi((USAGE_GOAL_LABELS[goal]).ko, (USAGE_GOAL_LABELS[goal]).en)}
                 </ToggleChip>
               ))}
             </div>

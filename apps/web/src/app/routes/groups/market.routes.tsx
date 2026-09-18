@@ -38,6 +38,10 @@ const MarketComparePage = lazyRetry(
   () => import("@/domains/market/pages/MarketComparePage").then((module) => ({ default: module.MarketComparePage })),
   "MarketComparePage",
 );
+const MarketCheckoutPage = lazyRetry(
+  () => import("@/domains/market/pages/MarketCheckoutPage").then((module) => ({ default: module.MarketCheckoutPage })),
+  "MarketCheckoutPage",
+);
 
 export const marketRoutes = defineAppRoutes([
   { id: "market-home", path: "/market", element: <MarketHomePage /> },
@@ -48,5 +52,6 @@ export const marketRoutes = defineAppRoutes([
   { id: "market-library", path: "/market/library", element: <MarketLibraryPage /> },
   { id: "market-wishlist", path: "/market/wishlist", element: <MarketWishlistPage /> },
   { id: "market-compare", path: "/market/compare", element: <MarketComparePage /> },
+  { id: "market-checkout", path: "/market/checkout/:id", element: <MarketCheckoutPage /> },
   { id: "market-resource", path: "/market/resource/:id", element: <MarketResourceDetailPage /> },
 ]);

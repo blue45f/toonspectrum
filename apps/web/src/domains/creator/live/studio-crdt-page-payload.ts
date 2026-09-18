@@ -189,7 +189,7 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
   if ("paperSurface" in props) validatePaperSurface(props.paperSurface);
   if ("layerComps" in props) {
     const layerComps = parseStudioLayerComps(props.layerComps);
-    if (!layerComps) throw new Error("페이지 레이어 콤프가 올바르지 않습니다.");
+    if (!layerComps) throw new Error("페이지 레이어 보기 정보가 올바르지 않습니다.");
     // The document parser returns detached, finite JSON values and drops unknown fields.
     props.layerComps = layerComps as unknown as StudioCrdtJsonValue;
   }

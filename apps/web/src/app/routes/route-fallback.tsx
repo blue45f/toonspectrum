@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { LoadingState } from "@/shared/components/LoadingState";
-import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  defineBilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 

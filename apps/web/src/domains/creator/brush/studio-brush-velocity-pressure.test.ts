@@ -171,7 +171,7 @@ describe("studio-brush-velocity-pressure", () => {
     );
 
     expect(first.pressure).toBe(0.5);
-    expect(jitter.sample.hardwarePressure).toBe(0.56);
+    expect(jitter.sample.hardwarePressure).toBeCloseTo(0.56, 12);
     expect(jitter.pressure).toBeGreaterThan(0.5);
     expect(jitter.pressure).toBeLessThan(0.56);
     expect(jitter.state.filteredPressure).toBe(jitter.pressure);
@@ -191,7 +191,7 @@ describe("studio-brush-velocity-pressure", () => {
     );
 
     expect(fast.sample.rawVelocity).toBeGreaterThan(1.6);
-    expect(fast.pressure).toBe(0.56);
+    expect(fast.pressure).toBeCloseTo(0.56, 12);
   });
 
   it("passes intentional large pressure changes immediately even at low speed", () => {

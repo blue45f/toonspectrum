@@ -28,7 +28,18 @@ export async function loadMotionImage(file: File, signal: AbortSignal): Promise<
     const context = canvas.getContext("2d");
     if (!context) throw new Error("이 브라우저는 이미지 변환을 지원하지 않아요. 기본 그림으로 체험해 주세요.");
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const result = canvas.toDataURL("image/png");
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((result) => result ? resolve(result) : reject(new Error("이미지 변환에 실패했어요. 다른 파일을 골라 주세요.")), "image/png");
+    });
+    if (signal.aborted) throw aborted();
+    const result = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      const cancel = () => { reader.abort(); reject(aborted()); };
+      signal.addEventListener("abort", cancel, { once: true });
+      reader.onerror = () => { signal.removeEventListener("abort", cancel); reject(new Error("이미지 변환 결과를 읽지 못했어요.")); };
+      reader.onload = () => { signal.removeEventListener("abort", cancel); resolve(String(reader.result ?? "")); };
+      reader.readAsDataURL(blob);
+    });
     if (!result.startsWith("data:image/png;base64,")) throw new Error("이미지 변환에 실패했어요. 다른 파일을 골라 주세요.");
     return result;
   } finally { image.src = ""; URL.revokeObjectURL(source); }

@@ -64,7 +64,7 @@ function journeySteps({
       title: acquired ? "계정 보관 완료" : "내 보관함에 추가 (선택)",
       detail: acquired
         ? "계정 라이브러리에서 다시 찾을 수 있습니다. 계정 보관은 현재 기기 설치와 별도입니다."
-        : "무료 소장은 계정에 찾기 쉬운 링크와 권리 정보를 보관합니다. 설치 없이도 먼저 보관할 수 있습니다.",
+        : "내 에셋 보관은 계정에 찾기 쉬운 링크와 권리 정보를 보관합니다. 설치 없이도 먼저 보관할 수 있습니다.",
       state: acquired ? "complete" : "optional",
       icon: FolderOpen,
     },

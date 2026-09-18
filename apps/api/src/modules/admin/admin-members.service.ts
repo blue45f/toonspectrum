@@ -384,6 +384,7 @@ export class AdminMembersService {
           sourceUserId: accountMerges.sourceUserId,
           targetUserId: accountMerges.targetUserId,
           status: accountMerges.status,
+          summary: accountMerges.summary,
           createdAt: accountMerges.createdAt,
           completedAt: accountMerges.completedAt,
         })
@@ -426,6 +427,7 @@ export class AdminMembersService {
           sourceUserId: entry.sourceUserId,
           targetUserId: entry.targetUserId,
           status: entry.status,
+          summary: entry.summary,
           createdAt: entry.createdAt ? new Date(entry.createdAt).toISOString() : null,
           completedAt: entry.completedAt
             ? new Date(entry.completedAt).toISOString()

@@ -270,7 +270,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     exports: ["mp4", "webm", "gif", "vertical-short"],
     workflow: [stage("scene", "장면", "Scene"), stage("motion", "모션", "Motion"), stage("audio", "음성·오디오", "Voice & audio"), stage("review", "재생 검수", "Playback review")],
   }),
-});
+} satisfies Record<StudioProjectKind, StudioModeProfile>);
 
 export function studioModeProfile(kind: StudioProjectKind): StudioModeProfile {
   return STUDIO_MODE_PROFILES[kind];

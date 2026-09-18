@@ -171,7 +171,7 @@ export function StudioCommandSearchHost({
                 className={studioChromeIconClass({ tone: "default" })}
               />
               <span className="min-w-0 flex-1 truncate">
-                기능·설정 찾기 · CSP·Photoshop 용어
+                기능·설정 찾기 · 다른 앱 용어도 검색
               </span>
               <span
                 className="flex shrink-0 items-center gap-1"

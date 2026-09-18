@@ -53,6 +53,13 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("AdminMembersPage", ko, en);
 
 interface MemberRow {
   id: string;
@@ -91,6 +98,19 @@ interface MemberDetails {
     deletedAt: string | null;
     createdAt: string | null;
     bio: string | null;
+  };
+  identity: {
+    linkedProviders: string[];
+    mergedIntoUserId: string | null;
+    mergeHistory: Array<{
+      id: string;
+      sourceUserId: string;
+      targetUserId: string | null;
+      status: string;
+      summary: Record<string, unknown> | null;
+      createdAt: string | null;
+      completedAt: string | null;
+    }>;
   };
   activity: {
     reviewsCount: number;
@@ -132,6 +152,7 @@ const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleString() : "—";
 
 export function AdminMembersPage() {
+  useBilingualI18nRevision();
   const t = useT();
   const lang = useI18n((state) => state.lang);
   useDocumentTitle(t("admin.members.title"));
@@ -182,6 +203,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
   selfId: string;
   canManageMembers: boolean;
 }) {
+  useBilingualI18nRevision();
   const [listRequests] = useState(() => new AdminRequestScope());
   const [detailRequests] = useState(() => new AdminRequestScope());
   const [refreshRevision, setRefreshRevision] = useState(0);
@@ -539,9 +561,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
     <div className="flex flex-col gap-4" aria-busy={loading || refreshing}>
       {!canManageMembers ? (
         <p role="status" className="rounded-xl border border-line bg-card/70 p-3 text-sm text-fg-2">
-          {lang === "ko"
-            ? "읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요."
-            : "Read only: you can view and export members. Only administrators can change roles, account status, or delete members."}
+          {bi("읽기 전용: 회원 조회와 내보내기는 가능하며, 역할·상태·삭제 변경은 관리자만 할 수 있어요.", "Read only: you can view and export members. Only administrators can change roles, account status, or delete members.")}
         </p>
       ) : null}
       <section className="rounded-2xl border border-line bg-card/70 p-4">
@@ -1136,6 +1156,67 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                   </dd>
                 </div>
               </dl>
+            </section>
+
+            <section className="rounded-xl border border-line bg-panel/50 p-4 md:col-span-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-fg-3">
+                계정 연결 · 통합 이력
+              </h3>
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-fg-3">연결된 로그인</p>
+                  <p className="mt-1 text-fg">
+                    {detail.identity.linkedProviders.join(" · ") || "이메일/비밀번호"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-fg-3">Canonical account</p>
+                  <p className="mt-1 break-all text-fg">
+                    {detail.identity.mergedIntoUserId ?? detail.user.id}
+                  </p>
+                </div>
+              </div>
+              {detail.identity.mergeHistory.length > 0 && (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="text-fg-3">
+                      <tr>
+                        <th className="pb-2 pr-3 font-medium">상태</th>
+                        <th className="pb-2 pr-3 font-medium">Source → Target</th>
+                        <th className="pb-2 pr-3 font-medium">완료</th>
+                        <th className="pb-2 font-medium">정리 결과</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line/60 text-fg-2">
+                      {detail.identity.mergeHistory.map((merge) => {
+                        const summary = merge.summary ?? {};
+                        const transferred = typeof summary.transferredRecordCount === "number"
+                          ? summary.transferredRecordCount
+                          : null;
+                        const deduplicated = typeof summary.deduplicatedRecordCount === "number"
+                          ? summary.deduplicatedRecordCount
+                          : null;
+                        return (
+                          <tr key={merge.id}>
+                            <td className="py-2 pr-3">{merge.status}</td>
+                            <td className="max-w-72 break-all py-2 pr-3">
+                              {merge.sourceUserId} → {merge.targetUserId ?? "—"}
+                            </td>
+                            <td className="whitespace-nowrap py-2 pr-3">
+                              {formatDate(merge.completedAt)}
+                            </td>
+                            <td className="py-2">
+                              {transferred == null
+                                ? "—"
+                                : `${formatNum(transferred)} 이전 · ${formatNum(deduplicated ?? 0)} 중복 정리`}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
 
             <section className="rounded-xl border border-line bg-panel/50 p-4">

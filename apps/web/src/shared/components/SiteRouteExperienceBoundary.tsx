@@ -5,7 +5,9 @@ import { Link, useLocation } from "react-router-dom";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
-import { defineBilingualText } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  defineBilingualText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteExperience } from "@/shared/lib/site-route-experience";
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";

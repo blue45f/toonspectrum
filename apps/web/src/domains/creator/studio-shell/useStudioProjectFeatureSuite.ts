@@ -9,6 +9,13 @@ import {
   type StudioProjectFeatureSuiteUpdater,
 } from "../studio-project-feature-suite-store";
 import { matchesStudioProjectStorageEvent } from "../studio-project-storage-event";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("useStudioProjectFeatureSuite", ko, en);
 
 export interface StudioProjectFeatureSuiteController {
   readonly state: StudioProjectFeatureSuiteState | null;
@@ -17,10 +24,8 @@ export interface StudioProjectFeatureSuiteController {
   readonly reload: () => void;
 }
 
-function storageError(locale: "ko" | "en"): string {
-  return locale === "ko"
-    ? "이 기기에서 프로젝트 기능 변경 내용을 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인해 주세요."
-    : "Project feature changes could not be stored on this device. Check browser storage space and permissions.";
+function storageError(_locale): string {
+  return bi("이 기기에서 프로젝트 기능 변경 내용을 저장하지 못했습니다. 브라우저 저장 공간과 권한을 확인해 주세요.", "Project feature changes could not be stored on this device. Check browser storage space and permissions.");
 }
 
 function eventState(value: unknown, projectId: string): StudioProjectFeatureSuiteState | null {
@@ -36,6 +41,7 @@ export function useStudioProjectFeatureSuite(
   projectId: string,
   locale: "ko" | "en",
 ): StudioProjectFeatureSuiteController {
+  useBilingualI18nRevision();
   const [state, setState] = useState<StudioProjectFeatureSuiteState | null>(null);
   const [error, setError] = useState<string | null>(null);
 

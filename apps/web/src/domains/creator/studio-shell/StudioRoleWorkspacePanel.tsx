@@ -29,9 +29,16 @@ import {
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
-function localized(locale: CreatorRoleLocale, ko: string, en: string): string {
-  return locale === "ko" ? ko : en;
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("StudioRoleWorkspacePanel", ko, en);
+
+function localized(_locale, ko: string, en: string): string {
+  return bi(ko, en);
 }
 
 function hrefForWorkspaceMode(href: string, mode: CreatorWorkspaceMode): string {
@@ -47,6 +54,7 @@ export function StudioRoleWorkspacePanel({
 }: {
   readonly locale: CreatorRoleLocale;
 }) {
+  useBilingualI18nRevision();
   const { status } = useSession();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loading, setLoading] = useState(false);

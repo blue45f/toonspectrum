@@ -16,7 +16,11 @@ import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
-import { useI18n } from "@/shared/lib/i18n";
+
+import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("WebtoonWorkflowPage", ko, en);
 
 const WORKFLOW_STAGES = [
   {
@@ -167,14 +171,13 @@ const ROLE_HANDOFFS = [
 ] as const;
 
 export function WebtoonWorkflowPage() {
-  const language = useI18n((state) => state.lang);
-  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
-  const ko = locale === "ko";
+  useBilingualI18nRevision();
+
+
+
 
   useDocumentTitle(
-    ko
-      ? "웹툰 제작 과정 · 기획부터 저장과 연재까지"
-      : "Webtoon production workflow · From planning to release",
+    bi("웹툰 제작 과정 · 기획부터 저장과 연재까지", "Webtoon production workflow · From planning to release"),
   );
 
   return (
@@ -182,25 +185,17 @@ export function WebtoonWorkflowPage() {
       <PublicStoryHero
         eyebrow="WORKFLOW · IDEA TO RELEASE"
         title={
-          ko
-            ? "웹툰은 한 번에 그려지지 않습니다."
-            : "A webtoon is not drawn in a single step."
+          bi("웹툰은 한 번에 그려지지 않습니다.", "A webtoon is not drawn in a single step.")
         }
         description={
-          ko
-            ? "이야기의 씨앗을 정리하고, 콘티로 호흡을 만들고, 작화와 검수를 거쳐 안전하게 저장하는 과정입니다. ToonStudio가 각 단계에서 어디로 이동해야 하는지 안내합니다."
-            : "It moves from a story seed to storyboard rhythm, drawing, review and safe saving. ToonStudio shows where to go at every stage."
+          bi("이야기의 씨앗을 정리하고, 콘티로 호흡을 만들고, 작화와 검수를 거쳐 안전하게 저장하는 과정입니다. ToonStudio가 각 단계에서 어디로 이동해야 하는지 안내합니다.", "It moves from a story seed to storyboard rhythm, drawing, review and safe saving. ToonStudio shows where to go at every stage.")
         }
         image="process"
         imageAlt={
-          ko
-            ? "스케치에서 선화와 채색, 완성된 웹툰 장면으로 발전하는 제작 과정 일러스트"
-            : "Illustration of a webtoon scene progressing from sketch to ink, color and a finished panel"
+          bi("스케치에서 선화와 채색, 완성된 웹툰 장면으로 발전하는 제작 과정 일러스트", "Illustration of a webtoon scene progressing from sketch to ink, color and a finished panel")
         }
         caption={
-          ko
-            ? "PLAN → BOARD → DRAW → REVIEW → SAVE · 일곱 단계 제작 흐름"
-            : "PLAN → BOARD → DRAW → REVIEW → SAVE · A seven-stage production flow"
+          bi("PLAN → BOARD → DRAW → REVIEW → SAVE · 일곱 단계 제작 흐름", "PLAN → BOARD → DRAW → REVIEW → SAVE · A seven-stage production flow")
         }
       >
         <div className="flex flex-wrap gap-3">
@@ -208,7 +203,7 @@ export function WebtoonWorkflowPage() {
             href="/story-lab"
             className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
           >
-            {ko ? "기획부터 시작하기" : "Start with planning"}
+            {bi("기획부터 시작하기", "Start with planning")}
             <ArrowRight size={16} aria-hidden="true" />
           </Link>
           <Link
@@ -216,7 +211,7 @@ export function WebtoonWorkflowPage() {
             className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
           >
             <Palette size={16} aria-hidden="true" />
-            {ko ? "새 작품 만들기" : "Create a new work"}
+            {bi("새 작품 만들기", "Create a new work")}
           </Link>
         </div>
       </PublicStoryHero>
@@ -230,21 +225,19 @@ export function WebtoonWorkflowPage() {
             id="workflow-stage-picker-title"
             className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
           >
-            {ko ? "현재 단계에서 바로 시작하세요." : "Begin from the stage you are in now."}
+            {bi("현재 단계에서 바로 시작하세요.", "Begin from the stage you are in now.")}
           </h2>
           <p className="mt-4 text-sm leading-7 text-fg-2">
-            {ko
-              ? "처음부터 순서대로 볼 수도 있고, 지금 막힌 단계로 바로 이동할 수도 있습니다. 각 단계의 결과물이 다음 담당자와 다음 작업공간의 입력이 됩니다."
-              : "Read from the beginning or jump directly to the stage blocking you. The output of each stage becomes the input for the next role and workspace."}
+            {bi("처음부터 순서대로 볼 수도 있고, 지금 막힌 단계로 바로 이동할 수도 있습니다. 각 단계의 결과물이 다음 담당자와 다음 작업공간의 입력이 됩니다.", "Read from the beginning or jump directly to the stage blocking you. The output of each stage becomes the input for the next role and workspace.")}
           </p>
         </div>
 
         <nav
-          aria-label={ko ? "웹툰 제작 단계 바로가기" : "Jump to a production stage"}
+          aria-label={bi("웹툰 제작 단계 바로가기", "Jump to a production stage")}
           className="mt-7 grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
         >
           {WORKFLOW_STAGES.map((stage, index) => {
-            const copy = stage[locale];
+            const copy = bi((stage).ko, (stage).en);
 
             return (
               <a
@@ -270,7 +263,7 @@ export function WebtoonWorkflowPage() {
               id="workflow-all-stages-title"
               className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl"
             >
-              {ko ? "기획에서 연재 운영까지." : "From planning to release operations."}
+              {bi("기획에서 연재 운영까지.", "From planning to release operations.")}
             </h2>
           </div>
           <span className="hidden font-display text-xs font-bold uppercase tracking-[0.14em] text-fg-3 sm:block">
@@ -281,7 +274,7 @@ export function WebtoonWorkflowPage() {
         <ol className="divide-y divide-line">
           {WORKFLOW_STAGES.map((stage, index) => {
             const Icon = stage.icon;
-            const copy = stage[locale];
+            const copy = bi((stage).ko, (stage).en);
 
             return (
               <li
@@ -316,7 +309,7 @@ export function WebtoonWorkflowPage() {
 
                   <div className="rounded-2xl border border-line/70 bg-panel/55 p-4">
                     <p className="font-display text-[0.65rem] font-bold uppercase tracking-[0.14em] text-fg-3">
-                      {ko ? "이 단계의 결과물" : "Stage outputs"}
+                      {bi("이 단계의 결과물", "Stage outputs")}
                     </p>
                     <ul className="mt-4 space-y-3">
                       {copy.outputs.map((output) => (
@@ -350,20 +343,16 @@ export function WebtoonWorkflowPage() {
               id="workflow-handoff-title"
               className="mt-3 text-balance text-2xl font-bold tracking-tight text-fg sm:text-3xl"
             >
-              {ko
-                ? "스토리 작가와 그림 작가가 달라도 흐름은 이어져야 합니다."
-                : "The flow must continue even when story and art belong to different people."}
+              {bi("스토리 작가와 그림 작가가 달라도 흐름은 이어져야 합니다.", "The flow must continue even when story and art belong to different people.")}
             </h2>
             <p className="mt-4 text-sm leading-7 text-fg-2">
-              {ko
-                ? "각 역할이 무엇을 완료했고 다음 사람이 무엇을 받아야 하는지 결과물 단위로 구분하면, 대화가 많아져도 원고의 상태를 놓치지 않습니다."
-                : "When each role completes a clear output for the next person, the page state stays understandable even as feedback grows."}
+              {bi("각 역할이 무엇을 완료했고 다음 사람이 무엇을 받아야 하는지 결과물 단위로 구분하면, 대화가 많아져도 원고의 상태를 놓치지 않습니다.", "When each role completes a clear output for the next person, the page state stays understandable even as feedback grows.")}
             </p>
           </div>
 
           <ol className="grid gap-3 sm:grid-cols-2">
             {ROLE_HANDOFFS.map((role, index) => {
-              const [title, body] = role[locale];
+              const [title, body] = bi((role).ko, (role).en);
 
               return (
                 <li
@@ -396,19 +385,17 @@ export function WebtoonWorkflowPage() {
         <div>
           <Save size={22} className="text-accent" aria-hidden="true" />
           <h2 id="workflow-save-first-title" className="mt-4 text-xl font-bold text-fg">
-            {ko ? "마지막 행동은 ‘게시’가 아니라 ‘안전하게 남기기’입니다." : "The last action is safe keeping, not mandatory publishing."}
+            {bi("마지막 행동은 ‘게시’가 아니라 ‘안전하게 남기기’입니다.", "The last action is safe keeping, not mandatory publishing.")}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-fg-2">
-            {ko
-              ? "완성한 원고는 비공개로 보관하거나 외부 플랫폼 업로드용으로 내보낼 수 있어야 합니다. ToonStudio는 저장을 기본 행동으로 두고 공개는 사용자가 선택하는 다음 단계로 다룹니다."
-              : "A finished page should be kept privately or exported for another platform. ToonStudio treats saving as the default action and publishing as an optional next step."}
+            {bi("완성한 원고는 비공개로 보관하거나 외부 플랫폼 업로드용으로 내보낼 수 있어야 합니다. ToonStudio는 저장을 기본 행동으로 두고 공개는 사용자가 선택하는 다음 단계로 다룹니다.", "A finished page should be kept privately or exported for another platform. ToonStudio treats saving as the default action and publishing as an optional next step.")}
           </p>
         </div>
         <Link
           href="/studio"
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-fg px-5 py-3 text-sm font-bold text-canvas"
         >
-          {ko ? "내 작업으로 이동" : "Go to My work"}
+          {bi("내 작업으로 이동", "Go to My work")}
           <ArrowRight size={16} aria-hidden="true" />
         </Link>
       </section>
