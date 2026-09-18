@@ -50,8 +50,22 @@ describe("Cloudflare static response rules", () => {
 
   it("keeps static and edge response policy artifacts synchronized", () => {
     expect(verifyCloudflareStaticRules()).toEqual([]);
-    expect(readFileSync("apps/web/public/_headers", "utf8")).toContain(
-      "Content-Security-Policy:",
+    const headers = readFileSync("apps/web/public/_headers", "utf8");
+    expect(headers).toContain("Content-Security-Policy:");
+    expect(headers).toContain(
+      "/studio/*\n  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: credentialless\n  X-Robots-Tag: noindex, nofollow, noarchive",
+    );
+    expect(headers).toContain(
+      "/search\n  X-Robots-Tag: noindex, follow",
+    );
+    expect(headers).toContain(
+      "/admin/*\n  X-Robots-Tag: noindex, nofollow, noarchive",
+    );
+    expect(headers).toContain(
+      "/auth/*\n  X-Robots-Tag: noindex, nofollow, noarchive",
+    );
+    expect(headers).toContain(
+      "/messages\n  X-Robots-Tag: noindex, nofollow, noarchive",
     );
   });
 });

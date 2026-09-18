@@ -6,7 +6,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   formatProductTitle,
   useDocumentTitle,
+  useMetaRobots,
   usePageSocialMeta,
+  useRouteSeoPolicy,
 } from "./use-document-title";
 
 import { useI18n } from "@/shared/lib/i18n";
@@ -27,6 +29,17 @@ function TitleProbe({ title }: { title?: string }) {
   return null;
 }
 
+function PolicyProbe({ path }: { path: string }) {
+  useRouteSeoPolicy(path);
+  return null;
+}
+
+function PageRobotsOverrideProbe({ path }: { path: string }) {
+  useMetaRobots("noindex,nofollow,noarchive");
+  useRouteSeoPolicy(path);
+  return null;
+}
+
 function installHeadFixtures(): void {
   document.head.innerHTML = `
     <link rel="canonical" href="https://www.toonstudio.cloud/">
@@ -39,6 +52,8 @@ function installHeadFixtures(): void {
     <meta name="twitter:title" content="기본 제목">
     <meta name="twitter:description" content="기본 설명">
     <meta name="twitter:image" content="https://www.toonstudio.cloud/og-web.png">
+    <meta name="robots" content="index,follow">
+    <meta name="googlebot" content="index,follow">
   `;
 }
 
@@ -70,6 +85,36 @@ describe("useDocumentTitle", () => {
   });
 });
 
+describe("useRouteSeoPolicy", () => {
+  it("canonicalizes aliases and applies the route robots policy", () => {
+    installHeadFixtures();
+    render(<PolicyProbe path="/shaper" />);
+
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href"))
+      .toBe("https://www.toonstudio.cloud/studio/assets/characters/new");
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content"))
+      .toBe("noindex,nofollow,noarchive");
+    expect(document.querySelector('meta[name="googlebot"]')?.getAttribute("content"))
+      .toBe("noindex,nofollow,noarchive");
+  });
+
+  it("keeps search crawlable while excluding it from search indexes", () => {
+    installHeadFixtures();
+    render(<PolicyProbe path="/search" />);
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content"))
+      .toBe("noindex,follow");
+  });
+
+  it("preserves a page-level noindex override over the route default", () => {
+    installHeadFixtures();
+    render(<PageRobotsOverrideProbe path="/title/sample-work" />);
+    expect(document.querySelector('meta[name="robots"]')?.getAttribute("content"))
+      .toBe("noindex,nofollow,noarchive");
+    expect(document.querySelector('meta[name="googlebot"]')?.getAttribute("content"))
+      .toBe("noindex,nofollow,noarchive");
+  });
+});
+
 describe("usePageSocialMeta", () => {
   it("updates canonical, Open Graph, and Twitter metadata for a route", () => {
     installHeadFixtures();
@@ -83,6 +128,15 @@ describe("usePageSocialMeta", () => {
       .toBe("먹선 브러시 · 툰스튜디오");
     expect(document.querySelector('meta[name="twitter:description"]')?.getAttribute("content"))
       .toBe("창작 리소스를 실제 Studio 호환성과 함께 탐색합니다.");
+  });
+
+  it("canonicalizes historical aliases in social metadata", () => {
+    installHeadFixtures();
+    render(<MetaProbe path="/create" title="창작자 쇼케이스" />);
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href"))
+      .toBe("https://www.toonstudio.cloud/showcase");
+    expect(document.querySelector('meta[property="og:url"]')?.getAttribute("content"))
+      .toBe("https://www.toonstudio.cloud/showcase");
   });
 
   it("restores the previous route metadata on unmount", () => {

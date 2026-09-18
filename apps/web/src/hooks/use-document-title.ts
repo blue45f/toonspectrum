@@ -1,7 +1,8 @@
 import { SITE_URL } from "@toonspectrum/core";
 import { useEffect } from "react";
 
-import { useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
+import { resolveSeoRoutePolicy } from "@/shared/lib/seo-route-policy";
 
 const LEGACY_PRODUCT_NAMES = ["툰스펙트럼", "ToonSpectrum"] as const;
 
@@ -78,6 +79,65 @@ export function useMetaDescription(description?: string | null) {
   }, [description]);
 }
 
+function ensureMeta(selector: string, name: string): HTMLMetaElement {
+  const existing = document.head.querySelector<HTMLMetaElement>(selector);
+  if (existing) return existing;
+  const element = document.createElement("meta");
+  element.name = name;
+  document.head.appendChild(element);
+  return element;
+}
+
+const PAGE_ROBOTS_OVERRIDE_ATTRIBUTE = "data-seo-robots-override";
+
+export function useMetaRobots(content?: string | null): void {
+  useEffect(() => {
+    const next = content?.trim();
+    if (!next) return;
+    const robots = ensureMeta('meta[name="robots"]', "robots");
+    const googlebot = ensureMeta('meta[name="googlebot"]', "googlebot");
+    const previousRobots = robots.content;
+    const previousGooglebot = googlebot.content;
+    const previousRobotsOverride = robots.getAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE);
+    const previousGooglebotOverride = googlebot.getAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE);
+    robots.setAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE, "page");
+    googlebot.setAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE, "page");
+    robots.content = next;
+    googlebot.content = next;
+    return () => {
+      robots.content = previousRobots;
+      googlebot.content = previousGooglebot;
+      if (previousRobotsOverride === null) robots.removeAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE);
+      else robots.setAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE, previousRobotsOverride);
+      if (previousGooglebotOverride === null) googlebot.removeAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE);
+      else googlebot.setAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE, previousGooglebotOverride);
+    };
+  }, [content]);
+}
+
+export function useRouteSeoPolicy(pathname: string): void {
+  const lang = useI18n((state) => state.lang);
+  const { canonicalPath, robots } = resolveSeoRoutePolicy(pathname);
+
+  useEffect(() => {
+    const canonicalUrl = `${SITE_URL}${canonicalPath}`;
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    canonical.href = canonicalUrl;
+    const robotsMeta = ensureMeta('meta[name="robots"]', "robots");
+    const googlebotMeta = ensureMeta('meta[name="googlebot"]', "googlebot");
+    if (!robotsMeta.hasAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE)) robotsMeta.content = robots;
+    if (!googlebotMeta.hasAttribute(PAGE_ROBOTS_OVERRIDE_ATTRIBUTE)) googlebotMeta.content = robots;
+    document.documentElement.lang = lang;
+    document.head.querySelector<HTMLMetaElement>('meta[property="og:url"]')
+      ?.setAttribute("content", canonicalUrl);
+  }, [canonicalPath, lang, robots]);
+}
+
 interface PageSocialMeta {
   readonly canonicalPath: string;
   readonly title: string;
@@ -126,7 +186,8 @@ export function usePageSocialMeta({
 
   useEffect(() => {
     const normalizedPath = canonicalPath.startsWith("/") ? canonicalPath : `/${canonicalPath}`;
-    const canonicalUrl = `${SITE_URL}${normalizedPath}`;
+    const resolvedCanonicalPath = resolveSeoRoutePolicy(normalizedPath).canonicalPath;
+    const canonicalUrl = `${SITE_URL}${resolvedCanonicalPath}`;
     const safeTitle = formatProductTitle(title, productName).slice(0, 120);
     const safeDescription = description.trim().slice(0, 200);
     const safeImageAlt = (imageAlt?.trim() || safeTitle).slice(0, 160);
