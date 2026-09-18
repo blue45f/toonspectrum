@@ -4,7 +4,10 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createEmptyAnimationTimelineDoc } from "./studio-anim-tracks";
-import { useStudioPageClipboard } from "./studio-page-clipboard-controller";
+import {
+  studioClipboardImageFiles,
+  useStudioPageClipboard,
+} from "./studio-page-clipboard-controller";
 
 import type { El } from "./studio-element-model";
 import type { PageState } from "./studio-page-state";
@@ -80,6 +83,37 @@ function renderClipboard(
 }
 
 afterEach(cleanup);
+
+describe("Studio external clipboard images", () => {
+  it("merges item and file clipboard sources without inserting the same image twice", () => {
+    const png = new File(["png"], "clipboard.png", { type: "image/png", lastModified: 1 });
+    const qoi = new File(["qoi"], "reference.qoi", { type: "", lastModified: 2 });
+    const note = new File(["text"], "notes.txt", { type: "text/plain", lastModified: 3 });
+    const clipboardData = {
+      items: [
+        { kind: "file", type: "image/png", getAsFile: () => png },
+        { kind: "string", type: "text/plain", getAsFile: () => null },
+      ],
+      files: [png, qoi, note],
+    } as unknown as Pick<DataTransfer, "items" | "files">;
+
+    expect(studioClipboardImageFiles(clipboardData)).toEqual([png, qoi]);
+  });
+
+  it("keeps multiple image items in clipboard order", () => {
+    const first = new File(["a"], "a.png", { type: "image/png" });
+    const second = new File(["b"], "b.webp", { type: "image/webp" });
+    const clipboardData = {
+      items: [
+        { kind: "file", type: "image/png", getAsFile: () => first },
+        { kind: "file", type: "image/webp", getAsFile: () => second },
+      ],
+      files: [],
+    } as unknown as Pick<DataTransfer, "items" | "files">;
+
+    expect(studioClipboardImageFiles(clipboardData)).toEqual([first, second]);
+  });
+});
 
 describe("Studio duplicate placement", () => {
   it("commits Option/Alt-drag as one in-place clone carrying the terminal drag patch", () => {
