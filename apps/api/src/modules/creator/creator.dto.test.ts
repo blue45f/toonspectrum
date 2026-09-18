@@ -4,6 +4,7 @@ import {
   CreateCreatorWorkSchema,
   CreatorAssetListQuerySchema,
   CreatorAssetModerationQuerySchema,
+  CreatorDirectoryQuerySchema,
   CreatorDraftCollaborationRoomParamsSchema,
   CreatorDraftCollaborationRoomResponseSchema,
   ModerateCreatorAssetSchema,
@@ -73,6 +74,30 @@ describe("creator asset marketplace zod contracts", () => {
     expect(CreatorAssetModerationQuerySchema.parse({})).toEqual({ status: "open", limit: 20, offset: 0 });
     expect(ModerateCreatorAssetSchema.safeParse({ status: "under_review", note: "확인 중" }).success).toBe(true);
     expect(ModerateCreatorAssetSchema.safeParse({ status: "deleted" }).success).toBe(false);
+  });
+});
+
+describe("creator directory query contract", () => {
+  it("coerces bounded pagination and rejects unknown role filters", () => {
+    expect(CreatorDirectoryQuerySchema.parse({
+      q: "  김작가  ",
+      role: "line-art",
+      specialty: "inking",
+      collaborationStatus: "available",
+      limit: "12",
+      offset: "24",
+    })).toEqual({
+      q: "김작가",
+      role: "line-art",
+      specialty: "inking",
+      collaborationStatus: "available",
+      limit: 12,
+      offset: 24,
+    });
+    expect(CreatorDirectoryQuerySchema.safeParse({ role: "super-admin" }).success).toBe(false);
+    expect(CreatorDirectoryQuerySchema.safeParse({ specialty: "secret" }).success).toBe(false);
+    expect(CreatorDirectoryQuerySchema.safeParse({ limit: 51 }).success).toBe(false);
+    expect(CreatorDirectoryQuerySchema.safeParse({ extra: "blocked" }).success).toBe(false);
   });
 });
 

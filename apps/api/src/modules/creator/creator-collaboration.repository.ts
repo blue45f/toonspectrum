@@ -4,6 +4,10 @@ import {
   assertStudioLinked3dPassAssetRows,
   extractStudioLinked3dPassAssetRequirements,
 } from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
+import {
+  publicCreatorRoleProfile,
+  type PublicCreatorRoleProfile,
+} from "@toonspectrum/core/creator-role";
 import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../../server/creator-provisional-work-status";
 import {
   CREATOR_WORK_REVISION_MAX,
@@ -79,6 +83,7 @@ export interface CreatorCollaborationTeamMember {
   role: CreatorCollaborationViewerRole;
   status: CreatorCollaborationStatus;
   isOwner: boolean;
+  creatorRoleProfile?: PublicCreatorRoleProfile;
   invitationId?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -286,6 +291,8 @@ function ownerMember(
     status: "active",
     isOwner: true,
   };
+  const publicRoleProfile = publicCreatorRoleProfile(owner?.creatorRoleProfile);
+  if (publicRoleProfile) member.creatorRoleProfile = publicRoleProfile;
   const createdAt = optionalIsoString(work.createdAt);
   const updatedAt = optionalIsoString(work.updatedAt);
   if (createdAt) member.createdAt = createdAt;
@@ -310,6 +317,8 @@ function collaborationMember(
     createdAt: membership.createdAt.toISOString(),
     updatedAt: membership.updatedAt.toISOString(),
   };
+  const publicRoleProfile = publicCreatorRoleProfile(membership.creatorRoleProfile);
+  if (publicRoleProfile) member.creatorRoleProfile = publicRoleProfile;
   if (membership.userId === viewerUserId && status === "pending") {
     member.invitationId = membership.invitationId;
   }

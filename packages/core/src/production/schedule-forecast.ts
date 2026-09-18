@@ -158,7 +158,11 @@ function assignmentReservedHours(
 
 function confidenceForTask(task: ProductionTask, hasCycle: boolean): ProductionRiskConfidence {
   if (hasCycle || !task.dueAt || !task.estimateHours) return "low";
-  if (task.assignmentIds.length === 0 || task.progressPercent === undefined) return "medium";
+  if (
+    task.assignmentIds.length === 0
+    || typeof task.progressPercent !== "number"
+    || typeof task.remainingEstimateHours !== "number"
+  ) return "medium";
   return "high";
 }
 

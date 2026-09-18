@@ -16,6 +16,7 @@ import {
   publishAsset,
   reportSharedAsset,
   restoreWorkRevision,
+  searchCreatorDirectory,
   updateWork,
 } from "./creator-client";
 
@@ -685,5 +686,32 @@ describe("creator client revision response contracts", () => {
     expect(apiGet).toHaveBeenNthCalledWith(2, "/creator/works/work%2F1/revisions/2", {
       signal: controller.signal,
     });
+  });
+});
+
+describe("creator directory client", () => {
+  beforeEach(() => {
+    apiGet.mockReset();
+    toApiError.mockClear();
+  });
+
+  it("encodes only bounded public discovery filters and preserves abort signals", async () => {
+    const controller = new AbortController();
+    const response = { items: [], nextOffset: null };
+    apiGet.mockResolvedValue(response);
+
+    await expect(searchCreatorDirectory({
+      q: "김 작가",
+      role: "line-art",
+      specialty: "inking",
+      collaborationStatus: "available",
+      limit: 12,
+      offset: 24,
+    }, controller.signal)).resolves.toBe(response);
+
+    expect(apiGet).toHaveBeenCalledWith(
+      "/creator/users?q=%EA%B9%80+%EC%9E%91%EA%B0%80&role=line-art&specialty=inking&collaborationStatus=available&limit=12&offset=24",
+      { signal: controller.signal },
+    );
   });
 });

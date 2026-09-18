@@ -33,6 +33,12 @@
       ],
       "mixbox": [
         "./apps/web/src/types/mixbox.d.ts"
+      ],
+      "@toonspectrum/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@toonspectrum/core/*": [
+        "./packages/core/src/*"
       ]
     },
     "allowImportingTsExtensions": true

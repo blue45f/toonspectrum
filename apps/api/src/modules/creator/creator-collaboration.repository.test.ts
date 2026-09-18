@@ -63,6 +63,7 @@ interface MemoryUser {
   name: string | null;
   image: string | null;
   status: string;
+  creatorRoleProfile?: unknown;
 }
 
 interface MemoryMembership {
@@ -252,6 +253,7 @@ class MemoryCollaborationStore
       .map((membership) => ({
         ...membership,
         name: this.users.get(membership.userId)?.name ?? null,
+        creatorRoleProfile: this.users.get(membership.userId)?.creatorRoleProfile,
       }));
   }
 
@@ -650,6 +652,22 @@ function createFixture(now = DEFAULT_NOW) {
     name: "작가",
     image: "owner.png",
     status: "active",
+    creatorRoleProfile: {
+      version: 2,
+      primaryRole: "producer",
+      secondaryRoles: ["story"],
+      specialties: ["budget"],
+      experienceLevel: "professional",
+      collaborationStatus: "limited",
+      visibility: {
+        roles: true,
+        specialties: false,
+        experienceLevel: false,
+        collaborationStatus: true,
+      },
+      activeRole: "story",
+      projectRolePreferences: [{ projectKey: "work-1", activeRole: "story" }],
+    },
   });
   store.users.set("admin", {
     userId: "admin",

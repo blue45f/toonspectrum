@@ -42,7 +42,10 @@ process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(root, "apps/web/src") },
+    alias: {
+      "@": path.resolve(root, "apps/web/src"),
+      "@toonspectrum/core/creator-role": path.resolve(root, "packages/core/src/creator-role.ts"),
+    },
   },
   test: {
     // 수집 루트를 이 설정 파일의 디렉터리에 고정한다(기본값은 process.cwd()라 어디서
