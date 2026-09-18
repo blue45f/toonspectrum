@@ -135,7 +135,7 @@ function OverviewSuite({
   view,
 }: {
   readonly projectId: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
   readonly view: string;
 }) {
   const l = useBilingualLocalizer("studioFeatureSuite.overview");
@@ -214,7 +214,7 @@ function StorySuite({
   view,
 }: {
   readonly projectId: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
   readonly view: string;
 }) {
   const l = useBilingualLocalizer("studioFeatureSuite.story");
@@ -726,7 +726,7 @@ export function StudioProjectFeatureSuitePanel({
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
-  readonly locale: string;
+  readonly locale: "ko" | "en";
 }) {
   const l = useBilingualLocalizer("studioFeatureSuite");
   if (section === "overview") {
