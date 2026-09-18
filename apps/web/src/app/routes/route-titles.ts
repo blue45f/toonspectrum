@@ -62,6 +62,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/contact": "route.contact",
   "/business": "route.business",
   "/support-us": "route.supportUs",
+  "/support-creators": "route.creatorSupport",
   "/support": "route.support",
   "/create": "route.create",
   "/showcase": "route.create",

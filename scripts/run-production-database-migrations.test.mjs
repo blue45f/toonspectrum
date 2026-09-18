@@ -44,10 +44,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(68);
+  expect(manifest).toHaveLength(70);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0068_business_inquiries");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(68);
+  expect(manifest.at(-1).id).toBe("0070_creator_support_program");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(70);
 });
 
 test("applied studio media inference migration remains checksum-immutable", () => {
@@ -1252,6 +1252,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "admin_content_reports",
     "admin_promos",
     "admin_security_policies",
+    "business_inquiry",
     "community_cafe_ban",
     "community_cafe_invite",
     "community_cafe_join_request",
@@ -1341,6 +1342,10 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_ai_comic_director_job_event",
     "studio_ai_comic_director_session",
     "studio_ai_visual_bible_revision",
+    "creator_support_application",
+    "creator_support_offer",
+    "supporter_funding_setting",
+    "supporter_payment",
   ]);
   const readinessSource = readFileSync(
     new URL(

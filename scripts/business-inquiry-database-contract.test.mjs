@@ -33,7 +33,6 @@ test("business inquiry migration is forward-only, private, and bounded", () => {
 });
 
 test("business inquiry migration is the next managed migration only once", () => {
-  expect(manifest.at(-1)).toBe("apps/api/src/db/migrations/0068_business_inquiries.sql");
   expect(manifest.filter((entry) => entry.endsWith("0068_business_inquiries.sql"))).toHaveLength(1);
 });
 
