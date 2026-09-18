@@ -40,6 +40,9 @@
 /library
   X-Robots-Tag: noindex, nofollow, noarchive
 
+/library/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
 /messages
   X-Robots-Tag: noindex, nofollow, noarchive
 
@@ -49,13 +52,22 @@
 /me
   X-Robots-Tag: noindex, nofollow, noarchive
 
+/me/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
 /my
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/my/*
   X-Robots-Tag: noindex, nofollow, noarchive
 
 /settings
   X-Robots-Tag: noindex, nofollow, noarchive
 
 /settings/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+
+/auth
   X-Robots-Tag: noindex, nofollow, noarchive
 
 /auth/*
