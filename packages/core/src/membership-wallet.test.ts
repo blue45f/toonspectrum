@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACTIVITY_POINT_POLICIES,
+  automaticCreatorLevel,
   estimateCreditCost,
   highestMembershipPlan,
   MEMBERSHIP_ECONOMY_POLICY,
@@ -23,6 +24,29 @@ describe("membership wallet policy", () => {
     expect(MEMBERSHIP_ECONOMY_POLICY.pointExpiryDays).toBe(365);
     expect(ACTIVITY_POINT_POLICIES["creator.work.published"].points).toBe(100);
     expect(ACTIVITY_POINT_POLICIES["community.comment.created"].dailyGrantLimit).toBe(10);
+  });
+
+  it("derives creator level from verified, published and activity signals", () => {
+    expect(automaticCreatorLevel({
+      verifiedCreator: false,
+      publishedWorks: 99,
+      activityPoints: 99_999,
+    })).toBe("new");
+    expect(automaticCreatorLevel({
+      verifiedCreator: true,
+      publishedWorks: 0,
+      activityPoints: 0,
+    })).toBe("verified");
+    expect(automaticCreatorLevel({
+      verifiedCreator: true,
+      publishedWorks: 5,
+      activityPoints: 1_500,
+    })).toBe("trusted");
+    expect(automaticCreatorLevel({
+      verifiedCreator: true,
+      publishedWorks: 20,
+      activityPoints: 5_000,
+    })).toBe("professional");
   });
 
   it("keeps future credit cost estimates bounded", () => {
