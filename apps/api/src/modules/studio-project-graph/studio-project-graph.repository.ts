@@ -85,6 +85,23 @@ export interface StudioRevisionRecord {
   }[];
 }
 
+export interface StudioExternalFileBindingRecord {
+  readonly id: string;
+  readonly artifactId: string;
+  readonly provider: "local-file" | "filesystem-handle" | "google-drive" | "dropbox" | "onedrive";
+  readonly providerAccountId: string | null;
+  readonly remoteFileId: string;
+  readonly displayPath: string;
+  readonly syncMode: "import-only" | "export-only" | "bidirectional" | "backup-mirror";
+  readonly remoteVersion: string | null;
+  readonly remoteEtag: string | null;
+  readonly contentHash: string | null;
+  readonly lastSyncedRevisionId: string | null;
+  readonly lastSyncedAt: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export interface StudioRevisionCommitResponse {
   readonly artifactId: string;
   readonly revisionId: string;
@@ -95,7 +112,7 @@ export interface StudioRevisionCommitResponse {
 }
 
 export class StudioProjectNotFoundError extends Error {
-  constructor(readonly target: "work" | "project" | "artifact" | "revision" | "review" | "comment" | "report") {
+  constructor(readonly target: "work" | "project" | "artifact" | "revision" | "review" | "comment" | "report" | "binding") {
     super(`studio_${target}_not_found`);
     this.name = "StudioProjectNotFoundError";
   }
@@ -109,7 +126,7 @@ export class StudioProjectForbiddenError extends Error {
 }
 
 export class StudioProjectIdentityConflictError extends Error {
-  constructor(readonly code: "project_exists" | "work_already_linked" | "artifact_exists" | "revision_exists") {
+  constructor(readonly code: "project_exists" | "work_already_linked" | "artifact_exists" | "revision_exists" | "binding_exists") {
     super(code);
     this.name = "StudioProjectIdentityConflictError";
   }

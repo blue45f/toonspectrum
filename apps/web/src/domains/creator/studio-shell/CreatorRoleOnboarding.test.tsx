@@ -24,6 +24,7 @@ const initialProfile: MeProfile = {
   avatar: null,
   email: "creator@example.com",
   bio: null,
+  regionSettings: null,
   creatorRoleProfile: normalizeCreatorRoleProfile(null),
 };
 

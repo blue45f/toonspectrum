@@ -86,6 +86,6 @@ export const PRODUCT_START_DESTINATIONS = [
 
 export type ProductStartDestinationId = (typeof PRODUCT_START_DESTINATIONS)[number]["id"];
 
-export function resolveProductLocale(_language): ProductLocale {
-  return getActiveI18nLocale();
+export function resolveProductLocale(_language?: unknown): ProductLocale {
+  return getActiveI18nLocale() === "ko" ? "ko" : "en";
 }

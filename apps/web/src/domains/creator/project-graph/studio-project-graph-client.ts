@@ -33,6 +33,12 @@ import {
   type CompatibilityReport,
 } from "./studio-project-graph-contract";
 
+export type {
+  StudioArtifactRecord as StudioProjectArtifactRecord,
+  StudioProjectRecord as StudioProjectGraphSnapshot,
+  StudioRevisionRecord as StudioProjectRevisionRecord,
+} from "./studio-project-graph-contract";
+
 const BASE = "/studio-project-graph";
 const MAX_PREFIX_LENGTH = 40;
 

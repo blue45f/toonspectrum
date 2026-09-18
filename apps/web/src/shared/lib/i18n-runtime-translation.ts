@@ -145,9 +145,22 @@ function getRuntimeTranslationStorageKey(locale: string): string {
   return `${RUNTIME_TRANSLATION_STORAGE_PREFIX}:v${RUNTIME_TRANSLATION_CACHE_VERSION}:${locale}`;
 }
 
+function getRuntimeTranslationStorage(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 function clearInvalidRuntimeTranslationCache(locale: string): void {
-  if (typeof localStorage === "undefined") return;
-  localStorage.removeItem(getRuntimeTranslationStorageKey(locale));
+  const storage = getRuntimeTranslationStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(getRuntimeTranslationStorageKey(locale));
+  } catch {
+    // Storage is optional; keep using the in-memory runtime bundle.
+  }
 }
 
 function isRuntimeTranslationDictionary(value: unknown): value is Dict {
@@ -167,10 +180,11 @@ function isRuntimeTranslationDictionary(value: unknown): value is Dict {
 }
 
 function readCachedRuntimeTranslation(locale: string): Dict | null {
-  if (typeof localStorage === "undefined") return null;
+  const storage = getRuntimeTranslationStorage();
+  if (!storage) return null;
   const key = getRuntimeTranslationStorageKey(locale);
   try {
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as RuntimeTranslationCachePayload;
 
@@ -196,7 +210,8 @@ function readCachedRuntimeTranslation(locale: string): Dict | null {
 }
 
 function writeRuntimeTranslationCache(locale: string, dict: Dict): void {
-  if (typeof localStorage === "undefined") return;
+  const storage = getRuntimeTranslationStorage();
+  if (!storage) return;
 
   const key = getRuntimeTranslationStorageKey(locale);
   const payload: RuntimeTranslationCachePayload = {
@@ -208,7 +223,7 @@ function writeRuntimeTranslationCache(locale: string, dict: Dict): void {
   };
 
   try {
-    localStorage.setItem(key, JSON.stringify(payload));
+    storage.setItem(key, JSON.stringify(payload));
   } catch {
     // Storage can be blocked or full. The in-memory bundle still remains usable.
   }

@@ -212,22 +212,6 @@ const ClarificationThreadSchema = z.object({
   updatedAt: IsoDateTimeSchema,
 }).strict();
 
-const ProductionStudioRevisionLinkSchema = z.object({
-  id: IdentitySchema,
-  projectId: IdentitySchema,
-  workId: IdentitySchema,
-  episodeId: IdentitySchema.nullable(),
-  studioDocumentRef: z.string().trim().min(1).max(500),
-  documentRole: z.enum(PRODUCTION_STUDIO_DOCUMENT_ROLES),
-  studioRevisionRef: ProductionRevisionRefSchema,
-  deliverableId: IdentitySchema,
-  submissionId: IdentitySchema,
-  linkedByAssignmentId: IdentitySchema,
-  status: z.enum(["submitted", "approved", "superseded"]),
-  linkedAt: IsoDateTimeSchema,
-  approvedAt: NullableIsoDateTimeSchema,
-}).strict();
-
 const ReviewPolicyLaneSchema = z.object({
   lane: z.enum(REVIEW_LANES),
   eligibleAssignmentIds: z.array(IdentitySchema).max(100),

@@ -1,7 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, Boxes, Compass, FolderKanban, Images, PackageCheck, Palette, Sparkles, Store, Workflow } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -12,10 +9,6 @@ import Link from "@/compat/router-link";
 
 import "./public-site-shell.css";
 import "./public-site-vibrance.css";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("public-site-journey", ko, en);
@@ -59,7 +52,7 @@ export function PublicSiteJourney({ pathname, locale: _locale }: { pathname: str
               ? PRODUCTION_ICONS[id as keyof typeof PRODUCTION_ICONS]
               : ICONS[id as keyof typeof ICONS];
             return (
-              <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "resources") : id === "make" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "create") : id} aria-current={active === id ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "step") : undefined} data-active={active === id || undefined}>
+              <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "resources") : id === "make" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "create") : id} aria-current={active === id ? "step" : undefined} data-active={active === id || undefined}>
                 <span aria-hidden="true" className="public-site-journey__step">{String(index + 1).padStart(2, "0")}</span>
                 <Icon size={13} aria-hidden="true" />
                 <span>{bi(ko, en)}</span>

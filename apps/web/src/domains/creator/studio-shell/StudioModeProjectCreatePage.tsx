@@ -334,7 +334,7 @@ export function StudioModeProjectCreatePage() {
 
           <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
             <div className="min-w-0 space-y-4">
-              <StudioModeWorkspacePreview profile={modePlan.profile} locale={locale} />
+              <StudioModeWorkspacePreview profile={modePlan.profile} locale={locale === "ko" ? "ko" : "en"} />
 
               {kind === "webtoon" ? (
                 <div className="rounded-2xl border border-line bg-card p-4 sm:p-5">

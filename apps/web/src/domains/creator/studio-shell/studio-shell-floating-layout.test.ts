@@ -10,7 +10,7 @@ import {
   hideAllStudioShellFloatingSurfaces,
   isStudioShellFloatingSurfaceVisible,
   normalizeStudioShellFloatingVisibility,
-  setStudioShellFloatingAutoHideDuringStroke,
+  setStudioShellFloatingAutoHideWhileDrawing,
   setStudioShellFloatingSurfaceVisible,
   showAllStudioShellFloatingSurfaces,
   studioShellFloatingSurfaceById,
@@ -50,9 +50,9 @@ describe("studio shell floating layout registry", () => {
     expect(state).toEqual({
       version: 1,
       hidden: ["document-tools", "collaboration"],
-      autoHideDuringStroke: true,
+      autoHideWhileDrawing: true,
     });
-    expect(Object.keys(state)).toEqual(["version", "hidden", "autoHideDuringStroke"]);
+    expect(Object.keys(state)).toEqual(["version", "hidden", "autoHideWhileDrawing"]);
     expect(Object.isFrozen(state)).toBe(true);
     expect(Object.isFrozen(state.hidden)).toBe(true);
     expect(JSON.parse(encodeStudioShellFloatingVisibility(state))).toEqual(state);
@@ -93,7 +93,7 @@ describe("studio shell floating layout registry", () => {
   });
 
   it("preserves the stroke-focus preference across visibility and preset changes", () => {
-    const disabled = setStudioShellFloatingAutoHideDuringStroke(
+    const disabled = setStudioShellFloatingAutoHideWhileDrawing(
       DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY,
       false,
     );
@@ -103,15 +103,15 @@ describe("studio shell floating layout registry", () => {
       false,
     );
 
-    expect(hidden.autoHideDuringStroke).toBe(false);
-    expect(applyStudioShellFloatingPreset("production", disabled).autoHideDuringStroke)
+    expect(hidden.autoHideWhileDrawing).toBe(false);
+    expect(applyStudioShellFloatingPreset("production", disabled).autoHideWhileDrawing)
       .toBe(false);
     expect(showAllStudioShellFloatingSurfaces(disabled)).toEqual({
       version: 1,
       hidden: [],
-      autoHideDuringStroke: false,
+      autoHideWhileDrawing: false,
     });
-    expect(hideAllStudioShellFloatingSurfaces(disabled).autoHideDuringStroke).toBe(false);
+    expect(hideAllStudioShellFloatingSurfaces(disabled).autoHideWhileDrawing).toBe(false);
     expect(normalizeStudioShellFloatingVisibility({ version: 1, hidden: [] }))
       .toEqual(DEFAULT_STUDIO_SHELL_FLOATING_VISIBILITY);
   });

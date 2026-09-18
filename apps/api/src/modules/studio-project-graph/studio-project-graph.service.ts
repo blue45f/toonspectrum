@@ -20,6 +20,7 @@ import type {
   RestoreStudioRevision,
   RegisterStudioBlob,
 } from "./studio-project-graph.dto";
+import { StudioExternalFileBindingRepository } from "./studio-external-file-binding.repository";
 import {
   StudioBlobMetadataConflictError,
   StudioBlobNotReadyError,

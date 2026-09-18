@@ -1,60 +1,14 @@
-import {
-  formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  AlertTriangle,
-  BadgeCheck,
-  BookOpenText,
-  Boxes,
-  BriefcaseBusiness,
-  CalendarClock,
-  ClipboardCheck,
-  Coins,
-  FileKey2,
-  GitBranch,
-  Handshake,
-  Layers3,
-  LayoutDashboard,
-  LockKeyhole,
-  MessagesSquare,
-  PanelTopOpen,
-  Scale,
-  ScrollText,
-  ShieldAlert,
-  Users,
-  Workflow,
-} from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenText, Boxes, BriefcaseBusiness, CalendarClock, ChevronRight, ClipboardCheck, Coins, FileKey2, GitBranch, Handshake, Layers3, LayoutDashboard, LockKeyhole, MessagesSquare, PanelTopOpen, Scale, ScrollText, ShieldCheck, Users, Workflow } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
-import {
-  applyProductionStudioRevisionLink,
-  createPlanningSnapshot,
-  evaluateHandoffReadiness,
-  evaluateProductionRisks,
-  evaluateReviewApproval,
-  preflightCreditManifest,
-  transitionProductionRisk,
-  transitionProductionRiskResponse,
-  type ClarificationThread,
-  type EpisodeCollaboration,
-  type ProductionProjectAggregate,
-  type ProductionTask,
-  type ReviewDecision,
-  type StoryToArtHandoffPackage,
-} from "@toonspectrum/core/production";
+import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHandoffReadiness, evaluateProductionRisks, evaluateReviewApproval, preflightCreditManifest, transitionProductionRisk, transitionProductionRiskResponse, type ClarificationThread, type EpisodeCollaboration, type ProductionProjectAggregate, type ProductionTask, type ReviewDecision, type StoryToArtHandoffPackage } from "@toonspectrum/core/production";
 
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
-import { ProductionRiskWorkspace } from "./ProductionRiskWorkspace";
+
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
 import { ProductionStudioRevisionBridgePanel } from "./ProductionStudioRevisionBridgePanel";
@@ -63,22 +17,10 @@ import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
 import { ProductionOperationsControlWorkspace } from "./ProductionOperationsControlWorkspace";
-import {
-  executeProductionCommand,
-  getProductionPersonalInbox,
-  getProductionProject,
-  listProductionProjects,
-  type ProductionClientCommand,
-  type ProductionPersonalInboxItem,
-  type ProductionProjectAccess,
-  type ProductionProjectSummary,
-} from "./production-api";
+import { executeProductionCommand, getProductionPersonalInbox, getProductionProject, listProductionProjects, type ProductionClientCommand, type ProductionPersonalInboxItem, type ProductionProjectAccess, type ProductionProjectSummary } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import {
-  creatorRoleLens,
-  type CreatorRoleLens,
-} from "@/shared/lib/creator-role-contract";
+import { creatorRoleLens, type CreatorRoleLens } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
 import { getApiErrorMessage, httpStatus } from "@/infrastructure/api";
@@ -824,7 +766,7 @@ function ProjectHeader({
           <div className="flex flex-wrap items-center gap-2">
             <Link className="text-xs font-bold tracking-[0.08em] text-accent" to="/production">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "제작 관리")}</Link>
             <span className="text-fg-3" aria-hidden="true">/</span>
-            <Pill tone={isDemo ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success")}>{isDemo ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "기능 미리보기") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "실제 프로젝트")}</Pill>
+            <Pill tone={isDemo ? "warning" : "success"}>{isDemo ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "기능 미리보기") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "실제 프로젝트")}</Pill>
             <Pill>{access.role ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "읽기 전용")}</Pill>
           </div>
           <h1 className="mt-1 truncate text-xl font-black tracking-tight text-fg">{aggregate.title}</h1>
@@ -862,7 +804,7 @@ function ProjectNav({ projectId, surface }: { readonly projectId: string; readon
           <Link
             key={id}
             to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "/production/projects/{v0}/{v1}"), { v0: String(encodeURIComponent(projectId)), v1: String(id) })}
-            aria-current={surface === id ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "page") : undefined}
+            aria-current={surface === id ? "page" : undefined}
             title={`${label} · ${description}`}
             className={cn(
               "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors lg:min-h-[3.75rem]",
@@ -931,10 +873,10 @@ function PlanningSurface({
     <div className="space-y-4">
       <ProductionVisualPlanningWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "기획 기준선")} value={brief ? `r${brief.revision}` : "—"} detail={brief?.status ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작품 한눈에 보기 없음")} icon={ScrollText} tone={brief?.status === "approved" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")} />
+        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "기획 기준선")} value={brief ? `r${brief.revision}` : "—"} detail={brief?.status ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작품 한눈에 보기 없음")} icon={ScrollText} tone={brief?.status === "approved" ? "success" : "warning"} />
         <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "회차 계획")} value={String(currentEpisodePlans.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "{v0} scenes · {v1} cuts"), { v0: String(currentScenePlans.length), v1: String(currentCutPlans.length) })} icon={PanelTopOpen} tone="accent" />
         <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "에셋 요구")} value={String(aggregate.assetRequirements.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 차단"), { v0: String(aggregate.assetRequirements.filter((entry) => entry.status === "blocked").length) })} icon={Boxes} />
-        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "열린 위험")} value={String(openRisks.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 고위험"), { v0: String(openRisks.filter((entry) => entry.probability * entry.impact >= 12).length) })} icon={AlertTriangle} tone={openRisks.some((entry) => entry.probability * entry.impact >= 12) ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "neutral")} />
+        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "열린 위험")} value={String(openRisks.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 고위험"), { v0: String(openRisks.filter((entry) => entry.probability * entry.impact >= 12).length) })} icon={AlertTriangle} tone={openRisks.some((entry) => entry.probability * entry.impact >= 12) ? "danger" : "neutral"} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
@@ -976,7 +918,7 @@ function PlanningSurface({
             const cuts = currentCutPlans.filter((entry) => entry.episodeId === plan.episodeId);
             return (
               <article key={plan.id} className="rounded-xl border border-line bg-panel p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "EP ")}{plan.episodeNumber}</p><h3 className="mt-1 font-bold text-fg">{plan.title}</h3></div><Pill tone={plan.status === "locked" || plan.status === "approved" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{plan.status} · r{plan.revision}</Pill></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-accent">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "EP ")}{plan.episodeNumber}</p><h3 className="mt-1 font-bold text-fg">{plan.title}</h3></div><Pill tone={plan.status === "locked" || plan.status === "approved" ? "success" : "warning"}>{plan.status} · r{plan.revision}</Pill></div>
                 <p className="mt-3 text-xs leading-5 text-fg-2">{plan.logline}</p>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs"><div className="rounded-lg bg-raised p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "목표 컷")}</p><p className="mt-1 font-bold text-fg">{plan.targetCutCount}</p></div><div className="rounded-lg bg-raised p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "설계 장면")}</p><p className="mt-1 font-bold text-fg">{scenes.length}</p></div><div className="rounded-lg bg-raised p-2"><p className="text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "설계 컷")}</p><p className="mt-1 font-bold text-fg">{cuts.length}</p></div></div>
                 <p className="mt-3 text-[0.6875rem] leading-5 text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "Hook: ")}{plan.openingHook || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작성 중")} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "· Cliffhanger: ")}{plan.cliffhanger || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작성 중")}</p>
@@ -1003,10 +945,10 @@ function PlanningSurface({
 
       <div className="grid gap-4 xl:grid-cols-2">
         <SectionCard title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "에셋 요구사항")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "기획 breakdown에서 내부 제작·외주·마켓 소싱으로 전환됩니다.")}>
-          <div className="space-y-2">{aggregate.assetRequirements.map((entry) => <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3"><Pill>{entry.category}</Pill><span className="font-semibold text-fg">{entry.title}</span><Pill tone={entry.status === "ready" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : entry.status === "blocked" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{entry.status}</Pill><span className="ml-auto text-xs text-fg-3">{entry.sourcing}</span><p className="w-full text-xs leading-5 text-fg-2">{entry.specification}</p></div>)}</div>
+          <div className="space-y-2">{aggregate.assetRequirements.map((entry) => <div key={entry.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3"><Pill>{entry.category}</Pill><span className="font-semibold text-fg">{entry.title}</span><Pill tone={entry.status === "ready" ? "success" : entry.status === "blocked" ? "danger" : "warning"}>{entry.status}</Pill><span className="ml-auto text-xs text-fg-3">{entry.sourcing}</span><p className="w-full text-xs leading-5 text-fg-2">{entry.specification}</p></div>)}</div>
         </SectionCard>
         <SectionCard title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "위험·결정 원장")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "위험 대응과 창작·운영 결정을 회차·장면 범위에 고정합니다.")}>
-          <div className="space-y-2">{openRisks.map((risk) => <div key={risk.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap items-center gap-2"><Pill tone={risk.probability * risk.impact >= 12 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>P{risk.probability} × I{risk.impact}</Pill><span className="font-semibold text-fg">{risk.title}</span><Pill>{risk.status}</Pill></div><p className="mt-2 text-xs leading-5 text-fg-2">{risk.mitigation}</p></div>)}</div>
+          <div className="space-y-2">{openRisks.map((risk) => <div key={risk.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap items-center gap-2"><Pill tone={risk.probability * risk.impact >= 12 ? "danger" : "warning"}>P{risk.probability} × I{risk.impact}</Pill><span className="font-semibold text-fg">{risk.title}</span><Pill>{risk.status}</Pill></div><p className="mt-2 text-xs leading-5 text-fg-2">{risk.mitigation}</p></div>)}</div>
         </SectionCard>
       </div>
     </div>
@@ -1076,7 +1018,7 @@ function HandoffSurface({
       <SectionCard title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작업 넘기기 준비도")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "필수 확인 항목이 하나라도 남으면 다음 작업을 시작할 수 없습니다.")}>
         <div className="flex items-end justify-between gap-4 rounded-xl border border-line bg-panel p-4">
           <div><p className="text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "Readiness")}</p><p className="mt-1 text-4xl font-black text-fg">{readiness.score}<span className="text-base text-fg-3">/100</span></p></div>
-          <Pill tone={readiness.ready ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger")}>{readiness.ready ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작화 수락 가능") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 차단"), { v0: String(readiness.hardBlocks.length) })}</Pill>
+          <Pill tone={readiness.ready ? "success" : "danger"}>{readiness.ready ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "작화 수락 가능") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 차단"), { v0: String(readiness.hardBlocks.length) })}</Pill>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {Object.entries(readiness.metrics).map(([key, value]) => (
@@ -1121,7 +1063,7 @@ function HandoffSurface({
           <div className="space-y-2">
             {clarifications.map((thread) => (
               <article key={thread.id} className={cn("rounded-xl border p-3", thread.blocking && thread.status === "open" ? "border-bad/30 bg-bad/10" : "border-line bg-panel")}>
-                <div className="flex flex-wrap items-center gap-2"><Pill tone={thread.blocking ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "neutral")}>{thread.blocking ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "진행 막힘") : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{thread.status}</Pill></div>
+                <div className="flex flex-wrap items-center gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "진행 막힘") : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
                 <p className="mt-2 text-sm font-semibold text-fg">{thread.question}</p>
                 {thread.answer ? <p className="mt-2 rounded-lg bg-raised p-2.5 text-xs leading-5 text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "결정: ")}{thread.answer}</p> : null}
                 <p className="mt-2 text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "질문 ")}{assignmentLabel(aggregate, thread.askedByAssignmentId)} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "→ 답변 ")}{assignmentLabel(aggregate, thread.answerOwnerAssignmentId)}</p>
@@ -1160,14 +1102,14 @@ function ReviewSurface({
       <ProductionReviewWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />
       <div className="grid gap-3 sm:grid-cols-3">
         <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "검수 항목")} value={String(policy.lanes.length)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "역할별 독립 승인")} icon={Layers3} />
-        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "승인 완료")} value={String(evaluation.laneResults.filter((entry) => entry.approved).length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 중"), { v0: String(policy.lanes.length) })} icon={BadgeCheck} tone={evaluation.approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")} />
-        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "게시 차단")} value={String(evaluation.blockingLanes.length)} detail={evaluation.blockingLanes.join(", ") || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "없음")} icon={LockKeyhole} tone={evaluation.blockingLanes.length ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success")} />
+        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "승인 완료")} value={String(evaluation.laneResults.filter((entry) => entry.approved).length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 중"), { v0: String(policy.lanes.length) })} icon={BadgeCheck} tone={evaluation.approved ? "success" : "warning"} />
+        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "게시 차단")} value={String(evaluation.blockingLanes.length)} detail={evaluation.blockingLanes.join(", ") || translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "없음")} icon={LockKeyhole} tone={evaluation.blockingLanes.length ? "danger" : "success"} />
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
         {evaluation.laneResults.map((result) => (
           <SectionCard key={result.lane} title={result.lane} description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}/{v1} 승인"), { v0: String(result.approvals), v1: String(result.requiredApprovals) })}>
             <div className="space-y-2 text-xs">
-              <div className="flex items-center justify-between"><span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "상태")}</span><Pill tone={result.approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{result.approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "승인") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "대기")}</Pill></div>
+              <div className="flex items-center justify-between"><span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "상태")}</span><Pill tone={result.approved ? "success" : "warning"}>{result.approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "승인") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "대기")}</Pill></div>
               <div className="flex items-center justify-between"><span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "필수 승인 누락")}</span><span className="font-semibold text-fg">{result.missingRequiredAssignmentIds.length}</span></div>
               <div className="flex items-center justify-between"><span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "변경 요청")}</span><span className="font-semibold text-fg">{result.changeRequestedByAssignmentIds.length}</span></div>
               <div className="flex items-center justify-between"><span className="text-fg-2">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "거부")}</span><span className="font-semibold text-fg">{result.vetoedByAssignmentIds.length}</span></div>
@@ -1179,7 +1121,7 @@ function ReviewSurface({
         <div className="space-y-2">
           {decisions.map((decision) => (
             <div key={decision.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel p-3 text-xs">
-              <Pill tone={decision.value === "approve" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : decision.value === "veto" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{decision.value}</Pill>
+              <Pill tone={decision.value === "approve" ? "success" : decision.value === "veto" ? "danger" : "warning"}>{decision.value}</Pill>
               <span className="font-semibold text-fg">{decision.lane}</span>
               <span className="text-fg-2">{assignmentLabel(aggregate, decision.assignmentId)}</span>
               <span className="ml-auto text-fg-3">{decision.reasonCode ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "근거 코드 없음")}</span>
@@ -1200,13 +1142,13 @@ function ProcurementSurface({ aggregate }: { readonly aggregate: ProductionProje
         <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "공개 범위")} value={String(aggregate.scopePackages.filter((entry) => entry.status === "published").length)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "불변 ScopePackage")} icon={BriefcaseBusiness} tone="accent" />
         <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "접수 제안")} value={String(aggregate.proposals.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 선정"), { v0: String(aggregate.proposals.filter((entry) => entry.status === "selected").length) })} icon={MessagesSquare} />
         <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "활성 계약")} value={String(activeAgreements.length)} detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "{v0}개 마일스톤"), { v0: String(aggregate.contractMilestones.length) })} icon={FileKey2} tone="success" />
-        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "지급 검증 대기")} value={String(pendingPayments.length)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 증빙 전 지급 완료 아님")} icon={Coins} tone={pendingPayments.length > 0 ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success")} />
+        <Metric label={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "지급 검증 대기")} value={String(pendingPayments.length)} detail={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 증빙 전 지급 완료 아님")} icon={Coins} tone={pendingPayments.length > 0 ? "warning" : "success"} />
       </div>
 
       {aggregate.scopePackages.map((scopePackage) => {
         const proposals = aggregate.proposals.filter((entry) => entry.scopePackageId === scopePackage.id && entry.scopePackageRevision === scopePackage.revision);
         return (
-          <SectionCard key={`${scopePackage.id}:${scopePackage.revision}`} title={scopePackage.id} description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "r{v0} · {v1} · digest {v2}"), { v0: String(scopePackage.revision), v1: String(scopePackage.informationDisclosureLevel), v2: String(scopePackage.digest) })} action={<Pill tone={scopePackage.status === "published" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "neutral")}>{scopePackage.status}</Pill>}>
+          <SectionCard key={`${scopePackage.id}:${scopePackage.revision}`} title={scopePackage.id} description={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "r{v0} · {v1} · digest {v2}"), { v0: String(scopePackage.revision), v1: String(scopePackage.informationDisclosureLevel), v2: String(scopePackage.digest) })} action={<Pill tone={scopePackage.status === "published" ? "success" : "neutral"}>{scopePackage.status}</Pill>}>
             <div className="grid gap-4 lg:grid-cols-[0.85fr_0.85fr_1.3fr]">
               <div><p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "산출물")}</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{scopePackage.deliverableSpecifications.map((entry) => <li key={entry}>• {entry}</li>)}</ul></div>
               <div><p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "완료 기준")}</p><ul className="mt-2 space-y-1.5 text-xs leading-5 text-fg-2">{scopePackage.acceptanceCriteria.map((entry) => <li key={entry}>• {entry}</li>)}</ul></div>
@@ -1215,7 +1157,7 @@ function ProcurementSurface({ aggregate }: { readonly aggregate: ProductionProje
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               {proposals.map((proposal) => (
                 <article key={proposal.id} className="rounded-xl border border-line bg-panel p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs text-fg-3">{aggregate.parties.find((party) => party.id === proposal.proposerPartyId)?.publicDisplayName ?? proposal.proposerPartyId}</p><h3 className="mt-1 font-bold text-fg">{proposal.totalAmountMinor.toLocaleString("ko-KR")} {proposal.currency}</h3></div><Pill tone={proposal.status === "selected" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : proposal.status === "rejected" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{proposal.status}</Pill></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs text-fg-3">{aggregate.parties.find((party) => party.id === proposal.proposerPartyId)?.publicDisplayName ?? proposal.proposerPartyId}</p><h3 className="mt-1 font-bold text-fg">{proposal.totalAmountMinor.toLocaleString("ko-KR")} {proposal.currency}</h3></div><Pill tone={proposal.status === "selected" ? "success" : proposal.status === "rejected" ? "danger" : "warning"}>{proposal.status}</Pill></div>
                   <p className="mt-3 text-xs leading-5 text-fg-2">{proposal.understanding}</p>
                   <div className="mt-3 space-y-1.5">{proposal.milestoneDrafts.map((milestone) => <div key={milestone.title} className="flex justify-between rounded-lg bg-raised px-3 py-2 text-xs"><span className="text-fg-2">{milestone.title}</span><span className="font-semibold text-fg">{milestone.amountMinor.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "원")}</span></div>)}</div>
                 </article>
@@ -1234,7 +1176,7 @@ function ProcurementSurface({ aggregate }: { readonly aggregate: ProductionProje
               return (
                 <article key={agreement.id} className="rounded-xl border border-line bg-panel p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-[0.6875rem] text-fg-3">{agreement.id} · r{agreement.revision}</p><h3 className="mt-1 font-bold text-fg">{agreement.totalAmountMinor.toLocaleString("ko-KR")} {agreement.currency}</h3></div><Pill tone="success">{agreement.status}</Pill></div>
-                  <div className="mt-4 space-y-2">{milestones.map((milestone) => <div key={milestone.id} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-raised p-3"><div className="flex size-8 items-center justify-center rounded-full bg-panel font-black text-accent">{milestone.sequence}</div><div><p className="text-xs font-semibold text-fg">{milestone.title}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{formatDay(milestone.dueAt)} · {milestone.amountMinor.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "원")}</p></div><Pill tone={milestone.status === "paid" || milestone.status === "accepted" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : milestone.status === "changes-requested" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{milestone.status}</Pill></div>)}</div>
+                  <div className="mt-4 space-y-2">{milestones.map((milestone) => <div key={milestone.id} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-3 rounded-xl bg-raised p-3"><div className="flex size-8 items-center justify-center rounded-full bg-panel font-black text-accent">{milestone.sequence}</div><div><p className="text-xs font-semibold text-fg">{milestone.title}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{formatDay(milestone.dueAt)} · {milestone.amountMinor.toLocaleString("ko-KR")}{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "원")}</p></div><Pill tone={milestone.status === "paid" || milestone.status === "accepted" ? "success" : milestone.status === "changes-requested" ? "danger" : "warning"}>{milestone.status}</Pill></div>)}</div>
                 </article>
               );
             })}
@@ -1243,10 +1185,10 @@ function ProcurementSurface({ aggregate }: { readonly aggregate: ProductionProje
 
         <SectionCard title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "납품·청구·지급 증빙")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 결제의 참조와 증빙이 확인되기 전에는 지급 완료로 표시하지 않습니다.")}>
           <div className="space-y-2">
-            {aggregate.deliveryRevisions.map((delivery) => <div key={delivery.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex items-center justify-between gap-2"><p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "납품 r")}{delivery.revision}</p><Pill tone={delivery.status === "accepted" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{delivery.status}</Pill></div><p className="mt-2 text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "Submission ")}{delivery.submissionIds.length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "· License ")}{delivery.licenseEvidenceRefs.length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "· AI receipt ")}{delivery.aiUseReceiptRefs.length}</p></div>)}
+            {aggregate.deliveryRevisions.map((delivery) => <div key={delivery.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex items-center justify-between gap-2"><p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "납품 r")}{delivery.revision}</p><Pill tone={delivery.status === "accepted" ? "success" : "warning"}>{delivery.status}</Pill></div><p className="mt-2 text-[0.6875rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "Submission ")}{delivery.submissionIds.length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "· License ")}{delivery.licenseEvidenceRefs.length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "· AI receipt ")}{delivery.aiUseReceiptRefs.length}</p></div>)}
             {aggregate.invoices.map((invoice) => {
               const payment = aggregate.paymentRecords.find((entry) => entry.invoiceId === invoice.id);
-              return <div key={invoice.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "청구 ")}{invoice.amountMinor.toLocaleString("ko-KR")} {invoice.currency}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{invoice.externalInvoiceRef ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 청구 참조 없음")}</p></div><Pill tone={invoice.status === "settled" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{invoice.status}</Pill></div>{payment ? <div className={cn("mt-3 rounded-lg border p-2.5 text-xs", payment.status === "verified-paid" ? "border-good/30 bg-good/10" : "border-warn/30 bg-warn/10")}><p className="font-semibold text-fg">{payment.status === "verified-paid" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "지급 검증 완료") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "지급 기록 · 검증 대기")}</p><p className="mt-1 text-fg-2">{payment.externalPaymentRef ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 결제 참조와 증빙이 아직 없습니다.")}</p></div> : null}</div>;
+              return <div key={invoice.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "청구 ")}{invoice.amountMinor.toLocaleString("ko-KR")} {invoice.currency}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{invoice.externalInvoiceRef ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 청구 참조 없음")}</p></div><Pill tone={invoice.status === "settled" ? "success" : "warning"}>{invoice.status}</Pill></div>{payment ? <div className={cn("mt-3 rounded-lg border p-2.5 text-xs", payment.status === "verified-paid" ? "border-good/30 bg-good/10" : "border-warn/30 bg-warn/10")}><p className="font-semibold text-fg">{payment.status === "verified-paid" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "지급 검증 완료") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "지급 기록 · 검증 대기")}</p><p className="mt-1 text-fg-2">{payment.externalPaymentRef ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "외부 결제 참조와 증빙이 아직 없습니다.")}</p></div> : null}</div>;
             })}
           </div>
         </SectionCard>
@@ -1268,7 +1210,7 @@ function RightsSurface({ aggregate }: { readonly aggregate: ProductionProjectAgg
     <div className="grid gap-4 xl:grid-cols-2">
       <SectionCard title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "Credit Manifest")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "실제로 공개할 파일 버전과 공개 크레딧을 함께 확정합니다.")}>
         {manifest ? <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"><div><p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "상태")}</p><p className="mt-1 font-bold text-fg">{manifest.status} · r{manifest.revision}</p></div><Pill tone={preflight.passed ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{preflight.passed ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "공개 준비 완료") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "막힌 항목 {v0}"), { v0: String(preflight.blockers.length) })}</Pill></div>
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3"><div><p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "상태")}</p><p className="mt-1 font-bold text-fg">{manifest.status} · r{manifest.revision}</p></div><Pill tone={preflight.passed ? "success" : "warning"}>{preflight.passed ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "공개 준비 완료") : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "막힌 항목 {v0}"), { v0: String(preflight.blockers.length) })}</Pill></div>
           {[...manifest.entries].sort((a, b) => a.order - b.order).map((entry) => <div key={entry.id} className="flex items-center gap-3 rounded-xl border border-line bg-panel p-3"><div className="flex size-9 items-center justify-center rounded-full bg-raised font-black text-accent">{entry.order}</div><div><p className="text-sm font-semibold text-fg">{entry.publicName}</p><p className="text-xs text-fg-2">{entry.roleLabel} · {entry.media.join(", ")}</p></div></div>)}
           {preflight.blockers.map((entry) => <p key={entry} className="rounded-xl border border-bad/30 bg-bad/10 p-3 text-xs text-fg">{entry}</p>)}
           {preflight.warnings.map((entry) => <p key={entry} className="rounded-xl border border-warn/30 bg-warn/10 p-3 text-xs text-fg">{entry}</p>)}
@@ -1279,7 +1221,7 @@ function RightsSurface({ aggregate }: { readonly aggregate: ProductionProjectAgg
         <div className="space-y-2">
           {aggregate.rightsInterests.map((interest) => (
             <div key={interest.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3 text-xs">
-              <Pill tone={interest.status === "verified" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : interest.status === "disputed" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{interest.status}</Pill>
+              <Pill tone={interest.status === "verified" ? "success" : interest.status === "disputed" ? "danger" : "warning"}>{interest.status}</Pill>
               <span className="font-semibold text-fg">{interest.type}</span>
               <span className="text-fg-2">{aggregate.parties.find((party) => party.id === interest.partyId)?.publicDisplayName ?? interest.partyId}</span>
               <span className="ml-auto text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "증빙 ")}{interest.evidenceRefs.length}</span>
@@ -1315,7 +1257,7 @@ function SettingsSurface({ aggregate }: { readonly aggregate: ProductionProjectA
             <div key={party.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-panel p-3">
               <div className="flex size-10 items-center justify-center rounded-full bg-raised font-black text-accent">{party.publicDisplayName.slice(0, 1)}</div>
               <div><p className="text-sm font-semibold text-fg">{party.publicDisplayName}</p><p className="text-xs text-fg-2">{partyRole(aggregate, party.id)}</p></div>
-              <Pill tone={party.status === "active" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "neutral")}>{party.status}</Pill>
+              <Pill tone={party.status === "active" ? "success" : "neutral"}>{party.status}</Pill>
               <span className="ml-auto text-xs text-fg-3">{aggregate.assignments.filter((entry) => entry.partyId === party.id).length} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "assignments")}</span>
             </div>
           ))}
@@ -1348,6 +1290,7 @@ function SurfaceContent({
   executeStrict,
   canEdit,
   canManage,
+  isDemo,
 }: {
   readonly surface: ProductionProjectSurface;
   readonly aggregate: ProductionProjectAggregate;
@@ -1356,6 +1299,7 @@ function SurfaceContent({
   readonly executeStrict: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
   readonly canManage: boolean;
+  readonly isDemo: boolean;
 }) {
   switch (surface) {
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} executeStrict={executeStrict} canEdit={canEdit} isDemo={isDemo} />;
@@ -1397,6 +1341,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
             executeStrict={project.executeStrict}
             canEdit={project.access.edit}
             canManage={project.access.manage}
+            isDemo={project.isDemo}
           />
         </div>
       </div>
@@ -1491,7 +1436,7 @@ export function ProductionEpisodeRoomPage() {
         <div className="mx-auto max-w-[100rem]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><Link className="text-xs font-semibold text-fg-3 hover:text-accent" to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "/production/projects/{v0}/episodes"), { v0: String(aggregate.projectId) })}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "← 회차 목록")}</Link><h1 className="mt-1 text-2xl font-black text-fg">{episode.episodeId} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "공동 회차 작업실")}</h1></div>
-            <div className="flex items-center gap-2"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>{readiness ? <Pill tone={readiness.ready ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger")}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "넘기기 준비도 ")}{readiness.score}</Pill> : null}</div>
+            <div className="flex items-center gap-2"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>{readiness ? <Pill tone={readiness.ready ? "success" : "danger"}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "넘기기 준비도 ")}{readiness.score}</Pill> : null}</div>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">{pipeline.map((step) => <TimelineStep key={step.label} {...step} />)}</div>
         </div>
@@ -1511,7 +1456,7 @@ export function ProductionEpisodeRoomPage() {
           <SectionCard title={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "보존·자율 경계")} description={translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "스토리 의도와 그림 작가의 시각적 자율성을 함께 표시합니다.")}>
             <div className="space-y-2">
               {handoff?.instructions.map((instruction) => (
-                <div key={instruction.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap gap-2"><Pill tone={instruction.priority === "MUST_PRESERVE" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : instruction.priority === "ARTIST_CHOICE" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "accent")}>{instruction.priority}</Pill><Pill>{instruction.latitude}</Pill></div><p className="mt-2 text-xs leading-5 text-fg">{instruction.text}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{instruction.rationale}</p></div>
+                <div key={instruction.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex flex-wrap gap-2"><Pill tone={instruction.priority === "MUST_PRESERVE" ? "danger" : instruction.priority === "ARTIST_CHOICE" ? "success" : "accent"}>{instruction.priority}</Pill><Pill>{instruction.latitude}</Pill></div><p className="mt-2 text-xs leading-5 text-fg">{instruction.text}</p><p className="mt-1 text-[0.6875rem] text-fg-3">{instruction.rationale}</p></div>
               )) ?? <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "넘길 작업 지시가 없습니다.")}</p>}
             </div>
           </SectionCard>
@@ -1538,7 +1483,7 @@ export function ProductionEpisodeRoomPage() {
                 ["스토리", aggregate.reviewDecisions.some((entry) => entry.lane === "narrative")],
                 ["그림 연출", aggregate.reviewDecisions.some((entry) => entry.lane === "visual-direction")],
                 ["제작", aggregate.reviewDecisions.some((entry) => entry.lane === "production")],
-              ].map(([label, approved]) => <div key={label as string} className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">{label as string}</p><div className="mt-2"><Pill tone={approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "결정 기록됨") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "대기")}</Pill></div></div>)}
+              ].map(([label, approved]) => <div key={label as string} className="rounded-xl border border-line bg-panel p-3"><p className="text-xs font-bold text-fg">{label as string}</p><div className="mt-2"><Pill tone={approved ? "success" : "warning"}>{approved ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "결정 기록됨") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "대기")}</Pill></div></div>)}
             </div>
           </SectionCard>
         </div>
@@ -1548,7 +1493,7 @@ export function ProductionEpisodeRoomPage() {
             <div className="space-y-2">
               {clarifications.map((thread) => (
                 <article key={thread.id} className={cn("rounded-xl border p-3", thread.blocking && thread.status === "open" ? "border-bad/30 bg-bad/10" : "border-line bg-panel")}>
-                  <div className="flex flex-wrap gap-2"><Pill tone={thread.blocking ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "danger") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "neutral")}>{thread.blocking ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "진행 막힘") : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "success") : translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "warning")}>{thread.status}</Pill></div>
+                  <div className="flex flex-wrap gap-2"><Pill tone={thread.blocking ? "danger" : "neutral"}>{thread.blocking ? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "진행 막힘") : thread.category}</Pill><Pill tone={thread.status === "decision-recorded" ? "success" : "warning"}>{thread.status}</Pill></div>
                   <p className="mt-2 text-xs font-semibold leading-5 text-fg">{thread.question}</p>
                   {thread.answer ? <p className="mt-2 rounded-lg bg-raised p-2 text-xs leading-5 text-fg-2">{thread.answer}</p> : null}
                   {thread.blocking && thread.status === "open" ? <button type="button" className={cn(buttonClass({ size: "sm" }), "mt-3 w-full")} onClick={() => void answerBlocker(thread)} disabled={!project.access.edit || (project.isDemo && roleLens !== "story") || (!project.isDemo && viewerAssignment?.id !== thread.answerOwnerAssignmentId)}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "결정 기록")}</button> : null}

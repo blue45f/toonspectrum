@@ -170,7 +170,7 @@ export function projectStudioArchiveToProjectGraph(input: {
     taskLinks: Object.freeze([]),
     reviewLinks: Object.freeze(reviewRevisionId && input.coordinates.review
       ? [{
-          version: 1,
+          version: 1 as const,
           reviewId: input.coordinates.review.cycleId,
           reviewSnapshotRevisionId: reviewRevisionId,
           approvedRevisionId,
@@ -179,7 +179,7 @@ export function projectStudioArchiveToProjectGraph(input: {
     releaseLinks: Object.freeze(
       releaseRevisionId && approvedRevisionId && input.coordinates.publish
         ? [{
-            version: 1,
+            version: 1 as const,
             releaseId: input.coordinates.publish.packageId,
             approvedRevisionId,
             releaseRevisionId,

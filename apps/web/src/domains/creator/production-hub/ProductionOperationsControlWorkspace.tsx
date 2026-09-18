@@ -1,50 +1,10 @@
-import {
-  AlertTriangle,
-  BarChart3,
-  Bell,
-  Bot,
-  CalendarDays,
-  Coins,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
-  Copy,
-  GitBranch,
-  LayoutDashboard,
-  Link2,
-  LoaderCircle,
-  Play,
-  Rocket,
-  Save,
-  Scissors,
-  ShieldCheck,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, Bot, CalendarDays, Coins, CheckCircle2, ClipboardList, Clock3, Copy, GitBranch, LayoutDashboard, Link2, LoaderCircle, Play, Rocket, Save, Scissors, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
-import {
-  deriveCriticalPathSchedule,
-  derivePersonalProductionInbox,
-  deriveProductionFinancialForecast,
-  deriveProductionFlowAnalytics,
-  deriveScheduleRecoveryScenarios,
-  evaluateAutomationRule,
-  evaluateReleaseReadiness,
-  type EpisodeReleasePlan,
-  type ExternalReviewAccess,
-  type ProductionAutomationRule,
-  type ProductionNotification,
-  type ProductionNotificationPolicy,
-  type ProductionProjectAggregate,
-  type ProductionSavedView,
-  type ProductionTask,
-  type ResourceCalendar,
-  type ScheduleBaseline,
-  type ScheduleRecoveryScenario,
-} from "@toonspectrum/core/production";
+import { deriveCriticalPathSchedule, derivePersonalProductionInbox, deriveProductionFinancialForecast, deriveProductionFlowAnalytics, deriveScheduleRecoveryScenarios, evaluateReleaseReadiness, type EpisodeReleasePlan, type ExternalReviewAccess, type ProductionAutomationRule, type ProductionNotification, type ProductionNotificationPolicy, type ProductionProjectAggregate, type ProductionSavedView, type ProductionTask, type ResourceCalendar, type ScheduleBaseline, type ScheduleRecoveryScenario } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
+import { deriveProductionAutomationExecutionPlan } from "./production-automation-execution";
 
 import { downloadBlob } from "../export/studio-export";
 

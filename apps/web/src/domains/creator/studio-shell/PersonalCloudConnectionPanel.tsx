@@ -1,27 +1,11 @@
-import {
-  CheckCircle2,
-  Cloud,
-  CloudOff,
-  Link2,
-  Loader2,
-  LogOut,
-  RefreshCw,
-} from "lucide-react";
+import { CheckCircle2, Cloud, CloudOff, Link2, Loader2, LogOut, RefreshCw } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { PersonalCloudProviderId } from "../save-first/personal-cloud-client";
-import {
-  PERSONAL_CLOUD_CONNECTION_PROVIDER_ORDER,
-  type PersonalCloudConnectionsController,
-} from "./usePersonalCloudConnections";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { PERSONAL_CLOUD_CONNECTION_PROVIDER_ORDER, type PersonalCloudConnectionsController } from "./usePersonalCloudConnections";
 
 function timeLabel(value: string | null, locale: string, bt: (ko: string, en: string) => string): string {
   if (!value || !Number.isFinite(Date.parse(value))) {
@@ -127,7 +111,7 @@ export function PersonalCloudConnectionPanel({
                         {status?.accountLabel}
                       </p>
                       <p className="mt-1 text-[0.64rem] text-fg-3">
-                        {bt("마지막 사용", "Last used")} {timeLabel(status?.lastUsedAt ?? null, locale, bt)}
+                        {bt("마지막 사용", "Last used")} {timeLabel(status?.lastUsedAt ?? null, _locale, bt)}
                       </p>
                     </div>
                   ) : null}

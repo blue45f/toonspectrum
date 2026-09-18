@@ -3,23 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import {
-  WEBTOON_CADENCES,
-  WEBTOON_ONBOARDING_GOALS,
-  WEBTOON_STARTING_POINTS,
-  WEBTOON_TEAM_MODELS,
-  buildWebtoonOnboardingPlan,
-  completeStudioWebtoonOnboarding,
-  readStudioWebtoonOnboardingProfile,
-  toggleStudioWebtoonOnboardingTask,
-  webtoonOnboardingProjectHref,
-  writeStudioWebtoonOnboardingProfile,
-  type StudioWebtoonOnboardingProfile,
-} from "@/shared/lib/webtoon-production-onboarding";
+import { WEBTOON_CADENCES, WEBTOON_ONBOARDING_GOALS, WEBTOON_STARTING_POINTS, WEBTOON_TEAM_MODELS, buildWebtoonOnboardingPlan, completeStudioWebtoonOnboarding, readStudioWebtoonOnboardingProfile, toggleStudioWebtoonOnboardingTask, webtoonOnboardingProjectHref, writeStudioWebtoonOnboardingProfile, type StudioWebtoonOnboardingProfile } from "@/shared/lib/webtoon-production-onboarding";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = string;
 
 function localizedLabel(
   options: readonly { readonly id: string; readonly labelKo: string; readonly labelEn: string }[],

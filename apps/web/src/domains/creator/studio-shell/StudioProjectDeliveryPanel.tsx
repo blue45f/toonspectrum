@@ -1,60 +1,22 @@
-import {
-  Archive,
-  CheckCircle2,
-  CircleAlert,
-  Download,
-  FileArchive,
-  FileCheck2,
-  Globe2,
-  KeyRound,
-  PackageCheck,
-  Send,
-  Smartphone,
-} from "lucide-react";
+import { Archive, CheckCircle2, CircleAlert, Download, FileArchive, FileCheck2, Globe2, KeyRound, PackageCheck, Send, Smartphone } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualLocalizer, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
-import {
-  WEBTOON_PLATFORM_SPECS,
-  type WebtoonImageFormat,
-  type WebtoonPlatformId,
-} from "../assistant/webtoon-platform-spec-validator";
-import {
-  planStudioArchiveRestore,
-  validateStudioArchiveManifest,
-  type StudioArchiveManifest,
-} from "../studio-archive-manifest";
-import {
-  planStudioPublish,
-  type StudioPublishConnector,
-  type StudioPublishPlan,
-} from "../studio-publishing-connector";
-import {
-  planStudioPublishingPackage,
-  type StudioPublishingPackagePlan,
-} from "../studio-publishing-package";
+import { WEBTOON_PLATFORM_SPECS, type WebtoonImageFormat, type WebtoonPlatformId } from "../assistant/webtoon-platform-spec-validator";
+import { planStudioArchiveRestore, validateStudioArchiveManifest, type StudioArchiveManifest } from "../studio-archive-manifest";
+import { planStudioPublish, type StudioPublishConnector, type StudioPublishPlan } from "../studio-publishing-connector";
+import { planStudioPublishingPackage, type StudioPublishingPackagePlan } from "../studio-publishing-package";
 import { auditStudioRightsGraph } from "../studio-rights-graph";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  createStudioPlatformDeliveryPlan,
-  STUDIO_PLATFORM_DELIVERY_IDS,
-  type StudioPlatformSourceStatus,
-} from "./studio-platform-delivery-plan";
+import { createStudioPlatformDeliveryPlan, STUDIO_PLATFORM_DELIVERY_IDS, type StudioPlatformSourceStatus } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
-type Locale = string;
 type DeliveryView = "publish" | "package" | "archive";
 
 const CHECKSUM_A = `sha256:${"a".repeat(64)}`;
@@ -149,7 +111,7 @@ function documentSizeLabel(
   localize: (ko: string, en: string) => string,
 ): string {
   if (!document || document.width === null || document.height === null) {
-    return bt("크기 정보 없음", "Dimensions unavailable");
+    return localize("크기 정보 없음", "Dimensions unavailable");
   }
   return `${document.width.toLocaleString()} × ${document.height.toLocaleString()}px`;
 }
@@ -198,7 +160,7 @@ function StatusPanel({
           <p className="mt-1 text-xs leading-5 text-fg-3">{description}</p>
         </div>
         <span className={cn("shrink-0 rounded-full border px-2.5 py-1 text-[0.65rem] font-black", statusTone(status))}>
-          {labelForStatus(status, bt)}
+          {labelForStatus(status, l)}
         </span>
       </div>
     </div>
@@ -227,8 +189,12 @@ export function StudioProjectDeliveryPanel({
   readonly locale?: string;
 }) {
   const bt = useBilingual("StudioProjectDeliveryPanel");
-  const workspace = useStudioProjectWorkspace(projectId, locale);
-  const documents = useStudioProjectDocuments(projectId, locale, "active");
+  const l = useBilingualLocalizer("studioDelivery");
+  const language = useI18n((state) => state.lang);
+  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const locale = legacyLocale;
+  const workspace = useStudioProjectWorkspace(projectId, legacyLocale);
+  const documents = useStudioProjectDocuments(projectId, legacyLocale, "active");
   const [deliveryView, setDeliveryView] = useState<DeliveryView>(() => defaultDeliveryView(section, view));
   const [platformId, setPlatformId] = useState<WebtoonPlatformId>("webtoon-canvas");
   const [platformDocumentId, setPlatformDocumentId] = useState("");
@@ -312,7 +278,7 @@ export function StudioProjectDeliveryPanel({
       sourceUrl: null,
     }],
     edges: [],
-  }, [documentId]), [documentId, l]);
+  }, [documentId]), [bt, documentId]);
 
   const packagePlan: StudioPublishingPackagePlan | null = useMemo(() => {
     if (!preflight || !state) return null;
@@ -377,7 +343,7 @@ export function StudioProjectDeliveryPanel({
     } catch {
       return null;
     }
-  }, [connector.id, connector.policyVersion, documentId, l, platformId, preflight, projectId, requestedAt, rights, state]);
+  }, [bt, connector.id, connector.policyVersion, documentId, platformId, preflight, projectId, requestedAt, rights, state]);
 
   const packageDeliveryStatus = packagePlan === null
     ? null

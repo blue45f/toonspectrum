@@ -183,7 +183,7 @@ describe("StudioWebtoonAssistantModal — tab accessibility", () => {
   });
 
   it("labels fixture-derived analyses as sample data", () => {
-    render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
+    const { rerender } = render(<StudioWebtoonAssistantModal open onClose={() => {}} />);
     expect(screen.getByText(/샘플 보호 영역 3곳 기준 예시/)).toBeTruthy();
 
     fireEvent.click(screen.getAllByRole("tab")[1]);

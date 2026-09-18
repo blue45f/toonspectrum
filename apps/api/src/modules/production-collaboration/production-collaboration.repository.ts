@@ -232,56 +232,6 @@ export class ProductionCollaborationRepository {
     return row.aggregate;
   }
 
-  async listProjects(actorUserId: string): Promise<readonly ProductionProjectRecord[]> {
-    const rows = await db
-      .select({
-        id: productionProjects.id,
-        workId: productionProjects.workId,
-        revision: productionProjects.revision,
-        aggregate: productionProjects.aggregate,
-        ownerUserId: creatorWorks.userId,
-        membershipRole: creatorWorkCollaborators.role,
-        membershipStatus: creatorWorkCollaborators.status,
-      })
-      .from(productionProjects)
-      .innerJoin(creatorWorks, eq(creatorWorks.id, productionProjects.workId))
-      .leftJoin(
-        creatorWorkCollaborators,
-        and(
-          eq(creatorWorkCollaborators.workId, creatorWorks.id),
-          eq(creatorWorkCollaborators.userId, actorUserId),
-        ),
-      )
-      .where(or(
-        eq(creatorWorks.userId, actorUserId),
-        eq(creatorWorkCollaborators.userId, actorUserId),
-      ));
-
-    return Object.freeze(rows.flatMap((row) => {
-      const projectRow: ProjectRow = {
-        id: row.id,
-        workId: row.workId,
-        revision: row.revision,
-        aggregate: row.aggregate,
-      };
-      assertAggregateRow(projectRow);
-      const access = accessProjection({
-        actorUserId,
-        ownerUserId: row.ownerUserId,
-        membershipRole: row.membershipRole,
-        membershipStatus: row.membershipStatus,
-      });
-      return access.view ? [{ aggregate: row.aggregate, access }] : [];
-    }));
-  }
-
-  async getPublicProject(projectId: string): Promise<ProductionProjectAggregate> {
-    const row = await loadProjectRow(db, projectId, false);
-    if (!row) throw new ProductionProjectNotFoundError("project");
-    assertAggregateRow(row);
-    return row.aggregate;
-  }
-
   async getProjectByWork(
     actorUserId: string,
     workId: string,
@@ -409,7 +359,7 @@ export class ProductionCollaborationRepository {
       if (
         aggregate.projectId !== row.id
         || aggregate.workId !== row.workId
-        || aggregate.modelVersion !== 1
+        || aggregate.modelVersion !== 2
       ) {
         throw new Error("public production mutation returned an invalid aggregate identity");
       }

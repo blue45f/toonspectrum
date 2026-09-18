@@ -39,7 +39,7 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
   }, [userId]);
 
   useEffect(() => {
-    if (status === "loading" || !eligible) {
+    if (!eligible) {
       setVisible(false);
       return;
     }

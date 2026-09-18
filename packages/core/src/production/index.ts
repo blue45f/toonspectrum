@@ -8,6 +8,7 @@ export * from "./change-impact";
 export * from "./procurement";
 export * from "./rights-credit";
 export * from "./aggregate";
+export * from "./migration";
 export * from "./versioning";
 export * from "./planning";
 export * from "./commercial";

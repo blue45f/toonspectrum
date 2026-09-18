@@ -25,7 +25,7 @@ import {
   type TrafficHeartbeatPayload,
   type TrafficPageViewPayload,
   type TrafficRequestContext,
-  type TrafficShareEventPayload,
+  type TrafficSharePayload,
 } from "./traffic-analytics-model";
 import {
   cleanupExpiredTrafficData,
@@ -289,12 +289,12 @@ export class TrafficAnalyticsService {
   }
 
   async recordShareEvent(
-    payload: TrafficShareEventPayload,
+    payload: TrafficSharePayload,
     context: TrafficRequestContext,
   ): Promise<{ accepted: boolean; excluded?: boolean }> {
     if (context.privacyOptOut) return { accepted: false, excluded: true };
 
-    const path = normalizeTrafficPath(payload.path);
+    const path = normalizeTrafficPath(payload.sourcePath);
     if (isExcludedTrafficPath(path)) return { accepted: false, excluded: true };
 
     const device = classifyTrafficDevice(context.userAgent);

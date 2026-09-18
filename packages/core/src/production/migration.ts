@@ -152,8 +152,8 @@ function migrateProductionRiskPolicy(
       ? policy.autoOpenSeverity as ProductionRiskPolicy["autoOpenSeverity"]
       : defaults.autoOpenSeverity,
     notificationCooldownHours: Math.max(1, Math.round(numberValue(policy.notificationCooldownHours, defaults.notificationCooldownHours))),
-    autoOpenStableHours: Math.max(0, Math.round(numberValue(policy.autoOpenStableHours, defaults.autoOpenStableHours))),
-    thresholdHysteresisPercent: Math.max(0, Math.min(50, numberValue(policy.thresholdHysteresisPercent, defaults.thresholdHysteresisPercent))),
+    autoOpenStableHours: Math.max(0, Math.round(numberValue(policy.autoOpenStableHours, defaults.autoOpenStableHours ?? 0))),
+    thresholdHysteresisPercent: Math.max(0, Math.min(50, numberValue(policy.thresholdHysteresisPercent, defaults.thresholdHysteresisPercent ?? 0))),
     autoResolveStableHours: Math.max(1, Math.round(numberValue(policy.autoResolveStableHours, defaults.autoResolveStableHours))),
     autoOpenMinimumConfidence: ["low", "medium", "high"].includes(String(policy.autoOpenMinimumConfidence))
       ? policy.autoOpenMinimumConfidence as ProductionRiskPolicy["autoOpenMinimumConfidence"]

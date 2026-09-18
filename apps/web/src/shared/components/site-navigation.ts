@@ -444,8 +444,8 @@ export function mobileSiteTabsForPath(pathname: string): readonly SiteNavigation
     : TOONSPECTRUM_MOBILE_TABS;
 }
 
-export function siteNavigationLocale(_locale): SiteNavigationLocale {
-  return getActiveI18nLocale();
+export function siteNavigationLocale(_locale?: unknown): SiteNavigationLocale {
+  return getActiveI18nLocale() === "ko" ? "ko" : "en";
 }
 
 export function siteNavigationText(text: SiteNavigationText, locale: string): string {

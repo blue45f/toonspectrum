@@ -1,32 +1,8 @@
-import {
-  formatI18nTemplate,
-  getCurrentUiLocale,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  CheckCircle2,
-  CloudOff,
-  Copy,
-  Download,
-  ExternalLink,
-  FileArchive,
-  FolderOpen,
-  HardDrive,
-  Plus,
-  RotateCcw,
-  Search,
-  Send,
-  ShieldCheck,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { CheckCircle2, CloudOff, Copy, Download, ExternalLink, FileArchive, FolderOpen, HardDrive, Plus, RotateCcw, Search, Send, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";
@@ -35,32 +11,14 @@ import { useI18n } from "@/shared/lib/i18n";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  PERSONAL_CLOUD_PROVIDER_IDS,
-  getPersonalCloudAccessToken,
-  type PersonalCloudProviderId,
-} from "../save-first/personal-cloud-client";
-import {
-  PersonalCloudUploadError,
-  uploadPersonalCloudProjectPackage,
-  type PersonalCloudUploadProgress,
-} from "../save-first/personal-cloud-upload";
+import { PERSONAL_CLOUD_PROVIDER_IDS, getPersonalCloudAccessToken, type PersonalCloudProviderId } from "../save-first/personal-cloud-client";
+import { PersonalCloudUploadError, uploadPersonalCloudProjectPackage, type PersonalCloudUploadProgress } from "../save-first/personal-cloud-upload";
 import { STUDIO_EXPORT_PRESETS } from "../save-first/studio-export-presets";
-import {
-  chooseStudioProjectPackageSaveTarget,
-  studioProjectPackageFileName,
-  writeStudioProjectPackageToTarget,
-} from "../save-first/studio-project-package";
+import { chooseStudioProjectPackageSaveTarget, studioProjectPackageFileName, writeStudioProjectPackageToTarget } from "../save-first/studio-project-package";
 import { buildStudioProjectPackageWithWorkspace } from "../save-first/studio-project-package-with-workspace";
-import {
-  studioSaveSafetySummary,
-  type StudioSaveProfile,
-} from "../save-first/studio-save-profile";
+import { studioSaveSafetySummary, type StudioSaveProfile } from "../save-first/studio-save-profile";
 import { readStudioSubmissions } from "../save-first/studio-submission-store";
-import {
-  ensureInitialStudioProjectDocument,
-  readStudioProjectDocuments,
-} from "../studio-project-document-store";
+import { ensureInitialStudioProjectDocument, readStudioProjectDocuments } from "../studio-project-document-store";
 import { resolveStudioProjectResumeTarget } from "../studio-project-resume-target";
 import type { StudioProjectLibraryEntry, StudioProjectStatus } from "../studio-project-library-store";
 import { PersonalCloudConnectionPanel } from "./PersonalCloudConnectionPanel";
@@ -71,7 +29,7 @@ import { usePersonalCloudConnections } from "./usePersonalCloudConnections";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
 
-type Locale = string;
+type Locale = "ko" | "en";
 type LibraryView = "active" | "storage" | "exports" | "publications" | "archived" | "trash";
 type InitialLibraryView = "active" | "archived" | "trash";
 
@@ -94,7 +52,7 @@ const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, BilingualText>> = {
 };
 
 function localeFromLanguage(language: string): Locale {
-  return language;
+  return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
 function resolveView(value: string | null, initialView?: InitialLibraryView): LibraryView {
@@ -179,7 +137,8 @@ export function StudioSaveFirstProjectLibraryPage({
   const { data: session } = useSession();
   const l = useBilingualLocalizer("studioProjectLibrary");
   const language = useI18n((state) => state.lang);
-  const legacyLocale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
+  const legacyLocale: Locale = localeFromLanguage(language);
+  const locale = legacyLocale;
   const authUserId = session?.user?.id ?? null;
   const view = resolveView(searchParams.get("view"), initialView);
   const status: StudioProjectStatus | undefined = view === "archived"
@@ -218,7 +177,7 @@ export function StudioSaveFirstProjectLibraryPage({
     next.delete("cloudError");
     if (result === "error") next.delete("sync");
     setSearchParams(next, { replace: true });
-  }, [l, reloadCloudConnections, searchParams, setSearchParams]);
+  }, [bt, l, reloadCloudConnections, searchParams, setSearchParams]);
 
   const allProjects = library.state?.projects ?? [];
   const activeProjects = allProjects.filter((project) => project.status === "active");
@@ -425,7 +384,7 @@ export function StudioSaveFirstProjectLibraryPage({
                 <Link
                   key={candidate}
                   href={viewHref(candidate)}
-                  aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "page") : undefined}
+                  aria-current={candidate === view ? "page" : undefined}
                   className={cn(
                     "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
                     candidate === view ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
@@ -441,7 +400,7 @@ export function StudioSaveFirstProjectLibraryPage({
               <Link
                 key={candidate}
                 href={viewHref(candidate)}
-                aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioSaveFirstProjectLibraryPage", "en", "page") : undefined}
+                aria-current={candidate === view ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center rounded-xl px-3 text-xs font-semibold",
                   candidate === view ? "bg-raised text-accent" : "text-fg-3 hover:bg-card hover:text-fg",
@@ -497,7 +456,7 @@ export function StudioSaveFirstProjectLibraryPage({
                         <SaveBadge profile={profile} locale={locale} />
                       </div>
                       <h2 className="mt-3 truncate text-lg font-black text-fg">{project.title}</h2>
-                      <p className="mt-1 text-xs text-fg-3">{locale === "ko" ? "마지막 작업" : "Last opened"} {dateLabel(project.lastOpenedAt, locale)}</p>
+                      <p className="mt-1 text-xs text-fg-3">{locale === "ko" ? "마지막 작업" : "Last opened"} {dateLabel(project.lastOpenedAt, locale, bt)}</p>
                       {resumeTarget.summary ? (
                         <div className={cn(
                           "mt-2 rounded-xl border px-3 py-2 text-[0.68rem] leading-5",

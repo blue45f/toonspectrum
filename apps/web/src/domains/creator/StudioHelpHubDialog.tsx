@@ -1,61 +1,12 @@
-import {
-  formatI18nTemplate,
-  resolveUiLocale,
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-import {
-  ArrowLeft,
-  BookOpen,
-  Bookmark,
-  Bug,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  Clock3,
-  Command,
-  ExternalLink,
-  GraduationCap,
-  Home,
-  Keyboard,
-  LifeBuoy,
-  Search,
-  Sparkles,
-  Stethoscope,
-  ThumbsDown,
-  ThumbsUp,
-  WifiOff,
-  Wrench,
-  X,
-  type LucideIcon,
-} from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { ArrowLeft, BookOpen, Bookmark, Bug, Check, ChevronRight, CircleHelp, Clock3, Command, ExternalLink, GraduationCap, Home, Keyboard, LifeBuoy, Search, Sparkles, Stethoscope, ThumbsDown, ThumbsUp, WifiOff, Wrench, X, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { STUDIO_SHORTCUT_ACTIONS, formatStudioShortcutChord } from "./studio-app-settings";
 import { buildStudioToolHelp } from "./studio-current-tool-help";
 import { requestStudioCommandSearch } from "./studio-help-center-channel";
-import {
-  STUDIO_HELP_ARTICLES,
-  STUDIO_HELP_CATEGORY_LABELS,
-  STUDIO_HELP_GUIDES,
-  STUDIO_HELP_UPDATES,
-  findStudioHelpArticle,
-  recommendStudioHelpArticles,
-  searchStudioHelpArticles,
-  studioHelpText,
-  type StudioHelpArticle,
-  type StudioHelpLocale,
-} from "./studio-help-knowledge";
+import { STUDIO_HELP_ARTICLES, STUDIO_HELP_CATEGORY_LABELS, STUDIO_HELP_GUIDES, STUDIO_HELP_UPDATES, findStudioHelpArticle, recommendStudioHelpArticles, searchStudioHelpArticles, studioHelpText, type StudioHelpArticle, type StudioHelpLocale } from "./studio-help-knowledge";
 import { studioSearchTextMatches } from "./studio-search-text";
 import { STUDIO_Z_CLASS } from "./studio-z-index";
 
@@ -63,10 +14,6 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 
 import type { StudioHelpCenterSection } from "./studio-help-center-channel";
 import type { StudioHelpHubActions, StudioHelpHubTab } from "./studio-help-hub-channel";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioHelpHubDialog", ko, en);
@@ -1031,7 +978,7 @@ export function StudioHelpHubDialog({
                       setActiveTab(item.id);
                       setSelectedArticleId(null);
                     }}
-                    aria-current={active ? translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "page") : undefined}
+                    aria-current={active ? "page" : undefined}
                     className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioHelpHubDialog", "en", "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:w-full {v0}"), { v0: String(active ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised") })}
                   >
                     <Icon className="size-4" aria-hidden />

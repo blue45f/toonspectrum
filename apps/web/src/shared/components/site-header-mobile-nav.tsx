@@ -1,27 +1,13 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
-import {
-  SITE_UTILITY_NAVIGATION,
-  mobileSiteTabsForPath,
-  siteNavigationContextForPath,
-  siteNavigationGroupsForPath,
-  siteNavigationLocale,
-  siteNavigationText,
-} from "./site-navigation";
+import { SITE_UTILITY_NAVIGATION, mobileSiteTabsForPath, siteNavigationContextForPath, siteNavigationGroupsForPath, siteNavigationLocale, siteNavigationText } from "./site-navigation";
 
 import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
 import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("site-header-mobile-nav", ko, en);
@@ -252,7 +238,7 @@ export function MobileHeaderNavigation({
                             <Link
                               href={item.href}
                               aria-label={label}
-                              aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "page") : undefined}
+                              aria-current={active ? "page" : undefined}
                               className={cx(
                                 "group flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150",
                                 active
@@ -295,7 +281,7 @@ export function MobileHeaderNavigation({
                       key={item.id}
                       href={item.href}
                       aria-label={label}
-                      aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "page") : undefined}
+                      aria-current={active ? "page" : undefined}
                       className={cx(
                         "group flex min-h-12 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
@@ -331,7 +317,7 @@ export function MobileHeaderNavigation({
                   key={item.id}
                   href={item.href}
                   aria-label={label}
-                  aria-current={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "page") : undefined}
+                  aria-current={active ? "page" : undefined}
                   className={cx(
                     "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-all duration-150 active:bg-raised/55",
                     active ? "text-accent" : "text-fg-3 hover:text-fg",

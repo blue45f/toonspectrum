@@ -680,7 +680,13 @@ function LiveStudioSidebar({
     { href: "/studio/ai-settings", ko: "AI 프로듀서", en: "AI Producer", icon: Bot },
     { href: "/community", ko: "커뮤니티", en: "Community", icon: MessageCircle },
     { href: storyHref, ko: "스토리", en: "Story", icon: BookOpen },
-  ] as const;
+  ] as readonly {
+    readonly href: string;
+    readonly ko: string;
+    readonly en: string;
+    readonly icon: typeof Home;
+    readonly active?: boolean;
+  }[];
   return (
     <aside className="vs2-sidebar vs2-live-sidebar">
       <nav aria-label={bt("Virtual Studio 메뉴", "Virtual Studio navigation")}>

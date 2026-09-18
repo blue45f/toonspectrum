@@ -82,6 +82,6 @@ export const HOME_COPY = {
 } as const;
 
 export type CreatorHomeCopy = (typeof HOME_COPY)[keyof typeof HOME_COPY];
-export function creatorHomeLocale(_locale): keyof typeof HOME_COPY {
-  return getActiveI18nLocale();
+export function creatorHomeLocale(_locale?: unknown): keyof typeof HOME_COPY {
+  return getActiveI18nLocale() === "ko" ? "ko" : "en";
 }

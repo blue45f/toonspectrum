@@ -1,8 +1,4 @@
-import {
-  translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, formatI18nTemplate, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 
@@ -10,18 +6,8 @@ import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
-import {
-  STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS,
-  STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS,
-  studioProjectLibraryManagementViewHref,
-  type StudioProjectLibrarySortMode,
-} from "./studio-project-library-management-model";
+import { STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS, STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS, studioProjectLibraryManagementViewHref, type StudioProjectLibrarySortMode } from "./studio-project-library-management-model";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectLibraryManagementHeader", ko, en);
@@ -71,7 +57,7 @@ export function StudioProjectLibraryManagementHeader({
               <Link
                 key={candidate}
                 href={studioProjectLibraryManagementViewHref(candidate)}
-                aria-current={candidate === view ? translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementHeader", "en", "page") : undefined}
+                aria-current={candidate === view ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold",
                   candidate === view

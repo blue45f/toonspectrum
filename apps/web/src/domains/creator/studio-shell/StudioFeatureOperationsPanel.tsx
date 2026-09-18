@@ -1,25 +1,13 @@
-import {
-  Archive,
-  BadgeCheck,
-  Blocks,
-  ExternalLink,
-  PackageCheck,
-  ShieldCheck,
-  Store,
-} from "lucide-react";
+import { Archive, BadgeCheck, Blocks, ExternalLink, PackageCheck, ShieldCheck, Store } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { studioFeatureModule } from "../studio-feature-registry";
-import {
-  studioFeatureSurfacesForView,
-  type StudioFeatureSurfaceTone,
-} from "../studio-feature-surface-registry";
+import { studioFeatureSurfacesForView, type StudioFeatureSurfaceTone } from "../studio-feature-surface-registry";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
-type Locale = string;
 
 const ICON_BY_TONE = {
   asset: BadgeCheck,

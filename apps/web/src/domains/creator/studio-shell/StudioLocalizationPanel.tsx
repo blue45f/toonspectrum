@@ -1,29 +1,8 @@
-import {
-  CheckCircle2,
-  Languages,
-  Plus,
-  RotateCcw,
-  Save,
-  Trash2,
-} from "lucide-react";
+import { CheckCircle2, Languages, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  createStudioLocalizationUnit,
-  evaluateStudioLocalizationQa,
-  summarizeStudioLocalization,
-  transitionStudioLocalizationUnit,
-  type StudioLocalizationStatus,
-  type StudioLocalizationUnit,
-  type StudioLocalizationUnitKind,
-} from "../studio-localization-workflow";
-import {
-  projectLocalizationDiagnostics,
-  readStudioLocalizationProject,
-  STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT,
-  writeStudioLocalizationProject,
-  type StudioLocalizationProjectDocument,
-} from "../studio-localization-project-store";
+import { createStudioLocalizationUnit, evaluateStudioLocalizationQa, summarizeStudioLocalization, transitionStudioLocalizationUnit, type StudioLocalizationStatus, type StudioLocalizationUnit, type StudioLocalizationUnitKind } from "../studio-localization-workflow";
+import { projectLocalizationDiagnostics, readStudioLocalizationProject, STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, writeStudioLocalizationProject, type StudioLocalizationProjectDocument } from "../studio-localization-project-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
@@ -32,7 +11,6 @@ import { cn } from "@/shared/lib/utils";
 
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
-type Locale = string;
 
 interface LayoutDraft {
   sourceRemoved: boolean;
@@ -142,6 +120,9 @@ export function StudioLocalizationPanel({
   readonly locale?: string;
 }) {
   const bt = useBilingual("StudioLocalizationPanel");
+  const l = useBilingualLocalizer("studioLocalization");
+  const language = useI18n((state) => state.lang);
+  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
   const workspace = useStudioProjectWorkspace(projectId, locale);
   const [document, setDocument] = useState<StudioLocalizationProjectDocument>(() => emptyProject(projectId));
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -174,7 +155,7 @@ export function StudioLocalizationPanel({
     };
     window.addEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
     return () => window.removeEventListener(STUDIO_LOCALIZATION_PROJECT_UPDATED_EVENT, handleUpdate);
-  }, [l, projectId]);
+  }, [bt, l, projectId]);
 
   const selected = document.units.find((unit) => unit.id === selectedId) ?? null;
   useEffect(() => {

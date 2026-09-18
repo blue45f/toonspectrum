@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -24,6 +25,7 @@ import {
   derivePersonalProductionInbox,
   evaluateAutomationRule,
   evaluateHandoffReadiness,
+  evaluateProductionRisks,
   evaluateProductionStudioRevisionCoverage,
   evaluateReleaseReadiness,
   evaluateReviewApproval,
@@ -1572,70 +1574,6 @@ function applyCommand(
       };
     }
   }
-}
-
-function externalReviewTokenDigest(token: string): string {
-  return `sha256:${createHash("sha256").update(token, "utf8").digest("hex")}`;
-}
-
-function externalReviewTokenMatches(expectedDigest: string, token: string): boolean {
-  const actual = Buffer.from(externalReviewTokenDigest(token), "utf8");
-  const expected = Buffer.from(expectedDigest, "utf8");
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
-
-function requireExternalReviewAccess(
-  aggregate: ProductionProjectAggregate,
-  reviewId: string,
-  token: string,
-): ExternalReviewAccess {
-  const access = (aggregate.externalReviewAccesses ?? []).find((entry) => entry.id === reviewId);
-  if (
-    !access
-    || access.status !== "active"
-    || Date.parse(access.expiresAt) <= Date.now()
-    || !externalReviewTokenMatches(access.tokenDigest, token)
-  ) {
-    throw new NotFoundException("유효한 외부 검수 링크를 찾을 수 없습니다.");
-  }
-  return access;
-}
-
-function externalReviewProjection(
-  aggregate: ProductionProjectAggregate,
-  access: ExternalReviewAccess,
-) {
-  const submissions = access.submissionIds.flatMap((submissionId) => {
-    const submission = aggregate.submissions.find((entry) => entry.id === submissionId);
-    if (!submission) return [];
-    const deliverable = aggregate.deliverables.find((entry) => entry.id === submission.deliverableId) ?? null;
-    return [{
-      id: submission.id,
-      status: submission.status,
-      submittedAt: submission.submittedAt,
-      revisionRef: submission.revisionRef,
-      evidenceRefs: submission.evidenceRefs,
-      deliverable: deliverable ? {
-        id: deliverable.id,
-        type: deliverable.type,
-        expectedFormat: deliverable.expectedFormat,
-        completionCriteria: deliverable.completionCriteria,
-      } : null,
-    }];
-  });
-  return Object.freeze({
-    projectId: aggregate.projectId,
-    projectTitle: aggregate.title,
-    review: {
-      id: access.id,
-      label: access.label,
-      watermark: access.watermark,
-      permissions: access.permissions,
-      expiresAt: access.expiresAt,
-      responses: access.responses,
-    },
-    submissions: Object.freeze(submissions),
-  });
 }
 
 const MAX_EXTERNAL_REVIEW_RESPONSES = 1_000;

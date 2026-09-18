@@ -20,29 +20,11 @@ import { join } from "node:path";
 import { decodePng } from "image-js";
 import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
 
-import {
-  STUDIO_ERASER_BRUSH_CATALOG_ITEMS,
-  STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
-  type StudioBrushCatalogItem,
-} from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
+import { STUDIO_ERASER_BRUSH_CATALOG_ITEMS, STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS, type StudioBrushCatalogItem } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 
-import {
-  collectStudioInAppRuntimeErrors,
-  installStudioInAppFirstRunState,
-  installStudioInAppGuestBoundary,
-  STUDIO_INAPP_PROFILES,
-  type StudioInAppRuntimeError,
-} from "./lib/studio-inapp-sweep-harness.mjs";
-import {
-  findFreePort,
-  spawnVitePreview,
-  stopChildProcess,
-  waitForServer,
-} from "./lib/studio-verify-preview-harness.mjs";
-import {
-  evaluateStudioSoakHeapGrowth,
-  STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR,
-} from "./lib/studio-memory-growth-policy.mjs";
+import { collectStudioInAppRuntimeErrors, installStudioInAppFirstRunState, installStudioInAppGuestBoundary, STUDIO_INAPP_PROFILES, type StudioInAppRuntimeError } from "./lib/studio-inapp-sweep-harness.mjs";
+import { evaluateStudioSoakHeapGrowth, STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR } from "./lib/studio-memory-growth-policy.mjs";
+import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const MINUTES = Math.max(1, Number(process.env.TOONSPECTRUM_SOAK_MINUTES ?? "300") || 300);
 const PROFILE_ID = process.env.TOONSPECTRUM_SOAK_PROFILE?.trim() || "desktop";
@@ -213,24 +195,6 @@ async function gcHeap(cdp: CDPSession | null, startedAt: number): Promise<HeapSa
   }
 }
 
-function heapSlopeBytesPerHour(samples: readonly HeapSample[]): number | null {
-  if (samples.length < 2) return null;
-  const firstAt = samples[0]?.atMs ?? 0;
-  const points = samples.map((sample) => ({
-    x: (sample.atMs - firstAt) / 3_600_000,
-    y: sample.usedBytes,
-  }));
-  const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
-  const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-  let numerator = 0;
-  let denominator = 0;
-  for (const point of points) {
-    const dx = point.x - meanX;
-    numerator += dx * (point.y - meanY);
-    denominator += dx * dx;
-  }
-  return denominator > 0 ? numerator / denominator : null;
-}
 
 async function closeBrushSurfaces(page: Page): Promise<boolean> {
   const surfaces = [
@@ -587,8 +551,12 @@ try {
         }
       }
       report.checkpoints.push({
-        atMs: nowMs(startedAt), cycle,
+        atMs: nowMs(startedAt),
+        cycle,
         heapBytes: heap?.usedBytes ?? null,
+        heapSlopeBytesPerHour: null,
+        domNodes: null,
+        eventListeners: null,
         failures: report.failures.length,
       });
       await page.screenshot({ path: join(OUT, `checkpoint-${Math.round(nowMs(startedAt) / 60000)}m.png`) }).catch(() => undefined);

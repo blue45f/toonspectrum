@@ -556,6 +556,10 @@ describe("Studio native-raster browser gate policy", () => {
       new URL("./verify-studio-native-raster-tools.mts", import.meta.url),
       "utf8",
     );
+    const durableAutosaveSource = readFileSync(
+      new URL("./lib/studio-verify-durable-autosave.mts", import.meta.url),
+      "utf8",
+    );
     expect(source).toContain('from "playwright"');
     expect(source).toContain("page.mouse.down()");
     expect(source).toContain("page.mouse.up()");
@@ -584,15 +588,16 @@ describe("Studio native-raster browser gate policy", () => {
     expect(source).toContain("readExactRasterImagePresentation");
     expect(source).toContain("__studioRasterImagePresentationProbe");
     expect(source).toContain("waitForRasterDurableAutosaveAfterOperation");
-    expect(source).toContain("createStudioAutosaveOpfsSession");
-    expect(source).toContain("Object.values(runtime)");
-    expect(source).toContain("namespace?.createStudioAutosaveOpfsSession");
-    expect(source).toContain("{ readOnly: true }");
-    expect(source).toContain("readLatest");
-    expect(source).toContain("studio-autosave-opfs-session-");
-    expect(source).toContain("studio-autosave-opfs-session\\.ts");
-    expect(source).toContain('url.includes("/@vite/client")');
-    expect(source).toContain("__studioNativeRasterAutosaveReadError");
+    expect(source).toContain("./lib/studio-verify-durable-autosave");
+    expect(durableAutosaveSource).toContain("createStudioAutosaveOpfsSession");
+    expect(durableAutosaveSource).toContain("Object.values(runtime)");
+    expect(durableAutosaveSource).toContain("namespace?.createStudioAutosaveOpfsSession");
+    expect(durableAutosaveSource).toContain("{ readOnly }");
+    expect(durableAutosaveSource).toContain("readLatest");
+    expect(durableAutosaveSource).toContain("studio-autosave-opfs-session-");
+    expect(durableAutosaveSource).toContain("studio-autosave-opfs-session\\.ts");
+    expect(durableAutosaveSource).toContain('url.includes("/@vite/client")');
+    expect(durableAutosaveSource).toContain("readDurableStudioAutosaveError");
     expect(source).toContain("선택 후 변형");
     expect(source).toContain("markRasterOperationSettled");
     expect(source).toContain("waitForClearedPixelSelectionUiState");

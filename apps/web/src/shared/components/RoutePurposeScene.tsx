@@ -89,7 +89,7 @@ export function RoutePurposeScene({
   experience,
   profile,
 }: RoutePurposeSceneProps) {
-  const copyLocale = toBilingualLocale(locale);
+  const copyLocale: "ko" | "en" = toBilingualLocale(locale) === "ko" ? "ko" : "en";
   const Icon = ICONS[profile.kind];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
@@ -97,8 +97,8 @@ export function RoutePurposeScene({
   const { hostRef, motionAllowed, paused, running, setPaused } = useAtelierMotion();
   const context = CONTEXT_LABELS[experience.contextLevel][copyLocale];
   const mobile = MOBILE_LABELS[experience.mobilePolicy][copyLocale];
-  const purpose = experience.pagePurpose[copyLocale];
-  const action = experience.primaryAction?.[copyLocale] ?? null;
+  const purpose = experience.pagePurpose;
+  const action = experience.primaryAction ?? null;
   const imageSrcSet = responsiveAtelierSrcSet(profile.image);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 
