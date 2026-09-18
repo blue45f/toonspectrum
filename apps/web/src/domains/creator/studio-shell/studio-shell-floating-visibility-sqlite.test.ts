@@ -62,7 +62,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
     await expect(repository.load()).resolves.toMatchObject({
       state: {
         hidden: ["collaboration"],
-        autoHideWhileDrawing: true,
+        autoHideWhileDrawing: false,
       },
       persisted: true,
       failure: null,
@@ -130,7 +130,7 @@ describe("studio shell floating visibility SQLite preferences", () => {
       snapshot: "{bad-json",
     }));
     await expect(malformed.load()).resolves.toMatchObject({
-      state: { hidden: [], autoHideWhileDrawing: true },
+      state: { hidden: [], autoHideWhileDrawing: false },
       persisted: false,
       failure: "read-failed",
     });

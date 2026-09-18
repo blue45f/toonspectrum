@@ -21,6 +21,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { useAtelierMotion } from "./site-experience/use-atelier-motion";
+import { useT } from "@/shared/lib/i18n";
 
 import type { SiteRouteExperience } from "@/shared/lib/site-route-experience";
 import type {
@@ -90,6 +91,7 @@ export function RoutePurposeScene({
   profile,
 }: RoutePurposeSceneProps) {
   const copyLocale: "ko" | "en" = toBilingualLocale(locale) === "ko" ? "ko" : "en";
+  const t = useT();
   const Icon = ICONS[profile.kind];
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
@@ -97,8 +99,8 @@ export function RoutePurposeScene({
   const { hostRef, motionAllowed, paused, running, setPaused } = useAtelierMotion();
   const context = CONTEXT_LABELS[experience.contextLevel][copyLocale];
   const mobile = MOBILE_LABELS[experience.mobilePolicy][copyLocale];
-  const purpose = experience.pagePurpose;
-  const action = experience.primaryAction ?? null;
+  const purpose = t(experience.pagePurpose);
+  const action = experience.primaryAction ? t(experience.primaryAction) : null;
   const imageSrcSet = responsiveAtelierSrcSet(profile.image);
   const videoEnabled = Boolean(profile.video) && motionAllowed && !videoFailed;
 

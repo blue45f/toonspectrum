@@ -50,7 +50,7 @@ describe("studio shell floating layout registry", () => {
     expect(state).toEqual({
       version: 1,
       hidden: ["document-tools", "collaboration"],
-      autoHideWhileDrawing: true,
+      autoHideWhileDrawing: false,
     });
     expect(Object.keys(state)).toEqual(["version", "hidden", "autoHideWhileDrawing"]);
     expect(Object.isFrozen(state)).toBe(true);

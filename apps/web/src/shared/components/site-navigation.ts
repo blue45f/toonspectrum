@@ -29,8 +29,6 @@ import {
   type SitePrimaryRouteId,
 } from "@/shared/lib/site-route-authority";
 import { resolveSiteRouteNavigationContext } from "@/shared/lib/site-route-metadata";
-import { getActiveI18nLocale } from "@/shared/lib/i18n-bilingual-copy";
-
 
 
 export type SiteNavigationLocale = "ko" | "en";
@@ -444,8 +442,8 @@ export function mobileSiteTabsForPath(pathname: string): readonly SiteNavigation
     : TOONSPECTRUM_MOBILE_TABS;
 }
 
-export function siteNavigationLocale(_locale?: unknown): SiteNavigationLocale {
-  return getActiveI18nLocale() === "ko" ? "ko" : "en";
+export function siteNavigationLocale(locale: string): SiteNavigationLocale {
+  return locale.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
 export function siteNavigationText(text: SiteNavigationText, locale: string): string {

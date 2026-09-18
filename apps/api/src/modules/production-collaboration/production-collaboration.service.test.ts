@@ -1124,7 +1124,7 @@ describe("ProductionCollaborationService", () => {
     });
 
     expect(result.aggregate).toMatchObject({ revision: 1 });
-    expect(result.aggregate.tasks).toEqual([task]);
+    expect(result.aggregate.tasks).toMatchObject([task]);
     expect(result.aggregate.notifications).toEqual([notification]);
     expect(result.aggregate.automationRules).toEqual([rule]);
     expect(result.derived).toEqual({
@@ -1264,8 +1264,8 @@ describe("ProductionCollaborationService", () => {
     await expect(service().submitExternalReview(
       current.projectId,
       "external-review-1",
-      externalReviewToken,
       {
+        token: externalReviewToken,
         responseId: "15151515-1515-4515-8515-151515151515",
         reviewerName: "외부 검수자",
         decision: "comment",

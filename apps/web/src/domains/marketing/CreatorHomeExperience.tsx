@@ -11,8 +11,10 @@ import "./creator-home-experience.css";
 import "./creator-prism.css";
 import "./creator-flagship.css";
 import "./creator-all-in-one.css";
+import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
 
+import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 
 interface LocalizedText {
@@ -241,10 +243,10 @@ export function CreatorHomeExperience() {
       <div className="cf-shell cf-home-wayfinding">
         <ProductIntentStart />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
-          <a href="#creator-start">{copy.jumpStart}</a>
-          <a href="#creator-flow">{copy.jumpFlow}</a>
-          <a href="#creator-principles">{copy.jumpPrinciples}</a>
-          <a href="#creator-support">{copy.jumpSupport}</a>
+          <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-principles">{copy.jumpPrinciples}</CreatorSectionLink>
+          <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
         </nav>
       </div>
 

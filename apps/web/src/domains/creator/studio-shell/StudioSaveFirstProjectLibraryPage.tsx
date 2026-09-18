@@ -29,7 +29,7 @@ import { usePersonalCloudConnections } from "./usePersonalCloudConnections";
 import { useStudioProjectLibrary } from "./useStudioProjectLibrary";
 import { useStudioSaveProfiles } from "./useStudioSaveProfiles";
 
-type Locale = "ko" | "en";
+type Locale = string;
 type LibraryView = "active" | "storage" | "exports" | "publications" | "archived" | "trash";
 type InitialLibraryView = "active" | "archived" | "trash";
 
@@ -51,7 +51,7 @@ const VIEW_DESCRIPTIONS: Readonly<Record<LibraryView, BilingualText>> = {
   trash: { ko: "삭제한 작업을 복원하거나 완전히 삭제합니다.", en: "Restore deleted work or remove it permanently." },
 };
 
-function localeFromLanguage(language: string): Locale {
+function localeFromLanguage(language: string): "ko" | "en" {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
@@ -137,7 +137,7 @@ export function StudioSaveFirstProjectLibraryPage({
   const { data: session } = useSession();
   const l = useBilingualLocalizer("studioProjectLibrary");
   const language = useI18n((state) => state.lang);
-  const legacyLocale: Locale = localeFromLanguage(language);
+  const legacyLocale = localeFromLanguage(language);
   const locale = legacyLocale;
   const authUserId = session?.user?.id ?? null;
   const view = resolveView(searchParams.get("view"), initialView);
