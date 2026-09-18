@@ -1461,7 +1461,9 @@ export function materializeStudioBrushPackDynamics(
   const descriptor = studioBrushPackDescriptorById(value);
   if (!descriptor) return null;
   const material = studioMaterialBrushDefinition(descriptor.catalogId);
-  if (material) return materializeStudioMaterialBrushDynamics(material);
+  if (material) {
+    return materializeStudioMaterialBrushDynamics(material, descriptor.defaultWidth);
+  }
   const index = STUDIO_BRUSH_PACK_CATALOG_IDS.indexOf(descriptor.catalogId);
   const profile = COMPACT_PROFILE_ROWS[index]!;
   const motif = profile[0];

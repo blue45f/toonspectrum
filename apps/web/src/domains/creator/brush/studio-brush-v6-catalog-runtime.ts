@@ -2,6 +2,7 @@
 import { BRUSH_STUDIO_V6_RECIPES } from "../brush-lab/brush-studio-v6-engine";
 import { createBrushStudioV6ProductBrush } from "../brush-lab/brush-studio-v6-product-bridge";
 
+import { studioV6BrushCatalogItemById } from "./studio-brush-v6-catalog";
 import { studioV6RecipeIdFromCatalogId } from "./studio-brush-v6-id";
 
 import type { BrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
@@ -38,7 +39,9 @@ export function materializeStudioV6BrushCatalogSelection(
     catalogName: program.name,
     runtimeBrushId: product.brushId,
     operation: "paint" as const,
-    defaultWidth: product.strokeWidth,
+    // Product selection uses the perceived-size policy; the material receipt keeps its authored
+    // tuning and the live renderer replaces tuning.size with the selected element stroke width.
+    defaultWidth: studioV6BrushCatalogItemById(catalogId)?.defaultWidth ?? product.strokeWidth,
     defaultOpacity: product.brushOpacity,
     defaultColor: product.color,
     brushDynamics: product.brushDynamics,

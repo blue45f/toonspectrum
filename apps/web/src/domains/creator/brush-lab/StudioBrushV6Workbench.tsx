@@ -64,6 +64,33 @@ const BUTTON = `inline-flex min-h-11 items-center justify-center rounded-xl bord
 const PRIMARY = `inline-flex min-h-11 items-center justify-center rounded-xl border border-accent/40 bg-accent px-3 py-2 text-sm font-black text-on-accent hover:opacity-90 ${STUDIO_FOCUS_RING}`;
 
 type Tab = "recipes" | "experiment" | "graph" | "input" | "material" | "physics" | "pattern" | "runtime";
+type BrushStudioExperience = "guided" | "expert";
+
+const BRUSH_STUDIO_EXPERIENCE_KEY = "toonspectrum.brush-studio.experience";
+const GUIDED_TABS: readonly { id: Tab; label: string }[] = [
+  { id: "recipes", label: `시작 레시피 ${BRUSH_STUDIO_V6_RECIPES.length}` },
+  { id: "experiment", label: "비교·실험" },
+  { id: "material", label: "재료·질감" },
+  { id: "input", label: "입력·필압" },
+  { id: "pattern", label: "패턴·문양" },
+];
+const EXPERT_TABS: readonly { id: Tab; label: string }[] = [
+  ...GUIDED_TABS,
+  { id: "graph", label: "엔진 조합" },
+  { id: "physics", label: "물리" },
+  { id: "runtime", label: "호환성·성능" },
+];
+const EXPERT_ONLY_TABS = new Set<Tab>(["graph", "physics", "runtime"]);
+
+function readBrushStudioExperience(): BrushStudioExperience {
+  try {
+    return globalThis.localStorage?.getItem(BRUSH_STUDIO_EXPERIENCE_KEY) === "expert"
+      ? "expert"
+      : "guided";
+  } catch {
+    return "guided";
+  }
+}
 type SingleSlot = Exclude<BrushStudioV6Slot, "input" | "physics" | "finish">;
 type NumericKey = Exclude<keyof BrushStudioV6Tuning, "primaryColor" | "secondaryColor">;
 interface SliderSpec { readonly key: NumericKey; readonly label: string; readonly min: number; readonly max: number; readonly step: number; }
@@ -253,6 +280,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   const [saving, setSaving] = useState(false);
   const [savedHref, setSavedHref] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("recipes");
+  const [experience, setExperience] = useState<BrushStudioExperience>(readBrushStudioExperience);
   const [status, setStatus] = useState("설정은 이 브라우저에 자동 저장됩니다. 비교·실험에서 기준을 고정하고 변경을 되돌릴 수 있습니다.");
   const [telemetry, setTelemetry] = useState<BrushStudioV6Telemetry>(EMPTY_TELEMETRY);
   const [capabilities, setCapabilities] = useState<BrushStudioV6Capabilities>(() => detectBrushStudioV6Capabilities());
@@ -272,6 +300,9 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   const topology = brushStudioV6Topology(program.slots.carrier);
 
   useEffect(() => setCapabilities(detectBrushStudioV6Capabilities()), []);
+  useEffect(() => {
+    try { globalThis.localStorage?.setItem(BRUSH_STUDIO_EXPERIENCE_KEY, experience); } catch { /* UI preference is optional */ }
+  }, [experience]);
   useEffect(() => {
     try { globalThis.localStorage?.setItem(storageKey, JSON.stringify(program)); } catch { /* persistence is optional */ }
     globalThis.dispatchEvent?.(new CustomEvent("toonspectrum:brush-v6-program", { detail: program }));
@@ -335,7 +366,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   const patchInput = (delta: Partial<BrushStudioV6InputPolicy>) => replace(patchBrushStudioV6Input(program, delta), undefined, `input:${Object.keys(delta).join(",")}`);
   const patchTuning = (key: NumericKey, value: number) => replace(patchBrushStudioV6Tuning(program, { [key]: value }), undefined, `tuning:${key}`);
   const choose = (slot: SingleSlot, id: string) => replace(replaceBrushStudioV6Slot(program, slot, id));
-  const chooseRecipe = (id: string) => { const recipe = BRUSH_STUDIO_V6_RECIPES.find((entry) => entry.id === id); if (!recipe) return; replace(recipe.create(), `${recipe.label} 레시피를 불러왔습니다.`); setTab("graph"); };
+  const chooseRecipe = (id: string) => { const recipe = BRUSH_STUDIO_V6_RECIPES.find((entry) => entry.id === id); if (!recipe) return; replace(recipe.create(), `${recipe.label} 레시피를 불러왔습니다.`); setTab("material"); };
   const importProgram = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return;
     try { replace(parseBrushStudioV6Import(await file.text()), `${file.name}에서 브러시 설정을 가져왔습니다.`); } catch { setStatus("V6 브러시 JSON을 읽을 수 없습니다. 현재 브러시 설정은 유지됩니다."); }
@@ -364,27 +395,35 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
     } finally { setSaving(false); }
   };
 
-  const tabs: readonly { id: Tab; label: string }[] = [
-    { id: "recipes", label: `레시피 ${BRUSH_STUDIO_V6_RECIPES.length}` }, { id: "experiment", label: "비교·실험" }, { id: "graph", label: "Engine Graph" }, { id: "input", label: "Input·Device" },
-    { id: "material", label: "Material" }, { id: "physics", label: "Physics" }, { id: "pattern", label: "Pattern" }, { id: "runtime", label: "Runtime" },
-  ];
+  const tabs = experience === "expert" ? EXPERT_TABS : GUIDED_TABS;
+  const changeExperience = (next: BrushStudioExperience) => {
+    setExperience(next);
+    if (next === "guided" && EXPERT_ONLY_TABS.has(tab)) setTab("material");
+    setStatus(next === "expert"
+      ? "전문가 설정을 열었습니다. 엔진 조합·물리·호환성 정보를 확인할 수 있습니다."
+      : "기본 편집으로 돌아왔습니다. 결과에 직접 영향을 주는 설정만 표시합니다.");
+  };
 
   return (
     <section ref={workbenchRef} className="space-y-4">
       <div className={CARD}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.2em] text-accent">BrushGraph V6</p>
-            <h2 className="mt-1 text-lg font-black text-fg">실행 가능한 물리·질감 브러시 제작기</h2>
-            <p className="mt-1 text-xs leading-relaxed text-fg-3">{BRUSH_STUDIO_V6_RECIPES.length}개 시그니처 레시피에서 시작해 재료와 물리를 조절하세요. 같은 궤적으로 비교하고, 실제 입력 패드에서 손맛을 확인할 수 있습니다.</p>
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.2em] text-accent">BRUSH STUDIO · FULL EDIT</p>
+            <h2 className="mt-1 text-lg font-black text-fg">브러시 만들기·전체 편집</h2>
+            <p className="mt-1 text-xs leading-relaxed text-fg-3">{BRUSH_STUDIO_V6_RECIPES.length}개 시작 레시피에서 골라 실제 획을 비교하세요. 기본 편집은 결과 중심으로 단순하게, 전문가 설정은 엔진과 물리까지 단계적으로 엽니다.</p>
+            <div role="group" aria-label="브러시 편집 깊이" className="mt-3 inline-flex rounded-xl border border-line bg-bg-2/55 p-1">
+              <button type="button" aria-pressed={experience === "guided"} onClick={() => changeExperience("guided")} className={`min-h-[44px] rounded-lg px-3 text-xs font-black ${experience === "guided" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>기본 편집</button>
+              <button type="button" aria-pressed={experience === "expert"} onClick={() => changeExperience("expert")} className={`min-h-[44px] rounded-lg px-3 text-xs font-black ${experience === "expert" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>전문가 설정</button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={`${PRIMARY} disabled:opacity-50`} disabled={saving || !analysis.valid} title={analysis.valid ? undefined : "실행할 수 없는 엔진 조합은 저장하지 않습니다."} onClick={() => { void saveToStudio(); }}>{saving ? "브러시 저장 중…" : "스튜디오에 브러시 저장"}</button>
+            <button type="button" className={`${PRIMARY} disabled:opacity-50`} disabled={saving || !analysis.valid} title={analysis.valid ? undefined : "실행할 수 없는 엔진 조합은 저장하지 않습니다."} onClick={() => { void saveToStudio(); }}>{saving ? "브러시 저장 중…" : "브러시로 저장"}</button>
             {savedHref ? <a href={savedHref} className={PRIMARY}>원고에서 사용하기</a> : null}
             <button type="button" className={`${BUTTON} disabled:opacity-45`} disabled={!history.past.length} onClick={() => moveHistory("undo")} title="실행 취소 (⌘/Ctrl+Z)">실행 취소</button>
             <button type="button" className={`${BUTTON} disabled:opacity-45`} disabled={!history.future.length} onClick={() => moveHistory("redo")} title="다시 실행 (⌘/Ctrl+Shift+Z)">다시 실행</button>
-            <button type="button" className={PRIMARY} onClick={() => replace(optimizeBrushStudioV6Program(program, capabilities), "장치 기능과 품질 목표에 맞게 입력·재료 설정을 조정했습니다.")}>장치 최적화</button>
-            <button type="button" className={BUTTON} onClick={() => replace(patchBrushStudioV6Metadata(program, { seed: (program.seed * 1664525 + 1013904223) >>> 0 }), "결정적 개성 시드를 변경했습니다.")}>개성 시드</button>
+            <button type="button" className={PRIMARY} onClick={() => replace(optimizeBrushStudioV6Program(program, capabilities), "장치 기능과 품질 목표에 맞게 입력·재료 설정을 조정했습니다.")}>이 기기에 맞게 조정</button>
+            <button type="button" className={BUTTON} onClick={() => replace(patchBrushStudioV6Metadata(program, { seed: (program.seed * 1664525 + 1013904223) >>> 0 }), "결정적 개성 시드를 변경했습니다.")}>질감 배치 바꾸기</button>
             <button type="button" className={BUTTON} onClick={() => download(program)}>내보내기</button>
             <button type="button" className={BUTTON} onClick={() => fileRef.current?.click()}>가져오기</button>
             <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" onChange={importProgram} />
@@ -400,7 +439,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
       </div>
 
       <nav aria-label="브러시 스튜디오 영역" className="flex gap-2 overflow-x-auto rounded-2xl border border-line bg-card/45 p-2">
-        {tabs.map((item) => <button key={item.id} type="button" aria-pressed={tab === item.id} onClick={() => setTab(item.id)} className={`min-h-10 shrink-0 rounded-xl px-3 text-xs font-black ${tab === item.id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>{item.label}</button>)}
+        {tabs.map((item) => <button key={item.id} type="button" aria-pressed={tab === item.id} onClick={() => setTab(item.id)} className={`min-h-[44px] shrink-0 rounded-xl px-3 text-xs font-black ${tab === item.id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised"} ${STUDIO_FOCUS_RING}`}>{item.label}</button>)}
       </nav>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
@@ -432,7 +471,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
           <Panel title="결정적 질감 시험지" description="동일 seed로 종이·안료·입자·습식·강모·패턴 결과를 비교합니다."><canvas ref={previewRef} role="img" aria-label="현재 브러시의 결정적 질감 시험지" className="h-64 w-full rounded-xl border border-line bg-white" /></Panel>
           <Panel title="실제 입력 필기 패드" description="펜·마우스·허용된 터치로 필압·틸트·팜 차단과 재질 반응을 확인합니다."><canvas ref={liveRef} aria-label="브러시 스튜디오 실제 입력 필기 패드" className="h-72 w-full cursor-crosshair rounded-xl border border-line bg-white" /><div className="mt-3 grid grid-cols-3 gap-2 text-center text-[0.68rem]"><div className={SUB}><p className="font-bold text-fg-3">입력률</p><p className="mt-1 font-black text-fg">{telemetry.sampleRateHz}Hz</p></div><div className={SUB}><p className="font-bold text-fg-3">필압</p><p className="mt-1 font-black text-fg">{telemetry.pressure.toFixed(2)}</p></div><div className={SUB}><p className="font-bold text-fg-3">Tilt</p><p className="mt-1 font-black text-fg">{telemetry.tilt.toFixed(0)}°</p></div></div><div className="mt-2 flex items-center justify-between gap-2 text-[0.68rem] text-fg-3"><span>{telemetry.pointerType} · twist {telemetry.twist.toFixed(0)}° · {telemetry.rejectedPalm ? "팜 차단" : "입력 수락"}</span><button type="button" className={BUTTON} onClick={() => controllerRef.current?.clear()}>지우기</button></div></Panel>
           <Panel title="조합 진단·품질 추정" description="설정에서 계산한 참고 점수입니다. 오류와 경고는 조합의 제약을 알려주며 실제 속도와 결과는 직접 그려서 확인하세요."><div className="grid grid-cols-2 gap-2"><Metric label="필기감" value={analysis.metrics.handFeel} /><Metric label="재료" value={analysis.metrics.materialFidelity} /><Metric label="색" value={analysis.metrics.colorFidelity} /><Metric label="시간 물리" value={analysis.metrics.temporalFidelity} /><Metric label="개성" value={analysis.metrics.uniqueness} /><Metric label="성능" value={analysis.metrics.performance} /><Metric label="결정성" value={analysis.metrics.determinism} /></div><div className="mt-3 space-y-2">{analysis.issues.length ? analysis.issues.map((entry) => <Issue key={entry.id} issue={entry} />) : <p className="rounded-xl border border-accent/35 bg-accent/10 p-3 text-xs font-black text-accent">그래프 조합 검사에서 확인할 사항이 없습니다.</p>}</div></Panel>
-          <Panel title="선택한 재료·엔진 구성" description={`${analysis.nodes.length}/${BRUSH_STUDIO_V6_NODES.length}개 타입 노드가 현재 프로그램을 구성합니다.`}><div className="flex flex-wrap gap-1.5">{analysis.nodes.map((node) => <span key={node.id} title={node.description} className="rounded-full border border-line bg-bg-2 px-2.5 py-1 text-[0.65rem] font-bold text-fg-2">{node.label}</span>)}</div></Panel>
+          {experience === "expert" ? <Panel title="선택한 재료·엔진 구성" description={`${analysis.nodes.length}/${BRUSH_STUDIO_V6_NODES.length}개 타입 노드가 현재 프로그램을 구성합니다.`}><div className="flex flex-wrap gap-1.5">{analysis.nodes.map((node) => <span key={node.id} title={node.description} className="rounded-full border border-line bg-bg-2 px-2.5 py-1 text-[0.65rem] font-bold text-fg-2">{node.label}</span>)}</div></Panel> : null}
         </aside>
       </div>
     </section>

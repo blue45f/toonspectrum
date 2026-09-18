@@ -71,9 +71,9 @@ describe("StudioBrushStudio", () => {
       toolProperties={<StudioBrushStudio {...props()} />} onLayoutChange={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "도구 속성 팝업 열기" }));
     const parent = screen.getByRole("dialog", { name: "도구 속성 팝업" });
-    const launcher = screen.getByRole("button", { name: /브러시 스튜디오/u });
+    const launcher = screen.getByRole("button", { name: /현재 브러시 편집/u });
     fireEvent.click(launcher);
-    const dialog = screen.getByRole("dialog", { name: "브러시 스튜디오" });
+    const dialog = screen.getByRole("dialog", { name: "현재 브러시 편집" });
     expect(parent.contains(dialog)).toBe(false);
     const engineTab = screen.getByRole("tab", { name: /엔진 조합/u });
     fireEvent.pointerDown(engineTab);
@@ -81,7 +81,7 @@ describe("StudioBrushStudio", () => {
     fireEvent.click(engineTab);
     expect(engineTab.getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(engineTab, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "브러시 스튜디오" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "현재 브러시 편집" })).toBeNull();
     expect(screen.getByRole("dialog", { name: "도구 속성 팝업" })).toBe(parent);
     fireEvent.keyDown(launcher, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "도구 속성 팝업" })).toBeNull();
@@ -93,12 +93,12 @@ describe("StudioBrushStudio", () => {
       toolProperties={<StudioBrushStudio {...props()} />} onLayoutChange={vi.fn()} />
       {createPortal(<div role="dialog" aria-label="별도 대화상자"><button type="button">다른 작업</button></div>, document.body)}</>);
     fireEvent.click(screen.getByRole("button", { name: "도구 속성 팝업 열기" }));
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/u }));
-    const dialog = screen.getByRole("dialog", { name: "브러시 스튜디오" });
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/u }));
+    const dialog = screen.getByRole("dialog", { name: "현재 브러시 편집" });
     const backdrop = dialog.querySelector("button[aria-hidden='true']")!;
     fireEvent.pointerDown(backdrop);
     fireEvent.click(backdrop);
-    expect(screen.queryByRole("dialog", { name: "브러시 스튜디오" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "현재 브러시 편집" })).toBeNull();
     expect(screen.getByRole("dialog", { name: "도구 속성 팝업" })).toBeTruthy();
     fireEvent.pointerDown(screen.getByRole("button", { name: "다른 작업" }));
     expect(screen.queryByRole("dialog", { name: "도구 속성 팝업" })).toBeNull();
@@ -107,7 +107,7 @@ describe("StudioBrushStudio", () => {
 
   it("renders one compact, dialog-capable launcher with a dynamics summary", () => {
     const html = renderToStaticMarkup(<StudioBrushStudio {...props()} />);
-    expect(html).toContain("브러시 스튜디오");
+    expect(html).toContain("현재 브러시 편집");
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).toContain("잉크 입자");
@@ -124,11 +124,11 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     const restore = await screen.findByRole("button", {
       name: "이 브러시 기본값 복원",
     });
-    const dialog = screen.getByRole("dialog", { name: "브러시 스튜디오" });
+    const dialog = screen.getByRole("dialog", { name: "현재 브러시 편집" });
     const panel = dialog.querySelector<HTMLElement>(":scope > div");
 
     expect(onBeforeOpen).toHaveBeenCalledOnce();
@@ -139,6 +139,8 @@ describe("StudioBrushStudio", () => {
     expect(panel?.className).toContain("overscroll-contain");
     expect(restore.className).toContain("min-h-11");
     expect(screen.getByText(/굵기·불투명도·필압·보정·촉을 함께 복원/)).toBeTruthy();
+    const fullEditor = screen.getByRole("link", { name: "새 브러시 만들기" });
+    expect(fullEditor.getAttribute("href")).toBe("/studio/assets/brushes/new");
   });
 
   it("recovers an incompatible brush through one explicit 44px dynamics preset CTA", async () => {
@@ -158,7 +160,7 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(await screen.findByRole("tab", { name: /반응/ }));
 
     const recovery = screen.getByRole("button", { name: "호환 브러시 선택하기" });
@@ -175,7 +177,7 @@ describe("StudioBrushStudio", () => {
     const onSelectDynamicsPreset = vi.fn();
     render(<StudioBrushStudio {...props({ onSelectDynamicsPreset })} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(await screen.findByRole("button", { name: /드라이 미디어/ }));
 
     const toolbarMinted = studioBrushDynamicsSettingsForBrushId("dry-media");
@@ -196,7 +198,7 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(await screen.findByRole("tab", { name: /반응/ }));
 
     expect(screen.queryByRole("button", { name: "호환 브러시 선택하기" })).toBeNull();
@@ -229,7 +231,7 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
 
     expect(await screen.findByText("미세 스프레이 기본값으로 복원할까요?")).toBeTruthy();
@@ -292,7 +294,7 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
 
     expect(await screen.findByText("내 레터링 붓 기본값으로 복원할까요?")).toBeTruthy();
@@ -325,7 +327,7 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
 
     await waitFor(() => {
@@ -356,7 +358,7 @@ describe("StudioBrushStudio", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /브러시 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현재 브러시 편집/ }));
     fireEvent.click(screen.getByRole("button", { name: "이 브러시 기본값 복원" }));
 
     expect(await screen.findByText(/저장된 브러시 라이브러리에서 다시 적용/)).toBeTruthy();

@@ -2,6 +2,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const RESPONSE_POLICY_PATH = "config/http-response-headers.json";
+const CLOUDFLARE_HEADERS_PATH = "apps/web/public/_headers";
+const CLOUDFLARE_WORKER_PATH = "deploy/cloudflare-static/src/index.ts";
+const CONTENT_SECURITY_POLICY_KEY = "Content-Security-Policy";
+const WORKER_CSP_PATTERN = /("Content-Security-Policy":\s*)"[^"]*",/u;
 
 function mapPattern(source) {
   if (source === "/(.*)") return "/*";
@@ -26,6 +30,31 @@ export function renderCloudflareHeaders(responsePolicy) {
   return `${blocks.join("\n")}\n`;
 }
 
+function rootResponseHeader(responsePolicy, key) {
+  const rootRule = responsePolicy.headers?.find((rule) => rule?.source === "/(.*)");
+  const header = rootRule?.headers?.find((candidate) => candidate?.key === key);
+  if (typeof header?.value !== "string" || header.value.trim() === "") {
+    throw new Error(`${RESPONSE_POLICY_PATH} must define ${key} for /(.*)`);
+  }
+  return header.value;
+}
+
+export function renderCloudflareWorkerSecurityPolicy(source, responsePolicy) {
+  const contentSecurityPolicy = rootResponseHeader(
+    responsePolicy,
+    CONTENT_SECURITY_POLICY_KEY,
+  );
+  if (!WORKER_CSP_PATTERN.test(source)) {
+    throw new Error(
+      `${CLOUDFLARE_WORKER_PATH} must expose COMMON_SECURITY_HEADERS.${CONTENT_SECURITY_POLICY_KEY}`,
+    );
+  }
+  return source.replace(
+    WORKER_CSP_PATTERN,
+    (_match, prefix) => `${prefix}${JSON.stringify(contentSecurityPolicy)},`,
+  );
+}
+
 export function loadResponseHeaderPolicy(root = process.cwd()) {
   const policy = JSON.parse(
     readFileSync(resolve(root, RESPONSE_POLICY_PATH), "utf8"),
@@ -38,12 +67,19 @@ export function loadResponseHeaderPolicy(root = process.cwd()) {
 
 export function verifyCloudflareStaticRules(root = process.cwd()) {
   const policy = loadResponseHeaderPolicy(root);
-  const expected = renderCloudflareHeaders(policy);
-  const actual = readFileSync(resolve(root, "apps/web/public/_headers"), "utf8");
+  const expectedHeaders = renderCloudflareHeaders(policy);
+  const actualHeaders = readFileSync(resolve(root, CLOUDFLARE_HEADERS_PATH), "utf8");
+  const workerSource = readFileSync(resolve(root, CLOUDFLARE_WORKER_PATH), "utf8");
+  const expectedWorkerSource = renderCloudflareWorkerSecurityPolicy(workerSource, policy);
   const issues = [];
-  if (actual !== expected) {
+  if (actualHeaders !== expectedHeaders) {
     issues.push(
-      "apps/web/public/_headers is stale; run pnpm run generate:cloudflare-static-rules",
+      `${CLOUDFLARE_HEADERS_PATH} is stale; run pnpm run generate:cloudflare-static-rules`,
+    );
+  }
+  if (workerSource !== expectedWorkerSource) {
+    issues.push(
+      `${CLOUDFLARE_WORKER_PATH} has a stale Content-Security-Policy; run pnpm run generate:cloudflare-static-rules`,
     );
   }
 
@@ -54,18 +90,25 @@ const invoked = process.argv[1]
   && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname);
 if (invoked) {
   const root = process.cwd();
-  const target = resolve(root, "apps/web/public/_headers");
+  const headersTarget = resolve(root, CLOUDFLARE_HEADERS_PATH);
+  const workerTarget = resolve(root, CLOUDFLARE_WORKER_PATH);
   const policy = loadResponseHeaderPolicy(root);
-  const rendered = renderCloudflareHeaders(policy);
+  const renderedHeaders = renderCloudflareHeaders(policy);
   if (process.argv.includes("--check")) {
     const issues = verifyCloudflareStaticRules(root);
     if (issues.length > 0) {
       for (const issue of issues) console.error(issue);
       process.exit(1);
     }
-    console.log("Cloudflare Static Assets headers match the provider-neutral response policy");
+    console.log("Cloudflare headers and edge worker match the provider-neutral response policy");
   } else {
-    writeFileSync(target, rendered);
-    console.log(`wrote ${target}`);
+    writeFileSync(headersTarget, renderedHeaders);
+    const workerSource = readFileSync(workerTarget, "utf8");
+    writeFileSync(
+      workerTarget,
+      renderCloudflareWorkerSecurityPolicy(workerSource, policy),
+    );
+    console.log(`wrote ${headersTarget}`);
+    console.log(`updated ${workerTarget}`);
   }
 }

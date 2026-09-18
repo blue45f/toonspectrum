@@ -342,11 +342,12 @@ export const STUDIO_SEARCH_CORPUS: readonly StudioSearchCorpusEntry[] =
       // 행을 가리키고, 형제인 `tool.brush-engines` 도 property 로 들어온다.
       // (id 는 다른 파일이 참조하므로 legacy `panel.` 접두사를 유지한다.)
       kind: "property",
-      label: "브러시 스튜디오",
-      labelEn: "Brush studio",
-      location: "인스펙터 › 대상 › 그리기 › 브러시 스튜디오",
-      description: "브러시 끝·산포·필압 곡선까지 전부 편집합니다.",
+      label: "현재 브러시 편집",
+      labelEn: "Edit current brush",
+      location: "인스펙터 › 대상 › 그리기 › 현재 브러시 편집",
+      description: "캔버스를 떠나지 않고 현재 브러시의 끝·산포·필압 곡선을 빠르게 편집합니다.",
       aliases: [
+        ours("브러시 스튜디오"),
         csp("보조 도구 상세"),
         cspEn("Sub Tool Detail"),
         ps("Brush Settings"),

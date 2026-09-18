@@ -205,9 +205,9 @@ export function StudioInspectorAsideShell({
       surfaceId="inspector"
       label="작업 패널"
       defaultLayout={DEFAULT_STUDIO_INSPECTOR_FLOATING_LAYOUT}
-      minWidth={360}
-      minHeight={480}
-      maxWidth={920}
+      minWidth={400}
+      minHeight={520}
+      maxWidth={1_040}
       maxHeight={1_100}
       allowedDockEdges={["left", "right"]}
       onClose={() => setRightPanelOpen(false)}

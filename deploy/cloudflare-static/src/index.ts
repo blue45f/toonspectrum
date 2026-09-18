@@ -2,6 +2,7 @@ import {
   getStaticPolicyDocument,
   isPolicySlug,
 } from "../../../packages/core/src/legal-policy";
+import { parsePublicSharePath } from "../../../packages/core/src/public-share-path";
 
 import {
   CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL,
@@ -9,6 +10,7 @@ import {
   cloudflareLargeAssetKey,
   cloudflareLargeAssetSidecarPath,
   isCloudflareOversizedAssetPath,
+  supportsCloudflareStaticSidecar,
   type CloudflareLargeAssetEncoding,
 } from "./large-static-assets";
 
@@ -83,7 +85,7 @@ export const COMMON_SECURITY_HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com; script-src 'self' 'sha256-OmHwrCLVdhu+S3kh6CjljJPz6ndGTuXZGMTrN96KuAg=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://commons.wikimedia.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://cloudflareinsights.com https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content",
+  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com; script-src 'self' 'sha256-IOP7wTtt9D3HpCkohTmfkH+ucqsTcH2YSDgerWQ41YU=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://commons.wikimedia.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://cloudflareinsights.com https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content",
   "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 } as const);
@@ -192,7 +194,8 @@ function isOgPagePath(pathname: string): boolean {
   return hasExactlyOneEncodedSegment(pathname, "/title/")
     || pathname === "/market"
     || pathname === "/market/browse"
-    || hasExactlyOneEncodedSegment(pathname, "/market/resource/");
+    || hasExactlyOneEncodedSegment(pathname, "/market/resource/")
+    || parsePublicSharePath(pathname) !== null;
 }
 
 function isCrawlerRequest(request: Request): boolean {
@@ -240,6 +243,9 @@ function mapDynamicPath(requestUrl: URL): URLSearchParams | null {
     const slug = decodePathSegment(requestUrl.pathname.slice("/title/".length));
     if (!slug) return null;
     return new URLSearchParams({ slug });
+  }
+  if (parsePublicSharePath(requestUrl.pathname)) {
+    return new URLSearchParams({ publicPath: requestUrl.pathname });
   }
   return null;
 }
@@ -579,7 +585,11 @@ async function serveCompressedLargeAsset(
   const incoming = new URL(request.url);
   const descriptor = cloudflareLargeAssetDescriptor(incoming.pathname);
   const encoding = preferredLargeAssetEncoding(request);
-  if (!descriptor || !encoding) return null;
+  if (
+    !descriptor
+    || !encoding
+    || !supportsCloudflareStaticSidecar(incoming.pathname)
+  ) return null;
 
   const sidecarUrl = new URL(incoming);
   sidecarUrl.pathname = cloudflareLargeAssetSidecarPath(

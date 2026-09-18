@@ -1,14 +1,17 @@
 import {
   Clapperboard,
   Images,
+  Languages,
+  ScanText,
   Settings2,
   Sparkles,
   WandSparkles,
 } from "lucide-react";
-import { Suspense } from "react";
+import { Suspense, useCallback } from "react";
 
 import { StudioMenuPopoverHeader, StudioMenuSubtabs } from "../studio-chrome-ui";
 import {
+  StudioAdvancedAiTools,
   StudioAiAssistHub,
   StudioAiBackgroundPanel,
   StudioAiCharacterConsistencyPanel,
@@ -24,6 +27,10 @@ import { StudioPanelLoading } from "../StudioLazySurfaceFallback";
 
 import { pushStudioAiRecentPrompt } from "./studio-ai-assist-ux";
 import { isStudioAiConfigured } from "./studio-ai-client";
+import {
+  requestStudioGenerated3dArtifact,
+  useStudioGenerated3dHostBridge,
+} from "./studio-generated-3d-product-bridge";
 import { createStudioAiComicComposerHandoff } from "./studio-ai-comic-composer-handoff";
 import { requestStudioAiComicComposerOpen } from "./studio-ai-comic-composer-intent";
 import { requestStudioAiEpisodeProductionOpen } from "./studio-ai-episode-production-intent";
@@ -38,6 +45,12 @@ import type { StudioServerAiProviderPreference } from "../studio-server-ai-clien
 import type { StudioAiEpisodeProductionPlan } from "./studio-ai-episode-production-director";
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
+import { useSession } from "@/compat/auth-session-store";
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
+import {
+  useUserAi,
+  userAiAutomaticExternalConnectionsForCapability,
+} from "@/shared/ai/user-ai-store";
 import { useT } from "@/shared/lib/i18n";
 
 
@@ -50,6 +63,8 @@ export function StudioAiToolPopoverBody({
   toolBelt,
 }: StudioAiToolPopoverBodyProps) {
   const t = useT();
+  const { data: session, ready: sessionReady, status: sessionStatus } = useSession();
+  useUserAi();
   const lt = (fallback: string, key: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
@@ -94,6 +109,8 @@ export function StudioAiToolPopoverBody({
     setAiDialogueSuggestSituation,
     setAiPaletteSuggestMood,
     setAiRecentPrompts,
+    setBg3dOpen,
+    setDialogueTranslateOpen,
     setMenu,
     setScenarioOpen,
     setTool,
@@ -119,6 +136,51 @@ export function StudioAiToolPopoverBody({
     updateAiSettings,
     updateServerAiProvider,
   } = toolBelt.stableHandlers;
+
+  const openGenerated3dImporter = useCallback(() => {
+    setBg3dOpen(true);
+  }, [setBg3dOpen]);
+  useStudioGenerated3dHostBridge({
+    ownerId: session?.user.id ?? "guest",
+    openObjectInsert: openGenerated3dImporter,
+  });
+
+  const personalTextRoutes = userAiAutomaticExternalConnectionsForCapability("text");
+  const personalTextConfigured = personalTextRoutes.length > 0;
+  const personalFreeTextConfigured = personalTextRoutes.some((route) =>
+    route.costPolicy === "provider-free-tier" || route.costPolicy === "openrouter-free"
+  );
+  const managedTextReady = textAiTransport.mode === "server"
+    && serverAiStatus?.configured === true
+    && (!serverAiStatus.requiresAuth || sessionStatus === "authenticated");
+  const serverStatusPending = textAiTransport.mode === "server"
+    && serverAiStatus === null
+    && !personalTextConfigured;
+  const serverSessionChecking = sessionReady === false
+    && textAiTransport.mode === "server"
+    && serverAiStatus?.configured === true
+    && Boolean(serverAiStatus.requiresAuth)
+    && !personalTextConfigured;
+  const serverLoginRequired = sessionReady
+    && textAiTransport.mode === "server"
+    && serverAiStatus?.configured === true
+    && Boolean(serverAiStatus.requiresAuth)
+    && sessionStatus === "unauthenticated"
+    && !personalTextConfigured;
+  const textAiReady = personalTextConfigured
+    || managedTextReady
+    || (textAiTransport.mode !== "server" && textAiConfigured);
+  const imageAiConfigured = isStudioAiConfigured(aiSettings);
+
+  const openTranslationSurface = (surface: "translate" | "qa") => {
+    setDialogueTranslateOpen(surface);
+    setMenu(null);
+    announceDrawingShortcut(
+      surface === "translate"
+        ? "대사 번역 검토 화면을 열었어요."
+        : "현지화 QA와 말풍선 넘침 검사를 열었어요.",
+    );
+  };
 
   const applyEpisodeProductionPlan = (plan: StudioAiEpisodeProductionPlan) => {
     if (masterEditMode) {
@@ -212,7 +274,10 @@ export function StudioAiToolPopoverBody({
         ]}
       />
       {menu === "aiAssist" && (
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div
+          className="pointer-events-auto relative z-[4] flex min-h-0 flex-1 flex-col isolate"
+          data-studio-ai-pointer-shield="true"
+        >
           <Suspense
             fallback={
               <StudioPanelLoading label={lt("AI 어시스트 패널을 여는 중...", "studio.aiToolPopover.panelLoadingAssist")} />
@@ -222,18 +287,26 @@ export function StudioAiToolPopoverBody({
               className="min-h-0 flex-1"
               activeTool={aiAssistTool}
               onToolChange={setAiAssistTool}
-              imageConfigured={isStudioAiConfigured(aiSettings)}
-              textConfigured={textAiConfigured}
-              connectionOk={textAiConfigured || isStudioAiConfigured(aiSettings)}
+              imageConfigured={imageAiConfigured}
+              textConfigured={textAiReady}
+              connectionOk={textAiReady || imageAiConfigured}
               connectionLabel={
-                textAiConfigured
-                  ? textAiTransport.mode === "server"
-                    ? lt(
-                        `${activeServerAiProviderLabel} 연결됨`,
-                        "studio.aiToolPopover.serverProviderConnected"
-                      ).replace("{provider}", activeServerAiProviderLabel)
-                    : lt("내 API 연결됨", "studio.aiToolPopover.internalProviderConnected")
-                  : isStudioAiConfigured(aiSettings)
+                serverStatusPending || serverSessionChecking
+                  ? lt("무료 AI 상태 확인 중", "studio.aiToolPopover.serverSessionChecking")
+                  : serverLoginRequired
+                    ? lt("무료 AI 준비됨 · 로그인 필요", "studio.aiToolPopover.serverLoginRequired")
+                    : personalTextConfigured && sessionStatus === "unauthenticated"
+                      ? personalFreeTextConfigured
+                        ? lt("내 무료 API 연결됨", "studio.aiToolPopover.personalFreeConnected")
+                        : lt("내 BYOK 연결됨", "studio.aiToolPopover.personalByokConnected")
+                      : textAiConfigured
+                      ? textAiTransport.mode === "server"
+                      ? lt(
+                          `${activeServerAiProviderLabel} 연결됨`,
+                          "studio.aiToolPopover.serverProviderConnected"
+                        ).replace("{provider}", activeServerAiProviderLabel)
+                      : lt("내 API 연결됨", "studio.aiToolPopover.internalProviderConnected")
+                  : imageAiConfigured
                     ? lt("이미지 API 연결됨", "studio.aiToolPopover.imageApiConnected")
                     : serverAiStatus?.configured
                       ? lt("로그인하면 자동 무료 AI 사용", "studio.aiToolPopover.serverLoginHint")
@@ -260,8 +333,20 @@ export function StudioAiToolPopoverBody({
                 requestStudioAiSuperSuiteOpen();
               }}
               providerSlot={
-                textAiTransport.mode === "server" && configuredServerAiProviders.length > 0 ? (
-                  <div className="rounded-xl border border-line bg-card/35 p-2.5">
+                <div className="grid gap-2">
+                  {serverLoginRequired ? (
+                    <AiRecoveryNotice
+                      code="login_required"
+                      message="로그인하면 현재 입력을 유지한 채 자동 무료 AI를 사용할 수 있어요. 로그인 없이 쓰려면 개인 무료 API 키를 연결하세요."
+                      compact
+                    />
+                  ) : null}
+                  {textAiTransport.mode === "server"
+                    && configuredServerAiProviders.length > 0
+                    && !serverLoginRequired
+                    && !serverSessionChecking
+                    && !(personalTextConfigured && sessionStatus === "unauthenticated") ? (
+                    <div className="rounded-xl border border-line bg-card/35 p-2.5">
                     <label className="flex items-center justify-between gap-2 text-xs font-semibold text-fg-2">
                       <span>{lt("텍스트 AI 제공자", "studio.aiToolPopover.textAiProvider")}</span>
                       <select
@@ -300,10 +385,50 @@ export function StudioAiToolPopoverBody({
                       )}
                     </p>
                   </div>
-                ) : null
+                ) : null}
+                </div>
               }
               toolPanel={
                 <>
+                  <section
+                    className="rounded-xl border border-line bg-card/55 p-2"
+                    aria-label="AI 번역·검수 바로가기"
+                  >
+                    <div className="flex items-center justify-between gap-2 px-1">
+                      <strong className="text-[0.64rem] font-black text-fg-2">번역·검수</strong>
+                      <span className="text-[0.56rem] text-fg-3">현재 문서 기준</span>
+                    </div>
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => openTranslationSurface("translate")}
+                        data-studio-ai-translation-launcher="true"
+                        className="flex min-h-12 min-w-0 items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-2 text-left transition-colors hover:border-accent/45 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent">
+                          <Languages size={14} aria-hidden />
+                        </span>
+                        <span className="min-w-0">
+                          <strong className="block truncate text-[0.66rem] font-black text-fg">대사 번역</strong>
+                          <span className="block truncate text-[0.55rem] text-fg-3">검토 후 적용</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openTranslationSurface("qa")}
+                        data-studio-ai-localization-qa-launcher="true"
+                        className="flex min-h-12 min-w-0 items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-2 text-left transition-colors hover:border-accent/45 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent/10 text-accent">
+                          <ScanText size={14} aria-hidden />
+                        </span>
+                        <span className="min-w-0">
+                          <strong className="block truncate text-[0.66rem] font-black text-fg">현지화 QA</strong>
+                          <span className="block truncate text-[0.55rem] text-fg-3">넘침·문체 검사</span>
+                        </span>
+                      </button>
+                    </div>
+                  </section>
                   {aiAssistTool === "background" ? (
                     <StudioAiBackgroundPanel
                       configured={isStudioAiConfigured(aiSettings)}
@@ -347,7 +472,7 @@ export function StudioAiToolPopoverBody({
                     <StudioAiCompositionPanel
                       settings={aiSettings}
                       transport={textAiTransport}
-                      configured={textAiConfigured}
+                      configured={textAiReady}
                       sceneText={aiCompositionDraft}
                       onSceneTextChange={setAiCompositionDraft}
                       onInsertAsNote={insertAiCompositionNote}
@@ -375,7 +500,7 @@ export function StudioAiToolPopoverBody({
                   ) : null}
                   {aiAssistTool === "dialogue" ? (
                     <StudioDialogueSuggestPanel
-                      configured={textAiConfigured}
+                      configured={textAiReady}
                       situationText={aiDialogueSuggestSituation}
                       onSituationTextChange={setAiDialogueSuggestSituation}
                       hasContext={activePage.elements.some(
@@ -404,7 +529,7 @@ export function StudioAiToolPopoverBody({
                   ) : null}
                   {aiAssistTool === "palette" ? (
                     <StudioPaletteSuggestPanel
-                      configured={textAiConfigured}
+                      configured={textAiReady}
                       moodText={aiPaletteSuggestMood}
                       onMoodTextChange={setAiPaletteSuggestMood}
                       busy={aiPaletteSuggestBusy}
@@ -423,6 +548,16 @@ export function StudioAiToolPopoverBody({
                       onSaveToLibrary={saveSuggestedPaletteToLibrary}
                     />
                   ) : null}
+                  <StudioAdvancedAiTools
+                    userId={session?.user.id}
+                    onInsertGenerated3d={(blob, revisionId) => {
+                      requestStudioGenerated3dArtifact({
+                        intent: "insert",
+                        blob,
+                        revisionId,
+                      });
+                    }}
+                  />
                 </>
               }
             />

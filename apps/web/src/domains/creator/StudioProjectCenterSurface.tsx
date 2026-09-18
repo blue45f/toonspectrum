@@ -38,7 +38,7 @@ export function StudioProjectCenterSurface({
     <div
       onClickCapture={(event) => handleProjectAction(event, onClose)}
       className={desktop
-        ? "grid h-full min-h-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-2.5 [scrollbar-gutter:stable] sm:grid-cols-3 [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"
+        ? "grid h-full min-h-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain p-2.5 [scrollbar-gutter:stable] @xl:grid-cols-3 [&>button]:min-h-11 [&>button]:min-w-0 [&>button]:justify-start [&>label]:min-h-11 [&>label]:min-w-0 [&>label]:justify-start"
         : "fixed inset-x-2 top-12 z-[100] grid max-h-[calc(100dvh-4rem)] grid-cols-2 gap-2 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur-xl [scrollbar-gutter:stable] sm:grid-cols-3 sm:inset-x-auto sm:right-3 sm:w-[min(44rem,calc(100vw-1.5rem))] [&>button]:min-h-11 [&>button]:justify-start [&>label]:min-h-11 [&>label]:justify-start"}
     >
       {children}

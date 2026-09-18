@@ -1,4 +1,13 @@
-import { BookOpen, Mail, PenLine, RefreshCw, UserCheck, UserPlus } from "lucide-react";
+import {
+  BookOpen,
+  BriefcaseBusiness,
+  Mail,
+  PenLine,
+  RefreshCw,
+  Sparkles,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -8,15 +17,25 @@ import type { SeedReview, Title } from "@/shared/lib/types";
 import Link from "@/compat/router-link";
 
 import { ReviewCard } from "@/shared/components/review-card";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { Stars } from "@/shared/components/ui/stars";
+import {
+  CREATOR_COLLABORATION_LABELS,
+  CREATOR_EXPERIENCE_LABELS,
+  creatorRoleDefinition,
+  creatorSpecialtyDefinition,
+  creatorText,
+  type CreatorRoleLocale,
+} from "@/shared/lib/creator-role-contract";
 import { useT } from "@/shared/lib/i18n";
+import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
 import { ErrorState } from "@/components/error-state";
 import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/domains/creator/creator-community-ui";
-import { useDocumentTitle, useMetaDescription } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
 import {
   getCreatorProfile,
   listSeries,
@@ -27,6 +46,9 @@ import {
   type WorkSummary,
 } from "@/infrastructure/creator-client";
 import { useApiResource } from "@/infrastructure/use-api-resource";
+import { getActiveI18nLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+
+
 
 
 // 회원 공개 프로필 — 리뷰 카드의 작성자명을 누르면 오는 /u/:userId.
@@ -51,6 +73,7 @@ function isTab(value: string | null): value is ProfileTab {
 
 // ── 창작 작품 탭 ──────────────────────────────────────────────────────
 function ProfileWorksTab({ userId }: { userId: string }) {
+  useBilingualI18nRevision();
   const t = useT();
   const [works, setWorks] = useState<WorkSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +118,7 @@ function ProfileWorksTab({ userId }: { userId: string }) {
 
 // ── 시리즈 탭 ─────────────────────────────────────────────────────────
 function ProfileSeriesTab({ userId }: { userId: string }) {
+  useBilingualI18nRevision();
   const t = useT();
   const [series, setSeries] = useState<SeriesSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,7 +176,9 @@ function ProfileSeriesTab({ userId }: { userId: string }) {
 }
 
 export function UserProfilePage() {
+  useBilingualI18nRevision();
   const t = useT();
+  const locale: CreatorRoleLocale = getActiveI18nLocale();
   const { userId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -188,19 +214,40 @@ export function UserProfilePage() {
   const feed = data?.feed ?? [];
   const author = profile?.name ?? feed[0]?.author ?? t("userProfile.authorFallback");
   const avatar = profile?.avatar ?? feed[0]?.avatar ?? "#7c5cfc";
+  const roleProfile = profile?.creatorRoleProfile ?? null;
+  const primaryRole = creatorRoleDefinition(roleProfile?.primaryRole);
+  const secondaryRoles = (roleProfile?.secondaryRoles ?? [])
+    .map((role) => creatorRoleDefinition(role))
+    .filter((role): role is NonNullable<typeof role> => Boolean(role));
+  const specialtyLabels = (roleProfile?.specialties ?? [])
+    .map((specialty) => creatorSpecialtyDefinition(specialty))
+    .filter((specialty): specialty is NonNullable<typeof specialty> => Boolean(specialty));
   const total = data?.stats.total ?? 0;
   const avg = data?.stats.avg ?? 0;
   const distinctTitles = data?.stats.distinctTitles ?? 0;
+  const profileMetaDescription = data
+    ? t("userProfile.metaTemplate")
+        .replace("{author}", author)
+        .replace("{reviews}", String(total))
+        .replace("{works}", String(distinctTitles))
+        .replace("{avg}", avg ? avg.toFixed(1) : "-")
+    : compactPublicShareDescription(
+        profile?.bio,
+        `${author} 창작자의 작품, 시리즈와 커뮤니티 활동을 확인해 보세요.`,
+      );
+  const sharePath = userId ? `/u/${encodeURIComponent(userId)}` : "/community";
+  const shareDescription = compactPublicShareDescription(profile?.bio, profileMetaDescription);
+  const shareImage = publicShareImageUrl(profile?.avatar);
+
   useDocumentTitle(loading && !profile ? t("userProfile.eyebrow") : `${author}`);
-  useMetaDescription(
-    data
-      ? t("userProfile.metaTemplate")
-          .replace("{author}", author)
-          .replace("{reviews}", String(total))
-          .replace("{works}", String(distinctTitles))
-          .replace("{avg}", avg ? avg.toFixed(1) : "-")
-      : null
-  );
+  useMetaDescription(profileMetaDescription);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: `${author} 창작자 프로필`,
+    description: shareDescription,
+    type: "website",
+    image: shareImage,
+  });
 
   async function onToggleFollow() {
     if (!profile || !viewerId || isSelf || followBusy) return;
@@ -249,43 +296,89 @@ export function UserProfilePage() {
               <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">
                 {profile?.bio || t("userProfile.bioFallback")}
               </p>
+              {primaryRole && roleProfile ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
+                      <BriefcaseBusiness size={12} aria-hidden="true" />
+                      {creatorText(primaryRole.label, locale)}
+                    </span>
+                    {secondaryRoles.map((role) => (
+                      <span key={role.id} className="inline-flex min-h-7 items-center rounded-full border border-line bg-card px-2.5 text-xs font-semibold text-fg-2">
+                        {creatorText(role.shortLabel, locale)}
+                      </span>
+                    ))}
+                    {roleProfile.experienceLevel ? (
+                      <span className="text-[0.7rem] font-semibold text-fg-3">
+                        {creatorText(CREATOR_EXPERIENCE_LABELS[roleProfile.experienceLevel], locale)}
+                      </span>
+                    ) : null}
+                    {roleProfile.collaborationStatus ? (
+                      <span className="text-[0.7rem] font-semibold text-accent">
+                        {creatorText(CREATOR_COLLABORATION_LABELS[roleProfile.collaborationStatus], locale)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {specialtyLabels.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.7rem] text-fg-3">
+                      <Sparkles size={12} className="text-accent" aria-hidden="true" />
+                      {specialtyLabels.slice(0, 8).map((specialty) => (
+                        <span key={specialty.id}>{creatorText(specialty.label, locale)}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-            {/* 본인 프로필에서는 연락·팔로우 동작을 숨긴다. */}
-            {profile && !isSelf && (
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {viewerId && (
-                  <Link
-                    href={{
-                      pathname: "/messages/new",
-                      query: { to: profile.id, name: author },
-                    }}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {(profile || data) && (
+                <SharePageButton
+                  path={sharePath}
+                  text={`${author} 창작자 프로필`}
+                  description={shareDescription}
+                  imageUrl={shareImage}
+                  label="프로필 공유"
+                  actionLabel="프로필 보기"
+                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                />
+              )}
+              {/* 본인 프로필에서는 연락·팔로우 동작을 숨긴다. */}
+              {profile && !isSelf && (
+                <>
+                  {viewerId && (
+                    <Link
+                      href={{
+                        pathname: "/messages/new",
+                        query: { to: profile.id, name: author },
+                      }}
+                      className={buttonClass({
+                        size: "sm",
+                        variant: "outline",
+                        className: "gap-1.5",
+                      })}
+                    >
+                      <Mail size={14} aria-hidden="true" />
+                      메시지
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onToggleFollow}
+                    disabled={!viewerId || followBusy}
+                    aria-pressed={profile.isFollowing}
+                    title={viewerId ? undefined : t("userProfile.followHint")}
                     className={buttonClass({
                       size: "sm",
-                      variant: "outline",
+                      variant: profile.isFollowing ? "outline" : "solid",
                       className: "gap-1.5",
                     })}
                   >
-                    <Mail size={14} aria-hidden="true" />
-                    메시지
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  onClick={onToggleFollow}
-                  disabled={!viewerId || followBusy}
-                  aria-pressed={profile.isFollowing}
-                  title={viewerId ? undefined : t("userProfile.followHint")}
-                  className={buttonClass({
-                    size: "sm",
-                    variant: profile.isFollowing ? "outline" : "solid",
-                    className: "gap-1.5",
-                  })}
-                >
-                  {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
-                  {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
-                </button>
-              </div>
-            )}
+                    {profile.isFollowing ? <UserCheck size={14} /> : <UserPlus size={14} />}
+                    {profile.isFollowing ? t("userProfile.following") : t("userProfile.follow")}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-line pt-6 sm:flex sm:flex-wrap sm:items-end sm:gap-x-9">

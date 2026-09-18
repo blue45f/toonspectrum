@@ -6,7 +6,10 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import { Studio3dAssetQualityPanel } from "../Studio3dAssetQualityPanel";
 
+import { useEffect as useReactEffect, useMemo, useState as useReactState } from "react";
+
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { StudioBg3dSceneOutliner } from "./StudioBg3dSceneOutliner";
 
 export function StudioBg3dEditorSidebarExtras({ h }) {
   const {
@@ -321,6 +324,109 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
     ltUserPresetLibraryStatus, physicsGravityPreset, setPhysicsGravityPreset,
     LazyStudioBg3dAssetLibraryPanel, babylonDiagnosticState, engineRuntime, engineFrameTimeMs, genericModelClassifications, genericModelControlMode, layerListItems, measurementDocument, measurementDraft, measurementInference, measurementLockedLengthMeters, modelLibraryStatus, setMeasurementDocument, webXrController, webXrSessionState, webXrSupport,
   } = { ...R, ...h };
+  const professionalReadinessInput = useMemo(() => {
+    const viewportWidth = viewportBoxSize?.width ?? documentCanvasSize?.width ?? 0;
+    const viewportHeight = viewportBoxSize?.height ?? documentCanvasSize?.height ?? 0;
+    const viewportAspectRatio = viewportWidth > 0 && viewportHeight > 0
+      ? viewportWidth / viewportHeight
+      : sceneBaseDocument.output.exportAspectRatio;
+    const groundingReceipts = new Map(sharedCharacters.flatMap((character) => {
+      const receipt = sharedCharacterGroundings[character.runtimeKey]
+        ?? sharedCharacterGroundings[character.modelRuntimeKey];
+      return receipt ? [[character.elementId, receipt]] : [];
+    }));
+    const runtimeFailure = engineRuntime.deviceLostMessage
+      ? {
+          kind: "webgpu-device-lost" as const,
+          attempt: 1,
+          recoverable: false,
+        }
+      : engineRuntime.plan.status === "failed"
+        ? {
+            kind: engineRuntime.plan.backend === "webgpu"
+              ? "webgpu-initialization" as const
+              : "webgl-context-lost" as const,
+            attempt: 1,
+            recoverable: false,
+          }
+        : undefined;
+    return {
+      authorityId: `bg3d:${sharedStageSessionScopeKey ?? "editor-session"}`,
+      primitives,
+      customModels,
+      attachmentByStorageModelId: attachmentByStorageModelIdRef.current,
+      baseDocument: sceneBaseDocument,
+      sharedSceneSession,
+      viewportAspectRatio,
+      revision: canonicalRevision,
+      enginePlan: engineRuntime.plan,
+      webGpuProbe: engineRuntime.probe,
+      deviceSignals,
+      maxTextureDimension2d: deviceSignals.deviceMemoryGb && deviceSignals.deviceMemoryGb >= 8
+        ? 8192
+        : 4096,
+      float16Shaders: engineRuntime.probe.supported,
+      groundingReceipts,
+      babylonSpecialistAvailable: babylonDiagnosticState.status === "success",
+      runtimeFailure,
+    };
+  }, [
+    attachmentByStorageModelIdRef,
+    babylonDiagnosticState.status,
+    canonicalRevision,
+    customModels,
+    deviceSignals,
+    documentCanvasSize?.height,
+    documentCanvasSize?.width,
+    engineRuntime.deviceLostMessage,
+    engineRuntime.plan,
+    engineRuntime.probe,
+    primitives,
+    sceneBaseDocument,
+    sharedCharacterGroundings,
+    sharedCharacters,
+    sharedSceneSession,
+    sharedStageSessionScopeKey,
+    viewportBoxSize?.height,
+    viewportBoxSize?.width,
+  ]);
+  const [professionalRuntimeReadiness, setProfessionalRuntimeReadiness] = useReactState();
+  useReactEffect(() => {
+    if (!open || viewEditorSection !== "prosuite") {
+      setProfessionalRuntimeReadiness(undefined);
+      return undefined;
+    }
+    let cancelled = false;
+    setProfessionalRuntimeReadiness(undefined);
+    void import("./studio-bg3d-professional-runtime-readiness").then((module) => {
+      if (cancelled) return;
+      const capabilities = module.deriveStudioBg3dProfessionalDeviceCapabilities({
+        enginePlan: professionalReadinessInput.enginePlan,
+        webGpuProbe: professionalReadinessInput.webGpuProbe,
+        deviceSignals: professionalReadinessInput.deviceSignals,
+        maxTextureDimension2d: professionalReadinessInput.maxTextureDimension2d,
+        float16Shaders: professionalReadinessInput.float16Shaders,
+      });
+      const {
+        enginePlan: _enginePlan,
+        webGpuProbe: _webGpuProbe,
+        deviceSignals: _deviceSignals,
+        maxTextureDimension2d: _maxTextureDimension2d,
+        float16Shaders: _float16Shaders,
+        ...readinessInput
+      } = professionalReadinessInput;
+      const next = module.resolveStudioBg3dProfessionalRuntimeReadiness({
+        ...readinessInput,
+        capabilities,
+      });
+      if (!cancelled) setProfessionalRuntimeReadiness(next);
+    }).catch(() => {
+      if (!cancelled) setProfessionalRuntimeReadiness(undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, professionalReadinessInput, viewEditorSection]);
   return (
     <>
               <Studio3dAssetQualityPanel
@@ -370,193 +476,14 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                   </Suspense>
                 ) : null}
                 <div className={cx(
-                  "mb-2 flex items-center justify-between gap-3",
-                  includeSharedCharactersInCapture
-                    && sharedCharacters.length > 0
-                    && "mt-4",
+                  includeSharedCharactersInCapture && sharedCharacters.length > 0 && "mt-4",
+                  "xl:hidden",
                 )}>
-                  <h3 className="flex items-center gap-1.5 text-sm font-bold text-fg">
-                    <Layers size={15} className="text-accent" aria-hidden />
-                    레이어
-                  </h3>
-                  <span className="text-[0.68rem] text-fg-3">
-                    {filteredLayerItems.length}/{layerListItems.length}개
-                  </span>
+                  <StudioBg3dSceneOutliner controller={h.outlinerController} variant="panel" />
                 </div>
-                {layerListItems.length === 0 ? (
-                  <p className="text-xs leading-relaxed text-fg-3">아직 추가한 도형·에셋이 없습니다. &ldquo;도형&rdquo;/&ldquo;에셋&rdquo; 탭에서 먼저 추가해 주세요.</p>
-                ) : (
-                  <>
-                    <label className="mb-2 block">
-                      <span className="sr-only">레이어 검색</span>
-                      <input
-                        type="search"
-                        value={layerQuery}
-                        onChange={(e) => setLayerQuery(e.target.value)}
-                        placeholder="이름 검색…"
-                        className="min-h-11 w-full rounded-lg border border-line bg-card px-3 text-xs font-medium text-fg focus-visible:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:min-h-9"
-                      />
-                    </label>
-                    {filteredLayerItems.length === 0 ? (
-                      <p className="text-xs leading-relaxed text-fg-3">검색 결과가 없습니다.</p>
-                    ) : (
-                                            <ul className="space-y-1">
-                        {(() => {
-                          const filteredById = new Map(
-                            filteredLayerItems.map((entry) => [entry.id, entry] as const),
-                          );
-                          const searchActive = layerQuery.trim().length > 0;
-                          const renderSidebarNode = (item: typeof filteredLayerItems[0], depth: number = 0) => {
-                            const isActive = selectedIds.has(item.id);
-                            const prim = item.kind === "primitive" ? primitives.find((p) => p.id === item.id) : null;
-                            const children = searchActive
-                              ? []
-                              : (sceneHierarchy.childrenByParent.get(item.id) ?? [])
-                                .map((id) => filteredById.get(id))
-                                .filter((entry): entry is typeof item => entry !== undefined);
-                            
-                            return (
-                              <Fragment key={item.id}>
-                                <li>
-                                  <div
-                                    style={{ marginLeft: `${depth * 16}px` }}
-                                    className={cx(
-                                      "flex min-h-11 items-center gap-1 rounded-lg border px-1.5 py-1.5 text-xs transition-colors sm:min-h-0",
-                                      isActive
-                                        ? "border-accent/55 bg-accent-soft text-accent"
-                                        : "border-line bg-card text-fg-2 hover:bg-raised",
-                                      !item.visible && "opacity-60"
-                                    )}
-                                  >
-                                    <button
-                                      type="button"
-                                      className="flex min-h-11 min-w-0 flex-1 items-center gap-2 px-1 text-left sm:min-h-0"
-                                      onClick={(e) => {
-                                        setSelectedIds((prev) => {
-                                          const isMulti = e.shiftKey || e.metaKey || e.ctrlKey;
-                                          if (isMulti) {
-                                            const next = new Set(prev);
-                                            if (next.has(item.id)) next.delete(item.id);
-                                            else next.add(item.id);
-                                            return next;
-                                          }
-                                          return new Set([item.id]);
-                                        });
-                                      }}
-                                    >
-                                      {prim ? (
-                                        <span
-                                          className="inline-block size-2.5 shrink-0 rounded-sm"
-                                          style={{ backgroundColor: prim.color }}
-                                          aria-hidden
-                                        />
-                                      ) : (
-                                        <Hexagon size={13} className="shrink-0 text-fg-3" aria-hidden />
-                                      )}
-                                      <span className="truncate font-semibold">{item.label}</span>
-                                      {item.locked ? <Lock size={11} className="shrink-0 opacity-80" aria-hidden /> : null}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} 이름 변경`}
-                                      title="이름 변경"
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => renameBgObject(item.id, item.kind)}
-                                    >
-                                      <PencilLine size={12} aria-hidden />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} ${item.visible ? "숨기기" : "보이기"}`}
-                                      title={item.visible ? "숨기기" : "보이기"}
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        if (item.kind === "primitive") togglePrimitiveFlag(item.id, "visible");
-                                        else toggleCustomModelFlag(item.id, "visible");
-                                      }}
-                                    >
-                                      {item.visible ? <Eye size={12} aria-hidden /> : <EyeOff size={12} aria-hidden />}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} ${item.locked ? "잠금 해제" : "잠금"}`}
-                                      title={item.locked ? "잠금 해제" : "잠금"}
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        if (item.kind === "primitive") togglePrimitiveFlag(item.id, "locked");
-                                        else toggleCustomModelFlag(item.id, "locked");
-                                      }}
-                                    >
-                                      {item.locked ? <Lock size={12} aria-hidden /> : <Unlock size={12} aria-hidden />}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} 복제`}
-                                      title="복제"
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        if (!canAdmitSceneNodes(1)) return;
-                                        const live = physicsRuntimeSourceRef.current;
-                                        if (item.kind === "primitive") {
-                                          const source = live.primitives.find((p) => p.id === item.id);
-                                          if (!source) return;
-                                          const clone = duplicatePrimitive(source);
-                                          const nextPrimitives = [...live.primitives, clone];
-                                          physicsRuntimeSourceRef.current = {
-                                            ...live,
-                                            primitives: nextPrimitives,
-                                          };
-                                          setPrimitives(nextPrimitives);
-                                          setSelectedIds(new Set([clone.id]));
-                                          return;
-                                        }
-                                        const source = live.customModels.find((m) => m.id === item.id);
-                                        if (!source) return;
-                                        const clone = duplicateBgCustomModelInstance(source);
-                                        const nextCustomModels = [...live.customModels, clone];
-                                        physicsRuntimeSourceRef.current = {
-                                          ...live,
-                                          customModels: nextCustomModels,
-                                        };
-                                        setCustomModels(nextCustomModels);
-                                        setSelectedIds(new Set([clone.id]));
-                                      }}
-                                    >
-                                      <Copy size={12} aria-hidden />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-label={`${item.label} 삭제`}
-                                      title="삭제"
-                                      className="grid size-11 shrink-0 place-items-center rounded text-fg-3 hover:bg-accent-soft hover:text-accent sm:size-6"
-                                      onClick={() => {
-                                        removeSceneEntities(new Set([item.id]));
-                                        setSelectedIds((prev) => {
-                                          const next = new Set(prev);
-                                          next.delete(item.id);
-                                          return next;
-                                        });
-                                      }}
-                                    >
-                                      <Trash2 size={12} aria-hidden />
-                                    </button>
-                                  </div>
-                                </li>
-                                {children.map(child => renderSidebarNode(child, depth + 1))}
-                              </Fragment>
-                            );
-                          };
-                          const roots = searchActive
-                            ? filteredLayerItems
-                            : sceneHierarchy.roots
-                              .map((id) => filteredById.get(id))
-                              .filter((entry): entry is typeof filteredLayerItems[0] => entry !== undefined);
-                          return roots.map(root => renderSidebarNode(root, 0));
-                        })()}
-                      </ul>
-                    )}
-                  </>
-                )}
+                <p className="hidden rounded-lg border border-line bg-raised/60 px-3 py-2.5 text-xs leading-relaxed text-fg-3 xl:block">
+                  장면 계층은 왼쪽 패널에서 관리할 수 있습니다. 선택한 객체의 상세 설정은 이 패널에서 이어서 편집하세요.
+                </p>
               </section>
 
               <div inert={immersiveSceneActive || undefined}>
@@ -570,6 +497,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineProbing={engineRuntime.phase === "probing"}
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
                 engineFrameTimeMs={engineFrameTimeMs}
+                professionalReadiness={professionalRuntimeReadiness}
                 onEnginePreferenceChange={engineRuntime.setPreference}
                 onOpenPrecisionModeler={handleOpenPrecisionModeler}
                 aiReferenceBusy={isCapturing}

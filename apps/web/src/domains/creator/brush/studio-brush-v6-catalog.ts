@@ -4,6 +4,7 @@
  */
 import { BRUSH_STUDIO_V6_RECIPE_SEEDS } from "../brush-lab/brush-studio-v6-recipe-catalog";
 
+import { studioBrushDefaultStartWidth } from "./studio-brush-default-size-policy";
 import { studioV6BrushCatalogId } from "./studio-brush-v6-id";
 
 import type { BrushStudioV6RecipeSeed } from "../brush-lab/brush-studio-v6-recipe-catalog";
@@ -96,7 +97,8 @@ export const STUDIO_V6_BRUSH_CATALOG_ITEMS: readonly StudioBrushCatalogItem[] =
     BRUSH_STUDIO_V6_RECIPE_SEEDS.map((seed) => {
       const slots = slotStrings(seed);
       const mediaGroup = studioV6BrushMaterialGroup(seed);
-      const width = seed.delta.tuning?.size ?? 18;
+      const authoredWidth = seed.delta.tuning?.size ?? 18;
+      const width = studioBrushDefaultStartWidth(mediaGroup, authoredWidth);
       const opacity = seed.delta.tuning?.opacity ?? 0.95;
       const defaultColor = seed.delta.tuning?.primaryColor ?? "#111827";
       const signature = `${seed.id} ${seed.group} ${slots.join(" ")}`

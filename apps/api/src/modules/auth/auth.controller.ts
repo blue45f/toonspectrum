@@ -22,6 +22,13 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 
 import {
+  AccountMergeError,
+  confirmAccountMerge,
+  issueAccountMergeToken,
+  normalizeAccountMergeProfilePreference,
+  previewAccountMerge,
+} from "../../server/account-merge";
+import {
   hashPassword,
   isPasswordVerificationInputBounded,
   passwordPolicyError,
@@ -352,22 +359,41 @@ export class AuthController {
     const browserPkceVerifier = provider === "github"
       ? resolveOAuthPkceVerifierCookieValue(request.headers.cookie, provider)
       : null;
-    clearOAuthStateCookie(res, provider);
-    if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
 
     if (!isAuthorizationCodeFlowConfigured(provider)) {
+      clearOAuthStateCookie(res, provider);
+      if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
       return res.redirect(`${web}/auth/callback#error=oauth_unavailable`);
     }
+
+    const stateContext = readOAuthStateContext(provider, state);
     if (
       typeof state !== "string"
+      || !stateContext
       || !verifyBrowserBoundState(provider, state, browserState)
     ) {
+      const isRepeatedLoginCallback = stateContext?.purpose === "login"
+        && error === undefined
+        && typeof code === "string"
+        && code.length > 0
+        && code.length <= OAUTH_AUTHORIZATION_CODE_MAX_LENGTH;
+      const existingSession = isRepeatedLoginCallback
+        ? verifySessionToken(resolveSessionCookieValue(request.headers.cookie))
+        : null;
+      if (existingSession) {
+        this.logger.log({
+          event: "auth.oauth.duplicate_callback_recovered",
+          provider,
+        });
+        return res.redirect(`${web}/auth/callback#session=1`);
+      }
       return res.redirect(`${web}/auth/callback#error=bad_state`);
     }
-    const stateContext = readOAuthStateContext(provider, state);
-    if (!stateContext) {
-      return res.redirect(`${web}/auth/callback#error=bad_state`);
-    }
+
+    // Consume browser-bound material only after the callback proves it owns the
+    // current flow. A stale callback must not erase a newer tab's valid state.
+    clearOAuthStateCookie(res, provider);
+    if (provider === "github") clearOAuthPkceVerifierCookie(res, provider);
     let linkToUserId: string | undefined;
     if (stateContext.purpose === "link") {
       const principal = verifySessionToken(
@@ -1061,6 +1087,144 @@ export class AuthController {
     };
   }
 
+  @Post("account-merge/code")
+  async issueAccountMergeCode(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 통합 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-merge", request, userId);
+    try {
+      const issued = await issueAccountMergeToken(userId);
+      this.logger.log({ event: "auth.account-merge.code-issued" });
+      return { ok: true, ...issued };
+    } catch (error: unknown) {
+      this.throwAccountMergeError(error, "code");
+    }
+  }
+
+  @Post("account-merge/preview")
+  async previewAccountMergeRequest(
+    @Body() body: { token?: unknown },
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 통합 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-merge", request, userId);
+    try {
+      const preview = await previewAccountMerge(
+        userId,
+        typeof body?.token === "string" ? body.token.trim() : "",
+      );
+      return {
+        ok: true,
+        source: {
+          name: preview.source.name,
+          email: preview.source.email,
+          providers: preview.source.providers,
+          profile: preview.source.profile,
+        },
+        target: {
+          name: preview.target.name,
+          email: preview.target.email,
+          providers: preview.target.providers,
+          profile: preview.target.profile,
+        },
+        affectedRecordCount: preview.affectedRecordCount,
+        deduplicatedRecordCount: preview.deduplicatedRecordCount,
+        expiresAt: preview.expiresAt,
+        warnings: preview.warnings,
+      };
+    } catch (error: unknown) {
+      this.throwAccountMergeError(error, "preview");
+    }
+  }
+
+  @Post("account-merge/confirm")
+  async confirmAccountMergeRequest(
+    @Body() body: { token?: unknown; profilePreference?: unknown },
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("origin") origin: string | undefined,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!userId) {
+      throw new UnauthorizedException({ error: "로그인이 필요해요." });
+    }
+    if (!isAllowedAuthRequestOrigin(origin)) {
+      throw new ForbiddenException({
+        error: "허용되지 않은 사이트에서 보낸 계정 통합 요청이에요.",
+      });
+    }
+    await this.enforceRateLimit("account-merge", request, userId);
+    try {
+      const merged = await confirmAccountMerge(
+        userId,
+        typeof body?.token === "string" ? body.token.trim() : "",
+        {
+          profilePreference: normalizeAccountMergeProfilePreference(
+            body?.profilePreference,
+          ),
+        },
+      );
+      invalidateSessionUser(merged.sourceUserId);
+      invalidateSessionUser(merged.targetUserId);
+      const revocations = await Promise.allSettled([
+        this.realtimeRevocation.revokeSessionVersion(
+          merged.sourceUserId,
+          merged.sourceSessionVersion,
+        ),
+        this.realtimeRevocation.revokeSessionVersion(
+          merged.targetUserId,
+          merged.targetSessionVersion,
+        ),
+      ]);
+      if (revocations.some((entry) => entry.status === "rejected")) {
+        this.logger.error({
+          event: "auth.account-merge.realtime-revocation-failed",
+        });
+      }
+
+      applyAuthSessionCookie(
+        response,
+        signSession(merged.targetUserId, merged.targetSessionVersion),
+      );
+      this.logger.log({
+        event: "auth.account-merge.completed",
+        transferredRecordCount: merged.transferredRecordCount,
+        deduplicatedRecordCount: merged.deduplicatedRecordCount,
+        consolidatedQuotaRecordCount: merged.consolidatedQuotaRecordCount,
+        profilePreference: merged.profilePreference,
+      });
+      return {
+        ok: true,
+        transferredRecordCount: merged.transferredRecordCount,
+        deduplicatedRecordCount: merged.deduplicatedRecordCount,
+        consolidatedQuotaRecordCount: merged.consolidatedQuotaRecordCount,
+        profilePreference: merged.profilePreference,
+        providers: merged.providers,
+      };
+    } catch (error: unknown) {
+      this.throwAccountMergeError(error, "confirm");
+    }
+  }
+
   @Post("logout")
   async logout(
     @Headers("x-user-id") userId: string | undefined,
@@ -1094,6 +1258,26 @@ export class AuthController {
         error: "로그아웃 세션 정리를 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
       });
     }
+  }
+
+  private throwAccountMergeError(
+    error: unknown,
+    phase: "code" | "preview" | "confirm",
+  ): never {
+    if (error instanceof AccountMergeError) {
+      throw new HttpException(
+        { code: error.code, error: error.publicMessage },
+        error.status,
+      );
+    }
+    this.logger.error({
+      event: "auth.account-merge.failure",
+      phase,
+      reasonCode: "unexpected",
+    });
+    throw new ServiceUnavailableException({
+      error: "계정 통합을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.",
+    });
   }
 
   private async enforceRateLimit(

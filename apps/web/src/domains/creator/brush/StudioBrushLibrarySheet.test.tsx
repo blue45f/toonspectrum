@@ -461,6 +461,57 @@ describe("StudioBrushLibrarySheet", () => {
     expect(screen.getByRole("button", { name: "잎송이 선택" })).toBeTruthy();
   });
 
+  it("previews the actual engine chain, traits, normalized size, and text-size policy before selection", () => {
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "전체 브러시 검색" }), {
+      target: { value: "소금결 과립 수채" },
+    });
+    fireEvent.focus(screen.getByRole("button", { name: "소금결 과립 수채 선택" }));
+
+    const card = container.querySelector(
+      '[data-studio-brush-profile-card="v6:salt-crystal-watercolor"]',
+    );
+    expect(card).not.toBeNull();
+    expect(card?.textContent).toContain("Hokusai");
+    expect(card?.textContent).toContain("습식 번짐");
+    expect(card?.textContent).toContain("고과립");
+    expect(card?.textContent).toContain("기본 30px");
+    expect(card?.textContent).toContain("원본 34px 보정");
+    expect(card?.querySelector('[data-studio-brush-text-size-policy="preserve"]')).not.toBeNull();
+    expect(card?.querySelectorAll("[data-studio-brush-engine-stage]").length).toBeGreaterThan(6);
+  });
+
+  it("filters the product shelf by actual engine family independently of material tabs", () => {
+    const { container } = render(
+      <StudioBrushLibrarySheet
+        open
+        activeBrushId="pen"
+        onClose={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "전체" }));
+    const engineFilter = screen.getByRole("combobox", { name: "브러시 엔진 계열 필터" });
+    expect(engineFilter.textContent).toContain("Hokusai");
+    fireEvent.change(engineFilter, { target: { value: "hokusai" } });
+
+    const tiles = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-studio-brush-engine-lane]"),
+    );
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(tiles.every((tile) => tile.dataset.studioBrushEngineLane === "hokusai")).toBe(true);
+    expect(screen.getByRole("status").textContent).toMatch(/개의 브러시가 표시됩니다/);
+  });
+
   it("shows brush-kind badges and re-applies the active catalogue defaults", async () => {
     const onSelect = vi.fn();
     const onClose = vi.fn();
@@ -565,7 +616,7 @@ describe("StudioBrushLibrarySheet", () => {
         catalogId: "material-fern-frond",
         catalogName: "고사리 깃잎",
         runtimeBrushId: "ink-particle",
-        defaultWidth: 56,
+        defaultWidth: 38,
         defaultOpacity: 0.94,
         brushDynamics: expect.objectContaining({
           version: 1,

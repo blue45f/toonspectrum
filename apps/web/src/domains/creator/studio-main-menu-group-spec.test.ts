@@ -193,7 +193,7 @@ describe("§15.3 menu group spec", () => {
       // 얻어 absent → partial 로 이동했으므로 rowsPartial 은 37, rowsAbsent 는 61이다.
       // 2026-09-06: 별도 사용자 매뉴얼 문(help/user-manual, #794)은 §15.3 행이 없어 extras(38 → 39).
       // Recent-stroke correction is a shipped extra alongside the drawing-assist mode.
-      extras: 40,
+      extras: 41,
     });
   });
 

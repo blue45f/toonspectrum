@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
-import { MUSIC_MOODS, musicFilename } from "@toonspectrum/core/studio-music";
+import { MUSIC_ARCS, MUSIC_INTENSITIES, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_SONG_STRUCTURES, MUSIC_VOCAL_STYLES, musicFilename } from "@toonspectrum/core/studio-music";
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -58,7 +58,7 @@ export function MusicTrackCard({ track, saved, busy, pending, onDelete, onSave, 
   return (
     <article className="space-y-3 rounded-2xl border border-line bg-card p-4" aria-label={`${b.title} 음원`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><h3 className="break-words font-semibold">{b.title}</h3><p className="mt-1 text-xs text-fg-3">{MUSIC_MOODS.find((m) => m.id === b.mood)?.label} · 요청 {b.seconds}초{duration === null ? "" : ` / 실제 ${duration.toFixed(1)}초`} · {b.vocals ? "보컬" : "연주곡"}</p></div>
+        <div className="min-w-0"><h3 className="break-words font-semibold">{b.title}</h3><p className="mt-1 text-xs text-fg-3">{MUSIC_PURPOSES.find((entry) => entry.id === b.purpose)?.label ?? "사운드트랙"} · {MUSIC_MOODS.find((m) => m.id === b.mood)?.label} · {MUSIC_INTENSITIES.find((entry) => entry.id === b.intensity)?.label ?? "균형"} · {MUSIC_ARCS.find((entry) => entry.id === b.arc)?.label ?? "일정한 분위기"}</p><p className="mt-1 text-xs text-fg-3">요청 {b.seconds}초{duration === null ? "" : ` / 실제 ${duration.toFixed(1)}초`} · {b.vocals ? `${MUSIC_VOCAL_STYLES.find((entry) => entry.id === b.vocalStyle)?.label ?? "보컬"} · ${MUSIC_SONG_STRUCTURES.find((entry) => entry.id === b.songStructure)?.label ?? "애니 OST"}` : "연주곡"}{b.episodeId ? ` · ${b.episodeId}` : ""}</p></div>
         <span className="shrink-0 rounded-full bg-panel px-2 py-1 text-xs text-fg-2">{pending ? "저장소 처리 중" : saved ? "기기에 저장됨" : "저장 확인 필요"}</span>
       </div>
       <p className="line-clamp-2 text-sm text-fg-2">{b.scene}</p>
@@ -75,7 +75,7 @@ export function MusicTrackCard({ track, saved, busy, pending, onDelete, onSave, 
       </div>
       {confirming && <div className="rounded-lg border border-line p-3 text-sm"><p>이 기기의 음원을 삭제할까요? 필요한 MP3를 먼저 다운로드해 주세요.</p><div className="mt-2 flex gap-2"><button type="button" className={actionClass} disabled={disabled} onClick={() => void run("delete")}>삭제 확인</button><button type="button" className={actionClass} onClick={() => setConfirming(false)} disabled={disabled}>유지</button></div></div>}
       {error && <p role="alert" className="text-sm text-bad">{error}</p>}
-      <p className="text-xs leading-relaxed text-fg-3">Eleven Music · {new Date(track.metadata.createdAt).toLocaleDateString("ko-KR")} · AI 생성 음원. 상용 이용은 공급자 요금제와 이용 조건을 확인해 주세요.</p>
+      <p className="text-xs leading-relaxed text-fg-3">Eleven Music {track.metadata.model === "music_v2_5" ? "v2.5" : "v1"} · {new Date(track.metadata.createdAt).toLocaleDateString("ko-KR")} · AI 생성 음원. 상용 이용은 공급자 요금제와 이용 조건을 확인해 주세요.</p>
     </article>
   );
 }

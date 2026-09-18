@@ -1,38 +1,29 @@
 import {
   AlertTriangle,
-  ArrowRight,
   BadgeCheck,
   BookOpenText,
   Boxes,
   BriefcaseBusiness,
   CalendarClock,
-  CheckCircle2,
-  ChevronRight,
-  CircleDot,
   ClipboardCheck,
   Coins,
   FileKey2,
-  FolderKanban,
   GitBranch,
   Handshake,
   Layers3,
   LayoutDashboard,
   LockKeyhole,
-  MessageCircleQuestion,
   MessagesSquare,
-  PackageCheck,
   PanelTopOpen,
   Scale,
   ScrollText,
-  ShieldCheck,
-  Sparkles,
+  ShieldAlert,
   Users,
   Workflow,
 } from "lucide-react";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -42,22 +33,31 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import {
   createPlanningSnapshot,
   evaluateHandoffReadiness,
+  evaluateProductionRisks,
   evaluateReviewApproval,
   preflightCreditManifest,
+  transitionProductionRisk,
+  transitionProductionRiskResponse,
   type ClarificationThread,
   type EpisodeCollaboration,
   type ProductionProjectAggregate,
+  type ProductionTask,
   type ReviewDecision,
   type StoryToArtHandoffPackage,
 } from "@toonspectrum/core/production";
 
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
+import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
+import { ProductionRiskWorkspace } from "./ProductionRiskWorkspace";
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
+import { ProductionStudioRevisionBridgePanel } from "./ProductionStudioRevisionBridgePanel";
 import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWorkspace";
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
+import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
+import { ProductionOperationsControlWorkspace } from "./ProductionOperationsControlWorkspace";
 import {
   executeProductionCommand,
   getProductionProject,
@@ -66,9 +66,14 @@ import {
 } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  creatorRoleLens,
+  type CreatorRoleLens,
+} from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
 import { getApiErrorMessage } from "@/infrastructure/api";
+import { getMyProfile } from "@/infrastructure/me-client";
 
 export type ProductionProjectSurface =
   | "overview"
@@ -76,18 +81,53 @@ export type ProductionProjectSurface =
   | "episodes"
   | "production"
   | "schedule"
+  | "control"
+  | "risks"
   | "handoff"
   | "review"
   | "procurement"
   | "rights"
   | "settings";
 
-type RoleLens = "story" | "art" | "producer";
+type RoleLens = CreatorRoleLens;
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 const SAMPLE_PROJECT_ID = "sample-project";
-const DATE_TIME = new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" });
 const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" });
+
+function usePreferredRoleLens(fallback: RoleLens): readonly [RoleLens, (next: RoleLens) => void] {
+  const userId = useApp((state) => state.userId);
+  const [roleLens, setRoleLens] = useState<RoleLens>(fallback);
+  const manuallyChanged = useRef(false);
+
+  useEffect(() => {
+    manuallyChanged.current = false;
+    if (!userId) {
+      setRoleLens(fallback);
+      return;
+    }
+    let alive = true;
+    const controller = new AbortController();
+    getMyProfile(controller.signal)
+      .then((profile) => {
+        if (!alive || manuallyChanged.current) return;
+        const role = profile.creatorRoleProfile.activeRole ?? profile.creatorRoleProfile.primaryRole;
+        setRoleLens(creatorRoleLens(role));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [fallback, userId]);
+
+  const changeRoleLens = useCallback((next: RoleLens) => {
+    manuallyChanged.current = true;
+    setRoleLens(next);
+  }, []);
+
+  return [roleLens, changeRoleLens];
+}
 
 const SURFACES: readonly {
   readonly id: ProductionProjectSurface;
@@ -100,6 +140,8 @@ const SURFACES: readonly {
   { id: "episodes", label: "회차", description: "회차별 상태와 원고", icon: PanelTopOpen },
   { id: "production", label: "작업 보드", description: "담당자와 진행 상태", icon: Workflow },
   { id: "schedule", label: "일정", description: "마감과 작업량 확인", icon: CalendarClock },
+  { id: "control", label: "운영 제어", description: "임계경로·연재·자동화", icon: GitBranch },
+  { id: "risks", label: "위험·병목", description: "초과 예측과 대응", icon: ShieldAlert },
   { id: "handoff", label: "작업 넘기기", description: "꼭 지킬 내용과 질문", icon: Handshake },
   { id: "review", label: "검수·수정", description: "수정 요청과 승인", icon: ClipboardCheck },
   { id: "procurement", label: "외주·발주", description: "의뢰 범위와 납품", icon: BriefcaseBusiness },
@@ -128,12 +170,6 @@ const EPISODE_STATE_LABELS: Readonly<Record<EpisodeCollaboration["state"], strin
   "creator-replacement": "창작자 교체",
   cancelled: "취소",
 };
-
-function formatDate(value: string | null): string {
-  if (!value) return "미정";
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? DATE_TIME.format(date) : "미정";
-}
 
 function formatDay(value: string | null): string {
   if (!value) return "미정";
@@ -317,6 +353,63 @@ function reduceDemoCommand(
       return { ...base, episodes: replaceById(aggregate.episodes, command.episode) };
     case "upsert-task":
       return { ...base, tasks: replaceById(aggregate.tasks, command.task) };
+    case "upsert-task-batch": {
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      return { ...base, tasks };
+    }
+    case "upsert-episode-operations": {
+      const episodes = command.episode
+        ? replaceById(aggregate.episodes, command.episode)
+        : aggregate.episodes;
+      const episodePlans = command.episodePlan
+        ? replaceById(aggregate.episodePlans, command.episodePlan)
+        : aggregate.episodePlans;
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      return { ...base, episodes, episodePlans, tasks };
+    }
+    case "upsert-operations-record": {
+      const record = command.record;
+      switch (record.kind) {
+        case "resource-calendar":
+          return { ...base, resourceCalendars: replaceById(aggregate.resourceCalendars ?? [], record.value) };
+        case "schedule-baseline":
+          return { ...base, scheduleBaselines: replaceById(aggregate.scheduleBaselines ?? [], record.value) };
+        case "release-plan":
+          return { ...base, releasePlans: replaceById(aggregate.releasePlans ?? [], record.value) };
+        case "external-review-access":
+          return { ...base, externalReviewAccesses: replaceById(aggregate.externalReviewAccesses ?? [], record.value) };
+        case "automation-rule":
+          return { ...base, automationRules: replaceById(aggregate.automationRules ?? [], record.value) };
+        case "notification-policy":
+          return { ...base, notificationPolicies: replaceById(aggregate.notificationPolicies ?? [], record.value) };
+        case "notification":
+          return { ...base, notifications: replaceById(aggregate.notifications ?? [], record.value) };
+        case "saved-view":
+          return { ...base, savedViews: replaceById(aggregate.savedViews ?? [], record.value) };
+      }
+      return aggregate;
+    }
+    case "apply-schedule-scenario": {
+      const tasks = command.tasks.reduce<readonly ProductionTask[]>(
+        (current, task) => replaceById(current, task),
+        aggregate.tasks,
+      );
+      const baselines = (aggregate.scheduleBaselines ?? []).map((baseline) => ({
+        ...baseline,
+        active: command.baseline.active ? false : baseline.active,
+      }));
+      return {
+        ...base,
+        tasks,
+        scheduleBaselines: replaceById(baselines, command.baseline),
+      };
+    }
     case "upsert-change-request":
       return { ...base, changeRequests: replaceById(aggregate.changeRequests, command.request) };
     case "upsert-contribution":
@@ -327,6 +420,33 @@ function reduceDemoCommand(
       return { ...base, rightsInterests: replaceById(aggregate.rightsInterests, command.interest) };
     case "upsert-compensation-plan":
       return { ...base, compensationPlans: replaceById(aggregate.compensationPlans, command.plan) };
+    case "upsert-risk":
+      return { ...base, risks: replaceById(aggregate.risks, command.risk) };
+    case "transition-risk": {
+      const risk = aggregate.risks.find((entry) => entry.id === command.riskId);
+      if (!risk) return aggregate;
+      const next = transitionProductionRisk(risk, command.toStatus, { reason: command.reason, at: new Date().toISOString() });
+      return { ...base, risks: replaceById(aggregate.risks, next) };
+    }
+    case "upsert-risk-response":
+      return { ...base, riskResponses: replaceById(aggregate.riskResponses, command.response) };
+    case "transition-risk-response": {
+      const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
+      if (!response) return aggregate;
+      const next = transitionProductionRiskResponse(response, command.toStatus, {
+        at: new Date().toISOString(),
+        actualEffect: command.actualEffect,
+      });
+      return { ...base, riskResponses: replaceById(aggregate.riskResponses, next) };
+    }
+    case "suppress-risk-signal":
+      return { ...base, riskSignals: aggregate.riskSignals.map((signal) => signal.id === command.signalId ? { ...signal, state: "suppressed" as const, suppression: { reason: command.reason, suppressedByAssignmentId: command.suppressedByAssignmentId, suppressedAt: new Date().toISOString(), expiresAt: command.expiresAt } } : signal) };
+    case "update-risk-policy":
+      return { ...base, riskPolicy: command.policy };
+    case "evaluate-risks":
+      return base;
+    case "rebaseline-task":
+      return { ...base, tasks: aggregate.tasks.map((task) => task.id === command.taskId ? { ...task, baselineDueAt: command.newDueAt, dueAt: command.newDueAt, statusChangedAt: new Date().toISOString() } : task) };
     case "upsert-review-policy":
       return { ...base, reviewPolicies: replaceById(aggregate.reviewPolicies, command.policy) };
     case "configure-collaboration":
@@ -343,10 +463,30 @@ function reduceDemoCommand(
   }
 }
 
+function evaluateDemoRiskState(aggregate: ProductionProjectAggregate): ProductionProjectAggregate {
+  const evaluation = evaluateProductionRisks(aggregate);
+  const riskIdsByTask = new Map<string, string[]>();
+  for (const risk of evaluation.risks) {
+    if (["resolved", "dismissed", "closed"].includes(risk.status)) continue;
+    for (const taskId of risk.affectedTaskIds) {
+      const values = riskIdsByTask.get(taskId) ?? [];
+      values.push(risk.id);
+      riskIdsByTask.set(taskId, values);
+    }
+  }
+  return {
+    ...aggregate,
+    tasks: aggregate.tasks.map((task) => ({ ...task, linkedRiskIds: riskIdsByTask.get(task.id) ?? [] })),
+    riskSignals: evaluation.signals,
+    risks: evaluation.risks,
+    riskAssessments: evaluation.assessments,
+  };
+}
+
 function useProductionProject(projectId: string | undefined) {
   const isDemo = !projectId || projectId === SAMPLE_PROJECT_ID;
   const [aggregate, setAggregate] = useState<ProductionProjectAggregate | null>(
-    isDemo ? createProductionDemoProject() : null,
+    isDemo ? evaluateDemoRiskState(createProductionDemoProject()) : null,
   );
   const [access, setAccess] = useState<ProductionProjectAccess>({
     view: true,
@@ -369,7 +509,7 @@ function useProductionProject(projectId: string | undefined) {
 
   useEffect(() => {
     if (isDemo) {
-      setAggregate(createProductionDemoProject());
+      setAggregate(evaluateDemoRiskState(createProductionDemoProject()));
       setLoading(false);
       setError(null);
       return;
@@ -398,7 +538,7 @@ function useProductionProject(projectId: string | undefined) {
       setNotice(null);
       try {
         const next = isDemo
-          ? reduceDemoCommand(current, command)
+          ? evaluateDemoRiskState(reduceDemoCommand(current, command))
           : (await executeProductionCommand(current.projectId, current.revision, command)).aggregate;
         aggregateRef.current = next;
         setAggregate(next);
@@ -415,72 +555,6 @@ function useProductionProject(projectId: string | undefined) {
   }, [isDemo]);
 
   return { aggregate, access, loading, error, saveState, notice, execute, isDemo };
-}
-
-export function ProductionLandingPage() {
-  const demo = useMemo(() => createProductionDemoProject(), []);
-  return (
-    <div className="min-h-dvh bg-canvas text-fg">
-      <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
-        <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">
-            <span>ToonStudio</span><span aria-hidden="true">/</span><span>웹툰 제작 관리</span>
-          </div>
-          <div className="mt-5 grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
-            <div>
-              <h1 className="max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
-                흩어진 웹툰 제작을 하나의 흐름으로
-              </h1>
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-                기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link className={buttonClass({ size: "lg" })} to={`/production/projects/${demo.projectId}/overview`}>
-                  기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio/projects">
-                  내 프로젝트 열기
-                </Link>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Metric label="작업 기준" value="3" detail="스토리·그림·최종본 연결" icon={GitBranch} tone="accent" />
-              <Metric label="확인 단계" value="4" detail="기획 · 넘기기 · 콘티 · 최종 검수" icon={LockKeyhole} tone="success" />
-              <Metric label="역할·권한" value="11" detail="항목별 제안·승인·거부 권한" icon={ShieldCheck} />
-              <Metric label="연결 범위" value="100%" detail="회차부터 계약·크레딧까지" icon={FileKey2} tone="warning" />
-            </div>
-          </div>
-        </header>
-
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            { icon: BookOpenText, title: "기획·회차", text: "작품 목표와 세계관, 시즌·회차별 기준을 최신 버전으로 정리합니다." },
-            { icon: Handshake, title: "작업 넘기기", text: "다음 작업자가 꼭 지킬 내용, 자유롭게 바꿀 부분과 질문을 분명히 나눕니다." },
-            { icon: ClipboardCheck, title: "검수·수정", text: "스토리·그림·제작·권리별 필수 승인과 수정 요청을 파일에 연결합니다." },
-            { icon: Scale, title: "계약·정산", text: "기여 기록, 공개 크레딧, 사용 권리와 보상 기준을 따로 정확히 관리합니다." },
-          ].map(({ icon: Icon, title, text }) => (
-            <article key={title} className="rounded-2xl border border-line bg-card p-5">
-              <Icon className="size-5 text-accent" aria-hidden="true" />
-              <h2 className="mt-4 font-bold text-fg">{title}</h2>
-              <p className="mt-2 text-xs leading-6 text-fg-2">{text}</p>
-            </article>
-          ))}
-        </section>
-
-        <SectionCard className="mt-6" title="현재 제작 흐름" description="한 화면에서 단계별 상태와 다음 결정자를 확인합니다.">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-            {["기획 확정", "작업 넘기기", "콘티", "최종 원고", "검수·수정", "내보내기"].map((label, index) => (
-              <div key={label} className="relative rounded-xl border border-line bg-panel p-3">
-                <p className="text-[0.6875rem] font-bold text-accent">{String(index + 1).padStart(2, "0")}</p>
-                <p className="mt-1 text-sm font-semibold text-fg">{label}</p>
-                {index < 5 ? <ChevronRight className="absolute -right-3 top-1/2 z-10 hidden size-5 -translate-y-1/2 text-fg-3 lg:block" aria-hidden="true" /> : null}
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-      </div>
-    </div>
-  );
 }
 
 function ProjectHeader({
@@ -563,93 +637,28 @@ function ProjectNav({ projectId, surface }: { readonly projectId: string; readon
   );
 }
 
-function OverviewSurface({ aggregate, roleLens }: { readonly aggregate: ProductionProjectAggregate; readonly roleLens: RoleLens }) {
-  const openQuestions = aggregate.clarifications.filter((entry) => entry.status === "open" || entry.status === "answered");
-  const blockers = openQuestions.filter((entry) => entry.blocking);
-  const activeEpisodes = aggregate.episodes.filter((entry) => !["published", "cancelled"].includes(entry.state));
-  const dueTasks = [...aggregate.tasks].filter((task) => task.dueAt && !["done", "cancelled", "out-of-scope"].includes(task.status));
-  const nextEpisode = activeEpisodes[0];
-  const roleCopy = {
-    story: "그림 작업에서 온 질문과 스토리 확인 요청을 먼저 보여 줍니다.",
-    art: "승인된 작업 버전과 막힌 질문, 내가 맡은 결과물을 먼저 보여 줍니다.",
-    producer: "일정·승인·외주·계약에서 확인할 일을 먼저 보여 줍니다.",
-  }[roleLens];
+function OverviewSurface({
+  aggregate,
+  roleLens,
+  execute,
+  canEdit,
+  isDemo,
+}: {
+  readonly aggregate: ProductionProjectAggregate;
+  readonly roleLens: RoleLens;
+  readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly canEdit: boolean;
+  readonly isDemo: boolean;
+}) {
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="진행 회차" value={String(activeEpisodes.length)} detail={nextEpisode ? `${nextEpisode.episodeId} · ${EPISODE_STATE_LABELS[nextEpisode.state]}` : "진행 회차 없음"} icon={PanelTopOpen} tone="accent" />
-        <Metric label="막힌 질문" value={String(blockers.length)} detail={blockers.length > 0 ? "답변 전 다음 작업 진행 불가" : "막힌 질문 없음"} icon={MessageCircleQuestion} tone={blockers.length > 0 ? "danger" : "success"} />
-        <Metric label="열린 작업" value={String(dueTasks.length)} detail={`${dueTasks.filter((task) => task.status === "blocked").length}개 차단`} icon={FolderKanban} tone="warning" />
-        <Metric label="외주 요청" value={String(aggregate.scopePackages.length)} detail="의뢰 범위·완료 기준 포함" icon={PackageCheck} />
-      </div>
-
-      <div className="rounded-2xl border border-accent/30 bg-accent-soft p-4">
-        <div className="flex items-start gap-3">
-          <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-          <div>
-            <p className="text-sm font-bold text-fg">{roleLens === "story" ? "스토리 작가 홈" : roleLens === "art" ? "그림 작가 홈" : "프로듀서 홈"}</p>
-            <p className="mt-1 text-xs leading-6 text-fg-2">{roleCopy}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard title="회차 흐름" description="확정된 작업과 함께 확인할 상태를 회차별로 봅니다.">
-          <div className="space-y-2">
-            {aggregate.episodes.map((episode) => (
-              <Link
-                key={episode.id}
-                to={`/production/projects/${aggregate.projectId}/episodes/${episode.episodeId}`}
-                className="group flex items-center gap-3 rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/40 hover:bg-raised"
-              >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-raised text-sm font-black text-accent">
-                  {episode.episodeId.replace(/\D+/gu, "") || "·"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-fg">{episode.episodeId}</p>
-                    <Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>
-                    {episode.openBlockerCount > 0 ? <Pill tone="danger">막힘 {episode.openBlockerCount}</Pill> : null}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-1.5 text-[0.6875rem] text-fg-3">
-                    <span>스토리 {episode.storyLockApproved ? "✓" : "—"}</span>
-                    <span>·</span>
-                    <span>콘티 {episode.thumbnailLockApproved ? "✓" : "—"}</span>
-                    <span>·</span>
-                    <span>최종 검수 {episode.jointProofApproved ? "✓" : "—"}</span>
-                  </div>
-                </div>
-                <ChevronRight className="size-4 text-fg-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="다음 확인" description="내 역할과 필수 승인 순서에 따라 지금 확인할 일을 보여 줍니다.">
-          <div className="space-y-3">
-            {blockers.map((thread) => (
-              <div key={thread.id} className="rounded-xl border border-bad/30 bg-bad/10 p-3">
-                <div className="flex items-center gap-2"><AlertTriangle className="size-4 text-bad" aria-hidden="true" /><Pill tone="danger">작화 차단</Pill></div>
-                <p className="mt-2 text-sm font-semibold text-fg">{thread.question}</p>
-                <p className="mt-1 text-xs text-fg-2">담당 {assignmentLabel(aggregate, thread.answerOwnerAssignmentId)} · {formatDate(thread.dueAt)}</p>
-              </div>
-            ))}
-            {blockers.length === 0 ? <EmptyState title="차단 결정이 없습니다" description="새 질문이나 검수 요청이 생기면 이곳에 표시됩니다." /> : null}
-          </div>
-        </SectionCard>
-      </div>
-
-      <SectionCard title="최근 프로젝트 활동" description="승인·권리·보상의 중요한 변경은 수정할 수 없는 기록으로 남깁니다.">
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {[...aggregate.auditEvents].reverse().slice(0, 6).map((event) => (
-            <div key={event.id} className="rounded-xl border border-line bg-panel p-3">
-              <p className="text-xs font-bold text-fg">{event.action}</p>
-              <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{event.targetType} · {event.targetId}</p>
-              <p className="mt-2 text-[0.6875rem] text-fg-3">r{event.aggregateRevision} · {formatDate(event.occurredAt)}</p>
-            </div>
-          ))}
-        </div>
-      </SectionCard>
+      <ProductionManagementWorkspace aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />
+      <ProductionStudioRevisionBridgePanel
+        aggregate={aggregate}
+        execute={execute}
+        canEdit={canEdit}
+        enabled={!isDemo}
+      />
     </div>
   );
 }
@@ -668,7 +677,7 @@ function PlanningSurface({
   const seriesMaster = [...aggregate.seriesMasters].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const season = [...aggregate.seasonPlans].sort((a, b) => b.revision - a.revision)[0] ?? null;
   const domains = ["canon", "dialogue", "layout", "visual-direction", "color", "publication", "rights"] as const;
-  const openRisks = aggregate.risks.filter((risk) => !["resolved", "closed"].includes(risk.status));
+  const openRisks = aggregate.risks.filter((risk) => ["open", "monitoring", "mitigating", "occurred"].includes(risk.status));
   const currentEpisodePlans = aggregate.episodePlans.filter((plan) => !aggregate.episodePlans.some((candidate) => candidate.episodeId === plan.episodeId && candidate.revision > plan.revision));
   const currentScenePlans = aggregate.scenePlans.filter((plan) => !aggregate.scenePlans.some((candidate) => candidate.sceneId === plan.sceneId && candidate.revision > plan.revision));
   const currentCutPlans = aggregate.cutPlans.filter((plan) => !aggregate.cutPlans.some((candidate) => candidate.cutId === plan.cutId && candidate.revision > plan.revision));
@@ -757,44 +766,6 @@ function PlanningSurface({
     </div>
   );
 }
-function EpisodesSurface({ aggregate }: { readonly aggregate: ProductionProjectAggregate }) {
-  const stages = ["스토리", "작업 넘기기", "콘티", "작화", "최종 검수", "공개 준비"] as const;
-  return (
-    <SectionCard title="회차 공정 매트릭스" description="상태 셀을 누르면 해당 회차의 공동 작업실로 이동합니다.">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[54rem] border-separate border-spacing-y-1 text-xs">
-          <thead className="text-fg-3"><tr><th className="px-3 py-2 text-left">회차</th>{stages.map((stage) => <th key={stage} className="px-3 py-2 text-center">{stage}</th>)}<th className="px-3 py-2 text-left">현재 상태</th></tr></thead>
-          <tbody>
-            {aggregate.episodes.map((episode) => {
-              const progression = [
-                episode.storyLockApproved,
-                Boolean(episode.activeHandoffId),
-                episode.thumbnailLockApproved,
-                Boolean(episode.visualRevisionRef),
-                episode.jointProofApproved,
-                episode.state === "published",
-              ];
-              return (
-                <tr key={episode.id} className="bg-panel">
-                  <td className="rounded-l-xl px-3 py-3">
-                    <Link className="font-bold text-fg hover:text-accent" to={`/production/projects/${aggregate.projectId}/episodes/${episode.episodeId}`}>{episode.episodeId}</Link>
-                  </td>
-                  {progression.map((done, index) => (
-                    <td key={stages[index]} className="px-3 py-3 text-center">
-                      {done ? <CheckCircle2 className="mx-auto size-4 text-good" aria-label="완료" /> : <CircleDot className="mx-auto size-4 text-fg-3" aria-label="대기" />}
-                    </td>
-                  ))}
-                  <td className="rounded-r-xl px-3 py-3"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </SectionCard>
-  );
-}
-
 function ProductionSurface({
   aggregate,
   execute,
@@ -1129,19 +1100,25 @@ function SurfaceContent({
   roleLens,
   execute,
   canEdit,
+  canManage,
+  isDemo,
 }: {
   readonly surface: ProductionProjectSurface;
   readonly aggregate: ProductionProjectAggregate;
   readonly roleLens: RoleLens;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
+  readonly canManage: boolean;
+  readonly isDemo: boolean;
 }) {
   switch (surface) {
-    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} />;
+    case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} isDemo={isDemo} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
-    case "episodes": return <EpisodesSurface aggregate={aggregate} />;
+    case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
+    case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} canManage={canManage} />;
+    case "risks": return <ProductionRiskWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} canManage={canManage} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
     case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "procurement": return <ProcurementSurface aggregate={aggregate} />;
@@ -1154,20 +1131,28 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
   const params = useParams<{ projectId: string }>();
   const projectId = params.projectId;
   const project = useProductionProject(projectId);
-  const [roleLens, setRoleLens] = useState<RoleLens>("producer");
+  const [roleLens, setRoleLens] = usePreferredRoleLens("producer");
 
   if (!projectId) return <Navigate to="/production" replace />;
-  if (project.loading) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">제작 프로젝트를 불러오는 중…</div></div>;
-  if (project.error || !project.aggregate) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">프로젝트를 열 수 없습니다</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? "프로젝트 데이터가 없습니다."}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">제작 관리 홈</Link></div></div>;
+  if (project.loading) return <div data-route-pending="production-project" className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">제작 프로젝트를 불러오는 중…</div></div>;
+  if (project.error || !project.aggregate) return <div data-route-error="production-project" className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">프로젝트를 열 수 없습니다</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? "프로젝트 데이터가 없습니다."}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">제작 관리 홈</Link></div></div>;
 
   return (
-    <div className="min-h-dvh bg-canvas text-fg">
+    <div data-route-ready="production-project" className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={project.aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
       <div className="mx-auto grid max-w-[100rem] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
-          <SurfaceContent surface={surface} aggregate={project.aggregate} roleLens={roleLens} execute={project.execute} canEdit={project.access.edit} />
+          <SurfaceContent
+            surface={surface}
+            aggregate={project.aggregate}
+            roleLens={roleLens}
+            execute={project.execute}
+            canEdit={project.access.edit}
+            canManage={project.access.manage}
+            isDemo={project.isDemo}
+          />
         </div>
       </div>
     </div>
@@ -1194,16 +1179,16 @@ function TimelineStep({
 export function ProductionEpisodeRoomPage() {
   const params = useParams<{ projectId: string; episodeId: string }>();
   const project = useProductionProject(params.projectId);
-  const [roleLens, setRoleLens] = useState<RoleLens>("art");
+  const [roleLens, setRoleLens] = usePreferredRoleLens("art");
   const userId = useApp((state) => state.userId);
 
   if (!params.projectId || !params.episodeId) return <Navigate to="/production" replace />;
-  if (project.loading) return <div className="min-h-dvh bg-canvas p-6 text-fg">회차 작업실을 불러오는 중…</div>;
-  if (!project.aggregate || project.error) return <div className="min-h-dvh bg-canvas p-6 text-fg">{project.error ?? "회차 데이터가 없습니다."}</div>;
+  if (project.loading) return <div data-route-pending="production-episode" className="min-h-dvh bg-canvas p-6 text-fg">회차 작업실을 불러오는 중…</div>;
+  if (!project.aggregate || project.error) return <div data-route-error="production-episode" className="min-h-dvh bg-canvas p-6 text-fg">{project.error ?? "회차 데이터가 없습니다."}</div>;
 
   const aggregate = project.aggregate;
   const episode = aggregate.episodes.find((entry) => entry.episodeId === params.episodeId);
-  if (!episode) return <div className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-3xl rounded-2xl border border-line bg-card p-6">회차를 찾을 수 없습니다.</div></div>;
+  if (!episode) return <div data-route-blocked="production-episode" className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-3xl rounded-2xl border border-line bg-card p-6">회차를 찾을 수 없습니다.</div></div>;
   const handoff = aggregate.handoffs.find((entry) => entry.episodeId === episode.episodeId && !["superseded", "cancelled"].includes(entry.status));
   const clarifications = handoff ? aggregate.clarifications.filter((entry) => entry.handoffId === handoff.id) : [];
   const readiness = handoff ? evaluateHandoffReadiness({ package: handoff, clarifications }) : null;
@@ -1255,7 +1240,7 @@ export function ProductionEpisodeRoomPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-canvas text-fg">
+    <div data-route-ready="production-episode" className="min-h-dvh bg-canvas text-fg">
       <ProjectHeader aggregate={aggregate} access={project.access} roleLens={roleLens} onRoleLensChange={setRoleLens} saveState={project.saveState} isDemo={project.isDemo} />
       <div className="border-b border-line bg-card px-4 py-4 sm:px-6">
         <div className="mx-auto max-w-[100rem]">

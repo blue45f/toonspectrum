@@ -171,7 +171,7 @@ export const STUDIO_INSPECTOR_CANONICAL_LABELS: Readonly<
   "effect-lines": "집중선·속도선",
   "order-align": "정렬·순서",
   "line-correction": "선 보정",
-  "brush-studio": "브러시 스튜디오",
+  "brush-studio": "현재 브러시 편집",
   "brush-engines": "브러시 엔진",
   symmetry: "대칭 자",
   rulers: "자·가이드",

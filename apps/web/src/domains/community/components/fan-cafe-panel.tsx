@@ -581,7 +581,7 @@ export function FanCafePanel({
                   setFilterKind(item.value);
                 }}
                 className={cn(
-                  "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  "min-h-[44px] min-w-[44px] rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                   filterKind === item.value
                     ? "border-accent/55 bg-accent-soft text-accent"
                     : "border-line bg-raised/45 text-fg-3 hover:text-fg"

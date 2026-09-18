@@ -43,20 +43,30 @@ describe("studio music paid request boundary", () => {
     expect(result.audio.length).toBe(23);
     expect(result.songId).toBe("song-1");
     const [url, init] = transport.mock.calls[1];
-    expect(url).toBe("https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128");
+    expect(url).toBe("https://api.elevenlabs.io/v1/music?output_format=auto");
     expect(init?.redirect).toBe("error");
     const body = JSON.parse(init?.body as string);
     expect(body.force_instrumental).toBe(true);
     expect(body.music_length_ms).toBe(30000);
-    expect(body.model_id).toBe("music_v1");
+    expect(body.model_id).toBe("music_v2_5");
+    expect(body.store_for_inpainting).toBe(true);
+    expect(body.sign_with_c2pa).toBe(true);
     expect(body).not.toHaveProperty("seed");
     expect(body).not.toHaveProperty("composition_plan");
     expect(body.prompt).not.toContain("test-only");
   });
-  it("uses explicit original lyrics for vocals without forcing instrumental", async () => {
+  it("uses a structured v2.5 composition plan for vocal anime OSTs", async () => {
     const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(redis("accepted")).mockResolvedValueOnce(audio());
-    await composeMusic(env, "u", key, { ...brief, vocals: true, lyrics: "우리의 내일을 노래해" }, signal(), transport);
-    expect(JSON.parse(transport.mock.calls[1][1]?.body as string)).toMatchObject({ force_instrumental: false });
+    await composeMusic(env, "u", key, { ...brief, vocals: true, songStructure: "anime-op", lyrics: "[Verse]\n우리의 내일을 노래해\n[Chorus]\n다음 페이지를 함께 열어" }, signal(), transport);
+    const body = JSON.parse(transport.mock.calls[1][1]?.body as string);
+    expect(body.model_id).toBe("music_v2_5");
+    expect(body.store_for_inpainting).toBe(true);
+    expect(body.sign_with_c2pa).toBe(true);
+    expect(body).toHaveProperty("composition_plan");
+    expect(body).not.toHaveProperty("prompt");
+    expect(body).not.toHaveProperty("force_instrumental");
+    expect(body.composition_plan.chunks.reduce((sum: number, chunk: { duration_ms: number }) => sum + chunk.duration_ms, 0)).toBe(30_000);
+    expect(JSON.stringify(body.composition_plan)).toContain("다음 페이지를 함께 열어");
   });
   it.each([400, 401, 403, 422, 429, 500])("does not retry or expose provider error body for HTTP %i", async (status) => {
     const transport = vi.fn<typeof fetch>().mockResolvedValueOnce(redis("accepted")).mockResolvedValueOnce(new Response("test-only-secret", { status }));

@@ -25,7 +25,7 @@ export const CREATOR_ESSENTIALS: readonly CreatorEssential[] = Object.freeze(
   manifest.assets.map((asset) => Object.freeze({ ...asset, kind: asset.kind as EssentialsKind })),
 );
 export const ESSENTIALS_MAX_BYTES = 4 * 1024 * 1024;
-const PATH = /^\/creator-essentials\/[a-z0-9-]+(?:\.preview)?\.(?:svg|glb)$/u;
+const PATH = /^\/creator-essentials\/[a-z0-9-]+(?:\.preview)?\.(?:svg|glb|png)$/u;
 export const isEssentialsPath = (value: string): boolean => PATH.test(value);
 
 /** URL values are untrusted; unknown categories always resolve to the complete inventory. */

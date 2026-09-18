@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
-import { SERIES_STATUS_LABEL } from "./creator-community-utils";
+import { SERIES_STATUS_CLASS, SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { buildStudioHref } from "./creator-studio-links";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeleteSeriesRequest } from "./studio-destructive-command-catalog";
@@ -24,12 +24,22 @@ import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  canShareCreatorSeries,
+  compactPublicShareDescription,
+  publicShareImageUrl,
+} from "@/shared/lib/public-share-policy";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useMetaDescription,
+  usePageSocialMeta,
+} from "@/hooks/use-document-title";
 import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/infrastructure/creator-client";
 
 
@@ -92,8 +102,27 @@ export function CreateSeriesPage() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const publishedEpisodes = series?.episodeList.filter((episode) => episode.status === "published") ?? [];
+  const shareable = canShareCreatorSeries(publishedEpisodes);
+  const sharePath = series ? `/create/series/${encodeURIComponent(series.id)}` : "/create?tab=series";
+  const shareTitle = series ? `${series.title} · 연재 시리즈` : "연재 시리즈";
+  const shareDescription = compactPublicShareDescription(
+    shareable ? series?.description : null,
+    shareable && series
+      ? `${series.author.name} 작가의 ${series.title} 시리즈 ${publishedEpisodes.length}화를 감상해 보세요.`
+      : "툰스튜디오의 공개 연재 시리즈를 감상해 보세요.",
+  );
+  const shareImage = publicShareImageUrl(shareable ? series?.cover : null);
 
   useDocumentTitle(series ? `${series.title} · 연재 시리즈` : "연재 시리즈");
+  useMetaDescription(series ? shareDescription : null);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: shareable ? shareTitle : "연재 시리즈",
+    description: shareDescription,
+    type: "website",
+    image: shareImage,
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -171,7 +200,7 @@ export function CreateSeriesPage() {
   }
 
   // 공개 회차 기준 첫화/최신화 — 목록은 episodeNo 오름차순.
-  const published = series.episodeList.filter((episode) => episode.status === "published");
+  const published = publishedEpisodes;
   const firstEpisode = published[0] ?? null;
   const latestEpisode = published.length > 0 ? published[published.length - 1] : null;
 
@@ -206,9 +235,7 @@ export function CreateSeriesPage() {
               <span
                 className={cn(
                   "inline-flex items-center rounded-md border px-1.5 py-0.5 text-[0.7rem] font-medium leading-none",
-                  series.status === "completed"
-                    ? "border-line bg-raised text-fg-2"
-                    : "border-[color:oklch(0.8_0.15_150/0.3)] bg-[oklch(0.8_0.15_150/0.12)] text-good"
+                  SERIES_STATUS_CLASS[series.status]
                 )}
               >
                 {SERIES_STATUS_LABEL[series.status]}
@@ -277,6 +304,17 @@ export function CreateSeriesPage() {
                   <SkipForward size={14} />
                   최신화 보기
                 </Link>
+              )}
+              {shareable && (
+                <SharePageButton
+                  path={sharePath}
+                  text={shareTitle}
+                  description={shareDescription}
+                  imageUrl={shareImage}
+                  label="시리즈 공유"
+                  actionLabel="시리즈 감상하기"
+                  className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+                />
               )}
               {series.isOwner && (
                 <Link

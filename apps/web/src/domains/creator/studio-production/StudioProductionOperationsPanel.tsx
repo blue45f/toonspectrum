@@ -21,14 +21,25 @@ import {
   type ProductionRole,
   type ProductionWorkspace,
 } from "./studio-production-workspace-runtime";
+import { applyProductionRoleAssignment } from "./production-role-assignment";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
+
+export interface StudioProductionRoleCandidate {
+  readonly memberId: string;
+  readonly displayName: string;
+  /** Access permission from Studio Team. It is displayed but never converted into a production role. */
+  readonly accessRole: string | null;
+  readonly isCurrentUser?: boolean;
+  readonly recommendedRoles?: readonly ProductionRole[];
+}
 
 interface StudioProductionOperationsPanelProps {
   readonly workspace: ProductionWorkspace;
   readonly canEdit: boolean;
   readonly canManageRoles: boolean;
+  readonly roleCandidates?: readonly StudioProductionRoleCandidate[];
   readonly onCommit: (
     update: (current: ProductionWorkspace) => ProductionWorkspace,
     message: string,
@@ -52,6 +63,15 @@ const ROLE_LABELS: Readonly<Record<ProductionRole, string>> = {
   reviewer: "검수",
   director: "디렉터",
   publisher: "게시",
+};
+const MANUAL_MEMBER_SELECTION = "__manual__";
+const ACCESS_ROLE_LABELS: Readonly<Record<string, string>> = {
+  owner: "소유자",
+  admin: "관리자",
+  editor: "편집",
+  commenter: "댓글",
+  viewer: "보기",
+  local: "개인 작업",
 };
 const HIERARCHY_LABELS: Readonly<Record<ProductionHierarchyKind, string>> = {
   episode: "에피소드",
@@ -94,12 +114,14 @@ export function StudioProductionOperationsPanel({
   workspace,
   canEdit,
   canManageRoles,
+  roleCandidates = [],
   onCommit,
 }: StudioProductionOperationsPanelProps) {
   const [hierarchyKind, setHierarchyKind] = useState<ProductionHierarchyKind>("episode");
   const [hierarchyTitle, setHierarchyTitle] = useState("");
   const [parentId, setParentId] = useState("");
   const [pageId, setPageId] = useState("");
+  const [memberSelection, setMemberSelection] = useState(MANUAL_MEMBER_SELECTION);
   const [memberName, setMemberName] = useState("");
   const [memberRole, setMemberRole] = useState<ProductionRole>("story");
   const [memberScope, setMemberScope] = useState("");
@@ -117,6 +139,16 @@ export function StudioProductionOperationsPanel({
     "dialogue",
     "character-continuity",
   ]);
+
+  const roleCandidateMap = useMemo(
+    () => new Map(roleCandidates.map((candidate) => [candidate.memberId, candidate] as const)),
+    [roleCandidates],
+  );
+  const selectedCandidate = memberSelection === MANUAL_MEMBER_SELECTION
+    ? null
+    : roleCandidateMap.get(memberSelection) ?? null;
+  const selectedDisplayName = selectedCandidate?.displayName ?? memberName.trim();
+  const recommendedRoles = selectedCandidate?.recommendedRoles ?? [];
 
   const allowedParents = useMemo(() => {
     const kinds = new Set(parentKinds(hierarchyKind));
@@ -172,25 +204,16 @@ export function StudioProductionOperationsPanel({
   };
 
   const addRoleAssignment = () => {
-    const displayName = memberName.trim();
+    const displayName = selectedDisplayName.trim();
     if (!displayName) return;
-    onCommit((current) => ({
-      ...current,
-      members: current.members.includes(displayName)
-        ? current.members
-        : [...current.members, displayName],
-      roleAssignments: [
-        ...current.roleAssignments,
-        {
-          id: createId("role"),
-          memberId: null,
-          displayName,
-          roles: [memberRole],
-          hierarchyNodeId: memberScope || null,
-        },
-      ],
-    }), "제작 역할을 배정했습니다.");
-    setMemberName("");
+    onCommit((current) => applyProductionRoleAssignment(current, {
+      assignmentId: createId("role"),
+      memberId: selectedCandidate?.memberId ?? null,
+      displayName,
+      role: memberRole,
+      hierarchyNodeId: memberScope || null,
+    }), "제작 역할을 배정했습니다. 협업 권한은 변경하지 않았습니다.");
+    if (!selectedCandidate) setMemberName("");
   };
 
   const removeRoleAssignment = (id: string) => {
@@ -410,21 +433,48 @@ export function StudioProductionOperationsPanel({
           <h2 className="text-sm font-black">제작 역할 배정</h2>
         </div>
         <p className="mt-1 text-xs leading-relaxed text-fg-2">
-          한 사람에게 여러 역할을 배정할 수 있고, 에피소드·시퀀스·장면 범위별 책임자를 따로 둘 수 있습니다.
+          제작 직무는 소유자·편집·댓글·보기 같은 협업 권한과 별도입니다. 실제 팀원을 연결한 뒤 프로젝트 전체 또는 장면별 책임을 배정하세요.
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            이름
-            <input
+            대상 팀원
+            <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
-              value={memberName}
+              value={memberSelection}
+              onChange={(event) => {
+                const selection = event.currentTarget.value;
+                setMemberSelection(selection);
+                const candidate = roleCandidateMap.get(selection);
+                if (candidate?.recommendedRoles?.[0]) setMemberRole(candidate.recommendedRoles[0]);
+                if (selection === MANUAL_MEMBER_SELECTION) setMemberName("");
+              }}
+              disabled={!canManageRoles}
+            >
+              <option value={MANUAL_MEMBER_SELECTION}>이름 직접 입력</option>
+              {roleCandidates.map((candidate) => (
+                <option key={candidate.memberId} value={candidate.memberId}>
+                  {candidate.displayName}
+                  {candidate.isCurrentUser ? " (나)" : ""}
+                  {candidate.accessRole
+                    ? ` · ${ACCESS_ROLE_LABELS[candidate.accessRole] ?? candidate.accessRole}`
+                    : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-fg-2">
+            표시 이름
+            <input
+              className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg disabled:opacity-70"
+              value={selectedCandidate?.displayName ?? memberName}
               onChange={(event) => setMemberName(event.currentTarget.value)}
               maxLength={240}
-              disabled={!canManageRoles}
+              placeholder="담당자 이름"
+              disabled={!canManageRoles || Boolean(selectedCandidate)}
             />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-fg-2">
-            역할
+            제작 직무
             <select
               className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
               value={memberRole}
@@ -456,12 +506,47 @@ export function StudioProductionOperationsPanel({
             type="button"
             className={cn(buttonClass({ size: "sm" }), "self-end")}
             onClick={addRoleAssignment}
-            disabled={!canManageRoles || !memberName.trim()}
+            disabled={!canManageRoles || !selectedDisplayName}
           >
             <Plus className="size-4" aria-hidden="true" />
             역할 배정
           </button>
         </div>
+
+        {selectedCandidate ? (
+          <div className="mt-3 rounded-xl border border-line bg-panel/60 p-3 text-xs text-fg-2">
+            <p>
+              협업 권한: <strong className="text-fg">
+                {selectedCandidate.accessRole
+                  ? ACCESS_ROLE_LABELS[selectedCandidate.accessRole] ?? selectedCandidate.accessRole
+                  : "별도 권한 없음"}
+              </strong>
+              <span className="ml-2 text-fg-3">제작 직무를 배정해도 이 권한은 바뀌지 않습니다.</span>
+            </p>
+            {recommendedRoles.length > 0 ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="font-bold text-accent">프로필 추천</span>
+                {recommendedRoles.map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    aria-pressed={memberRole === role}
+                    className={cn(
+                      "min-h-8 rounded-full border px-2.5 text-[0.6875rem] font-bold transition-colors",
+                      memberRole === role
+                        ? "border-accent bg-accent text-on-accent"
+                        : "border-line bg-card text-fg-2 hover:border-accent/40 hover:text-fg",
+                    )}
+                    onClick={() => setMemberRole(role)}
+                    disabled={!canManageRoles}
+                  >
+                    {ROLE_LABELS[role]}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {workspace.roleAssignments.length === 0 ? (
           <p className="mt-4 rounded-xl border border-dashed border-line p-5 text-center text-xs text-fg-2">
@@ -473,6 +558,9 @@ export function StudioProductionOperationsPanel({
               const scope = assignment.hierarchyNodeId
                 ? workspace.hierarchy.find((node) => node.id === assignment.hierarchyNodeId)?.title
                 : "프로젝트 전체";
+              const linkedCandidate = assignment.memberId
+                ? roleCandidateMap.get(assignment.memberId)
+                : null;
               return (
                 <article key={assignment.id} className="rounded-xl border border-line bg-panel p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -481,6 +569,17 @@ export function StudioProductionOperationsPanel({
                       <p className="mt-1 text-xs text-fg-2">
                         {assignment.roles.map((role) => ROLE_LABELS[role]).join(" · ")}
                       </p>
+                      {linkedCandidate ? (
+                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">
+                          협업 권한 · {linkedCandidate.accessRole
+                            ? ACCESS_ROLE_LABELS[linkedCandidate.accessRole] ?? linkedCandidate.accessRole
+                            : "별도 권한 없음"}
+                        </p>
+                      ) : assignment.memberId ? (
+                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">연결된 팀 멤버</p>
+                      ) : (
+                        <p className="mt-1 truncate text-[0.6875rem] text-fg-3">직접 입력한 담당자</p>
+                      )}
                       <p className="mt-1 truncate text-xs text-fg-3">{scope}</p>
                     </div>
                     <button

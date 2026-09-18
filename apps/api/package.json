@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs ../../scripts/verify-api-calendar-runtime.test.mjs && tsc -p tsconfig.json && node ../../scripts/verify-api-runtime-imports.mjs && node ../../scripts/verify-legal-policy-runtime.mjs",
+    "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs ../../scripts/verify-api-calendar-runtime.test.mjs ../../scripts/stage-api-workspace-runtime.test.mjs && tsc -p tsconfig.json && node ../../scripts/stage-api-workspace-runtime.mjs && node ../../scripts/verify-api-runtime-imports.mjs && node ../../scripts/verify-legal-policy-runtime.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "integration:generate-secrets": "node scripts/generate-production-integration-secrets.mjs",
     "start": "node dist/apps/api/src/main.js"
@@ -19,6 +19,8 @@
     "@nestjs/websockets": "^11.1.28",
     "@socket.io/postgres-adapter": "^0.5.0",
     "@toonspectrum/core": "workspace:*",
+    "@toonspectrum/studio-format-gateway": "workspace:*",
+    "@toonspectrum/studio-project-model": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "express": "^4.22.2",
     "google-auth-library": "^10.7.0",

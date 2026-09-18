@@ -21,7 +21,6 @@ import {
   setSelectionFeather,
   toggleSelectionInvert,
 } from "../studio-selection-tools";
-import { StudioSelectionContextBar } from "../StudioSelectionContextBar";
 import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
@@ -783,21 +782,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
             s.commitPixelSelectionState(null, "clear");
           }}
         />
-        <StudioSelectionContextBar
-          visible={
-            tool === "select"
-            && !nodeEditArmed
-            && currentCanvasSelectionCount > 0
-            && !canvasOnlyMode
-            && !canvasInteractionBlocked
-            && !isExporting
-            && !pixelOverlaySel
-          }
-          selectionCount={currentCanvasSelectionCount}
-          readOnly={activeSurfaceReviewLocked || pageEditLocked}
-          canDelete={!activeSurfaceReviewLocked && !pageEditLocked}
-          stableHandlers={studioOnCanvasSurfaceHandlers}
-        />
+
 
         {pointCommentComposer ? (
           <Suspense fallback={null}>

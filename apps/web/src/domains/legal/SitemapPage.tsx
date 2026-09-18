@@ -1,6 +1,8 @@
 import {
   ArrowRight,
   CircleHelp,
+  FolderOpen,
+  Palette,
   Search,
   Sparkles,
   UserRound,
@@ -10,12 +12,12 @@ import { SiteDirectoryPersonalized } from "./SiteDirectoryPersonalized";
 import { SiteDirectorySearch } from "./SiteDirectorySearch";
 import {
   PERSONAL_DESTINATIONS,
+  SITEMAP_CORE_DESTINATION_GROUPS,
   SITEMAP_DIRECTORY_ENTRIES,
   SITEMAP_EXTENDED_DESTINATION_GROUPS,
 } from "./site-directory-data";
 
 import {
-  SITE_NAVIGATION_GROUPS,
   siteNavigationLocale,
   siteNavigationText,
 } from "@/shared/components/site-navigation";
@@ -23,39 +25,49 @@ import { Container } from "@/shared/components/section";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
 import Link from "@/compat/router-link";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+
+const bi = <T,>(ko: T, en: T): T =>
+  translateBilingualValueForActiveLocale("SitemapPage", ko, en);
 
 const PAGE_COPY = {
   ko: {
     eyebrow: "TOONSTUDIO DIRECTORY",
-    title: "하고 싶은 일에서\n바로 시작하세요.",
-    description: "기능 이름을 찾기보다 만들기, 발견하기, 성장하기, 함께하기 중 지금의 목적을 고르세요. 전문 도구와 정책은 아래 보조 탐색에서 이어집니다.",
+    title: "서비스 전체를\n한눈에 찾으세요.",
+    description: "새 프로젝트를 시작하는 순간부터 드로잉·3D·AI·소재·학습·공유·커뮤니티·지원까지, 하고 싶은 일 기준으로 가장 가까운 화면부터 찾을 수 있게 다시 정리했습니다.",
+    newProject: "새 프로젝트",
+    projects: "프로젝트 목록",
+    brandFilm: "전체 제품 투어 보기",
     search: "작품 검색",
-    core: "핵심 작업 흐름",
-    coreDescription: "자주 쓰는 목적지를 창작 여정에 맞춰 네 갈래로 정리했습니다.",
+    core: "목적별 빠른 시작",
+    coreDescription: "제작 시작, 배우고 준비하기, 작품 발견, 함께하고 관리하기 네 흐름으로 자주 쓰는 목적지를 먼저 모았습니다.",
     personal: "내 공간과 환경",
     extended: "전체 기능과 페이지",
-    extendedDescription: "직접 열 수 있는 제작·학습·관리·데이터·정책 페이지를 한곳에 모았습니다.",
-    home: "메인으로 돌아가기",
+    extendedDescription: "직접 열 수 있는 제작·3D·AI·학습·에셋·리서치·데이터·지원 페이지를 역할별로 나눠 빠르게 훑을 수 있습니다.",
   },
   en: {
     eyebrow: "TOONSTUDIO DIRECTORY",
-    title: "Start with what\nyou want to do.",
-    description: "Choose your current purpose—create, discover, grow or connect—instead of hunting for a feature name. Specialized tools and policies continue below.",
+    title: "See the whole service\nat a glance.",
+    description: "From starting a project to drawing, 3D, AI, assets, learning, sharing, community and support, the directory is organized around what you want to do next.",
+    newProject: "New project",
+    projects: "Project list",
+    brandFilm: "Watch full product tour",
     search: "Search stories",
-    core: "Core creative flow",
-    coreDescription: "Frequent destinations are organized into four paths that follow the creative journey.",
+    core: "Start by purpose",
+    coreDescription: "Frequent destinations are grouped into four flows: create, prepare, discover, and connect or manage.",
     personal: "Your space and preferences",
     extended: "All features and pages",
-    extendedDescription: "Browse every directly accessible creation, learning, management, data and policy page.",
-    home: "Back to home",
+    extendedDescription: "Scan every directly accessible creation, 3D, AI, learning, asset, research, data and support page by role.",
   },
 } as const;
 
-function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "en" }) {
+function RouteConditionBadges({ href, locale: _locale }: { href: string; locale: "ko" | "en" }) {
+  useBilingualI18nRevision();
   const metadata = resolveSiteRouteMetadata(href);
-  const labels = locale === "ko"
-    ? { beta: "베타", experimental: "실험", "sign-in": "로그인 필요", project: "프로젝트 필요", desktop: "데스크톱 권장" }
-    : { beta: "Beta", experimental: "Experimental", "sign-in": "Sign-in required", project: "Project required", desktop: "Desktop recommended" };
+  const labels = bi({ beta: "베타", experimental: "실험", "sign-in": "로그인 필요", project: "프로젝트 필요", desktop: "데스크톱 권장" }, { beta: "Beta", experimental: "Experimental", "sign-in": "Sign-in required", project: "Project required", desktop: "Desktop recommended" });
   const badges = [
     metadata.maturity === "beta" ? { key: "beta", label: labels.beta, tone: "accent" } : null,
     metadata.maturity === "experimental" ? { key: "experimental", label: labels.experimental, tone: "warning" } : null,
@@ -65,7 +77,7 @@ function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "
   ].filter((badge): badge is { key: string; label: string; tone: string } => badge !== null);
   if (!badges.length) return null;
   return (
-    <span className="mt-2 flex flex-wrap gap-1" aria-label={locale === "ko" ? "사용 조건" : "Usage conditions"}>
+    <span className="mt-2 flex flex-wrap gap-1" aria-label={bi("사용 조건", "Usage conditions")}>
       {badges.map((badge) => (
         <small
           key={badge.key}
@@ -80,9 +92,10 @@ function RouteConditionBadges({ href, locale }: { href: string; locale: "ko" | "
 }
 
 export function SitemapPage() {
+  useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = siteNavigationLocale(language);
-  const copy = PAGE_COPY[locale];
+  const copy = bi((PAGE_COPY).ko, (PAGE_COPY).en);
   const t = useT();
 
   return (
@@ -93,7 +106,7 @@ export function SitemapPage() {
       >
         <span aria-hidden="true" className="absolute -right-20 -top-24 size-72 rounded-full border border-accent/20" />
         <span aria-hidden="true" className="absolute -right-6 -top-8 size-40 rounded-full border border-line-strong/45" />
-        <div className="relative max-w-3xl">
+        <div className="relative max-w-4xl">
           <p className="flex items-center gap-2 font-display text-[0.66rem] font-bold uppercase tracking-[0.16em] text-accent">
             <Sparkles size={14} aria-hidden="true" />{copy.eyebrow}
           </p>
@@ -103,21 +116,41 @@ export function SitemapPage() {
           >
             {copy.title}
           </h1>
-          <p className="mt-5 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base sm:leading-8">
+          <p className="mt-5 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base sm:leading-8">
             {copy.description}
           </p>
-          <div className="mt-7 flex flex-wrap gap-2.5">
+          <div className="mt-7 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             <Link
-              href="/search"
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2.5 text-sm font-bold text-canvas shadow-sm transition-transform hover:-translate-y-0.5"
+              href="/studio/new"
+              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-fg bg-fg px-4 py-3 text-sm font-bold text-canvas shadow-sm transition-transform hover:-translate-y-0.5"
             >
-              <Search size={17} aria-hidden="true" />{copy.search}
+              <Palette size={18} aria-hidden="true" />
+              <span>{copy.newProject}</span>
+              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </Link>
             <Link
-              href="/"
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong bg-card/80 px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
+              href="/studio/projects"
+              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-line-strong bg-card/80 px-4 py-3 text-sm font-bold text-fg-2 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:text-accent"
             >
-              {copy.home}<ArrowRight size={16} aria-hidden="true" />
+              <FolderOpen size={18} aria-hidden="true" />
+              <span>{copy.projects}</span>
+              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/product-tour"
+              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-accent/35 bg-accent-soft/70 px-4 py-3 text-sm font-bold text-accent transition-all hover:-translate-y-0.5 hover:border-accent/60"
+            >
+              <Sparkles size={18} aria-hidden="true" />
+              <span>{copy.brandFilm}</span>
+              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+            <Link
+              href="/search"
+              className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-line bg-panel/75 px-4 py-3 text-sm font-bold text-fg-2 transition-all hover:-translate-y-0.5 hover:border-line-strong hover:text-fg"
+            >
+              <Search size={18} aria-hidden="true" />
+              <span>{copy.search}</span>
+              <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </Link>
           </div>
         </div>
@@ -129,19 +162,19 @@ export function SitemapPage() {
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
-            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">01 · PRIMARY PATHS</p>
+            <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">01 · START HERE</p>
             <h2 id="sitemap-core-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
               {copy.core}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-3">{copy.coreDescription}</p>
           </div>
           <span className="hidden font-display text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-fg-3 sm:block">
-            Create · Share · Discover
+            Create · Learn · Discover · Connect
           </span>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          {SITE_NAVIGATION_GROUPS.map((group, groupIndex) => (
+          {SITEMAP_CORE_DESTINATION_GROUPS.map((group, groupIndex) => (
             <section
               key={group.id}
               className="rounded-3xl border border-line/70 bg-panel/45 p-4 shadow-sm sm:p-5"
@@ -149,7 +182,7 @@ export function SitemapPage() {
             >
               <div className="flex items-start gap-3 px-1 pb-4 sm:px-2">
                 <span aria-hidden="true" className="pt-0.5 font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
-                  0{groupIndex + 1}
+                  {String(groupIndex + 1).padStart(2, "0")}
                 </span>
                 <div>
                   <h3 id={`sitemap-${group.id}`} className="font-display text-lg font-bold text-fg">
@@ -229,7 +262,7 @@ export function SitemapPage() {
           <h2 id="sitemap-extended-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
             {copy.extended}
           </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-fg-3">{copy.extendedDescription}</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-3">{copy.extendedDescription}</p>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -285,17 +318,15 @@ export function SitemapPage() {
         <div className="flex items-start gap-3">
           <CircleHelp size={20} className="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
           <p className="max-w-2xl text-sm leading-6 text-fg-2">
-            {locale === "ko"
-              ? "원하는 메뉴를 찾기 어렵거나 기능 제안이 있다면 이용 문의와 제보·제안에서 바로 알려주세요."
-              : "When a destination is hard to find or you have an idea, reach us through Support or Feedback."}
+            {bi("원하는 메뉴를 찾기 어렵거나 기능 제안이 있다면 이용 문의와 제보·제안에서 바로 알려주세요.", "When a destination is hard to find or you have an idea, reach us through Support or Feedback.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/support" className="inline-flex min-h-11 items-center rounded-xl border border-line-strong bg-panel px-4 py-2 text-sm font-bold text-fg-2 hover:text-accent">
-            {locale === "ko" ? "이용 문의" : "Support"}
+            {bi("이용 문의", "Support")}
           </Link>
           <Link href="/feedback" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-fg bg-fg px-4 py-2 text-sm font-bold text-canvas">
-            {locale === "ko" ? "제보·제안" : "Feedback"}<ArrowRight size={16} aria-hidden="true" />
+            {bi("제보·제안", "Feedback")}<ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
       </section>

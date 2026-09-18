@@ -323,7 +323,9 @@ export function StudioPageReviewPanel({
 
   const bulkReviewControls: ReactNode = (
     <div className="sticky top-0 z-10 mb-3 space-y-2 rounded-xl border border-line bg-panel/95 p-3 shadow-sm backdrop-blur">
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+      <div className={isMobile
+        ? "grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]"
+        : "grid gap-2 @lg:grid-cols-[minmax(0,1fr)_10rem]"}>
         <label className="relative block">
           <span className="sr-only">페이지 검토 검색</span>
           <Search
@@ -551,7 +553,9 @@ export function StudioPageReviewPanel({
                   </button>
                 </div>
 
-                <div className="mt-2 grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                <div className={isMobile
+                  ? "mt-2 grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]"
+                  : "mt-2 grid gap-2 @lg:grid-cols-[10rem_minmax(0,1fr)]"}>
                   <label className="text-[0.68rem] font-semibold text-fg-3">
                     검토 상태
                     <select

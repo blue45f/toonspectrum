@@ -3,6 +3,7 @@ import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
+import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { cn } from "@/shared/lib/utils";
 
@@ -10,6 +11,10 @@ import type { StudioDocumentWorkspaceId } from "../studio-document-workspace";
 import type { StudioProjectSection } from "../studio-project-views";
 
 import { useStudioDocumentLayout } from "../studio-router/studio-document-layout-context";
+import {
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 const StudioProjectFeatureSuitePanel = lazyRetry(
   () => import("./StudioProjectFeatureSuitePanel").then((module) => ({
@@ -29,8 +34,6 @@ const StudioReviewPanel = lazyRetry(
   })),
   "StudioDocumentReviewPanel",
 );
-
-type Locale = "ko" | "en";
 
 type WorkspaceToolProjection =
   | {
@@ -150,14 +153,15 @@ const WORKSPACE_TOOL_PROJECTIONS: Partial<
   },
 });
 
-function localeFromLanguage(language: string): Locale {
+function localeFromLanguage(language: string) {
   return language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
 }
 
-function DockLoading({ locale }: { readonly locale: Locale }) {
+function DockLoading({ locale: _locale }: { readonly locale: string }) {
+  const l = useBilingualLocalizer("studioDocumentDock.loading");
   return (
     <div className="grid min-h-40 place-items-center rounded-2xl border border-line bg-panel/50 p-5 text-sm font-semibold text-fg-3">
-      {locale === "ko" ? "문서 도구를 여는 중..." : "Opening document tools..."}
+      {l("문서 도구를 여는 중...", "Opening document tools...")}
     </div>
   );
 }
@@ -167,10 +171,11 @@ function ProjectionContent({
   projectId,
   projection,
 }: {
-  readonly locale: Locale;
+  readonly locale: string;
   readonly projectId: string;
   readonly projection: WorkspaceToolProjection;
 }) {
+  useBilingualI18nRevision();
   if (projection.kind === "suite") {
     return (
       <StudioProjectFeatureSuitePanel
@@ -193,6 +198,7 @@ function ProjectionContent({
  * until they are saved into a project, and drawing/image workspaces keep an uncluttered canvas.
  */
 export function StudioDocumentWorkspaceDock() {
+  const l = useBilingualLocalizer("studioDocumentDock");
   const runtime = useStudioDocumentLayout();
   const language = useI18n((state) => state.lang);
   const locale = localeFromLanguage(language);
@@ -222,15 +228,18 @@ export function StudioDocumentWorkspaceDock() {
 
   if (!projectId || !projection) return null;
 
-  const title = locale === "ko" ? projection.titleKo : projection.titleEn;
-  const description = locale === "ko" ? projection.descriptionKo : projection.descriptionEn;
+  const title = l(projection.titleKo, projection.titleEn);
+  const description = l(projection.descriptionKo, projection.descriptionEn);
   const triggerLabel = open
-    ? (locale === "ko" ? "문서 도구 닫기" : "Close document tools")
-    : (locale === "ko" ? "문서 도구 열기" : "Open document tools");
+    ? (l("문서 도구 닫기", "Close document tools"))
+    : (l("문서 도구 열기", "Open document tools"));
 
   return (
     <>
-      <div className="pointer-events-none fixed right-2 top-2 z-[119] print:hidden sm:right-3">
+      <div
+        className="pointer-events-none fixed right-2 top-2 z-[119] print:hidden sm:right-3"
+        data-studio-shell-floating-target="document-tools"
+      >
         <button
           type="button"
           aria-controls={panelId}
@@ -243,7 +252,7 @@ export function StudioDocumentWorkspaceDock() {
           onClick={() => setOpen((value) => !value)}
         >
           <PanelRightOpen size={16} aria-hidden="true" />
-          <span className="hidden sm:inline">{locale === "ko" ? "문서 도구" : "Document tools"}</span>
+          <span className="hidden sm:inline">{l("문서 도구", "Document tools")}</span>
         </button>
       </div>
 
@@ -265,7 +274,7 @@ export function StudioDocumentWorkspaceDock() {
             <button
               ref={closeButtonRef}
               type="button"
-              aria-label={locale === "ko" ? "문서 도구 닫기" : "Close document tools"}
+              aria-label={l("문서 도구 닫기", "Close document tools")}
               className={buttonClass({ variant: "quiet", size: "icon" })}
               onClick={() => setOpen(false)}
             >

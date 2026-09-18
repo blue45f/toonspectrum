@@ -127,13 +127,10 @@ function arrange(h: any, instances: readonly any[]): void {
     live.document,
     h.createStudioBg3dHistorySnapshot(live),
   );
-  h.physicsRuntimeSourceRef.current = {
-    ...live,
+  h.replaceCanonicalDocumentState({
     primitives: nextPrimitives,
     customModels: nextCustomModels,
-  };
-  h.setPrimitives(nextPrimitives);
-  h.setCustomModels(nextCustomModels);
+  });
   h.selectTemplateInstances(instances);
 }
 
@@ -222,13 +219,10 @@ function reset(h: any, instances: readonly any[]): void {
     live.document,
     h.createStudioBg3dHistorySnapshot(live),
   );
-  h.physicsRuntimeSourceRef.current = {
-    ...live,
+  h.replaceCanonicalDocumentState({
     primitives: nextPrimitives,
     customModels: nextCustomModels,
-  };
-  h.setPrimitives(nextPrimitives);
-  h.setCustomModels(nextCustomModels);
+  });
   h.selectTemplateInstances(instances);
 }
 

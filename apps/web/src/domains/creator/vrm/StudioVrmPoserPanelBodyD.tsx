@@ -26,10 +26,14 @@ import {
 import {
   DEFAULT_BONE_OFFSETS,
   SCENE_PROPS,
+  SCENE_PROP_RENDERABLE_IDS,
 } from "./studio-vrm-procedural-scene-props";
 import {
   propDefById,
 } from "./studio-vrm-props";
+import {
+  StudioVrmScenePropVisual,
+} from "./StudioVrmSemanticVisual";
 import type {
   ScenePropAttachmentConfig as PropAttachmentConfig,
 } from "./studio-vrm-scene-props";
@@ -566,7 +570,7 @@ export function StudioVrmPoserPanelBodyD({ h }: { h: StudioVrmPoserHost }) {
                     동물·효과·장면 장식을 월드에 놓거나 본에 연결합니다. 손에 쥐는 소품은 위의 스마트 그립을 사용하세요.
                   </p>
                 {(["animal", "item", "effect"] as const).map((cat) => {
-                  const items = SCENE_PROPS.filter((p) => p.category === cat && !(cat === "item" && propDefById(p.id)));
+                  const items = SCENE_PROPS.filter((p) => SCENE_PROP_RENDERABLE_IDS.has(p.id) && p.category === cat && !(cat === "item" && propDefById(p.id)));
                   if (items.length === 0) return null;
                   return (
                     <div key={cat} className="mb-3">
@@ -594,7 +598,7 @@ export function StudioVrmPoserPanelBodyD({ h }: { h: StudioVrmPoserHost }) {
                                 setSelectedPropId(prop.id);
                               }}
                             >
-                              <span className="text-base leading-none" aria-hidden>{prop.emoji}</span>
+                              <StudioVrmScenePropVisual prop={prop} className="size-9" />
                               <span className="text-[0.68rem] font-semibold leading-tight">{prop.label}</span>
                               {isActive && (
                                 <span 
@@ -647,7 +651,7 @@ export function StudioVrmPoserPanelBodyD({ h }: { h: StudioVrmPoserHost }) {
                     <div className="mt-3 space-y-3 rounded-xl border border-accent/40 bg-accent-soft/20 p-3 animate-fade-in motion-reduce:animate-none">
                       <div className="flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1 text-xs font-bold text-accent">
-                          <span aria-hidden>{prop.emoji}</span>
+                          <StudioVrmScenePropVisual prop={prop} className="size-7" />
                           <span>{prop.label} 장착 및 위치 설정</span>
                         </span>
                         <div className="flex items-center gap-1">

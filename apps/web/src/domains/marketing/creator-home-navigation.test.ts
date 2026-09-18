@@ -17,6 +17,14 @@ test("the existing film fragment resolves to its readable heading", () => {
   assert.equal(creatorSectionFromHash("#creator-%66ilm")?.id, "creator-film");
 });
 
+test("the current all-in-one homepage fragments resolve to readable headings", () => {
+  assert.equal(creatorSectionFromHash("#creator-start")?.headingId, "creator-toolkit-title");
+  assert.equal(creatorSectionFromHash("#creator-flow")?.headingId, "creator-process-title");
+  assert.equal(creatorSectionFromHash("#creator-principles")?.headingId, "creator-principles-title");
+  assert.equal(creatorSectionFromHash("#creator-principles-title")?.headingId, "creator-principles-title");
+  assert.equal(creatorSectionFromHash("#creator-support")?.headingId, "creator-support-title");
+});
+
 for (const hash of ["", "#", "creator-film", "#unknown", "#%E0%A4%A", "#%", "#%2563reator-film", "#creator-film?play=1", "#creator-film\"[onclick]", "#creator-film/../../studio", `#${"a".repeat(200)}`]) {
   test(`unknown or malformed fragment does not become a selector: ${hash.slice(0, 40)}`, () => {
     assert.equal(creatorSectionFromHash(hash), undefined);

@@ -167,7 +167,7 @@ describe("StudioCommandSearchDialog", () => {
     type("브러시 스튜디오");
     const inspectorResult = screen.getAllByRole("option").find(
       (option) => option.getAttribute("data-action") === "inspector"
-        && within(option).queryByText("브러시 스튜디오"),
+        && within(option).queryByText("현재 브러시 편집"),
     );
     expect(inspectorResult).toBeTruthy();
     fireEvent.click(inspectorResult as HTMLElement);

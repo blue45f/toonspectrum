@@ -11,6 +11,7 @@ import { build as viteBuild, defineConfig, type Plugin } from "vite";
 import { createStudioManualChunks } from "./apps/web/config/vite-manual-chunks";
 import { STUDIO_I18N_NAMESPACES } from "./apps/web/src/shared/lib/i18n-asset-manifest";
 import {
+  STUDIO_SERVICE_WORKER_STATIC_CRITICAL_URLS,
   planStudioServiceWorkerPrecache,
   studioServiceWorkerBuildId,
   type StudioServiceWorkerManifest,
@@ -370,9 +371,20 @@ function studioServiceWorkerPlugin(): Plugin {
       const manifest = JSON.parse(
         readFileSync(manifestPath, "utf8"),
       ) as StudioViteManifest;
+      const outputPath = (url: string): string =>
+        path.join(outDir, url.replace(/^\/+/u, ""));
       const sizeOf = (url: string): number | null => {
         try {
-          return statSync(path.join(outDir, url.replace(/^\/+/u, ""))).size;
+          return statSync(outputPath(url)).size;
+        } catch {
+          return null;
+        }
+      };
+      const fingerprintOf = (url: string): string | null => {
+        try {
+          return createHash("sha256")
+            .update(readFileSync(outputPath(url)))
+            .digest("hex");
         } catch {
           return null;
         }
@@ -382,7 +394,9 @@ function studioServiceWorkerPlugin(): Plugin {
         manifest,
         appEntryKey: "index.html",
         warmUrls: STUDIO_SERVICE_WORKER_WARM_URLS,
+        staticCriticalUrls: STUDIO_SERVICE_WORKER_STATIC_CRITICAL_URLS,
         sizeOf,
+        fingerprintOf,
       });
       for (const warning of plan.warnings) this.warn(warning);
       if (plan.violations.length > 0) {

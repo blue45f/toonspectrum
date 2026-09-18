@@ -1,8 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const ACTIVE_EVENTS = new Set(["push", "pull_request"]);
-const ACTIVE_STATUSES = ["queued", "in_progress"];
+const ACTIVE_EVENTS = new Set(["push", "pull_request", "dynamic"]);
+const ACTIVE_STATUSES = ["pending", "queued", "in_progress"];
+const WAITING_STATUSES = new Set(["pending", "queued"]);
+const DEFAULT_STALE_QUEUED_AFTER_MS = 6 * 60 * 60 * 1_000;
 
 export function selectSupersededActionsRuns(
   runs,
@@ -10,6 +12,8 @@ export function selectSupersededActionsRuns(
     currentRunId,
     pullRequestStates = new Map(),
     openPullHeadBranches = new Set(),
+    now,
+    staleQueuedAfterMs = DEFAULT_STALE_QUEUED_AFTER_MS,
   } = {},
 ) {
   const current = Number(currentRunId);
@@ -30,6 +34,21 @@ export function selectSupersededActionsRuns(
     bucket.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
     for (const run of bucket.slice(1)) {
       selected.set(Number(run.id), { run, reason: "superseded" });
+    }
+  }
+
+  const nowMs = now instanceof Date ? now.getTime() : Number(now);
+  if (
+    Number.isFinite(nowMs) &&
+    Number.isFinite(staleQueuedAfterMs) &&
+    staleQueuedAfterMs >= 0
+  ) {
+    for (const run of active) {
+      if (!WAITING_STATUSES.has(run.status) || selected.has(Number(run.id))) continue;
+      const createdAtMs = Date.parse(run.created_at);
+      if (Number.isFinite(createdAtMs) && nowMs - createdAtMs >= staleQueuedAfterMs) {
+        selected.set(Number(run.id), { run, reason: "stale-queued" });
+      }
     }
   }
 
@@ -114,12 +133,26 @@ async function listOpenPulls({ token, repository, fetchImpl }) {
   return pulls;
 }
 
+function summarizeSelectedRun(run, reason) {
+  return {
+    id: run.id,
+    workflow: run.name,
+    event: run.event,
+    branch: run.head_branch,
+    status: run.status,
+    createdAt: run.created_at,
+    reason,
+  };
+}
+
 export async function cleanupSupersededActionsRuns({
   token,
   repository,
   currentRunId,
   apply = false,
   fetchImpl = fetch,
+  now = Date.now(),
+  staleQueuedAfterMs = DEFAULT_STALE_QUEUED_AFTER_MS,
 }) {
   if (!token || !repository || !Number.isFinite(Number(currentRunId))) {
     throw new Error("Missing Actions queue cleanup environment.");
@@ -159,7 +192,10 @@ export async function cleanupSupersededActionsRuns({
     currentRunId,
     pullRequestStates,
     openPullHeadBranches,
+    now,
+    staleQueuedAfterMs,
   });
+  const planned = candidates.map(({ run, reason }) => summarizeSelectedRun(run, reason));
   const cancelled = [];
   const skipped = [];
 
@@ -173,19 +209,26 @@ export async function cleanupSupersededActionsRuns({
           init: { method: "POST" },
           fetchImpl,
         });
-        cancelled.push({
-          id: run.id,
-          workflow: run.name,
-          event: run.event,
-          branch: run.head_branch,
-          reason,
-        });
+        cancelled.push({ ...summarizeSelectedRun(run, reason), operation: "cancel" });
       } catch (error) {
-        if (error?.status === 409) {
-          skipped.push({ id: run.id, reason: "already-terminal" });
-          continue;
+        if (error?.status !== 409) throw error;
+
+        try {
+          await githubRequest({
+            token,
+            repository,
+            path: `/actions/runs/${run.id}/force-cancel`,
+            init: { method: "POST" },
+            fetchImpl,
+          });
+          cancelled.push({ ...summarizeSelectedRun(run, reason), operation: "force-cancel" });
+        } catch (forceError) {
+          if (forceError?.status !== 409) throw forceError;
+          skipped.push({
+            ...summarizeSelectedRun(run, reason),
+            failure: "cancel-and-force-cancel-rejected",
+          });
         }
-        throw error;
       }
     }
   }
@@ -194,6 +237,7 @@ export async function cleanupSupersededActionsRuns({
     activeRunsScanned: runs.filter((run) => ACTIVE_EVENTS.has(run.event)).length,
     openPullHeads: openPullHeadBranches.size,
     candidateRuns: candidates.length,
+    planned,
     cancelled,
     skipped,
     dryRun: !apply,

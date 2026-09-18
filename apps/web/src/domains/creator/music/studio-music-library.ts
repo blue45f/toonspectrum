@@ -3,7 +3,7 @@ import type { StudioLocalDatabase } from "../studio-local-database";
 import type { LocalMusicTrack } from "./studio-music-client";
 import type { MusicTrackMetadata } from "@toonspectrum/core/studio-music";
 
-import { isMp3, MUSIC_MAX_BYTES, MUSIC_TERMS_URL, parseMusicBrief } from "@toonspectrum/core/studio-music";
+import { isMp3, MUSIC_LEGACY_OUTPUT_FORMAT, MUSIC_MAX_BYTES, MUSIC_OUTPUT_FORMAT, MUSIC_TERMS_URL, parseMusicBrief } from "@toonspectrum/core/studio-music";
 
 export const MUSIC_LIBRARY_NAMESPACE = "studio-music-library-v1";
 const MAX_TRACKS = 20;
@@ -21,12 +21,15 @@ function metadata(value: unknown): MusicTrackMetadata {
   if (!value || typeof value !== "object") throw new Error("음원 제작 정보가 올바르지 않습니다.");
   const m = value as MusicTrackMetadata;
   if (typeof m.id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(m.id)
-    || m.provider !== "elevenlabs" || m.model !== "music_v1" || m.format !== "mp3_44100_128"
+    || m.provider !== "elevenlabs" || !["music_v1", "music_v2_5"].includes(m.model) || ![MUSIC_LEGACY_OUTPUT_FORMAT, MUSIC_OUTPUT_FORMAT].includes(m.format)
+    || (m.format === MUSIC_OUTPUT_FORMAT && (m.c2paRequested !== true || m.storeForInpainting !== true))
     || typeof m.createdAt !== "string" || m.createdAt.length > 40 || !Number.isFinite(Date.parse(m.createdAt))) {
     throw new Error("음원 제작 정보가 올바르지 않습니다.");
   }
   return {
     id: m.id.toLowerCase(), createdAt: m.createdAt, provider: m.provider, model: m.model, format: m.format,
+    ...(m.c2paRequested === true ? { c2paRequested: true } : {}),
+    ...(m.storeForInpainting === true ? { storeForInpainting: true } : {}),
     brief: parseMusicBrief(m.brief), termsUrl: MUSIC_TERMS_URL,
     ...(typeof m.songId === "string" && /^[a-zA-Z0-9_-]{1,160}$/.test(m.songId) ? { songId: m.songId } : {}),
   };

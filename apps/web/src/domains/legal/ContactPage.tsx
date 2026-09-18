@@ -1,6 +1,7 @@
 import {
   Bug,
   Database,
+  HandCoins,
   Handshake,
   MessagesSquare,
   Palette,
@@ -20,9 +21,15 @@ const SUPPORT_LINKS = [
   },
   {
     icon: Handshake,
-    title: "제휴 문의",
-    body: "광고, 플랫폼 연동, 콘텐츠 제휴 같은 비즈니스 제안을 접수합니다.",
-    href: "/feedback?type=idea",
+    title: "투자·제휴·후원 문의",
+    body: "투자·IR, 콘텐츠/IP, 광고·스폰서십 제안을 비공개로 접수합니다.",
+    href: "/business",
+  },
+  {
+    icon: HandCoins,
+    title: "ToonSpectrum 응원하기",
+    body: "개인 서포터 결제 준비 상태, 기업 스폰서십, 공익 기부의 서로 다른 경로를 확인합니다.",
+    href: "/support-us",
   },
   {
     icon: Bug,
@@ -51,7 +58,7 @@ const TYPES = [
   {
     icon: MessagesSquare,
     title: "기타 문의",
-    body: "서비스 제휴·투자, 채용, 권리 관련 등 그 밖의 모든 문의.",
+    body: "서비스 투자·IR, 후원·스폰서십, 채용, 권리 관련 등 그 밖의 문의.",
   },
 ] as const;
 
@@ -62,16 +69,16 @@ export function ContactPage() {
       <PublicStoryHero
         eyebrow="CONTACT · CREATE SOMETHING TOGETHER"
         title="웹툰을 만드는 더 나은 환경, 함께."
-        description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서 해결 경로를 찾고, 공개 제안과 협업 아이디어는 피드백 보드에서 함께 논의할 수 있습니다."
+        description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서, 투자·제휴·스폰서십은 비공개 비즈니스 센터에서, 개인 서포터와 후원 경계는 응원 센터에서 확인할 수 있습니다."
         image="materials"
         imageAlt="브러시와 재료가 놓인 웹툰 작업실 콘셉트 아트"
         caption="LET’S MAKE ROOM FOR IDEAS · 드로잉 재료 콘셉트 아트"
       >
         <Link
-          href="/feedback"
+          href="/business"
           className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition-colors hover:bg-accent-2"
         >
-          제안 작성하기
+          비즈니스 문의
           <Handshake size={16} aria-hidden="true" />
         </Link>
         <Link
@@ -101,9 +108,9 @@ export function ContactPage() {
           </div>
 
           <h2 className="mb-3 mt-8 text-lg font-bold text-fg">
-            자사 문의·제안 보드
+            문의 성격에 맞는 전용 경로
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {SUPPORT_LINKS.map((link) => (
               <Link
                 key={link.title}
@@ -122,16 +129,16 @@ export function ContactPage() {
 
         <aside>
           <div className="sticky top-[var(--site-header-sticky-offset,5rem)] rounded-2xl border border-line bg-panel/40 p-5">
-            <h2 className="text-sm font-semibold text-fg">문의 성격에 맞는 경로</h2>
+            <h2 className="text-sm font-semibold text-fg">공개와 비공개를 구분합니다</h2>
             <p className="mt-2 text-xs leading-relaxed text-fg-3">
               사용 중 발생한 문제는 지원 센터에서 해결 방법과 진단 정보를 확인하세요.
-              공개해도 되는 제안과 오류는 피드백 보드에서 댓글과 운영 상태를 함께 볼 수 있습니다.
+              공개해도 되는 제안과 오류는 피드백 보드에서 논의하고, 연락처·사업 정보가 포함되는 투자·제휴 문의는 비공개 센터를 이용해 주세요.
             </p>
             <Link
-              href="/support"
+              href="/business"
               className="mt-4 inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-2"
             >
-              지원 센터 열기
+              비공개 비즈니스 센터 열기
             </Link>
           </div>
         </aside>

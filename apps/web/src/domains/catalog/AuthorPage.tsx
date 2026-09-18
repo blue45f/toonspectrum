@@ -6,14 +6,16 @@ import type { Title } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { TitleCard } from "@/shared/components/title-card";
 import { GenreChip } from "@/shared/components/ui/chip";
 import { Stars } from "@/shared/components/ui/stars";
+import { compactPublicShareDescription } from "@/shared/lib/public-share-policy";
 import { formatCount } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
 import { NotFoundPage } from "@/components/NotFoundPage";
-import { useMetaDescription } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
 import { useApiResource } from "@/infrastructure/use-api-resource";
 
 interface AuthorResponse {
@@ -42,11 +44,22 @@ export function AuthorPage() {
   const avg = data?.avg ?? 0;
   const genres = data?.genres ?? [];
 
-  useMetaDescription(
+  const sharePath = authorParam ? `/author/${encodeURIComponent(decodedAuthor)}` : "/authors";
+  const shareDescription = compactPublicShareDescription(
     data
-      ? `${author} 작가의 작품 ${works.length}편${genres.length ? ` · ${genres.slice(0, 3).join("·")}` : ""} — 툰스펙트럼에서 작가별로 모아 봅니다.`
-      : null
+      ? `${author} 작가의 작품 ${works.length}편${genres.length ? ` · ${genres.slice(0, 3).join("·")}` : ""}`
+      : null,
+    `${author} 작가의 작품과 장르별 활동을 한눈에 확인해 보세요.`,
   );
+
+  useDocumentTitle(author || "작가");
+  useMetaDescription(data ? `${shareDescription} — 툰스펙트럼에서 작가별로 모아 봅니다.` : null);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: `${author} 작가`,
+    description: shareDescription,
+    type: "website",
+  });
 
   if (notFound || (!loading && !error && authorParam && data === null)) return <NotFoundPage />;
 
@@ -69,6 +82,16 @@ export function AuthorPage() {
               <GenreChip key={genre} genre={genre} size="sm" />
             ))}
           </div>
+          {!loading && !error && data && (
+            <SharePageButton
+              path={sharePath}
+              text={`${author} 작가`}
+              description={shareDescription}
+              label="작가 페이지 공유"
+              actionLabel="작가 작품 보기"
+              className="mt-4"
+            />
+          )}
         </div>
         <dl className="flex flex-wrap items-center gap-6">
           <div>

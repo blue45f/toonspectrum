@@ -10,6 +10,10 @@ const MAX_DOWNLOAD_BYTES = 32 * 1024 * 1024;
 const MAX_RESOURCE_BYTES = 8 * 1024 * 1024;
 const RESOURCE_TIMEOUT_MS = 12_000;
 const PREPARATION_TIMEOUT_MS = 30_000;
+const STANDALONE_OFFLINE_HTML_URLS = new Set([
+  "/offline-draw/index.html",
+  "/offline-draw/portable.html",
+]);
 
 export interface StudioOfflinePreparationOptions {
   readonly origin: string;
@@ -29,7 +33,8 @@ function usable(url: string, response: Response, shellUrls: readonly string[]): 
   if (!response.ok || response.status === 206 || response.redirected) return false;
   const mime = response.headers.get("content-type")?.toLowerCase() ?? "";
   // SPA error pages must never be accepted as JavaScript, fonts, or dictionaries.
-  if (mime.includes("text/html")) return false;
+  // The reviewed emergency drawing documents are intentional standalone HTML.
+  if (mime.includes("text/html") && !STANDALONE_OFFLINE_HTML_URLS.has(url)) return false;
   if (/\.m?js$/u.test(url) && !/(?:javascript|ecmascript)/u.test(mime)) return false;
   if (url.endsWith(".css") && !mime.includes("text/css")) return false;
   if (url.endsWith(".json") && !mime.includes("json")) return false;

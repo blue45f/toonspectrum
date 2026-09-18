@@ -142,9 +142,9 @@ async function folderHidden(hidden: boolean, timeoutMs?: number): Promise<void> 
 
 async function capture(name: string): Promise<void> {
   await layers();
-  await comps.getByRole("button", { name: "새 콤프", exact: true }).click();
-  await comps.getByRole("textbox", { name: "새 콤프 이름" }).fill(name);
-  await comps.getByRole("button", { name: "저장", exact: true }).click();
+  await comps.getByRole("button", { name: "현재 보기 저장", exact: true }).click();
+  await comps.getByRole("textbox", { name: "저장할 보기 이름" }).fill(name);
+  await comps.getByRole("button", { name: "보기 저장", exact: true }).click();
   await savedPage(state => state.layerComps?.some(comp => comp.name === name) === true);
 }
 
@@ -275,11 +275,11 @@ try {
       await layers();
       const name = "QA 즉시 캡처";
       if (!update) {
-        await comps.getByRole("button", { name: "새 콤프", exact: true }).click();
-        await comps.getByRole("textbox", { name: "새 콤프 이름" }).fill(name);
+        await comps.getByRole("button", { name: "현재 보기 저장", exact: true }).click();
+        await comps.getByRole("textbox", { name: "저장할 보기 이름" }).fill(name);
       }
-      const action = update ? compRow(name).getByTitle("현재 레이어 상태로 업데이트")
-        : comps.getByRole("button", { name: "저장", exact: true });
+      const action = update ? compRow(name).getByTitle("현재 레이어 상태로 덮어쓰기")
+        : comps.getByRole("button", { name: "보기 저장", exact: true });
       await action.scrollIntoViewIfNeeded();
       const pointerupAt = await draw(update ? 0.15 : 0.07);
       await action.click();

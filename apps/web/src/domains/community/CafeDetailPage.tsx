@@ -22,11 +22,20 @@ import type { CommunityCafe } from "@/shared/lib/types";
 
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
+import { SharePageButton } from "@/shared/components/share-page-button";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
+import {
+  canShareCommunityCafe,
+  compactPublicShareDescription,
+} from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import {
+  useDocumentTitle,
+  useMetaDescription,
+  usePageSocialMeta,
+} from "@/hooks/use-document-title";
 import { api, apiPath, getApiErrorMessage } from "@/infrastructure/api";
 
 export function CafeDetailPage() {
@@ -50,7 +59,25 @@ export function CafeDetailPage() {
   const [inviteCode, setInviteCode] = useState(() => searchParams.get("invite") ?? "");
   const [refreshTick, setRefreshTick] = useState(0);
 
+  const shareable = cafe ? canShareCommunityCafe(cafe) : false;
+  const sharePath = slug ? `/community/cafes/${encodeURIComponent(slug)}` : "/community/cafes";
+  const shareDescription = compactPublicShareDescription(
+    shareable ? cafe?.description : null,
+    "웹툰 창작자와 독자가 함께 이야기하는 공개 커뮤니티입니다.",
+  );
+  const publicMetaTitle = shareable && cafe ? cafe.name : "회원 커뮤니티";
+  const publicMetaDescription = shareable
+    ? shareDescription
+    : "웹툰 창작자와 독자가 함께 이야기하는 회원 커뮤니티입니다.";
+
   useDocumentTitle(cafe ? cafe.name : notFound ? "커뮤니티를 찾을 수 없어요" : "커뮤니티");
+  useMetaDescription(cafe ? publicMetaDescription : null);
+  usePageSocialMeta({
+    canonicalPath: sharePath,
+    title: publicMetaTitle,
+    description: publicMetaDescription,
+    type: "website",
+  });
 
   useEffect(() => {
     const fromQuery = searchParams.get("invite");
@@ -195,6 +222,16 @@ export function CafeDetailPage() {
           </div>
 
           <div className="w-full max-w-xs space-y-2 sm:w-auto">
+            {shareable && (
+              <SharePageButton
+                path={sharePath}
+                text={cafe.name}
+                description={shareDescription}
+                label="커뮤니티 공유"
+                actionLabel="커뮤니티 보기"
+                className="w-full justify-center rounded-lg"
+              />
+            )}
             {canManage && (
               <Link href={`/community/cafes/${encodeURIComponent(cafe.slug)}/manage`} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-xs font-semibold text-accent"><Settings size={14} />운영 관리</Link>
             )}

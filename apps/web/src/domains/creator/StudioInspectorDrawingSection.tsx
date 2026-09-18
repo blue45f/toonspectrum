@@ -481,7 +481,7 @@ export function StudioInspectorDrawingSection({
                 ) : null}
 
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
-                  <StudioInspectorSection sectionId="tool.brush-studio" loadingLabel="브러시 스튜디오를 여는 중...">
+                  <StudioInspectorSection sectionId="tool.brush-studio" loadingLabel="현재 브러시 편집을 여는 중...">
                   <Suspense fallback={<div className="h-40 animate-pulse rounded-xl bg-raised/35 motion-reduce:animate-none" aria-hidden />}>
                     <StudioBrushStudio
                       brushId={brush}

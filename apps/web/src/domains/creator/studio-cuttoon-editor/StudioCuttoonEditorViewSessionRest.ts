@@ -64,8 +64,6 @@ export type StudioCuttoonEditorViewSessionRest = {
   scrollPos: any;
   scrollPreviewOpen: any;
   scrollViewportStore: any;
-  selectOptionsLaneReserved: any;
-  selectOptionsStripArmed: any;
   selected: any;
   selectedBg3dEditSource: any;
   selectedBubbleTailGeometry: any;

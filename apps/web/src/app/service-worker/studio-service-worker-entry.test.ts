@@ -6,7 +6,12 @@ const BUILD_ID = "testbuild001";
 const PRECACHE = `toonspectrum-sw-precache-v5-${BUILD_ID}`;
 const MANIFEST = {
   buildId: BUILD_ID, shellUrls: ["/", "/studio"],
-  criticalUrls: ["/assets/index-abc.js", "/assets/index-abc.css"],
+  criticalUrls: [
+    "/assets/index-abc.js",
+    "/assets/index-abc.css",
+    "/bootstrap-compat.js",
+    "/offline-draw/bootstrap.js",
+  ],
   warmUrls: ["/i18n/studio/mainMenu/ko.json"],
   offlineUrls: ["/assets/pen-def.js"],
 };
@@ -118,7 +123,9 @@ describe("install", () => {
     harness.setNetwork(async (url) => assetResponse(url));
     await loadWorker(); await harness.dispatch("install");
     const precache = harness.caches.entries(PRECACHE);
-    expect(precache).toHaveLength(4); expect(precache).toContain(`${ORIGIN}/studio`);
+    expect(precache).toHaveLength(6); expect(precache).toContain(`${ORIGIN}/studio`);
+    expect(precache).toContain(`${ORIGIN}/bootstrap-compat.js`);
+    expect(precache).toContain(`${ORIGIN}/offline-draw/bootstrap.js`);
     expect(harness.fetchCalls).toContain(`${ORIGIN}/offline-drawing`);
     expect(harness.fetchCalls).not.toContain(`${ORIGIN}/offline-drawing.html`);
     expect(harness.counters.skipWaiting).toBe(0);
@@ -166,6 +173,32 @@ describe("fetch routing", () => {
     const { response } = await harness.dispatch("fetch", { request: new Request(`${ORIGIN}/assets/index-abc.js`) });
     expect(await response?.text()).toBe("critical bundle"); expect(harness.fetchCalls).toEqual([]);
   });
+  it("serves stable bootstrap code from the build precache while offline", async () => {
+    harness.caches.seed(PRECACHE, "/bootstrap-compat.js", new Response("cached bootstrap"));
+    harness.setNetwork(async () => { throw new Error("offline"); });
+    await loadWorker();
+    const { response } = await harness.dispatch("fetch", {
+      request: new Request(`${ORIGIN}/bootstrap-compat.js`),
+    });
+    expect(await response?.text()).toBe("cached bootstrap");
+    expect(harness.fetchCalls).toEqual([]);
+  });
+
+  it("uses the build precache for legacy emergency drawing before network fallback", async () => {
+    harness.caches.seed(
+      PRECACHE,
+      "/offline-draw/bootstrap.js",
+      new Response("cached emergency bootstrap"),
+    );
+    harness.setNetwork(async () => { throw new Error("offline"); });
+    await loadWorker();
+    const { response } = await harness.dispatch("fetch", {
+      request: new Request(`${ORIGIN}/offline-draw/bootstrap.js`),
+    });
+    expect(await response?.text()).toBe("cached emergency bootstrap");
+    expect(harness.fetchCalls).toEqual([]);
+  });
+
   it("re-fetches a worker asset cached without CORP instead of replaying it", async () => {
     harness.caches.seed("toonspectrum-sw-immutable-v5", "/assets/studio-engine.worker-abc123.js", new Response("stale worker without CORP"));
     harness.setNetwork(async () => new Response("repaired", { headers: { "cross-origin-resource-policy": "same-origin" } }));

@@ -275,7 +275,7 @@ describe("복구 가이드", () => {
 
 /* ------------------------------------------------------------- 용어 사전 */
 
-describe("CSP · Photoshop 용어 사전", () => {
+describe("다른 앱 용어 사전", () => {
   it("카탈로그 별칭에서 파생된다 — 손으로 적은 목록이 아니다", () => {
     const rows = studioTerminologyRows();
     expect(rows.length).toBeGreaterThan(400);

@@ -51,9 +51,12 @@ try {
 
     await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/studio/new");
     await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/production");
-    await expect(page.locator(".cf-hero-links a")).toHaveAttribute("href", "/studio/projects");
-    await expect(page.locator(".ch-jump-nav a")).toHaveCount(4);
-    await expect(page.locator(".cf-jump-nav a")).toHaveCount(3);
+    await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toHaveCount(1);
+    await expect(page.locator('.cf-hero-links a[href="/brand-film"]')).toHaveCount(1);
+    await expect(page.locator(".cf-jump-nav a")).toHaveCount(4);
+    for (const href of ["#creator-start", "#creator-flow", "#creator-principles", "#creator-support"]) {
+      await expect(page.locator(`.cf-jump-nav a[href="${href}"]`)).toHaveCount(1);
+    }
     await expect(page.locator(".cf-start-card")).toHaveCount(4);
     await expect(page.locator(".cf-flow li a")).toHaveCount(6);
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
@@ -77,16 +80,21 @@ try {
     await expect(page).toHaveURL(/#creator-process-title$/);
     await expect(processTitle).toBeFocused();
 
-    const processLink = page.locator('.ch-jump-nav a[href="#creator-process-title"]');
+    const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
     await processLink.focus();
     await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/#creator-flow$/);
+    await expect(processTitle).toBeFocused();
+    await processLink.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/#creator-flow$/);
     await expect(processTitle).toBeFocused();
 
     assert.equal(await page.locator("video").count(), 0);
     assert.deepEqual(mediaRequests, [], "The all-in-one homepage must not mount or download a video");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     for (const control of await page.locator(
-      ".cf-actions a,.cf-start-card,.cf-flow li a,.cf-support-grid a,.ch-jump-nav a,.cf-jump-nav a",
+      ".cf-actions a,.cf-start-card,.cf-flow li a,.cf-support-grid a,.cf-jump-nav a",
     ).all()) {
       const box = await control.boundingBox();
       assert(box && box.height >= 44, "Homepage navigation controls must keep the 44px touch target");

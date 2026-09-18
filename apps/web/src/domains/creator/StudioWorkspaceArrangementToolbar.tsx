@@ -56,7 +56,11 @@ export function StudioWorkspaceArrangementToolbar({ disabled = false }: { readon
   );
   if (disabled) return null;
   return (
-    <div data-studio-workspace-arrangement="true" className="pointer-events-auto fixed bottom-3 right-3 z-[69] hidden max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-xl border border-line-strong bg-panel/95 p-1.5 text-fg shadow-xl lg:flex">
+    <div
+      data-studio-workspace-arrangement="true"
+      data-studio-shell-floating-target="workspace-arrangement"
+      className="pointer-events-auto fixed bottom-3 right-3 z-[69] hidden max-w-[calc(100vw-1.5rem)] flex-col gap-1 rounded-xl border border-line-strong bg-panel/95 p-1.5 text-fg shadow-xl lg:flex"
+    >
       <button ref={launcher} type="button" disabled={busy} aria-busy={busy} aria-pressed={false} className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg disabled:cursor-wait disabled:opacity-40 ${STUDIO_FOCUS_RING}`} onClick={() => void open()}>
         <LayoutGrid size={15} aria-hidden />{busy ? "배치 도구 여는 중…" : "배치 편집"}
       </button>
