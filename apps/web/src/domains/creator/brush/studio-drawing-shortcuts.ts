@@ -18,6 +18,8 @@ export type StudioDrawingShortcut =
   | { type: "recall-brush-slot"; index: number }
   /** Toggle canvas-first chrome (Backquote; Tab stays native browser navigation). */
   | { type: "toggle-chrome" }
+  /** Open the cursor-near six-slot Quick HUD. */
+  | { type: "open-quick-hud" }
   /** CSP / Photoshop: swap primary ↔ secondary color (X). */
   | { type: "swap-colors" }
   /** CSP / Photoshop: reset to ink black / paper white (D). */
@@ -70,6 +72,7 @@ const REGISTRY_DRAWING_DEFAULTS: ReadonlyArray<{
   { id: "tool-eraser", defaultChord: "E" },
   { id: "swap-colors", defaultChord: "X" },
   { id: "toggle-chrome", defaultChord: "`" },
+  { id: "quick-hud", defaultChord: "Shift+Space" },
   { id: "flip-canvas", defaultChord: "H" },
   { id: "brush-smaller", defaultChord: "[" },
   { id: "brush-larger", defaultChord: "]" },
@@ -161,6 +164,9 @@ function resolveFromRegistry(
     if (matchRegistryAction(shortcuts, "toggle-chrome", event)) {
       return { type: "toggle-chrome" };
     }
+    if (matchRegistryAction(shortcuts, "quick-hud", event)) {
+      return { type: "open-quick-hud" };
+    }
     if (matchRegistryAction(shortcuts, "flip-canvas", event)) {
       return { type: "toggle-canvas-flip-h" };
     }
@@ -231,6 +237,7 @@ export function resolveStudioDrawingShortcut(
   const allowEraser = hardcodeAllowed(shortcuts, "tool-eraser");
   const allowSwap = hardcodeAllowed(shortcuts, "swap-colors");
   const allowChrome = hardcodeAllowed(shortcuts, "toggle-chrome");
+  const allowQuickHud = hardcodeAllowed(shortcuts, "quick-hud");
   const allowFlip = hardcodeAllowed(shortcuts, "flip-canvas");
   const allowBrushSmaller = defaultBrushHardcodeAllowed(shortcuts, "brush-smaller", "[");
   const allowBrushLarger = defaultBrushHardcodeAllowed(shortcuts, "brush-larger", "]");
@@ -257,6 +264,9 @@ export function resolveStudioDrawingShortcut(
   // Backquote toggles canvas chrome. Tab must remain native focus navigation.
   if (allowChrome && code === "Backquote" && !event.altKey && !event.shiftKey && !event.repeat) {
     return { type: "toggle-chrome" };
+  }
+  if (allowQuickHud && code === "Space" && event.shiftKey && !event.altKey && !event.repeat) {
+    return { type: "open-quick-hud" };
   }
 
   // CSP / Photoshop color keys (no modifiers — Cmd+D remains the Edit deselect command).

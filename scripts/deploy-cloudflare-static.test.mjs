@@ -110,6 +110,7 @@ describe("Cloudflare static deployment origin contract", () => {
     for (const origin of [
       "http://social.example.test",
       "https://social.example.test/private",
+      // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
       "https://user:opaque@social.example.test",
     ]) {
       const { result, commands } = runDeploy({

@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioColorProofLauncher } from "./color/StudioColorProofContext";
 // 페이지 전체 색보정 패널 — 페이지 그레이드(밝기/대비/채도/색조/세피아/흑백/비네트)
 // 슬라이더 + 무드 프리셋 칩. 표시 전용(로컬 상태 없음): 값은 grade로 받고 변경은 콜백으로 위임한다.
@@ -54,17 +55,16 @@ export function StudioPageGradePanel({
       <StudioColorProofLauncher />
       {/* 헤더 + 초기화(기본값일 땐 비활성) */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">페이지 색보정 (전체 톤)</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioPageGradePanel", "ko", "페이지 색보정 (전체 톤)")}</p>
         <button
           type="button"
           onClick={onReset}
           disabled={isDefault}
-          title="페이지 색보정 초기화"
+          title={translateCurrentStaticSourceText("domains.creator.StudioPageGradePanel", "ko", "페이지 색보정 초기화")}
           className={buttonClass({ variant: "quiet", size: "sm", className: "h-7 gap-1 px-2 text-xs" })}
         >
           <RotateCcw className="size-3.5" aria-hidden />
-          초기화
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioPageGradePanel", "ko", "초기화")}</button>
       </div>
 
       {/* 무드 프리셋 칩 — 클릭 시 프리셋 grade 전체를 적용 */}

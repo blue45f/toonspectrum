@@ -77,6 +77,7 @@ for (const [input, expected] of [
   ["http://[::1]:4001/", "http://[::1]:4001"],
 ]) test(`base URL keeps supported transport and prefix: ${input}`, () => assert.equal(normalizeUploadBaseUrl(input), expected));
 
+// secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
 for (const input of ["http://127.evil.test", "http://127.0.0.1.evil.test", "http://localhost.evil.test", "https://example.test\u0000", "http://example.test", "https://user:secret@example.test", "https://example.test?token=secret",
   "https://example.test#secret", "file:///private", "data:text/plain,secret", "not-a-url", "https://example.test\\private", "https://exam\nple.test", " https://example.test"]) {
   test(`unsafe/ambiguous base is rejected without echoing it: ${JSON.stringify(input)}`, () => {

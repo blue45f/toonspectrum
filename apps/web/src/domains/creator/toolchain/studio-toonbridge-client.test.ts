@@ -41,6 +41,7 @@ describe("Studio ToonBridge client", () => {
       token: TOKEN,
     })).toThrow(/HTTPS/u);
     expect(() => validateStudioToonBridgeSettings({
+      // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
       baseUrl: "http://user:pass@127.0.0.1:49631",
       token: TOKEN,
     })).toThrow(/자격증명/u);

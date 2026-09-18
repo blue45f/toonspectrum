@@ -6,7 +6,7 @@ A deterministic, silent 24-second brand film using original repository artwork a
 
 Use Node 24 and install Korean system fonts (`fonts-noto-cjk` on Ubuntu). Run `npm --prefix media/brand-film ci`, then `npm --prefix media/brand-film run typecheck` and `npm --prefix media/brand-film run render -- all`. The first render may download Chrome Headless Shell through Remotion. `landscape`, `portrait` or `square` may be selected instead of `all`.
 
-Outputs live in `public/brand`: three H.264 MP4s (1280×720, 720×1280, 1080×1080), poster JPG, 1200×630 sharing PNG, KO/EN VTT, and SHA-256 manifest. A selected-format run replaces that rendition and refreshes poster/sharing artwork; untouched rendition entries continue to describe the previously generated files.
+Outputs live in `apps/web/public/brand`: three H.264 MP4s (1280×720, 720×1280, 1080×1080), a dedicated high-quality 1920×768 route-header MP4, poster JPG, 1200×630 sharing PNG, KO/EN VTT, and SHA-256 manifest. A selected-format run replaces that rendition and refreshes poster/sharing artwork; untouched rendition entries continue to describe the previously generated files.
 
 `npm --prefix media/brand-film run studio` opens the Remotion editing preview. The website does not import this package or Remotion runtime. System fonts are build dependencies and are not shared as font files.
 

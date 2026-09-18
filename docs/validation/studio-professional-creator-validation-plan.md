@@ -55,3 +55,35 @@
 ## 6. 판정 원칙
 
 실제 참가자 실행과 서명된 결과가 없으면 `PR-057`은 `external-validation-required`로 유지한다. 자동 테스트, 내부 스크린샷 또는 개발자 자체 사용은 전문 창작자 검증을 대체하지 않는다.
+
+## Automated A–D prerequisite gate
+
+External sessions start only after `pnpm run verify:studio-reference-projects` passes. The automated gate runs four deterministic project suites:
+
+- A · solo vertical webtoon: project creation, durable resume, lettering and publish package
+- B · team production: role gates, exact ProjectGraph revision binding, review and comment re-anchoring
+- C · PSD and CLIP interchange: import, editable text, adjustment graph, selection round-trip and loss reporting
+- D · editable 3D production: scene document, camera, multi-pass output, archive restore and VRM editing
+
+The gate records evidence hashes and explicitly leaves `professionalReplacementClaimAllowed=false`. Passing it is a prerequisite, not a substitute, for signed participant evidence.
+
+Before participant sessions, `pnpm run verify:studio-operational-validation` must also pass. That gate verifies bounded performance planning, committed historical soak evidence and its leak negative control, deterministic failure recovery, file round-trip contracts, accessibility, CSP and dependency-security policy. Its receipt keeps current-commit long soak, physical device/browser faults and professional replacement claims disabled.
+
+## 7. 실행 패키지와 제출 형식
+
+검증 운영자는 다음 순서로 실행한다.
+
+1. `docs/validation/studio-professional-creator-validation-protocol.json`의 역할·과제·통과 임계값을 검토한다.
+2. `docs/validation/studio-professional-creator-validation-template.json`의 익명 참가자 슬롯을 실제 세션 기록으로 채운 별도 evidence JSON을 만든다.
+3. 서명 원본과 작품 원본은 접근 통제된 외부 저장소에 보관하고, evidence JSON에는 파일의 SHA-256만 기록한다.
+4. 다음 명령으로 구조, 역할별 인원, 7개 과제, 장치 정보, 결과 checksum, 참가자별 독립 서명과 통과 임계값을 검증한다.
+
+```bash
+node scripts/verify-studio-professional-validation.mjs \
+  --evidence /secure/path/studio-professional-evidence.json \
+  --receipt qa-results/studio-professional-validation/receipt.json
+```
+
+검증기는 참가자 12명과 역할별 최소 인원, 84개 과제 결과, 데이터 유실·게시 사전검사·PSD 손실 보고 불일치, SUS 중앙값, 치명적 접근성·보안 결함을 집계한다. 참가자와 코디네이터의 서명 파일 checksum이 모두 독립적이지 않거나 임계값 하나라도 충족하지 못하면 종료 코드가 실패하고 대체 완료 문구는 계속 차단된다.
+
+저장소 CI는 protocol과 빈 template, 판정 로직을 검증하지만 실제 참가자 evidence를 생성하거나 통과로 가장하지 않는다. 최종 receipt의 `receiptSha256`, 원본 evidence checksum, 외부 서명 파일은 동일한 검증 실행 기록으로 보관한다.

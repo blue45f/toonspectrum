@@ -5,6 +5,7 @@
  * one pressure authority at the input boundary:
  *
  * - valid stylus/force-touch pressure keeps precedence;
+ * - tiny low-speed hardware-pressure jitter is damped without delaying deliberate changes;
  * - mouse and ordinary touch use the family profile's speed response;
  * - the first non-pressure point and velocity-disabled input retain the exact nominal width;
  * - the historical 0.75 speed-response span is preserved while adding temporal low-pass filtering.
@@ -102,6 +103,17 @@ const profileByVelocityState = new WeakMap<
 >();
 let activeStrokePressureProfile = DEFAULT_STUDIO_STYLUS_PRESSURE_PROFILE;
 
+/**
+ * Dedicated art apps benefit from stable slow inking, but a pressure filter must never make fast
+ * flicks or intentional pressure ramps feel rubber-banded. Keep this envelope deliberately narrow:
+ * only small adjacent changes at low pointer speed are eased. Zero/light contacts and larger
+ * expressive changes remain exact hardware input.
+ */
+const HARDWARE_PRESSURE_JITTER_DELTA = 0.14;
+const HARDWARE_PRESSURE_EDGE = 0.02;
+const HARDWARE_PRESSURE_SMOOTHING_MS = 9;
+const HARDWARE_PRESSURE_FAST_RATIO = 0.8;
+
 function finiteOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -112,6 +124,44 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function clamp01(value: unknown, fallback: number): number {
   return clamp(finiteOr(value, fallback), 0, 1);
+}
+
+function stabilizeHardwarePressure(
+  previousState: StudioVelocityPressureState | null | undefined,
+  sample: StudioVelocityPressureSample,
+  targetPressure: number,
+  velocityForMinimumPressure: number,
+): number {
+  if (!previousState?.hasPosition || sample.hardwarePressure === null) return targetPressure;
+
+  const previousPressure = clamp01(previousState.filteredPressure, targetPressure);
+  const target = clamp01(targetPressure, previousPressure);
+  const delta = Math.abs(target - previousPressure);
+  if (
+    delta === 0
+    || delta >= HARDWARE_PRESSURE_JITTER_DELTA
+    || target <= HARDWARE_PRESSURE_EDGE
+    || previousPressure <= HARDWARE_PRESSURE_EDGE
+  ) {
+    return target;
+  }
+
+  const speedScale = Math.max(0.001, finiteOr(velocityForMinimumPressure, 1.6));
+  const speedRatio = clamp(sample.rawVelocity / speedScale, 0, 1);
+  if (speedRatio >= HARDWARE_PRESSURE_FAST_RATIO) return target;
+
+  // Slow detail strokes receive the full ~9 ms time constant. As speed rises the filter rapidly
+  // approaches transparency, preserving the direct feel of flicks, hatching and fast linework.
+  const response = 1 - speedRatio / HARDWARE_PRESSURE_FAST_RATIO;
+  const smoothingMs = HARDWARE_PRESSURE_SMOOTHING_MS * response * response;
+  if (smoothingMs <= 0.5 || sample.elapsedMs <= 0) return target;
+
+  const alpha = clamp(
+    1 - Math.exp(-sample.elapsedMs / smoothingMs),
+    0,
+    1,
+  );
+  return clamp01(previousPressure + (target - previousPressure) * alpha, target);
 }
 
 /** Matches the workbench contact convention without device, brush-family or speed curves. */
@@ -191,6 +241,7 @@ export function advanceStudioBrushVelocityPressure(
     pointer.pressure,
     pressureProfile,
   );
+  const velocityForMinimumPressure = family?.maxVelocity ?? 1.6;
   const transition = advanceStudioVelocityPressure(
     state,
     { ...pointer, pressure: profiledPressure },
@@ -203,15 +254,14 @@ export function advanceStudioBrushVelocityPressure(
           * (family ? artistVelocitySensitivity : 1)
           * 0.75
         : 0,
-      velocityForMinimumPressure: family?.maxVelocity ?? 1.6,
+      velocityForMinimumPressure,
       minimumWidthRatio,
       pressureExponent,
       penPolicy: "hardware-precedence",
     },
   );
-  profileByVelocityState.set(transition.state, pressureProfile);
   const nonHardware = transition.sample.hardwarePressure === null;
-  const pressure = nonHardware
+  const targetPressure = nonHardware
     && (transition.sample.source === "nominal" || !velocityEnabled)
     // Nominal cursor width is not a simulated pressure sample: pressure curves and min-size floors
     // must not make the first stationary mouse/touch point thicker or thinner.
@@ -222,10 +272,25 @@ export function advanceStudioBrushVelocityPressure(
       // light deposit even when a stylus reports pressure near zero.
       ? transition.sample.pressure
       : transition.sample.widthRatio;
+  const pressure = stabilizeHardwarePressure(
+    state,
+    transition.sample,
+    targetPressure,
+    velocityForMinimumPressure,
+  );
+
+  // For hardware input, carry the exact canonical value returned by this adapter into the next
+  // transition. The lower-level sample intentionally remains raw diagnostic evidence; renderers
+  // and persistence consume `pressure`, so a prediction/replay can inspect both without applying
+  // the stabilizer twice.
+  const outputState = transition.sample.hardwarePressure !== null
+    ? Object.freeze({ ...transition.state, filteredPressure: pressure })
+    : transition.state;
+  profileByVelocityState.set(outputState, pressureProfile);
 
   return Object.freeze({
     version: STUDIO_BRUSH_VELOCITY_PRESSURE_ADAPTER_VERSION,
-    state: transition.state,
+    state: outputState,
     sample: transition.sample,
     pressure,
   });

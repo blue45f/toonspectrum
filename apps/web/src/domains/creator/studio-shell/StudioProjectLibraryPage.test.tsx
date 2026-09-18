@@ -6,6 +6,10 @@ import { MemoryRouter } from "react-router-dom";
 
 import { serializeStudioAutosave, studioAutosaveKey } from "../studio-autosave";
 import {
+  studioExactResumeStorageKey,
+  writeStudioExactResumeContext,
+} from "../studio-exact-resume-context";
+import {
   ensureInitialStudioProjectDocument,
   studioProjectDocumentStorageKey,
 } from "../studio-project-document-store";
@@ -131,6 +135,52 @@ describe("StudioProjectLibraryPage", () => {
     expect(screen.getByText("최근 자동 저장")).toBeTruthy();
   });
 
+  it("continues from the exact document page, selection and viewport context", async () => {
+    const project = createStudioProject(window.localStorage, {
+      id: "series-resume",
+      title: "이어보기 작품",
+      kind: "webtoon",
+      createdAt: "2026-09-12T00:00:00.000Z",
+    });
+    const document = ensureInitialStudioProjectDocument(window.localStorage, {
+      projectId: project.id,
+      projectTitle: project.title,
+      projectKind: project.kind,
+      createdAt: "2026-09-12T00:00:00.000Z",
+    });
+    markStudioProjectOpened(window.localStorage, project.id, document.id, {
+      at: "2026-09-17T09:00:00.000Z",
+    });
+    writeStudioExactResumeContext(window.localStorage, {
+      projectId: project.id,
+      documentId: document.id,
+      workspace: "comic",
+      pageId: "page-8",
+      selectedElementIds: ["bubble-4"],
+      zoom: 1.4,
+      scrollLeft: 220,
+      scrollTop: 1_620,
+      tool: "select",
+      drawMode: "pen",
+      focus: "cut:44",
+      language: "ko-KR",
+      sourceVersion: "approved-9",
+      updatedAt: "2026-09-17T09:01:00.000Z",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/studio"]}>
+        <StudioProjectLibraryPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("최근 위치 기억됨")).toBeTruthy();
+    expect(screen.getByText("page-8 · 확대 140% · 선택 1개")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "이어서 작업" }).getAttribute("href")).toBe(
+      `/studio/p/${project.id}/d/${document.id}?focus=cut%3A44&language=ko-KR&resume=latest&version=approved-9&workspace=comic`,
+    );
+  });
+
   it("restores every project from Trash in one action", async () => {
     for (const [id, title] of [["series-alpha", "복원할 작품 A"], ["series-beta", "복원할 작품 B"]] as const) {
       createStudioProject(window.localStorage, {
@@ -156,16 +206,30 @@ describe("StudioProjectLibraryPage", () => {
   });
 
   it("selects multiple Trash projects and permanently deletes their related metadata after confirmation", async () => {
+    const resumeKeys: string[] = [];
     for (const [id, title] of [["series-alpha", "삭제할 작품 A"], ["series-beta", "삭제할 작품 B"]] as const) {
-      createStudioProject(window.localStorage, {
+      const project = createStudioProject(window.localStorage, {
         id,
         title,
         kind: "webtoon",
         createdAt: "2026-09-12T00:00:00.000Z",
       });
+      const document = ensureInitialStudioProjectDocument(window.localStorage, {
+        projectId: project.id,
+        projectTitle: project.title,
+        projectKind: project.kind,
+        createdAt: "2026-09-12T00:00:00.000Z",
+      });
+      writeStudioExactResumeContext(window.localStorage, {
+        projectId: project.id,
+        documentId: document.id,
+        workspace: document.defaultWorkspace,
+        pageId: "page-1",
+        updatedAt: "2026-09-12T00:00:30.000Z",
+      });
+      resumeKeys.push(studioExactResumeStorageKey(project.id, document.id));
       trashStudioProject(window.localStorage, id, { at: "2026-09-12T00:01:00.000Z" });
       ensureStudioSaveProfile(window.localStorage, id, { provider: "browser" });
-      window.localStorage.setItem(studioProjectDocumentStorageKey(id), JSON.stringify({ schemaVersion: 1 }));
     }
 
     render(
@@ -185,5 +249,6 @@ describe("StudioProjectLibraryPage", () => {
     expect(Object.keys(readStudioSaveProfiles(window.localStorage).profiles)).toHaveLength(0);
     expect(window.localStorage.getItem(studioProjectDocumentStorageKey("series-alpha"))).toBeNull();
     expect(window.localStorage.getItem(studioProjectDocumentStorageKey("series-beta"))).toBeNull();
+    expect(resumeKeys.every((key) => window.localStorage.getItem(key) === null)).toBe(true);
   });
 });

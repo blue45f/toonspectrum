@@ -12,15 +12,38 @@
     "verbatimModuleSyntax": false,
     "baseUrl": ".",
     "paths": {
-      "@toonspectrum/core": ["../../packages/core/src/index.ts"],
-      "@toonspectrum/core/*": ["../../packages/core/src/*"]
+      "@toonspectrum/core": [
+        "../../packages/core/src/index.ts"
+      ],
+      "@toonspectrum/core/*": [
+        "../../packages/core/src/*"
+      ],
+      "@toonspectrum/studio-project-model": [
+        "../../packages/studio-project-model/src/index.ts"
+      ],
+      "@toonspectrum/studio-project-model/*": [
+        "../../packages/studio-project-model/src/*"
+      ],
+      "@toonspectrum/studio-format-gateway": [
+        "../../packages/studio-format-gateway/src/index.ts"
+      ],
+      "@toonspectrum/studio-format-gateway/*": [
+        "../../packages/studio-format-gateway/src/*"
+      ]
     },
     "outDir": "dist",
     "rootDir": "../..",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "sourceMap": true,
     "noEmitOnError": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
+  ]
 }

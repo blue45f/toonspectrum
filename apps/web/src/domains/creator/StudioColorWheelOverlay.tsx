@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // Krita 스타일 팝업 원형 색상 휠 — 캔버스를 길게 누르면 뜨는 최근 색 8개짜리 원형 퀵픽.
 // 기하/히트테스트는 studio-color-wheel.ts(순수, Konva/DOM 의존 없음)에 위임하고, 이 컴포넌트는
 // "열림 여부·중심점·색 목록을 받아 그리고, 골라진 색을 콜백으로 올려보내는" 표시 + 자체 완결
@@ -96,7 +100,7 @@ export function StudioColorWheelOverlay({ open, center, colors, onSelect, onClos
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       role="menu"
-      aria-label="최근 사용 색 빠른 선택"
+      aria-label={translateCurrentStaticSourceText("domains.creator.StudioColorWheelOverlay", "ko", "최근 사용 색 빠른 선택")}
     >
       <div className="absolute" style={{ left: center.x, top: center.y }}>
         {/* 중심 기준점 — 순수 시각적 표식(클릭 불가), 데드존 크기를 눈으로 가늠하게 해준다. */}
@@ -110,7 +114,7 @@ export function StudioColorWheelOverlay({ open, center, colors, onSelect, onClos
               type="button"
               role="menuitem"
               title={c}
-              aria-label={`최근 색 ${c} 선택`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioColorWheelOverlay", "ko", "최근 색 {v0} 선택"), { v0: String(c) })}
               onClick={(e) => {
                 // 포인터 클릭은 이미 부모 div로 버블링된 pointerup에서 처리됐다 — 여기서는
                 // 키보드 활성화(Enter/Space)만 처리한다. isKeyboardActivatedClick 상세 근거는

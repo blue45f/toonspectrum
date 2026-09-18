@@ -16,9 +16,29 @@ const projectStartPanel = readFileSync(
 );
 
 describe("Studio front door UX contract", () => {
-  it("keeps the existing project library home and integrates the task-first start panel", () => {
-    expect(projectHome).toContain('import { StudioProjectStartPanel } from "./StudioProjectStartPanel"');
-    expect(projectHome).toContain('controller.view === "active" ? <StudioProjectStartPanel locale={controller.locale} /> : null');
+  it("keeps the project library home and integrates role and task-first panels", () => {
+    expect(projectHome).toContain(
+      'import { StudioProjectStartPanel } from "./StudioProjectStartPanel"',
+    );
+    expect(projectHome).toContain(
+      'import { StudioRoleWorkspacePanel } from "./StudioRoleWorkspacePanel"',
+    );
+
+    const activeViewIndex = projectHome.indexOf('{controller.view === "active" ? (');
+    const rolePanelIndex = projectHome.indexOf(
+      "<StudioRoleWorkspacePanel",
+      activeViewIndex,
+    );
+    const startPanelIndex = projectHome.indexOf(
+      "<StudioProjectStartPanel",
+      rolePanelIndex,
+    );
+    const activeViewEndIndex = projectHome.indexOf(") : null}", startPanelIndex);
+
+    expect(activeViewIndex).toBeGreaterThanOrEqual(0);
+    expect(rolePanelIndex).toBeGreaterThan(activeViewIndex);
+    expect(startPanelIndex).toBeGreaterThan(rolePanelIndex);
+    expect(activeViewEndIndex).toBeGreaterThan(startPanelIndex);
     expect(projectStartPanel).toContain("기존 프로젝트는 아래에서 바로 이어서 작업할 수 있습니다");
   });
 

@@ -44,8 +44,11 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(page).toHaveTitle(/기획부터 연재까지/u);
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.locator("h1")).toContainText("기획부터 연재까지");
-    await expect(home.locator("img")).toHaveCount(3);
     await expect(home.locator(".cf-home-preview img")).toBeVisible();
+    await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
+    await expect(home.locator(".cf-intent-film img")).toBeVisible();
+    await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
+    await expect(home.locator(".cf-production-journey img")).toBeVisible();
     await expect(startCards).toHaveCount(4);
     await expect(primaryAction).toBeVisible();
 
@@ -70,7 +73,7 @@ for (const width of [320, 390, 820, 1440]) {
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "프로젝트·회차·컷·도구·소재 검색" }).click();
+  await page.getByRole("button", { name: "프로젝트·컷·도구·소재를 바로 찾기" }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
   await search.fill("비 오는 교실 배경");
@@ -155,4 +158,93 @@ test("new project flow explains a disabled start action and preserves the chosen
   );
   expect(hasNoHorizontalOverflow).toBe(true);
   await capturePageEvidence(page, testInfo, "studio-new-guided-320");
+});
+
+
+test("recent work reopens the exact Studio document and restores its viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/studio/new?kind=webtoon&template=webtoon-four-cut", {
+    waitUntil: "domcontentloaded",
+  });
+  await page.getByLabel("프로젝트 이름").fill("정확한 재개 검증 작품");
+  const start = page.getByRole("button", { name: /시작$/u }).last();
+  await expect(start).toBeEnabled();
+  await start.click();
+  await page.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u);
+
+  const createdUrl = new URL(page.url());
+  const documentPath = createdUrl.pathname;
+  const viewport = page.locator("[data-studio-canvas-viewport]").first();
+  await expect(viewport).toBeVisible({ timeout: 60_000 });
+
+  const canvasStatus = page.getByRole("group", { name: "캔버스 상태 및 보기" });
+  const zoomIn = page.getByRole("button", { name: "확대", exact: true });
+  for (let step = 0; step < 4; step += 1) await zoomIn.click();
+  const zoomPercent = await canvasStatus.getByText(/^\d+%$/u).textContent();
+  expect(zoomPercent).toMatch(/^\d+%$/u);
+
+  const expectedView = await viewport.evaluate((element) => {
+    const viewportElement = element as HTMLElement;
+    const maxLeft = Math.max(0, viewportElement.scrollWidth - viewportElement.clientWidth);
+    const maxTop = Math.max(0, viewportElement.scrollHeight - viewportElement.clientHeight);
+    viewportElement.scrollLeft = Math.round(maxLeft * 0.5);
+    viewportElement.scrollTop = Math.round(maxTop * 0.6);
+    viewportElement.dispatchEvent(new Event("scroll", { bubbles: true }));
+    return {
+      leftRatio: maxLeft > 0 ? viewportElement.scrollLeft / maxLeft : 0,
+      topRatio: maxTop > 0 ? viewportElement.scrollTop / maxTop : 0,
+    };
+  });
+  expect(expectedView.topRatio).toBeGreaterThan(0.3);
+  await page.waitForTimeout(1_100);
+
+  const storedCheckpoint = await page.evaluate(() => {
+    const raw = localStorage.getItem("toonstudio:studio-resume-checkpoints:v1");
+    return raw ? JSON.parse(raw) as {
+      checkpoints?: Array<{ pageId?: string; viewport?: { scrollY?: number; zoom?: number } }>;
+    } : null;
+  });
+  expect(storedCheckpoint?.checkpoints?.[0]?.pageId).toBeTruthy();
+  expect(storedCheckpoint?.checkpoints?.[0]?.viewport?.scrollY ?? 0).toBeGreaterThan(0.3);
+  expect(storedCheckpoint?.checkpoints?.[0]?.viewport?.zoom ?? 0).toBeGreaterThan(1);
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  const recent = page.locator(".cf-recent-card");
+  await expect(recent).toContainText(/문서의 마지막 페이지·선택·화면 위치/u);
+  const recentHref = await recent.getAttribute("href");
+  expect(recentHref).not.toBeNull();
+  const recentUrl = new URL(recentHref!, "https://toonstudio.test");
+  expect(recentUrl.pathname).toBe(documentPath);
+  expect(recentUrl.searchParams.get("token")).toBeNull();
+  expect(recentUrl.searchParams.get("room")).toBeNull();
+  expect(recentUrl.searchParams.get("startTool")).toBeNull();
+
+  await recent.click();
+  await page.waitForURL((url) => url.pathname === documentPath);
+  const restoredViewport = page.locator("[data-studio-canvas-viewport]").first();
+  await expect(restoredViewport).toBeVisible({ timeout: 60_000 });
+  await expect(
+    page.getByRole("group", { name: "캔버스 상태 및 보기" }).getByText(zoomPercent!, { exact: true }),
+  ).toBeVisible();
+
+  await expect.poll(async () => restoredViewport.evaluate((element) => {
+    const viewportElement = element as HTMLElement;
+    const maxTop = Math.max(0, viewportElement.scrollHeight - viewportElement.clientHeight);
+    return maxTop > 0 ? viewportElement.scrollTop / maxTop : 0;
+  })).toBeGreaterThan(0.3);
+  const restoredView = await restoredViewport.evaluate((element) => {
+    const viewportElement = element as HTMLElement;
+    const maxLeft = Math.max(0, viewportElement.scrollWidth - viewportElement.clientWidth);
+    const maxTop = Math.max(0, viewportElement.scrollHeight - viewportElement.clientHeight);
+    return {
+      leftRatio: maxLeft > 0 ? viewportElement.scrollLeft / maxLeft : 0,
+      topRatio: maxTop > 0 ? viewportElement.scrollTop / maxTop : 0,
+    };
+  });
+  expect(Math.abs(restoredView.leftRatio - expectedView.leftRatio)).toBeLessThan(0.12);
+  expect(Math.abs(restoredView.topRatio - expectedView.topRatio)).toBeLessThan(0.12);
+  expect(pageErrors).toEqual([]);
 });

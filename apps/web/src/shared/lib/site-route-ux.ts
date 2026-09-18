@@ -1,3 +1,4 @@
+import { defineBilingualAutoText } from "./i18n-bilingual-copy";
 import {
   canonicalSitePath,
   resolveSiteRouteMetadata,
@@ -9,10 +10,8 @@ export type SiteRouteMobilePolicy = "full" | "review" | "preview" | "desktop-req
 export type SiteRouteRecoveryPolicy = "none" | "resume-recent" | "preserve-draft" | "restore-revision";
 export type SiteRouteAudience = "solo-creator" | "team" | "specialist" | "reviewer" | "reader";
 
-export interface SiteRouteUxText {
-  readonly ko: string;
-  readonly en: string;
-}
+/** Global i18n key for route-level user-facing copy. */
+export type SiteRouteUxText = string;
 
 export interface SiteRouteUxContract {
   readonly canonicalPath: string;
@@ -29,7 +28,8 @@ interface SiteRouteUxOverride extends Omit<SiteRouteUxContract, "canonicalPath">
   readonly matches: (pathname: string) => boolean;
 }
 
-const text = (ko: string, en: string): SiteRouteUxText => ({ ko, en });
+const text = (ko: string, en: string): SiteRouteUxText =>
+  defineBilingualAutoText("siteRouteUx", ko, en);
 const exact = (route: string) => (pathname: string) => pathname === route;
 const family = (route: string) => (pathname: string) => pathname === route || pathname.startsWith(`${route}/`);
 

@@ -1,373 +1,256 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { REQUIRED_CORE_GATES } from "./ci-core-gate.mjs";
+import {
+  loadRequiredTargets,
+  resolveRequiredTargets,
+} from "./run-core-vitest.mjs";
 
-// Support both the complete Vitest suite and a small standalone Node gate.
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const requiredTargets = readFileSync(
+  new URL("./ci-required-vitest-targets.txt", import.meta.url),
+  "utf8",
+).trim().split(/\r?\n/).filter(Boolean);
+const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const jobs = source.slice(source.indexOf("\njobs:\n") + 7).split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m);
+
 function job(name) {
   const block = jobs.find((entry) => entry.startsWith(`  ${name}:\n`));
   assert.ok(block, `missing job: ${name}`);
   return block;
 }
 
-// This is a minimum protected set, not an exact total. Additional coverage is
-// welcome; deleting or moving a protected suite requires an explicit review.
-const requiredRegressions = Object.freeze([
-  "apps/web/src/app/app-floating-controls-startup.test.ts",
-  "scripts/verify-studio-engine-editor-entry.test.ts",
-  "scripts/verify-studio-hokusai-live-integration.test.ts",
-  "scripts/verify-studio-living-ink-integration.test.ts",
-  "scripts/verify-studio-hybrid-dcc-integration.test.ts",
-  "scripts/verify-studio-hybrid-dcc-opfs-race.test.ts",
-  "apps/web/src/domains/creator/studio-editor-document-source.test.ts",
-  "apps/web/src/domains/creator/canvas/StudioRecoveryNotice.test.tsx",
-  "apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts",
-  "apps/web/src/domains/creator/studio-workspace-route.test.ts",
-  "apps/web/src/domains/creator/studio-production/studio-production-scope.test.ts",
-  "apps/web/src/domains/creator/studio-production/StudioProductionHubPage.scope.test.tsx",
-  "apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts",
-  "apps/web/src/domains/creator/studio-router/studio-route-manifest.home-boundary.test.ts",
-  "apps/web/src/domains/creator/studio-router/StudioRouteCollaborationGateway.test.tsx",
-  "apps/web/src/domains/creator/studio-router/studio-production-command-center-boundary.test.ts",
-  "apps/web/src/domains/creator/studio-router/StudioRouteEntryContracts.test.tsx",
-  "apps/web/src/domains/creator/studio-batch-rename.test.ts",
-  "apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx",
-  "apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts",
-  "apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx",
-  "apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts",
-  "apps/api/src/modules/og/og-page.test.ts",
-  "packages/core/src/search-normalization.test.ts",
-  "packages/core/src/server/home.cpu-cache.test.ts",
-  "apps/web/src/infrastructure/creator-work-read-options.test.ts",
-  "apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts",
-  "apps/web/src/domains/creator/studio-shared-document-client.test.ts",
-  "apps/web/src/domains/creator/studio-release-schedule-loader.test.ts",
-  "apps/web/src/domains/creator/studio-release-schedule-empty-recovery.test.ts",
-  "apps/web/src/domains/creator/studio-autosave-snapshot-fence.test.ts",
-  "apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts",
-  "apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts",
-  "apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts",
-  "apps/web/src/domains/creator/studio-page-autosave-runtime.test.ts",
-  "apps/web/src/domains/creator/studio-unsaved-work-guard.test.ts",
-  "apps/web/src/domains/creator/canvas/StudioCanvasStickyBanners.view-workspace.test.tsx",
-  "apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx",
-  "apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx",
-  "apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts",
-  "apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts",
-  "apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts",
-  "apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts",
-  "apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts",
-  "apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts",
-  "apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx",
-  "apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts",
-  "apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts",
-  "apps/web/src/app/routes/groups/creator-brush-lab-route-contract.test.ts",
-  "apps/web/src/domains/creator/studio-integration-closure.test.ts",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts",
-  "apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-application.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-framing.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-selection.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-engine-remount-safety.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-camera-surface-integration.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.lens.test.tsx",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dCompositionOverlay.test.tsx",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dCinematicDirectorPanel.test.tsx",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.lazy.test.tsx",
-  "apps/web/src/domains/creator/bg3d/StudioBg3dProSuiteRuntimeBridge.test.tsx",
-  "apps/web/src/domains/creator/character-shaper/CharacterShaperOutputDock.test.tsx",
-  "apps/web/src/domains/creator/character-shaper/StudioCharacterShaperDialog.test.tsx",
-  "apps/web/src/domains/creator/character-shaper/character-shaper-export.test.ts",
-  "apps/web/src/domains/creator/character-shaper/character-shaper-image-math.test.ts",
-  "apps/web/src/domains/creator/character-shaper/character-shaper-semantic-psd.test.ts",
-  "apps/web/src/domains/creator/character-platform/ui/CharacterPlatformWorkbench.drawing.test.tsx",
-  "apps/web/src/domains/creator/vrm/studio-vrm-raster-capture.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-png.worker.test.ts",
-  "apps/web/src/domains/creator/character-shaper/CharacterShaperShelf.discovery.test.tsx",
-  "apps/web/src/domains/creator/character-shaper/character-shaper-catalog.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-skinned-garment.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-texture-preflight.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-color-conversion.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-camera-projection.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-readback.test.ts",
-  "apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-normal-capture.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-skirt-body-profile.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-skirt-contact-projection.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-skirt-surface-contact.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-skirt-waist-clearance.test.ts",
-  "apps/web/src/domains/creator/vrm/StudioVrmXpbdSkirtAttachment.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.ts",
-  "apps/web/src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts",
-  "apps/web/src/domains/creator/character-platform/thumbnail/character-runtime-thumbnail-store.test.tsx",
-  "apps/web/src/domains/creator/character-shaper/CharacterSlotCard.accessibility.test.tsx",
-  "apps/web/src/domains/creator/character-shaper/character-shaper-psd-worker-client.test.ts",
-  "apps/web/src/domains/creator/character-shaper/studio-character-shaper-psd.worker.test.ts",
-  "apps/web/src/app/studio-cross-origin-isolation.test.ts",
-  "scripts/verify-studio-3d-console.test.ts",
-  "scripts/lib/character-psd-reference-compositor.test.mjs",
-  "scripts/verify-studio-menus.test.ts",
-  "apps/web/src/domains/creator/color/studio-color-proof.test.ts",
-  "apps/web/src/domains/creator/studio-live-adjustment.test.ts",
-  "apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx",
-  "apps/web/src/domains/creator/canvas/StudioLiveAdjustmentGroup.test.tsx",
-  "apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts",
-  "apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx",
-  "apps/web/src/domains/creator/studio-palette-brand-clip-sqlite-authority-contract.test.ts",
-  "apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts",
-  "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
-  "apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts",
-]);
+function targetExists(target) {
+  const absoluteTarget = join(repoRoot, target);
+  if (existsSync(absoluteTarget)) return true;
 
-// Read the explicit file arguments of the Vitest commands used by this workflow.
-// Comments and echo text do not count as execution; retain app, package and script suites.
-// Lex only comments, quotes, escapes and continuations in our explicit static
-// commands. This is not a general Bash evaluator or a YAML execution proof.
-function normalizeShellSource(block) {
-  let result = "";
-  let quote = null;
-  let wordStart = true;
-  for (let index = 0; index < block.length; index += 1) {
-    const char = block[index];
-    const next = block[index + 1];
-    if (quote === null && char === "#" && wordStart) {
-      while (index < block.length && block[index] !== "\n") index += 1;
-      result += "\n";
-      wordStart = true;
-      continue;
-    }
-    if (quote !== "'" && char === "\\" && next !== undefined) {
-      if (next === "\n" || (next === "\r" && block[index + 2] === "\n")) {
-        index += next === "\r" ? 2 : 1;
-        continue;
-      }
-      if (quote === null || /[$`"\\]/.test(next)) {
-        result += char + next;
-        index += 1;
-        wordStart = false;
-        continue;
-      }
-    }
-    if (quote === null && (char === "'" || char === '"')) {
-      quote = char;
-    } else if (quote === char) {
-      quote = null;
-    }
-    result += char;
-    wordStart = quote === null && /[\s|&;()<>]/.test(char);
+  const directory = dirname(absoluteTarget);
+  if (!existsSync(directory)) return false;
+  const name = basename(target);
+  if (!name.includes("*")) {
+    return readdirSync(directory).some(
+      (entry) => entry.startsWith(name) && /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(entry),
+    );
   }
-  return result;
+
+  const expression = new RegExp(
+    `^${name
+      .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+      .replaceAll("*", ".*")}$`,
+  );
+  return readdirSync(directory).some((entry) => expression.test(entry));
 }
 
-function executedVitestTargets(block) {
-  return normalizeShellSource(block)
-    .split(/\r?\n/)
-    .filter((line) => /^\s*(?:-\s*)?(?:run:\s*)?pnpm exec vitest run(?:\s|$)/.test(line))
-    .flatMap((line) => line.trim().split(/\s+/))
-    .map((word) => word.replace(/^["']|["']$/g, ""))
-    .filter((word) => /^(?:apps|packages|scripts)\/[\w./-]+$/.test(word));
+function assertRequiredPortfolio(block) {
+  assert.match(block, /mapfile -t targets < scripts\/ci-required-vitest-targets\.txt/);
+  assert.match(block, /test "\$\{#targets\[@\]\}" -gt 0/);
+  assert.match(
+    block,
+    /pnpm exec vitest run "\$\{targets\[@\]\}" --pool=forks --maxWorkers=4/,
+  );
+  assert.equal(
+    [...block.matchAll(/pnpm exec vitest run/g)].length,
+    1,
+    "required regression portfolio must start Vitest exactly once",
+  );
 }
 
-function executedRegressions(block) {
-  return executedVitestTargets(block)
-    .filter((word) => /\.test\.(?:[cm]?[jt]s|[jt]sx)$/.test(word));
-}
-
-function assertRequiredRegressions(block) {
-  const tests = executedRegressions(block);
-  const actual = new Set(tests);
-  assert.equal(actual.size, tests.length, "duplicate regression arguments in static CI");
-  for (const path of requiredRegressions) {
-    assert.ok(actual.has(path), `missing mandatory regression: ${path}`);
-  }
-}
-
-test("core retains all executing main checks without a bypass", () => {
+test("core retains every mandatory quality lane without a bypass", () => {
   assert.doesNotMatch(source, /CI_CORE_BYPASS|continue-on-error|if:\s*\$\{\{\s*false/);
-  assert.match(source, /permissions:\n {2}contents: read/);
+  assert.match(source, /permissions:\n {2}contents: read\n {2}pull-requests: read/);
+
   for (const name of REQUIRED_CORE_GATES) {
-    assert.doesNotMatch(job(name), /^ {4}if:/m, `${name} must not be conditionally skipped`);
-    assert.match(job(name), /pnpm install --frozen-lockfile/);
+    const block = job(name);
+    assert.doesNotMatch(block, /^ {4}needs:/m, `${name} must start independently`);
+    if (name !== "core") assert.match(block, /pnpm install --frozen-lockfile/);
   }
+  const lint = job("lint");
+  assert.match(lint, /node scripts\/lint-changed\.mjs --files-from=/);
+  assert.match(lint, /--full-on-config/);
+  assert.match(lint, /pnpm run lint:strict/);
+
+  assert.match(job("typecheck"), /pnpm run typecheck\n/);
+  assert.match(job("typecheck"), /pnpm run typecheck:cloudflare-realtime/);
   for (const command of [
-    "pnpm run validate:architecture", "pnpm run lint:strict", "pnpm run typecheck",
-    "pnpm run typecheck:cloudflare-realtime", "pnpm run verify:csp",
-    "pnpm run verify:toolchain-coverage", "pnpm exec vitest run",
+    "node --experimental-strip-types --test --test-concurrency=1",
+    "node scripts/run-core-vitest.mjs",
+    "pnpm run validate:architecture",
+    "pnpm run verify:csp",
+    "pnpm run verify:toolchain-coverage",
     "pnpm run test:studio-material-brush",
     "scripts/audit-studio-brush-quality-portfolio.mts",
-  ]) assert.ok(job("static").includes(command), `missing static gate: ${command}`);
-  for (const command of ["pnpm --filter @webtoon-nest/api build", "pnpm run build", "pnpm run check:studio-bundle", "test -s dist/.vite/manifest.json"]) {
+  ]) {
+    assert.ok(job("static").includes(command), `missing static gate: ${command}`);
+  }
+  for (const script of [
+    "scripts/api-followup-ci-policy.test.mjs",
+    "scripts/api-followup-unit.test.mjs",
+    "scripts/studio-offline-resilience.test.mjs",
+    "scripts/verify-studio-menus-ci.test.mjs",
+    "scripts/verify-studio-p2p-huddle.test.mjs",
+  ]) {
+    assert.ok(job("static").includes(script), `missing Node regression contract: ${script}`);
+  }
+  for (const command of [
+    "pnpm --filter @webtoon-nest/api build",
+    "pnpm run build:bundle",
+    "pnpm run check:studio-bundle",
+    "test -s dist/.vite/manifest.json",
+  ]) {
     assert.ok(job("build").includes(command), `missing build gate: ${command}`);
   }
+  assert.doesNotMatch(job("build"), /pnpm run build(?!:)/, "web typecheck must not repeat in build");
   assert.ok(job("serial").includes("pnpm run test:perf"));
 });
 
-test("core aggregation rejects skipped dependencies and verify requires core success", () => {
+test("protected core aggregates every lane without another checkout", () => {
   assert.ok(job("core").includes(`needs: [${REQUIRED_CORE_GATES.join(", ")}]`));
   assert.ok(job("core").includes("if: ${{ always() }}"));
   assert.ok(job("core").includes("CORE_RESULTS: ${{ toJSON(needs) }}"));
-  assert.ok(job("core").includes("run: node scripts/ci-core-gate.mjs"));
+  for (const name of REQUIRED_CORE_GATES) {
+    assert.ok(job("core").includes(`"${name}"`), `inline aggregate is missing ${name}`);
+  }
+  assert.doesNotMatch(job("core"), /actions\/checkout|pnpm install/);
   assert.ok(job("verify").includes("needs: core"));
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
-test("preflight validates CI before any dependency installation or expensive gate", () => {
-  assert.doesNotMatch(job("preflight"), /^\s+(?:if|continue-on-error):/m);
-  assert.ok(job("preflight").includes("node --test scripts/ci-core-gate.test.mjs scripts/ci-executed-gates.test.mjs"));
-  assert.doesNotMatch(job("preflight"), /pnpm (?:install|exec|run)|cache: pnpm/);
-  assert.ok(job("preflight").includes("package-manager-cache: false"));
-  for (const name of REQUIRED_CORE_GATES) {
-    assert.match(job(name), /^ {4}needs: preflight$/m, `${name} must wait for preflight success`);
+test("mandatory lanes start independently and dependency-free contracts run first", () => {
+  assert.doesNotMatch(source, /^ {2}preflight:\n/m);
+  for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
+    assert.doesNotMatch(job(name), /^ {4}needs:/m, `${name} should start independently`);
   }
-  assert.doesNotMatch(job("static"), /^\s+if:/m, "mandatory static steps cannot be skipped");
+  const typecheck = job("typecheck");
+  const contractTest = typecheck.indexOf("node --test scripts/ci-core-gate.test.mjs");
+  const fanoutPolicy = typecheck.indexOf("python3 scripts/verify-pr-workflow-fanout.py");
+  const install = typecheck.indexOf("pnpm install --frozen-lockfile");
+  assert.ok(contractTest >= 0, "typecheck lane must execute CI contract tests");
+  assert.ok(fanoutPolicy > contractTest, "fanout policy should follow the contract suite");
+  assert.ok(install > fanoutPolicy, "dependency installation must follow dependency-free checks");
+  for (const contract of [
+    "scripts/lint-changed-policy.test.mjs",
+    "scripts/run-core-vitest.test.mjs",
+  ]) {
+    assert.ok(typecheck.includes(contract), `preflight is missing ${contract}`);
+  }
+
+  for (const excludedPath of [
+    "!/apps/web/public/assets/",
+    "!/apps/web/public/vrm/",
+    "!/artifacts/",
+    "!/docs/",
+    "!/tests/benchmarks/results/",
+  ]) {
+    assert.match(typecheck, new RegExp(contract.replaceAll(".", "\\.")));
+  }
+  for (const requiredManifest of [
+    "/apps/web/public/assets/3d/environments/refined-v6/manifest.json",
+    "/apps/web/public/assets/3d/environments/expansion-v1/manifest.json",
+  ]) {
+    assert.ok(typecheck.includes(requiredManifest), `typecheck checkout is missing ${requiredManifest}`);
+  }
+});
+test("PR lint is scoped while push and merge validation stay repository-wide", () => {
+  const lint = job("lint");
+  assert.match(lint, /if: github\.event_name == 'pull_request'/);
+  assert.match(lint, /pulls\/\$PR_NUMBER\/files\?per_page=100&page=\$page/);
+  assert.match(lint, /node scripts\/lint-changed\.mjs --files-from=/);
+  assert.match(lint, /--full-on-config/);
+  assert.match(lint, /if: github\.event_name != 'pull_request'/);
+  assert.match(lint, /run: pnpm run lint:strict/);
+  assert.match(lint, /path: node_modules\/\.cache\/eslint\n/);
+  for (const path of [
+    "filter: blob:none",
+    "!/apps/web/public/assets/",
+    "/apps/web/public/assets/reference-rebuild/",
+    "!/apps/web/public/vrm/",
+  ]) {
+    assert.ok(lint.includes(path), `lint sparse checkout is missing ${path}`);
+  }
 });
 
-test("all named main regressions remain mandatory without fixing the total count", () => {
-  assert.equal(new Set(requiredRegressions).size, requiredRegressions.length);
-  assertRequiredRegressions(job("static"));
+test("PR caches restore without paying cache-save post steps", () => {
+  for (const [name, cacheId] of [
+    ["lint", "eslint-cache"],
+    ["typecheck", "typescript-cache"],
+  ]) {
+    const block = job(name);
+    assert.match(block, new RegExp(`id: ${cacheId}\\n\\s+uses: actions/cache/restore@v4`));
+    assert.match(block, /uses: actions\/cache\/save@v4/);
+    assert.match(block, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(block, /uses: actions\/cache@v4/);
+  }
 });
 
-test("additional application and package coverage does not break the CI contract", () => {
-  const extra = `${job("static")}
-      - name: Additional regressions
-        run: pnpm exec vitest run apps/web/src/Additional.test.tsx packages/core/src/additional.test.ts
-`;
-  assertRequiredRegressions(extra);
+test("the required Vitest manifest is sorted, unique, resolvable and executed once", () => {
+  assert.deepEqual(requiredTargets, [...requiredTargets].sort());
+  assert.equal(new Set(requiredTargets).size, requiredTargets.length);
+  assert.ok(requiredTargets.length >= 160, "unexpected regression coverage shrink");
+  for (const target of requiredTargets) {
+    assert.ok(targetExists(target), `missing mandatory Vitest target: ${target}`);
+  }
+  assertRequiredPortfolio(job("static"));
 });
 
-for (const path of requiredRegressions) {
-  test(`rejects removal of ${path} even when the total count is unchanged`, () => {
-    const replaced = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
-    assert.throws(() => assertRequiredRegressions(replaced), /missing mandatory regression/);
-  });
-}
-
-test("comments and echo output cannot replace an executing regression", () => {
-  const path = requiredRegressions[0];
-  const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
-  const decoys = `${missing}
-      # pnpm exec vitest run ${path}
-      - run: echo "pnpm exec vitest run ${path}"
-`;
-  assert.throws(() => assertRequiredRegressions(decoys), /missing mandatory regression/);
+test("the expensive portfolio runs after cheap fail-fast contracts", () => {
+  const block = job("static");
+  const portfolio = block.indexOf("Run required Vitest regression portfolio");
+  for (const command of [
+    "node --test scripts/verify-studio-p2p-huddle.test.mjs",
+    "node --test scripts/studio-offline-resilience.test.mjs",
+    "pnpm run validate:architecture",
+    "node --test scripts/verify-studio-menus-ci.test.mjs",
+    "node --experimental-strip-types --test scripts/api-followup-unit.test.mjs",
+  ]) {
+    assert.ok(block.indexOf(command) < portfolio, `${command} must fail before the full portfolio`);
+  }
+  assert.ok(block.indexOf("pnpm run test:studio-material-brush") > portfolio);
+  assert.ok(block.indexOf("scripts/audit-studio-brush-quality-portfolio.mts") > portfolio);
 });
 
-test("duplicate arguments cannot inflate regression coverage", () => {
-  const duplicated = `${job("static")}
-      - run: pnpm exec vitest run ${requiredRegressions[0]}
-`;
-  assert.throws(() => assertRequiredRegressions(duplicated), /duplicate regression arguments/);
-});
-
-// Preserve the concurrent production-audit runner fix from PR #1337.
-test("production visual audit uses the Vitest runner for its policy suite", () => {
-  const audit = readFileSync(new URL("../.github/workflows/studio-3d-production-visual-audit.yml", import.meta.url), "utf8");
+test("production visual audit and protected core share the Vitest policy suite", () => {
+  const audit = readFileSync(
+    new URL("../.github/workflows/studio-3d-production-visual-audit.yml", import.meta.url),
+    "utf8",
+  );
   assert.ok(audit.includes("      - name: Verify audit policy\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
   assert.doesNotMatch(audit, /node\s+--test\s+scripts\/lib\/studio-3d-production-audit-policy\.test\.mjs/);
+  assert.ok(requiredTargets.includes("scripts/lib/studio-3d-production-audit-policy.test.mjs"));
+  assertRequiredPortfolio(job("static"));
 });
-
-test("required core executes the production audit policy suite before merge", () => {
-  assert.ok(job("static").includes("      - name: Studio 3D production audit policy regressions\n        run: pnpm exec vitest run scripts/lib/studio-3d-production-audit-policy.test.mjs\n"));
-});
-
-const requiredNon3DTargets = Object.freeze([
-  "apps/web/src/domains/creator/layer",
-  "apps/web/src/domains/creator/export",
-  "apps/web/src/domains/creator/StudioColorHarmoniesPanel.test.tsx",
-  "apps/web/src/domains/creator/StudioColorPopoverAdvanced.test.tsx",
-  "apps/web/src/domains/creator/StudioSelectionWorkbenchPanel.interaction.test.tsx",
-  "apps/web/src/domains/creator/studio-selection",
-  "apps/web/src/domains/creator/studio-color-range",
-  "apps/web/src/domains/creator/studio-page-lazy-ui-recovery.test.ts",
-  "apps/web/src/domains/creator/studio-menubar-content-boundary.test.ts",
-]);
-
-function assertNon3DRegressions(block) {
-  const name = "      - name: Non-3D Studio editing and export regressions\n";
-  const step = block.split(/(?=^ {6}- name:)/m).find((entry) => entry.startsWith(name));
-  assert.ok(step, "missing non-3D Studio regression step");
-  assert.doesNotMatch(step, /^ {8}if:/m, "non-3D Studio regressions must not be conditionally skipped");
-  const targets = new Set(executedVitestTargets(step));
-  for (const path of requiredNon3DTargets) {
-    assert.ok(targets.has(path), `missing non-3D Studio regression: ${path}`);
-  }
-}
-
-test("non-3D Studio editing and export regressions execute in the required static job", () => {
-  assertNon3DRegressions(job("static"));
-});
-
-test("non-3D directory and file targets cannot be replaced with commented coverage", () => {
-  for (const path of requiredNon3DTargets) {
-    const source = job("static");
-    const step = source.split(/(?=^ {6}- name:)/m).find((entry) => entry.startsWith("      - name: Non-3D Studio editing and export regressions\n"));
-    assert.ok(step, "missing non-3D Studio regression step");
-    const missing = source.replace(step, step.replace(path, "apps/web/src/unrelated-replacement.test.ts"));
-    const decoy = `${missing}\n      # pnpm exec vitest run ${path}\n`;
-    assert.throws(() => assertNon3DRegressions(decoy), /missing non-3D Studio regression/, path);
-  }
-});
-
-// Manual validation must not cancel push validation; retries keep prior evidence.
-test("isolates event concurrency and retry artifact names", () => {
-  assert.ok(source.includes("group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}"));
+test("manual validation cannot cancel push validation and retries retain evidence", () => {
+  assert.ok(source.includes(
+    "group: core-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}",
+  ));
   assert.ok(job("serial").includes("name: core-serial-attempt-${{ github.run_attempt }}"));
   assert.ok(job("build").includes("name: core-build-attempt-${{ github.run_attempt }}"));
 });
 
-// Shell comments end at the physical newline, even when the comment ends in a
-// backslash. Keep these fixtures dependency-free for the Node-only preflight.
-test("commented mandatory arguments are rejected for every protected suite", () => {
-  for (const path of requiredRegressions) {
-    const missing = job("static").replace(path, "apps/web/src/unrelated-replacement.test.ts");
-    const decoy = `${missing}\n      - run: pnpm exec vitest run apps/web/src/extra.test.ts \\\n          # ${path}\n`;
-    assert.throws(() => assertRequiredRegressions(decoy), /missing mandatory regression/, path);
-  }
+test("ToonStudio session validation shares one setup and delegates full gates to protected core", () => {
+  const session = readFileSync(
+    new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url),
+    "utf8",
+  );
+  const sessionJobs = session.slice(session.indexOf("\njobs:\n") + 7)
+    .split(/(?=^ {2}[a-z][a-z0-9-]*:\n)/m)
+    .filter((entry) => /^ {2}[a-z][a-z0-9-]*:\n/.test(entry));
+  assert.equal(sessionJobs.length, 1, "session validation should pay setup cost once");
+  assert.match(session, /filter: blob:none/);
+  assert.match(session, /!\/apps\/web\/public\/assets\//);
+  assert.match(session, /git diff --name-only -z --diff-filter=ACMR "\$BASE_SHA" HEAD/);
+  assert.match(session, /pnpm exec eslint --max-warnings=0 --no-warn-ignored/);
+  assert.match(session, /pnpm exec vitest related/);
+  assert.doesNotMatch(session, /lint:quick|pnpm (?:run )?build(?:\s|$)|pnpm exec tsc/);
 });
-
-const shellCommentFixtures = [
-  ["continued comment argument", "pnpm exec vitest run apps/kept.test.ts \\\n  # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["inline comment", "pnpm exec vitest run apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["comment backslash cannot consume the next command", "pnpm exec vitest run apps/first.test.ts # ignored \\\npnpm exec vitest run packages/second.test.ts\n", ["apps/first.test.ts", "packages/second.test.ts"]],
-  ["standalone comment continuation cannot enable a bare path", "pnpm exec vitest run apps/kept.test.ts \\\n  # ignored \\\n  packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["quoted hashes are not comments", "pnpm exec vitest run --testNamePattern '#literal' \"apps/kept.test.ts\" # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["escaped hashes are not comments", "pnpm exec vitest run --testNamePattern \\#literal apps/kept.test.ts # packages/hidden.test.ts\n", ["apps/kept.test.ts"]],
-  ["valid continued and quoted arguments remain visible", "pnpm exec vitest run \\\n  'apps/kept.test.ts' \\\n  \"packages/kept.test.tsx\"\n", ["apps/kept.test.ts", "packages/kept.test.tsx"]],
-];
-for (const [name, command, expected] of shellCommentFixtures) {
-  test(`regression arguments respect shell syntax: ${name}`, () => {
-    assert.deepEqual(executedRegressions(command), expected);
-  });
-}
-
-test("required core validates current production menu entry points", () => {
-  assert.ok(job("static").includes("      - name: Production menu entry point regressions\n        run: pnpm exec vitest run scripts/verify-studio-menus.test.ts\n"));
-});
-
-test("removal and inline comments cannot replace mandatory execution", () => {
-  for (const path of requiredRegressions) {
-    const missing = job("static").replace(path, "");
-    assert.throws(() => assertRequiredRegressions(missing), /missing mandatory regression/);
-    assert.throws(() => assertRequiredRegressions(missing + "\n          pnpm exec vitest run # " + path), /missing mandatory regression/);
-  }
-});
-
-
 test("focused integration checks cannot collide with the protected core status", () => {
-  const integration = readFileSync(new URL("../.github/workflows/toonstudio-integration.yml", import.meta.url), "utf8");
+  const integration = readFileSync(
+    new URL("../.github/workflows/toonstudio-integration.yml", import.meta.url),
+    "utf8",
+  );
   const start = integration.indexOf("\n  validate:\n");
   assert.ok(start >= 0, "missing focused integration validation job");
   const validation = integration.slice(start);
@@ -378,6 +261,9 @@ test("focused integration checks cannot collide with the protected core status",
   assert.deepEqual(checks, tracks.map((track) => `ToonStudio integration / ${track}`));
   assert.equal(new Set(checks).size, tracks.length);
   assert.ok(checks.every((name) => name !== "core" && name !== "verify"));
-  assert.match(job("core"), /^ {4}name: core$/m, "preserve the existing protected merge gate");
-  assert.match(validation, /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/);
+  assert.match(job("core"), /^ {4}name: core$/m, "preserve protected merge gate");
+  assert.match(
+    validation,
+    /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/,
+  );
 });

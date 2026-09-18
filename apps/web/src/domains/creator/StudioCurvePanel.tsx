@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Curve Panel
  * 인터랙티브 SVG 톤 커브 에디터 — 채널 세그먼트(RGB/R/G/B) + 프리셋 칩 + 드래그 가능한 제어점.
@@ -158,7 +162,7 @@ function CurveCoordinateInput({
         pattern="[0-9]*"
         value={draft}
         readOnly={readOnly}
-        aria-label={`선택한 제어점 ${axis} 좌표`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "선택한 제어점 {v0} 좌표"), { v0: String(axis) })}
         aria-describedby={describedBy}
         onFocus={() => {
           editingRef.current = !readOnly;
@@ -397,7 +401,7 @@ export function StudioCurvePanel({
     <div className="space-y-2">
       {/* 헤더 + 항등 복귀(모든 채널) */}
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">톤 커브 (Curves)</p>
+        <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "톤 커브 (Curves)")}</p>
         <button
           type="button"
           onClick={() => {
@@ -407,16 +411,15 @@ export function StudioCurvePanel({
           }}
           disabled={channelEditable ? allIdentity : identityByChannel.master}
           className={buttonClass({ size: "sm", variant: "quiet" })}
-          title="톤 커브(모든 채널)를 제거하고 원본 톤으로 되돌립니다."
+          title={translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "톤 커브(모든 채널)를 제거하고 원본 톤으로 되돌립니다.")}
         >
           <RotateCcw className="size-3.5" />
-          원본으로
-        </button>
+          {translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "원본으로")}</button>
       </div>
 
       {/* 채널 세그먼트 — RGB(마스터)/R/G/B. 조정된 채널에는 점 배지를 띄운다. */}
       {channelEditable && (
-        <div role="group" aria-label="곡선 채널" className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label={translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "곡선 채널")} className="flex flex-wrap gap-1.5">
           {TONE_CHANNELS.map((c) => (
             <StudioToggleChip
               key={c.id}
@@ -432,7 +435,7 @@ export function StudioCurvePanel({
               {!identityByChannel[c.id] && (
                 <>
                   <span aria-hidden className="ml-1 inline-block size-1.5 rounded-full bg-accent align-middle" />
-                  <span className="sr-only">(조정됨)</span>
+                  <span className="sr-only">{translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "(조정됨)")}</span>
                 </>
               )}
             </StudioToggleChip>
@@ -472,7 +475,7 @@ export function StudioCurvePanel({
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="mx-auto w-full min-w-[170px] max-w-[180px] touch-none select-none rounded border border-line bg-card"
         role="group"
-        aria-label={`톤 커브 편집기 (${channelLabel} 채널)`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "톤 커브 편집기 ({v0} 채널)"), { v0: String(channelLabel) })}
         aria-describedby={instructionsId}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -528,7 +531,7 @@ export function StudioCurvePanel({
               tabIndex={0}
               role="button"
               aria-pressed={selectedIndex === i}
-              aria-label={`${channelLabel} 제어점 ${i + 1}/${curve.length}, X ${p.x}, Y ${p.y}`}
+              aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "{v0} 제어점 {v1}/{v2}, X {v3}, Y {v4}"), { v0: String(channelLabel), v1: String(i + 1), v2: String(curve.length), v3: String(p.x), v4: String(p.y) })}
               aria-describedby={instructionsId}
               aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown"
               data-studio-curve-point-hit-target="true"
@@ -567,15 +570,15 @@ export function StudioCurvePanel({
 
       <div
         role="group"
-        aria-label={`${channelLabel} 채널 선택한 제어점`}
+        aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "{v0} 채널 선택한 제어점"), { v0: String(channelLabel) })}
         data-studio-curve-point-editor="true"
         className="rounded-xl border border-line/70 bg-card/55 p-2.5"
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="text-[0.66rem] font-semibold text-fg-2">
-            선택한 점 {selectedIndex + 1}/{curve.length}
+            {translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "선택한 점 ")}{selectedIndex + 1}/{curve.length}
           </p>
-          <span className="text-[0.6rem] font-semibold text-fg-4">{channelLabel} 채널</span>
+          <span className="text-[0.6rem] font-semibold text-fg-4">{channelLabel} {translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "채널")}</span>
         </div>
         <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
           <CurveCoordinateInput
@@ -595,8 +598,8 @@ export function StudioCurvePanel({
             disabled={!suggestedPoint}
             aria-describedby={curvePointLimitReached ? instructionsId : undefined}
             title={curvePointLimitReached
-              ? `채널마다 제어점은 최대 ${STUDIO_CURVE_MAX_CONTROL_POINTS}개까지 사용할 수 있습니다.`
-              : "가장 넓은 구간에 제어점을 추가합니다."}
+              ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "채널마다 제어점은 최대 {v0}개까지 사용할 수 있습니다."), { v0: String(STUDIO_CURVE_MAX_CONTROL_POINTS) })
+              : translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "가장 넓은 구간에 제어점을 추가합니다.")}
             onClick={addSuggestedPoint}
             className={buttonClass({
               size: "sm",
@@ -605,8 +608,7 @@ export function StudioCurvePanel({
             })}
           >
             <Plus className="size-3.5" aria-hidden />
-            점 추가
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "점 추가")}</button>
           <button
             type="button"
             disabled={selectedPointIsEndpoint}
@@ -619,19 +621,17 @@ export function StudioCurvePanel({
             })}
           >
             <Trash2 className="size-3.5" aria-hidden />
-            점 삭제
-          </button>
+            {translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "점 삭제")}</button>
         </div>
         <p id={endpointHintId} className="mt-2 text-[0.6rem] leading-relaxed text-fg-4">
           {selectedPointIsEndpoint
-            ? "첫 점과 마지막 점의 X 위치는 고정되며 Y만 조절할 수 있습니다."
-            : "X와 Y를 직접 입력하거나 화살표 키로 미세 조절할 수 있습니다."}
+            ? translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "첫 점과 마지막 점의 X 위치는 고정되며 Y만 조절할 수 있습니다.")
+            : translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "X와 Y를 직접 입력하거나 화살표 키로 미세 조절할 수 있습니다.")}
         </p>
       </div>
 
       <p id={instructionsId} className="text-[0.6rem] leading-relaxed text-fg-4">
-        그래프의 빈 곳을 클릭하면 그 자리에 점이 생기고 그대로 드래그됩니다. 점 위를 더블클릭하면 삭제됩니다. 점을 선택한 뒤 화살표 키로 1, Shift+화살표로 10씩 이동합니다. 점 추가 버튼은 가장 넓은 구간의 중간에 배치되며 채널마다 최대 {STUDIO_CURVE_MAX_CONTROL_POINTS}개까지 사용할 수 있습니다.
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "그래프의 빈 곳을 클릭하면 그 자리에 점이 생기고 그대로 드래그됩니다. 점 위를 더블클릭하면 삭제됩니다. 점을 선택한 뒤 화살표 키로 1, Shift+화살표로 10씩 이동합니다. 점 추가 버튼은 가장 넓은 구간의 중간에 배치되며 채널마다 최대 ")}{STUDIO_CURVE_MAX_CONTROL_POINTS}{translateCurrentStaticSourceText("domains.creator.StudioCurvePanel", "ko", "개까지 사용할 수 있습니다.")}</p>
     </div>
   );
 }

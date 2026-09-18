@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 // AI 캐릭터 일관성 생성 패널 — 캔버스에서 선택한 "기준 캐릭터" 이미지를 참고 이미지로 함께 전송해,
 // 같은 캐릭터가 새로운 상황에 있는 모습을 생성한다(젠툰 벤치마크 — docs/studio-competitor-features.md
 // §2 "캐릭터 일관성 유지 생성" 참고). IP-Adapter/캐릭터 LoRA 같은 전문 기법이 아니라 "참고 이미지 +
@@ -11,6 +14,8 @@
 // 그대로 넘겨준다(선택 상태는 StudioPage.tsx가 이미 소유한 `selected`의 파생값이라 이중 소유를
 // 피한다).
 import { Loader2, MousePointer2, UserRoundCheck } from "lucide-react";
+
+import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 
 export function StudioAiCharacterConsistencyPanel({
   configured,
@@ -42,15 +47,15 @@ export function StudioAiCharacterConsistencyPanel({
     <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel/50 p-3">
       <div className="flex items-center gap-1.5 text-sm font-bold text-fg">
         <UserRoundCheck size={14} className="text-accent" aria-hidden />
-        AI 캐릭터 일관성 생성
-      </div>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "AI 캐릭터 일관성 생성")}</div>
 
-      {!configured && (
-        <p className="rounded-md border border-line bg-card/70 px-2 py-1.5 text-[0.63rem] leading-relaxed text-fg-3">
-          기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 실행하려면 위{" "}
-          <span className="font-semibold text-fg-2">AI 어시스트 설정</span>에서 이미지 API를 연결하세요.
-        </p>
-      )}
+      {!configured ? (
+        <AiRecoveryNotice
+          code="not_configured"
+          message="기준 이미지와 상황 프롬프트는 먼저 준비할 수 있어요. 생성하려면 통합 AI 설정에서 개인 이미지 API 키와 모델을 연결하세요."
+          compact
+        />
+      ) : null}
 
       {!hasReference && (
         <div
@@ -59,26 +64,23 @@ export function StudioAiCharacterConsistencyPanel({
           aria-live="polite"
         >
           <p>
-            캔버스에서 기준으로 쓸 <span className="font-semibold text-fg-2">캐릭터 이미지</span>를 먼저
-            선택하세요.
-          </p>
+            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "캔버스에서 기준으로 쓸 ")}<span className="font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "캐릭터 이미지")}</span>{translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "를 먼저 선택하세요.")}</p>
           <button
             type="button"
             onClick={onRequestSelectReference}
             className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-accent/45 bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
-            aria-label="기준 이미지 선택하기"
+            aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "기준 이미지 선택하기")}
           >
             <MousePointer2 size={14} aria-hidden />
-            기준 이미지 선택하기
-          </button>
-          <p className="mt-1.5 text-[0.6rem] text-fg-3">Esc를 누르면 선택을 취소할 수 있어요.</p>
+            {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "기준 이미지 선택하기")}</button>
+          <p className="mt-1.5 text-[0.6rem] text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "Esc를 누르면 선택을 취소할 수 있어요.")}</p>
         </div>
       )}
 
       {hasReference && referenceThumbnail && (
         <div className="flex items-center gap-2 rounded-md border border-line bg-card/70 px-2 py-1.5">
-          <img src={referenceThumbnail} alt="기준 캐릭터 미리보기" className="h-9 w-9 shrink-0 rounded object-cover" />
-          <p className="text-[0.63rem] leading-relaxed text-fg-3">이 이미지를 기준 캐릭터로 사용해요.</p>
+          <img src={referenceThumbnail} alt={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "기준 캐릭터 미리보기")} className="h-9 w-9 shrink-0 rounded object-cover" />
+          <p className="text-[0.63rem] leading-relaxed text-fg-3">{translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "이 이미지를 기준 캐릭터로 사용해요.")}</p>
         </div>
       )}
 
@@ -88,7 +90,7 @@ export function StudioAiCharacterConsistencyPanel({
         onKeyDown={(e) => {
           if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGenerate) onGenerate();
         }}
-        placeholder="예: 이 캐릭터가 비 오는 골목에서 우산을 쓰고 서 있는 모습"
+        placeholder={translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "예: 이 캐릭터가 비 오는 골목에서 우산을 쓰고 서 있는 모습")}
         rows={2}
         disabled={busy}
         className="h-14 w-full resize-none rounded-md border border-line bg-panel px-2 py-1 text-[0.65rem] leading-snug text-fg outline-none transition-colors placeholder:text-fg-3 focus:border-accent disabled:opacity-60"
@@ -101,15 +103,19 @@ export function StudioAiCharacterConsistencyPanel({
         className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <UserRoundCheck size={14} />}
-        {busy ? "생성하는 중…" : "같은 캐릭터로 생성"}
+        {busy ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "생성하는 중…") : translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "같은 캐릭터로 생성")}
       </button>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {error ? (
+        <AiRecoveryNotice
+          message={error}
+          onRetry={canGenerate ? onGenerate : undefined}
+          compact
+        />
+      ) : null}
 
       <p className="text-[0.6rem] leading-relaxed text-fg-3">
-        참고 이미지 기반 근사치예요 — 매번 완벽히 동일한 얼굴을 보장하진 않아요. 생성된 이미지는 캔버스에
-        새 이미지 요소로 추가돼요(기준 이미지는 그대로 남아요).
-      </p>
+        {translateCurrentStaticSourceText("domains.creator.ai.StudioAiCharacterConsistencyPanel", "ko", "참고 이미지 기반 근사치예요 — 매번 완벽히 동일한 얼굴을 보장하진 않아요. 생성된 이미지는 캔버스에 새 이미지 요소로 추가돼요(기준 이미지는 그대로 남아요).")}</p>
     </div>
   );
 }

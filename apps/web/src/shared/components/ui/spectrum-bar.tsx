@@ -1,3 +1,7 @@
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { useState } from "react";
 
 import { spectrumGradient, genreTextColor } from "@/shared/lib/genre-color";
@@ -51,8 +55,8 @@ export function GenreSpectrum({
       style={{ height }}
       onPointerMove={onMove}
       onPointerLeave={() => setScrub(null)}
-      role={interactive ? "img" : undefined}
-      aria-label={interactive ? (label ?? `장르 스펙트럼: ${list.join(", ")}`) : undefined}
+      role={interactive ? translateCurrentStaticSourceText("shared.components.ui.spectrum.bar", "en", "img") : undefined}
+      aria-label={interactive ? (label ?? formatI18nTemplate(translateCurrentStaticSourceText("shared.components.ui.spectrum.bar", "ko", "장르 스펙트럼: {v0}"), { v0: String(list.join(", ")) })) : undefined}
       aria-hidden={interactive ? undefined : true}
     >
       {/* 어둑한 트랙 (채워지기 전 잔상) */}

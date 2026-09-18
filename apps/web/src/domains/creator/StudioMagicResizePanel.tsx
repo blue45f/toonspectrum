@@ -1,3 +1,6 @@
+import {
+  translateCurrentStaticSourceText,
+} from "@/shared/lib/i18n-bilingual-copy";
 /**
  * Studio Magic Resize Panel — page aspect presets + reflow strategy.
  * Polished for warm-ink chrome; used in inspector (and optionally elsewhere).
@@ -58,10 +61,9 @@ export function StudioMagicResizePanel({
   return (
     <div className="space-y-2.5" data-studio-magic-resize-panel="true">
       <div>
-        <p className="text-[0.7rem] font-bold text-fg">매직 리사이즈</p>
+        <p className="text-[0.7rem] font-bold text-fg">{translateCurrentStaticSourceText("domains.creator.StudioMagicResizePanel", "ko", "매직 리사이즈")}</p>
         <p className="mt-0.5 text-[0.62rem] leading-snug text-fg-3">
-          규격을 고르면 요소를 새 비율에 맞춰 다시 배치해요. 실수해도 Ctrl+Z로 되돌릴 수 있어요.
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.StudioMagicResizePanel", "ko", "규격을 고르면 요소를 새 비율에 맞춰 다시 배치해요. 실수해도 Ctrl+Z로 되돌릴 수 있어요.")}</p>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -85,7 +87,7 @@ export function StudioMagicResizePanel({
       />
 
       <div>
-        <p className="mb-1 text-[0.64rem] font-semibold text-fg-2">기본 비율</p>
+        <p className="mb-1 text-[0.64rem] font-semibold text-fg-2">{translateCurrentStaticSourceText("domains.creator.StudioMagicResizePanel", "ko", "기본 비율")}</p>
         <div className="grid grid-cols-2 gap-1.5">
         {MAGIC_RESIZE_PRESETS.map((preset) => {
           const Icon = PRESET_ICONS[preset.id] ?? Square;
@@ -126,7 +128,7 @@ export function StudioMagicResizePanel({
                   width={preview.w * (28 / 40)}
                   height={preview.h * (28 / 40)}
                   rx={2}
-                  fill={active ? "oklch(0.72 0.185 42)" : "oklch(0.62 0.08 42 / 0.75)"}
+                  fill={active ? translateCurrentStaticSourceText("domains.creator.StudioMagicResizePanel", "en", "oklch(0.72 0.185 42)") : translateCurrentStaticSourceText("domains.creator.StudioMagicResizePanel", "en", "oklch(0.62 0.08 42 / 0.75)")}
                 />
               </svg>
               <span className="min-w-0">

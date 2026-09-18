@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Suspense } from "react";
 
 import { normalizeShapeParams, normalizeStrokeStyle } from "./brush/studio-stroke-shapes";
@@ -92,7 +93,7 @@ export function StudioInspectorShapeSection({
   onRequestColorSample,
 }: StudioInspectorShapeSectionProps) {
   return (
-    <StudioInspectorSection sectionId="element.shape-style" loadingLabel="도형 스타일을 여는 중...">
+    <StudioInspectorSection sectionId="element.shape-style" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "도형 스타일을 여는 중...")}>
       <div className="space-y-3">
         <StudioInspectorSelectionStrokeControls
           selected={selected}
@@ -111,16 +112,16 @@ export function StudioInspectorShapeSection({
           selected.kind === "triangle" ||
           selected.kind === "polygon") && (
           <div className="mt-2.5 border-t border-line/40 pt-2.5 space-y-2.5">
-            <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">채우기</p>
+            <p className="text-[0.66rem] font-semibold text-fg-3 uppercase tracking-wider">{translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "채우기")}</p>
             <StudioColorField
-              label="채우기 색상"
+              label={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "채우기 색상")}
               value={selected.fill ?? null}
               fallbackColor="#ffffff"
               purpose="fill"
               recentColors={recentColors}
               documentColors={documentColors}
               allowNone
-              noneLabel="채우기 없음"
+              noneLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "채우기 없음")}
               onChange={(color) =>
                 patchEl(selected.id, { fill: color ?? undefined } as Partial<El>)
               }
@@ -148,7 +149,7 @@ export function StudioInspectorShapeSection({
               <StudioGradientEnginePanel
                 value={selected.gradient ?? null}
                 onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
-                title="그라데이션 채우기"
+                title={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "그라데이션 채우기")}
               />
             )}
             <div className="border-t border-line/40 pt-2.5">
@@ -161,7 +162,7 @@ export function StudioInspectorShapeSection({
         )}
         {selected.kind && selected.kind !== "freehand" && (
           <div className="mt-2.5 border-t border-line/40 pt-2.5">
-            <Suspense fallback={<StudioPanelLoading label="선 스타일 패널을 여는 중..." />}>
+            <Suspense fallback={<StudioPanelLoading label={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "선 스타일 패널을 여는 중...")} />}>
               <StudioStrokeShapePanel
                 kind={selected.kind}
                 strokeStyle={normalizeStrokeStyle(selected.strokeStyle)}
@@ -243,7 +244,7 @@ export function StudioInspectorTextFillSection({
   patchEl,
 }: StudioInspectorTextFillSectionProps) {
   return (
-    <StudioInspectorSection sectionId="element.text-fill" loadingLabel="글자 채우기 스타일을 여는 중...">
+    <StudioInspectorSection sectionId="element.text-fill" loadingLabel={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "글자 채우기 스타일을 여는 중...")}>
       <div className="space-y-2.5">
         <div className="flex gap-1.5 bg-card rounded-lg p-0.5 border border-line">
           {[
@@ -273,7 +274,7 @@ export function StudioInspectorTextFillSection({
               value={selected.gradient ?? legacyTextGradientToSpec(selected.gradientColorStart, selected.gradientColorEnd, selected.gradientDirection)}
               onChange={(spec) => patchEl(selected.id, { gradient: spec ?? undefined } as Partial<El>)}
               allowClear={false}
-              title="그라데이션 편집"
+              title={translateCurrentStaticSourceText("domains.creator.StudioInspectorShapeSection", "ko", "그라데이션 편집")}
             />
           </div>
         )}

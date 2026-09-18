@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from "lucide-react";
 import { useState, useCallback } from "react";
 
@@ -26,15 +27,13 @@ export function AdminToastProvider({ children }: { children: React.ReactNode }) 
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto p-4 rounded-2xl border backdrop-blur-xl shadow-2xl flex items-start gap-3 transition-all duration-300 animate-in slide-in-from-bottom-3 ${
-              toast.type === "success"
+            className={formatI18nTemplate(translateCurrentStaticSourceText("domains.admin.components.AdminToast", "en", "pointer-events-auto p-4 rounded-2xl border backdrop-blur-xl shadow-2xl flex items-start gap-3 transition-all duration-300 animate-in slide-in-from-bottom-3 {v0}"), { v0: String(toast.type === "success"
                 ? "bg-slate-900/90 border-emerald-500/30 text-emerald-300"
                 : toast.type === "error"
                 ? "bg-slate-900/90 border-rose-500/30 text-rose-300"
                 : toast.type === "warning"
                 ? "bg-slate-900/90 border-amber-500/30 text-amber-300"
-                : "bg-slate-900/90 border-indigo-500/30 text-indigo-300"
-            }`}
+                : "bg-slate-900/90 border-indigo-500/30 text-indigo-300") })}
           >
             <div className="mt-0.5">
               {toast.type === "success" && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}

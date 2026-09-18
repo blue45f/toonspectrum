@@ -59,6 +59,7 @@ describe("spatial reader interaction", () => {
     expect(screen.getByRole("img").getAttribute("src"))
       .toBe(new URL("/page%20one.png?sig=a%2Fb&part=1", document.baseURI).href);
   });
+    // secretlint-disable-next-line @secretlint/secretlint-rule-basicauth -- synthetic URL-userinfo rejection fixture
   it.each(["javascript:alert(1)", "data:text/html;base64,PHN2Zz4=", "data:image/svg+xml;base64,PHN2Zz4=", "https://user:pass@example.com/page.png", "blob:https://other.test/id"])
     ("removes the previous image when a new source is rejected: %s", (source) => {
       const view = render(<SpatialWebtoonReader pages={["/one.png"]} onClose={vi.fn()} />);

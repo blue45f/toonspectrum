@@ -1,0 +1,254 @@
+/* Site-wide layout, contrast and interaction contract. */
+:root {
+  --site-content-max: 100rem;
+  --site-page-gutter: clamp(1rem, 2.7vw, 2rem);
+  --site-section-space: clamp(2.25rem, 6vw, 5rem);
+  --site-card-gap: clamp(0.75rem, 1.4vw, 1.25rem);
+  --site-control-size: 44px;
+  --site-focus-ring-width: 2px;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+:is(#root, #main-content, .route-stage) {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+#main-content {
+  overflow-x: clip;
+}
+
+.route-stage {
+  container-type: inline-size;
+}
+
+.route-stage > *,
+.route-stage :where(section, article, aside, nav, header, footer),
+.route-stage :where([class*="grid"], [class*="flex"]) > * {
+  min-inline-size: 0;
+}
+
+.route-stage :where(img, video, canvas, svg) {
+  max-inline-size: 100%;
+}
+
+.route-stage :where(h1, h2, h3, h4, p, li, dt, dd, a, button, label) {
+  overflow-wrap: anywhere;
+}
+
+:is([data-route-device-guidance], [data-route-recovery-guidance], [data-route-recovery]) {
+  width: min(var(--site-content-max), calc(100% - (var(--site-page-gutter) * 2)));
+  min-width: 0;
+  margin-inline: auto;
+}
+
+:root[data-route-purpose-scene="true"] #main-content .route-stage :is(
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="option"],
+  select,
+  textarea
+) {
+  min-inline-size: 2.5rem;
+  min-block-size: 2.5rem;
+}
+
+@media (pointer: coarse) {
+  #main-content :is(button, [role="button"], [role="tab"], [role="option"], select, textarea) {
+    min-block-size: var(--site-control-size);
+  }
+  :root[data-route-purpose-scene="true"] #main-content .route-stage :is(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="option"],
+    select,
+    textarea
+  ) {
+    min-inline-size: var(--site-control-size);
+  }
+}
+
+@media (max-width: 767px) {
+  :root[data-route-purpose-scene="true"] #main-content .route-stage :is(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="option"],
+    select,
+    textarea
+  ) {
+    min-inline-size: var(--site-control-size);
+    min-block-size: var(--site-control-size);
+  }
+}
+
+[data-auth-modal="true"] :is(button, input, [role="tab"]) {
+  min-block-size: 2.5rem;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  [data-auth-modal="true"] :is(button, input, [role="tab"]) {
+    min-block-size: var(--site-control-size);
+  }
+}
+
+:root[data-design-theme="contrast"] {
+  --site-focus-ring-width: 3px;
+}
+
+:root[data-design-theme="contrast"] :focus-visible {
+  outline: var(--site-focus-ring-width) solid var(--color-accent) !important;
+  outline-offset: 3px !important;
+}
+
+:root[data-design-theme="contrast"] :is(
+  [role="dialog"],
+  [role="menu"],
+  [role="listbox"],
+  [role="tooltip"],
+  [data-site-chrome],
+  [data-studio-tool-popover="true"],
+  [data-studio-menu-popover="true"]
+) {
+  border-color: var(--color-line-strong) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+:root[data-design-theme="contrast"] :is(button, input, select, textarea, [role="button"], [role="tab"], [role="option"]) {
+  border-color: var(--color-line-strong);
+}
+
+:root[data-design-theme="contrast"] #main-content :is(
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="option"],
+  select,
+  textarea
+) {
+  min-inline-size: var(--site-control-size) !important;
+  min-block-size: var(--site-control-size) !important;
+}
+
+:root[data-design-theme="contrast"] :disabled {
+  opacity: 0.72;
+}
+
+:root[data-design-theme="contrast"] [data-auth-modal="true"] {
+  --color-fg-3: var(--color-fg-2);
+  border-width: 2px;
+  border-color: var(--color-line-strong);
+  background: var(--color-canvas);
+  box-shadow: none;
+}
+
+:root[data-design-theme="contrast"] [data-auth-modal="true"] :is(input, button, [role="tab"]) {
+  min-block-size: var(--site-control-size);
+  border-color: var(--color-line-strong);
+}
+
+:root[data-design-theme="contrast"] [data-auth-modal="true"] input {
+  background: var(--color-panel);
+  color: var(--color-fg);
+  caret-color: var(--color-accent);
+}
+
+:root[data-design-theme="contrast"] ::placeholder {
+  color: var(--color-fg-3);
+  opacity: 1;
+}
+
+:root[data-design-theme="contrast"] #main-content :is(p, li, dd) a[href] {
+  text-decoration-line: underline;
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.2em;
+}
+
+:root[data-design-theme="contrast"] :is(
+  [data-studio-app-menubar="true"],
+  [data-studio-draw-options="true"],
+  [data-studio-select-options="true"],
+  [data-studio-tool-rail="true"],
+  [data-studio-inspector="true"],
+  [data-studio-layer-navigator="true"]
+) {
+  background: var(--color-panel);
+  border-width: 2px;
+  box-shadow: none;
+}
+
+@media (prefers-contrast: more) {
+  :root { --site-focus-ring-width: 3px; }
+  :focus-visible {
+    outline-width: var(--site-focus-ring-width) !important;
+    outline-offset: 3px !important;
+  }
+  :is(
+    [role="dialog"],
+    [role="menu"],
+    [role="listbox"],
+    [role="tooltip"],
+    [data-site-chrome],
+    [data-studio-tool-popover="true"],
+    [data-studio-menu-popover="true"]
+  ) {
+    border-color: var(--color-line-strong) !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+  :is(button, input, select, textarea, [role="button"], [role="tab"], [role="option"]) {
+    border-color: var(--color-line-strong);
+  }
+  [data-auth-modal="true"] {
+    --color-fg-3: var(--color-fg-2);
+    border-width: 2px;
+    border-color: var(--color-line-strong);
+    background: var(--color-canvas);
+    box-shadow: none;
+  }
+  [data-auth-modal="true"] :is(input, button, [role="tab"]) {
+    min-block-size: var(--site-control-size);
+    border-color: var(--color-line-strong);
+  }
+}
+
+@media (forced-colors: active) {
+  #main-content :focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 3px !important;
+  }
+  :is(
+    [role="dialog"],
+    [role="menu"],
+    [role="listbox"],
+    [role="tooltip"],
+    [data-site-chrome],
+    [data-studio-tool-popover="true"],
+    [data-studio-menu-popover="true"]
+  ) {
+    border: 2px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+    forced-color-adjust: auto;
+  }
+}
+
+@media (max-width: 390px) {
+  :root { --site-page-gutter: 0.875rem; }
+}
+
+/* Document-window controls stay operable without making the editor canvas itself less dense. */
+[data-studio-document-window-hub-bar="true"] :is(button, select) {
+  min-block-size: var(--site-control-size);
+}
+
+[data-studio-document-window-hub-bar="true"] button {
+  min-inline-size: var(--site-control-size);
+}

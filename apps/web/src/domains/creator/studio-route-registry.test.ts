@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  STUDIO_DISCOVERY_ROUTE_IDS,
   STUDIO_ROUTE_REGISTRY,
   auditStudioRouteRegistry,
   canonicalStudioRoutePath,
   resolveStudioRouteRegistration,
   studioProjectSectionPath,
   studioRoutePath,
+  studioRouteRegistration,
 } from "./studio-route-registry";
 
 describe("Studio route registry", () => {
@@ -23,6 +25,22 @@ describe("Studio route registry", () => {
     expect(studioRoutePath("project-document")).toBe("/studio/p/:projectId/d/:documentId");
     expect(studioProjectSectionPath("series/한글", "story"))
       .toBe("/studio/p/series%2F%ED%95%9C%EA%B8%80/story");
+  });
+
+  it("uses the registry as the single authority for specialist Studio discovery routes", () => {
+    expect(STUDIO_DISCOVERY_ROUTE_IDS).toEqual([
+      "generate",
+      "ai-lab",
+      "ai-runtime",
+      "character-convert",
+      "ecosystem",
+      "jobs",
+    ]);
+    for (const id of STUDIO_DISCOVERY_ROUTE_IDS) {
+      const registration = studioRouteRegistration(id);
+      expect(studioRoutePath(id)).toBe(registration.pattern);
+      expect(resolveStudioRouteRegistration(registration.pattern)?.id).toBe(id);
+    }
   });
 
   it("resolves canonical and legacy entry points to the same route owner", () => {

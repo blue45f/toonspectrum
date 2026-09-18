@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { triggerParticleBurst } from "@toonspectrum/core/fx";
 import { useEffect, useRef, useState } from "react";
 
@@ -148,8 +149,7 @@ export function SplashScreen({
           className="ts-splash-title m-0 font-black text-white"
           style={{ fontSize: "clamp(1.6rem,8vw,2.3rem)", letterSpacing: "0.14em" }}
         >
-          TOON
-          <span
+          {translateCurrentStaticSourceText("shared.components.SplashScreen", "en", "TOON")}<span
             className="ts-splash-accent"
             style={{
               background:
@@ -160,8 +160,7 @@ export function SplashScreen({
               color: "transparent",
             }}
           >
-            SPECTRUM
-          </span>
+            {translateCurrentStaticSourceText("shared.components.SplashScreen", "en", "SPECTRUM")}</span>
         </h1>
 
         <div className="ts-splash-line my-4 h-0.5 rounded-full bg-gradient-to-r from-[#ff3b30] to-[#5ac8fa]" />
@@ -170,8 +169,7 @@ export function SplashScreen({
           className="ts-splash-sub font-bold text-white/50"
           style={{ fontSize: "clamp(9px,2.6vw,10.5px)", letterSpacing: "0.25em" }}
         >
-          WEBTOON CATALOG &amp; CREATOR STUDIO
-        </span>
+          {translateCurrentStaticSourceText("shared.components.SplashScreen", "en", "WEBTOON CATALOG &amp; CREATOR STUDIO")}</span>
 
         <span
           className="ts-splash-badge mt-5 rounded-full border px-2.5 py-0.5 font-extrabold uppercase tracking-wider"
@@ -183,32 +181,12 @@ export function SplashScreen({
             letterSpacing: "0.1em",
           }}
         >
-          Beta Service
-        </span>
+          {translateCurrentStaticSourceText("shared.components.SplashScreen", "en", "Beta Service")}</span>
       </div>
 
       {/* 컴포넌트 로컬 keyframes — 별도 CSS import 불필요.
           fx.css 의 공유 키프레임(pf-*)과 충돌하지 않게 ts-splash-* 네임스페이스 사용. */}
-      <style>{`
-        @keyframes ts-splash-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-        @keyframes ts-splash-spin { to{transform:rotate(360deg)} }
-        @keyframes ts-splash-hue { to{filter:hue-rotate(360deg)} }
-        @keyframes ts-splash-up { from{transform:translateY(20px);opacity:0;filter:blur(5px)} to{transform:translateY(0);opacity:1;filter:blur(0)} }
-        @keyframes ts-splash-grow { to{width:clamp(72px,26vw,100px)} }
-        @keyframes ts-splash-fade { to{opacity:1} }
-        .ts-splash-logo{ animation: ts-splash-float 2.8s ease-in-out infinite; }
-        .ts-splash-ring{ animation: ts-splash-spin 8s linear infinite; }
-        .ts-splash-title{ animation: ts-splash-up 1s cubic-bezier(0.16,1,0.3,1); }
-        .ts-splash-accent{ animation: ts-splash-hue 6s infinite linear; display:inline-block; }
-        .ts-splash-line{ width:0; animation: ts-splash-grow 1.4s 0.3s forwards cubic-bezier(0.16,1,0.3,1); }
-        .ts-splash-sub{ opacity:0; animation: ts-splash-fade 1s 0.6s forwards ease-out; }
-        .ts-splash-badge{ opacity:0; animation: ts-splash-fade 1s 0.8s forwards ease-out; }
-        @media (prefers-reduced-motion: reduce){
-          .ts-splash-logo,.ts-splash-ring,.ts-splash-accent,.ts-splash-line,.ts-splash-sub,.ts-splash-badge,.ts-splash-title{ animation:none; }
-          .ts-splash-line{ width:clamp(72px,26vw,100px); }
-          .ts-splash-sub,.ts-splash-badge{ opacity:1; }
-        }
-      `}</style>
+      <style>{translateCurrentStaticSourceText("shared.components.SplashScreen", "en", "\n        @keyframes ts-splash-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }\n        @keyframes ts-splash-spin { to{transform:rotate(360deg)} }\n        @keyframes ts-splash-hue { to{filter:hue-rotate(360deg)} }\n        @keyframes ts-splash-up { from{transform:translateY(20px);opacity:0;filter:blur(5px)} to{transform:translateY(0);opacity:1;filter:blur(0)} }\n        @keyframes ts-splash-grow { to{width:clamp(72px,26vw,100px)} }\n        @keyframes ts-splash-fade { to{opacity:1} }\n        .ts-splash-logo{ animation: ts-splash-float 2.8s ease-in-out infinite; }\n        .ts-splash-ring{ animation: ts-splash-spin 8s linear infinite; }\n        .ts-splash-title{ animation: ts-splash-up 1s cubic-bezier(0.16,1,0.3,1); }\n        .ts-splash-accent{ animation: ts-splash-hue 6s infinite linear; display:inline-block; }\n        .ts-splash-line{ width:0; animation: ts-splash-grow 1.4s 0.3s forwards cubic-bezier(0.16,1,0.3,1); }\n        .ts-splash-sub{ opacity:0; animation: ts-splash-fade 1s 0.6s forwards ease-out; }\n        .ts-splash-badge{ opacity:0; animation: ts-splash-fade 1s 0.8s forwards ease-out; }\n        @media (prefers-reduced-motion: reduce){\n          .ts-splash-logo,.ts-splash-ring,.ts-splash-accent,.ts-splash-line,.ts-splash-sub,.ts-splash-badge,.ts-splash-title{ animation:none; }\n          .ts-splash-line{ width:clamp(72px,26vw,100px); }\n          .ts-splash-sub,.ts-splash-badge{ opacity:1; }\n        }\n      ")}</style>
     </div>
   );
 }

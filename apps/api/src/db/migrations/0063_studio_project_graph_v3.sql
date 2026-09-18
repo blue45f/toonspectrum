@@ -343,7 +343,10 @@ CREATE TABLE IF NOT EXISTS studio_review_comment (
     AND anchor ? 'artifactId'
     AND anchor ? 'revisionId'
     AND anchor ? 'scope'
-    AND anchor ? 'kind'
+    AND anchor ? 'target'
+    AND jsonb_typeof(anchor->'scope') = 'object'
+    AND jsonb_typeof(anchor->'target') = 'object'
+    AND anchor->'target' ? 'type'
   ),
   CONSTRAINT studio_review_comment_body_check CHECK (length(btrim(body)) BETWEEN 1 AND 20000),
   CONSTRAINT studio_review_comment_severity_check CHECK (severity IN ('required', 'recommended', 'note')),

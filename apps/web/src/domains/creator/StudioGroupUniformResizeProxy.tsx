@@ -1,3 +1,4 @@
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { Fragment, useCallback, useLayoutEffect, useRef } from "react";
 import { Rect } from "react-konva/lib/ReactKonvaCore";
 
@@ -542,7 +543,7 @@ export function StudioGroupUniformResizeProxy({
         resizeEnabled={enabled && validBounds}
         rotateEnabled={rotatable && enabled && validBounds}
         naturalRotationEnabled={rotatable}
-        naturalRatioMode={freeTransform ? "shift" : "always"}
+        naturalRatioMode={freeTransform ? translateCurrentStaticSourceText("domains.creator.StudioGroupUniformResizeProxy", "en", "shift") : translateCurrentStaticSourceText("domains.creator.StudioGroupUniformResizeProxy", "en", "always")}
         flipEnabled={false}
         shouldOverdrawWholeArea={false}
         rotateAnchorOffset={26 / scale}
