@@ -9,6 +9,21 @@ import {
 } from "./StudioProductionHubPage";
 import { createEmptyProductionWorkspace } from "./studio-production-workspace";
 
+const roleWorkspace = vi.hoisted(() => ({
+  collaborationMode: "solo" as "solo" | "team",
+}));
+
+vi.mock("@/shared/lib/use-creator-role-workspace", () => ({
+  useCreatorRoleWorkspace: () => ({
+    snapshot: {
+      document: {
+        collaborationMode: roleWorkspace.collaborationMode,
+        workspaceMode: "creator",
+      },
+    },
+  }),
+}));
+
 const database = vi.hoisted(() => ({
   kvGet: vi.fn<(_namespace: string, _key: string) => Promise<string | null>>(async () => null),
   kvSet: vi.fn<(_namespace: string, _key: string, _value: string) => Promise<void>>(async () => undefined),
@@ -46,6 +61,7 @@ vi.mock("./studio-production-server-client", () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  roleWorkspace.collaborationMode = "solo";
   database.kvGet.mockResolvedValue(null);
   database.kvSet.mockResolvedValue(undefined);
   server.loadWorkspace.mockImplementation(async (workId: string) => {
@@ -102,9 +118,19 @@ describe("production scope at the actual React page", () => {
     expect(screen.getByRole("link", { name: "홈" }).getAttribute("href")).toBe(
       `/studio/projects?scope=${kind}%3Achapter-1`,
     );
-    expect(screen.getByRole("link", { name: "참여" }).getAttribute("href")).toBe(
-      `/studio/join?scope=${kind}%3Achapter-1`,
-    );
+    if (kind === "work") {
+      expect(screen.getByRole("link", { name: "참여" }).getAttribute("href")).toBe(
+        "/studio/join?scope=work%3Achapter-1",
+      );
+      expect(document.querySelector("[data-collaboration-level]")?.getAttribute("data-collaboration-level")).toBe(
+        "lightweight",
+      );
+    } else {
+      expect(screen.queryByRole("link", { name: "참여" })).toBeNull();
+      expect(document.querySelector("[data-collaboration-level]")?.getAttribute("data-collaboration-level")).toBe(
+        "solo",
+      );
+    }
     expect(database.kvSet).not.toHaveBeenCalled();
   });
 
@@ -143,6 +169,21 @@ describe("production scope at the actual React page", () => {
       "/studio/remix/b/canvas",
     );
     expect(database.kvSet).not.toHaveBeenCalled();
+  });
+
+  it("shows collaboration chrome for an explicit team preference on a local project", async () => {
+    roleWorkspace.collaborationMode = "team";
+    mount("/studio/projects?scope=remix%3Ateam-local", "projects");
+
+    await screen.findByText("이 기기에 저장됨");
+    expect(document.querySelector("[data-collaboration-level]")?.getAttribute("data-collaboration-level")).toBe(
+      "lightweight",
+    );
+    expect(screen.getByRole("link", { name: "참여" }).getAttribute("href")).toBe(
+      "/studio/join?scope=remix%3Ateam-local",
+    );
+    expect(screen.getByText("참여자")).toBeTruthy();
+    expect(document.querySelector("[data-solo-workspace-notice]")).toBeNull();
   });
 
   it("does not steal typing or IME keyboard events for workspace shortcuts", async () => {
