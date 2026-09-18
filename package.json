@@ -55,7 +55,7 @@
     "verify:cloudflare-realtime": "pnpm run test:cloudflare-realtime && pnpm run typecheck:cloudflare-realtime && pnpm exec wrangler deploy --dry-run --config deploy/cloudflare-realtime/wrangler.jsonc",
     "verify:backend-capability-worker": "node scripts/canary-backend-capability-worker.mjs",
     "verify:csp": "node scripts/verify-static-csp.mjs apps/web/index.html",
-    "validate:architecture": "node scripts/validate-architecture.mjs",
+    "validate:architecture": "node scripts/validate-architecture.mjs && pnpm run validate:app-boundaries",
     "verify:toolchain-coverage": "node scripts/verify-toolchain-coverage.mjs",
     "check:studio-bundle": "node scripts/check-studio-bundle.mjs",
     "ci": "pnpm run validate:architecture && pnpm run verify:free-infrastructure && pnpm run verify:cloudflare-apex-redirect && pnpm run verify:cloudflare-static && pnpm run verify:csp && pnpm run verify:toolchain-coverage && pnpm run verify:studio-competitor-capabilities && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run test:toonbridge && pnpm run verify:cloudflare-realtime && pnpm run build && pnpm run check:studio-bundle && pnpm run audit:licenses && pnpm run build:all",
@@ -206,7 +206,11 @@
     "mobile:assets": "capacitor-assets generate --android --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d' && capacitor-assets generate --ios --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d'",
     "mobile:android:build": "cap sync android && cd android && ./gradlew assembleDebug",
     "mobile:android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
-    "mobile:ios:prepare": "cap sync ios"
+    "mobile:ios:prepare": "cap sync ios",
+    "dev:admin": "vite --config vite.admin.config.ts",
+    "build:admin": "vite build --config vite.admin.config.ts",
+    "typecheck:admin": "tsc -p apps/admin/tsconfig.json",
+    "validate:app-boundaries": "node scripts/validate-app-boundaries.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
@@ -235,6 +239,7 @@
     "@resvg/resvg-wasm": "2.6.2",
     "@sqlite.org/sqlite-wasm": "3.53.0-build1",
     "@techstark/opencv-js": "5.0.0-release.1",
+    "@toonspectrum/contracts": "workspace:*",
     "@toonspectrum/core": "workspace:*",
     "@toonspectrum/play-core": "workspace:*",
     "@toonspectrum/studio-brush-platform": "workspace:*",

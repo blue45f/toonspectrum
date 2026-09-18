@@ -37,6 +37,7 @@ export class StudioP2pHuddleController {
   private readonly epoch: string;
   private readonly peers = new Map<string, HuddlePeer>();
   private readonly links = new Map<string, Link>();
+  private mediaPeerScope: Set<string> | null = null;
   private readonly blocked = new Set<string>();
   private readonly seen = new Set<string>();
   private readonly listeners = new Set<() => void>();
@@ -171,6 +172,24 @@ export class StudioP2pHuddleController {
     this.emit(); return message.sent.length > 0;
   }
   setHand(hand: boolean): void { this.state.hand = hand; this.announce(); this.emit(); }
+  setMediaPeerScope(sessionIds: readonly string[] | null): void {
+    this.mediaPeerScope = sessionIds === null
+      ? null
+      : new Set(sessionIds.filter((id) => id !== this.self.sessionId && !this.blocked.has(id)));
+    for (const id of [...this.links.keys()]) {
+      if (!this.isMediaPeerAllowed(id)) this.closeLink(id);
+    }
+    for (const [id, peer] of this.peers) {
+      if (this.isMediaPeerAllowed(id)
+        && (!peer.muted || peer.camera || peer.sharing || this.audioTrack || this.videoTrack)) {
+        this.ensureLink(id);
+      }
+    }
+    this.emit();
+  }
+  private isMediaPeerAllowed(id: string): boolean {
+    return this.mediaPeerScope === null || this.mediaPeerScope.has(id);
+  }
   react(emoji: HuddleReaction): void {
     const packet: HuddlePacket = { kind: "reaction", epoch: this.epoch, id: this.id(), emoji };
     for (const id of this.peers.keys()) this.send(id, packet);
@@ -181,7 +200,7 @@ export class StudioP2pHuddleController {
   }
   private ensureLink(id: string): Link | null {
     const peer = this.peers.get(id);
-    if (this.closed || !peer) return null;
+    if (this.closed || !peer || !this.isMediaPeerAllowed(id)) return null;
     const existing = this.links.get(id);
     if (existing) return existing;
     try {
@@ -314,7 +333,7 @@ export class StudioP2pHuddleController {
     }
     this.announce(); this.emit();
   }
-  private removePeer(id: string): void {
+  private closeLink(id: string): void {
     const link = this.links.get(id);
     this.links.delete(id);
     if (link) {
@@ -322,6 +341,11 @@ export class StudioP2pHuddleController {
       link.pc.onnegotiationneeded = null; link.pc.onconnectionstatechange = null;
       link.pc.close();
     }
+    const peer = this.peers.get(id);
+    if (peer) { peer.stream = null; peer.connection = "idle"; }
+  }
+  private removePeer(id: string): void {
+    this.closeLink(id);
     this.peers.delete(id); this.inboundChat.delete(id);
   }
   close(): void {

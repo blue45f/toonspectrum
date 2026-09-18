@@ -6,6 +6,10 @@ on:
       - "apps/admin/**"
       - "apps/web/src/**"
       - "apps/api/src/**"
+      - "apps/api/tsconfig.json"
+      - "packages/contracts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "config/architecture-boundary-ratchet.json"
       - "scripts/validate-app-boundaries.mjs"
       - "vite.admin.config.ts"
@@ -16,6 +20,10 @@ on:
       - "apps/admin/**"
       - "apps/web/src/**"
       - "apps/api/src/**"
+      - "apps/api/tsconfig.json"
+      - "packages/contracts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
       - "config/architecture-boundary-ratchet.json"
       - "scripts/validate-app-boundaries.mjs"
       - "vite.admin.config.ts"
@@ -38,6 +46,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Validate application import ratchets
         run: node scripts/validate-app-boundaries.mjs
+      - name: Type-check shared contracts
+        run: pnpm --filter @toonspectrum/contracts run typecheck
       - name: Type-check Admin boundary
         run: pnpm exec tsc -p apps/admin/tsconfig.json
       - name: Build Admin boundary

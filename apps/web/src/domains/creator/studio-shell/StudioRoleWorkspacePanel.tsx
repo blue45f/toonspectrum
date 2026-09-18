@@ -1,6 +1,7 @@
 import {
-  translateBilingualValueForLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -17,31 +18,40 @@ import { useSession } from "@/compat/auth-session-store";
 import { getMyProfile, updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
-  CREATOR_STAGE_LABELS,
   creatorRoleDefinition,
   creatorRoleSelection,
   creatorText,
   normalizeCreatorRoleProfile,
+  type CreatorExperienceLevel,
   type CreatorRoleId,
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
 import { creatorRoleExperience } from "@/shared/lib/creator-role-experience";
 import {
   GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
+  creatorExperienceLevelFromLegacyStage,
   creatorWorkspaceStudioUiMode,
   type CreatorWorkspaceMode,
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioRoleWorkspacePanel", ko, en);
 
-function localized(_locale, ko: string, en: string): string {
+const ACCOUNT_CONTEXT_LABELS = {
+  individual: { ko: "개인", en: "Individual" },
+  education: { ko: "교육", en: "Education" },
+  studio: { ko: "팀 · 스튜디오", en: "Team · Studio" },
+} as const;
+
+const EXPERIENCE_LABELS: Readonly<Record<CreatorExperienceLevel, { ko: string; en: string }>> = {
+  beginner: { ko: "입문", en: "Beginner" },
+  experienced: { ko: "경험 있음", en: "Experienced" },
+  professional: { ko: "현업 · 전문", en: "Professional" },
+};
+
+function localized(_locale: CreatorRoleLocale, ko: string, en: string): string {
   return bi(ko, en);
 }
 
@@ -157,9 +167,34 @@ export function StudioRoleWorkspacePanel({
   if (!activeDefinition) return null;
   const experience = creatorRoleExperience(activeRole);
   const workspaceMode = globalWorkspace.snapshot.document.workspaceMode;
-  const stageLabel = roleProfile.creatorStage
-    ? creatorText(CREATOR_STAGE_LABELS[roleProfile.creatorStage], locale)
+  const accountContext = globalWorkspace.snapshot.document.accountContext;
+  const resolvedExperienceLevel = roleProfile.experienceLevel
+    ?? creatorExperienceLevelFromLegacyStage(roleProfile.creatorStage);
+  const experienceLabel = resolvedExperienceLevel
+    ? localized(locale, EXPERIENCE_LABELS[resolvedExperienceLevel].ko, EXPERIENCE_LABELS[resolvedExperienceLevel].en)
     : null;
+  const contextAssist = accountContext === "studio"
+    ? {
+        title: localized(locale, "팀 제작 흐름을 바로 확인하세요", "Open your team production flow"),
+        description: localized(locale, "배정·마감·검수·인계 상태를 Production에서 우선 확인합니다.", "Review assignments, deadlines, reviews and handoffs in Production."),
+        href: "/production",
+        action: localized(locale, "Production 열기", "Open Production"),
+      }
+    : accountContext === "education"
+      ? {
+          title: localized(locale, "학습과 실습을 제작 흐름에 연결하세요", "Connect learning directly to practice"),
+          description: localized(locale, "교육 자료와 실습 프로젝트를 오가며 같은 전문 도구를 사용할 수 있습니다.", "Move between learning resources and practice projects while keeping the same professional tools."),
+          href: "/learn",
+          action: localized(locale, "교육 자료 보기", "Browse learning resources"),
+        }
+      : workspaceMode === "guided"
+        ? {
+            title: localized(locale, "필요할 때 배우고 바로 실습하세요", "Learn only when you need it, then practice immediately"),
+            description: localized(locale, "Guided 모드는 설명과 추천 학습 동선을 더 보여주지만 모든 전문 도구는 그대로 사용할 수 있습니다.", "Guided mode surfaces explanations and learning paths while keeping every professional tool available."),
+            href: "/learn",
+            action: localized(locale, "교육 자료 보기", "Browse learning resources"),
+          }
+        : null;
 
   const changeRole = async (role: CreatorRoleId) => {
     if (role === activeRole || savingRole) return;
@@ -203,9 +238,12 @@ export function StudioRoleWorkspacePanel({
               <span className="inline-flex min-h-7 items-center rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
                 {creatorText(activeDefinition.label, locale)}
               </span>
-              {stageLabel ? (
+              <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-bold text-fg-2">
+                {localized(locale, ACCOUNT_CONTEXT_LABELS[accountContext].ko, ACCOUNT_CONTEXT_LABELS[accountContext].en)}
+              </span>
+              {experienceLabel ? (
                 <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-bold text-fg-2">
-                  {stageLabel}
+                  {experienceLabel}
                 </span>
               ) : null}
               <span className="inline-flex min-h-7 items-center rounded-full border border-line bg-panel px-2.5 text-xs font-bold text-fg-2">
@@ -317,23 +355,19 @@ export function StudioRoleWorkspacePanel({
           </nav>
         </div>
 
-        {workspaceMode === "guided" ? (
+        {contextAssist ? (
           <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-line bg-panel p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
                 <Sparkles size={16} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-xs font-black text-fg">
-                  {localized(locale, "필요할 때 배우고 바로 실습하세요", "Learn only when you need it, then practice immediately")}
-                </p>
-                <p className="mt-1 text-[0.7rem] leading-5 text-fg-3">
-                  {localized(locale, "Guided 모드는 설명과 추천 학습 동선을 더 보여주지만 모든 전문 도구는 그대로 사용할 수 있습니다.", "Guided mode surfaces explanations and learning paths while keeping every professional tool available.")}
-                </p>
+                <p className="text-xs font-black text-fg">{contextAssist.title}</p>
+                <p className="mt-1 text-[0.7rem] leading-5 text-fg-3">{contextAssist.description}</p>
               </div>
             </div>
-            <Link href="/learn" className={buttonClass({ variant: "quiet", size: "sm", className: "shrink-0 gap-1.5" })}>
-              {localized(locale, "교육 자료 보기", "Browse learning resources")}
+            <Link href={contextAssist.href} className={buttonClass({ variant: "quiet", size: "sm", className: "shrink-0 gap-1.5" })}>
+              {contextAssist.action}
               <ArrowRight size={13} aria-hidden="true" />
             </Link>
           </div>

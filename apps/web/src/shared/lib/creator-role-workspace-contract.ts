@@ -2,9 +2,11 @@ import {
   CREATOR_ROLE_IDS,
   CREATOR_SPECIALTY_IDS,
   type CreatorCollaborationStatus,
+  type CreatorExperienceLevel,
   type CreatorRoleId,
   type CreatorRoleProfile,
   type CreatorSpecialtyId,
+  type CreatorStage,
   type PublicCreatorRoleProfile,
 } from "./creator-role-contract";
 
@@ -65,6 +67,9 @@ export const CREATOR_ROLE_USAGE_GOALS = [
   "outsourcing",
 ] as const;
 export type CreatorRoleUsageGoal = (typeof CREATOR_ROLE_USAGE_GOALS)[number];
+
+export const CREATOR_ACCOUNT_CONTEXTS = ["individual", "education", "studio"] as const;
+export type CreatorAccountContext = (typeof CREATOR_ACCOUNT_CONTEXTS)[number];
 
 export const CREATOR_WORKSPACE_MODES = ["guided", "creator", "production"] as const;
 export type CreatorWorkspaceMode = (typeof CREATOR_WORKSPACE_MODES)[number];
@@ -149,6 +154,7 @@ export interface CreatorRoleWorkspacePreference {
     Partial<Record<CreatorRoleNotificationEvent, boolean>>
   >;
   readonly usageGoals: readonly CreatorRoleUsageGoal[];
+  readonly accountContext: CreatorAccountContext;
   readonly workspaceMode: CreatorWorkspaceMode;
   readonly collaborationMode: CreatorCollaborationMode;
   readonly capacity: CreatorRoleCapacity;
@@ -271,6 +277,7 @@ const LENS_SET = new Set<string>(CREATOR_DETAILED_ROLE_LENSES);
 const WORKSPACE_PRESET_SET = new Set<string>(CREATOR_ROLE_WORKSPACE_PRESETS);
 const NOTIFICATION_PRESET_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_PRESETS);
 const USAGE_GOAL_SET = new Set<string>(CREATOR_ROLE_USAGE_GOALS);
+const ACCOUNT_CONTEXT_SET = new Set<string>(CREATOR_ACCOUNT_CONTEXTS);
 const WORKSPACE_MODE_SET = new Set<string>(CREATOR_WORKSPACE_MODES);
 const COLLABORATION_MODE_SET = new Set<string>(CREATOR_COLLABORATION_MODES);
 const NOTIFICATION_EVENT_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_EVENTS);
@@ -299,6 +306,7 @@ export const EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE: CreatorRoleWorkspacePrefer
     notificationPreset: "balanced",
     notificationOverrides: Object.freeze({}),
     usageGoals: Object.freeze([]),
+    accountContext: "individual",
     workspaceMode: "creator",
     collaborationMode: "solo",
     capacity: EMPTY_CREATOR_ROLE_CAPACITY,
@@ -468,6 +476,9 @@ export function normalizeCreatorRoleWorkspacePreference(
       value.notificationOverrides,
     ),
     usageGoals,
+    accountContext:
+      normalizeEnum<CreatorAccountContext>(value.accountContext, ACCOUNT_CONTEXT_SET)
+      ?? "individual",
     workspaceMode:
       normalizeEnum<CreatorWorkspaceMode>(value.workspaceMode, WORKSPACE_MODE_SET)
       ?? "creator",
@@ -478,6 +489,61 @@ export function normalizeCreatorRoleWorkspacePreference(
     onboardingComplete: value.onboardingComplete === true,
     checklistStates: normalizeChecklistStates(value.checklistStates),
   };
+}
+
+/** Map the legacy mixed creatorStage field into the new account-context axis. */
+export function creatorAccountContextFromLegacyStage(
+  stage: CreatorStage | null | undefined,
+): CreatorAccountContext {
+  if (stage === "studio") return "studio";
+  if (stage === "student" || stage === "educator") return "education";
+  return "individual";
+}
+
+/** Preserve old onboarding choices while new flows write the dedicated experienceLevel field. */
+export function creatorExperienceLevelFromLegacyStage(
+  stage: CreatorStage | null | undefined,
+): CreatorExperienceLevel | null {
+  if (stage === "student" || stage === "hobbyist") return "beginner";
+  if (stage === "aspiring") return "experienced";
+  if (stage === "professional" || stage === "studio" || stage === "educator") {
+    return "professional";
+  }
+  return null;
+}
+
+/** Recommend information density without changing feature access or project permissions. */
+export function recommendCreatorWorkspaceMode(input: {
+  readonly accountContext: CreatorAccountContext;
+  readonly experienceLevel: CreatorExperienceLevel | null;
+  readonly usageGoals: readonly CreatorRoleUsageGoal[];
+}): CreatorWorkspaceMode {
+  const goals = new Set(input.usageGoals);
+  if (
+    input.accountContext === "studio"
+    || goals.has("studio-management")
+    || goals.has("team-production")
+  ) {
+    return "production";
+  }
+  if (
+    input.experienceLevel === "professional"
+    && (goals.has("serialization") || goals.has("outsourcing"))
+  ) {
+    return "production";
+  }
+  if (
+    input.experienceLevel === "beginner"
+    && (
+      input.accountContext === "education"
+      || goals.has("learning")
+      || goals.has("first-project")
+      || goals.has("drawing-practice")
+    )
+  ) {
+    return "guided";
+  }
+  return "creator";
 }
 
 export function creatorRoleWorkspacePreferenceForProfile(

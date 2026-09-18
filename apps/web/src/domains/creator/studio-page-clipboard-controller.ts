@@ -9,8 +9,12 @@ import {
 } from "./studio-edit-controls";
 import { planAtomicSelectionTranslation } from "./studio-group-selection";
 import { uid } from "./studio-id";
+import { STUDIO_INSERT_BATCH_MAX_ITEMS } from "./studio-insert-batch-model";
 import { createLayerGroup, missingLayerGroupIds, type LayerGroup } from "./studio-layers";
-import { loadStudioCanvasImageFile } from "./studio-legacy-editor-runtime-helpers";
+import {
+  isStudioOpenRasterDropFile,
+  loadStudioCanvasImageFile,
+} from "./studio-legacy-editor-runtime-helpers";
 import {
   buildClipboardPayload,
   clipboardPayloadMatchesMembers,
@@ -30,7 +34,10 @@ import type { AnimationTimelineDoc } from "./studio-anim-tracks";
 import type { StudioEditorMutationTicket } from "./studio-editor-scope";
 import type { Tool } from "./studio-editor-tool-model";
 import type { El, ImageEl } from "./studio-element-model";
-import type { CanvasImagePlacement } from "./studio-image-placement";
+import {
+  createCanvasImageElement,
+  type CanvasImagePlacement,
+} from "./studio-image-placement";
 import type { PageState } from "./studio-page-state";
 import type { StudioPublishAiProvenance } from "./studio-publish-preflight";
 
@@ -42,6 +49,75 @@ export interface StudioDuplicateSelectionOptions {
     readonly deltaY: number;
   };
   readonly announcement?: string;
+}
+
+const STUDIO_CLIPBOARD_IMAGE_EXTENSION =
+  /\.(?:avif|apng|bmp|dib|gif|jpe?g|png|tga|icb|vda|vst|ppm|pam|qoi|tif|tiff|webp)$/iu;
+
+function isStudioClipboardImageFile(file: File): boolean {
+  return (
+    file.type.trim().toLowerCase().startsWith("image/") ||
+    STUDIO_CLIPBOARD_IMAGE_EXTENSION.test(file.name) ||
+    isStudioOpenRasterDropFile(file)
+  );
+}
+
+function studioClipboardFileFingerprint(file: File): string {
+  return [file.name, file.type, file.size, file.lastModified].join(":");
+}
+
+/**
+ * Clipboard implementations are inconsistent: Chromium usually exposes copied images through
+ * DataTransfer.items, while Safari/WebKit and OS file-copy paths can surface them only in files.
+ * Merge both sources and de-duplicate so one Cmd/Ctrl+V never creates the same layer twice.
+ */
+export function studioClipboardImageFiles(
+  clipboardData: Pick<DataTransfer, "items" | "files"> | null | undefined,
+): File[] {
+  if (!clipboardData) return [];
+  const itemFiles: File[] = [];
+  for (const item of Array.from(clipboardData.items ?? [])) {
+    if (item.kind !== "file") continue;
+    const file = item.getAsFile();
+    if (file && isStudioClipboardImageFile(file)) itemFiles.push(file);
+  }
+  const itemFingerprints = new Set(itemFiles.map(studioClipboardFileFingerprint));
+  const fileFallbacks = Array.from(clipboardData.files ?? []).filter(
+    (file) =>
+      isStudioClipboardImageFile(file) &&
+      !itemFingerprints.has(studioClipboardFileFingerprint(file)),
+  );
+  return [...itemFiles, ...fileFallbacks];
+}
+
+type LoadedStudioClipboardImage = Awaited<ReturnType<typeof loadStudioCanvasImageFile>>;
+
+async function loadStudioClipboardImages(
+  files: readonly File[],
+): Promise<PromiseSettledResult<LoadedStudioClipboardImage>[]> {
+  const results = new Array<PromiseSettledResult<LoadedStudioClipboardImage>>(files.length);
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < files.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      const file = files[index]!;
+      try {
+        results[index] = {
+          status: "fulfilled",
+          value: await loadStudioCanvasImageFile(file),
+        };
+      } catch (reason) {
+        results[index] = { status: "rejected", reason };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(2, files.length) }, () => worker()),
+  );
+  return results;
 }
 
 export interface UseStudioPageClipboardOptions {
@@ -454,8 +530,8 @@ export function useStudioPageClipboard({
         return;
       }
       const clipboardText = e.clipboardData?.getData("text/plain") ?? "";
-      const clipboardItems = Array.from(e.clipboardData?.items ?? []);
-      const hasClipboardImage = clipboardItems.some((item) => item.type.startsWith("image/"));
+      const allClipboardImages = studioClipboardImageFiles(e.clipboardData);
+      const hasClipboardImage = allClipboardImages.length > 0;
       const elementPayload =
         parseClipboardPayload(clipboardText) ??
         (clipboardText.trim() || hasClipboardImage
@@ -466,48 +542,132 @@ export function useStudioPageClipboard({
         e.preventDefault();
         return;
       }
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (!item.type.startsWith("image/")) continue;
-        const file = item.getAsFile();
-        if (!file) continue;
-        e.preventDefault();
-        const mutationTicket = captureStudioMutationTicket();
-        const targetPageId = activePage.id;
-        const targetMasterEditMode = masterEditMode;
-        const insertionPlacement = nextAssetInsertionPlacement();
-        void (async () => {
-          try {
-            const { src, width, height, isAnimatedGif } = await loadStudioCanvasImageFile(file);
-            if (
-              !isStudioPasteScopeCurrent({
-                mutationAllowed: canApplyStudioMutation(mutationTicket),
-                reviewLocked: activeSurfaceReviewLockedRef.current,
-                targetPageId,
-                currentPageId: currentPageIdRef.current,
-                targetMasterEditMode,
-                currentMasterEditMode: masterEditModeRef.current,
-              })
-            ) {
-              return;
-            }
-            addRenderedImage(
-              src,
-              width,
-              height,
-              undefined,
-              isAnimatedGif,
-              undefined,
-              insertionPlacement,
-            );
-          } catch (err) {
-            setError(err instanceof Error ? err.message : "이미지 붙여넣기 실패");
-          }
-        })();
+      if (allClipboardImages.length === 0) return;
+      e.preventDefault();
+      if (activeSurfaceReviewLockedRef.current) {
+        setError(
+          collaborationDocumentLocked
+            ? collaborationLockMessage()
+            : "이 페이지는 검토 잠금 상태예요. 잠금을 해제한 뒤 이미지를 붙여넣어 주세요.",
+        );
         return;
       }
+      const clipboardImages = allClipboardImages.slice(0, STUDIO_INSERT_BATCH_MAX_ITEMS);
+      const omittedCount = allClipboardImages.length - clipboardImages.length;
+      const mutationTicket = captureStudioMutationTicket();
+      const targetPageId = activePage.id;
+      const targetMasterEditMode = masterEditMode;
+      const placements = clipboardImages.map(() => nextAssetInsertionPlacement());
+      void (async () => {
+        const decoded = await loadStudioClipboardImages(clipboardImages);
+        if (
+          !isStudioPasteScopeCurrent({
+            mutationAllowed: canApplyStudioMutation(mutationTicket),
+            reviewLocked: activeSurfaceReviewLockedRef.current,
+            targetPageId,
+            currentPageId: currentPageIdRef.current,
+            targetMasterEditMode,
+            currentMasterEditMode: masterEditModeRef.current,
+          })
+        ) {
+          announceDrawingShortcut("페이지나 원고 상태가 바뀌어 이미지 붙여넣기를 취소했습니다");
+          return;
+        }
+
+        const failures: string[] = [];
+        const prepared = decoded.flatMap((result, index) => {
+          const file = clipboardImages[index]!;
+          if (result.status === "rejected") {
+            const message = result.reason instanceof Error ? result.reason.message : "이미지 준비 실패";
+            failures.push(`${file.name || "클립보드 이미지"}: ${message}`);
+            return [];
+          }
+          return [{ file, placement: placements[index]!, image: result.value, index }];
+        });
+        if (prepared.length === 0) {
+          const omittedMessage = omittedCount > 0
+            ? ` · 최대 ${STUDIO_INSERT_BATCH_MAX_ITEMS}개 제한으로 ${omittedCount}개 제외`
+            : "";
+          setError(
+            `${failures[0] ?? "붙여넣을 수 있는 이미지를 찾지 못했습니다."}${omittedMessage}`,
+          );
+          return;
+        }
+
+        const patchFor = (entry: (typeof prepared)[number]) => ({
+          name: entry.file.name.trim() || (prepared.length > 1 ? `클립보드 이미지 ${entry.index + 1}` : "클립보드 이미지"),
+          ...(entry.image.frames && entry.image.frames.length > 1
+            ? {
+                frames: entry.image.frames,
+                frameFps: entry.image.frameFps,
+                frameLoop: entry.image.frameLoop,
+                activeFrameId: entry.image.frames[0]!.id,
+              }
+            : {}),
+        });
+
+        let insertedCount = 0;
+        if (prepared.length === 1) {
+          const entry = prepared[0]!;
+          if (
+            addRenderedImage(
+              entry.image.src,
+              entry.image.width,
+              entry.image.height,
+              undefined,
+              entry.image.isAnimatedGif,
+              patchFor(entry),
+              entry.placement,
+            )
+          ) {
+            insertedCount = 1;
+          }
+        } else {
+          const inserted = prepared.map((entry) => ({
+            ...createCanvasImageElement({
+              id: uid(),
+              src: entry.image.src,
+              canvasWidth: CANVAS_W,
+              canvasHeight: canvasH,
+              sourceWidth: entry.image.width,
+              sourceHeight: entry.image.height,
+              placement: entry.placement,
+            }),
+            ...(entry.image.isAnimatedGif ? { isAnimatedGif: true } : {}),
+            ...patchFor(entry),
+          } as ImageEl));
+          if (commit([...elements, ...inserted])) {
+            insertedCount = inserted.length;
+            setMarqueeIds(inserted.map((element) => element.id));
+            setSelectedId(null);
+            setTool("select");
+          }
+        }
+
+        if (insertedCount > 0) {
+          announceDrawingShortcut(
+            insertedCount === 1
+              ? "클립보드 이미지 붙여넣기"
+              : `클립보드 이미지 ${insertedCount}개 붙여넣기`,
+          );
+        }
+        const issues: string[] = [];
+        if (failures.length > 0) {
+          issues.push(`${failures.length}개 실패 · ${failures[0]}`);
+        }
+        if (omittedCount > 0) {
+          issues.push(
+            `최대 ${STUDIO_INSERT_BATCH_MAX_ITEMS}개 제한으로 ${omittedCount}개 제외`,
+          );
+        }
+        if (issues.length > 0) {
+          setError(`${insertedCount}개 삽입 · ${issues.join(" · ")}`);
+        } else if (insertedCount === 0) {
+          setError("이미지를 캔버스에 삽입하지 못했습니다.");
+        } else {
+          setError(null);
+        }
+      })();
     };
   });
 

@@ -71,12 +71,13 @@ afterEach(() => {
 });
 
 describe("CreatorAdaptiveOnboardingGate", () => {
-  it("활동 단계·복수 역할·목적·작업 화면을 저장한다", async () => {
+  it("계정 환경·경험·복수 역할·목적·협업·작업 화면을 분리해 저장한다", async () => {
     render(<CreatorAdaptiveOnboardingGate />);
 
     expect(await screen.findByRole("heading", { name: "나에게 맞는 작업 환경 만들기" })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "프로 · 현업 창작자" }));
+    fireEvent.click(screen.getByRole("button", { name: /팀 · 스튜디오/ }));
+    fireEvent.click(screen.getByRole("button", { name: /현업 · 전문/ }));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
 
     fireEvent.click(screen.getByRole("button", { name: /글작가/ }));
@@ -97,7 +98,7 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     await waitFor(() => expect(mocks.updateMyProfile).toHaveBeenCalledTimes(1));
     expect(mocks.updateMyProfile).toHaveBeenCalledWith({
       creatorRoleProfile: expect.objectContaining({
-        creatorStage: "professional",
+        experienceLevel: "professional",
         primaryRole: "story",
         secondaryRoles: ["assistant"],
         activeRole: "story",
@@ -106,6 +107,7 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     expect(mocks.saveWorkspace).toHaveBeenCalledWith(expect.objectContaining({
       activeRole: "story",
       usageGoals: ["story-writing"],
+      accountContext: "studio",
       collaborationMode: "team",
       workspaceMode: "production",
       onboardingComplete: true,

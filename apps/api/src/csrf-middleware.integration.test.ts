@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   TOONSPECTRUM_CSRF_HEADER,
   TOONSPECTRUM_CSRF_HEADER_VALUE,
-} from "../../web/src/shared/lib/csrf";
+} from "@toonspectrum/contracts/security/csrf";
 
 
 import { configureCors } from "./config/cors";

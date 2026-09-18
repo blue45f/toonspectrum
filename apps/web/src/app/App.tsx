@@ -59,6 +59,11 @@ const BrowserCompatibilityBridge = lazy(() =>
     default: mod.BrowserCompatibilityBridge,
   })),
 );
+const BetaOpenEventGate = lazy(() =>
+  import("@/domains/marketing/events/BetaOpenEventGate").then((mod) => ({
+    default: mod.BetaOpenEventGate,
+  })),
+);
 
 const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_SURVEYDESK_URL ||
@@ -287,6 +292,9 @@ function AppRuntime() {
               <>
                 <DeferredBackToTop />
                 <DeskCloudHost />
+                <Suspense fallback={null}>
+                  <BetaOpenEventGate pathname={pathname} />
+                </Suspense>
               </>
             ) : null}
             {!adminChrome ? (

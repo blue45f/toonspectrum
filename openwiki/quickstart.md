@@ -26,9 +26,11 @@ Studio is an architectural exception to ordinary page-oriented organization. Fol
 ## OpenWiki commands
 
 ```sh
-npm install -g openwiki@0.4.3
-openwiki code --init
-openwiki code --update
+npm install -g openwiki@0.5.2
+openwiki --init
+openwiki --update
 ```
 
-The scheduled workflow is intentionally non-auto-merge. It only runs generation when repository OpenWiki provider/model variables and the corresponding credential secret are configured.
+For local/manual maintenance, the repository includes the project-scoped Codex integration under `.agents/skills/openwiki` and `.codex/config.toml`. Restart Codex after checkout, then ask it to initialize or update this repository's OpenWiki. Host-driven generation uses the coding agent's authenticated model session, so it does not require a separate OpenWiki provider credential.
+
+The scheduled workflow is intentionally non-auto-merge and runs weekly to bound inference cost. It only generates when `OPENWIKI_PROVIDER` and `OPENWIKI_MODEL_ID` repository variables plus `OPENROUTER_API_KEY` and the dedicated `OPENWIKI_PR_TOKEN` secrets are configured. `.openwikiignore` keeps generated, binary, and high-volume runtime assets outside the documentation read boundary.

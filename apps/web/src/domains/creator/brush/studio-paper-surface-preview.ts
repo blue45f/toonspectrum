@@ -20,6 +20,7 @@ import {
 import {
   createPaperHeightField,
   PAPER_REFERENCE_TILE,
+  STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2,
   type PaperGrainKind,
 } from "./studio-paper-texture";
 
@@ -119,6 +120,7 @@ export function getStudioPaperSurfacePreviewTile(
     seed: surface.seed,
     width: size,
     height: size,
+    contrast: STUDIO_PAPER_HEIGHT_CONTRAST_SHAPED_V2,
   });
   const { r, g, b } = parseHexRgb(tintHex);
   const canvas = document.createElement("canvas");
@@ -128,22 +130,33 @@ export function getStudioPaperSurfacePreviewTile(
   if (!ctx) return null;
   const image = ctx.createImageData(size, size);
   const data = image.data;
-  // Turn the physically subtle height field into a neutral relief multiplier. The previous path
-  // tinted this tile with the page background and then multiplied it over the same background,
-  // which shifted the average colour while leaving less than one 8-bit step of visible contrast.
-  // Contrast expansion keeps smooth papers restrained but makes cold/rough sheets readable at fit.
-  for (let i = 0; i < field.values.length; i++) {
-    const h = field.values[i]!;
-    const relief = Math.min(1, Math.max(-1, (h - 0.5) * 5));
-    const lit = 1 + relief * grainStrength * grainOpacity;
-    const rr = Math.round(Math.min(255, Math.max(0, r * lit)));
-    const gg = Math.round(Math.min(255, Math.max(0, g * lit)));
-    const bb = Math.round(Math.min(255, Math.max(0, b * lit)));
-    const o = i * 4;
-    data[o] = rr;
-    data[o + 1] = gg;
-    data[o + 2] = bb;
-    data[o + 3] = 255;
+  // Combine height, wrapped slope and micro-curvature. Height alone reads like cloudy noise;
+  // directional slope/curvature makes fibres and tooth catch a virtual raking light while keeping
+  // the tile seamless (all neighbour reads wrap at the boundary). Shaped-v2 preserves each paper's
+  // declared amplitude, so smooth sheets stay restrained and rough sheets remain materially rough.
+  const sample = (x: number, y: number): number => {
+    const xx = (x + size) % size;
+    const yy = (y + size) % size;
+    return field.values[yy * size + xx]!;
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const h = sample(x, y);
+      const left = sample(x - 1, y);
+      const right = sample(x + 1, y);
+      const up = sample(x, y - 1);
+      const down = sample(x, y + 1);
+      const relief = Math.min(1, Math.max(-1, (h - 0.5) * 4.4));
+      const slope = Math.min(1, Math.max(-1, ((left - right) * 0.72 + (up - down) * 0.48) * 8));
+      const curvature = Math.min(1, Math.max(-1, (h * 4 - left - right - up - down) * 10));
+      const tooth = Math.min(1, Math.max(-1, relief * 0.5 + slope * 0.35 + curvature * 0.15));
+      const lit = 1 + tooth * grainStrength * grainOpacity * 0.72;
+      const o = (y * size + x) * 4;
+      data[o] = Math.round(Math.min(255, Math.max(0, r * lit)));
+      data[o + 1] = Math.round(Math.min(255, Math.max(0, g * lit)));
+      data[o + 2] = Math.round(Math.min(255, Math.max(0, b * lit)));
+      data[o + 3] = 255;
+    }
   }
   ctx.putImageData(image, 0, 0);
   const stored: CacheEntry = { key, canvas, width: size, height: size };
@@ -159,11 +172,10 @@ export function getStudioPaperSurfacePreviewTile(
 /**
  * Paint a signed substrate relief field ([-1,1], row-major) into a pattern canvas.
  *
- * This is the high-fidelity sibling of `getStudioPaperSurfacePreviewTile`. The legacy path
- * samples `createPaperHeightField` (unsigned, mean-only) and then hard-expands contrast by ×5,
- * which clips. The substrate path receives a field that is already tanh-shaped and span
- * standardized by the procedural surface provider, so the only work left here is turning the
- * signed relief into a multiply-blend luminance tile.
+ * This is the high-fidelity sibling of `getStudioPaperSurfacePreviewTile`. The synchronous
+ * fallback already uses shaped-v2 height plus wrapped slope/curvature so it remains materially
+ * readable without a worker. The substrate path goes further: it receives a signed field baked
+ * by the procedural surface provider and runs the shared relief BRDF for raking-light shading.
  *
  * The caller owns the field; nothing here mutates it. Returns null without a DOM.
  */
@@ -209,10 +221,10 @@ export function paintStudioPaperSubstrateTileCanvas(
     ? computeStudioImpastoReliefShading(heightField, {
         width: fieldWidth,
         height: fieldWidth,
-        normalScale: 2.4,
-        roughness: 0.42,
-        specularScale: 0.28,
-        diffuseScale: 0.35,
+        normalScale: 3.1,
+        roughness: 0.5,
+        specularScale: 0.2,
+        diffuseScale: 0.44,
         maxShadingMultiplier: 1.9,
       })
     : null;
@@ -223,7 +235,7 @@ export function paintStudioPaperSubstrateTileCanvas(
       const source = (y + halo) * fieldWidth + (x + halo);
       const relief = Math.min(1, Math.max(-1, heightField[source]!));
       const base = shading
-        ? (shading[source]! - 1) * 1.35 + relief * 0.45
+        ? (shading[source]! - 1) * 1.5 + relief * 0.38
         : relief;
       const lit = 1 + Math.min(1, Math.max(-1, base)) * grainStrength * grainOpacity;
       const o = (y * size + x) * 4;
@@ -240,7 +252,7 @@ export function paintStudioPaperSubstrateTileCanvas(
 /** Deterministic backdrop opacity — rougher papers show a bit more tooth, never overpower strokes. */
 export function studioPaperSurfacePreviewOpacity(kind: PaperGrainKind | unknown): number {
   const entry = getStudioPaperSurfaceCatalogEntry(kind);
-  return Math.min(0.72, Math.max(0.34, 0.32 + entry.tooth * 0.42));
+  return Math.min(0.78, Math.max(0.36, 0.34 + entry.tooth * 0.46));
 }
 
 export function resolveStudioPaperSurfaceTint(

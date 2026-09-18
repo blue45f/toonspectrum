@@ -1,8 +1,8 @@
 import {
   formatI18nTemplate,
-  translateBilingualValueForLocale,
+  translateBilingualValueForActiveLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
@@ -49,6 +49,7 @@ import {
   type CreatorSpecialtyId,
 } from "@/shared/lib/creator-role-contract";
 import {
+  CREATOR_ACCOUNT_CONTEXTS,
   CREATOR_ROLE_NOTIFICATION_EVENTS,
   CREATOR_ROLE_USAGE_GOALS,
   CREATOR_ROLE_WORKSPACE_PRESETS,
@@ -62,6 +63,7 @@ import {
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
+  recommendCreatorWorkspaceMode,
   resolveCreatorRoleProjectKey,
   type CreatorProductionRole,
   type CreatorRoleNotificationEvent,
@@ -86,10 +88,6 @@ import {
 } from "../production-hub/creator-role-production-work";
 import { getProductionProjectByWork } from "../production-hub/production-api";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioRolePersonalizationCenter", ko, en);
@@ -119,6 +117,15 @@ const USAGE_GOAL_LABELS: Readonly<
   "studio-management": { ko: "제작사·스튜디오 운영", en: "Studio management" },
   education: { ko: "학생 교육·수업", en: "Teaching & education" },
   outsourcing: { ko: "외주 작업", en: "Freelance work" },
+};
+
+const ACCOUNT_CONTEXT_LABELS: Readonly<Record<
+  CreatorRoleWorkspacePreference["accountContext"],
+  { readonly ko: string; readonly en: string }
+>> = {
+  individual: { ko: "개인 창작", en: "Individual" },
+  education: { ko: "교육", en: "Education" },
+  studio: { ko: "팀 · 스튜디오", en: "Team · Studio" },
 };
 
 const NOTIFICATION_LABELS: Readonly<
@@ -161,7 +168,7 @@ const PRODUCTION_ROLE_LABELS: Readonly<Record<CreatorProductionRole, string>> = 
   publisher: "게시",
 };
 
-function localized(_locale, ko: string, en: string): string {
+function localized(_locale: CreatorRoleLocale, ko: string, en: string): string {
   return bi(ko, en);
 }
 
@@ -474,6 +481,11 @@ export function StudioRolePersonalizationCenter({
 
   const globalDocument = globalWorkspace.snapshot.document;
   const projectDocument = projectWorkspace.snapshot.document;
+  const recommendedGlobalWorkspaceMode = recommendCreatorWorkspaceMode({
+    accountContext: globalDocument.accountContext,
+    experienceLevel: profile.creatorRoleProfile.experienceLevel,
+    usageGoals: globalDocument.usageGoals,
+  });
   const selectedRoles = [
     profile.creatorRoleProfile.primaryRole,
     ...profile.creatorRoleProfile.secondaryRoles,
@@ -1182,7 +1194,26 @@ export function StudioRolePersonalizationCenter({
         description={localized(locale, "활동 목적과 화면 밀도는 기본값으로만 사용되며 프로젝트 역할과 권한을 변경하지 않습니다.", "Goals and workspace density are defaults only and never change project roles or permissions.")}
         action={<Settings2 className="size-4 text-accent" aria-hidden="true" />}
       >
-        <div className="grid gap-4 xl:grid-cols-[18rem_18rem_minmax(0,1fr)]">
+        <div className="grid gap-4 xl:grid-cols-[15rem_18rem_18rem_minmax(0,1fr)]">
+          <label className="text-xs font-bold text-fg-2">
+            {localized(locale, "사용 환경", "Account context")}
+            <select
+              value={globalDocument.accountContext}
+              onChange={(event) => void saveGlobalPatch({
+                accountContext: event.currentTarget.value as CreatorRoleWorkspacePreference["accountContext"],
+              })}
+              className="mt-1.5 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg"
+            >
+              {CREATOR_ACCOUNT_CONTEXTS.map((context) => (
+                <option key={context} value={context}>
+                  {localized(locale, ACCOUNT_CONTEXT_LABELS[context].ko, ACCOUNT_CONTEXT_LABELS[context].en)}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
+              {localized(locale, "개인·교육·스튜디오 맥락은 추천과 시작 동선만 바꾸며 권한이나 요금제를 자동 변경하지 않습니다.", "Context changes recommendations and starting paths only; it never changes permissions or plans automatically.")}
+            </span>
+          </label>
           <label className="text-xs font-bold text-fg-2">
             {localized(locale, "작업 화면", "Workspace mode")}
             <select
@@ -1197,7 +1228,10 @@ export function StudioRolePersonalizationCenter({
               <option value="production">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "Production · ")}{localized(locale, "고밀도", "high density")}</option>
             </select>
             <span className="mt-1.5 block text-[0.68rem] font-normal leading-5 text-fg-3">
-              {localized(locale, "Studio를 열 때 Guided/Creator는 단순 화면, Production은 전체 패널 밀도로 연결됩니다.", "Guided and Creator open a simplified Studio layout, while Production opens the full-density layout.")}
+              {localized(locale, "현재 환경·경험·목적 기준 추천", "Recommended for your current context, experience and goals")}:{" "}
+              <strong className="text-fg-2">
+                {recommendedGlobalWorkspaceMode === "guided" ? "Guided" : recommendedGlobalWorkspaceMode === "production" ? "Production" : "Creator"}
+              </strong>
             </span>
           </label>
           <label className="text-xs font-bold text-fg-2">

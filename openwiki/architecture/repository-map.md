@@ -9,6 +9,7 @@ apps/
   api/                  backend application
   desktop-sync*/        specialized Studio companion runtimes
 packages/
+  contracts/             focused cross-application runtime-neutral contracts
   core/                  existing focused shared/core code
   studio-*/              Studio runtime/engine packages
 config/                  machine-readable policy and ratchets

@@ -274,7 +274,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
         paintStudioPaperSubstrateTileCanvas(baked.heightField, baked.size, {
           halo: baked.halo,
           relief: "lit",
-          grainStrength: 0.58,
+          grainStrength: 0.68,
         }),
       );
     });
@@ -287,7 +287,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     if (!paperGrainVisible) return null;
     return getStudioPaperSurfacePreviewTile(paperSurfaceForPreview, {
       size: 128,
-      grainStrength: 0.58,
+      grainStrength: 0.66,
     });
   }, [paperGrainVisible, paperSurfaceForPreview]);
   // Both tiles cover exactly `tile.width` document pixels, so the pattern scale stays 1 and the

@@ -2,17 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE,
+  creatorAccountContextFromLegacyStage,
+  creatorCollaborationUiEnabled,
   creatorDetailedRoleLens,
+  creatorExperienceLevelFromLegacyStage,
   creatorRoleAiTools,
   creatorRoleChecklist,
   creatorRoleNotificationSettings,
   creatorRoleStudioWorkspace,
   creatorWorkspaceStudioUiMode,
-  creatorCollaborationUiEnabled,
   isCreatorRoleProjectKey,
   normalizeCreatorRoleWorkspacePreference,
   rankCreatorRoleWork,
   recommendCreatorTeamRoles,
+  recommendCreatorWorkspaceMode,
   resolveCreatorCollaborationLevel,
   resolveCreatorRoleProjectKey,
   scoreCreatorRoleMatch,
@@ -51,6 +54,7 @@ describe("creator role workspace contract", () => {
       notificationPreset: "balanced",
       notificationOverrides: {},
       usageGoals: ["team-production"],
+      accountContext: "individual",
       workspaceMode: "creator",
       collaborationMode: "team",
       capacity: {
@@ -74,26 +78,27 @@ describe("creator role workspace contract", () => {
     expect(EMPTY_CREATOR_ROLE_WORKSPACE_PREFERENCE.visibility.roles).toBe(false);
   });
 
-  it("resolves project-specific keys without leaking malformed paths", () => {
-    expect(isCreatorRoleProjectKey("work:work-1")).toBe(true);
-    expect(isCreatorRoleProjectKey("project:season:2")).toBe(true);
-    expect(isCreatorRoleProjectKey("../secret")).toBe(false);
-    expect(resolveCreatorRoleProjectKey({
-      pathname: "/studio/work/work-42/review",
-      search: "",
-    })).toBe("work:work-42");
-    expect(resolveCreatorRoleProjectKey({
-      pathname: "/production/projects/webtoon-a/overview",
-      search: "",
-    })).toBe("project:webtoon-a");
-    expect(resolveCreatorRoleProjectKey({
-      pathname: "/studio/projects",
-      search: "?scope=remix%3Aremix-7",
-    })).toBe("remix:remix-7");
-    expect(resolveCreatorRoleProjectKey({
-      pathname: "/studio/projects",
-      search: "",
-    })).toBe("draft");
+  it("separates account context, experience and workspace-mode recommendations", () => {
+    expect(creatorAccountContextFromLegacyStage("student")).toBe("education");
+    expect(creatorAccountContextFromLegacyStage("studio")).toBe("studio");
+    expect(creatorAccountContextFromLegacyStage("professional")).toBe("individual");
+    expect(creatorExperienceLevelFromLegacyStage("aspiring")).toBe("experienced");
+
+    expect(recommendCreatorWorkspaceMode({
+      accountContext: "education",
+      experienceLevel: "beginner",
+      usageGoals: ["learning"],
+    })).toBe("guided");
+    expect(recommendCreatorWorkspaceMode({
+      accountContext: "studio",
+      experienceLevel: "experienced",
+      usageGoals: ["personal-project"],
+    })).toBe("production");
+    expect(recommendCreatorWorkspaceMode({
+      accountContext: "individual",
+      experienceLevel: "experienced",
+      usageGoals: ["personal-project"],
+    })).toBe("creator");
   });
 
   it("keeps collaboration preference orthogonal to workspace density", () => {
@@ -121,6 +126,28 @@ describe("creator role workspace contract", () => {
     })).toBe("studio");
     expect(creatorCollaborationUiEnabled("solo")).toBe(false);
     expect(creatorCollaborationUiEnabled("lightweight")).toBe(true);
+  });
+
+  it("resolves project-specific keys without leaking malformed paths", () => {
+    expect(isCreatorRoleProjectKey("work:work-1")).toBe(true);
+    expect(isCreatorRoleProjectKey("project:season:2")).toBe(true);
+    expect(isCreatorRoleProjectKey("../secret")).toBe(false);
+    expect(resolveCreatorRoleProjectKey({
+      pathname: "/studio/work/work-42/review",
+      search: "",
+    })).toBe("work:work-42");
+    expect(resolveCreatorRoleProjectKey({
+      pathname: "/production/projects/webtoon-a/overview",
+      search: "",
+    })).toBe("project:webtoon-a");
+    expect(resolveCreatorRoleProjectKey({
+      pathname: "/studio/projects",
+      search: "?scope=remix%3Aremix-7",
+    })).toBe("remix:remix-7");
+    expect(resolveCreatorRoleProjectKey({
+      pathname: "/studio/projects",
+      search: "",
+    })).toBe("draft");
   });
 
   it("maps every detailed role to an operational lens and editor preset", () => {

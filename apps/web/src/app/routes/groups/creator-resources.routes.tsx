@@ -58,7 +58,22 @@ const ContentPacksPage = lazyRetry(
   () => import("@/domains/creator-resources/ContentPacksPage").then((module) => ({ default: module.ContentPacksPage })),
   "ContentPacksPage",
 );
-
+const EducationHubPage = lazyRetry(
+  () => import("@/domains/creator-ecosystem/EducationHubPage").then((module) => ({ default: module.EducationHubPage })),
+  "EducationHubPage",
+);
+const CollaborationHubPage = lazyRetry(
+  () => import("@/domains/creator-ecosystem/CollaborationHubPage").then((module) => ({ default: module.CollaborationHubPage })),
+  "CollaborationHubPage",
+);
+const FandomCosplayPage = lazyRetry(
+  () => import("@/domains/creator-ecosystem/FandomCosplayPage").then((module) => ({ default: module.FandomCosplayPage })),
+  "FandomCosplayPage",
+);
+const ComicLibraryPage = lazyRetry(
+  () => import("@/domains/creator-ecosystem/ComicLibraryPage").then((module) => ({ default: module.ComicLibraryPage })),
+  "ComicLibraryPage",
+);
 
 export const creatorResourcesRoutes = defineAppRoutes([
   // Legacy creator hubs now resolve to the canonical ToonStudio front door.
@@ -82,6 +97,14 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "resources-story", path: "/story-lab", element: <StoryLabPage /> },
   { id: "resources-works", path: "/discover/works", element: <WorksPage /> },
   { id: "resources-sources", path: "/insights/resources", element: <SourcesPage /> },
+
+  // Creator ecosystem: one coherent entry point instead of adding more top-level navigation.
+  { id: "ecosystem-home", path: "/ecosystem", element: <Navigate to="/ecosystem/education" replace /> },
+  { id: "ecosystem-education-legacy", path: "/learn/education", element: <Navigate to="/ecosystem/education" replace /> },
+  { id: "ecosystem-education", path: "/ecosystem/education", element: <EducationHubPage /> },
+  { id: "ecosystem-collaboration", path: "/ecosystem/collaboration", element: <CollaborationHubPage /> },
+  { id: "ecosystem-fandom", path: "/ecosystem/fandom", element: <FandomCosplayPage /> },
+  { id: "ecosystem-library", path: "/ecosystem/library", element: <ComicLibraryPage /> },
 
   // Historical aliases keep old links functional without competing for canonical ownership.
   { id: "resources-showcase", path: "/challenges", element: <Navigate to="/showcase/challenges" replace /> },
