@@ -20,6 +20,7 @@ import { HealthModule } from "./modules/health/health.module";
 import { LegalModule } from "./modules/legal/legal.module";
 import { LearningModule } from "./modules/learning/learning.module";
 import { MeModule } from "./modules/me/me.module";
+import { MembershipWalletModule } from "./modules/membership-wallet/membership-wallet.module";
 import { MessagingModule } from "./modules/messaging/messaging.module";
 import { OgModule } from "./modules/og/og.module";
 import { PersonalCloudModule } from "./modules/personal-cloud/personal-cloud.module";
@@ -40,6 +41,7 @@ const studioRealtimeTicketModule =
     BackendCapabilitiesModule,
     AuthModule,
     MeModule,
+    MembershipWalletModule,
     MessagingModule,
     OgModule,
     PersonalCloudModule,

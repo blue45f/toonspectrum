@@ -99,6 +99,14 @@ function positiveInteger(value: unknown, label: string, max = 1_000_000_000): nu
   return parsed;
 }
 
+function nonNegativeInteger(value: unknown, label: string, max = 1_000_000_000): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > max) {
+    throw new BadRequestException(`${label} 값이 올바르지 않습니다.`);
+  }
+  return parsed;
+}
+
 function boundedText(value: unknown, max: number): string {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
@@ -1216,6 +1224,77 @@ export class MembershipWalletService {
     };
   }
 
+  async adminSetPolicyOverride(input: {
+    adminId: string | undefined;
+    key: unknown;
+    value: unknown;
+    active?: unknown;
+  }) {
+    const adminId = await this.requireAdmin(input.adminId);
+    const key = boundedText(input.key, 180);
+    const validPlanKey = key.startsWith("plan:")
+      && isMembershipPlanId(key.slice("plan:".length));
+    const validCreditKey = key.startsWith("credit:")
+      && isCreditFeatureKey(key.slice("credit:".length));
+    if (!validPlanKey && !validCreditKey) {
+      throw new BadRequestException("지원하지 않는 정책 키입니다.");
+    }
+    if (!input.value || typeof input.value !== "object" || Array.isArray(input.value)) {
+      throw new BadRequestException("정책 값은 객체여야 합니다.");
+    }
+    const active = input.active === undefined ? true : input.active === true;
+    await dbPool.query(
+      `INSERT INTO membership_policy_override (key, value, active, "updatedBy", "updatedAt")
+       VALUES ($1,$2::jsonb,$3,$4,now())
+       ON CONFLICT (key) DO UPDATE SET
+         value=EXCLUDED.value,
+         active=EXCLUDED.active,
+         "updatedBy"=EXCLUDED."updatedBy",
+         "updatedAt"=now()`,
+      [key, JSON.stringify(input.value), active, adminId],
+    );
+    await logAuditAction(
+      adminId,
+      "membership_wallet.policy_override",
+      "membership_policy",
+      key,
+      { active, value: input.value as Record<string, unknown> },
+    );
+    return { key, value: input.value, active };
+  }
+
+  async adminRevokeMembership(input: {
+    adminId: string | undefined;
+    targetUserId: unknown;
+    membershipId: unknown;
+    reason?: unknown;
+  }) {
+    const adminId = await this.requireAdmin(input.adminId);
+    const targetUserId = boundedText(input.targetUserId, 160);
+    const membershipId = boundedText(input.membershipId, 160);
+    if (!targetUserId || !membershipId) {
+      throw new BadRequestException("대상 사용자와 멤버십 ID가 필요합니다.");
+    }
+    const result = await dbPool.query<{ id: string }>(
+      `UPDATE membership_grant
+       SET status='cancelled', "updatedAt"=now()
+       WHERE id=$1 AND "userId"=$2 AND status='active'
+       RETURNING id`,
+      [membershipId, targetUserId],
+    );
+    if (!result.rows[0]) {
+      throw new NotFoundException("활성 멤버십을 찾을 수 없습니다.");
+    }
+    await logAuditAction(
+      adminId,
+      "membership_wallet.membership_revoke",
+      "user",
+      targetUserId,
+      { membershipId, reason: boundedText(input.reason, 240) },
+    );
+    return { id: membershipId, revoked: true };
+  }
+
   async adminGetUser(
     adminIdValue: string | undefined,
     targetUserIdValue: unknown,
@@ -1370,7 +1449,7 @@ export class MembershipWalletService {
     }
     const trustScore = input.trustScore === undefined
       ? 0
-      : positiveInteger(input.trustScore, "신뢰 점수", 1000);
+      : nonNegativeInteger(input.trustScore, "신뢰 점수", 1000);
     await dbPool.query(
       `INSERT INTO member_level (
          "userId","creatorLevel","trustLevel","sellerLevel","trustScore","updatedBy","updatedAt"
