@@ -38,6 +38,7 @@ import {
 } from "../studio-workspace-arrangement";
 import { useStudioShellFloatingLayout } from "./studio-shell-floating-layout-context";
 import { StudioShellFloatingTarget } from "./StudioShellFloatingTarget";
+import { STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT } from "./studio-shell-floating-layout-events";
 import {
   STUDIO_SHELL_FLOATING_SURFACES,
   STUDIO_SHELL_FLOATING_VISIBILITY_IDS,
@@ -49,9 +50,6 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
-
-const STUDIO_SHELL_FLOATING_LAYOUT_OPEN_EVENT =
-  "toonspectrum:studio-shell-floating-layout-open";
 
 const PRESETS: readonly {
   readonly id: StudioShellFloatingPresetId;

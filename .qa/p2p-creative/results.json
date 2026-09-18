@@ -1,0 +1,1557 @@
+[
+  {
+    "profile": "webkit-mobile-emulation",
+    "browserVersion": "26.5",
+    "checks": [
+      "UI consent, zero implicit capture, Korean chat and receipt"
+    ],
+    "errors": [
+      "Error sending string through RTCDataChannel."
+    ],
+    "nativeInAppVerified": false,
+    "physicalDevices": false,
+    "productionAuth": false,
+    "syntheticMedia": true,
+    "generatedStreams": true,
+    "result": "FAIL",
+    "failure": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '마이크 끄기', exact: true }) to be visible\u001b[22m\n\n    at /Users/hjunkim/.chatgpt-worktrees/toonspectrum-mobile-regression-followup-20260918/scripts/verify-studio-p2p-creative-ui.mjs:83:75",
+    "directPackets": [
+      [
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "chat",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "ack",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "ack",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "ack",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000002",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        }
+      ],
+      [
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "chat",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "ack",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "chat",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "chat",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "3394cc80-28df-499e-af4d-d20eb893cece"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "space-state",
+          "epoch": "47da2b69-7380-4614-98d2-33ed37b7db28"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "in",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "e76f5804-bf90-41f6-ac7e-c6ee5b1965ca"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "state",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        },
+        {
+          "direction": "out",
+          "peer": "00000000-0000-4000-8000-000000000001",
+          "kind": "activity",
+          "epoch": "1259eaa2-530f-476e-b9aa-c6058bcd574c"
+        }
+      ]
+    ],
+    "rtc": [
+      [
+        {
+          "connectionState": "connected",
+          "iceConnectionState": "connected",
+          "signalingState": "stable",
+          "localType": "offer",
+          "remoteType": "answer",
+          "localSdpLength": 587,
+          "remoteSdpLength": 586,
+          "senders": [],
+          "receivers": [],
+          "stats": []
+        }
+      ],
+      [
+        {
+          "connectionState": "connected",
+          "iceConnectionState": "connected",
+          "signalingState": "stable",
+          "localType": "answer",
+          "remoteType": "offer",
+          "localSdpLength": 586,
+          "remoteSdpLength": 587,
+          "senders": [],
+          "receivers": [],
+          "stats": []
+        }
+      ]
+    ],
+    "body0": "Virtual Studio · Huddle\n\n근접 P2P 우선 · 카메라·마이크는 직접 켤 때만 사용\n\n나 포함 2명 참여 · 연결 가능 1명\n\n마이크 켜기\n카메라 켜기\n화면 공유\n소리 끄기\n손들기\n나가기\nVIRTUAL CREATOR STUDIO\n가상 창작 스튜디오\n\n위치·존 상태는 RTCDataChannel로만 공유하며 서버에 저장하지 않습니다.\n\n2\nWriters Room\nStoryboard Wall\nCreator Lounge\nAsset Library\nProject Lobby\nDrawing Studio\nReview Room\nAssistant Desk\n작가 2\n나\nProject Lobby\n프로젝트의 현재 상황과 다음 작업을 확인합니다.\n작업 화면 열기\n→\nWriters Room\nStoryboard Wall\nCreator Lounge\nAsset Library\nProject Lobby\nDrawing Studio\nReview Room\nAssistant Desk\n대화 가능\n집중 작업\n리뷰 중\n잠시 자리 비움\n근접 미디어\n같은 공간의 가까운 사용자 1명만 음성·영상 연결\n나\n\n나 · 미리보기\n\n작\n\n작가 2\n\n마이크 꺼짐\n\n작가 2 이 세션에서 차단\n👍\n👏\n💡\n❤️\n함께 그리기·투표\n나\n\n브라우저 P2P 한글 검증\n\n전송 1/1 · 수신 확인 1/1\nP2P 메시지\n전송\n\n이 대화는 기존 세션 채팅과 분리되어 있습니다. 수신 확인은 상대 브라우저 도착을 뜻하며 읽음 확인이 아닙니다. 나가면 기록이 지워집니다.\n\n마이크를 켜지 못했습니다. 브라우저 권한과 장치를 확인해 주세요.\n\nP2P 대화 중 · 2명",
+    "body1": "Virtual Studio · Huddle\n\n근접 P2P 우선 · 카메라·마이크는 직접 켤 때만 사용\n\n나 포함 2명 참여 · 연결 가능 1명\n\n마이크 켜기\n카메라 켜기\n화면 공유\n소리 끄기\n손들기\n나가기\nVIRTUAL CREATOR STUDIO\n가상 창작 스튜디오\n\n위치·존 상태는 RTCDataChannel로만 공유하며 서버에 저장하지 않습니다.\n\n2\nWriters Room\nStoryboard Wall\nCreator Lounge\nAsset Library\nProject Lobby\nDrawing Studio\nReview Room\nAssistant Desk\n작가 1\n나\nProject Lobby\n프로젝트의 현재 상황과 다음 작업을 확인합니다.\n작업 화면 열기\n→\nWriters Room\nStoryboard Wall\nCreator Lounge\nAsset Library\nProject Lobby\nDrawing Studio\nReview Room\nAssistant Desk\n대화 가능\n집중 작업\n리뷰 중\n잠시 자리 비움\n근접 미디어\n같은 공간의 가까운 사용자 1명만 음성·영상 연결\n나\n\n나 · 미리보기\n\n작\n\n작가 1\n\n마이크 꺼짐\n\n작가 1 이 세션에서 차단\n👍\n👏\n💡\n❤️\n함께 그리기·투표\n작가 1\n\n브라우저 P2P 한글 검증\n\nP2P 메시지\n전송\n\n이 대화는 기존 세션 채팅과 분리되어 있습니다. 수신 확인은 상대 브라우저 도착을 뜻하며 읽음 확인이 아닙니다. 나가면 기록이 지워집니다.\n\nP2P 대화 중 · 2명"
+  }
+]

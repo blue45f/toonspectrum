@@ -139,6 +139,23 @@ try {
       assert.equal(row.errors.length, 0, row.errors.join("\n")); row.result = "PASS";
     } catch (error) {
       row.result = "FAIL"; row.failure = String(error?.stack ?? error);
+      row.directPackets = await Promise.all(pages.map((page) => page.evaluate(() =>
+        window.qaDirectPackets ?? []).catch(() => [])));
+      row.rtc = await Promise.all(pages.map((page) => page.evaluate(async () =>
+        Promise.all(window.qaConnections.map(async (pc) => ({
+          connectionState: pc.connectionState,
+          iceConnectionState: pc.iceConnectionState,
+          signalingState: pc.signalingState,
+          localType: pc.localDescription?.type ?? null,
+          remoteType: pc.remoteDescription?.type ?? null,
+          localSdpLength: pc.localDescription?.sdp?.length ?? 0,
+          remoteSdpLength: pc.remoteDescription?.sdp?.length ?? 0,
+          senders: pc.getSenders().map((sender) => ({ kind: sender.track?.kind ?? null, state: sender.track?.readyState ?? null })),
+          receivers: pc.getReceivers().map((receiver) => ({ kind: receiver.track?.kind ?? null, state: receiver.track?.readyState ?? null, muted: receiver.track?.muted ?? null })),
+          stats: [...(await pc.getStats()).values()].filter((stat) => stat.type === "inbound-rtp" || stat.type === "outbound-rtp")
+            .map((stat) => ({ type: stat.type, kind: stat.kind, bytesReceived: stat.bytesReceived, bytesSent: stat.bytesSent, framesDecoded: stat.framesDecoded, framesEncoded: stat.framesEncoded })),
+        })))
+      ).catch(() => [])));
       for (let i = 0; i < pages.length; i++) {
         row[`body${i}`] = (await pages[i].locator("body").innerText().catch(() => "")).slice(-6000);
         await pages[i].screenshot({ path: `${out}/${profile.name}-failure-${i}.png` }).catch(() => undefined);

@@ -253,4 +253,53 @@ describe("P2P huddle consent and delivery", () => {
     expect(close).toHaveBeenCalledOnce();
     expect(controller.snapshot().peers[0]?.connection).toBe("idle");
   });
+
+  it("defers media signaling until a proximity peer becomes allowed", async () => {
+    let inbound: ((sender: StudioLiveParticipant, raw: string) => void) | null = null;
+    const outbound: string[] = [];
+    const replaceTrack = vi.fn(async () => undefined);
+    const setRemoteDescription = vi.fn(async () => undefined);
+    const peer = {
+      connectionState: "new",
+      signalingState: "stable",
+      localDescription: null,
+      remoteDescription: null,
+      addTransceiver: vi.fn(() => ({ sender: { replaceTrack } })),
+      setLocalDescription: vi.fn(async () => undefined),
+      setRemoteDescription,
+      addIceCandidate: vi.fn(async () => undefined),
+      close: vi.fn(),
+      onicecandidate: null,
+      ontrack: null,
+      onnegotiationneeded: null,
+      onconnectionstatechange: null,
+    } as unknown as RTCPeerConnection;
+    const createPeerConnection = vi.fn(() => peer);
+    const port: StudioLiveDirectPort = {
+      getPeers: () => [B],
+      subscribe: (listener) => { inbound = listener; return () => { inbound = null; }; },
+      send: (_target, raw) => { outbound.push(raw); return true; },
+    };
+    const controller = new StudioP2pHuddleController(A, port, { createPeerConnection });
+    sessions.push(controller);
+    controller.start();
+    controller.setMediaPeerScope([]);
+    const localEpoch = (JSON.parse(outbound.find((raw) => JSON.parse(raw).kind === "state")!) as { epoch: string }).epoch;
+    inbound?.(B, JSON.stringify({
+      kind: "state", epoch: "epoch-b", muted: false, camera: true, sharing: false, hand: false,
+    }));
+    inbound?.(B, JSON.stringify({
+      kind: "description", epoch: "epoch-b", toEpoch: localEpoch, type: "offer", sdp: "v=0\r\n",
+    }));
+
+    expect(createPeerConnection).not.toHaveBeenCalled();
+    expect(setRemoteDescription).not.toHaveBeenCalled();
+
+    controller.setMediaPeerScope(["b"]);
+    await vi.waitFor(() => expect(setRemoteDescription).toHaveBeenCalledWith({
+      type: "offer",
+      sdp: "v=0\r\n",
+    }));
+    expect(createPeerConnection).toHaveBeenCalledOnce();
+  });
 });

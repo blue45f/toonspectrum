@@ -11,6 +11,8 @@ import "../../src/styles/globals.css";
 
 // Local fixture only: real RTC/SCTP/RTP and product UI, NOT production authentication/signaling.
 export const primaryPackets: StudioLiveEnvelope[] = [];
+export const directPackets: Array<{ direction: "in" | "out"; peer: string; kind: string | null; epoch?: string; toEpoch?: string; type?: string }> = [];
+(globalThis as unknown as { qaDirectPackets: typeof directPackets }).qaDirectPackets = directPackets;
 const listeners = new Set<(packet: StudioLiveEnvelope) => void>();
 const terminalListeners = new Set<(event: { type: string }) => void>();
 let transport: StudioLiveTransport | null = null;
@@ -34,7 +36,29 @@ export async function mount(index: number): Promise<void> {
   } as StudioLiveTransport;
   transport = applyStudioLiveP2pOverlay(() => primary)({ workId: "creative-qa", roomName: "creative-qa", participant });
   await transport.connect();
-  const room = { ready: true, workId: "creative-qa", participant, direct: transport.direct,
+  const baseDirect = transport.direct!;
+  const direct = {
+    getPeers: () => baseDirect.getPeers(),
+    send: (targetSessionId: string, payload: string) => {
+      let packet: { kind?: unknown; epoch?: unknown; toEpoch?: unknown; type?: unknown } = {};
+      try { packet = JSON.parse(payload) as typeof packet; } catch { /* QA diagnostics only */ }
+      directPackets.push({ direction: "out", peer: targetSessionId, kind: typeof packet.kind === "string" ? packet.kind : null,
+        epoch: typeof packet.epoch === "string" ? packet.epoch : undefined,
+        toEpoch: typeof packet.toEpoch === "string" ? packet.toEpoch : undefined,
+        type: typeof packet.type === "string" ? packet.type : undefined });
+      return baseDirect.send(targetSessionId, payload);
+    },
+    subscribe: (listener: (sender: StudioLiveParticipant, payload: string) => void) => baseDirect.subscribe((sender, payload) => {
+      let packet: { kind?: unknown; epoch?: unknown; toEpoch?: unknown; type?: unknown } = {};
+      try { packet = JSON.parse(payload) as typeof packet; } catch { /* QA diagnostics only */ }
+      directPackets.push({ direction: "in", peer: sender.sessionId, kind: typeof packet.kind === "string" ? packet.kind : null,
+        epoch: typeof packet.epoch === "string" ? packet.epoch : undefined,
+        toEpoch: typeof packet.toEpoch === "string" ? packet.toEpoch : undefined,
+        type: typeof packet.type === "string" ? packet.type : undefined });
+      listener(sender, payload);
+    }),
+  };
+  const room = { ready: true, workId: "creative-qa", participant, direct,
     subscribe: () => () => undefined,
     subscribeVoice: (listener: (event: { type: string }) => void) => {
       terminalListeners.add(listener); return () => { terminalListeners.delete(listener); };

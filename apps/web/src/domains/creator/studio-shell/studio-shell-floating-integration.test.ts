@@ -49,7 +49,8 @@ describe("studio shell floating integration", () => {
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(saveCenter).toContain("var(--studio-canvas-bottom-inset,7rem)+4.25rem");
     expect(offline).toContain("var(--studio-canvas-bottom-inset,7rem)+7.5rem");
-    expect(offline).toContain('!attentionRequired && "max-lg:hidden"');
+    expect(offline).toContain("if (!shouldShowPanel) return null;");
+    expect(offline).toContain('data-studio-shell-force-visible="true"');
     expect(huddle).toContain("var(--studio-canvas-bottom-inset,5rem)+0.75rem");
     expect(manager).toContain("var(--studio-canvas-bottom-inset,0px)+0.75rem");
     expect(manager).toContain("보기 설정");
@@ -88,13 +89,17 @@ describe("studio shell floating integration", () => {
     const provider = source("studio-shell/StudioShellFloatingLayoutProvider.tsx");
     expect(provider).not.toContain("navigator.storage");
     expect(provider).toContain('"data-studio-shell-stroke-auto-hide"');
+    expect(provider).toContain('event.pointerType !== "pen"');
+    expect(provider).toContain('window.addEventListener("pointerdown", start, true)');
+    expect(provider).toContain("STUDIO_SHELL_DRAWING_AUTO_HIDE_RELEASE_MS");
+
+    const strokeFocus = source("studio-stroke-focus-activity.ts");
+    expect(strokeFocus).toContain('return pointerType !== "touch"');
+    expect(strokeFocus).toContain("STUDIO_STROKE_FOCUS_SETTLE_MS = 700");
 
     const manager = source("studio-shell/StudioShellFloatingLayoutManager.tsx");
     expect(manager).toContain('aria-keyshortcuts="Control+Shift+L Meta+Shift+L"');
     expect(manager).toContain("z-[70]");
-    expect(manager).toContain("data-studio-shell-stroke-auto-hide");
-    expect(manager).toContain('data-studio-shell-force-visible="true"');
-    expect(manager).toContain("STUDIO_STROKE_FOCUS_SETTLE_MS");
     expect(manager).toContain("플랫폼 규격");
     expect(manager).toContain("펜으로 그리는 동안 자동 숨김");
     expect(manager).toContain("data-studio-shell-drawing-auto-hide-active");

@@ -42,6 +42,7 @@ export class StudioP2pHuddleController {
   private readonly epoch: string;
   private readonly peers = new Map<string, HuddlePeer>();
   private readonly links = new Map<string, Link>();
+  private readonly deferredSignals = new Map<string, Array<HuddlePacket & { kind: "description" | "ice" }>>();
   private mediaPeerScope: Set<string> | null = null;
   private readonly blocked = new Set<string>();
   private readonly seen = new Set<string>();
@@ -132,7 +133,10 @@ export class StudioP2pHuddleController {
     if (!peer || peer.epoch !== packet.epoch) return;
     if (packet.kind === "left") { this.removePeer(id); this.emit(); return; }
     if (packet.kind === "description" || packet.kind === "ice") {
-      if (packet.toEpoch === this.epoch) this.enqueueSignal(id, packet);
+      if (packet.toEpoch === this.epoch) {
+        if (this.isMediaPeerAllowed(id)) this.enqueueSignal(id, packet);
+        else this.deferSignal(id, packet);
+      }
       return;
     }
     if (packet.kind === "ack") {
@@ -203,8 +207,9 @@ export class StudioP2pHuddleController {
       if (!this.isMediaPeerAllowed(id)) this.closeLink(id);
     }
     for (const [id, peer] of this.peers) {
-      if (this.isMediaPeerAllowed(id)
-        && (!peer.muted || peer.camera || peer.sharing || this.audioTrack || this.videoTrack)) {
+      if (!this.isMediaPeerAllowed(id)) continue;
+      this.flushDeferredSignals(id);
+      if (!peer.muted || peer.camera || peer.sharing || this.audioTrack || this.videoTrack) {
         this.ensureLink(id);
       }
     }
@@ -318,6 +323,19 @@ export class StudioP2pHuddleController {
       }
     }
   }
+  private deferSignal(id: string, packet: HuddlePacket & { kind: "description" | "ice" }): void {
+    const pending = this.deferredSignals.get(id) ?? [];
+    if (pending.length >= 96) pending.shift();
+    pending.push(packet);
+    this.deferredSignals.set(id, pending);
+  }
+  private flushDeferredSignals(id: string): void {
+    if (!this.isMediaPeerAllowed(id)) return;
+    const pending = this.deferredSignals.get(id);
+    if (!pending?.length) return;
+    this.deferredSignals.delete(id);
+    for (const packet of pending) this.enqueueSignal(id, packet);
+  }
   private enqueueSignal(id: string, packet: HuddlePacket & { kind: "description" | "ice" }): void {
     const link = this.ensureLink(id);
     if (!link || link.pendingSignals >= 96) return;
@@ -427,6 +445,7 @@ export class StudioP2pHuddleController {
   }
   private removePeer(id: string): void {
     this.closeLink(id);
+    this.deferredSignals.delete(id);
     this.peers.delete(id); this.inboundChat.delete(id);
   }
   close(): void {
