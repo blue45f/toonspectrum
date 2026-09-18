@@ -12,6 +12,7 @@ import {
   buildCreatorRoleWorkspaceRuntimeAclViolationSql,
   buildCreatorMarketplaceRuntimeAclViolationSql,
   buildMessagingRuntimeAclViolationSql,
+  buildMembershipRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildPersonalCloudRuntimeAclViolationSql,
   buildRuntimeCutoverLedgerAclViolationSql,
@@ -81,6 +82,9 @@ test("generated verification covers runtime capabilities and exact migration che
   );
   expect(sql).toContain(
     buildPersonalCloudRuntimeAclViolationSql("webdex_runtime"),
+  );
+  expect(sql).toContain(
+    buildMembershipRuntimeAclViolationSql("webdex_runtime"),
   );
   expect(sql).toContain(
     buildRuntimeCutoverLedgerAclViolationSql("webdex_runtime"),

@@ -75,6 +75,7 @@ export interface CreatorCollaborationRepositoryOptions {
   now?: () => Date;
   createInvitationId?: () => string;
   createEventId?: () => string;
+  resolveMemberLimit?: (ownerUserId: string) => Promise<number>;
 }
 
 export interface CreatorCollaborationTeamMember {
@@ -690,6 +691,7 @@ export class CreatorCollaborationRepository {
   private readonly now: () => Date;
   private readonly createInvitationId: () => string;
   private readonly createEventId: () => string;
+  private readonly resolveMemberLimit: (ownerUserId: string) => Promise<number>;
 
   constructor(
     private readonly persistence: CreatorCollaborationPersistence =
@@ -699,6 +701,8 @@ export class CreatorCollaborationRepository {
     this.now = options.now ?? (() => new Date());
     this.createInvitationId = options.createInvitationId ?? randomUUID;
     this.createEventId = options.createEventId ?? randomUUID;
+    this.resolveMemberLimit = options.resolveMemberLimit
+      ?? (async () => CREATOR_COLLABORATION_MAX_MEMBERS);
   }
 
   async listSharedWorks(
@@ -1012,11 +1016,22 @@ export class CreatorCollaborationRepository {
           throw new CreatorCollaborationConflictError("reinvite_cooldown");
         }
       }
-      if (
-        (!existing || existingStatus === "declined") &&
-        (await unit.countNonDeclinedMemberships(workId)) >= CREATOR_COLLABORATION_MAX_MEMBERS
-      ) {
-        throw new CreatorCollaborationConflictError("member_limit_reached");
+      if (!existing || existingStatus === "declined") {
+        const configuredLimit = await this.resolveMemberLimit(
+          context.work.ownerUserId,
+        );
+        const memberLimit = Math.max(
+          1,
+          Math.min(
+            CREATOR_COLLABORATION_MAX_MEMBERS,
+            Number.isSafeInteger(configuredLimit)
+              ? configuredLimit
+              : CREATOR_COLLABORATION_MAX_MEMBERS,
+          ),
+        );
+        if ((await unit.countNonDeclinedMemberships(workId)) >= memberLimit) {
+          throw new CreatorCollaborationConflictError("member_limit_reached");
+        }
       }
 
       const invitationId = this.createInvitationId();

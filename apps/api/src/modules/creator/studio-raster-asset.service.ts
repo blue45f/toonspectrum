@@ -11,6 +11,8 @@ import {
   PayloadTooLargeException,
 } from "@nestjs/common";
 
+import { MembershipResourceQuotaError } from "../membership-operations/membership-resource-quota";
+
 import {
   STUDIO_RASTER_ASSET_MAX_AXIS,
   STUDIO_RASTER_ASSET_MAX_BYTES,
@@ -568,6 +570,15 @@ export class StudioRasterAssetService {
       }
       if (error instanceof StudioRasterAssetImmutableConflictError) {
         throw new ConflictException("내용 주소가 같은 래스터 자산의 불변 메타데이터가 다릅니다.");
+      }
+      if (error instanceof MembershipResourceQuotaError) {
+        throw new PayloadTooLargeException(
+          error.quota === "file"
+            ? "현재 멤버십의 파일 1개 업로드 한도를 초과했습니다."
+            : error.quota === "daily-upload"
+              ? "오늘 업로드할 수 있는 멤버십 용량을 모두 사용했습니다."
+              : "현재 멤버십의 계정 저장공간 한도를 초과했습니다. 기존 파일을 정리하거나 멤버십을 확인해 주세요."
+        );
       }
       if (error instanceof StudioRasterAssetQuotaError) {
         throw new PayloadTooLargeException(

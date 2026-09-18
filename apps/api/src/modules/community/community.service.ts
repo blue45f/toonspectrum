@@ -62,6 +62,7 @@ import {
   MEMBERSHIP_REWARD_SERVICE,
   type MembershipRewardService,
 } from "../membership-wallet/membership-wallet.tokens";
+import { MembershipRewardReversalService } from "../membership-operations/membership-reward-reversal.service";
 
 import type {
   CommunityCafe,
@@ -153,6 +154,9 @@ export class CommunityService {
     @Optional()
     @Inject(MEMBERSHIP_REWARD_SERVICE)
     private readonly membershipWallet?: MembershipRewardService,
+    @Optional()
+    @Inject(MembershipRewardReversalService)
+    private readonly rewardReversal?: MembershipRewardReversalService,
   ) {}
 
   private async awardActivity(
@@ -173,6 +177,37 @@ export class CommunityService {
       // Community writes are authoritative; reward accounting is best-effort.
     }
   }
+  private async reverseActivity(
+    activity: "community.post.created" | "community.comment.created",
+    sourceRef: string,
+    actorUserId: string,
+    reason: string,
+  ): Promise<void> {
+    if (!this.rewardReversal) return;
+    try {
+      await this.rewardReversal.reverseActivityBySource({
+        activity,
+        sourceRef,
+        actorUserId,
+        reason,
+      });
+    } catch {
+      // Deletion/moderation remains authoritative if reward recovery is unavailable.
+    }
+  }
+
+  private replyIds(replies: FanCafeReply[]): string[] {
+    const result: string[] = [];
+    const visit = (items: FanCafeReply[]) => {
+      for (const reply of items) {
+        result.push(reply.id);
+        if (reply.children?.length) visit(reply.children);
+      }
+    };
+    visit(replies);
+    return result;
+  }
+
   async boards(
     scopeValue: string | null,
     query: string | null,
@@ -267,12 +302,48 @@ export class CommunityService {
 
   async deletePost(postId: string, userId: string) {
     if (!postId) throw new BadRequestException("postId 필요");
-    return governed(() => deleteGovernedCommunityPost(postId, userId));
+    let replyIds: string[];
+    try {
+      replyIds = this.replyIds(await listFanPostReplies(postId));
+    } catch {
+      replyIds = [];
+    }
+    const result = await governed(() => deleteGovernedCommunityPost(postId, userId));
+    if (result.deleted) {
+      await this.reverseActivity(
+        "community.post.created",
+        postId,
+        userId,
+        "게시글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+      );
+      await Promise.allSettled(
+        replyIds.map((replyId) =>
+          this.reverseActivity(
+            "community.comment.created",
+            replyId,
+            userId,
+            "게시글 삭제로 함께 제거된 댓글 활동 포인트 회수",
+          ),
+        ),
+      );
+    }
+    return result;
   }
 
   async deletePostReply(postId: string, replyId: string, userId: string) {
     if (!postId || !replyId) throw new BadRequestException("postId/replyId 필요");
-    return governed(() => deleteGovernedCommunityReply(postId, replyId, userId));
+    const result = await governed(() =>
+      deleteGovernedCommunityReply(postId, replyId, userId)
+    );
+    if (result.deleted) {
+      await this.reverseActivity(
+        "community.comment.created",
+        replyId,
+        userId,
+        "댓글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+      );
+    }
+    return result;
   }
 
   async listPostReplies(postId: string, viewerId: string | null): Promise<FanCafeReply[]> {
@@ -419,7 +490,16 @@ export class CommunityService {
   async deleteReviewReply(reviewId: string, replyId: string, userId: string) {
     if (!reviewId || !replyId) throw new BadRequestException("reviewId/replyId 필요");
     try {
-      return await deleteReviewReply(userId, reviewId, replyId, false);
+      const result = await deleteReviewReply(userId, reviewId, replyId, false);
+      if (result.deleted) {
+        await this.reverseActivity(
+          "community.comment.created",
+          replyId,
+          userId,
+          "리뷰 답글 삭제에 따른 활동 포인트 회수",
+        );
+      }
+      return result;
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
     }

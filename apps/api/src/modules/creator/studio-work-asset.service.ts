@@ -49,6 +49,8 @@ import {
   assertStudioR8GrainAdmissionManifest,
   assertStudioR8GrainAdmissionSourceBudget,
 } from "./studio-r8-grain-admission";
+import { MembershipResourceQuotaError } from "../membership-operations/membership-resource-quota";
+
 import {
   STUDIO_WORK_ASSET_REPOSITORY,
   StudioWorkAssetCleanupOwnershipError,
@@ -1359,6 +1361,15 @@ export class StudioWorkAssetService {
       }
       if (error instanceof StudioWorkAssetImmutableConflictError) {
         throw new ConflictException("이미 동기화된 에셋 ID는 변경할 수 없습니다. 새 ID로 추가해 주세요.");
+      }
+      if (error instanceof MembershipResourceQuotaError) {
+        throw new PayloadTooLargeException(
+          error.quota === "file"
+            ? "현재 멤버십의 파일 1개 업로드 한도를 초과했습니다."
+            : error.quota === "daily-upload"
+              ? "오늘 업로드할 수 있는 멤버십 용량을 모두 사용했습니다."
+              : "현재 멤버십의 계정 저장공간 한도를 초과했습니다. 기존 파일을 정리하거나 멤버십을 확인해 주세요."
+        );
       }
       if (error instanceof StudioWorkAssetQuotaError) {
         throw new PayloadTooLargeException(

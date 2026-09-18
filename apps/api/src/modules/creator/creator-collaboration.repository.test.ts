@@ -1237,6 +1237,26 @@ describe("CreatorCollaborationRepository", () => {
     expect(store.memberships.has(membershipKey("work-1", "overflow"))).toBe(false);
   });
 
+  it("멤버십별 동적 협업 인원 한도를 기존 100명 안전 상한보다 먼저 적용한다", async () => {
+    const { store } = createFixture();
+    store.users.set("membership-overflow", {
+      userId: "membership-overflow",
+      name: "등급 한도 초과",
+      image: null,
+      status: "active",
+    });
+    const repository = new CreatorCollaborationRepository(store, {
+      resolveMemberLimit: async () => 3,
+    });
+
+    await expect(
+      repository.invite("owner", "work-1", "membership-overflow", "viewer")
+    ).rejects.toEqual(new CreatorCollaborationConflictError("member_limit_reached"));
+    expect(
+      store.memberships.has(membershipKey("work-1", "membership-overflow"))
+    ).toBe(false);
+  });
+
   it("소유자·본인·비활성 회원 초대와 active/pending 중복 초대를 구분해 거부한다", async () => {
     const { repository } = createFixture();
 

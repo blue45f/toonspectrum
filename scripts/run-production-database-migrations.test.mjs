@@ -24,6 +24,8 @@ import {
   buildHistoricalAdoptionVerificationSql,
   buildMessagingRuntimeAclSql,
   buildMessagingRuntimeAclViolationSql,
+  buildMembershipRuntimeAclSql,
+  buildMembershipRuntimeAclViolationSql,
   buildMigrationLedgerRuntimeAclSql,
   buildMigrationLedgerRuntimeAclViolationSql,
   buildPersonalCloudRuntimeAclSql,
@@ -44,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(73);
+  expect(manifest).toHaveLength(77);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0073_commerce_payments");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(73);
+  expect(manifest.at(-1).id).toBe("0077_membership_operations");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(77);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -752,7 +754,7 @@ test("cloud-save intent migration widens and validates the existing room check",
     "CHECK (\"provisionIntent\" IN ('share-link', 'invite-member', 'cloud-save'))",
   );
   expect(sql).toContain(
-    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_state_check"',
+    'VALIDATE CONSTRAINT "creator_draft_collaboration_room_provision_intent_check"',
   );
   expect(sql).toContain("0026_creator_draft_cloud_save_intent");
   expect(sql).toContain('INSERT INTO "toonspectrum_schema_migration"');
@@ -1168,6 +1170,39 @@ test("creator marketplace runtime ACL is normalized to the repository contract",
   );
 });
 
+test("membership runtime ACL is private and keeps ledgers append-only", () => {
+  const sql = buildMembershipRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildMembershipRuntimeAclViolationSql(
+    "toonspectrum_runtime",
+  );
+  expect(sql).toContain(
+    "REVOKE ALL ON SEQUENCE public.membership_policy_change_revision_seq FROM PUBLIC",
+  );
+  expect(sql).toContain(
+    "GRANT SELECT ON TABLE",
+  );
+  expect(sql).toContain(
+    "GRANT UPDATE (\"availableAmount\", \"reservedAmount\", \"lifetimeGranted\", \"lifetimeSpent\", \"updatedAt\")",
+  );
+  expect(sql).not.toMatch(
+    /GRANT UPDATE[^;]*wallet_ledger_entry/u,
+  );
+  expect(sql).not.toMatch(
+    /GRANT (?:UPDATE|DELETE)[^;]*membership_policy_change/u,
+  );
+  expect(violation).toContain("membership_policy_change_revision_seq");
+  expect(violation).toContain("WITH GRANT OPTION");
+  expect(violation).toContain("0::oid");
+
+  const runner = readFileSync(
+    new URL("./run-production-database-migrations.mjs", import.meta.url),
+    "utf8",
+  );
+  expect(runner).toContain(
+    "buildMembershipRuntimeAclSql(runtimeDatabaseRole)",
+  );
+});
+
 test("runtime role boundary rejects membership, DDL and ownership capabilities", () => {
   const sql = buildRuntimeDatabaseRoleBoundaryStateSql(
     "toonspectrum_runtime",
@@ -1291,6 +1326,7 @@ test("historical adoption requires structural evidence through 0019", () => {
 
 test("historical adoption and post-baseline relations exactly partition runtime readiness", () => {
   expect(POST_BASELINE_RELATIONS).toEqual([
+    "account_merge",
     "admin_announcements",
     "admin_audit_logs",
     "admin_banned_words",
@@ -1353,6 +1389,18 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_work_report",
     "creator_work_review_feedback",
     "creator_work_review_link",
+    "creator_business_profile",
+    "creator_collaboration_preference",
+    "creator_collection_item",
+    "creator_ip_proposal",
+    "member_level",
+    "membership_grant",
+    "membership_notice",
+    "membership_policy_change",
+    "membership_policy_override",
+    "membership_resource_state",
+    "membership_resource_usage_event",
+    "membership_reward_reversal",
     "member_message",
     "member_message_block",
     "member_message_participant",
@@ -1395,6 +1443,11 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_support_offer",
     "supporter_funding_setting",
     "supporter_payment",
+    "wallet_account",
+    "wallet_ledger_entry",
+    "wallet_lot",
+    "wallet_reservation",
+    "wallet_reservation_allocation",
   ]);
   const readinessSource = readFileSync(
     new URL(
