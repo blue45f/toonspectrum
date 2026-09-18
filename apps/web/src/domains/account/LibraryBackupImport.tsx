@@ -1,7 +1,9 @@
 import {
   formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { Upload } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -9,10 +11,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { MAX_LIBRARY_BACKUP_BYTES, parseLibraryBackup } from "./library-backup";
 
 import type { HydratePayload } from "@/shared/lib/store-types";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("LibraryBackupImport", ko, en);
