@@ -1,8 +1,10 @@
 import {
   formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -12,7 +14,7 @@ import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { CREATOR_ESSENTIALS, ESSENTIALS_KINDS, ESSENTIALS_LABELS, essentialsByteLabel, essentialsEditorHref, essentialsFormat, essentialsKind, filterCreatorEssentials, type CreatorEssential, type EssentialsLocale } from "./creator-essentials-catalog";
 import { downloadCreatorEssential } from "./creator-essentials-download";
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
+
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorEssentialsPage", ko, en);
