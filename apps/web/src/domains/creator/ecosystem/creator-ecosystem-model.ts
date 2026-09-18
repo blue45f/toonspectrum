@@ -3,7 +3,7 @@ import {
   translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("creator-ecosystem-model", ko, en);export const CREATOR_ECOSYSTEM_STORAGE_KEY = "toonspectrum:creator-ecosystem:v1";
 export const CREATOR_ECOSYSTEM_MAX_BYTES = 1_500_000;
 

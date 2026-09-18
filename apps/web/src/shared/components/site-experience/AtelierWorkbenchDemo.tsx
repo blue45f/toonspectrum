@@ -17,7 +17,7 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("AtelierWorkbenchDemo", ko, en);
 
 const ICONS = { ink: Brush, layers: Layers, panels: LayoutGrid, motion: Clapperboard, materials: SwatchBook };

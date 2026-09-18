@@ -28,6 +28,7 @@ export interface DropboxDesktopCloudProviderOptions {
   readonly credentialProfile?: string;
   readonly uploadSessionStore?: DesktopUploadSessionStore;
   readonly simpleUploadThresholdBytes?: number;
+  readonly now?: () => number;
 }
 
 const DROPBOX_API = "https://api.dropboxapi.com/2";
@@ -101,6 +102,7 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
   private readonly credentialProfile: string;
   private readonly uploadSessionStore?: DesktopUploadSessionStore;
   private readonly simpleUploadThresholdBytes: number;
+  private readonly now: () => number;
   private rootEnsured = false;
 
   constructor(options: DropboxDesktopCloudProviderOptions) {
@@ -110,6 +112,7 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
     this.uploadSessionStore = options.uploadSessionStore;
     this.simpleUploadThresholdBytes = options.simpleUploadThresholdBytes
       ?? DROPBOX_SIMPLE_UPLOAD_BYTES;
+    this.now = options.now ?? Date.now;
     if (this.simpleUploadThresholdBytes < 1
       || this.simpleUploadThresholdBytes > DROPBOX_SIMPLE_UPLOAD_BYTES) {
       throw new TypeError("invalid Dropbox simple upload threshold");
@@ -555,6 +558,18 @@ export class DropboxDesktopCloudProvider implements DesktopCloudProvider {
         throw error;
       }
     }
+  }
+
+  private trashRelativePath(
+    file: DesktopCloudObject,
+    expectedVersion: string,
+  ): string {
+    const timestamp = new Date(this.now()).toISOString().replace(/\D/gu, "");
+    const safePath = normalizeCloudRelativePath(file.relativePath)
+      .replaceAll("/", "__")
+      .replace(/[^A-Za-z0-9._-]/gu, "_");
+    const safeVersion = expectedVersion.replace(/[^A-Za-z0-9._-]/gu, "_").slice(0, 48);
+    return `${DROPBOX_TRASH_ROOT}/${timestamp}-${safeVersion}-${safePath}`;
   }
 
   async deleteFile(input: {

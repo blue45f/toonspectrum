@@ -56,7 +56,7 @@ import { Container } from "@/shared/components/section";
 import { cx } from "@/shared/lib/cx";
 import { getActiveI18nLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringFieldNotesPage", ko, en);
 
 const CATEGORY_FILTERS: readonly {

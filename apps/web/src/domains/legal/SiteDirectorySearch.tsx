@@ -31,7 +31,7 @@ import type {
 } from "@/shared/lib/site-route-metadata";
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision, formatI18nTemplate } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteDirectorySearch", ko, en);
 
 const PRODUCT_VALUES = ["studio", "spectrum", "docs"] as const satisfies readonly SiteRouteProduct[];

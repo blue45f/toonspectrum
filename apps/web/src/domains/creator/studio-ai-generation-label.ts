@@ -3,7 +3,7 @@ import {
   translateBilingualValueForActiveLocale,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("studio-ai-generation-label", ko, en);/**
  * Studio AI Generation Label — 생성형 AI 표기가 **결과물 자체에 필요한지** 판정하는 순수 플래너.
  *

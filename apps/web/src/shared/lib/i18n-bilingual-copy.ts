@@ -227,17 +227,17 @@ function translateBilingualObjectValue(
  * Strings and string arrays join the global translation pipeline. Other value shapes retain the
  * authored Korean/English branch instead of sending arbitrary structured/user data externally.
  */
-export function translateBilingualValueForActiveLocale<T>(
+export function translateBilingualValueForActiveLocale<TKo, TEn>(
   scope: string,
-  ko: T,
-  en: T,
-): T {
+  ko: TKo,
+  en: TEn,
+): TKo {
   if (typeof ko === "string" && typeof en === "string") {
-    return translateBilingualPair(scope, ko, en) as T;
+    return translateBilingualPair(scope, ko, en) as TKo;
   }
   if (Array.isArray(ko) && Array.isArray(en)) {
     const translated = translateBilingualArrayValue(scope, ko, en);
-    if (translated !== null) return translated as T;
+    if (translated !== null) return translated as TKo;
   }
   if (
     ko !== null && en !== null
@@ -249,10 +249,10 @@ export function translateBilingualValueForActiveLocale<T>(
       ko as Readonly<Record<string, unknown>>,
       en as Readonly<Record<string, unknown>>,
     );
-    if (translated !== null) return translated as T;
+    if (translated !== null) return translated as TKo;
   }
   const root = getLang().split("-")[0]?.toLowerCase();
-  return (root === "ko" ? ko : en);
+  return (root === "ko" ? ko : en) as unknown as TKo;
 }
 
 export function defineBilingualMap<
@@ -438,20 +438,20 @@ function translateCurrentPair(
  * arrays or plain objects; matching non-text fields are preserved while differing string leaves
  * are registered as runtime i18n sources.
  */
-export function translateBilingualValueForLocale<T>(
+export function translateBilingualValueForLocale<TKo, TEn>(
   locale: string,
   scope: string,
-  ko: T,
-  en: T,
-): T {
-  return translateCurrentPair(resolveUiLocale(locale), scope, ko, en) as T;
+  ko: TKo,
+  en: TEn,
+): TKo {
+  return translateCurrentPair(resolveUiLocale(locale), scope, ko, en) as TKo;
 }
 
-export function translateCurrentBilingualValue<T>(
+export function translateCurrentBilingualValue<TKo, TEn>(
   scope: string,
-  ko: T,
-  en: T,
-): T {
+  ko: TKo,
+  en: TEn,
+): TKo {
   return translateBilingualValueForLocale(getCurrentUiLocale(), scope, ko, en);
 }
 

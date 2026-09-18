@@ -8,8 +8,6 @@ import {
   requestPwaInstall,
   subscribePwaInstall,
 } from "@/shared/lib/pwa-install-store";
-
-
 import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
@@ -17,7 +15,7 @@ import {
 
 import "./pwa-install-nudge.css";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("pwa-install-nudge", ko, en);
 
 const INSTALL_NUDGE_SESSION_KEY = "toonstudio:pwa-install-nudge-dismissed";
@@ -35,19 +33,19 @@ export function PwaInstallNudge() {
   useBilingualI18nRevision();
   const { pathname } = useLocation();
 
-
   const pwa = useSyncExternalStore(
     subscribePwaInstall,
     getPwaInstallSnapshot,
     getPwaInstallServerSnapshot,
   );
   const [dismissed, setDismissed] = useState(readInstallNudgeDismissal);
+
   // Market browsing is content-first; the install prompt competes with discovery chrome there.
   // The creator home keeps the prompt, but CSS moves it above the mobile bottom navigation.
   const hideOnMarket = pathname === "/market" || pathname.startsWith("/market/");
-
   const iosManualInstall = pwa.platform === "ios" && !pwa.standalone;
   const promptAvailable = pwa.status === "available";
+
   if (hideOnMarket || (!promptAvailable && !iosManualInstall) || dismissed) return null;
 
   const title = iosManualInstall

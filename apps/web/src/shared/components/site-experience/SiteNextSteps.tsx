@@ -21,7 +21,7 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SiteNextSteps", ko, en);
 
 const ICONS = { discover: Compass, research: Search, learn: BookOpen, market: Store, showcase: Images, community: MessageCircle, calendar: CalendarDays, library: Library };

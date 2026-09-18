@@ -89,7 +89,7 @@ import {
 import { getProductionProjectByWork } from "../production-hub/production-api";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
-const bi = <T,>(ko: T, en: T): T =>
+const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioRolePersonalizationCenter", ko, en);
 
 const FEATURED_ONBOARDING_ROLES: readonly CreatorRoleId[] = [
