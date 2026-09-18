@@ -24,15 +24,15 @@
 
 | 경계 | 현재 판정 | 직접 근거 | 확대 해석 금지 |
 | --- | --- | --- | --- |
-| 앱/URL | **기존 `/studio`에서 in-place** | [`index.html`](../../index.html) → [`src/app/main.tsx`](../../src/app/main.tsx) → [`src/app/routes/AppRouter.tsx`](../../src/app/routes/AppRouter.tsx) → [`src/app/routes/groups/creator.routes.tsx`](../../src/app/routes/groups/creator.routes.tsx) → [`src/domains/creator/studio-router/StudioRouter.tsx`](../../src/domains/creator/studio-router/StudioRouter.tsx) → [`src/domains/creator/StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx) | 별도 `/studio-v11`, `/studio-v12`, `/studio/v12` 제품 route가 있다는 뜻이 아니다. |
-| 문서·입력 권위 | **Konva Stage 유지** | [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)의 `<Stage>`와 pointer handlers | Vello가 전체 문서, pointer, brush pixel 또는 whole-canvas 권위를 얻었다고 말할 수 없다. |
-| Vello 제품 배선 | **selection-overlay island에 제한해 기본 활성** | [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts), [`studio-vello-hub-surface.tsx`](../../src/domains/creator/studio-vello-hub-surface.tsx), [`studio-vello-hub.ts`](../../src/domains/creator/studio-vello-hub.ts) | scene-local candidate이며 `productWidePromoted=false`, `persistentWinnerStorage=false`다. |
-| 렌더/브러시 tournament | **실제 제품 호출부에 배선** | [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx)의 pointer-down admission, [`StudioKonvaImageNode.tsx`](../../src/domains/creator/StudioKonvaImageNode.tsx)의 filter-island plan | winner cache가 모든 장면·장치의 기본 renderer 승격을 의미하지 않는다. |
-| VRM 표면 브러시 | **round-tip/no-mixing 제품 경로에 배선** | [`StudioVrmPoser.tsx`](../../src/domains/creator/StudioVrmPoser.tsx), [`studio-vrm-surface-paint-tool.ts`](../../src/domains/creator/studio-vrm-surface-paint-tool.ts), [`studio-vrm-surface-brush-provider.ts`](../../src/domains/creator/studio-vrm-surface-brush-provider.ts) | stamp/image/smudge/wet와 사람 손맛·다중 실기기 품질까지 통과했다는 뜻이 아니다. |
+| 앱/URL | **기존 `/studio`에서 in-place** | [`index.html`](../../apps/web/index.html) → [`src/app/main.tsx`](../../apps/web/src/app/main.tsx) → [`src/app/routes/AppRouter.tsx`](../../apps/web/src/app/routes/AppRouter.tsx) → [`src/app/routes/groups/creator.routes.tsx`](../../apps/web/src/app/routes/groups/creator.routes.tsx) → [`src/domains/creator/studio-router/StudioRouter.tsx`](../../apps/web/src/domains/creator/studio-router/StudioRouter.tsx) → [`src/domains/creator/StudioPage.tsx`](../../apps/web/src/domains/creator/StudioPage.tsx) | 별도 `/studio-v11`, `/studio-v12`, `/studio/v12` 제품 route가 있다는 뜻이 아니다. |
+| 문서·입력 권위 | **Konva Stage 유지** | [`StudioCanvasViewport.tsx`](../../apps/web/src/domains/creator/canvas/StudioCanvasViewport.tsx)의 `<Stage>`와 pointer handlers | Vello가 전체 문서, pointer, brush pixel 또는 whole-canvas 권위를 얻었다고 말할 수 없다. |
+| Vello 제품 배선 | **selection-overlay island에 제한해 기본 활성** | [`studio-vello-hub-capability.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub-capability.ts), [`studio-vello-hub-surface.tsx`](../../apps/web/src/domains/creator/render/studio-vello-hub-surface.tsx), [`studio-vello-hub.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub.ts) | scene-local candidate이며 `productWidePromoted=false`, `persistentWinnerStorage=false`다. |
+| 렌더/브러시 tournament | **실제 제품 호출부에 배선** | [`StudioPage.tsx`](../../apps/web/src/domains/creator/StudioPage.tsx)의 pointer-down admission, [`StudioKonvaImageNode.tsx`](../../apps/web/src/domains/creator/StudioKonvaImageNode.tsx)의 filter-island plan | winner cache가 모든 장면·장치의 기본 renderer 승격을 의미하지 않는다. |
+| VRM 표면 브러시 | **round-tip/no-mixing 제품 경로에 배선** | [`StudioVrmPoser.tsx`](../../apps/web/src/domains/creator/vrm/StudioVrmPoser.tsx), [`studio-vrm-surface-paint-tool.ts`](../../apps/web/src/domains/creator/vrm/studio-vrm-surface-paint-tool.ts), [`studio-vrm-surface-brush-provider.ts`](../../apps/web/src/domains/creator/vrm/studio-vrm-surface-brush-provider.ts) | stamp/image/smudge/wet와 사람 손맛·다중 실기기 품질까지 통과했다는 뜻이 아니다. |
 | Velato | **엔진 패키지·wasm·하니스 구현, 제품 호출부 없음** | [`crates/studio-engine-vello/Cargo.toml`](../../crates/studio-engine-vello/Cargo.toml), [`packages/studio-engine-vello/src/lottie.ts`](../../packages/studio-engine-vello/src/lottie.ts) | 현재 Studio Lottie UI가 Velato를 사용한다고 말할 수 없다. |
 | WESL | **컴파일러·corpus 구현, 제품 호출부 없음** | [`packages/studio-engine-registry/src/wesl-compile.ts`](../../packages/studio-engine-registry/src/wesl-compile.ts) | 결합 승격 raw gate가 `passed=false`이므로 제품 기본 shader platform이라고 말할 수 없다. |
-| 로컬 데이터 | **SQLite WASM + OPFS SAH-pool이 제품 기본 권위** | [`studio-local-database.ts`](../../src/domains/creator/studio-local-database.ts), [`studio-local-database.worker.ts`](../../src/domains/creator/studio-local-database.worker.ts) | OPFS는 cloud backup이 아니며 실제 power-loss/fsync 보장을 이 소스만으로 주장할 수 없다. |
-| browser KV | **localStorage/IndexedDB 호환 시임이 남음** | [`studio-browser-kv-authority-boundary.test.ts`](../../src/domains/creator/studio-browser-kv-authority-boundary.test.ts)의 exact allowance 원장 | “localStorage가 소스에서 완전히 제거됨”은 거짓이다. 제품 창작 데이터의 기본 권위가 아니라는 것이 현재 계약이다. |
+| 로컬 데이터 | **SQLite WASM + OPFS SAH-pool이 제품 기본 권위** | [`studio-local-database.ts`](../../apps/web/src/domains/creator/studio-local-database.ts), [`studio-local-database.worker.ts`](../../apps/web/src/domains/creator/studio-local-database.worker.ts) | OPFS는 cloud backup이 아니며 실제 power-loss/fsync 보장을 이 소스만으로 주장할 수 없다. |
+| browser KV | **localStorage/IndexedDB 호환 시임이 남음** | [`studio-browser-kv-authority-boundary.test.ts`](../../apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts)의 exact allowance 원장 | “localStorage가 소스에서 완전히 제거됨”은 거짓이다. 제품 창작 데이터의 기본 권위가 아니라는 것이 현재 계약이다. |
 | 외부 gate | **미통과·격리 유지** | 8시간 soak raw artifact, CSP 블라인드 랩 CLI, CRDT fault artifact (§6) | 기술 CSP 검사, 8시간 soak, Worker terminate를 외부 CSP/24h/물리 fault 통과로 대체할 수 없다. |
 
 ## 2. `/studio` in-place 진입과 표면 소유권
@@ -54,18 +54,18 @@ index.html
        `- Pixi: Vello disabled/fallback 때 같은 island의 명시적 fallback
 ```
 
-- [`AppRouter.tsx`](../../src/app/routes/AppRouter.tsx)는 전역 fallback·error·isolation 경계만
-  조립한다. [`creator.routes.tsx`](../../src/app/routes/groups/creator.routes.tsx)가 정확히 하나의
+- [`AppRouter.tsx`](../../apps/web/src/app/routes/AppRouter.tsx)는 전역 fallback·error·isolation 경계만
+  조립한다. [`creator.routes.tsx`](../../apps/web/src/app/routes/groups/creator.routes.tsx)가 정확히 하나의
   `path="/studio/*"` 엔트리에서 `StudioRouter`를 lazy import한다. 편집기·게시·2D→3D·동반 도구는
-  [`StudioRouter.tsx`](../../src/domains/creator/studio-router/StudioRouter.tsx)가 canonical URL로
+  [`StudioRouter.tsx`](../../apps/web/src/domains/creator/studio-router/StudioRouter.tsx)가 canonical URL로
   dispatch하며 경쟁하는 flat Studio route나 별도 V12 앱을 만들지 않는다.
-- 같은 router는 [`StudioCrossOriginIsolationGate.tsx`](../../src/app/StudioCrossOriginIsolationGate.tsx)로
+- 같은 router는 [`StudioCrossOriginIsolationGate.tsx`](../../apps/web/src/app/StudioCrossOriginIsolationGate.tsx)로
   Studio 문서 전환을 감싼다. [`vercel.json`](../../vercel.json)은 `/studio`와 `/studio/(.*)`에
   COOP `same-origin`, COEP `credentialless`를 설정하고, 전체 응답에 HTTP
   `Content-Security-Policy`를 설정한다.
-- [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)는 현재도 Konva
+- [`StudioCanvasViewport.tsx`](../../apps/web/src/domains/creator/canvas/StudioCanvasViewport.tsx)는 현재도 Konva
   `<Stage>`와 `onPointerDown`/`onPointerMove`/`onPointerUp` 경로를 마운트한다. Vello canvas는
-  [`studio-vello-hub-canvas-target.ts`](../../src/domains/creator/studio-vello-hub-canvas-target.ts)에서
+  [`studio-vello-hub-canvas-target.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub-canvas-target.ts)에서
   `pointerEvents = "none"`이다.
 - 따라서 “in-place 교체”는 URL·앱을 새로 만들지 않고 기존 호출부 내부에서 기능별 provider를
   교체한다는 뜻이다. whole-canvas 단일 엔진 컷오버 완료를 뜻하지 않는다.
@@ -77,40 +77,40 @@ index.html
 
 ### 3.1 renderer/brush tournament
 
-- [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx)는 mount 뒤
+- [`StudioPage.tsx`](../../apps/web/src/domains/creator/StudioPage.tsx)는 mount 뒤
   `bootStudioTournamentPersistence()`를 호출한다. 구현은
-  [`studio-tournament-persistence-bootstrap.ts`](../../src/domains/creator/studio-tournament-persistence-bootstrap.ts)에서
+  [`studio-tournament-persistence-bootstrap.ts`](../../apps/web/src/domains/creator/studio-tournament-persistence-bootstrap.ts)에서
   SQLite adapter를 dynamic import하고, hydration이 끝나기 전에는 원래 lane 순서를 유지한다.
 - 같은 `StudioPage.tsx`의 실제 pointer-down 경로는
-  [`studio-stroke-route-tournament.ts`](../../src/domains/creator/studio-stroke-route-tournament.ts)의
+  [`studio-stroke-route-tournament.ts`](../../apps/web/src/domains/creator/brush/studio-stroke-route-tournament.ts)의
   `resolveStudioStrokeRoutePointerDownGate()`로 living-ink, Hokusai, stamp, GPU, live-ink,
   wet-fallback, dynamic, Konva admission을 결정한다. Konva는 fail-visible 종단 fallback으로 남는다.
-- [`StudioKonvaImageNode.tsx`](../../src/domains/creator/StudioKonvaImageNode.tsx)는
-  [`studio-filter-island-plan.ts`](../../src/domains/creator/studio-filter-island-plan.ts)의
+- [`StudioKonvaImageNode.tsx`](../../apps/web/src/domains/creator/StudioKonvaImageNode.tsx)는
+  [`studio-filter-island-plan.ts`](../../apps/web/src/domains/creator/filter/studio-filter-island-plan.ts)의
   `planStudioFilterIslandLanes()`를 실제 이미지 필터 경로에서 호출한다.
 - tournament 메커니즘은
   [`@toonspectrum/studio-engine-registry`](../../packages/studio-engine-registry/src/index.ts)에서 오고,
-  제품 브리지는 [`studio-renderer-tournament-runtime.ts`](../../src/domains/creator/studio-renderer-tournament-runtime.ts)에
+  제품 브리지는 [`studio-renderer-tournament-runtime.ts`](../../apps/web/src/domains/creator/studio-renderer-tournament-runtime.ts)에
   있다. 이 배선은 존재하지만 장면/장치 전체의 영구 승격과는 별개다.
 
 ### 3.2 Vello GPU/CPU 제품 island
 
-- [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts)는
+- [`studio-vello-hub-capability.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub-capability.ts)는
   `studio-vello-hub-selection-overlay-v1`을 기본 활성화한다. 범위는
   `accelerated-selection-overlay` 하나이며 document/input/brush-pixel/canonical-document 권위는
   모두 `false`다.
-- [`StudioCanvasViewport.tsx`](../../src/domains/creator/StudioCanvasViewport.tsx)는
+- [`StudioCanvasViewport.tsx`](../../apps/web/src/domains/creator/canvas/StudioCanvasViewport.tsx)는
   `StudioVelloHubSurface`를 기존 `/studio` canvas host에 직접 마운트한다. Vello가 명시적으로
   disabled되거나 `fallback` 상태일 때만 같은 selection island의 Pixi host를 활성화한다.
-- [`studio-vello-hub.ts`](../../src/domains/creator/studio-vello-hub.ts)의 Classic backend는
-  [`studio-gpu-fabric.ts`](../../src/domains/creator/studio-gpu-fabric.ts)의 공유 `GPUDevice` lease를
+- [`studio-vello-hub.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub.ts)의 Classic backend는
+  [`studio-gpu-fabric.ts`](../../apps/web/src/domains/creator/render/studio-gpu-fabric.ts)의 공유 `GPUDevice` lease를
   채택하고 Vello GPU texture를 만든다. CPU backend는 `vello_cpu` pixels를 품질 기준/fallback으로
   사용한다.
-- [`studio-vello-hub-canvas-target.ts`](../../src/domains/creator/studio-vello-hub-canvas-target.ts)는
+- [`studio-vello-hub-canvas-target.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub-canvas-target.ts)는
   GPU frame을 `GPUCanvasContext.getCurrentTexture()`로 texture-to-texture copy해 표시한다. CPU frame만
   `putImageData()`를 사용하며, GPU hot path를 CPU readback으로 가장하지 않는다.
 - hub의 승격은 scene-local memory evidence, visual shadow, 12% hysteresis, pen-up 전환 금지에 묶인다.
-  Hybrid/Sparse GPU는 [`studio-vello-hub-capability.ts`](../../src/domains/creator/studio-vello-hub-capability.ts)에서
+  Hybrid/Sparse GPU는 [`studio-vello-hub-capability.ts`](../../apps/web/src/domains/creator/render/studio-vello-hub-capability.ts)에서
   `unavailable-upstream-api`로 남아 있다. 현재 제품 GPU backend는 Vello 0.9 Classic이다.
 
 ### 3.3 Velato와 WESL: 구현됨, 제품 기본 아님
@@ -125,9 +125,9 @@ index.html
 
 ### 3.4 VRM 표면 브러시 제품 경로
 
-- [`StudioVrmPoser.tsx`](../../src/domains/creator/StudioVrmPoser.tsx)의 실제 R3F pointer workflow가
+- [`StudioVrmPoser.tsx`](../../apps/web/src/domains/creator/vrm/StudioVrmPoser.tsx)의 실제 R3F pointer workflow가
   down/move/up, `Intersection.faceIndex`, pressure/tilt와 analytic camera scale을
-  [`studio-vrm-surface-paint-tool.ts`](../../src/domains/creator/studio-vrm-surface-paint-tool.ts)의
+  [`studio-vrm-surface-paint-tool.ts`](../../apps/web/src/domains/creator/vrm/studio-vrm-surface-paint-tool.ts)의
   bounded transaction으로 전달한다.
 - transaction은 최대 2,048 input samples와 50,000 projected operations로 제한되고, 기존
   `BrushProgramIR`/`StrokeIR`→surface adapter→`StudioVrmTexturePaintRuntime` 경계에서 atlas를
@@ -144,10 +144,10 @@ index.html
 - package: `@sqlite.org/sqlite-wasm` `3.53.0-build1` — [`package.json`](../../package.json)
 - OPFS SAH-pool directory: `toonspectrum-studio-sqlite`
 - logical database: `studio-local-v12.db`
-- app-lifetime owner: [`studio-local-database-runtime.ts`](../../src/domains/creator/studio-local-database-runtime.ts)
-- Dedicated Worker RPC: [`studio-local-database-worker-client.ts`](../../src/domains/creator/studio-local-database-worker-client.ts)
-  → [`studio-local-database.worker.ts`](../../src/domains/creator/studio-local-database.worker.ts)
-- schema/API: [`studio-local-database.ts`](../../src/domains/creator/studio-local-database.ts)
+- app-lifetime owner: [`studio-local-database-runtime.ts`](../../apps/web/src/domains/creator/studio-local-database-runtime.ts)
+- Dedicated Worker RPC: [`studio-local-database-worker-client.ts`](../../apps/web/src/domains/creator/studio-local-database-worker-client.ts)
+  → [`studio-local-database.worker.ts`](../../apps/web/src/domains/creator/studio-local-database.worker.ts)
+- schema/API: [`studio-local-database.ts`](../../apps/web/src/domains/creator/studio-local-database.ts)
 
 Worker는 `@sqlite.org/sqlite-wasm`을 동적 import하고 SAH-pool 하나를 소유한다. OPFS/SQLite를 열 수
 없으면 core open은 `SqliteUnavailableError`로 명시 실패한다. 각 UI 기능이 허용하는 memory-only
@@ -171,16 +171,16 @@ rg -n -g '*.ts' -g '*.tsx' -g '!*.test.ts' -g '!*.test.tsx' \
 
 “제품 기본 권위가 SQLite/OPFS다”와 “browser KV 코드가 없다”는 다른 주장이다. 후자는 현재
 거짓이다. exact allowlist의 단일 원장은
-[`studio-browser-kv-authority-boundary.test.ts`](../../src/domains/creator/studio-browser-kv-authority-boundary.test.ts)다.
+[`studio-browser-kv-authority-boundary.test.ts`](../../apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts)다.
 
 | 잔여 시임 | 현재 동작 | 대표 경로 |
 | --- | --- | --- |
-| autosave 호환 읽기 | OPFS/SQLite 후보를 먼저 조정한다. durable 후보가 없거나 open이 실패할 때 기존 browser-storage JSON을 `compatibility-only` 복구 후보로 표시할 수 있지만 새 autosave를 localStorage에 쓰지 않는다. durable write/clear 뒤에는 구 key를 삭제한다. | [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx), [`studio-autosave-opfs-session.ts`](../../src/domains/creator/studio-autosave-opfs-session.ts) |
-| 삭제 전용 cleanup | autosave/sidecar, AI recent prompts, VRM pose clipboard, account data-destruction, server revision restore가 구 key를 제거한다. `removeItem`은 새 권위를 만들지 않는다. | [`studio-data-destruction.ts`](../../src/domains/creator/studio-data-destruction.ts), [`studio-server-revision-restore-controller.ts`](../../src/domains/creator/studio-server-revision-restore-controller.ts) |
-| 명시적 legacy import/test adapter | brush/filter/production-bible/animatic/BG3D preset/brand/clip/font/marketplace/palette 등의 codec가 주입된 `Storage`를 처리한다. 제품 default는 `discard`; import는 명시 opt-in이어야 한다. | [`studio-brush-library-sqlite-repository.ts`](../../src/domains/creator/studio-brush-library-sqlite-repository.ts), [`studio-filter-library-sqlite-repository.ts`](../../src/domains/creator/studio-filter-library-sqlite-repository.ts), [`studio-production-bible.ts`](../../src/domains/creator/studio-production-bible.ts) |
-| UI-only compatibility helper | tutorial progress와 workspace의 주입형 rollback/test codec 등 구 동기 helper는 남아 있지만 제품 UI factory는 SQLite runtime/repository를 사용한다. exact key/write 수는 allowlist가 고정한다. | [`studio-feature-tutorials.ts`](../../src/domains/creator/studio-feature-tutorials.ts), [`studio-tutorial-progress-sqlite.ts`](../../src/domains/creator/studio-tutorial-progress-sqlite.ts), [`studio-workspaces.ts`](../../src/domains/creator/studio-workspaces.ts) |
-| legacy IndexedDB | BG3D/asset/checkpoint/CRDT/history/production-bible/VRM 등의 기존 DB adapter가 명시적 import·rollback seam으로 남는다. product factory의 ambient 자동 선택을 허용하지 않는다. | [`studio-browser-kv-authority-boundary.test.ts`](../../src/domains/creator/studio-browser-kv-authority-boundary.test.ts) |
-| 탭 범위 민감 상태 | 일부 clipboard/BYOK 설정은 `sessionStorage`를 사용한다. 이는 재시작 durable authority가 아니며 scanner도 별도로 취급한다. | [`studio-ai-client.ts`](../../src/domains/creator/studio-ai-client.ts), [`StudioPage.tsx`](../../src/domains/creator/StudioPage.tsx) |
+| autosave 호환 읽기 | OPFS/SQLite 후보를 먼저 조정한다. durable 후보가 없거나 open이 실패할 때 기존 browser-storage JSON을 `compatibility-only` 복구 후보로 표시할 수 있지만 새 autosave를 localStorage에 쓰지 않는다. durable write/clear 뒤에는 구 key를 삭제한다. | [`StudioPage.tsx`](../../apps/web/src/domains/creator/StudioPage.tsx), [`studio-autosave-opfs-session.ts`](../../apps/web/src/domains/creator/studio-autosave-opfs-session.ts) |
+| 삭제 전용 cleanup | autosave/sidecar, AI recent prompts, VRM pose clipboard, account data-destruction, server revision restore가 구 key를 제거한다. `removeItem`은 새 권위를 만들지 않는다. | [`studio-data-destruction.ts`](../../apps/web/src/domains/creator/studio-data-destruction.ts), [`studio-server-revision-restore-controller.ts`](../../apps/web/src/domains/creator/studio-server-revision-restore-controller.ts) |
+| 명시적 legacy import/test adapter | brush/filter/production-bible/animatic/BG3D preset/brand/clip/font/marketplace/palette 등의 codec가 주입된 `Storage`를 처리한다. 제품 default는 `discard`; import는 명시 opt-in이어야 한다. | [`studio-brush-library-sqlite-repository.ts`](../../apps/web/src/domains/creator/brush/studio-brush-library-sqlite-repository.ts), [`studio-filter-library-sqlite-repository.ts`](../../apps/web/src/domains/creator/filter/studio-filter-library-sqlite-repository.ts), [`studio-production-bible.ts`](../../apps/web/src/domains/creator/studio-production-bible.ts) |
+| UI-only compatibility helper | tutorial progress와 workspace의 주입형 rollback/test codec 등 구 동기 helper는 남아 있지만 제품 UI factory는 SQLite runtime/repository를 사용한다. exact key/write 수는 allowlist가 고정한다. | [`studio-feature-tutorials.ts`](../../apps/web/src/domains/creator/studio-feature-tutorials.ts), [`studio-tutorial-progress-sqlite.ts`](../../apps/web/src/domains/creator/studio-tutorial-progress-sqlite.ts), [`studio-workspaces.ts`](../../apps/web/src/domains/creator/studio-workspaces.ts) |
+| legacy IndexedDB | BG3D/asset/checkpoint/CRDT/history/production-bible/VRM 등의 기존 DB adapter가 명시적 import·rollback seam으로 남는다. product factory의 ambient 자동 선택을 허용하지 않는다. | [`studio-browser-kv-authority-boundary.test.ts`](../../apps/web/src/domains/creator/studio-browser-kv-authority-boundary.test.ts) |
+| 탭 범위 민감 상태 | 일부 clipboard/BYOK 설정은 `sessionStorage`를 사용한다. 이는 재시작 durable authority가 아니며 scanner도 별도로 취급한다. | [`studio-ai-client.ts`](../../apps/web/src/domains/creator/ai/studio-ai-client.ts), [`StudioPage.tsx`](../../apps/web/src/domains/creator/StudioPage.tsx) |
 
 따라서 삭제 기준은 “`localStorage` 문자열 grep 0건”이 아니다. 새 창작 데이터 write 또는 새
 IndexedDB open이 exact allowance 없이 들어오지 못하고, 제품 factory가 legacy adapter를 ambient하게

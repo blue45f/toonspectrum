@@ -16,6 +16,28 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 
 <br/>
 
+## 현재 저장소와 개발 기준
+
+2026-09-18 기준 ToonSpectrum은 하나의 모노레포에서 사용자 웹, 관리자 웹 경계, API와 Studio 핵심 패키지를 함께 관리합니다. 도메인은 아직 별도 `packages/domains/*`로 쪼개지 않고 각 애플리케이션 안에서 논리적으로 구분합니다.
+
+```text
+apps/
+  web/                 사용자용 Vite/React 애플리케이션
+  admin/               독립 빌드 가능한 관리자 UI 경계(점진적 이전 중)
+  api/                 NestJS API
+packages/
+  contracts/           Web/Admin/API가 실제로 공유하는 런타임 중립 계약
+  studio-*/            Studio 문서·명령·렌더링 등 집중 패키지
+openwiki/              코드 기반 탐색·설명 문서
+docs/                  ADR·아키텍처·운영·역사적 증거 문서
+```
+
+- **현재 구조:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **합의된 목표/마이그레이션:** [docs/architecture/modular-monorepo-target.md](docs/architecture/modular-monorepo-target.md)
+- **운영·배포 권위:** [DEPLOY.md](DEPLOY.md)와 [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)
+- **AI/문서 탐색:** [openwiki/quickstart.md](openwiki/quickstart.md)
+- 문서 권위는 **source/tests → accepted ADR → architecture docs → OpenWiki** 순서입니다.
+
 ## 왜 만들었나 — 기존 서비스의 빈자리
 
 네이버·카카오·리디 등은 모두 **자기 플랫폼 안에 독자를 가두는** 워터가든입니다. 독자는 작품이 "어디서, 얼마에" 볼 수 있는지 여러 앱을 오가며 확인해야 하고, 신뢰할 만한 통합 평점·리뷰도, 웹소설 원작과 웹툰화의 연결도 한눈에 보기 어렵습니다. ToonSpectrum는 그 공백을 정확히 겨냥합니다.
@@ -156,7 +178,7 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 새 후보는 라이선스·공급망, lazy/Worker 격리, 취소·예산·복구 receipt, 실제 브라우저 품질 게이트를
 통과한 뒤 같은 provider 계약 아래 승격합니다. Vello처럼 유망하지만 웹 지원이 alpha인 엔진은
 제품 권위를 주지 않고 실험실에서 비교하며, 실측 근거와 한계는
-[`studio-vello-observed-poc.ts`](src/domains/creator/studio-vello-observed-poc.ts)에 고정합니다.
+[`studio-vello-observed-poc.ts`](apps/web/src/domains/creator/render/studio-vello-observed-poc.ts)에 고정합니다.
 더 나은 결과가 모든 hard gate에서 확인되면 기존 provider를 교체합니다.
 Signature Pad·Atrament·Croquis는 필기 품질 비교용 benchmark oracle일 뿐 런타임 의존성이 아니며,
 Fabric.js는 Konva와 장면 모델이 중복되어 제품 런타임 도입 대상에서 제외합니다.
@@ -224,10 +246,14 @@ KMAS_PRV_KEY=... pnpm kmas:update-catalog
 
 ```bash
 pnpm install
-pnpm dev          # Vite 웹앱: http://localhost:5173
-pnpm dev:api     # http://127.0.0.1:4001
-pnpm dev:all     # 권장: 웹앱(:5173) + Nest API(:4001) 한 번에 실행
-pnpm build && pnpm start   # 프로덕션 프리뷰
+pnpm dev                    # 사용자 웹: http://localhost:5173
+pnpm dev:api                # API: http://127.0.0.1:4001
+pnpm dev:all                # 사용자 웹 + API
+pnpm dev:admin              # 관리자 UI: http://localhost:4174
+pnpm typecheck:admin
+pnpm build:admin            # dist-admin/
+pnpm validate:architecture  # 구조 + application boundary ratchet
+pnpm build && pnpm start    # 사용자 웹 프로덕션 프리뷰
 ```
 
 ### Studio 3D 에셋 배치 업로드
@@ -235,32 +261,16 @@ pnpm build && pnpm start   # 프로덕션 프리뷰
 `toonstudio` 쪽 3D 배경/캐릭터/소품을 `manifest`로 묶어 운영 API에 업로드하려면
 [`docs/studio-asset-upload-automation.md`](docs/studio-asset-upload-automation.md)를 그대로 따라오면 됩니다.
 
-권장 로컬 원샷 플로우:
-1. `pnpm run studio:toolchain:setup -- --check`로 준비상태 점검
-2. `pnpm run studio:asset:release -- --auto-deploy -- --auto-demo-login --type auto --max-items 20`
-- `--auto-deploy`는 GitHub Actions `Studio 3D Asset Batch Upload`를 `main` 브랜치 기준으로 dispatch 합니다.
-- 운영에서 `studio:batch`/`studio:upload-assets`는 여전히 사용 가능하며, 단일 명령으로 관리하려면 `studio:asset:release` 권장.
-- `TOONSTUDIO_HOME`을 고정하면 다른 경로에서도 동일하게 실행 가능합니다.
-- 운영 배포 체크리스트와 토큰 관리(Secret) 규칙은 위 문서의 “운영 배포 마무리 체크리스트” 참조
+현재 기본 절차는 **로컬 생성·검증·dry-run까지만 자동화**합니다. 저장소의 현재 운영 정책은 자동 배포를 금지하므로 `--auto-deploy`를 사용하지 않습니다. 운영 업로드와 Cloudflare/Render 배포는 각각 명시적 승인을 받은 뒤 별도 수행합니다.
 
 ```bash
+pnpm run studio:toolchain:setup -- --check
 pnpm run studio:manifest:generate -- --source-dir ./batch_source --output batch_generated/manifest.json
 pnpm run studio:batch -- --source-dir ./batch_source --output batch_generated/manifest.json -- --dry-run --max-items 20
-pnpm run studio:toolchain:setup -- --check
 pnpm run studio:upload-assets:dry-run -- --manifest batch_generated/manifest.json --max-items 20
-TOONSTUDIO_HOME="/path/to/toonspectrum"
-pnpm --dir "$TOONSTUDIO_HOME" run studio:asset:release -- \
-  --source-dir "$TOONSTUDIO_HOME/batch_source" \
-  --manifest "$TOONSTUDIO_HOME/batch_generated/manifest.json" \
-  --auto-deploy \
-  --deploy-ref main \
-  --deploy-environment production \
-  -- \
-  --auto-demo-login \
-  --type auto \
-  --work-title "toonbatch-$(date +%Y%m%d)" \
-  --max-items 20
 ```
+
+실제 운영 반영 전에는 [Studio 에셋 업로드 문서](docs/studio-asset-upload-automation.md)와 [DEPLOY.md](DEPLOY.md)의 수동 승인 정책을 함께 확인합니다. `studio:asset:release`의 과거 `--auto-deploy` 옵션은 호환 목적으로 코드에 남아 있을 수 있으나 현재 승인된 운영 경로가 아닙니다.
 
 ### DB 준비 (PostgreSQL / Neon)
 
@@ -385,16 +395,30 @@ Studio writer를 drain해야 합니다. Render pre-deploy 등 다른 migration w
 
 ## 프로젝트 구조
 
+```text
+apps/
+  web/               사용자용 Vite·React 브라우저 애플리케이션
+    src/app/          부트스트랩·라우팅·앱 셸
+    src/domains/      앱 내부의 논리적 업무 도메인
+    src/shared/       도메인 독립 UI·브라우저 공용 코드
+    src/infrastructure/
+    public/           그대로 배포되는 정적 자산
+  admin/             독립 빌드 가능한 관리자 surface(점진적 이전 중)
+    src/app/
+    src/domains/
+    src/shared/
+    src/platform/
+  api/               NestJS 백엔드 workspace package
+packages/
+  contracts/         실제 Web/Admin/API 공용 런타임 중립 계약
+  core/              기존 공용 순수 모델/계약
+  studio-*/          Studio 핵심 엔진·문서·명령 패키지
+openwiki/            코드 기반 탐색·설명 레이어
+docs/                ADR·아키텍처·운영·역사적 증거
+scripts/, tools/     저장소 횡단 생성·검증 도구
 ```
-apps/web/            Vite·React 브라우저 애플리케이션
-  src/app/           부트스트랩·라우팅·서비스 워커·앱 셸
-  src/domains/       creator·catalog·community·auth 등 기능 도메인
-  src/shared/        도메인 간 브라우저 서비스·계약·정적 카탈로그 런타임
-  src/components/    앱 셸·오류·브라우저 호환 컴포넌트
-  src/infrastructure/ API·클라우드 저장소 클라이언트
-  public/             브라우저 배포 자산
-apps/api/            NestJS 백엔드
-```
+
+`packages/domains/*`는 아직 만들지 않습니다. 기능은 먼저 각 앱의 `domains/<domain>/<capability>`에 두고, 실제 두 번째 소비자가 생긴 좁은 계약만 `packages/contracts` 등으로 승격합니다.
 
 <br/>
 

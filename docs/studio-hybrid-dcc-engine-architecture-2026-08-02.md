@@ -39,25 +39,25 @@
 
 현재 상태의 기준 코드는 다음과 같다.
 
-- 카탈로그와 7단계 평가: [`studio-dcc-section6-full-catalog.ts`](../src/domains/creator/studio-dcc-section6-full-catalog.ts)
-- 독립 제품 패널: [`StudioHybridDccPanel.tsx`](../src/domains/creator/StudioHybridDccPanel.tsx)
-- 다이얼로그 shell: [`StudioHybridDccDialog.tsx`](../src/domains/creator/StudioHybridDccDialog.tsx)
-- workspace facade: [`studio-hybrid-dcc-workspace.ts`](../src/domains/creator/studio-hybrid-dcc-workspace.ts)
-- workspace OPFS codec/recovery: [`studio-hybrid-dcc-workspace-persistence.ts`](../src/domains/creator/studio-hybrid-dcc-workspace-persistence.ts)
-- component-selection authority: [`studio-hybrid-dcc-component-selection.ts`](../src/domains/creator/studio-hybrid-dcc-component-selection.ts)
-- authority preview: [`StudioHybridDccViewport.tsx`](../src/domains/creator/StudioHybridDccViewport.tsx)
-- GLB derivative exporter: [`studio-hybrid-dcc-glb-export.ts`](../src/domains/creator/studio-hybrid-dcc-glb-export.ts)
-- shipping BG3D handoff: [`studio-hybrid-dcc-bg3d-handoff.ts`](../src/domains/creator/studio-hybrid-dcc-bg3d-handoff.ts)
-- 현재 제품 3D 뷰포트: [`StudioBackground3D.tsx`](../src/domains/creator/StudioBackground3D.tsx)
-- BG3D 그림자 fit: [`studio-bg3d-shadow-frustum.ts`](../src/domains/creator/studio-bg3d-shadow-frustum.ts)
-- BG3D↔VRM runtime 공유 장면 계약: [`studio-shared-3d-scene-bridge.ts`](../src/domains/creator/studio-shared-3d-scene-bridge.ts)
-- 공유 VRM 로드·상태 적용 경계: [`studio-bg3d-shared-vrm-runtime.ts`](../src/domains/creator/studio-bg3d-shared-vrm-runtime.ts)
-- 공유 VRM runtime projection: [`StudioBg3dSharedVrmCharacter.tsx`](../src/domains/creator/StudioBg3dSharedVrmCharacter.tsx)
-- VRM 기반 캐릭터 creator: [`studio-vrm-avatar-forge.ts`](../src/domains/creator/studio-vrm-avatar-forge.ts)
-- 자동 손가락 grip: [`studio-vrm-prop-rig.ts`](../src/domains/creator/studio-vrm-prop-rig.ts)
-- 실측 procedural wardrobe: [`studio-vrm-wardrobe.ts`](../src/domains/creator/studio-vrm-wardrobe.ts)
-- 데생 인형 Live Motion runtime: [`studio-mannequin-webcam-tracking.ts`](../src/domains/creator/studio-mannequin-webcam-tracking.ts)
-- Studio 진입점: [`StudioPage.tsx`](../src/domains/creator/StudioPage.tsx)
+- 카탈로그와 7단계 평가: [`studio-dcc-section6-full-catalog.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-dcc-section6-full-catalog.ts)
+- 독립 제품 패널: [`StudioHybridDccPanel.tsx`](../apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccPanel.tsx)
+- 다이얼로그 shell: [`StudioHybridDccDialog.tsx`](../apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccDialog.tsx)
+- workspace facade: [`studio-hybrid-dcc-workspace.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-workspace.ts)
+- workspace OPFS codec/recovery: [`studio-hybrid-dcc-workspace-persistence.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-workspace-persistence.ts)
+- component-selection authority: [`studio-hybrid-dcc-component-selection.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-component-selection.ts)
+- authority preview: [`StudioHybridDccViewport.tsx`](../apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccViewport.tsx)
+- GLB derivative exporter: [`studio-hybrid-dcc-glb-export.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-glb-export.ts)
+- shipping BG3D handoff: [`studio-hybrid-dcc-bg3d-handoff.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-bg3d-handoff.ts)
+- 현재 제품 3D 뷰포트: [`StudioBackground3D.tsx`](../apps/web/src/domains/creator/bg3d/StudioBackground3D.tsx)
+- BG3D 그림자 fit: [`studio-bg3d-shadow-frustum.ts`](../apps/web/src/domains/creator/bg3d/studio-bg3d-shadow-frustum.ts)
+- BG3D↔VRM runtime 공유 장면 계약: [`studio-shared-3d-scene-bridge.ts`](../apps/web/src/domains/creator/studio-shared-3d-scene-bridge.ts)
+- 공유 VRM 로드·상태 적용 경계: [`studio-bg3d-shared-vrm-runtime.ts`](../apps/web/src/domains/creator/bg3d/studio-bg3d-shared-vrm-runtime.ts)
+- 공유 VRM runtime projection: [`StudioBg3dSharedVrmCharacter.tsx`](../apps/web/src/domains/creator/bg3d/StudioBg3dSharedVrmCharacter.tsx)
+- VRM 기반 캐릭터 creator: [`studio-vrm-avatar-forge.ts`](../apps/web/src/domains/creator/vrm/studio-vrm-avatar-forge.ts)
+- 자동 손가락 grip: [`studio-vrm-prop-rig.ts`](../apps/web/src/domains/creator/vrm/studio-vrm-prop-rig.ts)
+- 실측 procedural wardrobe: [`studio-vrm-wardrobe.ts`](../apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.ts)
+- 데생 인형 Live Motion runtime: [`studio-mannequin-webcam-tracking.ts`](../apps/web/src/domains/creator/scene-3d/studio-mannequin-webcam-tracking.ts)
+- Studio 진입점: [`StudioPage.tsx`](../apps/web/src/domains/creator/StudioPage.tsx)
 - production 3D console verifier: [`verify-studio-3d-console.mts`](../scripts/verify-studio-3d-console.mts)
 
 ### 0.3 완료 선언 금지 규칙
@@ -151,7 +151,7 @@ ID 집합 외에도 다음 세 우선순위 표현이 원본과 다르다.
 
 ### 2.3 현재 보수적 평가
 
-현재 [`STUDIO_DCC_SECTION6_DELIVERY_ASSESSMENTS`](../src/domains/creator/studio-dcc-section6-full-catalog.ts)는 178개 모두 `verifiedStages: ["kernel-shipped"]`로만 기록한다.
+현재 [`STUDIO_DCC_SECTION6_DELIVERY_ASSESSMENTS`](../apps/web/src/domains/creator/hybrid-dcc/studio-dcc-section6-full-catalog.ts)는 178개 모두 `verifiedStages: ["kernel-shipped"]`로만 기록한다.
 
 ```text
 total                178
@@ -231,7 +231,7 @@ Vite는 WASM 자산, COOP/COEP 헤더, React Compiler, Babylon 수동 chunk, OCC
 
 ### 3.3 Phase 0에서 연결된 것과 아직 끊긴 것
 
-[`StudioHybridDccDialog.tsx`](../src/domains/creator/StudioHybridDccDialog.tsx)는 [`StudioHybridDccPanel.tsx`](../src/domains/creator/StudioHybridDccPanel.tsx)을 마운트하고, 현재 panel은 다음처럼 전달받은 workspace 또는 자체 workspace를 React state로 소유한다.
+[`StudioHybridDccDialog.tsx`](../apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccDialog.tsx)는 [`StudioHybridDccPanel.tsx`](../apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccPanel.tsx)을 마운트하고, 현재 panel은 다음처럼 전달받은 workspace 또는 자체 workspace를 React state로 소유한다.
 
 ```ts
 const [ws, setWs] = useState(() =>
@@ -241,22 +241,22 @@ const [ws, setWs] = useState(() =>
 
 현재 Phase 0에는 다음과 같은 실질 연결과 제품 보강이 있다.
 
-1. [`StudioHybridDccViewport.tsx`](../src/domains/creator/StudioHybridDccViewport.tsx)가 immutable geometry authority record를 Three `BufferGeometry` cache로 투영하며, viewport와 outliner가 `workspaceSelectAsset`으로 같은 object ID를 선택한다.
-2. [`studio-hybrid-dcc-component-selection.ts`](../src/domains/creator/studio-hybrid-dcc-component-selection.ts)가 object/vertex/edge/face 선택, replace/add/toggle/subtract, active element, source revision/hash provenance를 별도 권위로 관리한다. viewport fan-triangle ray hit는 stable face·vertex·canonical undirected edge ID로 변환되고, 숫자 1–4와 mouse modifier가 panel state에 연결된다. 점·선 refinement는 로컬 3D 거리가 아니라 CSS pixel 반경을 사용해 면 중앙 클릭을 임의 요소로 바꾸지 않는다. Extrude·Inset·Bevel·Loop Cut은 선택 ID를 소비하며, component mode의 명시적 빈 선택에서는 임의 첫 요소 fallback을 금지한다.
+1. [`StudioHybridDccViewport.tsx`](../apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccViewport.tsx)가 immutable geometry authority record를 Three `BufferGeometry` cache로 투영하며, viewport와 outliner가 `workspaceSelectAsset`으로 같은 object ID를 선택한다.
+2. [`studio-hybrid-dcc-component-selection.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-component-selection.ts)가 object/vertex/edge/face 선택, replace/add/toggle/subtract, active element, source revision/hash provenance를 별도 권위로 관리한다. viewport fan-triangle ray hit는 stable face·vertex·canonical undirected edge ID로 변환되고, 숫자 1–4와 mouse modifier가 panel state에 연결된다. 점·선 refinement는 로컬 3D 거리가 아니라 CSS pixel 반경을 사용해 면 중앙 클릭을 임의 요소로 바꾸지 않는다. Extrude·Inset·Bevel·Loop Cut은 선택 ID를 소비하며, component mode의 명시적 빈 선택에서는 임의 첫 요소 fallback을 금지한다.
 3. document schema v2의 canonical object TRS가 geometry와 분리되어 snapshot·undo/redo·OPFS checkpoint·`.toon3d`에 저장되며, 실제 Three TransformControls의 pointer-up과 숫자 inspector가 각각 하나의 `object.transform` 명령으로 commit된다.
 4. `Inset`, direct edge `Bevel`, `Loop Cut`, merge-by-distance, flat/smooth shading을 포함한 핵심 mesh edit가 쉬운 모드별 UI에서 geometry authority commit과 undo에 연결된다. 선택 reconcile은 살아 있는 stable ID를 보존하고 사라진 ID를 prune하며 명시적 remap API도 갖지만, 각 topology operation이 실제 remap receipt를 내는 단계는 아직 아니다.
 5. command 기반 duplicate/delete가 geometry·TRS·Rights BOM을 함께 복제하거나 제거하고 undo/redo로 복구한다. 반복 cube 생성은 충돌 없는 ID와 겹치지 않는 초기 X 배치를 사용한다. visibility는 bridge base object를 바꾸고 모든 toon pass를 dirty 처리하지만 아직 공용 document command/history로 승격되지 않았다.
 6. viewport는 등각·정면·우측·상단 preset, perspective/orthographic 전환, scene/selection bounds frame을 제공한다. `Numpad1/3/7`, `Home`, `.`/`NumpadDecimal`, `G/R/S`, `Shift+D`, `Delete`가 같은 초점 범위에서 동작한다.
-7. [`studio-hybrid-dcc-glb-export.ts`](../src/domains/creator/studio-hybrid-dcc-glb-export.ts)가 editable mesh authority에서 deterministic GLB derivative와 hash/loss report를 만든다. browser 입력은 15-section little-endian packed SoA `ArrayBuffer`로 변환되어 module Worker에 transfer되며 object graph structured clone을 사용하지 않는다.
-8. [`studio-hybrid-dcc-bg3d-handoff.ts`](../src/domains/creator/studio-hybrid-dcc-bg3d-handoff.ts)가 derivative를 기존 model-library에 검증·저장하고 canonical object TRS를 유지한 BG3D scene을 만들어 [`StudioBackground3D.tsx`](../src/domains/creator/StudioBackground3D.tsx)로 연다. 지원하지 않는 shot override와 artist ink는 silently drop하지 않고 DCC authority에 남았다는 loss로 보고한다.
-9. [`studio-hybrid-dcc-workspace-persistence.ts`](../src/domains/creator/studio-hybrid-dcc-workspace-persistence.ts)는 native OPFS와 origin Web Lock을 필수로 사용한다. user/work ID는 SHA-256 scope key로 경로와 분리하고, 48 MiB hard bound 안에서 document state, command journal, undo/redo, bridge, UV typed array, CAD 및 보조 상태를 canonical JSON envelope로 저장한다. byte length·CRC32·SHA-256·state hash·schema revision을 검증하고, checkpoint/head atomicity, tombstone clear, quota/corruption/version mismatch fail-closed를 테스트한다. 같은 persistence 인스턴스의 save/clear는 writer lease 전체를 FIFO 직렬화한다. `StudioPage`는 인증 준비 완료 전 복구를 시작하지 않고, 미게시 문서에는 기존 Studio autosave key에서 고정한 draft scope를 사용한다. 12초 bounded recovery gate는 기존 modal focus/inert/Escape 경계를 유지하며, 900 ms autosave·dialog close/BG3D handoff 전 flush는 scope별로 실행 중 1개와 최신 대기 snapshot 1개만 보존한다. UI는 `checking/ready/saving/saved/session-only/error`를 구분한다.
-10. [`studio-shared-3d-scene-bridge.ts`](../src/domains/creator/studio-shared-3d-scene-bridge.ts)는 현재 페이지의 image element 중 canonical `vrmScene`을 최대 12명까지 runtime session으로 묶는다. BG3D는 camera/light/environment/background 권위를 유지하고 각 character는 VRM source authority를 보존한다. model, body/finger pose, root translation/rotation, expression, body scale, base color와 MToon 효과만 이 slice의 지원 범위다. Avatar Forge, wardrobe/costume, props, surface paint, IK constraint, physics 등 omission이 하나라도 있으면 viewport-only이며 결과 캡처와 source hide receipt에서 제외된다.
-11. [`StudioBg3dSharedVrmCharacter.tsx`](../src/domains/creator/StudioBg3dSharedVrmCharacter.tsx)는 bundled 또는 content-addressed attachment VRM을 실제 Three object로 로드하고 BG3D 조명과 shadow를 함께 사용한다. 완전히 준비된 full-fidelity character만 capture receipt에 들어가며, [`StudioPage.tsx`](../src/domains/creator/StudioPage.tsx)는 정확히 그 unlocked source layer만 delete가 아닌 `hidden:true`로 같은 undo transaction에서 보존한다. loading/unavailable이면 삽입을 차단한다. document master mode와 quad secondary views는 중복 합성을 명시적으로 피한다.
+7. [`studio-hybrid-dcc-glb-export.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-glb-export.ts)가 editable mesh authority에서 deterministic GLB derivative와 hash/loss report를 만든다. browser 입력은 15-section little-endian packed SoA `ArrayBuffer`로 변환되어 module Worker에 transfer되며 object graph structured clone을 사용하지 않는다.
+8. [`studio-hybrid-dcc-bg3d-handoff.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-bg3d-handoff.ts)가 derivative를 기존 model-library에 검증·저장하고 canonical object TRS를 유지한 BG3D scene을 만들어 [`StudioBackground3D.tsx`](../apps/web/src/domains/creator/bg3d/StudioBackground3D.tsx)로 연다. 지원하지 않는 shot override와 artist ink는 silently drop하지 않고 DCC authority에 남았다는 loss로 보고한다.
+9. [`studio-hybrid-dcc-workspace-persistence.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-workspace-persistence.ts)는 native OPFS와 origin Web Lock을 필수로 사용한다. user/work ID는 SHA-256 scope key로 경로와 분리하고, 48 MiB hard bound 안에서 document state, command journal, undo/redo, bridge, UV typed array, CAD 및 보조 상태를 canonical JSON envelope로 저장한다. byte length·CRC32·SHA-256·state hash·schema revision을 검증하고, checkpoint/head atomicity, tombstone clear, quota/corruption/version mismatch fail-closed를 테스트한다. 같은 persistence 인스턴스의 save/clear는 writer lease 전체를 FIFO 직렬화한다. `StudioPage`는 인증 준비 완료 전 복구를 시작하지 않고, 미게시 문서에는 기존 Studio autosave key에서 고정한 draft scope를 사용한다. 12초 bounded recovery gate는 기존 modal focus/inert/Escape 경계를 유지하며, 900 ms autosave·dialog close/BG3D handoff 전 flush는 scope별로 실행 중 1개와 최신 대기 snapshot 1개만 보존한다. UI는 `checking/ready/saving/saved/session-only/error`를 구분한다.
+10. [`studio-shared-3d-scene-bridge.ts`](../apps/web/src/domains/creator/studio-shared-3d-scene-bridge.ts)는 현재 페이지의 image element 중 canonical `vrmScene`을 최대 12명까지 runtime session으로 묶는다. BG3D는 camera/light/environment/background 권위를 유지하고 각 character는 VRM source authority를 보존한다. model, body/finger pose, root translation/rotation, expression, body scale, base color와 MToon 효과만 이 slice의 지원 범위다. Avatar Forge, wardrobe/costume, props, surface paint, IK constraint, physics 등 omission이 하나라도 있으면 viewport-only이며 결과 캡처와 source hide receipt에서 제외된다.
+11. [`StudioBg3dSharedVrmCharacter.tsx`](../apps/web/src/domains/creator/bg3d/StudioBg3dSharedVrmCharacter.tsx)는 bundled 또는 content-addressed attachment VRM을 실제 Three object로 로드하고 BG3D 조명과 shadow를 함께 사용한다. 완전히 준비된 full-fidelity character만 capture receipt에 들어가며, [`StudioPage.tsx`](../apps/web/src/domains/creator/StudioPage.tsx)는 정확히 그 unlocked source layer만 delete가 아닌 `hidden:true`로 같은 undo transaction에서 보존한다. loading/unavailable이면 삽입을 차단한다. document master mode와 quad secondary views는 중복 합성을 명시적으로 피한다.
 12. Avatar Forge v3는 기존 face·hair·accent·color creator에 어깨·몸통·골반·팔·다리 비율과 5개 deterministic body preset을 추가했다. raw/skinned humanoid rig만 치수 권위로 사용하고 normalized pose rig와 geometry buffer를 변경하지 않으며 effect cleanup에서 원래 TRS를 복원한다. 이는 기존 VRM 기반 creator이지 빈 mesh 생성·topology sculpt·skin weight·morph authoring·VRM export가 아니다.
 13. 손가락 자동 grip은 선택된 contact anchor 반경과 최종 prop scale, 실제 손 치수를 사용한다. pinch/cylinder/handle/flat/support별 접촉 손가락을 분리하고 PIP 중심 굽힘, 제한된 DIP 결합, 분산된 thumb opposition, 좌우 미러, 모든 VRM joint hard limit을 적용한다. 불완전 rig·fallback socket·invalid basis·한 손의 복수 충돌은 임의 포즈 대신 fail-closed한다. wardrobe는 곡선형 lathe torso/skirt와 physical material/shadow를 사용하고, hard-surface prop은 rounded geometry adapter와 shadow를 사용한다.
 14. 3D 데생 인형 Live Motion은 운영 CSP에서 차단되던 jsDelivr MediaPipe loader를 제거하고 package-exported SIMD/non-SIMD loader·WASM을 Vite `?url`의 same-origin asset으로 사용한다. pose model은 허용된 GCS에서 20초 timeout/AbortSignal로 명시적으로 가져와 `modelAssetBuffer`로 전달하고, mannequin 전용 VIDEO singleton과 GPU→CPU fallback을 사용한다. stop·close·unmount·stale initialization은 generation과 best-effort close로 camera/RAF/task를 정리한다. secure-context, permission, camera busy/missing, model timeout/load, WASM, frame analysis 오류는 동일한 generic failure가 아니라 재시도 가능한 한국어 안내로 구분한다.
 
-shipping BG3D 쪽에서는 [`studio-bg3d-shadow-frustum.ts`](../src/domains/creator/studio-bg3d-shadow-frustum.ts)가 primitive와 검증된 model hierarchy의 실제 world bounds 및 linked VRM의 보수적 human bounds를 모아 key/fill별 orthographic shadow camera를 맞춘다. hidden hierarchy는 제외하고 static batch 후보는 포함하며, ground receiver depth, 작은 장면의 기존 40 m 폭, 대형 장면 확장, texel snapping, 수직 광원용 up vector, hostile finite input clamp를 함께 처리한다. 이는 렌더 품질과 첫 runtime composite 보강이지 Hybrid/BG3D/VRM scene authority 전체가 하나로 통합됐다는 뜻은 아니다.
+shipping BG3D 쪽에서는 [`studio-bg3d-shadow-frustum.ts`](../apps/web/src/domains/creator/bg3d/studio-bg3d-shadow-frustum.ts)가 primitive와 검증된 model hierarchy의 실제 world bounds 및 linked VRM의 보수적 human bounds를 모아 key/fill별 orthographic shadow camera를 맞춘다. hidden hierarchy는 제외하고 static batch 후보는 포함하며, ground receiver depth, 작은 장면의 기존 40 m 폭, 대형 장면 확장, texel snapping, 수직 광원용 up vector, hostile finite input clamp를 함께 처리한다. 이는 렌더 품질과 첫 runtime composite 보강이지 Hybrid/BG3D/VRM scene authority 전체가 하나로 통합됐다는 뜻은 아니다.
 
 workspace는 더 이상 module-global 변수를 사용하지 않고 `StudioPage`가 사용자·work scope별 React state로 소유하며 scope 변경 시 dialog를 remount한다. native OPFS가 있으면 앱 재진입 시 이 **별도 Hybrid workspace**를 복원할 수 있고, 없으면 UI가 session-only 상태를 명시한다. 다만 이것은 canonical Studio project controller, 수동 save/checkpoint acknowledgement, 2D layer와 함께하는 단일 저장 트랜잭션을 아직 대체하지 않는다. 실제 `/studio`의 cold restart·crash injection·browser matrix 증거도 없다. handoff 역시 DCC→BG3D one-way derivative이며 BG3D 편집을 DCC authority로 되돌리는 command는 남아 있다. handoff evidence는 `canonicalSceneVerified`, 실제 모델이 있을 때만 `receipt-verified`, 아직 Studio canvas commit 전에는 `canvasDocumentIntegrated:false`로 단계별 사실만 보고한다. 그러므로 독립 workspace durability와 shipping shot editor 진입이 생긴 것, 프로젝트 전체가 종단 통합됐다는 주장을 구분한다.
 
@@ -331,7 +331,7 @@ flowchart LR
 - Rights BOM, external source hash, import/export loss report
 - capability-independent authoring parameters
 
-기존 [`studio-hybrid-dcc-document.ts`](../src/domains/creator/studio-hybrid-dcc-document.ts)의 snapshot·geometry registry·Rights BOM을 기존 Studio project schema 안으로 흡수한다. 별도 `ui-workspace` 문서는 최종 구조에서 없어야 한다.
+기존 [`studio-hybrid-dcc-document.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-document.ts)의 snapshot·geometry registry·Rights BOM을 기존 Studio project schema 안으로 흡수한다. 별도 `ui-workspace` 문서는 최종 구조에서 없어야 한다.
 
 ### 4.4 Geometry Authority
 
@@ -367,11 +367,11 @@ interface StudioGeometryHandle {
 
 `exact-brep → editable-mesh`는 암묵 변환이 아니라 `ConvertToEditableFork` command다. 원본 B-Rep를 유지하고 새 asset ID, provenance map, loss report를 만든다. 반대 방향은 일반적으로 무손실이 아니므로 자동 왕복을 약속하지 않는다.
 
-현재 [`studio-geometry-authority.ts`](../src/domains/creator/studio-geometry-authority.ts)는 half-edge source와 derived render cache의 분리를 이미 강제한다. 다음 단계는 record의 `kernel`을 실질적인 다중 representation handle로 확장하는 것이다.
+현재 [`studio-geometry-authority.ts`](../apps/web/src/domains/creator/studio-geometry-authority.ts)는 half-edge source와 derived render cache의 분리를 이미 강제한다. 다음 단계는 record의 `kernel`을 실질적인 다중 representation handle로 확장하는 것이다.
 
 #### 4.4.1 Component Selection Authority
 
-[`studio-hybrid-dcc-component-selection.ts`](../src/domains/creator/studio-hybrid-dcc-component-selection.ts)는 Three raycast 결과를 편집 권위로 저장하지 않는다. object mode와 single-object vertex/edge/face mode를 구분하고, 요소 선택에는 정확한 `assetId`, geometry-authority revision, source mesh hash를 붙인다. directed half-edge의 twin 쌍은 더 작은 stable ID 하나로 canonicalize한다. 배열은 정렬·중복 제거하고 selection/topology/snapshot 작업량을 hard bound로 제한한다.
+[`studio-hybrid-dcc-component-selection.ts`](../apps/web/src/domains/creator/hybrid-dcc/studio-hybrid-dcc-component-selection.ts)는 Three raycast 결과를 편집 권위로 저장하지 않는다. object mode와 single-object vertex/edge/face mode를 구분하고, 요소 선택에는 정확한 `assetId`, geometry-authority revision, source mesh hash를 붙인다. directed half-edge의 twin 쌍은 더 작은 stable ID 하나로 canonicalize한다. 배열은 정렬·중복 제거하고 selection/topology/snapshot 작업량을 hard bound로 제한한다.
 
 현재 viewport는 renderer의 fan-triangulated `faceIndex`를 원래 polygon face, triangle-local vertex 후보, polygon boundary edge 후보로 되돌린 뒤 화면상 가장 가까운 stable element를 선택한다. 후보 좌표는 현재 object world transform과 실제 camera로 CSS pixel 공간에 투영하며 기본 10 px 반경 밖의 점·선은 선택하지 않는다. 비균일 object scale에서도 로컬 거리 대신 화면상 거리를 사용한다. 이것은 point click 기반 첫 제품 경로다. source hash 검증의 대형 메시 반복 비용, BVH 가속 대형 선택, box/lasso, occlusion 정책은 아직 이 경로에 연결되지 않았다.
 
@@ -407,7 +407,7 @@ gizmo drag처럼 고주파인 동작은 매 pointer event를 journal에 넣지 �
 - `pointerup`: 최종 transform 하나를 command로 commit한다.
 - `Escape`, pointer cancel, worker error: preview를 폐기하고 command를 만들지 않는다.
 
-기존 [`studio-command-journal.ts`](../src/domains/creator/studio-command-journal.ts)는 canonical JSON, checksum, transaction/group, undo/redo, 64 MiB hard limit을 제공한다. Hybrid DCC command는 이 공용 journal 규약을 사용하고 별도 역사 스택을 만들지 않는다.
+기존 [`studio-command-journal.ts`](../apps/web/src/domains/creator/studio-command-journal.ts)는 canonical JSON, checksum, transaction/group, undo/redo, 64 MiB hard limit을 제공한다. Hybrid DCC command는 이 공용 journal 규약을 사용하고 별도 역사 스택을 만들지 않는다.
 
 ### 4.6 Worker 구조
 
@@ -485,13 +485,13 @@ Tier 0/1에서는 무거운 geometry job을 동시에 1개만 실행한다. Tier
 - Babylon은 stable object/material ID, depth/normal/beauty 등 독립 artifact capture를 위한 **offscreen specialist**다. 대화형 scene owner가 되지 않는다.
 - PixiJS와 CanvasKit은 2D 합성·path/text·고품질 raster specialist이며 3D geometry나 authoring document를 소유하지 않는다.
 
-shipping BG3D의 directional shadow camera도 render cache다. [`studio-bg3d-shadow-frustum.ts`](../src/domains/creator/studio-bg3d-shadow-frustum.ts)가 scene hierarchy와 verified model cache의 bounds에서 매 렌더 상태에 맞는 key/fill fit을 만들지만, 그 frustum 값은 scene/document authority로 역기록하지 않는다. bounds가 없거나 잘못되면 bounded fallback을 쓰며, shadow 품질 계산 실패가 authoring geometry를 변경해서는 안 된다.
+shipping BG3D의 directional shadow camera도 render cache다. [`studio-bg3d-shadow-frustum.ts`](../apps/web/src/domains/creator/bg3d/studio-bg3d-shadow-frustum.ts)가 scene hierarchy와 verified model cache의 bounds에서 매 렌더 상태에 맞는 key/fill fit을 만들지만, 그 frustum 값은 scene/document authority로 역기록하지 않는다. bounds가 없거나 잘못되면 bounded fallback을 쓰며, shadow 품질 계산 실패가 authoring geometry를 변경해서는 안 된다.
 
-이 경계는 [`check-studio-bundle.mjs`](../scripts/check-studio-bundle.mjs)와 [`studio-background-3d-bundle-boundary.test.ts`](../src/domains/creator/studio-background-3d-bundle-boundary.test.ts)에서 구조적으로 검사한다.
+이 경계는 [`check-studio-bundle.mjs`](../scripts/check-studio-bundle.mjs)와 [`studio-background-3d-bundle-boundary.test.ts`](../apps/web/src/domains/creator/studio-background-3d-bundle-boundary.test.ts)에서 구조적으로 검사한다.
 
 ### 4.8 2D↔3D Live Bridge
 
-[`studio-live-2d3d-bridge.ts`](../src/domains/creator/studio-live-2d3d-bridge.ts)의 shared set, shot override, dirty pass, artist correction delta는 ToonSpectrum의 차별화 중심이다.
+[`studio-live-2d3d-bridge.ts`](../apps/web/src/domains/creator/live/studio-live-2d3d-bridge.ts)의 shared set, shot override, dirty pass, artist correction delta는 ToonSpectrum의 차별화 중심이다.
 
 정상 흐름은 다음과 같다.
 
@@ -517,7 +517,7 @@ artist delta 보존은 pass hash를 다시 만든다는 사실만으로 증명�
 | Three.js | 0.184.0 / MIT | 유일한 대화형 3D render scene owner, loaders/exporters, render cache 소비자 | BG3D·VRM 제품 표면에 실제 사용 | `BufferGeometry`를 authoring authority로 사용 금지; Studio 초기 graph에서 lazy 유지 | [Three WebGPURenderer](https://threejs.org/docs/pages/WebGPURenderer.html) |
 | React Three Fiber | 9.6.1 / MIT | React 19에서 Three scene shell·pointer/gizmo 연결 | BG3D·VRM에 실제 사용, workspace patch 적용 | document mutation과 geometry kernel을 React component에 넣지 않음 | [R3F Introduction](https://r3f.docs.pmnd.rs/getting-started/introduction) |
 | Drei | 10.7.7 / MIT | Orbit/Transform/Camera/View 등 UI adapter | BG3D·VRM에서 deep import | 필요한 module만 import, authority 없음 | [pmndrs/drei](https://github.com/pmndrs/drei) |
-| Three WebGPU | Three에 포함 / MIT | 차세대 production renderer, WebGL2 fallback capability | [`studio-bg3d-three-webgpu-entry.ts`](../src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry.ts) 뒤의 지연 entry | 승격 완료(2026-08-29). 실측 backend parity와 인앱 브라우저 정책은 [3D 차세대 엔진 승격](./studio-bg3d-webgpu-engine-promotion-2026-08-29.md) 참조 | [WebGPURenderer 공식 문서](https://threejs.org/docs/pages/WebGPURenderer.html) |
+| Three WebGPU | Three에 포함 / MIT | 차세대 production renderer, WebGL2 fallback capability | [`studio-bg3d-three-webgpu-entry.ts`](../apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry.ts) 뒤의 지연 entry | 승격 완료(2026-08-29). 실측 backend parity와 인앱 브라우저 정책은 [3D 차세대 엔진 승격](./studio-bg3d-webgpu-engine-promotion-2026-08-29.md) 참조 | [WebGPURenderer 공식 문서](https://threejs.org/docs/pages/WebGPURenderer.html) |
 | Babylon.js core/loaders | 9.19.0 / Apache-2.0 | stable ID·beauty/depth/normal 등 offscreen artifact specialist | 승인된 dynamic entry와 수동 runtime chunk 존재 | 두 번째 interactive scene owner 금지; 승인 entry 밖 import 금지 | [Babylon WebGPU Support](https://doc.babylonjs.com/setup/support/webGPU/) |
 | Manifold | 3.5.1 / Apache-2.0 | watertight mesh Boolean, solid commit, repair | provider와 default Boolean backend에서 실제 WASM 호출 | main thread 경로를 geometry Worker로 이동; input/output receipt 필수 | [elalish/manifold](https://github.com/elalish/manifold) |
 | OpenCascade.js | 1.1.1 / LGPL-2.1-only | exact B-Rep, fillet/shell/pattern/STEP, mass/topology receipt | 실제 module Worker와 약 63 MiB WASM, one-shot realm 격리 | 교체 가능한 adapter/WASM, source·notice·checksum·relink 정보 유지 | [donalffons/opencascade.js](https://github.com/donalffons/opencascade.js/) |
@@ -585,7 +585,7 @@ R = Rig/animation fidelity
 S = Semantic/history/metadata fidelity
 ```
 
-예를 들어 `A/B/X/P`는 geometry는 직접 구조 지원, material은 부분 지원, rig는 미지원, history는 baked/reference만 보존한다는 뜻이다. 현재 타입은 [`studio-import-compatibility-report.ts`](../src/domains/creator/studio-import-compatibility-report.ts)에 이미 `N/A/B/C/D/P/X`를 포함한다.
+예를 들어 `A/B/X/P`는 geometry는 직접 구조 지원, material은 부분 지원, rig는 미지원, history는 baked/reference만 보존한다는 뜻이다. 현재 타입은 [`studio-import-compatibility-report.ts`](../apps/web/src/domains/creator/studio-import-compatibility-report.ts)에 이미 `N/A/B/C/D/P/X`를 포함한다.
 
 ### 6.2 포맷 등급과 7단계는 별개다
 
@@ -601,7 +601,7 @@ S = Semantic/history/metadata fidelity
 
 | 포맷 | 목표 등급 | 현재 축 `G/M/R/S` | 현재 실제 경로와 한계 |
 |---|---|---|---|
-| `.toon3d` | `N/N/N/N` | `B/P/X/B` | [`studio-toon3d-package.ts`](../src/domains/creator/studio-toon3d-package.ts)는 JSON/ZIP-ready shell이며 실제 ZIP64, command segments, full layer/source cache를 아직 담지 않음 |
+| `.toon3d` | `N/N/N/N` | `B/P/X/B` | [`studio-toon3d-package.ts`](../apps/web/src/domains/creator/studio-toon3d-package.ts)는 JSON/ZIP-ready shell이며 실제 ZIP64, command segments, full layer/source cache를 아직 담지 않음 |
 | glTF/GLB | `A/A/A/B` | `B/B/B/P` | custom SceneIR/probe와 Three loader/exporter, glTF Transform provider가 분리되어 있고 authoring round-trip 종단 증거가 없음 |
 | VRM 0.x/1.0 | `A/A/A/B` | `A/A/A/B` provider capability | three-vrm 제품 runtime은 강하지만 Hybrid DCC document/shot/save와 아직 단일 경로가 아님 |
 | OBJ/MTL | `A/B/X/P` | `A/B/X/P` | OBJ geometry subset과 BG3D Worker/Three 경로가 존재, units/hierarchy/rig/history 제한 |
@@ -882,12 +882,12 @@ Boolean·CAD·unwrap의 2초 계약은 모든 임의 입력의 완료 보장이 
 
 | provider | `현행 hard` 한도 | 저장소 근거 |
 |---|---|---|
-| Manifold | input 250,000 vertices/500,000 triangles; output 500,000 vertices/1,000,000 triangles/128 MiB; concurrent 1 | [`studio-manifold-mesh-provider.ts`](../src/domains/creator/studio-manifold-mesh-provider.ts) |
-| xatlas | 64 meshes; mesh당 65,535 vertices; input 1,000,000 vertices/2,000,000 triangles/256 MiB; output 4,000,000 vertices/2,000,000 triangles/512 MiB; execution 120 s; pending 1 | [`studio-xatlas-uv-provider.ts`](../src/domains/creator/studio-xatlas-uv-provider.ts) |
-| three-mesh-bvh | 2,000,000 vertices/2,000,000 triangles; depth 48; query당 triangle tests 250,000/candidates 100,000; lasso 512 points; concurrent 4 | [`studio-three-mesh-bvh-provider.ts`](../src/domains/creator/studio-three-mesh-bvh-provider.ts) |
-| glTF Transform | input/output 각각 256 MiB; operations 4; scenes 10,000; nodes 500,000; meshes 100,000; primitives 500,000; textures 20,000; concurrent 1 | [`studio-gltf-transform-provider.ts`](../src/domains/creator/studio-gltf-transform-provider.ts) |
-| Command Journal | default records 2,048, actors 256, command payload 1 MiB, serialized journal 16 MiB; absolute serialized ceiling 64 MiB; ID/kind 160 code units | [`studio-command-journal.ts`](../src/domains/creator/studio-command-journal.ts) |
-| OCCT | default timeout 120 s, 허용 1–300 s; shared Worker에서 active request 1개 | [`studio-occt-worker-client.ts`](../src/domains/creator/studio-occt-worker-client.ts) |
+| Manifold | input 250,000 vertices/500,000 triangles; output 500,000 vertices/1,000,000 triangles/128 MiB; concurrent 1 | [`studio-manifold-mesh-provider.ts`](../apps/web/src/domains/creator/studio-manifold-mesh-provider.ts) |
+| xatlas | 64 meshes; mesh당 65,535 vertices; input 1,000,000 vertices/2,000,000 triangles/256 MiB; output 4,000,000 vertices/2,000,000 triangles/512 MiB; execution 120 s; pending 1 | [`studio-xatlas-uv-provider.ts`](../apps/web/src/domains/creator/studio-xatlas-uv-provider.ts) |
+| three-mesh-bvh | 2,000,000 vertices/2,000,000 triangles; depth 48; query당 triangle tests 250,000/candidates 100,000; lasso 512 points; concurrent 4 | [`studio-three-mesh-bvh-provider.ts`](../apps/web/src/domains/creator/studio-three-mesh-bvh-provider.ts) |
+| glTF Transform | input/output 각각 256 MiB; operations 4; scenes 10,000; nodes 500,000; meshes 100,000; primitives 500,000; textures 20,000; concurrent 1 | [`studio-gltf-transform-provider.ts`](../apps/web/src/domains/creator/studio-gltf-transform-provider.ts) |
+| Command Journal | default records 2,048, actors 256, command payload 1 MiB, serialized journal 16 MiB; absolute serialized ceiling 64 MiB; ID/kind 160 code units | [`studio-command-journal.ts`](../apps/web/src/domains/creator/studio-command-journal.ts) |
+| OCCT | default timeout 120 s, 허용 1–300 s; shared Worker에서 active request 1개 | [`studio-occt-worker-client.ts`](../apps/web/src/domains/creator/studio-occt-worker-client.ts) |
 
 Provider 최대치가 제품의 기본 admission limit라는 뜻은 아니다. 예를 들어 xatlas output 512 MiB는 provider의 최후 방어선이고, Tier 0/1 제품은 memory estimate에 따라 훨씬 일찍 거부하거나 분할해야 한다. 특히 OCCT, rhino3dm, web-ifc에는 입력 byte·entity·topology의 공통 admission receipt가 아직 부족하다. 이것은 Phase 0/P0의 보안·안정성 차단점이다.
 

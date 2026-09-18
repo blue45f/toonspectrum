@@ -46,12 +46,12 @@
 
 | 모듈 파일명 | 담당 기능 및 벤치마크 대상 | 주요 세부 사양 |
 |---|---|---|
-| [`studio-ai-webtoon-style-filter.ts`](../src/domains/creator/ai/studio-ai-webtoon-style-filter.ts) | **화풍 변환 툰필터 엔진**<br>(네이버 툰필터 & Krea AI 벤치마크) | • 4대 핵심 화풍: 로맨스 판타지, 소년 액션 극화체, 판타지 웹소설 표지, 스릴러 누아르<br>• 선화 굵기 계수, 명암비 부스트, 디노이징 강도(0.55~0.70) 합성 |
-| [`studio-ai-shading-assist.ts`](../src/domains/creator/ai/studio-ai-shading-assist.ts) | **AI 음영 어시스턴트**<br>(클립스튜디오 Shading Assist 벤치마크) | • 8방향 광원 나침반 및 역광 림라이트(Backlight Rim)<br>• 1차/2차 셀 그림자 투명도 및 오프셋 벡터 `(dx, dy)` 계산<br>• 4대 환경광 색온도(새벽, 대낮, 석양, 달빛) 그림자 틴트 결정 |
-| [`studio-ai-prompt-enhancer.ts`](../src/domains/creator/ai/studio-ai-prompt-enhancer.ts) | **웹툰 프롬프트 증강기**<br>(Midjourney & Dashtoon 벤치마크) | • 자연어 한국어/영어 대사 및 상황 문장 자동 장르 분류<br>• 고품질 웹툰 마스터피스 키워드 및 작화 붕괴 방지 15종 네거티브 프롬프트 주입 |
-| [`studio-ai-storyboard-director.ts`](../src/domains/creator/ai/studio-ai-storyboard-director.ts) | **콘티 자동 디렉터**<br>(오노마에이아이 TooNat 벤치마크) | • 줄글 대본을 컷별(Shot Scale, Camera Angle, Emotion, SFX, BG Prompt)로 자동 연출<br>• 완독 시간은 컷당 6초 고정 추정, 페이싱 스코어는 8컷 기준 편차 공식(`95 - |컷수-8| × 3`)<br>• 세로 스크롤 시뮬레이션이 아니다 — 여백 기반 실측은 `assistant/webtoon-scroll-pacing-simulator.ts`가 담당한다 |
-| [`studio-ai-emotion-bubble-matcher.ts`](../src/domains/creator/ai/studio-ai-emotion-bubble-matcher.ts) | **감정-말풍선 자동 매처**<br>(투닝 Tooning NLP 벤치마크) | • 대사 감정 분석 (외침, 충격, 은밀, 독백, 설렘, 평온)<br>• 외침 톱니바퀴, 찌그러진 테두리, 점선, 구름, 핑크 틴트 말풍선 및 테두리 두께 자동 추천 |
-| [`StudioAiSuperSuiteModal.tsx`](../src/domains/creator/ai/StudioAiSuperSuiteModal.tsx) | **통합 슈퍼 스위트 모달 UI** | • 5개 탭 실시간 파라미터 제어, 프리뷰, 원클릭 복사 및 스튜디오 캔버스 생성기 즉시 연동 |
+| [`studio-ai-webtoon-style-filter.ts`](../apps/web/src/domains/creator/ai/studio-ai-webtoon-style-filter.ts) | **화풍 변환 툰필터 엔진**<br>(네이버 툰필터 & Krea AI 벤치마크) | • 4대 핵심 화풍: 로맨스 판타지, 소년 액션 극화체, 판타지 웹소설 표지, 스릴러 누아르<br>• 선화 굵기 계수, 명암비 부스트, 디노이징 강도(0.55~0.70) 합성 |
+| [`studio-ai-shading-assist.ts`](../apps/web/src/domains/creator/ai/studio-ai-shading-assist.ts) | **AI 음영 어시스턴트**<br>(클립스튜디오 Shading Assist 벤치마크) | • 8방향 광원 나침반 및 역광 림라이트(Backlight Rim)<br>• 1차/2차 셀 그림자 투명도 및 오프셋 벡터 `(dx, dy)` 계산<br>• 4대 환경광 색온도(새벽, 대낮, 석양, 달빛) 그림자 틴트 결정 |
+| [`studio-ai-prompt-enhancer.ts`](../apps/web/src/domains/creator/ai/studio-ai-prompt-enhancer.ts) | **웹툰 프롬프트 증강기**<br>(Midjourney & Dashtoon 벤치마크) | • 자연어 한국어/영어 대사 및 상황 문장 자동 장르 분류<br>• 고품질 웹툰 마스터피스 키워드 및 작화 붕괴 방지 15종 네거티브 프롬프트 주입 |
+| [`studio-ai-storyboard-director.ts`](../apps/web/src/domains/creator/ai/studio-ai-storyboard-director.ts) | **콘티 자동 디렉터**<br>(오노마에이아이 TooNat 벤치마크) | • 줄글 대본을 컷별(Shot Scale, Camera Angle, Emotion, SFX, BG Prompt)로 자동 연출<br>• 완독 시간은 컷당 6초 고정 추정, 페이싱 스코어는 8컷 기준 편차 공식(`95 - |컷수-8| × 3`)<br>• 세로 스크롤 시뮬레이션이 아니다 — 여백 기반 실측은 `assistant/webtoon-scroll-pacing-simulator.ts`가 담당한다 |
+| [`studio-ai-emotion-bubble-matcher.ts`](../apps/web/src/domains/creator/ai/studio-ai-emotion-bubble-matcher.ts) | **감정-말풍선 자동 매처**<br>(투닝 Tooning NLP 벤치마크) | • 대사 감정 분석 (외침, 충격, 은밀, 독백, 설렘, 평온)<br>• 외침 톱니바퀴, 찌그러진 테두리, 점선, 구름, 핑크 틴트 말풍선 및 테두리 두께 자동 추천 |
+| [`StudioAiSuperSuiteModal.tsx`](../apps/web/src/domains/creator/ai/StudioAiSuperSuiteModal.tsx) | **통합 슈퍼 스위트 모달 UI** | • 5개 탭 실시간 파라미터 제어, 프리뷰, 원클릭 복사 및 스튜디오 캔버스 생성기 즉시 연동 |
 
 ---
 
