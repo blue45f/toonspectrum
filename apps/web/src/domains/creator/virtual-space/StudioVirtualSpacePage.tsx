@@ -584,6 +584,16 @@ function VirtualSpaceExperience({
     selfRef.current = snapshot.self;
   }, [snapshot.self]);
 
+  useEffect(() => {
+    const timeout = globalThis.setTimeout(() => {
+      writeVirtualSpaceSessionPoint(projectId, {
+        x: snapshot.self.x,
+        y: snapshot.self.y,
+      });
+    }, 180);
+    return () => globalThis.clearTimeout(timeout);
+  }, [projectId, snapshot.self.x, snapshot.self.y]);
+
   useEffect(() => startStudioConnectivityRuntime(), []);
 
   const openAssistant = useCallback(() => {
@@ -718,7 +728,8 @@ function VirtualSpaceExperience({
       }
 
       const changed = next.x !== current.x || next.y !== current.y;
-      setMovingState(changed);
+      const walking = hasDirectInput || changed || clickPathRef.current.length > 0;
+      setMovingState(walking);
       if (changed) updatePosition(next, facing);
 
       frame = globalThis.requestAnimationFrame(tick);

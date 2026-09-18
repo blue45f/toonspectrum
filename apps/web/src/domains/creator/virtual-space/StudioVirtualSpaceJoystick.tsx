@@ -48,7 +48,11 @@ export function StudioVirtualSpaceJoystick({
       data-studio-virtual-joystick="true"
       onPointerDown={(event) => {
         pointerIdRef.current = event.pointerId;
-        event.currentTarget.setPointerCapture?.(event.pointerId);
+        try {
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+        } catch {
+          // Synthetic and privacy-constrained pointer implementations may not expose active capture.
+        }
         updateFromPointer(event);
       }}
       onPointerMove={(event) => {
