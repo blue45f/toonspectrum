@@ -1,3 +1,5 @@
+import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { useI18n } from "@/shared/lib/i18n";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Navigate, useLocation } from "react-router-dom";
 
@@ -21,6 +23,10 @@ import { StudioModeExperienceBoundary } from "./StudioModeExperienceBoundary";
 export function StudioDocumentWorkspaceRoute() {
   useBilingualI18nRevision();
   useStudioI18nPriorityLoading();
+  const bt = useBilingual("StudioDocumentWorkspaceRoute");
+  const bi = bt;
+  const language = useI18n((state) => state.lang);
+  const locale = language.toLowerCase().split(/[-_]/u)[0] === "ko" ? "ko" : "en";
   const location = useLocation();
 
 

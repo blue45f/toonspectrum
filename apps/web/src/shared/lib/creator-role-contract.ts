@@ -9,6 +9,31 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
 export const CREATOR_ROLE_MAX_SECONDARY = 5;
 export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
+export const CREATOR_ROLE_MAX_PROJECT_PREFERENCES = 64;
+export const CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH = 170;
+export const CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH = 160;
+
+export const CREATOR_ROLE_NOTIFICATION_LEVELS = ["essential", "standard", "all"] as const;
+export type CreatorRoleNotificationLevel = (typeof CREATOR_ROLE_NOTIFICATION_LEVELS)[number];
+
+export const CREATOR_USAGE_PURPOSE_IDS = [
+  "personal-project",
+  "team-production",
+  "serialization",
+  "freelance",
+  "portfolio",
+  "studio-operations",
+] as const;
+export type CreatorUsagePurposeId = (typeof CREATOR_USAGE_PURPOSE_IDS)[number];
+
+export const CREATOR_ROLE_ONBOARDING_STATUSES = [
+  "not-started",
+  "in-progress",
+  "completed",
+  "skipped",
+] as const;
+export type CreatorRoleOnboardingStatus = (typeof CREATOR_ROLE_ONBOARDING_STATUSES)[number];
+export type CreatorRoleOnboardingStep = 1 | 2 | 3 | 4;
 
 export const CREATOR_ROLE_IDS = [
   "creator",
@@ -32,6 +57,16 @@ export const CREATOR_ROLE_IDS = [
 export type CreatorRoleId = (typeof CREATOR_ROLE_IDS)[number];
 export type CreatorRoleGroup = "story" | "art" | "support" | "production";
 export type CreatorRoleLens = "story" | "art" | "producer";
+export type CreatorRoleOperationalLens =
+  | "story"
+  | "planning"
+  | "storyboard"
+  | "drawing"
+  | "background"
+  | "color-finishing"
+  | "lettering"
+  | "review"
+  | "production";
 export type CreatorRoleLocale = string;
 
 export const CREATOR_STAGE_IDS = [
@@ -113,6 +148,45 @@ export interface CreatorSpecialtyDefinition {
   readonly label: LocalizedCreatorText;
 }
 
+export interface CreatorUsagePurposeDefinition {
+  readonly id: CreatorUsagePurposeId;
+  readonly label: LocalizedCreatorText;
+  readonly description: LocalizedCreatorText;
+}
+
+export interface CreatorRoleVisibility {
+  readonly roles: boolean;
+  readonly specialties: boolean;
+  readonly experienceLevel: boolean;
+  readonly collaborationStatus: boolean;
+}
+
+export interface CreatorRoleAlias {
+  readonly role: CreatorRoleId;
+  readonly label: string;
+}
+
+export interface CreatorWorkCapacity {
+  readonly weeklyHours: number | null;
+  readonly maxConcurrentTasks: number | null;
+  readonly availabilityNote: string;
+}
+
+export interface CreatorRoleOnboarding {
+  readonly status: CreatorRoleOnboardingStatus;
+  readonly step: CreatorRoleOnboardingStep;
+  readonly completedAt: string | null;
+  readonly updatedAt: string | null;
+}
+
+export interface CreatorProjectRolePreference {
+  readonly projectKey: string;
+  readonly activeRole: CreatorRoleId;
+  readonly notificationLevel: CreatorRoleNotificationLevel | null;
+  readonly workspacePresetId: string | null;
+  readonly updatedAt: string | null;
+}
+
 export interface CreatorRoleProfile {
   readonly version: typeof CREATOR_ROLE_PROFILE_VERSION;
   readonly primaryRole: CreatorRoleId | null;
@@ -122,7 +196,14 @@ export interface CreatorRoleProfile {
   readonly experienceLevel: CreatorExperienceLevel | null;
   readonly collaborationStatus: CreatorCollaborationStatus | null;
   readonly roleVisibility: boolean;
+  readonly visibility: CreatorRoleVisibility;
   readonly activeRole: CreatorRoleId | null;
+  readonly usagePurposes: readonly CreatorUsagePurposeId[];
+  readonly roleAliases: readonly CreatorRoleAlias[];
+  readonly workCapacity: CreatorWorkCapacity;
+  readonly defaultNotificationLevel: CreatorRoleNotificationLevel;
+  readonly onboarding: CreatorRoleOnboarding;
+  readonly projectRolePreferences: readonly CreatorProjectRolePreference[];
 }
 
 /** Public projection intentionally excludes private workspace preferences. */
@@ -448,6 +529,39 @@ export const CREATOR_SPECIALTY_DEFINITIONS = [
   { id: "file-cleanup", label: text("파일·레이어 정리", "File & layer cleanup") },
 ] as const satisfies readonly CreatorSpecialtyDefinition[];
 
+export const CREATOR_USAGE_PURPOSE_DEFINITIONS = [
+  {
+    id: "personal-project",
+    label: text("개인 작품 제작", "Personal project"),
+    description: text("혼자 작품을 만들고 연재 준비까지 이어갑니다.", "Create independently and prepare for publishing."),
+  },
+  {
+    id: "team-production",
+    label: text("팀 프로젝트 참여", "Team production"),
+    description: text("역할을 나누고 인수인계와 검수를 함께 관리합니다.", "Coordinate assignments, handoffs and reviews with a team."),
+  },
+  {
+    id: "serialization",
+    label: text("연재 작품 관리", "Serialized production"),
+    description: text("회차 마감, 비축분과 플랫폼 납품을 관리합니다.", "Manage episode deadlines, buffers and platform delivery."),
+  },
+  {
+    id: "freelance",
+    label: text("외주 작업", "Freelance work"),
+    description: text("작업 범위, 납품 기준과 수정 요청을 명확히 합니다.", "Clarify scope, delivery requirements and revisions."),
+  },
+  {
+    id: "portfolio",
+    label: text("포트폴리오 제작", "Portfolio"),
+    description: text("작업 과정과 결과물을 정리해 공개합니다.", "Organize and present process and finished work."),
+  },
+  {
+    id: "studio-operations",
+    label: text("제작사 운영", "Studio operations"),
+    description: text("여러 프로젝트의 일정, 인력과 위험을 관리합니다.", "Manage schedules, staffing and risk across projects."),
+  },
+] as const satisfies readonly CreatorUsagePurposeDefinition[];
+
 export const CREATOR_EXPERIENCE_LABELS: Readonly<Record<CreatorExperienceLevel, LocalizedCreatorText>> = {
   beginner: text("입문·준비 중", "Starting out"),
   experienced: text("경험 있음", "Experienced"),
@@ -460,6 +574,32 @@ export const CREATOR_COLLABORATION_LABELS: Readonly<Record<CreatorCollaborationS
   unavailable: text("현재 협업 불가", "Not available"),
 };
 
+export const CREATOR_ROLE_NOTIFICATION_LABELS: Readonly<Record<CreatorRoleNotificationLevel, LocalizedCreatorText>> = {
+  essential: text("필수 알림만", "Essential only"),
+  standard: text("중요 알림", "Important updates"),
+  all: text("모든 작업 알림", "All task updates"),
+};
+
+export const EMPTY_CREATOR_ROLE_VISIBILITY: CreatorRoleVisibility = Object.freeze({
+  roles: false,
+  specialties: false,
+  experienceLevel: false,
+  collaborationStatus: false,
+});
+
+export const EMPTY_CREATOR_WORK_CAPACITY: CreatorWorkCapacity = Object.freeze({
+  weeklyHours: null,
+  maxConcurrentTasks: null,
+  availabilityNote: "",
+});
+
+export const EMPTY_CREATOR_ROLE_ONBOARDING: CreatorRoleOnboarding = Object.freeze({
+  status: "not-started",
+  step: 1,
+  completedAt: null,
+  updatedAt: null,
+});
+
 export const EMPTY_CREATOR_ROLE_PROFILE: CreatorRoleProfile = Object.freeze({
   version: CREATOR_ROLE_PROFILE_VERSION,
   primaryRole: null,
@@ -469,7 +609,14 @@ export const EMPTY_CREATOR_ROLE_PROFILE: CreatorRoleProfile = Object.freeze({
   experienceLevel: null,
   collaborationStatus: null,
   roleVisibility: true,
+  visibility: EMPTY_CREATOR_ROLE_VISIBILITY,
   activeRole: null,
+  usagePurposes: Object.freeze([]),
+  roleAliases: Object.freeze([]),
+  workCapacity: EMPTY_CREATOR_WORK_CAPACITY,
+  defaultNotificationLevel: "standard",
+  onboarding: EMPTY_CREATOR_ROLE_ONBOARDING,
+  projectRolePreferences: Object.freeze([]),
 });
 
 const ROLE_ID_SET = new Set<string>(CREATOR_ROLE_IDS);
@@ -477,6 +624,9 @@ const SPECIALTY_ID_SET = new Set<string>(CREATOR_SPECIALTY_IDS);
 const STAGE_SET = new Set<string>(CREATOR_STAGE_IDS);
 const EXPERIENCE_SET = new Set<string>(CREATOR_EXPERIENCE_LEVELS);
 const COLLABORATION_SET = new Set<string>(CREATOR_COLLABORATION_STATUSES);
+const USAGE_PURPOSE_SET = new Set<string>(CREATOR_USAGE_PURPOSE_IDS);
+const NOTIFICATION_LEVEL_SET = new Set<string>(CREATOR_ROLE_NOTIFICATION_LEVELS);
+const ONBOARDING_STATUS_SET = new Set<string>(CREATOR_ROLE_ONBOARDING_STATUSES);
 
 export function creatorText(value: LocalizedCreatorText, _locale: CreatorRoleLocale): string {
   return bi((value).ko, (value).en);
@@ -504,6 +654,18 @@ export function normalizeCreatorCollaborationStatus(value: unknown): CreatorColl
     : null;
 }
 
+export function normalizeCreatorUsagePurposeId(value: unknown): CreatorUsagePurposeId | null {
+  return typeof value === "string" && USAGE_PURPOSE_SET.has(value)
+    ? value as CreatorUsagePurposeId
+    : null;
+}
+
+export function normalizeCreatorRoleNotificationLevel(value: unknown): CreatorRoleNotificationLevel | null {
+  return typeof value === "string" && NOTIFICATION_LEVEL_SET.has(value)
+    ? value as CreatorRoleNotificationLevel
+    : null;
+}
+
 function normalizeDistinctValues<T>(
   value: unknown,
   parse: (entry: unknown) => T | null,
@@ -523,9 +685,118 @@ function normalizeDistinctValues<T>(
   return normalized;
 }
 
+function normalizeCreatorRoleVisibility(value: unknown, legacy: unknown): CreatorRoleVisibility {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    return {
+      roles: record.roles === true,
+      specialties: record.specialties === true,
+      experienceLevel: record.experienceLevel === true,
+      collaborationStatus: record.collaborationStatus === true,
+    };
+  }
+  const visible = legacy === true;
+  return {
+    roles: visible,
+    specialties: visible,
+    experienceLevel: visible,
+    collaborationStatus: visible,
+  };
+}
+
+function normalizeCreatorWorkCapacity(value: unknown): CreatorWorkCapacity {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ...EMPTY_CREATOR_WORK_CAPACITY };
+  }
+  const record = value as Record<string, unknown>;
+  const integer = (entry: unknown, max: number): number | null => {
+    if (entry === null || entry === undefined || entry === "") return null;
+    const parsed = typeof entry === "number" ? entry : Number(entry);
+    if (!Number.isFinite(parsed)) return null;
+    const normalized = Math.trunc(parsed);
+    return normalized >= 1 && normalized <= max ? normalized : null;
+  };
+  return {
+    weeklyHours: integer(record.weeklyHours, 168),
+    maxConcurrentTasks: integer(record.maxConcurrentTasks, 50),
+    availabilityNote: typeof record.availabilityNote === "string"
+      ? record.availabilityNote.trim().slice(0, CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH)
+      : "",
+  };
+}
+
+function normalizeCreatorRoleOnboarding(
+  value: unknown,
+  primaryRole: CreatorRoleId | null,
+): CreatorRoleOnboarding {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return primaryRole
+      ? { status: "completed", step: 4, completedAt: null, updatedAt: null }
+      : { ...EMPTY_CREATOR_ROLE_ONBOARDING };
+  }
+  const record = value as Record<string, unknown>;
+  const status = typeof record.status === "string" && ONBOARDING_STATUS_SET.has(record.status)
+    ? record.status as CreatorRoleOnboardingStatus
+    : primaryRole ? "completed" : "not-started";
+  const rawStep = typeof record.step === "number" ? Math.trunc(record.step) : 1;
+  const step = Math.min(4, Math.max(1, rawStep)) as CreatorRoleOnboardingStep;
+  const date = (entry: unknown): string | null => {
+    if (typeof entry !== "string" || !entry.trim() || !Number.isFinite(Date.parse(entry))) return null;
+    return new Date(entry).toISOString();
+  };
+  return {
+    status,
+    step: status === "completed" ? 4 : step,
+    completedAt: status === "completed" ? date(record.completedAt) : null,
+    updatedAt: date(record.updatedAt),
+  };
+}
+
+function normalizeCreatorProjectRolePreferences(
+  value: unknown,
+  selectedRoles: ReadonlySet<CreatorRoleId>,
+): CreatorProjectRolePreference[] {
+  if (!Array.isArray(value)) return [];
+  const result: CreatorProjectRolePreference[] = [];
+  const seen = new Set<string>();
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const record = candidate as Record<string, unknown>;
+    const projectKey = typeof record.projectKey === "string"
+      ? record.projectKey.trim().slice(0, CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH)
+      : "";
+    const activeRole = normalizeCreatorRoleId(record.activeRole);
+    if (!projectKey || !activeRole || !selectedRoles.has(activeRole) || seen.has(projectKey)) continue;
+    seen.add(projectKey);
+    result.push({
+      projectKey,
+      activeRole,
+      notificationLevel: normalizeCreatorRoleNotificationLevel(record.notificationLevel),
+      workspacePresetId: typeof record.workspacePresetId === "string"
+        ? record.workspacePresetId.trim().slice(0, 64) || null
+        : null,
+      updatedAt: typeof record.updatedAt === "string" && Number.isFinite(Date.parse(record.updatedAt))
+        ? new Date(record.updatedAt).toISOString()
+        : null,
+    });
+    if (result.length >= CREATOR_ROLE_MAX_PROJECT_PREFERENCES) break;
+  }
+  return result;
+}
+
 export function normalizeCreatorRoleProfile(value: unknown): CreatorRoleProfile {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { ...EMPTY_CREATOR_ROLE_PROFILE, secondaryRoles: [], specialties: [] };
+    return {
+      ...EMPTY_CREATOR_ROLE_PROFILE,
+      secondaryRoles: [],
+      specialties: [],
+      visibility: { ...EMPTY_CREATOR_ROLE_VISIBILITY },
+      usagePurposes: [],
+      roleAliases: [],
+      workCapacity: { ...EMPTY_CREATOR_WORK_CAPACITY },
+      onboarding: { ...EMPTY_CREATOR_ROLE_ONBOARDING },
+      projectRolePreferences: [],
+    };
   }
   const record = value as Record<string, unknown>;
   const primaryRole = normalizeCreatorRoleId(record.primaryRole);
@@ -555,8 +826,27 @@ export function normalizeCreatorRoleProfile(value: unknown): CreatorRoleProfile 
     creatorStage: normalizeCreatorStage(record.creatorStage),
     experienceLevel: normalizeCreatorExperienceLevel(record.experienceLevel),
     collaborationStatus: normalizeCreatorCollaborationStatus(record.collaborationStatus),
-    roleVisibility: typeof record.roleVisibility === "boolean" ? record.roleVisibility : true,
+    roleVisibility: typeof record.roleVisibility === "boolean"
+      ? record.roleVisibility
+      : record.visibility && typeof record.visibility === "object"
+        ? (record.visibility as Record<string, unknown>).roles === true
+        : true,
+    visibility: normalizeCreatorRoleVisibility(record.visibility, record.roleVisibility),
     activeRole,
+    usagePurposes: normalizeDistinctValues(
+      record.usagePurposes,
+      normalizeCreatorUsagePurposeId,
+      CREATOR_USAGE_PURPOSE_IDS.length,
+    ),
+    roleAliases: [],
+    workCapacity: normalizeCreatorWorkCapacity(record.workCapacity),
+    defaultNotificationLevel:
+      normalizeCreatorRoleNotificationLevel(record.defaultNotificationLevel) ?? "standard",
+    onboarding: normalizeCreatorRoleOnboarding(record.onboarding, primaryRole),
+    projectRolePreferences: normalizeCreatorProjectRolePreferences(
+      record.projectRolePreferences,
+      selectedRoles,
+    ),
   };
 }
 
@@ -569,7 +859,14 @@ const CREATOR_ROLE_PROFILE_KEYS = new Set([
   "experienceLevel",
   "collaborationStatus",
   "roleVisibility",
+  "visibility",
   "activeRole",
+  "usagePurposes",
+  "roleAliases",
+  "workCapacity",
+  "defaultNotificationLevel",
+  "onboarding",
+  "projectRolePreferences",
 ]);
 
 function validOptionalEnumValue(value: unknown, parse: (entry: unknown) => unknown): boolean {
@@ -631,6 +928,7 @@ export function normalizePublicCreatorRoleProfile(
     ),
     experienceLevel: normalizeCreatorExperienceLevel(record.experienceLevel),
     collaborationStatus: normalizeCreatorCollaborationStatus(record.collaborationStatus),
+    roleAliases: [],
   };
 }
 
@@ -644,6 +942,7 @@ export function publicCreatorRoleProfile(value: unknown): PublicCreatorRoleProfi
     specialties: profile.specialties,
     experienceLevel: profile.experienceLevel,
     collaborationStatus: profile.collaborationStatus,
+    roleAliases: profile.roleAliases,
   };
 }
 
@@ -663,6 +962,124 @@ export function creatorRoleSelection(profile: CreatorRoleProfile): readonly Crea
   return profile.primaryRole
     ? [profile.primaryRole, ...profile.secondaryRoles.filter((role) => role !== profile.primaryRole)]
     : profile.secondaryRoles;
+}
+
+export function creatorUsagePurposeDefinition(
+  purpose: CreatorUsagePurposeId | null | undefined,
+): CreatorUsagePurposeDefinition | null {
+  if (!purpose) return null;
+  return CREATOR_USAGE_PURPOSE_DEFINITIONS.find((entry) => entry.id === purpose) ?? null;
+}
+
+export function creatorProjectRolePreference(
+  profile: CreatorRoleProfile,
+  projectKey: string | null | undefined,
+): CreatorProjectRolePreference | null {
+  const normalized = typeof projectKey === "string" ? projectKey.trim() : "";
+  if (!normalized) return null;
+  return profile.projectRolePreferences.find((entry) => entry.projectKey === normalized) ?? null;
+}
+
+export function resolveCreatorActiveRole(
+  profile: CreatorRoleProfile,
+  projectKey?: string | null,
+): CreatorRoleId | null {
+  return creatorProjectRolePreference(profile, projectKey)?.activeRole
+    ?? profile.activeRole
+    ?? profile.primaryRole;
+}
+
+export function withCreatorProjectPreference(
+  profile: CreatorRoleProfile,
+  projectKey: string,
+  patch: Partial<Pick<CreatorProjectRolePreference, "activeRole" | "notificationLevel" | "workspacePresetId">>,
+  updatedAt: string | null = new Date().toISOString(),
+): CreatorRoleProfile {
+  const normalizedProjectKey = projectKey.trim().slice(0, CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH);
+  if (!normalizedProjectKey) return profile;
+  const selected = new Set(creatorRoleSelection(profile));
+  const current = creatorProjectRolePreference(profile, normalizedProjectKey);
+  const activeRole = patch.activeRole ?? current?.activeRole ?? resolveCreatorActiveRole(profile);
+  if (!activeRole || !selected.has(activeRole)) return profile;
+  return normalizeCreatorRoleProfile({
+    ...profile,
+    projectRolePreferences: [
+      {
+        projectKey: normalizedProjectKey,
+        activeRole,
+        notificationLevel: patch.notificationLevel === undefined
+          ? current?.notificationLevel ?? null
+          : patch.notificationLevel,
+        workspacePresetId: patch.workspacePresetId === undefined
+          ? current?.workspacePresetId ?? null
+          : patch.workspacePresetId,
+        updatedAt,
+      },
+      ...profile.projectRolePreferences.filter((entry) => entry.projectKey !== normalizedProjectKey),
+    ].slice(0, CREATOR_ROLE_MAX_PROJECT_PREFERENCES),
+  });
+}
+
+export function withCreatorProjectRolePreference(
+  profile: CreatorRoleProfile,
+  projectKey: string,
+  activeRole: CreatorRoleId,
+  updatedAt: string | null = new Date().toISOString(),
+): CreatorRoleProfile {
+  return withCreatorProjectPreference(profile, projectKey, { activeRole }, updatedAt);
+}
+
+export function withCreatorProjectNotificationPreference(
+  profile: CreatorRoleProfile,
+  projectKey: string,
+  notificationLevel: CreatorRoleNotificationLevel | null,
+  updatedAt: string | null = new Date().toISOString(),
+): CreatorRoleProfile {
+  return withCreatorProjectPreference(profile, projectKey, { notificationLevel }, updatedAt);
+}
+
+export function resolveCreatorNotificationLevel(
+  profile: CreatorRoleProfile,
+  projectKey?: string | null,
+): CreatorRoleNotificationLevel {
+  return creatorProjectRolePreference(profile, projectKey)?.notificationLevel
+    ?? profile.defaultNotificationLevel;
+}
+
+export function withCreatorRoleOnboarding(
+  profile: CreatorRoleProfile,
+  patch: Partial<CreatorRoleOnboarding>,
+  updatedAt: string = new Date().toISOString(),
+): CreatorRoleProfile {
+  return normalizeCreatorRoleProfile({
+    ...profile,
+    onboarding: {
+      ...profile.onboarding,
+      ...patch,
+      updatedAt,
+    },
+  });
+}
+
+export function creatorRoleOperationalLens(
+  role: CreatorRoleId | null | undefined,
+): CreatorRoleOperationalLens {
+  switch (role) {
+    case "story": return "story";
+    case "planner": return "planning";
+    case "storyboard": return "storyboard";
+    case "line-art":
+    case "character":
+    case "creator": return "drawing";
+    case "background":
+    case "three-d": return "background";
+    case "color": return "color-finishing";
+    case "lettering":
+    case "localization": return "lettering";
+    case "reviewer":
+    case "editor": return "review";
+    default: return "production";
+  }
 }
 
 export function creatorRoleLens(role: CreatorRoleId | null | undefined): CreatorRoleLens {

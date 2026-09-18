@@ -1,3 +1,4 @@
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ChevronRight,
   Clapperboard,
@@ -750,8 +751,8 @@ export function StudioAiComicDirectorPanel({
                 <li key={item.id}>
                   <button
                     type="button"
-                    data-autofocus={item.id === stage ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "en", "true") : undefined}
-                    aria-current={item.id === stage ? translateCurrentStaticSourceText("domains.creator.ai.StudioAiComicDirectorPanel", "en", "step") : undefined}
+                    data-autofocus={item.id === stage ? "true" : undefined}
+                    aria-current={item.id === stage ? "step" : undefined}
                     onClick={() => setStage(item.id)}
                     className={cn(
                       "flex min-h-14 w-full items-center gap-2 rounded-xl border px-2.5 text-left",

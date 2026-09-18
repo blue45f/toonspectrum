@@ -438,7 +438,7 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
 
           {notice && (
             <p
-              role={notice.kind === "error" ? translateCurrentStaticSourceText("shared.components.share.dialog", "en", "alert") : translateCurrentStaticSourceText("shared.components.share.dialog", "en", "status")}
+              role={notice.kind === "error" ? "alert" : "status"}
               aria-live="polite"
               className={cn(
                 "mt-4 rounded-xl border px-3 py-2 text-xs font-medium",
