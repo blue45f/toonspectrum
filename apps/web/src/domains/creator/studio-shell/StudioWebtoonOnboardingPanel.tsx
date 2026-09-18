@@ -16,21 +16,19 @@ import {
   writeStudioWebtoonOnboardingProfile,
   type StudioWebtoonOnboardingProfile,
 } from "@/shared/lib/webtoon-production-onboarding";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
+
+type Locale = string;
 
 function localizedLabel(
   options: readonly { readonly id: string; readonly labelKo: string; readonly labelEn: string }[],
   id: string,
-  localize: (ko: string, en: string) => string,
+  bt: (ko: string, en: string) => string,
 ): string {
   const option = options.find((item) => item.id === id);
   if (!option) return id;
-  return localize(option.labelKo, option.labelEn);
+  return bt(option.labelKo, option.labelEn);
 }
 
 function taskId(profile: StudioWebtoonOnboardingProfile, index: number): string {
@@ -44,7 +42,7 @@ export function StudioWebtoonOnboardingPanel({
   readonly projectId: string;
   readonly locale?: string;
 }) {
-  const l = useBilingualLocalizer("studioWebtoonOnboarding");
+  const bt = useBilingual("StudioWebtoonOnboardingPanel");
   const [profile, setProfile] = useState<StudioWebtoonOnboardingProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +54,7 @@ export function StudioWebtoonOnboardingPanel({
   }, [projectId]);
 
   const plan = useMemo(() => profile ? buildWebtoonOnboardingPlan(profile) : null, [profile]);
-  const tasks = plan ? plan.tasksKo.map((task, index) => l(task, plan.tasksEn[index] ?? task)) : [];
+  const tasks = plan ? plan.tasksKo.map((task, index) => bt(task, plan.tasksEn[index] ?? task)) : [];
   const completedCount = profile
     ? tasks.filter((_, index) => profile.completedTaskIds.includes(taskId(profile, index))).length
     : 0;
@@ -71,7 +69,7 @@ export function StudioWebtoonOnboardingPanel({
     } catch (cause) {
       setError(cause instanceof Error
         ? cause.message
-        : l("온보딩 진행을 저장하지 못했습니다.", "Onboarding progress could not be saved."));
+        : bt("온보딩 진행을 저장하지 못했습니다.", "Onboarding progress could not be saved."));
     }
   };
 
@@ -90,10 +88,10 @@ export function StudioWebtoonOnboardingPanel({
   const progress = Math.round((completedCount / Math.max(tasks.length, 1)) * 100);
   const recommendedHref = webtoonOnboardingProjectHref(projectId, profile);
   const badges = [
-    localizedLabel(WEBTOON_STARTING_POINTS, profile.startingPoint, l),
-    localizedLabel(WEBTOON_ONBOARDING_GOALS, profile.goal, l),
-    localizedLabel(WEBTOON_TEAM_MODELS, profile.teamModel, l),
-    localizedLabel(WEBTOON_CADENCES, profile.cadence, l),
+    localizedLabel(WEBTOON_STARTING_POINTS, profile.startingPoint, bt),
+    localizedLabel(WEBTOON_ONBOARDING_GOALS, profile.goal, bt),
+    localizedLabel(WEBTOON_TEAM_MODELS, profile.teamModel, bt),
+    localizedLabel(WEBTOON_CADENCES, profile.cadence, bt),
   ];
 
   return (
@@ -107,14 +105,14 @@ export function StudioWebtoonOnboardingPanel({
             <div className="min-w-0">
               <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">PROJECT ONBOARDING</p>
               <h2 id="webtoon-project-onboarding-title" className="mt-1 break-words text-xl font-black text-fg sm:text-2xl">
-                {l(plan.titleKo, plan.titleEn)}
+                {bt(plan.titleKo, plan.titleEn)}
               </h2>
               <p className="mt-2 max-w-3xl break-words text-sm leading-6 text-fg-2">
-                {l(plan.summaryKo, plan.summaryEn)}
+                {bt(plan.summaryKo, plan.summaryEn)}
               </p>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2" aria-label={l("선택한 제작 조건", "Selected production conditions")}>
+          <div className="mt-4 flex flex-wrap gap-2" aria-label={bt("선택한 제작 조건", "Selected production conditions")}>
             {badges.map((badge) => (
               <span key={badge} className="rounded-full border border-accent/25 bg-card px-3 py-1 text-xs font-bold text-fg-2">{badge}</span>
             ))}
@@ -124,12 +122,12 @@ export function StudioWebtoonOnboardingPanel({
           <div className="flex items-start gap-3">
             <Flag className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
             <div>
-              <p className="text-[0.65rem] font-bold text-fg-3">{l("첫 승인 마일스톤", "First approval milestone")}</p>
-              <p className="mt-1 text-sm font-black text-fg">{l(plan.milestoneKo, plan.milestoneEn)}</p>
+              <p className="text-[0.65rem] font-bold text-fg-3">{bt("첫 승인 마일스톤", "First approval milestone")}</p>
+              <p className="mt-1 text-sm font-black text-fg">{bt(plan.milestoneKo, plan.milestoneEn)}</p>
             </div>
           </div>
           <Link href={recommendedHref} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 w-full min-w-0" })}>
-            {l("추천 작업공간 열기", "Open recommended workspace")}
+            {bt("추천 작업공간 열기", "Open recommended workspace")}
           </Link>
         </div>
       </div>
@@ -139,10 +137,13 @@ export function StudioWebtoonOnboardingPanel({
           <div>
             <div className="flex items-center gap-2">
               <ListChecks size={18} className="text-accent" aria-hidden="true" />
-              <h3 className="text-lg font-black text-fg">{l("첫 작업 체크리스트", "First-work checklist")}</h3>
+              <h3 className="text-lg font-black text-fg">{bt("첫 작업 체크리스트", "First-work checklist")}</h3>
             </div>
             <p className="mt-1 text-xs leading-5 text-fg-3">
-              {l("기능을 둘러보는 대신 실제 제작 준비 항목을 완료하세요.", "Complete real production setup instead of a generic feature tour.")}
+              {bt(
+                "기능을 둘러보는 대신 실제 제작 준비 항목을 완료하세요.",
+                "Complete real production setup instead of a generic feature tour.",
+              )}
             </p>
           </div>
           <p className="text-sm font-black text-accent">{completedCount} / {tasks.length} · {progress}%</p>
@@ -183,7 +184,7 @@ export function StudioWebtoonOnboardingPanel({
 
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link href="/learn/process#production-onboarding" className={buttonClass({ variant: "quiet", className: "w-full min-w-0 sm:w-auto" })}>
-            {l("제작 과정과 트랙 다시 보기", "Review the workflow and tracks")}
+            {bt("제작 과정과 트랙 다시 보기", "Review the workflow and tracks")}
           </Link>
           <button
             type="button"
@@ -192,12 +193,12 @@ export function StudioWebtoonOnboardingPanel({
             className={buttonClass({ className: "w-full min-w-0 sm:w-auto" })}
           >
             <CheckCircle2 size={17} aria-hidden="true" />
-            {l("초기 제작 준비 완료", "Complete initial production setup")}
+            {bt("초기 제작 준비 완료", "Complete initial production setup")}
           </button>
         </div>
         {!allTasksComplete ? (
           <p className="mt-3 text-right text-xs leading-5 text-fg-3">
-            {l("모든 첫 작업을 확인하면 온보딩을 완료할 수 있습니다.", "Complete every first-work item to finish onboarding.")}
+            {bt("모든 첫 작업을 확인하면 온보딩을 완료할 수 있습니다.", "Complete every first-work item to finish onboarding.")}
           </p>
         ) : null}
       </div>

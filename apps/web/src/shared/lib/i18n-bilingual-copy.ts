@@ -247,14 +247,21 @@ export function translateBilingualText(
   return t(defineBilingualAutoText(scope, value.ko, value.en));
 }
 
-/**
- * Hook-friendly adapter for legacy components with many inline Korean/English branches.
- * The returned resolver stays on the global i18n pipeline and rerenders when runtime bundles land.
- */
-export function useBilingualLocalizer(scope: string): (ko: string, en: string) => string {
+/** Concise inline bridge for legacy `locale === "ko" ? ko : en` expressions. */
+export function translateBilingual(
+  t: TranslationResolver,
+  scope: string,
+  ko: string,
+  en: string,
+): string {
+  return t(defineBilingualAutoText(scope, ko, en));
+}
+
+/** React bridge for incrementally migrating legacy inline bilingual copy. */
+export function useBilingual(scope: string): (ko: string, en: string) => string {
   const t = useT();
   return useCallback(
-    (ko: string, en: string) => translateBilingualText(t, scope, { ko, en }),
+    (ko: string, en: string) => translateBilingual(t, scope, ko, en),
     [scope, t],
   );
 }

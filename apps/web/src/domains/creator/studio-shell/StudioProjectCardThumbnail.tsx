@@ -1,7 +1,7 @@
 import { Image as ImageIcon, LoaderCircle } from "lucide-react";
 import { Suspense, useEffect, useRef, useState, type ReactElement, type RefObject } from "react";
 
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import {
@@ -27,6 +27,7 @@ const LazyStudioPageThumbnail = lazyRetry(
   "StudioProjectCardThumbnail",
 );
 
+type Locale = string;
 type PreviewPhase = "idle" | "loading" | "ready" | "empty";
 
 interface PreviewCandidate {
@@ -184,7 +185,7 @@ function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
     <div className="grid h-full place-items-center bg-panel/70 text-fg-3">
       <div className="flex items-center gap-2 text-xs font-semibold">
         <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        {l("최근 작업 불러오는 중", "Loading recent work")}
+        {bt("최근 작업 불러오는 중", "Loading recent work")}
       </div>
     </div>
   );
@@ -197,7 +198,7 @@ function PreviewEmpty({ locale: _locale }: { readonly locale: string }) {
       <div>
         <ImageIcon size={22} className="mx-auto" aria-hidden="true" />
         <p className="mt-2 text-xs font-semibold">
-          {l("작업을 시작하면 미리보기가 표시됩니다.", "A preview appears after you start working.")}
+          {bt("작업을 시작하면 미리보기가 표시됩니다.", "A preview appears after you start working.")}
         </p>
       </div>
     </div>
@@ -227,6 +228,7 @@ export function StudioProjectCardThumbnail({
     if (!nearViewport) return;
     const storage = localStorageOrNull();
     if (!storage) {
+  const bt = useBilingual("StudioProjectCardThumbnail");
       setPhase("empty");
       return;
     }
@@ -270,7 +272,7 @@ export function StudioProjectCardThumbnail({
   const storedThumbnail = project.thumbnailUrl && !storedThumbnailFailed
     ? project.thumbnailUrl
     : null;
-  const previewLabel = l(`${project.title} 최근 작업 미리보기`, `Recent work preview for ${project.title}`);
+  const previewLabel = bt(`${project.title} 최근 작업 미리보기`, `Recent work preview for ${project.title}`);
 
   return (
     <div
@@ -304,8 +306,8 @@ export function StudioProjectCardThumbnail({
       {preview || storedThumbnail ? (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[0.62rem] font-black text-white shadow-sm backdrop-blur-sm">
           {preview
-            ? l("최근 자동 저장", "Latest autosave")
-            : l("프로젝트 미리보기", "Project preview")}
+            ? bt("최근 자동 저장", "Latest autosave")
+            : bt("프로젝트 미리보기", "Project preview")}
         </span>
       ) : null}
     </div>

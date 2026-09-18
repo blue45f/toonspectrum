@@ -29,6 +29,7 @@ import {
 } from "../studio-webtoon-3d-render";
 import { analyzeStudioWebtoonQuality } from "../studio-webtoon-quality";
 import type { StudioProjectSection } from "../studio-project-views";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
 import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
@@ -37,6 +38,7 @@ import { cn } from "@/shared/lib/utils";
 import { useStudioProjectFeatureSuite } from "./useStudioProjectFeatureSuite";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
 
+type Locale = string;
 type ResultStatus = "ready" | "review" | "blocked" | "pass" | "warning";
 
 const FIELD_CLASS =
@@ -59,11 +61,8 @@ function safeResult<T>(factory: () => T): T | null {
   }
 }
 
-function statusLabel(
-  status: ResultStatus,
-  localize: (ko: string, en: string) => string,
-): string {
-  const labels: Record<ResultStatus, BilingualText> = {
+function statusLabel(status: ResultStatus, bt: (ko: string, en: string) => string): string {
+  const labels: Record<ResultStatus, Record<Locale, string>> = {
     ready: { ko: "준비됨", en: "Ready" },
     review: { ko: "확인 필요", en: "Review" },
     blocked: { ko: "수정 필요", en: "Blocked" },
@@ -71,11 +70,11 @@ function statusLabel(
     warning: { ko: "확인 필요", en: "Warning" },
   };
   const label = labels[status];
-  return localize(label.ko, label.en);
+  return bt(label.ko, label.en);
 }
 
-function StatusBadge({ status, locale: _locale }: { readonly status: ResultStatus; readonly locale?: string }) {
-  const l = useBilingualLocalizer("studioFeatureSuite.status");
+function StatusBadge({ status, locale: _locale }: { readonly status: ResultStatus; readonly locale: Locale }) {
+  const bt = useBilingual("StudioProjectFeatureSuitePanel.status");
   return (
     <span className={cn(
       "inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-bold",
@@ -85,7 +84,7 @@ function StatusBadge({ status, locale: _locale }: { readonly status: ResultStatu
           ? "border-danger/30 bg-danger-soft/20 text-danger"
           : "border-warning/35 bg-warning-soft/20 text-warning",
     )}>
-      {statusLabel(status, l)}
+      {statusLabel(status, bt)}
     </span>
   );
 }
@@ -173,22 +172,22 @@ function OverviewSuite({
   };
 
   if (!state) {
-    return <p className="text-sm text-fg-2">{suite.error ?? (l("성과 데이터를 준비하고 있습니다.", "Preparing project analytics."))}</p>;
+    return <p className="text-sm text-fg-2">{suite.error ?? (bt("성과 데이터를 준비하고 있습니다.", "Preparing project analytics."))}</p>;
   }
 
   return (
     <FeatureCard
       icon={BarChart3}
       eyebrow={view === "activity" ? "ACTIVITY" : "PROJECT SIGNALS"}
-      title={l("제작과 공개 결과를 한눈에", "Production and audience signals together")}
-      description={l("플랫폼에서 가져온 데이터와 제작 비용을 한 프로젝트 기준으로 합칩니다. 연결 전에는 예제 데이터로 흐름을 확인할 수 있습니다.", "Combine platform metrics and production costs per project. Sample data demonstrates the workflow before connectors are enabled.")}
+      title={bt("제작과 공개 결과를 한눈에", "Production and audience signals together")}
+      description={bt("플랫폼에서 가져온 데이터와 제작 비용을 한 프로젝트 기준으로 합칩니다. 연결 전에는 예제 데이터로 흐름을 확인할 수 있습니다.", "Combine platform metrics and production costs per project. Sample data demonstrates the workflow before connectors are enabled.")}
     >
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric label={l("순 방문자", "Unique readers")} value={episode?.uniqueReaders ?? 0} />
-        <Metric label={l("완독률", "Completion")} value={`${Math.round((episode?.completionRate ?? 0) * 100)}%`} />
-        <Metric label={l("평균 스크롤", "Average scroll")} value={`${Math.round((episode?.averageMaxScrollDepth ?? 0) * 100)}%`} />
-        <Metric label={l("반응", "Reactions")} value={episode?.reactions ?? 0} />
-        <Metric label={l("순수익", "Net")} value={new Intl.NumberFormat(language || "en", {
+        <Metric label={bt("순 방문자", "Unique readers")} value={episode?.uniqueReaders ?? 0} />
+        <Metric label={bt("완독률", "Completion")} value={`${Math.round((episode?.completionRate ?? 0) * 100)}%`} />
+        <Metric label={bt("평균 스크롤", "Average scroll")} value={`${Math.round((episode?.averageMaxScrollDepth ?? 0) * 100)}%`} />
+        <Metric label={bt("반응", "Reactions")} value={episode?.reactions ?? 0} />
+        <Metric label={bt("순수익", "Net")} value={new Intl.NumberFormat(locale || "en", {
           style: "currency",
           currency: episode?.currency ?? "KRW",
           maximumFractionDigits: 0,
@@ -196,13 +195,13 @@ function OverviewSuite({
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={() => record("episode-open")} className={buttonClass({ variant: "outline", size: "sm" })}>
-          {l("미리보기 열기 기록", "Record preview open")}
+          {bt("미리보기 열기 기록", "Record preview open")}
         </button>
         <button type="button" onClick={() => record("scroll-depth")} className={buttonClass({ variant: "outline", size: "sm" })}>
-          {l("스크롤 확인 기록", "Record scroll check")}
+          {bt("스크롤 확인 기록", "Record scroll check")}
         </button>
         <button type="button" onClick={() => record("episode-complete")} className={buttonClass({ size: "sm" })}>
-          {l("완독 기록", "Record completion")}
+          {bt("완독 기록", "Record completion")}
         </button>
       </div>
       {suite.error ? <p role="alert" className="mt-3 text-xs font-semibold text-danger">{suite.error}</p> : null}
@@ -281,25 +280,25 @@ function StorySuite({
         <FeatureCard
           icon={FileText}
           eyebrow="STORYBOARD"
-          title={l("대본에서 컷 계획 만들기", "Plan panels from story beats")}
-          description={l("장면의 목적과 대사를 입력하면 샷 크기·카메라·말풍선 여백·스크롤 간격을 제안합니다. 원고는 자동으로 변경하지 않습니다.", "Story beats produce shot, camera, dialogue-space and scroll-gap suggestions without changing the manuscript.")}
+          title={bt("대본에서 컷 계획 만들기", "Plan panels from story beats")}
+          description={bt("장면의 목적과 대사를 입력하면 샷 크기·카메라·말풍선 여백·스크롤 간격을 제안합니다. 원고는 자동으로 변경하지 않습니다.", "Story beats produce shot, camera, dialogue-space and scroll-gap suggestions without changing the manuscript.")}
         >
           <div className="grid gap-2 sm:grid-cols-[9rem_1fr]">
-            <select value={kind} onChange={(event) => setKind(event.target.value as StudioStoryBeatKind)} className={FIELD_CLASS} aria-label={l("장면 종류", "Beat kind")}>
-              <option value="setup">{l("도입", "Setup")}</option>
-              <option value="dialogue">{l("대화", "Dialogue")}</option>
-              <option value="action">{l("행동", "Action")}</option>
-              <option value="reaction">{l("반응", "Reaction")}</option>
-              <option value="reveal">{l("반전·공개", "Reveal")}</option>
-              <option value="transition">{l("전환", "Transition")}</option>
+            <select value={kind} onChange={(event) => setKind(event.target.value as StudioStoryBeatKind)} className={FIELD_CLASS} aria-label={bt("장면 종류", "Beat kind")}>
+              <option value="setup">{bt("도입", "Setup")}</option>
+              <option value="dialogue">{bt("대화", "Dialogue")}</option>
+              <option value="action">{bt("행동", "Action")}</option>
+              <option value="reaction">{bt("반응", "Reaction")}</option>
+              <option value="reveal">{bt("반전·공개", "Reveal")}</option>
+              <option value="transition">{bt("전환", "Transition")}</option>
             </select>
-            <input value={summary} onChange={(event) => setSummary(event.target.value)} placeholder={l("장면에서 일어나는 핵심 사건", "What happens in this beat")} className={FIELD_CLASS} />
+            <input value={summary} onChange={(event) => setSummary(event.target.value)} placeholder={bt("장면에서 일어나는 핵심 사건", "What happens in this beat")} className={FIELD_CLASS} />
           </div>
           <div className="mt-2 flex gap-2">
-            <input value={dialogue} onChange={(event) => setDialogue(event.target.value)} placeholder={l("선택 사항: 주요 대사", "Optional dialogue")} className={FIELD_CLASS} />
+            <input value={dialogue} onChange={(event) => setDialogue(event.target.value)} placeholder={bt("선택 사항: 주요 대사", "Optional dialogue")} className={FIELD_CLASS} />
             <button type="button" onClick={addBeat} disabled={!summary.trim()} className={buttonClass({ className: "shrink-0 gap-1.5" })}>
               <Plus size={15} aria-hidden="true" />
-              {l("추가", "Add")}
+              {bt("추가", "Add")}
             </button>
           </div>
           <div className="mt-4 space-y-2">
@@ -310,7 +309,7 @@ function StorySuite({
                   <p className="text-sm font-bold text-fg">{beat.summary}</p>
                   {beat.dialogue ? <p className="mt-1 truncate text-xs text-fg-3">“{beat.dialogue}”</p> : null}
                 </div>
-                <button type="button" onClick={() => removeBeat(beat.id)} disabled={state.storyBeats.length <= 1} aria-label={l("장면 삭제", "Remove beat")} className={buttonClass({ variant: "quiet", size: "icon" })}>
+                <button type="button" onClick={() => removeBeat(beat.id)} disabled={state.storyBeats.length <= 1} aria-label={bt("장면 삭제", "Remove beat")} className={buttonClass({ variant: "quiet", size: "icon" })}>
                   <Trash2 size={15} aria-hidden="true" />
                 </button>
               </div>
@@ -318,9 +317,9 @@ function StorySuite({
           </div>
           {storyboard ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <Metric label={l("예상 컷", "Planned shots")} value={storyboard.shots.length} />
-              <Metric label={l("예상 원고 높이", "Estimated height")} value={`${storyboard.estimatedCanvasHeightPx.toLocaleString()}px`} />
-              <Metric label={l("확인할 항목", "Warnings")} value={storyboard.warnings.length} />
+              <Metric label={bt("예상 컷", "Planned shots")} value={storyboard.shots.length} />
+              <Metric label={bt("예상 원고 높이", "Estimated height")} value={`${storyboard.estimatedCanvasHeightPx.toLocaleString()}px`} />
+              <Metric label={bt("확인할 항목", "Warnings")} value={storyboard.warnings.length} />
             </div>
           ) : null}
         </FeatureCard>
@@ -330,28 +329,28 @@ function StorySuite({
         <FeatureCard
           icon={Workflow}
           eyebrow="CONTINUITY"
-          title={l("설정과 장면 연결 확인", "Check story continuity")}
-          description={l("캐릭터 의상·외형·부상·소품·알고 있는 정보·장소가 장면 사이에서 설명 없이 바뀌는지 검사합니다.", "Detect unexplained changes in costume, appearance, injuries, props, knowledge and location.")}
+          title={bt("설정과 장면 연결 확인", "Check story continuity")}
+          description={bt("캐릭터 의상·외형·부상·소품·알고 있는 정보·장소가 장면 사이에서 설명 없이 바뀌는지 검사합니다.", "Detect unexplained changes in costume, appearance, injuries, props, knowledge and location.")}
         >
           <div className="grid gap-3 sm:grid-cols-3">
-            <Metric label={l("캐릭터", "Characters")} value={workspaceState?.story.bible.characters.length ?? 0} />
-            <Metric label={l("장소", "Locations")} value={workspaceState?.story.bible.locations.length ?? 0} />
-            <Metric label={l("설정 사실", "Facts")} value={workspaceState?.story.bible.facts.length ?? 0} />
+            <Metric label={bt("캐릭터", "Characters")} value={workspaceState?.story.bible.characters.length ?? 0} />
+            <Metric label={bt("장소", "Locations")} value={workspaceState?.story.bible.locations.length ?? 0} />
+            <Metric label={bt("설정 사실", "Facts")} value={workspaceState?.story.bible.facts.length ?? 0} />
           </div>
           <div className="mt-4 flex items-center justify-between rounded-xl border border-line bg-panel p-3">
             <div>
-              <b className="text-sm text-fg">{l("연속성 검사 결과", "Continuity result")}</b>
+              <b className="text-sm text-fg">{bt("연속성 검사 결과", "Continuity result")}</b>
               <p className="mt-1 text-xs text-fg-3">
                 {continuity
-                  ? (l(`오류 ${continuity.blockingCount}개 · 확인 ${continuity.warningCount}개`, `${continuity.blockingCount} blocking · ${continuity.warningCount} warnings`))
-                  : (l("스토리 데이터를 준비하고 있습니다.", "Preparing story data."))}
+                  ? (bt(`오류 ${continuity.blockingCount}개 · 확인 ${continuity.warningCount}개`, `${continuity.blockingCount} blocking · ${continuity.warningCount} warnings`))
+                  : (bt("스토리 데이터를 준비하고 있습니다.", "Preparing story data."))}
               </p>
             </div>
             {continuity ? <StatusBadge status={continuity.status} locale={locale} /> : null}
           </div>
           {continuity?.issues.slice(0, 4).map((issue) => (
             <p key={`${issue.code}:${issue.toSceneId}`} className="mt-2 rounded-xl border border-warning/25 bg-warning-soft/10 px-3 py-2 text-xs leading-5 text-fg-2">
-              {l(issue.messageKo, issue.messageEn)}
+              {bt(issue.messageKo, issue.messageEn)}
             </p>
           ))}
         </FeatureCard>
@@ -387,13 +386,13 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
     <FeatureCard
       icon={Workflow}
       eyebrow="PRODUCTION"
-      title={l("제작 단계와 병목 관리", "Production stages and bottlenecks")}
-      description={l("대본부터 출력까지 의존 관계와 담당 작업량을 계산하고, 다음으로 진행 가능한 작업을 바로 표시합니다.", "Calculate dependencies and workload from story through export, then surface tasks that can move next.")}
+      title={bt("제작 단계와 병목 관리", "Production stages and bottlenecks")}
+      description={bt("대본부터 출력까지 의존 관계와 담당 작업량을 계산하고, 다음으로 진행 가능한 작업을 바로 표시합니다.", "Calculate dependencies and workload from story through export, then surface tasks that can move next.")}
     >
       <div className="grid gap-3 sm:grid-cols-3">
-        <Metric label={l("전체 진행", "Overall progress")} value={`${Math.round(report.progress * 100)}%`} />
-        <Metric label={l("바로 시작 가능", "Ready now")} value={report.readyTaskIds.length} />
-        <Metric label={l("막힌 작업", "Blocked")} value={report.dependencyBlockedTaskIds.length} />
+        <Metric label={bt("전체 진행", "Overall progress")} value={`${Math.round(report.progress * 100)}%`} />
+        <Metric label={bt("바로 시작 가능", "Ready now")} value={report.readyTaskIds.length} />
+        <Metric label={bt("막힌 작업", "Blocked")} value={report.dependencyBlockedTaskIds.length} />
       </div>
       <div className="mt-4 space-y-2">
         {workspaceState.productionTasks.map((task) => (
@@ -405,8 +404,8 @@ function ProductionPipeline({ projectId, locale }: { readonly projectId: string;
             </div>
             <button type="button" onClick={() => advance(task.id)} disabled={task.status === "done"} className={buttonClass({ variant: "outline", size: "sm" })}>
               {task.status === "done"
-                ? (l("완료", "Done"))
-                : (l("다음 단계", "Advance"))}
+                ? (bt("완료", "Done"))
+                : (bt("다음 단계", "Advance"))}
             </button>
           </div>
         ))}
@@ -441,14 +440,14 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
     <FeatureCard
       icon={Gauge}
       eyebrow="WEBTOON QUALITY"
-      title={l("모바일 가독성과 스크롤 리듬", "Mobile readability and scroll rhythm")}
-      description={l("작품을 자동 수정하지 않고 글자 크기·읽기 순서·말풍선 겹침·장면 전환 간격을 검사합니다.", "Inspect text size, reading order, balloon overlap and scene spacing without changing artwork.")}
+      title={bt("모바일 가독성과 스크롤 리듬", "Mobile readability and scroll rhythm")}
+      description={bt("작품을 자동 수정하지 않고 글자 크기·읽기 순서·말풍선 겹침·장면 전환 간격을 검사합니다.", "Inspect text size, reading order, balloon overlap and scene spacing without changing artwork.")}
     >
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel p-3">
         <div className="grid flex-1 gap-3 sm:grid-cols-3">
-          <Metric label={l("품질 점수", "Quality score")} value={report.score} />
-          <Metric label={l("수정 필요", "Blocking")} value={report.blockingCount} />
-          <Metric label={l("확인 필요", "Warnings")} value={report.warningCount} />
+          <Metric label={bt("품질 점수", "Quality score")} value={report.score} />
+          <Metric label={bt("수정 필요", "Blocking")} value={report.blockingCount} />
+          <Metric label={bt("확인 필요", "Warnings")} value={report.warningCount} />
         </div>
         <StatusBadge status={report.blockingCount > 0 ? "blocked" : report.warningCount > 0 ? "review" : "ready"} locale={locale} />
       </div>
@@ -460,11 +459,11 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
               <p className="mt-1 text-xs text-fg-3">{balloon.cutId} · {balloon.kind}</p>
             </div>
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {l("글자 크기", "Font size")}
+              {bt("글자 크기", "Font size")}
               <input type="number" min={8} max={72} value={balloon.fontSize} onChange={(event) => updateBalloon(balloon.id, "fontSize", Number(event.target.value))} className={`${FIELD_CLASS} mt-1`} />
             </label>
             <label className="text-[0.65rem] font-bold text-fg-3">
-              {l("읽기 순서", "Reading order")}
+              {bt("읽기 순서", "Reading order")}
               <input type="number" min={1} value={balloon.readingOrder ?? 1} onChange={(event) => updateBalloon(balloon.id, "readingOrder", Number(event.target.value))} className={`${FIELD_CLASS} mt-1`} />
             </label>
           </div>
@@ -477,7 +476,7 @@ function QualityPanel({ projectId, locale }: { readonly projectId: string; reado
             ? "border-danger/30 bg-danger-soft/10 text-danger"
             : "border-warning/25 bg-warning-soft/10 text-fg-2",
         )}>
-          {l(finding.messageKo, finding.messageEn)}
+          {bt(finding.messageKo, finding.messageEn)}
         </p>
       ))}
     </FeatureCard>
@@ -541,8 +540,8 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
       <FeatureCard
         icon={Boxes}
         eyebrow="3D RENDER"
-        title={l("웹툰용 3D 분리 출력", "Webtoon-ready 3D render passes")}
-        description={l("카메라·조명·권리·장면 부담을 검사하고 색·선화·그림자·깊이·마스크를 편집 가능한 레이어로 계획합니다.", "Check camera, lighting, rights and scene load, then plan editable color, line, shadow, depth and mask layers.")}
+        title={bt("웹툰용 3D 분리 출력", "Webtoon-ready 3D render passes")}
+        description={bt("카메라·조명·권리·장면 부담을 검사하고 색·선화·그림자·깊이·마스크를 편집 가능한 레이어로 계획합니다.", "Check camera, lighting, rights and scene load, then plan editable color, line, shadow, depth and mask layers.")}
       >
         <div className="flex flex-wrap gap-2">
           {STUDIO_WEBTOON_3D_PASSES.map((pass) => {
@@ -558,9 +557,9 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
           })}
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Metric label={l("상태", "Status")} value={statusLabel(renderPlan.status, l)} />
-          <Metric label={l("미리보기", "Preview mode")} value={renderPlan.mode} />
-          <Metric label={l("생성 레이어", "Layers")} value={renderPlan.layers.length} />
+          <Metric label={bt("상태", "Status")} value={statusLabel(renderPlan.status, locale)} />
+          <Metric label={bt("미리보기", "Preview mode")} value={renderPlan.mode} />
+          <Metric label={bt("생성 레이어", "Layers")} value={renderPlan.layers.length} />
         </div>
         {renderPlan.findings.map((finding) => (
           <p key={finding} className="mt-2 rounded-xl border border-warning/25 bg-warning-soft/10 px-3 py-2 text-xs text-fg-2">{finding}</p>
@@ -570,17 +569,17 @@ function RenderAndMotionPanel({ projectId, locale }: { readonly projectId: strin
       <FeatureCard
         icon={Mic2}
         eyebrow="VOICE & MOTION"
-        title={l("대사와 장면 타이밍 연결", "Connect dialogue, voice and motion timing")}
-        description={l("대사가 바뀐 구간만 다시 생성하고, 음성 권리와 출처 문구를 확인한 뒤 장면 타이밍을 계산합니다.", "Regenerate only changed dialogue, verify voice rights and attribution, and calculate scene timing.")}
+        title={bt("대사와 장면 타이밍 연결", "Connect dialogue, voice and motion timing")}
+        description={bt("대사가 바뀐 구간만 다시 생성하고, 음성 권리와 출처 문구를 확인한 뒤 장면 타이밍을 계산합니다.", "Regenerate only changed dialogue, verify voice rights and attribution, and calculate scene timing.")}
       >
         <label className="text-xs font-bold text-fg-2">
-          {l("대표 대사", "Sample dialogue")}
+          {bt("대표 대사", "Sample dialogue")}
           <textarea value={state.voiceMotion.lines[0]?.text ?? ""} onChange={(event) => updateVoiceText(event.target.value)} rows={3} className={`${FIELD_CLASS} mt-2 py-2`} />
         </label>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <Metric label={l("다시 생성", "Regenerate")} value={voicePlan.regenerateLineIds.length} />
-          <Metric label={l("재사용", "Reuse")} value={voicePlan.reuseLineIds.length} />
-          <Metric label={l("전체 길이", "Duration")} value={`${Math.round((schedule.at(-1)?.endMs ?? 0) / 100) / 10}s`} />
+          <Metric label={bt("다시 생성", "Regenerate")} value={voicePlan.regenerateLineIds.length} />
+          <Metric label={bt("재사용", "Reuse")} value={voicePlan.reuseLineIds.length} />
+          <Metric label={bt("전체 길이", "Duration")} value={`${Math.round((schedule.at(-1)?.endMs ?? 0) / 100) / 10}s`} />
         </div>
         {voicePlan.blockingIssues.map((issue) => (
           <p key={`${issue.code}:${issue.lineId}`} className="mt-2 rounded-xl border border-danger/30 bg-danger-soft/10 px-3 py-2 text-xs text-danger">{issue.code}</p>
@@ -627,22 +626,22 @@ function DesignTemplatePanel({ projectId, locale }: { readonly projectId: string
     <FeatureCard
       icon={WandSparkles}
       eyebrow="TEMPLATE & PRESENTATION"
-      title={l("템플릿을 구조적으로 적용", "Apply structured templates")}
-      description={l("텍스트·이미지·색상 슬롯과 사용 권리를 확인하고, 발표 자료의 글자 크기·겹침·레이아웃을 함께 검사합니다.", "Validate text, image, color slots and rights, then audit presentation type size, overlap and layout.")}
+      title={bt("템플릿을 구조적으로 적용", "Apply structured templates")}
+      description={bt("텍스트·이미지·색상 슬롯과 사용 권리를 확인하고, 발표 자료의 글자 크기·겹침·레이아웃을 함께 검사합니다.", "Validate text, image, color slots and rights, then audit presentation type size, overlap and layout.")}
     >
       <label className="text-xs font-bold text-fg-2">
-        {l("작품 제목", "Project title")}
+        {bt("작품 제목", "Project title")}
         <input value={title} onChange={(event) => updateTitle(event.target.value)} className={`${FIELD_CLASS} mt-2`} />
       </label>
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        <Metric label={l("템플릿", "Template")} value={statusLabel(templatePlan.status, l)} />
-        <Metric label={l("빈 슬롯", "Missing slots")} value={templatePlan.missingSlotIds.length} />
-        <Metric label={l("발표 검사", "Presentation")} value={statusLabel(presentation.status, l)} />
-        <Metric label={l("권장 배치", "Suggested layout")} value={Object.values(presentation.recommendedLayoutBySlide)[0] ?? "-"} />
+        <Metric label={bt("템플릿", "Template")} value={statusLabel(templatePlan.status, locale)} />
+        <Metric label={bt("빈 슬롯", "Missing slots")} value={templatePlan.missingSlotIds.length} />
+        <Metric label={bt("발표 검사", "Presentation")} value={statusLabel(presentation.status, locale)} />
+        <Metric label={bt("권장 배치", "Suggested layout")} value={Object.values(presentation.recommendedLayoutBySlide)[0] ?? "-"} />
       </div>
       {[...templatePlan.findings, ...presentation.findings].slice(0, 5).map((finding, index) => (
         <p key={`${"slotId" in finding ? finding.slotId : finding.slideId}:${finding.code}:${index}`} className="mt-2 rounded-xl border border-warning/25 bg-warning-soft/10 px-3 py-2 text-xs text-fg-2">
-          {"messageKo" in finding ? (l(finding.messageKo, finding.messageEn)) : finding.code}
+          {"messageKo" in finding ? bt(finding.messageKo, finding.messageEn) : finding.code}
         </p>
       ))}
     </FeatureCard>
@@ -682,8 +681,8 @@ function AutomationPanel({ projectId, locale }: { readonly projectId: string; re
     <FeatureCard
       icon={WandSparkles}
       eyebrow="AUTOMATION"
-      title={l("안전한 작업은 자동으로, 외부 작업은 확인 후", "Automate safe work and confirm external actions")}
-      description={l("품질·사전검사는 바로 실행하고 게시·유료·파괴 작업만 명시적으로 확인하는 자동화 계획입니다.", "Quality and preflight can run directly; publishing, paid and destructive steps require explicit confirmation.")}
+      title={bt("안전한 작업은 자동으로, 외부 작업은 확인 후", "Automate safe work and confirm external actions")}
+      description={bt("품질·사전검사는 바로 실행하고 게시·유료·파괴 작업만 명시적으로 확인하는 자동화 계획입니다.", "Quality and preflight can run directly; publishing, paid and destructive steps require explicit confirmation.")}
     >
       <div className="flex items-center justify-between rounded-xl border border-line bg-panel p-3">
         <div>
@@ -703,11 +702,11 @@ function AutomationPanel({ projectId, locale }: { readonly projectId: string; re
               </div>
               {step.status === "confirmation" ? (
                 <button type="button" onClick={() => toggleConfirmation(step.stepId)} className={buttonClass({ size: "sm" })}>
-                  {l("이 단계 허용", "Allow step")}
+                  {bt("이 단계 허용", "Allow step")}
                 </button>
               ) : step.status === "run" && definition?.risk !== "safe" ? (
                 <button type="button" onClick={() => toggleConfirmation(step.stepId)} className={buttonClass({ variant: "outline", size: "sm" })}>
-                  {l("허용 취소", "Revoke")}
+                  {bt("허용 취소", "Revoke")}
                 </button>
               ) : null}
             </div>
@@ -730,7 +729,7 @@ export function StudioProjectFeatureSuitePanel({
   readonly view: string;
   readonly locale: "ko" | "en";
 }) {
-  const l = useBilingualLocalizer("studioFeatureSuite");
+  const bt = useBilingual("StudioProjectFeatureSuitePanel");
   if (section === "overview") {
     return <OverviewSuite projectId={projectId} locale={locale} view={view} />;
   }
@@ -764,12 +763,12 @@ export function StudioProjectFeatureSuitePanel({
       <FeatureCard
         icon={CircleAlert}
         eyebrow="PROJECT SAFETY"
-        title={l("보관 전 안전 확인", "Safety checks before archiving")}
-        description={l("원고·에셋·Series Kit·현지화·검토·출력 기록을 포함한 완전한 프로젝트 사본을 먼저 만드는 흐름을 사용합니다.", "Create a complete project copy with documents, assets, Series Kit, localization, review and export history before archiving.")}
+        title={bt("보관 전 안전 확인", "Safety checks before archiving")}
+        description={bt("원고·에셋·Series Kit·현지화·검토·출력 기록을 포함한 완전한 프로젝트 사본을 먼저 만드는 흐름을 사용합니다.", "Create a complete project copy with documents, assets, Series Kit, localization, review and export history before archiving.")}
       >
         <div className="flex items-center gap-3 rounded-xl border border-success/30 bg-success-soft/15 p-3 text-sm text-fg-2">
           <CheckCircle2 size={18} className="shrink-0 text-success" aria-hidden="true" />
-          {l("보관은 원본 삭제가 아니며, 복원 가능한 상태로 유지됩니다.", "Archiving does not delete the original and remains reversible.")}
+          {bt("보관은 원본 삭제가 아니며, 복원 가능한 상태로 유지됩니다.", "Archiving does not delete the original and remains reversible.")}
         </div>
       </FeatureCard>
     );
