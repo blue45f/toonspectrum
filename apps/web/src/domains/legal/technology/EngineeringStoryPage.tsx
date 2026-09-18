@@ -3,6 +3,8 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+} from "@/shared/lib/i18n-bilingual-copy";
+import {
   ArrowRight,
   CheckCircle2,
   Code2,
@@ -11,16 +13,30 @@ import {
   GitBranch,
   TestTube2,
   Workflow,
-  } from "lucide-react"; import { AboutSectionNav } from "../AboutSectionNav"; import { ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
+} from "lucide-react";
+
+import { AboutSectionNav } from "../AboutSectionNav";
+import {
+  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   ENGINEERING_STATUS_META,
   type EngineeringEvidenceKind,
   type EngineeringStatus,
-  } from "./engineering-story-content"; import { EngineeringPageIntro,
+} from "./engineering-story-content";
+import {
+  EngineeringPageIntro,
   EngineeringStatusBadge,
   EngineeringStoryNav,
-  } from "./EngineeringStoryUi"; import { useEngineeringLocale } from "./use-engineering-locale"; import Link from "@/compat/router-link"; import { useDocumentTitle } from "@/hooks/use-document-title"; import { Container } from "@/shared/components/section"; import { translateBilingualValueForActiveLocale,
+} from "./EngineeringStoryUi";
+import { useEngineeringLocale } from "./use-engineering-locale";
+
+import Link from "@/compat/router-link";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { Container } from "@/shared/components/section";
+import {
+  translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
+
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringStoryPage", ko, en);
 
