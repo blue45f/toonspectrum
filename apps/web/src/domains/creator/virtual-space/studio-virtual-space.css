@@ -212,3 +212,11 @@
 @media(prefers-reduced-motion:reduce){
   .studio-vspace-reference-player{animation:none!important}
 }
+
+/* Phaser-powered live world */
+.studio-vspace-phaser-canvas{overflow:hidden;background:#17181b}
+.studio-vspace-phaser-canvas canvas{display:block;width:100%!important;height:100%!important;touch-action:none;outline:none}
+.studio-vspace-stage[data-studio-engine="phaser"]{cursor:crosshair}
+@media(max-width:1023px){
+  .studio-vspace-phaser-canvas{border-radius:inherit}
+}

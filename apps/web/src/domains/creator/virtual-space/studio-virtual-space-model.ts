@@ -8,15 +8,11 @@ export const STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS = 24;
 export const STUDIO_VIRTUAL_SPACE_AVATAR_COUNT = 4;
 export const STUDIO_VIRTUAL_SPACE_AUTO_AVATAR = -1;
 
-export type StudioVirtualSpaceZoneId =
-  | "lounge"
-  | "writers"
-  | "storyboard"
-  | "drawing"
-  | "review"
-  | "assets"
-  | "assistant"
-  | "live";
+/**
+ * Data-driven room id. Built-in ids are declared by the default manifest, while Tiled/custom
+ * manifests may introduce additional stable ids without changing the P2P wire contract.
+ */
+export type StudioVirtualSpaceZoneId = string;
 
 export type StudioVirtualSpaceFacing = "down" | "left" | "right" | "up";
 export type StudioVirtualSpaceActivity = "available" | "focused" | "reviewing" | "away";
@@ -200,6 +196,7 @@ export function studioVirtualSpaceState(
   activity: StudioVirtualSpaceActivity = "available",
   moving = false,
   avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
+  zoneId?: StudioVirtualSpaceZoneId,
 ): StudioVirtualSpacePresenceState {
   const bounded = clampStudioVirtualSpacePoint(point);
   const safeAvatarIndex = Number.isInteger(avatarIndex)
@@ -209,7 +206,7 @@ export function studioVirtualSpaceState(
     : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
   return Object.freeze({
     ...bounded,
-    zoneId: studioVirtualSpaceZoneAt(bounded),
+    zoneId: zoneId ?? studioVirtualSpaceZoneAt(bounded),
     facing,
     activity,
     moving,

@@ -34,16 +34,11 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
-import {
-  VirtualStudioAmbientActors,
-  VirtualStudioMasterBackdrop,
-} from "@/shared/components/virtual-studio/VirtualStudioMasterWorld";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -83,30 +78,27 @@ import {
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
 import {
-  readStudioVirtualSpaceGamepadInput,
-} from "./studio-virtual-space-gamepad";
-import {
-  STUDIO_VIRTUAL_SPACE_INTERACTIONS,
   selectNearestStudioVirtualSpaceInteraction,
   type StudioVirtualSpaceInteraction,
 } from "./studio-virtual-space-interactions";
 import {
-  STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE,
-  STUDIO_VIRTUAL_SPACE_WALK_SPEED,
-  findStudioVirtualSpacePath,
-  normalizeStudioVirtualSpaceVector,
-  resolveStudioVirtualSpaceMovement,
   studioVirtualSpaceCanOccupy,
-  studioVirtualSpaceStepToward,
 } from "./studio-virtual-space-navigation";
 import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
+import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
+import {
+  StudioVirtualSpacePhaserCanvas,
+  type StudioVirtualSpaceEngineLocalState,
+} from "./StudioVirtualSpacePhaserCanvas";
+import {
+  DEFAULT_STUDIO_WORLD_MANIFEST,
+  type StudioWorldPortalDefinition,
+} from "./studio-virtual-space-world-manifest";
 import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
-const KEYBOARD_MOVEMENT_KEYS = new Set(["arrowleft", "arrowright", "arrowup", "arrowdown", "a", "d", "w", "s"]);
-const MOBILE_CAMERA_SCALE = 0.72;
 const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v1";
 const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
@@ -247,10 +239,6 @@ function validProjectId(projectId: string): boolean {
   );
 }
 
-function facingFromDelta(dx: number, dy: number): StudioVirtualSpaceFacing {
-  if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? "left" : "right";
-  return dy < 0 ? "up" : "down";
-}
 
 function stagePosition(point: StudioVirtualSpacePoint): CSSProperties {
   return {
@@ -489,77 +477,6 @@ function ConnectionBadge({
   );
 }
 
-function ZoneSurface({
-  zone,
-  projectId,
-  active,
-  onAssistant,
-}: {
-  readonly zone: StudioVirtualSpaceZone;
-  readonly projectId: string;
-  readonly active: boolean;
-  readonly onAssistant: () => void;
-}) {
-  const bt = useBilingual("StudioVirtualSpaceZone");
-  const Icon = ZONE_ICONS[zone.id];
-  const destination = studioVirtualSpaceDestination(projectId, zone.destination);
-  const style: CSSProperties = {
-    left: `${(zone.x / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
-    top: `${(zone.y / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
-    width: `${(zone.width / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
-    height: `${(zone.height / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
-  };
-  const body = (
-    <>
-      <span className="studio-vspace-master-zone-glass absolute inset-0 rounded-[1.2rem]" aria-hidden />
-      <span className="relative z-[3] flex items-start justify-between gap-2">
-        <span className="rounded-lg border border-black/10 bg-[#fff1dc]/90 px-2.5 py-1.5 text-[#38271f] shadow-md backdrop-blur-sm">
-          <span className="flex items-center gap-1.5 text-[0.54rem] font-black uppercase tracking-[0.08em] opacity-70">
-            <Icon size={11} aria-hidden />
-            {zone.id === "live" ? "LIVE" : zone.id.toUpperCase()}
-          </span>
-          <strong className="mt-0.5 block text-[0.7rem] font-black">
-            {bt(zone.labelKo, zone.labelEn)}
-          </strong>
-        </span>
-        {destination || zone.destination === "assistant" ? (
-          <ExternalLink size={13} className="text-white/75 drop-shadow" aria-hidden />
-        ) : null}
-      </span>
-    </>
-  );
-  const className = cn(
-    "studio-vspace-zone absolute flex flex-col overflow-hidden rounded-[1.2rem] border p-2 text-left transition-all duration-200",
-    active
-      ? "z-[2] border-accent/70 bg-accent/5 ring-2 ring-accent/20"
-      : "border-transparent bg-transparent",
-    (destination || zone.destination === "assistant") && "hover:border-white/25 hover:bg-white/5",
-  );
-  return (
-    <div style={style} className={className} data-zone={zone.id}>
-      {body}
-      {zone.destination === "assistant" ? (
-        <button
-          type="button"
-          className="absolute bottom-3 right-3 z-[8] inline-flex min-h-8 items-center gap-1 rounded-xl border border-white/20 bg-panel/85 px-2.5 text-[0.58rem] font-black text-fg shadow-md backdrop-blur hover:border-accent/50 hover:text-accent"
-          data-space-interactive="true"
-          onClick={onAssistant}
-        >
-          E · {bt("열기", "Open")}
-        </button>
-      ) : destination ? (
-        <Link
-          href={destination}
-          className="absolute bottom-3 right-3 z-[8] inline-flex min-h-8 items-center gap-1 rounded-xl border border-white/20 bg-panel/85 px-2.5 text-[0.58rem] font-black text-fg shadow-md backdrop-blur hover:border-accent/50 hover:text-accent"
-          data-space-interactive="true"
-        >
-          E · {bt("열기", "Open")}
-        </Link>
-      ) : null}
-    </div>
-  );
-}
-
 function MobileZoneCard({
   zone,
   projectId,
@@ -782,7 +699,6 @@ function VirtualSpaceExperience({
     getStudioConnectivityServerSnapshot,
   );
   const controllerRef = useRef<StudioVirtualSpacePresenceController | null>(null);
-  const stageRef = useRef<HTMLDivElement | null>(null);
   const fallbackIdentity = live.room?.participant.sessionId ?? `space:${projectId}`;
   const initial = useMemo(() => {
     const fallback = studioVirtualSpaceInitialPoint(fallbackIdentity);
@@ -802,15 +718,10 @@ function VirtualSpaceExperience({
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
+  const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
-  const followingPeerIdRef = useRef<string | null>(null);
-  const lastFollowPathAtRef = useRef(0);
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const gamepadInteractHeldRef = useRef(false);
-  const pressedKeysRef = useRef(new Set<string>());
-  const joystickRef = useRef<StudioVirtualSpacePoint>({ x: 0, y: 0 });
-  const clickPathRef = useRef<readonly StudioVirtualSpacePoint[]>([]);
   const movingRef = useRef(false);
   const visibleParticipantCount = connectivity.serverAvailable ? snapshot.peers.length + 1 : 1;
 
@@ -820,11 +731,9 @@ function VirtualSpaceExperience({
   }, [snapshot.peers, snapshot.self]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
-    followingPeerIdRef.current = sessionId;
-    lastFollowPathAtRef.current = 0;
-    if (!sessionId) clickPathRef.current = [];
+    engineBridge.setFollowingPeer(sessionId);
     setFollowingPeerId(sessionId);
-  }, []);
+  }, [engineBridge]);
 
   useEffect(() => {
     const timeout = globalThis.setTimeout(() => {
@@ -901,6 +810,7 @@ function VirtualSpaceExperience({
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
     facing: StudioVirtualSpaceFacing,
+    zoneId?: string,
   ) => {
     const bounded = clampStudioVirtualSpacePoint(point);
     const nextState = studioVirtualSpaceState(
@@ -909,11 +819,19 @@ function VirtualSpaceExperience({
       activity,
       movingRef.current,
       selfRef.current.avatarIndex,
+      zoneId,
     );
     selfRef.current = nextState;
     const controller = controllerRef.current;
     if (controller) {
-      controller.update(bounded, facing, activity, movingRef.current, selfRef.current.avatarIndex);
+      controller.update(
+        bounded,
+        facing,
+        activity,
+        movingRef.current,
+        selfRef.current.avatarIndex,
+        zoneId,
+      );
       setSnapshot(controller.snapshot());
       return;
     }
@@ -954,223 +872,48 @@ function VirtualSpaceExperience({
     if (destination) navigate(destination);
   }, [activateInteraction, navigate, openAssistant, projectId]);
 
-  useEffect(() => {
-    let frame = 0;
-    let lastAt = performance.now();
-
-    const setMovingState = (next: boolean) => {
-      if (movingRef.current === next) return;
-      movingRef.current = next;
-      setMoving(next);
-      if (!next) writeVirtualSpaceSessionPoint(projectId, selfRef.current);
-      const controller = controllerRef.current;
-      if (controller) {
-        controller.setMoving(next);
-        setSnapshot(controller.snapshot());
-        return;
-      }
-      setSnapshot((current) => ({
-        ...current,
-        self: studioVirtualSpaceState(
-          current.self,
-          current.self.facing,
-          activity,
-          next,
-          current.self.avatarIndex,
-        ),
-      }));
-    };
-
-    const tick = (now: number) => {
-      const elapsedSeconds = Math.min(0.05, Math.max(0, (now - lastAt) / 1000));
-      lastAt = now;
-
-      let horizontal = joystickRef.current.x;
-      let vertical = joystickRef.current.y;
-      const keys = pressedKeysRef.current;
-      if (keys.has("arrowleft") || keys.has("a")) horizontal -= 1;
-      if (keys.has("arrowright") || keys.has("d")) horizontal += 1;
-      if (keys.has("arrowup") || keys.has("w")) vertical -= 1;
-      if (keys.has("arrowdown") || keys.has("s")) vertical += 1;
-
-      const gamepads = typeof navigator !== "undefined" && typeof navigator.getGamepads === "function"
-        ? Array.from(navigator.getGamepads())
-        : [];
-      const gamepad = gamepads.find((candidate) => Boolean(candidate?.connected)) ?? null;
-      const gamepadInput = readStudioVirtualSpaceGamepadInput(gamepad);
-      horizontal += gamepadInput.x;
-      vertical += gamepadInput.y;
-      if (gamepadInput.interact && !gamepadInteractHeldRef.current) {
-        activateCurrentZone();
-      }
-      gamepadInteractHeldRef.current = gamepadInput.interact;
-
-      const current = selfRef.current;
-      let next: StudioVirtualSpacePoint = current;
-      let facing = current.facing;
-      const hasDirectInput = Math.abs(horizontal) > 0.02 || Math.abs(vertical) > 0.02;
-
-      if (hasDirectInput) {
-        if (followingPeerIdRef.current) setFollowingPeer(null);
-        clickPathRef.current = [];
-        const direction = normalizeStudioVirtualSpaceVector(horizontal, vertical);
-        const sprint = keys.has("shift") || gamepadInput.sprint ? 1.35 : 1;
-        next = resolveStudioVirtualSpaceMovement(current, {
-          x: direction.x * STUDIO_VIRTUAL_SPACE_WALK_SPEED * sprint * elapsedSeconds,
-          y: direction.y * STUDIO_VIRTUAL_SPACE_WALK_SPEED * sprint * elapsedSeconds,
-        });
-        facing = facingFromDelta(direction.x, direction.y);
-      } else {
-        const followId = followingPeerIdRef.current;
-        if (followId) {
-          const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === followId);
-          if (!peer) {
-            setFollowingPeer(null);
-          } else {
-            const distance = Math.hypot(peer.state.x - current.x, peer.state.y - current.y);
-            if (distance <= 88) {
-              clickPathRef.current = [];
-            } else if (now - lastFollowPathAtRef.current >= 360 || clickPathRef.current.length === 0) {
-              const offsetX = peer.state.x >= current.x ? -56 : 56;
-              const approach = clampStudioVirtualSpacePoint({
-                x: peer.state.x + offsetX,
-                y: peer.state.y,
-              });
-              clickPathRef.current = findStudioVirtualSpacePath(current, approach);
-              lastFollowPathAtRef.current = now;
-            }
-          }
-        }
-
-        if (clickPathRef.current.length > 0) {
-          const target = clickPathRef.current[0]!;
-          const dx = target.x - current.x;
-          const dy = target.y - current.y;
-          if (Math.hypot(dx, dy) <= STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE) {
-            clickPathRef.current = clickPathRef.current.slice(1);
-          } else {
-            next = studioVirtualSpaceStepToward(
-              current,
-              target,
-              STUDIO_VIRTUAL_SPACE_WALK_SPEED * elapsedSeconds,
-            );
-            facing = facingFromDelta(dx, dy);
-            if (next.x === current.x && next.y === current.y) {
-              clickPathRef.current = clickPathRef.current.slice(1);
-            }
-          }
-        }
-      }
-
-      const changed = next.x !== current.x || next.y !== current.y;
-      const walking = hasDirectInput || changed || clickPathRef.current.length > 0;
-      setMovingState(walking);
-      if (changed) updatePosition(next, facing);
-
-      frame = globalThis.requestAnimationFrame(tick);
-    };
-
-    frame = globalThis.requestAnimationFrame(tick);
-    return () => {
-      globalThis.cancelAnimationFrame(frame);
-      setMovingState(false);
-    };
-  }, [activateCurrentZone, activity, projectId, setFollowingPeer, updatePosition]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("input,textarea,select,[contenteditable=true]")) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const key = event.key.toLowerCase();
-      if (key === "e") {
-        event.preventDefault();
-        activateCurrentZone();
-        return;
-      }
-      if (key === "shift") {
-        pressedKeysRef.current.add(key);
-        return;
-      }
-      if (!KEYBOARD_MOVEMENT_KEYS.has(key)) return;
-      event.preventDefault();
-      clickPathRef.current = [];
-      pressedKeysRef.current.add(key);
-    };
-    const handleKeyUp = (event: KeyboardEvent) => {
-      pressedKeysRef.current.delete(event.key.toLowerCase());
-    };
-    const clearInput = () => {
-      pressedKeysRef.current.clear();
-      joystickRef.current = { x: 0, y: 0 };
-    };
-    globalThis.addEventListener("keydown", handleKeyDown);
-    globalThis.addEventListener("keyup", handleKeyUp);
-    globalThis.addEventListener("blur", clearInput);
-    return () => {
-      globalThis.removeEventListener("keydown", handleKeyDown);
-      globalThis.removeEventListener("keyup", handleKeyUp);
-      globalThis.removeEventListener("blur", clearInput);
-    };
-  }, [activateCurrentZone]);
+  const handleEngineLocalState = useCallback((next: StudioVirtualSpaceEngineLocalState) => {
+    if (movingRef.current !== next.moving) {
+      movingRef.current = next.moving;
+      setMoving(next.moving);
+    }
+    updatePosition(next.point, next.facing, next.zoneId);
+  }, [updatePosition]);
 
   const queuePathTo = useCallback((point: StudioVirtualSpacePoint) => {
     setFollowingPeer(null);
-    clickPathRef.current = findStudioVirtualSpacePath(selfRef.current, point);
-  }, [setFollowingPeer]);
+    engineBridge.requestMove(point);
+  }, [engineBridge, setFollowingPeer]);
 
   const startFollowingPeer = useCallback((sessionId: string) => {
     const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === sessionId);
     if (!peer) return;
     setFollowingPeer(sessionId);
-    const offsetX = peer.state.x >= selfRef.current.x ? -56 : 56;
-    clickPathRef.current = findStudioVirtualSpacePath(selfRef.current, {
-      x: peer.state.x + offsetX,
-      y: peer.state.y,
-    });
   }, [setFollowingPeer]);
-
-  const handleStagePointer = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest("[data-space-interactive=true]")) return;
-    const rect = stageRef.current?.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return;
-    const compactCamera = globalThis.innerWidth < 1024;
-    const point = compactCamera
-      ? clampStudioVirtualSpacePoint({
-          x: (
-            event.clientX
-            - rect.left
-            - rect.width / 2
-            + selfRef.current.x * MOBILE_CAMERA_SCALE
-          ) / MOBILE_CAMERA_SCALE,
-          y: (
-            event.clientY
-            - rect.top
-            - rect.height / 2
-            + selfRef.current.y * MOBILE_CAMERA_SCALE
-          ) / MOBILE_CAMERA_SCALE,
-        })
-      : clampStudioVirtualSpacePoint({
-          x: ((event.clientX - rect.left) / rect.width) * STUDIO_VIRTUAL_SPACE_WIDTH,
-          y: ((event.clientY - rect.top) / rect.height) * STUDIO_VIRTUAL_SPACE_HEIGHT,
-        });
-    queuePathTo(point);
-  }, [queuePathTo]);
 
   const currentZone = STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === snapshot.self.zoneId)
     ?? STUDIO_VIRTUAL_SPACE_ZONES[0]!;
   const currentInteraction = selectNearestStudioVirtualSpaceInteraction(snapshot.self);
-  const approachInteraction = useCallback((interaction: StudioVirtualSpaceInteraction) => {
-    const nearby = selectNearestStudioVirtualSpaceInteraction(selfRef.current);
-    if (nearby?.id === interaction.id) {
-      activateInteraction(interaction);
-      return;
-    }
-    queuePathTo({ x: interaction.x, y: interaction.y });
-  }, [activateInteraction, queuePathTo]);
   const followingPeer = followingPeerId
     ? snapshot.peers.find((peer) => peer.participant.sessionId === followingPeerId) ?? null
     : null;
+
+  const handleEnginePeerSelect = useCallback((sessionId: string) => {
+    const nearby = snapshot.nearbyPeers.some((peer) => peer.participant.sessionId === sessionId);
+    if (nearby && connectivity.serverAvailable) {
+      openStudioP2pHuddle({ peerIds: [sessionId], source: "virtual-space" });
+      return;
+    }
+    startFollowingPeer(sessionId);
+  }, [connectivity.serverAvailable, snapshot.nearbyPeers, startFollowingPeer]);
+
+  const handleEnginePortal = useCallback((portal: StudioWorldPortalDefinition) => {
+    if (portal.href) {
+      navigate(portal.href);
+      return;
+    }
+    if (portal.targetPoint) engineBridge.requestMove(portal.targetPoint);
+  }, [engineBridge, navigate]);
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
 
   const startNearbyHuddle = useCallback(() => {
@@ -1296,137 +1039,21 @@ function VirtualSpaceExperience({
           <div className="vs2-world-wrap vs2-world-wrap--live">
             <div className="vs2-live-stage-host">
               <div
-                ref={stageRef}
                 role="application"
                 aria-label={bt("가상 스튜디오 공간. WASD 또는 방향키로 이동하고 E 키로 현재 방과 상호작용합니다.", "Virtual studio space. Move with WASD or arrow keys and press E to interact with the current room.")}
-                onPointerDown={handleStagePointer}
                 className="studio-vspace-stage relative aspect-[59/36] min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 data-studio-virtual-space="true"
               >
-                <div
-                  className="studio-vspace-world"
-                  style={{
-                    "--studio-camera-x": `${-snapshot.self.x * MOBILE_CAMERA_SCALE}px`,
-                    "--studio-camera-y": `${-snapshot.self.y * MOBILE_CAMERA_SCALE}px`,
-                  } as CSSProperties}
-                >
-                  <div className="studio-vspace-master-backdrop absolute inset-0 z-0" aria-hidden>
-                    <VirtualStudioMasterBackdrop />
-                  </div>
-                  <div className="studio-vspace-ambient-creators absolute inset-0 z-[8] pointer-events-none">
-                    <VirtualStudioAmbientActors compact />
-                  </div>
-                  {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
-                    <ZoneSurface
-                      key={zone.id}
-                      zone={zone}
-                      projectId={projectId}
-                      active={currentZone.id === zone.id}
-                      onAssistant={openAssistant}
-                    />
-                  ))}
-
-                  {STUDIO_VIRTUAL_SPACE_INTERACTIONS.map((interaction) => {
-                    const nearby = currentInteraction?.id === interaction.id;
-                    return (
-                      <button
-                        key={interaction.id}
-                        type="button"
-                        className="studio-vspace-hotspot absolute z-[16] -translate-x-1/2 -translate-y-1/2"
-                        style={stagePosition(interaction)}
-                        data-space-interactive="true"
-                        data-nearby={nearby || undefined}
-                        aria-label={nearby
-                          ? bt(
-                              `${interaction.labelKo} 열기`,
-                              `Open ${interaction.labelEn}`,
-                            )
-                          : bt(
-                              `${interaction.labelKo} 근처로 이동`,
-                              `Walk to ${interaction.labelEn}`,
-                            )}
-                        onClick={() => approachInteraction(interaction)}
-                      >
-                        <span className="studio-vspace-hotspot-orb" aria-hidden>
-                          {interaction.emoji}
-                        </span>
-                        <span className="studio-vspace-hotspot-label">
-                          <strong>{bt(interaction.labelKo, interaction.labelEn)}</strong>
-                          <small>
-                            {nearby
-                              ? bt("E · 상호작용", "E · Interact")
-                              : bt("이동", "Walk")}
-                          </small>
-                        </span>
-                      </button>
-                    );
-                  })}
-
-                <div
-                  aria-hidden
-                  className="studio-vspace-plaza-mascot-new pointer-events-none absolute left-1/2 top-[44%] z-[12] -translate-x-1/2 -translate-y-1/2"
-                >
-                  <StudioChibiSprite variant={10} size={64} motion="idle" />
-                </div>
-
-                {snapshot.peers.map((peer) => {
-                  const nearby = snapshot.nearbyPeers.some(
-                    (candidate) => candidate.participant.sessionId === peer.participant.sessionId,
-                  );
-                  const reaction = snapshot.peerReactions.find(
-                    (candidate) => candidate.sessionId === peer.participant.sessionId,
-                  )?.reaction ?? null;
-                  return (
-                    <button
-                      key={peer.participant.sessionId}
-                      type="button"
-                      className="studio-vspace-peer absolute z-20 transition-[left,top] duration-150 ease-linear"
-                      style={stagePosition(peer.state)}
-                      data-space-interactive="true"
-                      data-nearby={nearby || undefined}
-                      aria-label={nearby
-                        ? bt(`${peer.participant.displayName}님과 P2P 대화 시작`, `Start P2P huddle with ${peer.participant.displayName}`)
-                        : bt(`${peer.participant.displayName}님 근처로 이동`, `Walk near ${peer.participant.displayName}`)}
-                      onClick={() => {
-                        if (nearby && connectivity.serverAvailable) {
-                          openStudioP2pHuddle({
-                            peerIds: [peer.participant.sessionId],
-                            source: "virtual-space",
-                          });
-                          return;
-                        }
-                        startFollowingPeer(peer.participant.sessionId);
-                      }}
-                    >
-                      <ChibiAvatar
-                        identity={peer.participant.sessionId}
-                        name={peer.participant.displayName}
-                        activity={peer.state.activity}
-                        facing={peer.state.facing}
-                        moving={peer.state.moving}
-                        nearby={nearby}
-                        reaction={reaction}
-                        avatarIndex={peer.state.avatarIndex}
-                      />
-                    </button>
-                  );
-                })}
-                <div
-                  className="absolute z-30 transition-[left,top] duration-100 ease-linear"
-                  style={stagePosition(snapshot.self)}
-                >
-                  <ChibiAvatar
-                    identity={fallbackIdentity}
-                    name={localName}
-                    self
-                    activity={snapshot.self.activity}
-                    facing={snapshot.self.facing}
-                    moving={moving}
-                    reaction={snapshot.selfReaction}
-                    avatarIndex={snapshot.self.avatarIndex}
-                  />
-                </div>
-                </div>
+                <StudioVirtualSpacePhaserCanvas
+                  manifest={DEFAULT_STUDIO_WORLD_MANIFEST}
+                  snapshot={snapshot}
+                  bridge={engineBridge}
+                  onLocalState={handleEngineLocalState}
+                  onInteract={activateCurrentZone}
+                  onPeerSelect={handleEnginePeerSelect}
+                  onCancelFollow={() => setFollowingPeer(null)}
+                  onPortal={handleEnginePortal}
+                />
 
                 <VirtualSpaceMiniMap
                   snapshot={snapshot}
@@ -1497,8 +1124,7 @@ function VirtualSpaceExperience({
                 <div className="absolute bottom-4 right-4 z-50 lg:hidden" data-space-interactive="true">
                   <StudioVirtualSpaceJoystick
                     onVectorChange={(vector) => {
-                      joystickRef.current = vector;
-                      if (Math.abs(vector.x) > 0.02 || Math.abs(vector.y) > 0.02) clickPathRef.current = [];
+                      engineBridge.setJoystick(vector);
                     }}
                   />
                 </div>
