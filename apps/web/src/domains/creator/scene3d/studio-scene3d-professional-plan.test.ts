@@ -55,8 +55,9 @@ describe("Studio Scene3D professional plan", () => {
     expect(plan.renderGraph.runtimePlan).toMatchObject({
       primaryRenderer: "three-webgpu",
       qualityTier: "ultra",
-      features: { tsl: true, mrt: true, ktx2: true, meshopt: true },
+      features: { tsl: true, mrt: false, ktx2: true, meshopt: true },
     });
+    expect(plan.evolution.next.map(({ id }) => id)).toContain("tsl-npr-render-graph");
     expect(plan.renderGraph.executionOrder).toEqual(expect.arrayContaining([
       "depth",
       "normal",
