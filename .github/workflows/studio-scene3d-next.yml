@@ -3,9 +3,28 @@ name: Studio Scene3D next platform
 on:
   pull_request:
     paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "patches/**"
       - "apps/web/src/domains/creator/scene3d/**"
+      - "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanelContent.tsx"
+      - "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx"
+      - "scripts/verify-studio-scene3d-specialists.mjs"
+      - "scripts/verify-scene3d-specialist-bundle*.mjs"
+      - "apps/web/src/domains/creator/bg3d/*capture*"
+      - "apps/web/src/domains/creator/bg3d/*readback*"
+      - "apps/web/src/domains/creator/bg3d/*lt-*"
+      - "apps/web/src/domains/creator/bg3d/*shot-*"
+      - "scripts/scene3d-output-ci-policy.test.mjs"
+      - ".github/workflows/ci.yml"
+      - "apps/web/src/domains/creator/bg3d/StudioBg3dCaptureBridge.tsx"
+      - "apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer*"
+      - "apps/web/tools/browser-harnesses/studio-scene3d-capture-resources.ts"
+      - "scripts/verify-studio-scene3d-capture-resources.mjs"
       - "apps/web/src/domains/creator/StudioSceneToolPopoverBody.tsx"
       - "docs/studio/studio-3d-next-platform-architecture-2026-09-10.md"
+      - "docs/studio/studio-3d-platform-evolution-2026-09-19.md"
       - ".github/workflows/studio-scene3d-next.yml"
   workflow_dispatch:
 
@@ -30,7 +49,67 @@ jobs:
         run: >-
           pnpm exec vitest run
           apps/web/src/domains/creator/scene3d/studio-scene3d-document.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-document-contract-hardening.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-asset-admission.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-platform-evolution.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-residency-policy.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-model-cache-residency.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-npr-render-graph.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-professional-plan.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-professional-integration-boundary.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-template-transaction.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-resource-pool.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-resource-owner.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-capture-budget.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgl-capture.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-three-depth.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-normal-edges.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-capture-adapter.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-render-worker-client.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-insert-worker-boundary.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-shot-artifact-pipeline.test.ts
+          scripts/scene3d-output-ci-policy.test.mjs
+          scripts/verify-scene3d-specialist-bundle.test.mjs
+      - name: Verify functional specialist runtimes and UI
+        run: pnpm run verify:studio-3d-specialists
       - name: Type-check web workspace
         run: pnpm exec tsc -p tsconfig.json --noEmit
+
+
+  scene3d-specialists-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+      SCENE3D_SPECIALISTS_GPU_LANE: swiftshader
+      SCENE3D_SPECIALISTS_PRODUCTION_WORKER: "1"
+      TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.qa/scene3d-output-quality/specialist-ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Build actual production worker and CSP headers
+        run: pnpm run build:bundle
+      - name: Verify optional engine startup isolation
+        run: node scripts/verify-scene3d-specialist-bundle.mjs
+      - name: Verify real worker, artifact, IK and splat user paths
+        run: pnpm run verify:studio-3d-specialists:browser
+      - name: Preserve specialist verification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: scene3d-specialist-browser-evidence
+          path: |
+            .qa/scene3d-output-quality/specialist-ci/*.json
+            .qa/scene3d-output-quality/specialist-ci/*.png
+            .qa/scene3d-output-quality/specialist-ci/*.glb
+          if-no-files-found: warn
+          retention-days: 7

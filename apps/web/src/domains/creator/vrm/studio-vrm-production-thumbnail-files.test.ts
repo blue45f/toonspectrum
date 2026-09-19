@@ -82,6 +82,12 @@ function readImageDimensions(bytes: Buffer): Dimensions | null {
   return readPngDimensions(bytes) ?? readJpegDimensions(bytes) ?? readWebpDimensions(bytes);
 }
 
+const MIN_PRODUCTION_THUMBNAIL_DIMENSION_BY_ID = new Map<string, number>([
+  // The 768px Kage render is ~301KB and was intentionally retired in favor of the
+  // audited bounded card asset. Keep this exception explicit so no other card can regress.
+  ["kage", 256],
+]);
+
 describe("production VRM thumbnail files", () => {
   it("ships a unique, decodable, non-trivial image for every visible catalogue card", () => {
     expect(SAMPLE_VRM_ENTRIES.length).toBeGreaterThan(0);
@@ -102,8 +108,9 @@ describe("production VRM thumbnail files", () => {
       expect(dimensions, `${entry.id}: supported PNG/JPEG/WebP header`).not.toBeNull();
       if (!dimensions) continue;
 
-      expect(dimensions.width, `${entry.id}: width`).toBeGreaterThanOrEqual(768);
-      expect(dimensions.height, `${entry.id}: height`).toBeGreaterThanOrEqual(768);
+      const minimumDimension = MIN_PRODUCTION_THUMBNAIL_DIMENSION_BY_ID.get(entry.id) ?? 768;
+      expect(dimensions.width, `${entry.id}: width`).toBeGreaterThanOrEqual(minimumDimension);
+      expect(dimensions.height, `${entry.id}: height`).toBeGreaterThanOrEqual(minimumDimension);
       expect(dimensions.width / dimensions.height, `${entry.id}: aspect`).toBeGreaterThanOrEqual(0.5);
       expect(dimensions.width / dimensions.height, `${entry.id}: aspect`).toBeLessThanOrEqual(2);
 

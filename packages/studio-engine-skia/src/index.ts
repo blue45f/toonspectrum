@@ -7,6 +7,7 @@ export {
 } from "./descriptor";
 export {
   encodeRgbaToPng,
+  renderSceneToCanvas,
   renderSceneToPixels,
   renderSceneToPng,
 } from "./render";
@@ -27,6 +28,7 @@ export type {
 } from "./graphite-probe";
 export type {
   SkiaGpuIslandBackend,
+  SkiaGpuIslandBackendOptions,
   SkiaGpuIslandRequest,
   SkiaGpuIslandResult,
 } from "./gpu-island";

@@ -274,7 +274,7 @@ describe("StudioPageListPane", () => {
     const addPage = screen.getByRole("button", { name: "새 페이지 추가" });
     expect(addPage.textContent).toContain("페이지 추가");
     fireEvent.click(addPage);
-    fireEvent.click(screen.getByRole("button", { name: "그레이드 전체" }));
+    fireEvent.click(screen.getByRole("button", { name: "색보정 전체 적용" }));
     fireEvent.click(screen.getByRole("button", { name: "배경 전체" }));
     expect(props.stableHandlers.addPage).toHaveBeenCalledOnce();
     expect(props.stableHandlers.applyGradeToAll).toHaveBeenCalledOnce();

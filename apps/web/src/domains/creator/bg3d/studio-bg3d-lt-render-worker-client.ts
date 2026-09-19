@@ -80,7 +80,7 @@ function snapshotPayload(
   settingsValue: StudioBg3dLtRenderSettings,
 ): SnapshottedPayload | null {
   try {
-    if (!exactEnumerableKeys(inputValue, ["width", "height", "rgba"], ["depth"])) return null;
+    if (!exactEnumerableKeys(inputValue, ["width", "height", "rgba"], ["depth", "normalRgba"])) return null;
     if (!exactEnumerableKeys(settingsValue, ["line", "tone"])) return null;
     const lineValue = settingsValue.line;
     const toneValue = settingsValue.tone;
@@ -127,6 +127,13 @@ function snapshotPayload(
       depthBuffer = depth.buffer as ArrayBuffer;
     }
 
+    const sourceNormal = inputValue.normalRgba;
+    let normalBuffer: ArrayBuffer | undefined;
+    if (sourceNormal !== undefined) {
+      if (!depthBuffer || !(sourceNormal instanceof Uint8Array || sourceNormal instanceof Uint8ClampedArray)
+        || !(sourceNormal.buffer instanceof ArrayBuffer) || sourceNormal.length !== pixels * 4) return null;
+      normalBuffer = new Uint8Array(sourceNormal).buffer;
+    }
     const settings: StudioBg3dLtRenderSettings = Object.freeze({
       line: Object.freeze({
         enabled: lineValue.enabled,
@@ -162,6 +169,7 @@ function snapshotPayload(
         height,
         rgbaBuffer: rgba.buffer as ArrayBuffer,
         ...(depthBuffer ? { depthBuffer } : {}),
+        ...(normalBuffer ? { normalBuffer } : {}),
       }),
       settings,
     });

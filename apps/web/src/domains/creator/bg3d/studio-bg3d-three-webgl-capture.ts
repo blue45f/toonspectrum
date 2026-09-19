@@ -4,8 +4,10 @@ import * as THREE from "three";
 
 import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
-  STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+  STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
+  assertStudioBg3dCaptureRequest,
 } from "./studio-bg3d-capture-adapter";
+import { captureStudioBg3dThreeNormals } from "./studio-bg3d-three-normal-capture";
 import { hideStudioBg3dCaptureExcludedObjects } from "./studio-bg3d-capture-exclusion";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
@@ -68,7 +70,8 @@ async function captureStudioBg3dThreeWebglColor(input: {
     depthBuffer: true,
     stencilBuffer: false,
     format: THREE.RGBAFormat,
-    type: THREE.UnsignedByteType,
+    type: renderer.extensions?.has("EXT_color_buffer_float")
+      ? THREE.HalfFloatType : THREE.UnsignedByteType,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,
@@ -90,45 +93,54 @@ async function captureStudioBg3dThreeWebglColor(input: {
   const packed = new Uint8Array(request.width * request.height * 4);
 
   try {
-    let readback: Promise<THREE.TypedArray>;
+    let readback: Promise<THREE.TypedArray> | undefined;
+    let failed = false;
+    let failure: unknown;
     try {
-      renderer.xr.enabled = false;
-      renderer.autoClear = true;
-      renderer.setClearColor(request.background.color, request.background.alpha);
-      renderer.setRenderTarget(sceneTarget);
-      renderer.clear(true, true, true);
-      // Pin the background reference and yaw sampled at transaction entry. R3F effects or input
-      // drafts that commit around this call cannot make the raster disagree with its document.
-      scene.background = suppressSceneBackground ? null : capturedSceneBackground;
-      scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
-      renderer.render(scene, camera);
+      try {
+        renderer.xr.enabled = false;
+        renderer.autoClear = true;
+        renderer.setClearColor(request.background.color, request.background.alpha);
+        renderer.setRenderTarget(sceneTarget);
+        renderer.clear(true, true, true);
+        // Pin the background reference and yaw sampled at transaction entry. R3F effects or input
+        // drafts that commit around this call cannot make the raster disagree with its document.
+        scene.background = suppressSceneBackground ? null : capturedSceneBackground;
+        scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
+        renderer.render(scene, camera);
 
-      // Rendering to a normal WebGLRenderTarget deliberately bypasses Three's final canvas output
-      // transform. The output pass first restores straight linear RGB, then recreates tone mapping
-      // and output color space before RGBA8 readback so transparency and viewport color both agree.
-      outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
-      readback = renderer.readRenderTargetPixelsAsync(
-        outputTarget,
-        0,
-        0,
-        request.width,
-        request.height,
-        packed,
-      );
-    } finally {
-      // `readRenderTargetPixelsAsync` has already submitted its copy/fence work. Never leave a
-      // live R3F frame pointed at a temporary capture target while the Promise waits for the GPU.
-      renderer.setRenderTarget(previousTarget, previousActiveCubeFace, previousActiveMipmapLevel);
-      renderer.setClearColor(previousClearColor, previousClearAlpha);
-      renderer.autoClear = previousAutoClear;
-      renderer.xr.enabled = previousXrEnabled;
-      renderer.setViewport(previousViewport);
-      renderer.setScissor(previousScissor);
-      renderer.setScissorTest(previousScissorTest);
-      scene.background = capturedSceneBackground;
-      scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
+        // Rendering to a normal WebGLRenderTarget deliberately bypasses Three's final canvas output
+        // transform. The output pass first restores straight linear RGB, then recreates tone mapping
+        // and output color space before RGBA8 readback so transparency and viewport color both agree.
+        outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
+        readback = renderer.readRenderTargetPixelsAsync(
+          outputTarget,
+          0,
+          0,
+          request.width,
+          request.height,
+          packed,
+        );
+      } finally {
+        // `readRenderTargetPixelsAsync` has already submitted its copy/fence work. Never leave a
+        // live R3F frame pointed at a temporary capture target while the Promise waits for the GPU.
+        renderer.setRenderTarget(previousTarget, previousActiveCubeFace, previousActiveMipmapLevel);
+        renderer.setClearColor(previousClearColor, previousClearAlpha);
+        renderer.autoClear = previousAutoClear;
+        renderer.xr.enabled = previousXrEnabled;
+        renderer.setViewport(previousViewport);
+        renderer.setScissor(previousScissor);
+        renderer.setScissorTest(previousScissorTest);
+        scene.background = capturedSceneBackground;
+        scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
+      }
+    } catch (error) {
+      failed = true;
+      failure = error;
     }
-    await readback;
+    const settled = await Promise.allSettled(readback ? [readback] : []);
+    if (failed) throw failure;
+    if (settled[0]?.status === "rejected") throw settled[0].reason;
     return normalizeStudioBg3dRgbaReadback({
       width: request.width,
       height: request.height,
@@ -157,9 +169,11 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
   }
 
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
+    assertStudioBg3dCaptureRequest(request);
     const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
     let colorReadback: Promise<Uint8ClampedArray>;
     let depthReadback: Promise<Float32Array> | undefined;
+    let normalReadback: Promise<Uint8ClampedArray> | undefined;
     try {
       colorReadback = captureStudioBg3dThreeWebglColor({ camera, renderer, request, scene });
       if (request.includeDepth) {
@@ -171,21 +185,30 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
           height: request.height,
         });
       }
+      if (request.includeNormals) {
+        normalReadback = captureStudioBg3dThreeNormals({ renderer, scene, camera,
+          width: request.width, height: request.height });
+      }
     } finally {
-      // Both GPU passes submit their readback work before their first await and restore renderer
+      // All GPU passes submit their readback work before their first await and restore renderer
       // state themselves. Keep viewport-only objects hidden through both submissions, then restore
       // their exact original visibility while the GPU fence(s) are pending.
       restoreCaptureExcludedObjects();
     }
-    const [rgba, depth] = await Promise.all([
-      colorReadback!,
-      depthReadback ?? Promise.resolve(undefined),
-    ]);
+    // Drain every submitted copy before propagating failure; never abandon a GPU fence.
+    const results = await Promise.allSettled([colorReadback!, depthReadback, normalReadback]);
+    const rejected = results.find((result) => result.status === "rejected");
+    if (rejected?.status === "rejected") throw rejected.reason;
+    const rgba = results[0].status === "fulfilled" ? results[0].value : undefined;
+    const depth = results[1].status === "fulfilled" ? results[1].value : undefined;
+    const normalRgba = results[2].status === "fulfilled" ? results[2].value : undefined;
+    if (!rgba) throw new Error("Missing WebGL color capture.");
     return {
       width: request.width,
       height: request.height,
       rgba,
       ...(depth ? { depth } : {}),
+      ...(normalRgba ? { normalRgba } : {}),
     };
   }
 
@@ -193,7 +216,10 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
     backend: "three-webgl" as const,
     engineId: "three" as const,
     engineVersion: String(THREE.REVISION).toLowerCase(),
-    implementationRevision: STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+    implementationRevision: renderer.extensions?.has("EXT_color_buffer_float")
+      ? "studio-three-webgl-capture-adapter-v3-hdr-normals"
+      : "studio-three-webgl-capture-adapter-v3-ldr-normals",
+    normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
     graphicsApi: "webgl2" as const,
     profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
     getSourceSize: () => ({

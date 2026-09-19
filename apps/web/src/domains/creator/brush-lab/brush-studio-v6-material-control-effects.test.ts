@@ -8,9 +8,8 @@ const ranges: Partial<Record<keyof BrushStudioV6Tuning, readonly [number | strin
   surfaceTooth: [0, 1], friction: [0, 1], absorbency: [0, 1], granulation: [0, 1],
   edgeDarkening: [0, 1], pickup: [0, 1], reservoir: [0, 1], wetness: [0.1, 1],
   diffusion: [0, 1], advection: [0, 1], evaporation: [0, 1], viscosity: [0, 1], plasticity: [0, 1], gravity: [-1, 1],
-  gloss: [0, 1],
   bristleStrands: [8, 128], particleCount: [90, 2700], reactionRate: [0, 1],
-  patternDensity: [0, 1], patternScale: [0.3, 3], patternJitter: [0, 1], relief: [0, 1],
+  patternDensity: [0, 1], patternScale: [0.3, 3], patternJitter: [0, 1], relief: [0, 1], gloss: [0, 1],
 };
 
 function exportedAppearance(program: BrushStudioV6Program): string {

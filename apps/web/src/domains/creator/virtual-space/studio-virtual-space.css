@@ -220,3 +220,218 @@
 @media(max-width:1023px){
   .studio-vspace-phaser-canvas{border-radius:inherit}
 }
+
+.studio-vspace-engine-mount{position:absolute;inset:0;overflow:hidden}
+.studio-vspace-engine-message{position:absolute;inset:0;z-index:5;display:grid;place-content:center;gap:1rem;padding:2rem;background:#171b24;color:#f4f5fb;text-align:center;font-size:.875rem}
+.studio-vspace-engine-message button{justify-self:center;border:1px solid #a08cff;border-radius:.75rem;padding:.65rem 1.2rem;background:#49368f;color:white;font-weight:700;cursor:pointer}
+.studio-vspace-phaser-canvas canvas:focus-visible{outline:3px solid #b79fff;outline-offset:-4px}
+
+/* Virtual Studio world authoring */
+.studio-vspace-authoring{
+  margin-top:1rem;
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--color-accent) 24%,var(--color-line));
+  border-radius:1.25rem;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--color-panel) 96%,#211a35),color-mix(in srgb,var(--color-card) 97%,#121823));
+  box-shadow:0 18px 45px rgb(0 0 0/.22),inset 0 1px rgb(255 255 255/.06);
+}
+.studio-vspace-authoring-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:1rem;
+  padding:1rem 1.1rem;
+  border-bottom:1px solid var(--color-line);
+}
+.studio-vspace-authoring-head p{
+  margin:0 0 .18rem;
+  color:var(--color-accent);
+  font-size:.58rem;
+  font-weight:900;
+  letter-spacing:.16em;
+}
+.studio-vspace-authoring-head h2{margin:0;color:var(--color-fg);font-size:.95rem;font-weight:900}
+.studio-vspace-authoring-head span{display:block;margin-top:.28rem;color:var(--color-fg-3);font-size:.62rem;font-weight:700}
+.studio-vspace-authoring-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.4rem}
+.studio-vspace-authoring-actions button,
+.studio-vspace-authoring-list-head button,
+.studio-vspace-authoring-list-actions button{
+  display:inline-flex;
+  min-height:2.15rem;
+  align-items:center;
+  justify-content:center;
+  gap:.35rem;
+  border:1px solid var(--color-line);
+  border-radius:.65rem;
+  padding:.35rem .6rem;
+  background:var(--color-card);
+  color:var(--color-fg-2);
+  font-size:.62rem;
+  font-weight:800;
+  transition:border-color .15s,background .15s,color .15s;
+}
+.studio-vspace-authoring-actions button:hover,
+.studio-vspace-authoring-list-head button:hover,
+.studio-vspace-authoring-list-actions button:hover{
+  border-color:color-mix(in srgb,var(--color-accent) 55%,var(--color-line));
+  background:var(--color-raised);
+  color:var(--color-accent);
+}
+.studio-vspace-authoring-errors{
+  margin:.75rem 1rem 0;
+  border:1px solid color-mix(in srgb,var(--color-danger) 45%,var(--color-line));
+  border-radius:.8rem;
+  padding:.65rem .8rem;
+  background:color-mix(in srgb,var(--color-danger) 8%,var(--color-card));
+  color:var(--color-danger);
+  font-size:.64rem;
+}
+.studio-vspace-authoring-errors strong{font-weight:900}
+.studio-vspace-authoring-errors ul{margin:.35rem 0 0;padding-left:1rem;line-height:1.55}
+.studio-vspace-authoring-message{margin:.65rem 1rem 0;color:var(--color-good);font-size:.65rem;font-weight:800}
+.studio-vspace-authoring-body{
+  display:grid;
+  grid-template-columns:8rem minmax(10rem,14rem) minmax(0,1fr);
+  min-height:22rem;
+}
+.studio-vspace-authoring-sections{
+  display:flex;
+  flex-direction:column;
+  gap:.3rem;
+  padding:.75rem;
+  border-right:1px solid var(--color-line);
+  background:rgb(0 0 0/.09);
+}
+.studio-vspace-authoring-sections button{
+  display:flex;
+  min-height:2.15rem;
+  align-items:center;
+  justify-content:space-between;
+  gap:.5rem;
+  border:1px solid transparent;
+  border-radius:.65rem;
+  padding:.35rem .55rem;
+  color:var(--color-fg-3);
+  font-size:.62rem;
+  font-weight:850;
+  text-align:left;
+}
+.studio-vspace-authoring-sections button b{
+  display:grid;
+  min-width:1.35rem;
+  height:1.35rem;
+  place-items:center;
+  border-radius:999px;
+  background:var(--color-card);
+  color:var(--color-fg-3);
+  font-size:.55rem;
+}
+.studio-vspace-authoring-sections button[data-active=true]{
+  border-color:color-mix(in srgb,var(--color-accent) 38%,transparent);
+  background:var(--color-accent-soft);
+  color:var(--color-accent);
+}
+.studio-vspace-authoring-list{
+  min-width:0;
+  border-right:1px solid var(--color-line);
+}
+.studio-vspace-authoring-list-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.5rem;
+  padding:.7rem;
+  border-bottom:1px solid var(--color-line);
+}
+.studio-vspace-authoring-list-head strong{color:var(--color-fg-2);font-size:.65rem;text-transform:uppercase;letter-spacing:.08em}
+.studio-vspace-authoring-scroll{
+  max-height:18rem;
+  overflow:auto;
+  padding:.5rem;
+}
+.studio-vspace-authoring-scroll>button{
+  display:flex;
+  width:100%;
+  min-height:2.2rem;
+  align-items:center;
+  justify-content:space-between;
+  gap:.5rem;
+  border:1px solid transparent;
+  border-radius:.6rem;
+  padding:.4rem .55rem;
+  color:var(--color-fg-3);
+  font-size:.64rem;
+  text-align:left;
+}
+.studio-vspace-authoring-scroll>button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-vspace-authoring-scroll>button small{color:var(--color-fg-3);font-size:.52rem}
+.studio-vspace-authoring-scroll>button[data-active=true]{
+  border-color:color-mix(in srgb,var(--color-accent) 38%,transparent);
+  background:color-mix(in srgb,var(--color-accent) 10%,var(--color-card));
+  color:var(--color-fg);
+}
+.studio-vspace-authoring-scroll>p{padding:.9rem;color:var(--color-fg-3);font-size:.62rem;text-align:center}
+.studio-vspace-authoring-list-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.4rem;
+  padding:.6rem;
+  border-top:1px solid var(--color-line);
+}
+.studio-vspace-authoring-list-actions .is-danger:hover{
+  border-color:color-mix(in srgb,var(--color-danger) 55%,var(--color-line));
+  color:var(--color-danger);
+}
+.studio-vspace-authoring-editor{
+  display:grid;
+  align-content:start;
+  gap:.65rem;
+  min-width:0;
+  padding:.85rem;
+}
+.studio-vspace-authoring input[type=number]::-webkit-inner-spin-button{opacity:.5}
+.studio-vspace-authoring input:focus,
+.studio-vspace-authoring select:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--color-accent) 18%,transparent)}
+@media(max-width:1023px){
+  .studio-vspace-authoring-head{flex-direction:column}
+  .studio-vspace-authoring-actions{justify-content:flex-start}
+  .studio-vspace-authoring-body{grid-template-columns:1fr}
+  .studio-vspace-authoring-sections{
+    flex-direction:row;
+    overflow-x:auto;
+    border-right:0;
+    border-bottom:1px solid var(--color-line);
+  }
+  .studio-vspace-authoring-sections button{flex:0 0 auto;min-width:7rem}
+  .studio-vspace-authoring-list{border-right:0;border-bottom:1px solid var(--color-line)}
+  .studio-vspace-authoring-scroll{max-height:12rem}
+}
+@media(max-width:560px){
+  .studio-vspace-authoring{border-radius:1rem}
+  .studio-vspace-authoring-head{padding:.8rem}
+  .studio-vspace-authoring-actions{display:grid;width:100%;grid-template-columns:1fr 1fr}
+  .studio-vspace-authoring-actions button{width:100%}
+  .studio-vspace-authoring-editor{padding:.7rem}
+}
+
+/* Authoring mode overlays the world deliberately so editor controls never sit behind the game/offline banner. */
+.vs2-world-wrap--live>.studio-vspace-authoring{
+  position:absolute;
+  z-index:120;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  max-height:56%;
+  margin:0;
+  overflow:auto;
+  background:color-mix(in srgb,var(--color-panel) 96%,transparent);
+  backdrop-filter:blur(18px);
+}
+@media(max-width:900px){
+  .vs2-world-wrap--live>.studio-vspace-authoring{
+    left:8px;
+    right:8px;
+    bottom:8px;
+    max-height:68%;
+  }
+}

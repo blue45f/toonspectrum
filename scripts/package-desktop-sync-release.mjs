@@ -95,13 +95,23 @@ async function writeJson(filePath, value) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+/** Node cannot spawn a Windows .cmd shim directly without invoking cmd.exe. */
+export function resolveReleaseCommand(command, args, platform = process.platform, env = process.env) {
+  if (platform === "win32" && /\.(?:cmd|bat)$/iu.test(command)) {
+    return { command: env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", command, ...args] };
+  }
+  return { command, args };
+}
+
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const invocation = resolveReleaseCommand(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     cwd: options.cwd ?? ROOT,
     encoding: "utf8",
     env: { ...process.env, ...options.env },
     stdio: options.capture ? "pipe" : "inherit",
   });
+  if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(`${command} failed with exit code ${result.status ?? "unknown"}`);
   }
@@ -305,7 +315,15 @@ function parseSigningEvidence(value, metadata) {
       || typeof artifact.kind !== "string"
       || typeof artifact.verified !== "boolean"
     ) throw new TypeError("signing evidence artifact is invalid");
+    for (const field of ["path", "targetPath"]) {
+      const path = artifact[field];
+      if (typeof path !== "string" || !path || path.includes("\\") || path.startsWith("/") || /^[A-Za-z]:/u.test(path)
+        || path.split("/").some((part) => !part || part === "." || part === "..") || [...path].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
+        throw new TypeError(`unsafe bundle path: ${String(path)}`);
+      }
+    }
   }
+  if (value.status === "signed" && value.artifacts.length === 0) throw new TypeError("signed evidence contains no artifacts");
   if (value.status === "signed" && value.artifacts.some((artifact) => artifact.verified !== true)) {
     throw new TypeError("signed evidence contains an unverified artifact");
   }

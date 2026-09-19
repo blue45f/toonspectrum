@@ -15,11 +15,11 @@
   "artifacts": [
     {
       "path": "mypaint-wasm.mjs",
-      "sha256": "c9328dfdf5e793783ace902f446816bf4c5f579a61db0eddfc59043654cc7f2e"
+      "sha256": "a6fbdeca5ae15671c47f8c8d65fae598f7b9275e1f8387bbc9dd652a5a7a2a8a"
     },
     {
       "path": "mypaint-wasm.wasm",
-      "sha256": "811e5d89fd740dcb18f75ed5b631a405e05d84b3efb9a2f577f25f99301f757b"
+      "sha256": "1d6f2f4ab8a69856359efab8666e319099bc2e004eb6272df015384139daf6b3"
     }
   ]
 }

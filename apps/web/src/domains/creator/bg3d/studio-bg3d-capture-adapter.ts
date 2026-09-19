@@ -5,7 +5,7 @@
  * contract so WebGL and a future WebGPU adapter must produce the same top-down RGBA/depth raster.
  */
 
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
+import { assertStudioBg3dCaptureBudget } from "./studio-bg3d-capture-budget";
 
 export type StudioBg3dCaptureEngineId =
   | "three"
@@ -36,6 +36,9 @@ export const STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1 =
 export const STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1 =
   "studio-three-webgl-capture-adapter-v1";
 
+/** Optional additive surface-normal output; RGB encodes view-space normals, alpha is coverage. */
+export const STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1 = "studio-view-normal-rgba8-topdown-v1";
+
 export interface StudioBg3dCaptureSize {
   readonly width: number;
   readonly height: number;
@@ -47,6 +50,8 @@ export interface StudioBg3dCaptureRequest extends StudioBg3dCaptureSize {
     readonly alpha: number;
   };
   readonly includeDepth: boolean;
+  /** Requires depth and an adapter with the normalProfile capability. */
+  readonly includeNormals?: boolean;
 }
 
 export interface StudioBg3dCapturedRaster extends StudioBg3dCaptureSize {
@@ -54,6 +59,8 @@ export interface StudioBg3dCapturedRaster extends StudioBg3dCaptureSize {
   readonly rgba: Uint8Array | Uint8ClampedArray;
   /** Fresh top-down normalized depth samples. Required when includeDepth is true. */
   readonly depth?: Float32Array;
+  /** View-space interpolated vertex normals, [-1,1] mapped to RGB8; alpha=0 means no surface. */
+  readonly normalRgba?: Uint8Array | Uint8ClampedArray;
 }
 
 export interface StudioBg3dCaptureAdapter {
@@ -63,8 +70,11 @@ export interface StudioBg3dCaptureAdapter {
   readonly implementationRevision: string;
   readonly graphicsApi: StudioBg3dCaptureGraphicsApi;
   readonly profileId: typeof STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1;
+  readonly normalProfile?: typeof STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1;
   getSourceSize(): StudioBg3dCaptureSize;
   capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster>;
+  /** Release cached capture resources; active GPU work retains its lease until settlement. */
+  dispose?(): void;
 }
 
 export interface StudioBg3dCaptureOperationOptions {
@@ -177,9 +187,7 @@ function assertSize(size: unknown, label: string, enforcePixelBudget: boolean): 
   }
   const pixels = width! * height!;
   if (!Number.isSafeInteger(pixels)) throw new RangeError(`${label} pixel count is unsafe.`);
-  if (enforcePixelBudget && pixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS) {
-    throw new RangeError(`${label} exceeds the raster pixel budget.`);
-  }
+  if (enforcePixelBudget) assertStudioBg3dCaptureBudget({ width: width!, height: height!, includeDepth: false });
 }
 
 function assertAdapter(adapter: unknown): asserts adapter is StudioBg3dCaptureAdapter {
@@ -263,12 +271,20 @@ export async function acquireStudioBg3dCaptureAdapterAfterViewTransition(
   return null;
 }
 
-function assertRequest(request: unknown): asserts request is StudioBg3dCaptureRequest {
+export function assertStudioBg3dCaptureRequest(request: unknown): asserts request is StudioBg3dCaptureRequest {
   assertSize(request, "3D capture request", true);
   const candidate = request as Partial<StudioBg3dCaptureRequest>;
   if (typeof candidate.includeDepth !== "boolean") {
     throw new TypeError("3D capture includeDepth must be a boolean.");
   }
+  if (candidate.includeNormals !== undefined && typeof candidate.includeNormals !== "boolean") {
+    throw new TypeError("3D capture includeNormals must be a boolean.");
+  }
+  if (candidate.includeNormals && !candidate.includeDepth) {
+    throw new TypeError("3D surface normals require the matching depth raster.");
+  }
+  assertStudioBg3dCaptureBudget({ width: request.width, height: request.height,
+    includeDepth: candidate.includeDepth });
   if (!candidate.background || typeof candidate.background !== "object") {
     throw new TypeError("3D capture background must be an object.");
   }
@@ -307,6 +323,14 @@ function assertCapturedRaster(
   if (!request.includeDepth && candidate.depth !== undefined) {
     throw new TypeError("3D captured raster returned unrequested depth.");
   }
+  if (request.includeNormals) {
+    if (!(candidate.normalRgba instanceof Uint8Array || candidate.normalRgba instanceof Uint8ClampedArray)
+      || candidate.normalRgba.length !== pixels * 4) {
+      throw new TypeError("3D capture must return the requested packed normal raster.");
+    }
+  } else if (candidate.normalRgba !== undefined) {
+    throw new TypeError("3D capture returned unrequested surface normals.");
+  }
   if (candidate.depth) {
     if (candidate.depth.length !== pixels) {
       throw new RangeError("3D captured raster depth length must equal width * height.");
@@ -332,11 +356,15 @@ export async function captureStudioBg3dRaster(
   options: StudioBg3dCaptureOperationOptions = {},
 ): Promise<StudioBg3dCapturedRaster> {
   assertAdapter(adapter);
-  assertRequest(request);
+  assertStudioBg3dCaptureRequest(request);
+  if (request.includeNormals && adapter.normalProfile !== STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1) {
+    throw new TypeError("3D capture adapter does not support the requested normal profile.");
+  }
   const requestSnapshot = Object.freeze({
     width: request.width,
     height: request.height,
     includeDepth: request.includeDepth,
+    ...(request.includeNormals !== undefined ? { includeNormals: request.includeNormals } : {}),
     background: Object.freeze({ ...request.background }),
   });
   throwIfCaptureOperationAborted(options.signal);
@@ -353,5 +381,6 @@ export async function captureStudioBg3dRaster(
     height: captured.height,
     rgba: new Uint8ClampedArray(captured.rgba),
     ...(captured.depth ? { depth: new Float32Array(captured.depth) } : {}),
+    ...(captured.normalRgba ? { normalRgba: new Uint8ClampedArray(captured.normalRgba) } : {}),
   });
 }

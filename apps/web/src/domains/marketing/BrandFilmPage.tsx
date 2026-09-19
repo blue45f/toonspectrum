@@ -1,5 +1,5 @@
 import { translateCurrentStaticSourceText, defineBilingualText, translateBilingualValueForActiveLocale, translateParallelBilingualCopy, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { SITE_URL } from "@toonspectrum/core";
+import { SITE_URL } from "@toonspectrum/core/business";
 import {
   ArrowLeft,
   ArrowRight,

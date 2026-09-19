@@ -1,3 +1,5 @@
+import { StudioNativeBrushDocumentInspectorMount } from "./brush/StudioNativeBrushDocumentInspectorMount";
+import type { StudioNativeBrushDocumentPrepare } from "./brush/studio-native-brush-document-commit";
 import { isPressureWidthBrush, type NodeEditTool } from "./studio-node-edit";
 import {
   StudioHokusaiNaturalMediaInspectorMount,
@@ -32,6 +34,7 @@ interface StudioInspectorFreehandPathControlsProps {
   readonly onRefine: (operation: "simplify" | "smooth") => void;
   readonly onCancelRefinement: () => void;
   readonly onReplace: StudioHokusaiNaturalMediaReplaceHandler;
+  readonly onNativePrepare?: StudioNativeBrushDocumentPrepare;
 }
 
 /**
@@ -58,6 +61,7 @@ export function StudioInspectorFreehandPathControls({
   onRefine,
   onCancelRefinement,
   onReplace,
+  onNativePrepare,
 }: StudioInspectorFreehandPathControlsProps): ReactElement {
   return (
     <>
@@ -89,6 +93,12 @@ export function StudioInspectorFreehandPathControls({
           masterEditMode={masterEditMode}
           locks={locks}
           onReplace={onReplace}
+        />
+        <StudioNativeBrushDocumentInspectorMount
+          selected={selected} documentWidth={documentWidth} documentHeight={documentHeight}
+          pageId={pageId} masterEditMode={masterEditMode}
+          disabled={locks.collaboration || locks.surfaceReview || locks.selectedContent}
+          onPrepare={onNativePrepare}
         />
       </div>
     </>

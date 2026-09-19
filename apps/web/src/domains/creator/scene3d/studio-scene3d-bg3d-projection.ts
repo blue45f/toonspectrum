@@ -265,8 +265,8 @@ export function projectStudioBg3dDocumentToScene3d(input: {
       antialiasing: source.render.antialias ? "msaa" : "none",
       shadows: Object.freeze({
         enabled: source.render.shadows,
-        mode: "csm",
-        cascades: 3,
+        mode: "standard",
+        cascades: 1,
         mapSize: projectShadowMapSize(source.quality.desktop.shadowMapSize),
       }),
       effects: Object.freeze({

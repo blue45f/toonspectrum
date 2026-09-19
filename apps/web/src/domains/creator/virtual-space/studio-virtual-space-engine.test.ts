@@ -7,8 +7,14 @@ import {
 } from "./studio-virtual-space-motion";
 import {
   DEFAULT_STUDIO_WORLD_MANIFEST,
+  studioWorldInteractions,
   validateStudioWorldManifest,
 } from "./studio-virtual-space-world-manifest";
+import {
+  findStudioWorldPath,
+  studioWorldCanOccupy,
+} from "./studio-virtual-space-world-pathfinding";
+import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 import {
   studioWorldManifestFromTiled,
   type StudioTiledMapLike,
@@ -128,3 +134,130 @@ describe("Virtual Studio game-engine foundation", () => {
     expect(bridge.getJoystick()).toEqual({ x: 0, y: 0 });
   });
 });
+  it("preserves the approved master-art aspect ratio", () => {
+    expect(
+      DEFAULT_STUDIO_WORLD_MANIFEST.width / DEFAULT_STUDIO_WORLD_MANIFEST.height,
+    ).toBeCloseTo(700 / 656, 2);
+  });
+
+  it("keeps every default production interaction reachable", () => {
+    const spawn = DEFAULT_STUDIO_WORLD_MANIFEST.spawns.find((candidate) => candidate.id === "main")
+      ?? DEFAULT_STUDIO_WORLD_MANIFEST.spawns[0]!;
+    for (const interaction of studioWorldInteractions(DEFAULT_STUDIO_WORLD_MANIFEST)) {
+      const path = findStudioWorldPath(
+        DEFAULT_STUDIO_WORLD_MANIFEST,
+        spawn.point,
+        interaction.point,
+      );
+      expect(path.length, interaction.id).toBeGreaterThan(0);
+      expect(
+        path.every((point) => studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, point)),
+        interaction.id,
+      ).toBe(true);
+    }
+  });
+
+  it("converts new rooms, portals and NPCs from Tiled data", () => {
+    const tiled: StudioTiledMapLike = {
+      width: 100,
+      height: 80,
+      tilewidth: 10,
+      tileheight: 10,
+      layers: [
+        {
+          type: "objectgroup",
+          name: "rooms",
+          objects: [{
+            id: 1,
+            name: "sound-booth",
+            x: 100,
+            y: 100,
+            width: 240,
+            height: 180,
+            properties: [
+              { name: "roomId", value: "sound-booth" },
+              { name: "labelKo", value: "사운드 부스" },
+              { name: "labelEn", value: "Sound Booth" },
+              { name: "action", value: "live" },
+            ],
+          }],
+        },
+        {
+          type: "objectgroup",
+          name: "portals",
+          objects: [{
+            id: 2,
+            name: "booth-exit",
+            x: 220,
+            y: 270,
+            properties: [
+              { name: "radius", value: 40 },
+              { name: "targetRoomId", value: "sound-booth" },
+              { name: "targetX", value: 180 },
+              { name: "targetY", value: 220 },
+            ],
+          }],
+        },
+        {
+          type: "objectgroup",
+          name: "npcs",
+          objects: [{
+            id: 3,
+            name: "assistant-npc",
+            x: 180,
+            y: 210,
+            properties: [
+              { name: "skinKey", value: "silver" },
+              { name: "roomId", value: "sound-booth" },
+              { name: "behavior", value: "patrol" },
+              { name: "patrol", value: "180,210;260,210;260,240" },
+            ],
+          }],
+        },
+      ],
+    };
+    const manifest = studioWorldManifestFromTiled(tiled, DEFAULT_STUDIO_WORLD_MANIFEST);
+    expect(manifest.rooms[0]).toMatchObject({
+      id: "sound-booth",
+      labelEn: "Sound Booth",
+      action: "live",
+    });
+    expect(manifest.portals[0]).toMatchObject({
+      id: "booth-exit",
+      targetRoomId: "sound-booth",
+      targetPoint: { x: 180, y: 220 },
+    });
+    expect(manifest.npcs[0]).toMatchObject({
+      id: "assistant-npc",
+      skinKey: "silver",
+      behavior: "patrol",
+    });
+    expect(manifest.npcs[0]?.patrol).toHaveLength(3);
+  });
+
+  it("loads a valid Tiled world and falls back when the file is unavailable", async () => {
+    const tiled: StudioTiledMapLike = {
+      width: 425,
+      height: 399,
+      tilewidth: 2,
+      tileheight: 2,
+    };
+    const loaded = await loadStudioVirtualSpaceWorldManifest(
+      "/world.json",
+      async () => ({
+        ok: true,
+        json: async () => tiled,
+      }),
+    );
+    expect(loaded.width).toBe(850);
+    expect(loaded.height).toBe(798);
+
+    const fallback = await loadStudioVirtualSpaceWorldManifest(
+      "/missing.json",
+      async () => ({
+        ok: false,
+        json: async () => ({}),
+      }),
+    );
+    expect(fallback).toBe(DEFAULT_STUDIO_WORLD_MANIFEST);
+  });

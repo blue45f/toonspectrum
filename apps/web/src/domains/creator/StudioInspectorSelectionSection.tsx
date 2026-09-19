@@ -104,6 +104,7 @@ export function StudioInspectorSelectionSection({
     removeSelected,
     reorder,
     replaceDrawWithHokusaiNaturalMedia,
+    prepareNativeBrushDocumentConversion,
     selected,
     selectedBg3dEditSource,
     selectedBubbleTailGeometry,
@@ -205,6 +206,7 @@ export function StudioInspectorSelectionSection({
                   applyPaperVectorRefinement={applyPaperVectorRefinement}
                   cancelPaperVectorRefinement={cancelPaperVectorRefinement}
                   replaceDrawWithHokusaiNaturalMedia={replaceDrawWithHokusaiNaturalMedia}
+                  prepareNativeBrushDocumentConversion={prepareNativeBrushDocumentConversion}
                   recentColors={recentColors}
                   documentColors={inspectorDocumentColors}
                   ensureRecentColorsLoaded={ensureRecentColorsLoaded}

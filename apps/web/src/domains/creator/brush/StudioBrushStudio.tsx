@@ -18,6 +18,8 @@ import {
   X,
 } from "lucide-react";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useId,
   useLayoutEffect,
@@ -124,6 +126,8 @@ import type {
 
 import { SwitchIndicator } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
+
+const StudioNativeBrushEngineProbe = lazy(() => import("./StudioNativeBrushEngineProbe"));
 
 type BrushStudioCategory =
   | "presets"
@@ -1363,6 +1367,9 @@ export function StudioBrushStudio({
   ) : category === "engines" ? (
     <div className="space-y-3">
       <StudioBrushComposerIntro />
+      <Suspense fallback={<p role="status">엔진 시험 도구를 불러오는 중…</p>}>
+        <StudioNativeBrushEngineProbe color={color} strokeWidth={strokeWidth} />
+      </Suspense>
       <StudioBrushEngineStackPanel
         brushId={brushId}
         settings={settings}

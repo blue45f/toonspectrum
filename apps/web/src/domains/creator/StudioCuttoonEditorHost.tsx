@@ -264,7 +264,7 @@ import {
 import { createStudioAutosaveBusyRetry } from "./studio-autosave-busy-retry";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
-import { StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialog";
+import { StudioFormalSaveDialogMount as StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialogMount";
 import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
 import {
   chooseStudioProjectPackageSaveTarget,
@@ -272,7 +272,6 @@ import {
   writeStudioProjectPackageToTarget,
   type StudioProjectPackageSaveTarget,
 } from "./save-first/studio-project-package";
-import { buildStudioProjectPackageWithWorkspace } from "./save-first/studio-project-package-with-workspace";
 import {
   ensureStudioSaveProfile,
   markStudioStorageBindingSynced,
@@ -549,6 +548,7 @@ import { initialGpuLiveSourceJournalMatchesPlan } from "./canvas/studio-hokusai-
 import { StudioHokusaiLiveOverlayRenderer } from "./render/studio-hokusai-live-brush-overlay";
 import { StudioHokusaiLiveBrushProvider } from "./render/studio-hokusai-live-brush-runtime";
 import { planStudioHokusaiNaturalMediaReplacement } from "./render/studio-hokusai-natural-media-replacement";
+import { createNativeBrushDocumentEditorPreparer } from "./brush/studio-native-brush-editor-bridge";
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
@@ -24186,6 +24186,7 @@ No text, logo, watermark, or copyrighted character.`;
           window,
         );
       formalSaveTargetRef.current = target;
+      const { buildStudioProjectPackageWithWorkspace } = await import("./save-first/studio-project-package-with-workspace");
       if (pendingStrokeCommitsRef.current) {
         flushSync(() => flushPendingStrokeCommitsRef.current());
       }
@@ -27202,6 +27203,13 @@ function clearSelectionForEdit() {
       }
       return addRenderedImage(src, width, height, undefined, false, { name });
     },
+    prepareNativeBrushDocumentConversion: createNativeBrushDocumentEditorPreparer({
+      captureStudioMutationTicket, canApplyStudioMutation, editorMountedRef,
+      documentSaveInFlightRef, collaborationAccessRef, activeSurfaceReviewLockedRef,
+      drawingRef, pendingStrokeCommitsRef, pagesHistoryRef, pagesHiRef,
+      currentPageIdRef, masterEditModeRef, documentWidth: CANVAS_W,
+      commit, setSelectedId, announceDrawingShortcut,
+    }),
     replaceDrawWithHokusaiNaturalMedia: (
       result,
       targetPageId,

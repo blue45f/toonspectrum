@@ -155,10 +155,10 @@ export function evaluateStudioScene3dAssetAdmission(
     blockers.push("최대 텍스처 크기 측정값이 유효하지 않습니다.");
   }
   if (technical.textureCount > 0 && technical.textureCompression !== "ktx2") {
-    warnings.push("GPU texture가 KTX2/Basis production 경로를 사용하지 않습니다.");
+    blockers.push("GPU texture가 KTX2/Basis production 경로를 사용하지 않습니다.");
   }
   if (asset.kind !== "gaussian-splat" && technical.geometryCompression === "none") {
-    warnings.push("meshoptimizer/Draco geometry compression receipt가 없습니다.");
+    blockers.push("meshoptimizer/Draco geometry compression receipt가 없습니다.");
   }
   if (technical.maxTextureDimension > 4096) {
     warnings.push("4K를 넘는 텍스처는 mobile/중간 품질 derivative가 필요합니다.");

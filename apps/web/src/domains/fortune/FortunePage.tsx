@@ -1,5 +1,5 @@
 import { FortuneObservatory } from "./FortuneObservatory";
-import { getCharacters } from "@toonspectrum/core";
+import { getCharacters } from "@toonspectrum/core/fortune";
 import {
   Sparkles,
   User,

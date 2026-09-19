@@ -9,8 +9,8 @@ vi.mock("../studio-cc0-asset-delivery", async (importOriginal) => ({
   ...await importOriginal<typeof import("../studio-cc0-asset-delivery")>(),
   createStudioCc0ModelFile: vi.fn(),
 }));
-const modelId = "polyhaven-painted-wooden-chair-01";
-beforeEach(() => vi.mocked(createStudioCc0ModelFile).mockReset());
+const modelId = "polyhaven-large-iron-gate";
+beforeEach(() => { vi.mocked(createStudioCc0ModelFile).mockReset(); });
 afterEach(cleanup);
 
 function deferred<T>() {
