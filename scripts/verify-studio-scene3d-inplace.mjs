@@ -1,3 +1,4 @@
+import { verifyScene3dReview } from "./lib/scene3d-review-browser-proof.mjs";
 import {
   mkdirSync,
   existsSync,
@@ -162,6 +163,11 @@ try {
   await page
     .getByRole("button", { name: `${artifactName} 선택 객체에 적용`, exact: true })
     .waitFor({ timeout: 120000 });
+  await page.getByRole("button", { name: /^미리보기$|^Preview$/ }).nth(2).click();
+  await page.locator(`canvas[data-review-ready="true"][data-review-artifact="${artifactName}"]`).waitFor({ timeout: 60000 });
+  const unchangedBeforeReview = await page.evaluate(() => window.__scene3dInplace.assertUnchanged());
+  const comparison = await verifyScene3dReview(page, output, "inplace-comparison");
+  const unchangedAfterReview = await page.evaluate(() => window.__scene3dInplace.assertUnchanged());
   await page
     .getByRole("button", { name: `${artifactName} 선택 객체에 적용`, exact: true })
     .click();
@@ -188,6 +194,9 @@ try {
     browserVersion: browser.version(),
     builtProcessingWorker: worker,
     productionWorkerCspApplied: Boolean(csp),
+    comparison,
+    unchangedBeforeReview,
+    unchangedAfterReview,
     applied,
     reopened,
     errors,

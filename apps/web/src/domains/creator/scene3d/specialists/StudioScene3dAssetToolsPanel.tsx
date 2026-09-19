@@ -1,3 +1,4 @@
+import type { ArtifactReviewSource } from "./artifact-review-contract";
 import { StudioScene3dJobStatus } from "./StudioScene3dJobStatus";
 import type { SpecialistJobProgress } from "./specialist-job-progress";
 import { SCENE3D_INPLACE_OPERATIONS } from "../integration/scene3d-inplace-contract";
@@ -39,6 +40,7 @@ export function StudioScene3dAssetToolsPanel({
   const [jobProgress, setJobProgress] = useState<SpecialistJobProgress | null>(null);
   const [activity, setActivity] = useState<"read-source" | "process" | "apply">("process");
   const [result, setResult] = useState<SpecialistResult | null>(null);
+  const [reviewSource, setReviewSource] = useState<ArtifactReviewSource | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<readonly string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -93,6 +95,7 @@ export function StudioScene3dAssetToolsPanel({
     active.current?.abort();
     setBusy(true);
     setResult(null);
+    setReviewSource(undefined);
     resultSource.current = null; setAppliedName(null);
     setError(null);
     if (second) {
@@ -133,7 +136,7 @@ export function StudioScene3dAssetToolsPanel({
     if (!inplaceTools || busy || disabled) return;
     setActivity("read-source");
     const ticket = ++generation.current; const controller = new AbortController();
-    active.current?.abort(); active.current = controller; setBusy(true); setError(null); setResult(null); setAppliedName(null);
+    active.current?.abort(); active.current = controller; setBusy(true); setError(null); setResult(null); setReviewSource(undefined); setAppliedName(null);
     source.current = null; selectedSource.current = null; resultSource.current = null; setName("");
     try {
       const input = await inplaceTools.captureSelection(controller.signal);
@@ -164,11 +167,13 @@ export function StudioScene3dAssetToolsPanel({
     active.current = controller;
     setBusy(true);
     setResult(null);
+    setReviewSource(undefined);
     resultSource.current = null; setAppliedName(null);
     setError(null);
     setPreviewIndex(0);
     try {
       const inputBinding = selectedSource.current;
+      const originalBytes = source.current; const originalName = name;
       const next = await runScene3dSpecialistInWorker(
         {
           version: 1,
@@ -184,6 +189,9 @@ export function StudioScene3dAssetToolsPanel({
       );
       if (ticket === generation.current) {
         setResult(next);
+        setReviewSource(SCENE3D_INPLACE_OPERATIONS.some((kind) => kind === next.operation)
+          ? { label: originalName, bytes: new Uint8Array(originalBytes), sha256: next.sourceSha256, stats: next.before }
+          : undefined);
         resultSource.current = inputBinding;
         setNodeNames(next.sourceNodeNames ?? []);
       }
@@ -577,7 +585,7 @@ export function StudioScene3dAssetToolsPanel({
                 </p>
               }
             >
-              <Preview artifact={preview} />
+              <Preview artifact={preview} source={reviewSource} active={!disabled && !busy} />
             </Suspense>
           )}
           <p className="text-xs text-fg-3">
