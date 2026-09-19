@@ -174,7 +174,7 @@ async function dismissTransientChrome(page: Page): Promise<void> {
 async function activatePenAndDraw(page: Page): Promise<void> {
   await page.keyboard.press("b");
   const toolbar = page.locator('[data-studio-draw-options="true"]');
-  await toolbar.waitFor({ state: "visible", timeout: $2 });
+  await toolbar.waitFor({ state: "visible", timeout: 10_000 });
   await page.waitForFunction(() =>
     document.querySelector('[data-studio-draw-options="true"]')
       ?.getAttribute("data-studio-active-draw-mode") === "pen"

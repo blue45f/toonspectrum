@@ -39,7 +39,6 @@ import {
 import Link from "@/compat/router-link";
 import { cn } from "@/shared/lib/utils";
 
-
 const DESTINATION_LABELS: Readonly<
   Record<StudioAssetDestination, BilingualText>
 > = {

@@ -284,7 +284,7 @@ async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
 async function activatePen(page: Page): Promise<void> {
   await page.keyboard.press("b");
   const drawOptions = page.locator('[data-studio-draw-options="true"]');
-  await drawOptions.waitFor({ state: "visible", timeout: $2 });
+  await drawOptions.waitFor({ state: "visible", timeout: 8_000 });
   await page.waitForFunction(() =>
     document.querySelector('[data-studio-draw-options="true"]')
       ?.getAttribute("data-studio-active-draw-mode") === "pen"
