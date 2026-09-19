@@ -84,6 +84,7 @@ apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
 apps/web/src/domains/creator/brush/studio-brush-selection-isolation.test.ts
 apps/web/src/domains/creator/brush/studio-brush-selection-snapshot.test.ts
 apps/web/src/domains/creator/brush/studio-draw-object-transform*.test.ts
+apps/web/src/domains/creator/brush/studio-material-brush-streaming.test.ts
 apps/web/src/domains/creator/brush/studio-native-brush-document-session.test.ts
 apps/web/src/domains/creator/brush/studio-native-brush-document-wiring.test.ts
 apps/web/src/domains/creator/brush/studio-native-brush-document.test.ts

@@ -197,9 +197,13 @@ export function renderStudioMaterialBrushMarks(context: CanvasRenderingContext2D
   for (const batch of materialSymmetryBatches(marks, symmetry)) renderBrushStudioV6MaterialMarks(context, batch);
 }
 
-export function studioMaterialBrushMarksToSvg(marks: readonly StudioMaterialBrushMark[], symmetry?: StudioBrushSymmetrySpec): string {
+export function studioMaterialBrushMarksToSvg(
+  marks: readonly StudioMaterialBrushMark[],
+  symmetry?: StudioBrushSymmetrySpec,
+  curves: "legacy-primitives" | "canvas-paths" = "legacy-primitives",
+): string {
   const parts: string[] = [];
-  for (const batch of materialSymmetryBatches(marks, symmetry)) parts.push(brushStudioV6MaterialMarksToSvg(batch));
+  for (const batch of materialSymmetryBatches(marks, symmetry)) parts.push(brushStudioV6MaterialMarksToSvg(batch, curves));
   return parts.join("");
 }
 

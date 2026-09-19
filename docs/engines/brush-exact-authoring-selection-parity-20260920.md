@@ -63,3 +63,7 @@ pnpm exec tsx scripts/benchmark-brush-material-svg.mts
 ```
 
 No extra external engines, guessed calibrated pigments, physical canvas pickup or new water solver are claimed. The exact current-material workflow is a concrete step toward the unified engine contract; native-original editing and stateful physical material domains remain separate follow-up work.
+
+## Integrated-main follow-up
+
+Main `431c036cfaef56c4fe6a488d2d1308084f6241f1` was merged without conflicts. Its production bundle, static CSP and structural budget checks passed; the normal push hook passed frontend/API types, architecture, lockfile, changed-file lint and secret checks. A broader brush run passed 3,653 tests and exposed one block-vs-stream SVG expectation that omitted the now-explicit curve mode. The public block serializer now accepts an optional mode while retaining its legacy default. The streaming test covers both old and current receipts, exact contact order and unchanged output-budget failure behavior. The focused follow-up passed 39 tests in four files, including untouched legacy golden hashes. The full rerun outcome is recorded in the PR.

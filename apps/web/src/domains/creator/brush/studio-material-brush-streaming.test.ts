@@ -82,9 +82,20 @@ describe("bounded whole-stroke material replay", () => {
     expect(cache.statistics().entries).toBeLessThanOrEqual(32);
   });
 
-  it("streams exact SVG contact order and rejects a size overflow before returning partial output", () => {
-    const source = { ...element(), symmetry: { type: "radial" as const, radialCount: 4, centerX: 100, centerY: 100 } };
-    expect(studioMaterialBrushToSvg(source)).toBe(studioMaterialBrushMarksToSvg(planStudioMaterialBrush(source), source.symmetry));
+  it.each([1, 2] as const)("streams exact SVG order for material receipt %s and preserves its budget", (version) => {
+    const current = element();
+    const { runtime, ...material } = current.brushEnginePrograms!.material!;
+    const source: StudioMaterialBrushElement = {
+      ...current,
+      brushEnginePrograms: { version: 1, material: { ...material, version,
+        ...(version === 2 ? { runtime } : {}),
+      } },
+      symmetry: { type: "radial", radialCount: 4, centerX: 100, centerY: 100 },
+    };
+    expect(studioMaterialBrushToSvg(source)).toBe(studioMaterialBrushMarksToSvg(
+      planStudioMaterialBrush(source), source.symmetry,
+      version === 2 ? "canvas-paths" : "legacy-primitives",
+    ));
     let receivedBytes = 0;
     expect(() => writeStudioMaterialBrushSvg(source, (chunk) => { receivedBytes += chunk.length * 2; }, 1000))
       .toThrow(StudioMaterialBrushSvgBudgetError);
