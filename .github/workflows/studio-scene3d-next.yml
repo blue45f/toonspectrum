@@ -35,6 +35,7 @@ jobs:
           apps/web/src/domains/creator/scene3d/studio-scene3d-asset-admission.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-bg3d-projection.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-platform-evolution.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-residency-policy.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-npr-render-graph.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-professional-plan.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-professional-integration-boundary.test.ts
