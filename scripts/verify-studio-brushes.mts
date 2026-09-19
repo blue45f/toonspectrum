@@ -878,10 +878,10 @@ async function activateDesktopPen(page: Page): Promise<void> {
   }
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   await toolbar.waitFor({ state: "visible", timeout: 8_000 });
-  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-  if (await pen.count() > 0 && (await pen.getAttribute("aria-pressed") !== "true")) {
-    await pen.click();
-  }
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
   await page.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
 
   const inspectorNavigator = page.getByTestId("studio-inspector-navigator");

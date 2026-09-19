@@ -23,6 +23,7 @@
     "./business-inquiry": "./src/business-inquiry.ts",
     "./supporter-payment": "./src/supporter-payment.ts",
     "./creator-support": "./src/creator-support.ts",
+    "./creator-role": "./src/creator-role.ts",
     "./studio-music": "./src/studio-music.ts",
     "./reference-query-language": "./src/reference-query-language.ts",
     "./server": {

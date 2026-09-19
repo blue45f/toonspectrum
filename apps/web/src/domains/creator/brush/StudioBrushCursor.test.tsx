@@ -105,7 +105,8 @@ describe("StudioBrushCursor", () => {
       />,
     );
 
-    expect(capture.lines).toHaveLength(0);
+    expect(capture.lines.filter((line) => line.name === "studio-stroke-guide")).toHaveLength(0);
+    expect(capture.lines.some((line) => Array.isArray(line.points))).toBe(true);
     expect(capture.ellipses.length + capture.rects.length).toBeGreaterThan(0);
   });
 });
