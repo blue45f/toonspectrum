@@ -8,6 +8,14 @@ export type StudioScene3dEvolutionCandidateId =
   | "tsl-npr-render-graph"
   | "asset-release-pipeline"
   | "webgpu-render-bundles"
+  | "gpu-profiler"
+  | "texture-residency"
+  | "gpu-driven-culling"
+  | "mesh-cluster-lod"
+  | "mikk-tangent-pipeline"
+  | "animation-retarget-compression"
+  | "offscreen-output-worker"
+  | "webgpu-webxr"
   | "bvh-webgpu-compute"
   | "gpu-xpbd"
   | "three-native-gsplat"
@@ -132,6 +140,86 @@ export const STUDIO_SCENE3D_EVOLUTION_CANDIDATES:
       authorityPolicy: "Bundle residency is transient; Scene3D entities and transforms remain canonical.",
       goal: "정적 배경 subtree의 draw submission을 WebGPU render bundle로 묶어 대형 장면 CPU 비용을 줄임",
       gates: gates("frame-budget", "bundle-budget", "device-loss-recovery"),
+    }),
+    Object.freeze({
+      id: "gpu-profiler",
+      label: "WebGPU timestamp profiler",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["WebGPU timestamp-query"]),
+      authorityPolicy: "Profiling never changes renderer choice or document state; it only emits bounded telemetry receipts.",
+      goal: "pass별 GPU 시간·warmup·capture 비용을 실측해 품질 tier와 승격 결정을 wall-clock 추정 대신 증거로 만듦",
+      gates: gates("frame-budget", "resource-disposal"),
+    }),
+    Object.freeze({
+      id: "texture-residency",
+      label: "Scene3D texture residency manager",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["internal AssetCache", "KTX2"]),
+      authorityPolicy: "Residency/eviction is transient and content-addressed; source and derivative identities remain canonical.",
+      goal: "quality tier·visibility·recent use에 따라 GPU texture budget을 강제하고 inactive texture를 안전하게 evict",
+      gates: gates("memory-stability", "mobile-browser", "30-minute-soak"),
+    }),
+    Object.freeze({
+      id: "gpu-driven-culling",
+      label: "GPU-driven culling / indirect draw",
+      maturity: "evaluate",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["Three WebGPU", "WebGPU compute"]),
+      authorityPolicy: "Visibility buffers are transient derivatives; canonical visibility flags and transforms stay in Scene3D.",
+      goal: "대형 정적/반정적 장면에서 frustum·occlusion candidate를 compute로 압축하고 indirect draw 제출 비용을 절감",
+      gates: gates("frame-budget", "memory-stability", "device-loss-recovery"),
+    }),
+    Object.freeze({
+      id: "mesh-cluster-lod",
+      label: "Mesh cluster / hierarchical LOD",
+      maturity: "evaluate",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze(["meshoptimizer", "gltfpack"]),
+      authorityPolicy: "Cluster/LOD structures are release derivatives; source mesh topology remains canonical.",
+      goal: "대형 배경을 cluster 단위로 simplify/stream하여 draw-call과 triangle residency를 함께 낮춤",
+      gates: gates("asset-round-trip", "frame-budget", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "mikk-tangent-pipeline",
+      label: "MikkTSpace tangent quality",
+      maturity: "next",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze(["@gltf-transform/functions", "MikkTSpace"]),
+      authorityPolicy: "Tangents are deterministic asset derivatives and never mutate the source silently.",
+      goal: "normal-map seam과 mirrored UV shading 차이를 줄여 renderer backend 간 tangent-space 품질을 고정",
+      gates: gates("golden-visual-parity", "asset-round-trip"),
+    }),
+    Object.freeze({
+      id: "animation-retarget-compression",
+      label: "Animation retarget / compression pipeline",
+      maturity: "next",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze(["@pixiv/three-vrm", "@gltf-transform/functions"]),
+      authorityPolicy: "CharacterDocument pose/clip identity stays canonical; retargeted/compressed clips are versioned derivatives.",
+      goal: "VRM humanoid retarget, keyframe resample/optimization, clip LOD로 캐릭터 재사용성과 runtime CPU/bytes를 개선",
+      gates: gates("asset-round-trip", "golden-visual-parity", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "offscreen-output-worker",
+      label: "Off-main-thread 3D output worker",
+      maturity: "evaluate",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["OffscreenCanvas", "WebGPU/WebGL2"]),
+      authorityPolicy: "Worker receives immutable Scene3D snapshots and returns artifacts; UI/input authority remains on the main thread.",
+      goal: "2K/4K capture·thumbnail·batch output의 main-thread long task를 분리하고 cancellation/backpressure를 통합",
+      gates: gates("capture-contract", "memory-stability", "resource-disposal", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "webgpu-webxr",
+      label: "WebGPU WebXR convergence",
+      maturity: "research",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["Three WebGPU", "WebXR"]),
+      authorityPolicy: "XR session never changes canonical renderer preference; unsupported sessions fail visibly.",
+      goal: "현재 WebGL2 전용 XR 브리지와 동등한 WebGPU XR 경로가 상류/브라우저에서 안정될 때 재평가",
+      gates: gates("webgpu-webgl-compatibility", "device-loss-recovery", "mobile-browser"),
     }),
     Object.freeze({
       id: "bvh-webgpu-compute",
@@ -273,6 +361,22 @@ function admitted(
       return software.assetReleasePipeline;
     case "webgpu-render-bundles":
       return software.renderBundles;
+    case "gpu-profiler":
+      return software.gpuProfiling;
+    case "texture-residency":
+      return software.textureResidency;
+    case "gpu-driven-culling":
+      return software.gpuDrivenCulling;
+    case "mesh-cluster-lod":
+      return software.clusterLod;
+    case "mikk-tangent-pipeline":
+      return software.mikkTangents;
+    case "animation-retarget-compression":
+      return software.animationRetargetPipeline;
+    case "offscreen-output-worker":
+      return software.offscreenRenderWorker;
+    case "webgpu-webxr":
+      return software.webGpuWebXr;
     case "bvh-webgpu-compute":
       return software.bvhWebGpuCompute;
     case "gpu-xpbd":
@@ -335,6 +439,44 @@ function applicability(
         reason: runtimePlan.primaryRenderer === "three-webgpu" && environmentEntities > 0
           ? "정적 배경 subtree의 CPU draw submission을 줄일 수 있습니다."
           : "WebGPU 배경 장면이 아니면 render bundle 이득이 없습니다.",
+      };
+    case "gpu-profiler":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu",
+        reason: runtimePlan.primaryRenderer === "three-webgpu"
+          ? "WebGPU pass별 실측이 가능한 세션에서 우선 적용합니다."
+          : "WebGL2 세션에서는 WebGPU timestamp-query profiler를 적용하지 않습니다.",
+      };
+    case "texture-residency":
+      return {
+        applicable: document.assets.length > 0,
+        reason: document.assets.length > 0
+          ? "GPU resident texture/geometry budget을 자산 단위로 관리할 수 있습니다."
+          : "자산이 없는 장면에서는 residency manager 우선순위가 낮습니다.",
+      };
+    case "gpu-driven-culling":
+    case "mesh-cluster-lod":
+      return {
+        applicable: environmentEntities >= 32 || runtimePlan.workload === "environment-compose",
+        reason: "대형 환경 장면에서 CPU 제출량과 resident geometry를 줄이기 위한 후보입니다.",
+      };
+    case "mikk-tangent-pipeline":
+    case "animation-retarget-compression":
+      return {
+        applicable: document.assets.length > 0,
+        reason: "3D asset release derivative의 shading/animation 품질을 표준화하는 후보입니다.",
+      };
+    case "offscreen-output-worker":
+      return {
+        applicable: highQualityStill,
+        reason: highQualityStill
+          ? "2K 이상 output/capture를 main thread에서 분리할 가치가 있습니다."
+          : "저해상도 preview에는 worker output 전환 우선순위가 낮습니다.",
+      };
+    case "webgpu-webxr":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu",
+        reason: "WebGPU primary와 현재 WebGL2 XR bridge의 기능 동등성을 장기 검증합니다.",
       };
     case "bvh-webgpu-compute":
       return {
