@@ -248,9 +248,12 @@ export const STUDIO_SCENE3D_EVOLUTION_CANDIDATES:
       label: "Experimental WebGPU path-traced still",
       maturity: "research",
       host: "specialist-renderer",
-      packageCandidates: Object.freeze(["three-gpu-pathtracer"]),
+      packageCandidates: Object.freeze([
+        "internal studio-pathtrace-*",
+        "three-gpu-pathtracer",
+      ]),
       authorityPolicy: "Never replaces the interactive renderer; output is an explicit opt-in still-render job.",
-      goal: "안정 릴리스와 material corpus가 준비된 뒤 최종 고품질 참고 렌더/조명 검증에 한정",
+      goal: "기존 renderer-neutral CPU/WebGPU path-trace reference를 Scene3D still 계약에 먼저 연결하고 외부 후보는 동일 corpus로 A/B",
       gates: gates("golden-visual-parity", "bundle-budget", "license-review"),
     }),
   ]);
