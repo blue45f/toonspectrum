@@ -51,7 +51,7 @@ try {
   const result = { ...proof, status: errors.length ? "failed" : proof.status,
     lane, browserVersion: browser.version(), errors };
   writeFileSync(join(scratch, "summary.json"), JSON.stringify(result, null, 2) + "\n");
-  await page.screenshot({ path: join(scratch, "capture-proof.png") });
+  await page.screenshot({ path: join(scratch, "capture-proof.png"), fullPage: true });
   console.log(JSON.stringify(result, null, 2));
   process.exitCode = result.status === "ok" ? 0 : result.status === "unsupported" ? 2 : 1;
 } finally {

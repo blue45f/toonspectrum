@@ -81,6 +81,7 @@ class DeterministicRenderWorker extends FakeWorker {
         width: message.input.width,
         height: message.input.height,
         rgba: new Uint8Array(message.input.rgbaBuffer),
+        ...(message.input.normalBuffer ? { normalRgba: new Uint8Array(message.input.normalBuffer) } : {}),
         ...(message.input.depthBuffer
           ? { depth: new Float32Array(message.input.depthBuffer) }
           : {}),
@@ -303,7 +304,7 @@ describe("Studio BG3D LT render Worker boundary", () => {
       settings: settings(),
     };
     expect(isStudioBg3dLtRenderWorkerRequest(validRequest)).toBe(true);
-    expect(isStudioBg3dLtRenderWorkerRequest({ ...validRequest, version: 2 })).toBe(false);
+    expect(isStudioBg3dLtRenderWorkerRequest({ ...validRequest, version: STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION + 1 })).toBe(false);
     expect(isStudioBg3dLtRenderWorkerRequest({ ...validRequest, extra: true })).toBe(false);
     expect(isStudioBg3dLtRenderWorkerRequest({
       ...validRequest,
@@ -463,4 +464,44 @@ describe("Studio BG3D LT render Worker boundary", () => {
     })).rejects.toMatchObject({ code: "aborted" });
     expect(workerFactory).not.toHaveBeenCalled();
   });
+});
+
+
+it("transfers an owned normal snapshot and reproduces direct crease pixels", async () => {
+  const base = raster();
+  const normalRgba = new Uint8Array(base.width * base.height * 4);
+  for (let y = 0; y < base.height; y += 1) {
+    for (let x = 0; x < base.width; x += 1) {
+      normalRgba.set(x < 4 ? [128, 128, 255, 255] : [255, 128, 128, 255], (y * base.width + x) * 4);
+    }
+  }
+  base.rgba.fill(255);
+  base.depth?.fill(0.5);
+  const input = { ...base, normalRgba };
+  const options = settings();
+  const creaseSettings = { ...options, line: { ...options.line, depthOutlineOnly: false, creaseAngleDegrees: 30 } };
+  const expected = renderStudioBg3dLtLayers(input, creaseSettings);
+  const worker = new DeterministicRenderWorker();
+  const promise = renderStudioBg3dLtLayersInWorker(input, creaseSettings, { workerFactory: () => worker });
+  const request = worker.requests[0]!;
+  expect(worker.transfers[0]).toEqual([request.input.rgbaBuffer, request.input.depthBuffer, request.input.normalBuffer]);
+  expect(request.input.normalBuffer).not.toBe(normalRgba.buffer);
+  expect(normalRgba.byteLength).toBe(base.width * base.height * 4);
+  normalRgba.fill(0); // the Worker must still use the captured normals, not the caller's live array
+  expect(await promise).toEqual(expected);
+  expect(worker.terminateCalls).toBe(1);
+  expect(isStudioBg3dLtRenderWorkerRequest({ ...request, version: 1 })).toBe(false);
+});
+
+it("rejects shared, unpaired, and incorrectly sized normal payloads before creating a Worker", async () => {
+  const factory = vi.fn(() => new FakeWorker());
+  const base = raster();
+  for (const input of [
+    { ...base, normalRgba: new Uint8Array(1) },
+    { width: base.width, height: base.height, rgba: base.rgba, normalRgba: new Uint8Array(base.width * base.height * 4) },
+    { ...base, normalRgba: new Uint8Array(new SharedArrayBuffer(base.width * base.height * 4)) },
+  ]) {
+    await expect(renderStudioBg3dLtLayersInWorker(input, settings(), { workerFactory: factory })).rejects.toThrow(/invalid-request/);
+  }
+  expect(factory).not.toHaveBeenCalled();
 });

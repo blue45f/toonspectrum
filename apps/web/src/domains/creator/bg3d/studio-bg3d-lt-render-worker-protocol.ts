@@ -6,7 +6,7 @@ import type {
 } from "./studio-bg3d-lt-render";
 
 /** The wire schema is intentionally versioned independently from the persisted 3D document. */
-export const STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION = 1 as const;
+export const STUDIO_BG3D_LT_RENDER_WORKER_PROTOCOL_VERSION = 2 as const;
 export const STUDIO_BG3D_LT_RENDER_WORKER_MAX_LAYERS = 3;
 
 export interface StudioBg3dLtRenderWorkerInput {
@@ -16,6 +16,7 @@ export interface StudioBg3dLtRenderWorkerInput {
   readonly rgbaBuffer: ArrayBuffer;
   /** Optional normalized Float32 depth storage owned by this request. */
   readonly depthBuffer?: ArrayBuffer;
+  readonly normalBuffer?: ArrayBuffer;
 }
 
 export interface StudioBg3dLtRenderWorkerRequest {
@@ -52,7 +53,7 @@ export type StudioBg3dLtRenderWorkerResponse =
 
 const REQUEST_KEYS = ["version", "kind", "requestId", "input", "settings"] as const;
 const INPUT_KEYS = ["width", "height", "rgbaBuffer"] as const;
-const INPUT_OPTIONAL_KEYS = ["depthBuffer"] as const;
+const INPUT_OPTIONAL_KEYS = ["depthBuffer", "normalBuffer"] as const;
 const SETTINGS_KEYS = ["line", "tone"] as const;
 const LINE_KEYS = [
   "enabled",
@@ -185,6 +186,8 @@ function isWorkerInput(
   if (!isRecord(value) || !hasExactKeys(value, INPUT_KEYS, INPUT_OPTIONAL_KEYS)) return false;
   const shape = dimensions(value);
   if (!shape || !isOwnedArrayBuffer(value.rgbaBuffer, shape.pixels * 4)) return false;
+  if (hasOwn(value, "normalBuffer") && (!hasOwn(value, "depthBuffer")
+    || !isOwnedArrayBuffer(value.normalBuffer, shape.pixels * 4))) return false;
   if (!hasOwn(value, "depthBuffer")) return true;
   if (!isOwnedArrayBuffer(
     value.depthBuffer,
@@ -284,9 +287,9 @@ export function isStudioBg3dLtRenderWorkerResponse(
 export function studioBg3dLtRenderWorkerRequestTransfers(
   request: StudioBg3dLtRenderWorkerRequest,
 ): Transferable[] {
-  return request.input.depthBuffer
-    ? [request.input.rgbaBuffer, request.input.depthBuffer]
-    : [request.input.rgbaBuffer];
+  return [request.input.rgbaBuffer,
+    ...(request.input.depthBuffer ? [request.input.depthBuffer] : []),
+    ...(request.input.normalBuffer ? [request.input.normalBuffer] : [])];
 }
 
 export function studioBg3dLtRenderWorkerResponseTransfers(

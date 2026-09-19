@@ -179,3 +179,17 @@ describe("Studio BG3D interactive LT Worker boundary", () => {
     expect(encoderSource).not.toContain("TODO");
   });
 });
+
+
+it("threads paired geometry normals through the actual insert and batch output paths", () => {
+  const insert = readFileSync(new URL("./studio-bg3d-editor-insert-host.ts", import.meta.url), "utf8");
+  const batch = readFileSync(new URL("./studio-bg3d-shot-batch-export-run.ts", import.meta.url), "utf8");
+  const artifact = readFileSync(new URL("./studio-bg3d-shot-artifact-pipeline.ts", import.meta.url), "utf8");
+  expect(insert).toContain("captureAdapter.normalProfile");
+  expect(insert).toContain("!ltSettingsSnapshot.line.depthOutlineOnly");
+  expect(insert).toContain("{ includeNormals: true }");
+  expect(insert).toContain("{ normalRgba: captured.normalRgba }");
+  expect(batch).toContain("captureAdapter.normalProfile && shot.capture.includeDepth");
+  expect(batch).toContain("!applied.output.line.depthOutlineOnly");
+  expect(artifact).toContain("{ normalRgba: input.captured.normalRgba }");
+});
