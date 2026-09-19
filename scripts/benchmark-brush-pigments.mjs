@@ -36,7 +36,7 @@ try {
   await page.waitForFunction(() => typeof window.__pigmentBenchmark === "function");
   await page.getByRole("button", { name: "재료·질감", exact: true }).click();
   const selections = [];
-  for (const [label, id] of [["Spectral.js 3 선택", "pigment-spectral-js"], ["open-km 분광 선택", "pigment-open-km-spectral"], ["ColorMix.js Lab 선택", "pigment-colormix-lab"]]) {
+  for (const [label, id] of [["Spectral.js 선택", "pigment-spectral-js"], ["open-km 분광 선택", "pigment-open-km-spectral"], ["ColorMix.js Lab 선택", "pigment-colormix-lab"]]) {
     await page.getByRole("button", { name: label, exact: true }).click();
     await page.waitForFunction((node) => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:pigment-qa")).slots.pigment === node, id);
     selections.push({ id, persisted: true });

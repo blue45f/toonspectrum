@@ -113,7 +113,7 @@ function metric(id: string, domain: BrushStudioV6Domain, kind: "latency" | "fide
 
 export const BRUSH_STUDIO_V6_NODES: readonly BrushStudioV6NodeDescriptor[] = Object.freeze(NODE_SPECS.map(([id, slot, domain, phase, authority, rights, requires = []]) => {
   const [accepts, emits] = ports(slot); const label = labelFor(id);
-  return Object.freeze({ id, label, slot, provider: providerFor(id), description: brushStudioV6Topology(id)?.description ?? brushStudioV7AdvancedSurface(id)?.description ?? `${label}을(를) V6 품질 그래프의 ${slot} 단계에서 실행합니다.`, domain, phase, authority, accepts, emits, requires: Object.freeze([...requires]), rights, latency: metric(id, domain, "latency"), fidelity: metric(id, domain, "fidelity"), uniqueness: metric(id, domain, "uniqueness"), memory: metric(id, domain, "memory"), tags: Object.freeze([slot, providerFor(id)]) });
+  return Object.freeze({ id, label, slot, provider: providerFor(id), description: brushStudioV6Topology(id)?.description ?? brushStudioV7AdvancedSurface(id)?.description ?? `${label}을(를) 브러시 구성의 ${slot} 단계에서 실행합니다.`, domain, phase, authority, accepts, emits, requires: Object.freeze([...requires]), rights, latency: metric(id, domain, "latency"), fidelity: metric(id, domain, "fidelity"), uniqueness: metric(id, domain, "uniqueness"), memory: metric(id, domain, "memory"), tags: Object.freeze([slot, providerFor(id)]) });
 }));
 const NODE_BY_ID = new Map(BRUSH_STUDIO_V6_NODES.map((entry) => [entry.id, entry]));
 

@@ -128,7 +128,7 @@ export const STUDIO_BRUSH_LIBRARY_TABS: readonly {
   { id: "favorites", label: "즐겨찾기", title: "즐겨찾기 브러시" },
   { id: "recent", label: "최근 사용", title: "최근 사용한 브러시" },
   { id: "all", label: "전체", title: "모든 브러시" },
-  { id: "nextgen", label: "차세대", title: "V6 재질 엔진 · 무폴백 브러시" },
+  { id: "nextgen", label: "재료", title: "재질 엔진 · 자동 엔진 전환 없음" },
   { id: "beginner", label: "시작 도구", title: "자주 쓰는 기본 표현부터 선택" },
   { id: "ink", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.ink, title: "펜·G펜·붓펜 — 균일 선부터 필압 테이퍼까지" },
   { id: "pencil", label: STUDIO_BRUSH_MATERIAL_GROUP_LABELS.pencil, title: "연필·흑연 — 종이결 그레인" },
