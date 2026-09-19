@@ -40,6 +40,7 @@ import {
   StudioTemplatesPage,
   StudioRouter,
 } from "./creator-route-pages";
+
 export const creatorRoutes = defineAppRoutes([
   { id: "creator-ai-settings", path: studioRoutePath("ai-settings"), element: <StudioAiSettingsPage /> },
   { id: "creator-ai-inference", path: studioRoutePath("ai-lab"), element: <PersonalInferencePage /> },
