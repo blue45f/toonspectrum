@@ -12,7 +12,7 @@ const manifest = readFileSync(
 );
 
 describe("creator role profile v2 production migration", () => {
-  it("drops the v1 profile CHECK before rewriting rows to version 2", () => {
+  it("drops the v1-only profile CHECK before rewriting rows to version 2", () => {
     const dropConstraint = migration.indexOf(
       'DROP CONSTRAINT IF EXISTS "user_creator_role_profile_object_check"',
     );
@@ -26,6 +26,16 @@ describe("creator role profile v2 production migration", () => {
     expect(addConstraint).toBeGreaterThan(rewrite);
     expect(migration).toContain(
       'VALIDATE CONSTRAINT "user_creator_role_profile_object_check"',
+    );
+  });
+
+  it("keeps the expand window compatible with the previous runtime", () => {
+    expect(migration).toContain("'roleVisibility', CASE");
+    expect(migration).toContain('"roleVisibility":false');
+    expect(migration).toContain('("creatorRoleProfile" ->> \'version\') = \'1\'');
+    expect(migration).toContain('("creatorRoleProfile" ->> \'version\') = \'2\'');
+    expect(migration).toContain(
+      'jsonb_typeof("creatorRoleProfile" -> \'roleVisibility\') = \'boolean\'',
     );
   });
 
