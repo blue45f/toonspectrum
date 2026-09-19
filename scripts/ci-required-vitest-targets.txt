@@ -143,6 +143,7 @@ apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
 apps/web/src/domains/creator/studio-selection
 apps/web/src/domains/creator/studio-shared-document-client.test.ts
 apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
+apps/web/src/domains/creator/studio-shell/StudioMarketplaceSellerPanel.async-ownership.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx
@@ -182,6 +183,7 @@ packages/core/src/server/home.cpu-cache.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/lib/character-psd-reference-compositor.test.mjs
 scripts/lib/studio-3d-production-audit-policy.test.mjs
+scripts/pigment-dependency-install-policy.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/verify-studio-3d-console.test.ts
 scripts/verify-studio-engine-editor-entry.test.ts
@@ -190,4 +192,3 @@ scripts/verify-studio-hybrid-dcc-integration.test.ts
 scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
 scripts/verify-studio-living-ink-integration.test.ts
 scripts/verify-studio-menus.test.ts
-scripts/pigment-dependency-install-policy.test.mjs
