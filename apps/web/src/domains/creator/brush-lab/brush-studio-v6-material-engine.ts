@@ -578,7 +578,8 @@ export function createBrushStudioV6MaterialStroke(
       if (sedimentation) {
         const sediment = sampleBrushStudioV7Sediment({
           x: point.x, y: point.y, radius, index, seed, granulation: t.granulation,
-          absorbency: effectiveAbsorbency, tooth, fiberAngle: surfaceContact.fiberAngle, anisotropy: surfaceContact.anisotropy,
+          absorbency: effectiveAbsorbency, tooth: unit(tooth * t.surfaceTooth),
+          fiberAngle: surfaceContact.fiberAngle, anisotropy: surfaceContact.anisotropy,
         });
         for (const grain of sediment) emit("grain", grain.x, grain.y, grain.radiusX, grain.radiusY,
           grain.angle, alpha * grain.opacity * 4.2, grain.mix, 0, "ellipse");
