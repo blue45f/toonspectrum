@@ -196,6 +196,9 @@ jobs:
             /docs/competitor-analysis.md
             /docs/ranking-architecture.md
             !/tests/benchmarks/results/
+      - name: Restore Virtual Studio art for foundation regressions
+        if: matrix.shard == 'studio-foundation'
+        run: git sparse-checkout add /apps/web/public/assets/virtual-studio/production-v2/ /apps/web/public/assets/virtual-studio/living-world/ /apps/web/public/assets/virtual-studio/drawn-characters-v1/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:

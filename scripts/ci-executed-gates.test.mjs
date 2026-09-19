@@ -161,13 +161,41 @@ test("PR lint is scoped while push and merge validation stay repository-wide", (
   }
 });
 
-test("sparse core lanes retain the imported virtual world while excluding artwork binaries", () => {
+test("sparse lanes exclude artwork until foundation restores exactly its required Virtual Studio packs", () => {
   const world = "apps/web/public/assets/virtual-studio/world/default-world.json";
-  const excluded = [
+  const requiredArt = [
+    "apps/web/public/assets/virtual-studio/production-v2/art-manifest.json",
+    "apps/web/public/assets/virtual-studio/production-v2/master-central-lossless.webp",
+    "apps/web/public/assets/virtual-studio/production-v2/player-pink-direction-down.png",
     "apps/web/public/assets/virtual-studio/production-v2/player-pink-walk-down.webp",
+    "apps/web/public/assets/virtual-studio/living-world/art-manifest.json",
     "apps/web/public/assets/virtual-studio/living-world/master-clean-plate.webp",
-    "apps/web/public/assets/3d/environments/refined-v6/large-model.glb",
+    "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
+    ...["pink", "silver", "dark", "purple"].flatMap((skin) =>
+      ["walk-down", "walk-right", "walk-left", "walk-up", "sit", "wave"].map((state) =>
+        `apps/web/public/assets/virtual-studio/drawn-characters-v1/player-${skin}-${state}.png`)),
   ];
+  const unrelatedArt = [
+    "apps/web/public/assets/3d/environments/refined-v6/large-model.glb",
+    "apps/web/public/assets/virtual-studio/unrelated-pack/large-image.png",
+  ];
+  const excluded = [...requiredArt, ...unrelatedArt];
+  const staticJob = job("static");
+  const restoreStep = staticJob.split(/(?=^ {6}- )/mu)
+    .find((step) => step.includes("git sparse-checkout add"));
+  assert.ok(restoreStep, "foundation must restore the real artwork its required tests read");
+  assert.match(restoreStep, /^ {8}if: matrix\.shard == 'studio-foundation'$/mu);
+  const restoreArgs = restoreStep.match(/^ {8}run: git (.+)$/mu)?.[1].split(/\s+/u);
+  assert.deepEqual(restoreArgs, [
+    "sparse-checkout", "add",
+    "/apps/web/public/assets/virtual-studio/production-v2/",
+    "/apps/web/public/assets/virtual-studio/living-world/",
+    "/apps/web/public/assets/virtual-studio/drawn-characters-v1/",
+  ]);
+  assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
+    "artwork must be present before the required foundation tests execute");
+  assert.ok(requiredTargets.includes("scripts/verify-virtual-studio-art-manifest.test.mjs"),
+    "the full build art gate does not replace the existing foundation art regression target");
   const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
@@ -194,6 +222,11 @@ test("sparse core lanes retain the imported virtual world while excluding artwor
       for (const file of excluded) assert.equal(existsSync(join(scratch, file)), false,
         `${lane} must not download artwork/model binaries: ${file}`);
     }
+    git(...restoreArgs);
+    for (const file of [world, ...requiredArt]) assert.ok(existsSync(join(scratch, file)),
+      `foundation must retain its real art test input: ${file}`);
+    for (const file of unrelatedArt) assert.equal(existsSync(join(scratch, file)), false,
+      `foundation must still exclude unrelated artwork/models: ${file}`);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

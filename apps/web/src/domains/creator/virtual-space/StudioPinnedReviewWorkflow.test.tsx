@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { persistSession } from "@/compat/auth-session-state";
 import { StudioPinnedReviewWorkflow } from "./StudioPinnedReviewWorkflow";
 import type { StudioVirtualSpaceVerifiedReview } from "./studio-virtual-space-review-invitation";
 
-const f = vi.hoisted(() => ({ verify: vi.fn(), decide: vi.fn(), revisions: vi.fn(), resolve: vi.fn(), reopen: vi.fn(), refresh: vi.fn(), revoke: vi.fn(), actor: "reviewer", sessionRevision: 1 }));
+const f = vi.hoisted(() => ({ verify: vi.fn(), decide: vi.fn(), revisions: vi.fn(), resolve: vi.fn(), reopen: vi.fn(), refresh: vi.fn(), revoke: vi.fn(), actor: "reviewer" }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
-vi.mock("@/compat/auth-session-state", async (original) => ({ ...(await original<typeof import("@/compat/auth-session-state")>()), getAuthSessionRevision: () => f.sessionRevision }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: f.verify }));
 vi.mock("../project-graph/studio-project-graph-client", () => ({ decideStudioReview: f.decide, listStudioArtifactRevisions: f.revisions, resolveStudioReviewComment: f.resolve, reopenStudioReviewComment: f.reopen }));
 const subject = { schemaVersion: 1 as const, workId: "work", projectId: "project", artifactId: "artifact", reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) };
@@ -15,8 +15,8 @@ function verified(comments: unknown[] = []): StudioVirtualSpaceVerifiedReview {
   return { ok: true, subject, project: { access: { edit: true, manageMembers: false } }, review: { status: "open", reviewerIds: ["reviewer"], comments }, expiresAt: Date.now() + 15_000 } as StudioVirtualSpaceVerifiedReview;
 }
 function setup(value = verified()) { f.verify.mockResolvedValue(value); return render(<StudioPinnedReviewWorkflow verified={value} onRefresh={f.refresh} onRevoked={f.revoke} />); }
-beforeEach(() => { Object.values(f).forEach((mock) => { if (vi.isMockFunction(mock)) mock.mockReset(); }); f.actor = "reviewer"; f.sessionRevision = 1; f.decide.mockResolvedValue({}); f.resolve.mockResolvedValue({}); f.reopen.mockResolvedValue({}); });
-afterEach(cleanup);
+beforeEach(() => { Object.values(f).forEach((mock) => { if (vi.isMockFunction(mock)) mock.mockReset(); }); f.actor = "reviewer"; persistSession({ user: { id: f.actor }, token: null }); f.decide.mockResolvedValue({}); f.resolve.mockResolvedValue({}); f.reopen.mockResolvedValue({}); });
+afterEach(() => { cleanup(); persistSession(null); });
 describe("Pinned review revision workflow", () => {
   it("requires a separate approval confirmation and rechecks the exact review authority", async () => {
     setup();
@@ -90,9 +90,41 @@ describe("Pinned review revision workflow", () => {
     setup(); let resolve!: (value: StudioVirtualSpaceVerifiedReview) => void;
     f.verify.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     fireEvent.click(screen.getByRole("button", { name: "수정 요청으로 기록" }));
-    ++f.sessionRevision;
+    persistSession({ user: { id: "reviewer-b" }, token: null });
     await act(async () => { resolve(verified()); });
     expect(f.decide).not.toHaveBeenCalled();
     expect((screen.getByRole("button", { name: "수정 요청으로 기록" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("keeps same-actor approval confirmation but never retries its cancelled decision after session publication", async () => {
+    setup();
+    fireEvent.click(screen.getByRole("button", { name: "이 검수본 승인" }));
+    let resolve!: (value: StudioVirtualSpaceVerifiedReview) => void;
+    f.verify.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    fireEvent.click(screen.getByRole("button", { name: "승인 확정" }));
+    await act(async () => { persistSession({ user: { id: "reviewer", name: "Refreshed reviewer" }, token: null }); });
+    await act(async () => { resolve(verified()); });
+    expect(f.decide).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "승인 확정" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "승인 확정" }));
+    await waitFor(() => expect(f.decide).toHaveBeenCalledExactlyOnceWith("review", "approved"));
+  });
+
+  it("discards a saved-version read superseded by same-actor publication and permits a fresh explicit read", async () => {
+    setup(verified([comment]));
+    let resolve!: (value: unknown[]) => void;
+    f.revisions.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    fireEvent.click(screen.getByRole("button", { name: "수정한 저장 버전 선택" }));
+    await waitFor(() => expect(f.revisions).toHaveBeenCalledOnce());
+    await act(async () => { persistSession({ user: { id: "reviewer" }, token: null }); });
+    await act(async () => { resolve([{ id: "stale", artifactId: "artifact", kind: "submission" }]); });
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(f.resolve).not.toHaveBeenCalled();
+    f.revisions.mockResolvedValue([{ id: "current", artifactId: "artifact", kind: "submission", message: "Current saved version" }]);
+    fireEvent.click(screen.getByRole("button", { name: "수정한 저장 버전 선택" }));
+    await screen.findByRole("combobox");
+    expect(screen.getByRole("option", { name: /Current saved version/u })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /stale/u })).toBeNull();
+    expect(f.revisions).toHaveBeenCalledTimes(2);
   });
 });

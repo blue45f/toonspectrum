@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useSession } from "@/compat/auth-session-store";
-import { getAuthSessionRevision } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, listeners as sessionListeners, type Session } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { createStudioReviewComment, newStudioProjectGraphId } from "../project-graph/studio-project-graph-client";
 import type { StudioReviewCommentCreateInput } from "../project-graph/studio-project-graph-contract";
@@ -32,6 +32,11 @@ function PinnedReviewForActor({ actorId, subject }: {
   const generation = useRef(0);
   const readGeneration = useRef(0);
   const invalidate = useCallback(() => { ++generation.current; }, []);
+  // The mounted view relinquishes its pending UI state immediately. Old async
+  // finally blocks cannot release a newer action after this generation changes.
+  const invalidateActiveView = useCallback(() => {
+    invalidate(); setBusy(false); setLoading(false);
+  }, [invalidate]);
   // Invalidate at unmount commit, before a delayed authority promise can issue a
   // write under the next actor while passive effect cleanup is still pending.
   useLayoutEffect(() => invalidate, [invalidate]);
@@ -53,13 +58,21 @@ function PinnedReviewForActor({ actorId, subject }: {
     void refresh();
     const focus = () => { void refresh(); };
     const visibility = () => {
-      if (document.visibilityState === "hidden") { invalidate(); setResult(null); setLoading(false); }
+      if (document.visibilityState === "hidden") { invalidateActiveView(); setResult(null); }
       else void refresh();
     };
+    const sessionPublished = (session: Session) => {
+      // Normal cookie reconciliation also advances the session revision. Start
+      // a fresh read without remounting this actor's draft or retry identity.
+      // The revision fence still cancels pending mutations; never replay them.
+      if (actorId && session?.user.id === actorId) void refresh(true);
+      else { invalidateActiveView(); ++readGeneration.current; setResult(null); }
+    };
+    sessionListeners.add(sessionPublished);
     globalThis.addEventListener("focus", focus);
     document.addEventListener("visibilitychange", visibility);
-    return () => { invalidate(); globalThis.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", visibility); };
-  }, [invalidate, refresh]);
+    return () => { invalidate(); sessionListeners.delete(sessionPublished); globalThis.removeEventListener("focus", focus); document.removeEventListener("visibilitychange", visibility); };
+  }, [actorId, invalidate, invalidateActiveView, refresh]);
   useEffect(() => {
     if (!result?.ok) return;
     const ttl = result.expiresAt - Date.now();
@@ -105,7 +118,7 @@ function PinnedReviewForActor({ actorId, subject }: {
       <h3 className="mt-4 font-bold">{result.review.title}</h3>
       <p className="text-xs text-fg-3 break-all">{bt("검수 버전", "Review version")} · {result.subject.revisionId}</p>
       <details className="mt-2 text-xs"><summary>{bt("버전 식별 정보", "Version identity")}</summary><code className="break-all">{result.subject.rootGraphHash}</code></details>
-      <StudioPinnedReviewPreview key={JSON.stringify(result.subject)} subject={subject ?? result.subject} onRevoked={() => { invalidate(); setResult({ ok: false, reason: "access-denied" }); }} />
+      <StudioPinnedReviewPreview key={JSON.stringify(result.subject)} subject={subject ?? result.subject} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
       <div className="mt-4 space-y-3" aria-label={bt("검토 의견", "Review notes")}>
         {result.review.comments.map((comment) => <article key={comment.id} className="rounded-xl border border-line p-3">
           <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
@@ -124,7 +137,7 @@ function PinnedReviewForActor({ actorId, subject }: {
         </label>
         <button type="submit" className="mt-2 min-h-11 rounded-lg border border-line px-4" disabled={busy || !body.trim()}>{busy ? bt("저장 중…", "Saving…") : bt("의견 저장", "Save note")}</button>
       </form> : <p className="mt-3 text-xs">{bt("검토 기록을 열람하고 있습니다.", "You are viewing the review history.")}</p>}
-      <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidate(); setResult({ ok: false, reason: "access-denied" }); }} />
+      <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
     </> : null}
     {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
     <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-4" disabled={busy || loading} onClick={() => { void refresh(); }}>{bt("검토 기록 새로 확인", "Refresh review")}</button>

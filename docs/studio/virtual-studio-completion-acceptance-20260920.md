@@ -38,7 +38,11 @@ of this verification.
 - Invitations carry the exact project/work/artifact/review/revision/hash identity. New invitations
   require an open review; approved history remains readable with current ACL and the same pin.
   Private preview responses bind the work's active object ownership and short-lived signed URLs.
-  The panel removes expired, hidden, revoked or superseded private content.
+  The panel removes expired, hidden, revoked or superseded private content. Account changes
+  invalidate the old view, drafts and pending writes, including auth-store changes before React
+  publishes the new session. Same-account session renewal preserves drafts, retry identities and
+  selected workflow state within the existing permission lease. Returning from a hidden tab or
+  revoked view releases obsolete busy state without replaying a pending mutation.
 - Required/recommended/note comments, explicit saved-resolution selection, reopen, changes-requested
   decisions and a separate approval confirmation use existing review authority. Every mutation
   checks current access and review state. A review decision does not publish the work or advance
@@ -56,12 +60,16 @@ in `.qa/virtual-studio-runtime-acceptance/` and is not committed.
 
 | Evidence | Verified result | Limit |
 | --- | --- | --- |
+| Latest web integration portfolio | 56 files, 686 tests passed across the main 54-file run and two supplemental transport suites; same-account renewal, account change, hidden-view save races and stable character thumbnails are included | Targeted Virtual Studio/review/Huddle/transport/storage-boundary portfolio, not the entire repository |
 | Review API focused tests | 84 tests passed, including actual Nest feature-module dependency construction | Module construction does not start a production API or external storage |
+| Latest-main graph integration | 68 tests passed across 10 graph suites, including both actual Nest module construction regressions | The 18 PostgreSQL cases are skipped in this no-database run and verified separately by the dedicated database gate below |
 | Dedicated PostgreSQL gate | 18 tests passed across producer and review-race suites in a fresh PostgreSQL 16 database with full existing 0064 and 0077 SQL | Disposable localhost container; no production migration or production data |
 | Database bootstrap guard | Empty schema prepared with 12 Studio triggers; an existing 157-table target was rejected without reset | Only explicitly named loopback test/integration databases accepted |
-| Four-person RTC harness | 5 logical identities, 4 consenting members, 6 media edges, 12 decoded directions, outsider media edges 0; generated streams stopped on leave | One Chromium, native loopback RTCPeerConnections and generated canvas tracks; not WAN/NAT or physical devices |
+| Product runtime acceptance | 15 checks passed: desktop keyboard/input focus, mobile native touch, collision, portals, reliable consent, world mismatch, four-person media, repeated mount and failed-asset recovery | Local Chromium; simulated gamepad, no production admission |
+| Production artifacts | API build and import/runtime guards passed; Vite web build and static CSP passed; Studio bundle structural check passed | Build artifacts remain local. The bundle checker labels its older startup measurements as stale; they are not new runtime performance evidence |
+| Four-person RTC harness | 5 logical identities, 4 consenting members, 6 media edges, 12 decoded directions with 85 decoded frames in the final runtime run, outsider media edges 0; generated streams stopped on leave | One Chromium, native loopback RTCPeerConnections and generated canvas tracks; not WAN/NAT or physical devices |
 | Pinned review browser journey | Real React components and client parsers: required note → explicit saved resolution → confirmation → approval → readable history → ACL revoke removes image/notes; width 390 without overflow; page errors 0 | Intercepted HTTP fixtures and an existing character image as a test page; not real production authentication/storage |
-| CI contract tests | 33 tests passed with the new required database lane retained in `core` | GitHub execution and merge state are recorded separately after push |
+| CI contract tests | 58 tests passed after latest main integration with the new required database lane retained in `core`; an actual temporary Git checkout verifies that foundation alone restores its three required art packs | GitHub execution and merge state are recorded separately after push |
 
 The CI `database` job provisions PostgreSQL 16 on a standard Ubuntu runner, installs the current
 locked dependencies, prepares only a fresh test schema, and runs both real integration suites.
@@ -89,5 +97,8 @@ clips, cut-level annotations, two-version comparison/follow-view, durable asynch
 team templates/toolkits and the other expanded design paths still require implementation or
 integration evidence. Twenty-minute 8/16/24-presence and media measurements, multiple actual
 browsers/devices/NATs and manual screen-reader acceptance remain unverified. Local fixtures are
-not promoted into those claims. Conditional public ecosystems, large broadcasts and social 3D
+not promoted into those claims. The production P2P overlay currently admits at most eight remote
+peers per client; the presence store's 24-entry bound does not establish 24-person product
+admission. Larger direct-controller fixtures must be labeled as stress profiles until admission,
+transport topology and resource measurements are integrated and verified. Conditional public ecosystems, large broadcasts and social 3D
 retain the original design's conditions and do not authorize deployment or new paid infrastructure.

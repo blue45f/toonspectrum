@@ -61,6 +61,7 @@ import {
   type StudioVirtualSpaceActivity,
   type StudioVirtualSpaceFacing,
   type StudioVirtualSpacePoint,
+  type StudioVirtualSpacePresenceState,
   type StudioVirtualSpaceZoneId,
 } from "./studio-virtual-space-model";
 import {
@@ -78,7 +79,7 @@ import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-br
 import {
   STUDIO_CHARACTER_SKINS,
   studioCharacterAppearanceForAvatarIndex,
-  studioCharacterSkinForAvatarIndex,
+  resolveStudioCharacterAppearance,
 } from "./studio-virtual-space-character-skins";
 import {
   StudioVirtualSpacePhaserCanvas,
@@ -141,23 +142,6 @@ function virtualSpaceReactionEmoji(reaction: StudioVirtualSpaceReaction | null |
 }
 
 const VIRTUAL_AVATARS = STUDIO_CHARACTER_SKINS;
-
-function virtualAvatarIndex(identity: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < identity.length; index += 1) {
-    hash ^= identity.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0) % VIRTUAL_AVATARS.length;
-}
-
-function resolveVirtualAvatarIndex(identity: string, preferredIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR): number {
-  return Number.isInteger(preferredIndex)
-    && preferredIndex >= 0
-    && preferredIndex < VIRTUAL_AVATARS.length
-    ? preferredIndex
-    : virtualAvatarIndex(identity);
-}
 
 function readVirtualSpaceAvatarIndex(): number {
   if (typeof window === "undefined") return STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
@@ -321,6 +305,7 @@ function ChibiAvatar({
   nearby = false,
   reaction = null,
   avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
+  appearance,
 }: {
   readonly identity: string;
   readonly name: string;
@@ -332,11 +317,10 @@ function ChibiAvatar({
   readonly nearby?: boolean;
   readonly reaction?: StudioVirtualSpaceReaction | null;
   readonly avatarIndex?: number;
+  readonly appearance?: StudioVirtualSpacePresenceState["appearance"];
 }) {
-  const variant = resolveVirtualAvatarIndex(identity, avatarIndex);
-  const skin = studioCharacterSkinForAvatarIndex(variant);
   const reactionEmoji = virtualSpaceReactionEmoji(reaction);
-  const motion = moving
+  const requestedMotion = moving
     ? "walk"
     : activity === "reviewing"
       ? "review"
@@ -345,6 +329,9 @@ function ChibiAvatar({
         : nearby
           ? "talk"
           : "idle";
+  const { skin, clip } = resolveStudioCharacterAppearance({ avatarIndex, appearance }, identity,
+    requestedMotion === "walk" ? `walk-${facing}` : requestedMotion);
+  const motion = clip.startsWith("walk-") ? "walk" : clip;
   const stateTexture = motion === "talk" || motion === "draw" || motion === "review"
     ? skin.state?.[motion]
     : undefined;
@@ -360,7 +347,7 @@ function ChibiAvatar({
         aria-hidden
       >
         <img
-          src={skin.directional.down}
+          src={avatarTexture}
           alt=""
           draggable={false}
           className="studio-vspace-reference-compact-player"
@@ -547,6 +534,7 @@ function LiveStudioTopbar({
               compact
               activity={snapshot.self.activity}
               avatarIndex={snapshot.self.avatarIndex}
+              appearance={snapshot.self.appearance}
             />
           </span>
           {peers.map((peer) => (
@@ -557,6 +545,7 @@ function LiveStudioTopbar({
                 compact
                 activity={peer.state.activity}
                 avatarIndex={peer.state.avatarIndex}
+                appearance={peer.state.appearance}
               />
             </span>
           ))}
@@ -576,10 +565,12 @@ function LiveStudioSidebar({
   projectId,
   localName,
   snapshot,
+  fallbackIdentity,
 }: {
   readonly projectId: string;
   readonly localName: string;
   readonly snapshot: StudioVirtualSpaceSnapshot;
+  readonly fallbackIdentity: string;
 }) {
   const bt = useBilingual("LiveStudioSidebar");
   const reviewHref = studioVirtualSpaceDestination(projectId, "review") ?? "/production";
@@ -624,11 +615,12 @@ function LiveStudioSidebar({
       <div className="vs2-self">
         <span className="vs2-tiny-avatar">
           <ChibiAvatar
-            identity="local-self"
+            identity={fallbackIdentity}
             name={localName}
             compact
             activity={snapshot.self.activity}
             avatarIndex={snapshot.self.avatarIndex}
+            appearance={snapshot.self.appearance}
           />
         </span>
         <span><strong>{localName}</strong><small>● {snapshot.direct ? bt("온라인", "Online") : bt("로컬 작업", "Local work")}</small></span>
@@ -1283,6 +1275,7 @@ function VirtualSpaceExperience({
           localName={localName}
         />
         <LiveStudioSidebar
+          fallbackIdentity={fallbackIdentity}
           projectId={projectId}
           localName={localName}
           snapshot={snapshot}
@@ -1528,6 +1521,7 @@ function VirtualSpaceExperience({
                       compact
                       activity={peer.state.activity}
                       avatarIndex={peer.state.avatarIndex}
+                      appearance={peer.state.appearance}
                     />
                     <div className="min-w-0">
                       <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
@@ -1573,6 +1567,7 @@ function VirtualSpaceExperience({
                         compact
                         activity={peer.state.activity}
                         avatarIndex={peer.state.avatarIndex}
+                        appearance={peer.state.appearance}
                       />
                       <span>
                         <strong>{peer.participant.displayName}</strong>
@@ -1616,6 +1611,7 @@ function VirtualSpaceExperience({
                     compact
                     activity={snapshot.self.activity}
                     avatarIndex={snapshot.self.avatarIndex}
+                    appearance={snapshot.self.appearance}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold">{localName} · {bt("나", "Me")}</p>
@@ -1632,6 +1628,7 @@ function VirtualSpaceExperience({
                         compact
                         activity={peer.state.activity}
                         avatarIndex={peer.state.avatarIndex}
+                        appearance={peer.state.appearance}
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
