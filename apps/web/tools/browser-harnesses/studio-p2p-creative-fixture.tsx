@@ -5,12 +5,15 @@ import { StudioLiveCollaborationContext, EMPTY_STUDIO_LIVE_CONTEXT } from "../..
 import { createStudioLiveEnvelope, type StudioLiveEnvelope } from "../../src/domains/creator/live/studio-live-collaboration-protocol";
 import { applyStudioLiveP2pOverlay } from "../../src/domains/creator/live/studio-live-p2p-overlay-transport";
 
+import { traceStudioP2pDirectPort, type DirectPacketDiagnostic } from "./studio-p2p-direct-diagnostics";
+
 import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
 import type { StudioLiveTransport } from "../../src/domains/creator/live/studio-live-collaboration-transport";
 import "../../src/styles/globals.css";
 
 // Local fixture only: real RTC/SCTP/RTP and product UI, NOT production authentication/signaling.
 export const primaryPackets: StudioLiveEnvelope[] = [];
+export let directPackets: DirectPacketDiagnostic[] = [];
 const listeners = new Set<(packet: StudioLiveEnvelope) => void>();
 const terminalListeners = new Set<(event: { type: string }) => void>();
 let transport: StudioLiveTransport | null = null;
@@ -34,7 +37,9 @@ export async function mount(index: number): Promise<void> {
   } as StudioLiveTransport;
   transport = applyStudioLiveP2pOverlay(() => primary)({ workId: "creative-qa", roomName: "creative-qa", participant });
   await transport.connect();
-  const room = { ready: true, workId: "creative-qa", participant, direct: transport.direct,
+  const traced = transport.direct ? traceStudioP2pDirectPort(transport.direct) : null;
+  directPackets = traced?.packets ?? [];
+  const room = { ready: true, workId: "creative-qa", participant, direct: traced?.direct,
     subscribe: () => () => undefined,
     subscribeVoice: (listener: (event: { type: string }) => void) => {
       terminalListeners.add(listener); return () => { terminalListeners.delete(listener); };

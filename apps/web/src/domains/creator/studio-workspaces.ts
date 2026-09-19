@@ -105,6 +105,7 @@ export const STUDIO_EXPANDED_WORKSPACE_IDS = [
   "mobile-draw",
   "photo-edit",
   "vector-design",
+  "slides-deck",
   "animation",
   "pose-3d",
 ] as const;
@@ -827,6 +828,23 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
       { primary: "layers", image: "transform", document: "canvas" },
       { leftPanelOpen: true, rightPanelOpen: true, rightPanelWidth: 344 },
       ["undo", "redo", "select", "duplicate", "bring-front", "properties"],
+      READING_DEVICE_OVERRIDES,
+    ),
+  }),
+  Object.freeze({
+    id: "slides-deck",
+    name: "발표 자료",
+    description:
+      "슬라이드 목록, 본문 편집, 발표 설정과 노트를 한 화면에서 관리합니다.",
+    layout: createBuiltinLayout(
+      { primary: "layers", image: "transform", document: "navigator" },
+      {
+        leftPanelOpen: true,
+        rightPanelOpen: true,
+        leftPanelWidth: 224,
+        rightPanelWidth: 320,
+      },
+      ["undo", "redo", "select", "duplicate", "properties", "fit-width"],
       READING_DEVICE_OVERRIDES,
     ),
   }),

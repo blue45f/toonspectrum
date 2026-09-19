@@ -219,7 +219,7 @@ export const STUDIO_MODE_PROFILES: Readonly<Record<StudioProjectKind, StudioMode
     shell: "slides",
     headline: copy("작품 피칭을 슬라이드 흐름으로 설계", "Shape the pitch as a slide narrative"),
     description: copy("슬라이드 목록, 본문 편집, 발표 흐름과 노트를 중심으로 작업합니다.", "Work around slide navigation, content, presentation flow and notes."),
-    document: { kind: "slides", workspace: "slides", taskWorkspace: "vector-design" },
+    document: { kind: "slides", workspace: "slides", taskWorkspace: "slides-deck" },
     launch: { density: "simple", primaryTool: "select" },
     panels: { left: ["slides"], right: ["properties", "layers", "colors"], bottom: ["speaker-notes"] },
     keyTools: [copy("슬라이드", "Slides"), copy("레이아웃", "Layout"), copy("텍스트", "Text"), copy("발표", "Present")],

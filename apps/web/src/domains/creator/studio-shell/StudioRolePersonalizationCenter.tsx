@@ -41,6 +41,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   CREATOR_ROLE_DEFINITIONS,
   CREATOR_SPECIALTY_DEFINITIONS,
+  creatorRoleAlias,
   creatorRoleDefinition,
   creatorText,
   normalizeCreatorRoleProfile,
@@ -170,6 +171,22 @@ const PRODUCTION_ROLE_LABELS: Readonly<Record<CreatorProductionRole, string>> = 
 
 function localized(_locale: CreatorRoleLocale, ko: string, en: string): string {
   return bi(ko, en);
+}
+
+function publicCandidateRoleLabel(
+  candidate: PublicCreatorRoleCandidate,
+  locale: CreatorRoleLocale,
+): string | null {
+  const { roleProfile } = candidate;
+  const roles = roleProfile.primaryRole
+    ? [roleProfile.primaryRole]
+    : roleProfile.secondaryRoles;
+  if (roles.length === 0) return null;
+  return roles.map((role) => (
+    (role === roleProfile.primaryRole ? candidate.customRoleLabel : null)
+      ?? creatorRoleAlias(roleProfile, role)
+      ?? creatorText(creatorRoleDefinition(role)?.label ?? { ko: role, en: role }, locale)
+  )).join(" · ");
 }
 
 function Card({
@@ -1360,24 +1377,28 @@ export function StudioRolePersonalizationCenter({
         {directoryError ? <p className="mt-3 text-xs font-semibold text-bad" role="alert">{directoryError}</p> : null}
         {directory ? (
           <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {directory.items.map((candidate) => (
-              <Link key={candidate.userId} href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "/users/{v0}"), { v0: String(encodeURIComponent(candidate.userId)) })} className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/35">
-                <p className="text-xs font-black text-fg">{candidate.name}</p>
-                <p className="mt-1 text-[0.7rem] font-semibold text-accent">
-                  {candidate.customRoleLabel
-                    ?? creatorText(creatorRoleDefinition(candidate.roleProfile.primaryRole)?.label ?? { ko: candidate.roleProfile.primaryRole, en: candidate.roleProfile.primaryRole }, locale)}
-                </p>
-                {candidate.roleProfile.specialties.length > 0 ? (
-                  <p className="mt-2 line-clamp-2 text-[0.68rem] leading-5 text-fg-3">
-                    {candidate.roleProfile.specialties
-                      .map((id) => CREATOR_SPECIALTY_DEFINITIONS.find((entry) => entry.id === id))
-                      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-                      .map((entry) => creatorText(entry.label, locale))
-                      .join(" · ")}
-                  </p>
-                ) : null}
-              </Link>
-            ))}
+            {directory.items.map((candidate) => {
+              const roleLabel = publicCandidateRoleLabel(candidate, locale);
+              return (
+                <Link key={candidate.userId} href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.shell.StudioRolePersonalizationCenter", "en", "/users/{v0}"), { v0: String(encodeURIComponent(candidate.userId)) })} className="rounded-xl border border-line bg-panel p-3 transition-colors hover:border-accent/35">
+                  <p className="text-xs font-black text-fg">{candidate.name}</p>
+                  {roleLabel ? (
+                    <p className="mt-1 text-[0.7rem] font-semibold text-accent">
+                      {roleLabel}
+                    </p>
+                  ) : null}
+                  {candidate.roleProfile.specialties.length > 0 ? (
+                    <p className="mt-2 line-clamp-2 text-[0.68rem] leading-5 text-fg-3">
+                      {candidate.roleProfile.specialties
+                        .map((id) => CREATOR_SPECIALTY_DEFINITIONS.find((entry) => entry.id === id))
+                        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+                        .map((entry) => creatorText(entry.label, locale))
+                        .join(" · ")}
+                    </p>
+                  ) : null}
+                </Link>
+              );
+            })}
             {directory.items.length === 0 ? (
               <p className="md:col-span-2 xl:col-span-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-fg-2">
                 {localized(locale, "조건에 맞고 공개에 동의한 창작자를 찾지 못했습니다.", "No opted-in creators matched these filters.")}

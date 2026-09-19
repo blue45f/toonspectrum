@@ -26,6 +26,24 @@ describe("studio mode profiles", () => {
     expect(studioModeProfile("webtoon").document.taskWorkspace).toBe("pro-comic");
     expect(studioModeProfile("three-d").document.taskWorkspace).toBe("pose-3d");
     expect(studioModeProfile("animation").document.taskWorkspace).toBe("animation");
+    expect(studioModeProfile("design").document.taskWorkspace).toBe("vector-design");
+    expect(studioModeProfile("slides").document.taskWorkspace).toBe("slides-deck");
+  });
+
+  it("retains Slides document, tools, notes, AI, export and workflow semantics", () => {
+    expect(studioModeProfile("slides")).toMatchObject({
+      id: "slides",
+      shell: "slides",
+      document: { kind: "slides", workspace: "slides", taskWorkspace: "slides-deck" },
+      launch: { density: "simple", primaryTool: "select" },
+      panels: { left: ["slides"], right: ["properties", "layers", "colors"], bottom: ["speaker-notes"] },
+      aiActions: ["pitch-outline", "slide-layout", "speaker-notes", "copy-suggest"],
+      preview: "presentation",
+      exports: ["pitch-pdf", "presentation"],
+    });
+    expect(studioModeProfile("slides").workflow.map(({ id }) => id))
+      .toEqual(["outline", "slides", "notes", "present"]);
+    expect(resolveStudioRuntimeMode({ kind: "webtoon" }, { kind: "slides" })).toBe("slides");
   });
 
   it("derives runtime mode from the active document before falling back to project kind", () => {

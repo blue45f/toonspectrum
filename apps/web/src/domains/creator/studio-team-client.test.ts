@@ -89,6 +89,7 @@ describe("studio team client", () => {
         specialties: ["background-3d"],
         experienceLevel: "professional",
         collaborationStatus: "available",
+        roleAliases: [{ role: "background", label: "  Background lead  ", privateNote: "discard" }],
         activeRole: "producer",
         projectRolePreferences: [{ projectKey: "secret", activeRole: "producer" }],
       },
@@ -96,15 +97,53 @@ describe("studio team client", () => {
 
     const result = normalizeStudioTeamSnapshot(input, "work-roles");
     expect(result.members[0]?.creatorRoleProfile).toEqual({
-      version: 1,
+      version: 2,
       primaryRole: "background",
       secondaryRoles: ["reviewer"],
       specialties: ["background-3d"],
       experienceLevel: "professional",
       collaborationStatus: "available",
+      roleAliases: [{ role: "background", label: "Background lead" }],
     });
     expect(JSON.stringify(result)).not.toContain("projectRolePreferences");
     expect(JSON.stringify(result)).not.toContain("activeRole");
+    expect(JSON.stringify(result)).not.toContain("privateNote");
+  });
+
+  it.each([
+    { specialties: ["background-3d"], collaborationStatus: null },
+    { specialties: [], collaborationStatus: "available" },
+  ])("대표 직무가 없는 v2 공개 전문 분야·협업 정보를 보존한다: %j", (fields) => {
+    const input = snapshot("work-public-v2");
+    Object.assign(input.members[0]!, {
+      creatorRoleProfile: {
+        version: 2,
+        primaryRole: null,
+        ...fields,
+        roleAliases: [{ role: "story", label: "Unselected alias" }],
+        creatorStage: "professional",
+        workCapacity: { availabilityNote: "private" },
+      },
+    });
+    expect(normalizeStudioTeamSnapshot(input, "work-public-v2").members[0]?.creatorRoleProfile)
+      .toEqual({
+        version: 2,
+        primaryRole: null,
+        secondaryRoles: [],
+        specialties: fields.specialties,
+        experienceLevel: null,
+        collaborationStatus: fields.collaborationStatus,
+        roleAliases: [],
+      });
+  });
+
+  it("공개 정보가 비어 있는 팀원 직무 프로필을 제외한다", () => {
+    const input = snapshot("work-empty-role");
+    Object.assign(input.members[0]!, {
+      creatorRoleProfile: { version: 2, primaryRole: null, roleAliases: [], activeRole: "story" },
+    });
+    expect(normalizeStudioTeamSnapshot(input, "work-empty-role").members[0])
+      .not.toHaveProperty("creatorRoleProfile");
   });
 
   it("초대함과 감사 기록 URL에 제한된 limit와 정확히 인코딩한 작품 id를 전달한다", async () => {
