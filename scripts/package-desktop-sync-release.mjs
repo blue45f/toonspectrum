@@ -144,21 +144,25 @@ async function copyJavaScriptTree(source, destination) {
   }
 }
 
-async function findNodeLicense() {
-  const runtimeRoot = resolve(dirname(process.execPath), "..");
-  const candidates = [
-    join(runtimeRoot, "LICENSE"),
-    join(runtimeRoot, "LICENSE.md"),
-    join(runtimeRoot, "share", "doc", "node", "copyright"),
-  ];
+export async function findNodeLicense(execPath = process.execPath, {
+  pathApi = { dirname, resolve, join }, statFile = stat,
+} = {}) {
+  const executableDirectory = pathApi.dirname(execPath);
+  const runtimeRoot = pathApi.resolve(executableDirectory, "..");
+  // Windows archives keep LICENSE beside node.exe; Unix distributions use the prefix.
+  const candidates = [...new Set([
+    ...[executableDirectory, runtimeRoot].flatMap((directory) =>
+      ["LICENSE", "LICENSE.md", "LICENSE.txt"].map((name) => pathApi.join(directory, name))),
+    pathApi.join(runtimeRoot, "share", "doc", "node", "copyright"),
+  ])];
   for (const candidate of candidates) {
     try {
-      if ((await stat(candidate)).isFile()) return candidate;
+      if ((await statFile(candidate)).isFile()) return candidate;
     } catch {
       // Continue through known Node distribution layouts.
     }
   }
-  throw new Error(`Node license was not found beside ${process.execPath}`);
+  throw new Error(`Node license was not found beside ${execPath}`);
 }
 
 async function stageRelease(options) {
@@ -223,6 +227,9 @@ async function stageRelease(options) {
     version,
     platform: platformLabel(),
     nodePlatform: process.platform,
+    ...(process.platform === "linux" ? {
+      libc: process.report.getReport().header.glibcVersionRuntime ? "gnu" : "musl",
+    } : {}),
     arch: process.arch,
     nodeVersion: process.version,
     sourceCommit: commit,
