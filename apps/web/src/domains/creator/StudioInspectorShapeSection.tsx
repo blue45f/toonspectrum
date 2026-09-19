@@ -1,3 +1,4 @@
+import type { StudioNativeBrushDocumentPrepare } from "./brush/studio-native-brush-document-commit";
 import { Suspense } from "react";
 
 import { normalizeShapeParams, normalizeStrokeStyle } from "./brush/studio-stroke-shapes";
@@ -51,6 +52,7 @@ interface StudioInspectorShapeSectionProps {
   applyPaperVectorRefinement: (operation: "simplify" | "smooth") => void;
   cancelPaperVectorRefinement: () => void;
   replaceDrawWithHokusaiNaturalMedia: StudioHokusaiNaturalMediaReplaceHandler;
+  prepareNativeBrushDocumentConversion?: StudioNativeBrushDocumentPrepare;
   recentColors: readonly string[];
   documentColors: readonly string[];
   ensureRecentColorsLoaded: () => void;
@@ -83,6 +85,7 @@ export function StudioInspectorShapeSection({
   applyPaperVectorRefinement,
   cancelPaperVectorRefinement,
   replaceDrawWithHokusaiNaturalMedia,
+  prepareNativeBrushDocumentConversion,
   recentColors,
   documentColors,
   ensureRecentColorsLoaded,
@@ -226,6 +229,7 @@ export function StudioInspectorShapeSection({
             onRefine={applyPaperVectorRefinement}
             onCancelRefinement={cancelPaperVectorRefinement}
             onReplace={replaceDrawWithHokusaiNaturalMedia}
+            onNativePrepare={prepareNativeBrushDocumentConversion}
           />
         )}
       </div>
