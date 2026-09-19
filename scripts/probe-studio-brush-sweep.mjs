@@ -97,7 +97,11 @@ async function selectBrush(page, name, operation) {
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   let pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   if (await pill.count() === 0) {
-    await toolbar.getByRole("button", { name: "펜", exact: true }).click();
+    await page.keyboard.press("b");
+    await page.waitForFunction(() =>
+      document.querySelector('[data-studio-draw-options="true"]')
+        ?.getAttribute("data-studio-active-draw-mode") === "pen"
+    );
     pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   }
   await pill.waitFor({ state: "visible", timeout: 10_000 });
