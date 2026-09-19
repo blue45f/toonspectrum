@@ -105,6 +105,10 @@ const NEW_BUNDLE_FILES = [
 ] as const;
 
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
+const HIGH_DETAIL_THUMBNAIL_MAX_BYTES = new Map<string, number>([
+  // Froggy is a retained 768px production render whose audited PNG is ~287KB.
+  ["froggy", 320 * 1024],
+]);
 
 describe("VRM library helpers", () => {
   it("uses polished character names for bundled VRMs", () => {
@@ -231,9 +235,8 @@ describe("VRM library helpers", () => {
 
       const { size } = statSync(filePath);
       expect(size, `${sample.id} thumbnail size should be > 1KB`).toBeGreaterThan(1024);
-      const maxThumbnailBytes = sample.thumbnailUrl!.includes("/refined-v1/")
-        ? 320 * 1024
-        : 200 * 1024;
+      const maxThumbnailBytes = HIGH_DETAIL_THUMBNAIL_MAX_BYTES.get(sample.id)
+        ?? (sample.thumbnailUrl!.includes("/refined-v1/") ? 320 * 1024 : 200 * 1024);
       expect(
         size,
         `${sample.id} thumbnail size should be < ${maxThumbnailBytes / 1024}KB`,

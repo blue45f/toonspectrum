@@ -27,6 +27,11 @@
       "name": "manifestVersion",
       "type": "float",
       "value": 2
+    },
+    {
+      "name": "manifestId",
+      "type": "string",
+      "value": "toonspectrum-master-studio"
     }
   ],
   "layers": [

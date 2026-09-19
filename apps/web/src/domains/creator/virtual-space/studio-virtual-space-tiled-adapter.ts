@@ -18,6 +18,9 @@ interface TiledObject {
   readonly id?: number;
   readonly name?: string;
   readonly type?: string;
+  readonly class?: string;
+  readonly polygon?: readonly StudioVirtualSpacePoint[];
+  readonly polyline?: readonly StudioVirtualSpacePoint[];
   readonly x?: number;
   readonly y?: number;
   readonly width?: number;
@@ -27,10 +30,14 @@ interface TiledObject {
   readonly properties?: readonly TiledProperty[];
 }
 interface TiledObjectLayer {
-  readonly type: "objectgroup";
+  readonly type: "objectgroup" | "group" | "imagelayer" | "tilelayer";
   readonly name: string;
   readonly visible?: boolean;
   readonly objects?: readonly TiledObject[];
+  readonly layers?: readonly TiledObjectLayer[];
+  readonly offsetx?: number;
+  readonly offsety?: number;
+  readonly properties?: readonly TiledProperty[];
 }
 export interface StudioTiledMapLike {
   readonly width: number;
@@ -47,24 +54,49 @@ function property(object: TiledObject, name: string): unknown {
 function mapProperty(map: StudioTiledMapLike, name: string): unknown {
   return map.properties?.find((item) => item.name === name)?.value;
 }
-function objects(map: StudioTiledMapLike, layerName: string): readonly TiledObject[] {
-  return map.layers?.find((layer) =>
-    layer.type === "objectgroup"
-    && layer.name === layerName
-    && layer.visible !== false
-  )?.objects?.filter((object) => object.visible !== false) ?? [];
+/** An explicitly present empty layer replaces content; only missing layers inherit defaults. */
+function layerObjects(map: StudioTiledMapLike, layerName: string): readonly TiledObject[] | undefined {
+  let found = false;
+  const result: TiledObject[] = [];
+  const visit = (layers: readonly TiledObjectLayer[], ox = 0, oy = 0, hidden = false, enabled = true, depth = 0) => {
+    if (depth > 16) throw new Error("Tiled groups exceed maximum nesting depth");
+    for (const layer of layers) {
+      const x = ox + Number(layer.offsetx ?? 0);
+      const y = oy + Number(layer.offsety ?? 0);
+      const invisible = hidden || layer.visible === false;
+      const active = enabled && layer.properties?.find((item) => item.name === "enabled")?.value !== false;
+      if (layer.type === "group") {
+        visit(layer.layers ?? [], x, y, invisible, active, depth + 1);
+        continue;
+      }
+      if (layer.type !== "objectgroup" || layer.name !== layerName) continue;
+      found = true;
+      if (!active || (layerName === "props" && invisible)) continue;
+      for (const object of layer.objects ?? []) {
+        if (property(object, "enabled") === false || (layerName === "props" && object.visible === false)) continue;
+        if (layerName === "colliders" && (object.polygon || object.polyline || Number(object.rotation ?? 0) !== 0)) {
+          throw new Error("Arcade collision layers require axis-aligned rectangle objects");
+        }
+        result.push({ ...object, x: Number(object.x ?? 0) + x, y: Number(object.y ?? 0) + y });
+        if (result.length > 4096) throw new Error("Tiled object budget exceeded");
+      }
+    }
+  };
+  visit(map.layers ?? []);
+  return found ? result : undefined;
 }
 function rect(object: TiledObject): StudioWorldRect {
   return {
     x: Number(object.x ?? 0),
     y: Number(object.y ?? 0),
-    width: Math.max(0, Number(object.width ?? 0)),
-    height: Math.max(0, Number(object.height ?? 0)),
+    width: Number(object.width ?? 0),
+    height: Number(object.height ?? 0),
   };
 }
 function optionalNumber(value: unknown): number | undefined {
+  if (value == null || value === "" || typeof value === "boolean") return undefined;
   const number = Number(value);
-  return Number.isFinite(number) ? number : undefined;
+  return number;
 }
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
@@ -101,7 +133,10 @@ export function studioWorldManifestFromTiled(
   map: StudioTiledMapLike,
   base: StudioVirtualSpaceWorldManifest,
 ): StudioVirtualSpaceWorldManifest {
-  const rooms = objects(map, "rooms").map((object): StudioWorldRoomDefinition => ({
+  const layers = new Map(["rooms", "colliders", "props", "interactions", "portals", "spawns", "npcs"]
+    .map((name) => [name, layerObjects(map, name)] as const));
+  const objects = (name: string) => layers.get(name) ?? [];
+  const rooms = objects("rooms").map((object): StudioWorldRoomDefinition => ({
     ...rect(object),
     id: String(property(object, "roomId") ?? object.name ?? "lounge"),
     labelKo: String(property(object, "labelKo") ?? object.name ?? ""),
@@ -110,10 +145,10 @@ export function studioWorldManifestFromTiled(
     descriptionEn: optionalString(property(object, "descriptionEn")),
     action: optionalString(property(object, "action")) as StudioWorldRoomDefinition["action"],
   }));
-  const colliders = objects(map, "colliders").map(rect);
-  const props = objects(map, "props").map((object): StudioWorldPropDefinition => ({
+  const colliders = objects("colliders").map(rect);
+  const props = objects("props").map((object): StudioWorldPropDefinition => ({
     id: object.name ?? `prop-${object.id ?? 0}`,
-    kind: String(property(object, "kind") ?? "decor") as StudioWorldPropDefinition["kind"],
+    kind: String(property(object, "kind") ?? (object.class || object.type || "decor")) as StudioWorldPropDefinition["kind"],
     assetKey: optionalString(property(object, "assetKey")),
     assetUrl: optionalString(property(object, "assetUrl")),
     x: Number(object.x ?? 0),
@@ -123,51 +158,66 @@ export function studioWorldManifestFromTiled(
     scale: optionalNumber(property(object, "scale")) ?? 1,
     rotation: optionalNumber(property(object, "rotation")) ?? optionalNumber(object.rotation) ?? 0,
     alpha: optionalNumber(property(object, "alpha")) ?? 1,
-    originX: optionalNumber(property(object, "originX")),
-    originY: optionalNumber(property(object, "originY")),
+    originX: optionalNumber(property(object, "originX")) ?? (Number(object.width ?? 0) > 0 ? 0 : undefined),
+    originY: optionalNumber(property(object, "originY")) ?? (Number(object.height ?? 0) > 0 ? 0 : undefined),
     depth: String(property(object, "depth") ?? "y-sort") as StudioWorldPropDefinition["depth"],
     fixedDepth: optionalNumber(property(object, "fixedDepth")),
-    collider: property(object, "collider") === false ? undefined : (
-      Number(object.width ?? 0) > 0 && Number(object.height ?? 0) > 0
-        ? rect(object)
+    collider: property(object, "collider") === false || (
+      property(object, "collider") !== true
+      && (property(object, "kind") ?? (object.class || object.type || "decor")) === "decor"
+    ) ? undefined : (
+      Number(property(object, "colliderWidth") ?? object.width ?? 0) > 0
+      && Number(property(object, "colliderHeight") ?? object.height ?? 0) > 0
+        ? {
+            x: Number(object.x ?? 0) + Number(property(object, "colliderX") ?? 0),
+            y: Number(object.y ?? 0) + Number(property(object, "colliderY") ?? 0),
+            width: Number(property(object, "colliderWidth") ?? object.width),
+            height: Number(property(object, "colliderHeight") ?? object.height),
+          }
         : undefined
     ),
+    portal: String(property(object, "kind") ?? (object.class || object.type || "decor")) === "portal"
+      ? {
+          targetRoomId: optionalString(property(object, "targetRoomId")),
+          targetPoint: property(object, "targetX") != null && property(object, "targetY") != null
+            ? { x: Number(property(object, "targetX")), y: Number(property(object, "targetY")) }
+            : undefined,
+          href: optionalString(property(object, "href")),
+        }
+      : undefined,
     action: optionalString(property(object, "action")) as StudioWorldPropDefinition["action"],
     interactionRadius: optionalNumber(property(object, "interactionRadius")),
     labelKo: optionalString(property(object, "labelKo")),
     labelEn: optionalString(property(object, "labelEn")),
   }));
-  const interactions = objects(map, "interactions").map((object): StudioWorldInteractionDefinition => ({
+  const interactions = objects("interactions").map((object): StudioWorldInteractionDefinition => ({
     id: object.name ?? `interaction-${object.id ?? 0}`,
     zoneId: String(property(object, "roomId") ?? "lounge"),
     point: { x: Number(object.x ?? 0), y: Number(object.y ?? 0) },
-    radius: Math.max(
-      1,
-      optionalNumber(property(object, "radius"))
-        ?? Math.max(Number(object.width ?? 80), Number(object.height ?? 80)) / 2,
-    ),
+    radius: optionalNumber(property(object, "radius"))
+      ?? Math.max(Number(object.width || 80), Number(object.height || 80)) / 2,
     labelKo: String(property(object, "labelKo") ?? object.name ?? ""),
     labelEn: String(property(object, "labelEn") ?? object.name ?? ""),
     action: String(property(object, "action") ?? "community") as StudioWorldInteractionDefinition["action"],
   }));
-  const portals = objects(map, "portals").map((object): StudioWorldPortalDefinition => {
+  const portals = objects("portals").map((object): StudioWorldPortalDefinition => {
     const targetX = optionalNumber(property(object, "targetX"));
     const targetY = optionalNumber(property(object, "targetY"));
     return {
       id: object.name ?? `portal-${object.id ?? 0}`,
       point: { x: Number(object.x ?? 0), y: Number(object.y ?? 0) },
-      radius: Math.max(1, optionalNumber(property(object, "radius")) ?? 48),
+      radius: optionalNumber(property(object, "radius")) ?? 48,
       targetRoomId: optionalString(property(object, "targetRoomId")),
       targetPoint: targetX != null && targetY != null ? { x: targetX, y: targetY } : undefined,
       href: optionalString(property(object, "href")),
     };
   });
-  const spawns = objects(map, "spawns").map((object): StudioWorldSpawnDefinition => ({
+  const spawns = objects("spawns").map((object): StudioWorldSpawnDefinition => ({
     id: object.name ?? `spawn-${object.id ?? 0}`,
     point: { x: Number(object.x ?? 0), y: Number(object.y ?? 0) },
     facing: String(property(object, "facing") ?? "down") as StudioWorldSpawnDefinition["facing"],
   }));
-  const npcs = objects(map, "npcs").map((object): StudioWorldNpcDefinition => ({
+  const npcs = objects("npcs").map((object): StudioWorldNpcDefinition => ({
     id: object.name ?? `npc-${object.id ?? 0}`,
     skinKey: String(property(object, "skinKey") ?? "pink"),
     point: { x: Number(object.x ?? 0), y: Number(object.y ?? 0) },
@@ -179,21 +229,22 @@ export function studioWorldManifestFromTiled(
     patrol: parsePatrol(property(object, "patrol")),
   }));
 
-  const worldWidth = Math.max(1, map.width * map.tilewidth);
-  const worldHeight = Math.max(1, map.height * map.tileheight);
+  const worldWidth = map.width * map.tilewidth;
+  const worldHeight = map.height * map.tileheight;
   return {
     ...base,
-    version: base.version + 1,
+    id: optionalString(mapProperty(map, "manifestId")) ?? base.id,
+    version: optionalNumber(mapProperty(map, "manifestVersion")) ?? base.version,
     width: worldWidth,
     height: worldHeight,
     backgroundUrl: optionalString(mapProperty(map, "backgroundUrl")) ?? base.backgroundUrl,
     backgroundAssetKey: optionalString(mapProperty(map, "backgroundAssetKey")) ?? base.backgroundAssetKey,
-    rooms: rooms.length ? rooms : base.rooms,
-    colliders: colliders.length ? colliders : base.colliders,
-    props: props.length ? props : base.props,
-    interactions: interactions.length ? interactions : base.interactions,
-    portals: portals.length ? portals : base.portals,
-    spawns: spawns.length ? spawns : base.spawns,
-    npcs: npcs.length ? npcs : base.npcs,
+    rooms: layers.get("rooms") !== undefined ? rooms : base.rooms,
+    colliders: layers.get("colliders") !== undefined ? colliders : base.colliders,
+    props: layers.get("props") !== undefined ? props : base.props,
+    interactions: layers.get("interactions") !== undefined ? interactions : base.interactions,
+    portals: layers.get("portals") !== undefined ? portals : base.portals,
+    spawns: layers.get("spawns") !== undefined ? spawns : base.spawns,
+    npcs: layers.get("npcs") !== undefined ? npcs : base.npcs,
   };
 }

@@ -220,3 +220,8 @@
 @media(max-width:1023px){
   .studio-vspace-phaser-canvas{border-radius:inherit}
 }
+
+.studio-vspace-engine-mount{position:absolute;inset:0;overflow:hidden}
+.studio-vspace-engine-message{position:absolute;inset:0;z-index:5;display:grid;place-content:center;gap:1rem;padding:2rem;background:#171b24;color:#f4f5fb;text-align:center;font-size:.875rem}
+.studio-vspace-engine-message button{justify-self:center;border:1px solid #a08cff;border-radius:.75rem;padding:.65rem 1.2rem;background:#49368f;color:white;font-weight:700;cursor:pointer}
+.studio-vspace-phaser-canvas canvas:focus-visible{outline:3px solid #b79fff;outline-offset:-4px}

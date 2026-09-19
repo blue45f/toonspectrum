@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+
 import {
   getStudioBg3dEnvironmentAsset,
   isStudioBg3dEnvironmentAssetId,
@@ -238,7 +240,7 @@ export function StudioBg3dAssetLibraryPanel({
       <input
         ref={fileInputRef}
         accept={MODEL_FILE_ACCEPT}
-        aria-label="3D 모델 및 연결 파일 선택"
+        aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 및 연결 파일 선택")}
         className="sr-only"
         multiple
         type="file"

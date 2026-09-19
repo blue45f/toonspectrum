@@ -19,13 +19,13 @@ describe("studio pixel-selection workbench integration", () => {
     expect(source).toContain("operation={pixelCombine}");
   });
 
-  it("mounts a safe-area-aware pixel-selection HUD without overlapping the object bar", () => {
+  it("mounts a safe-area-aware pixel-selection HUD after contextual chrome consolidation", () => {
     const canvasSource = readCreatorFile("studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
     const hudSource = readCreatorFile("StudioPixelSelectionHud.tsx");
     expect(canvasSource).toContain('from "../StudioPixelSelectionHud"');
     expect(canvasSource).toContain("<StudioPixelSelectionHud");
     expect(canvasSource).toContain("stableHandlers={studioOnCanvasSurfaceHandlers}");
-    expect(canvasSource).toContain("&& !pixelOverlaySel");
+    expect(canvasSource).not.toContain("<StudioSelectionContextBar");
     expect(canvasSource).toContain('"hud-feather"');
     expect(hudSource).toContain("planStudioSelectionContextBarPlacement");
     expect(hudSource).toContain("studioOnCanvasSafeArea");

@@ -215,10 +215,12 @@ export class StudioVirtualSpacePresenceController {
   constructor(
     private readonly participant: StudioLiveParticipant,
     private readonly port: StudioLiveDirectPort,
-    initialPoint: StudioVirtualSpacePoint,
+    initialPoint: StudioVirtualSpacePoint | StudioVirtualSpacePresenceState,
     private readonly dependencies: StudioVirtualSpacePresenceDependencies = {},
   ) {
-    this.self = runtimePresenceState(initialPoint);
+    this.self = "facing" in initialPoint
+      ? runtimePresenceState(initialPoint, initialPoint.facing, initialPoint.activity, initialPoint.moving, initialPoint.avatarIndex, initialPoint.zoneId)
+      : runtimePresenceState(initialPoint);
   }
 
   private now(): number {
