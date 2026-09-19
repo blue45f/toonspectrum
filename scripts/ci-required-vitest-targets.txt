@@ -190,3 +190,4 @@ scripts/verify-studio-hybrid-dcc-integration.test.ts
 scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
 scripts/verify-studio-living-ink-integration.test.ts
 scripts/verify-studio-menus.test.ts
+scripts/pigment-dependency-install-policy.test.mjs

@@ -20,6 +20,9 @@ onlyBuiltDependencies:
 # firebase 웹 SDK 의 @firebase/util / protobufjs 는 postinstall 빌드 스크립트가 런타임에 불필요해
 # 명시적으로 거부(false)한다 — pnpm 11 strict 의 ERR_PNPM_IGNORED_BUILDS 를 깨끗하게 억제(fleet 컨벤션).
 allowBuilds:
+  # ColorMix's Babel runtime uses prebuilt core-js; its optional postinstall banner is not a build.
+  # Explicit denial keeps strict dependency-script admission enabled in clean CI installs.
+  core-js: false
   '@firebase/util': false
   protobufjs: false
   # image-js의 브라우저 분석 경로에는 선택적 네이티브 Node 캔버스가 필요하지 않다.
