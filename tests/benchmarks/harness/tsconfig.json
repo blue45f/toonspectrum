@@ -11,5 +11,8 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["main.ts"]
+  "include": [
+    "main.ts",
+    "../../../packages/studio-engine-skia/src/canvaskit-wasm-url.d.ts"
+  ]
 }

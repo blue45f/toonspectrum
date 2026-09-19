@@ -30,3 +30,13 @@ export function encodeRgbaToPng(
   width: number,
   height: number,
 ): Uint8Array;
+
+/** Vendor-neutral ImageBitmap boundary; actual CanvasKit types stay in the engine package. */
+export function createSkiaGpuIslandBackend(): {
+  render(request: { islandId: string; width: number; height: number; revision: number; scene: unknown }): Promise<
+    | { status: "transferred"; islandId: string; revision: number; bitmap: ImageBitmap }
+    | { status: "cached"; islandId: string; revision: number }
+    | { status: "unavailable"; reason: string }
+  >;
+  dispose(): void;
+};

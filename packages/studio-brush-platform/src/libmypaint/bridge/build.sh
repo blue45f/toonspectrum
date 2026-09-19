@@ -27,6 +27,12 @@ if ! command -v emcc >/dev/null 2>&1; then
   }
 fi
 
+ACTUAL_EMCC="$(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+if [ "$ACTUAL_EMCC" != "6.0.6" ]; then
+  echo "emcc is $ACTUAL_EMCC, expected the pinned 6.0.6 toolchain" >&2
+  exit 1
+fi
+
 ACTUAL_COMMIT="$(git -C "$LIBMYPAINT_DIR" rev-parse HEAD)"
 if [ "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" ]; then
   echo "libmypaint checkout is $ACTUAL_COMMIT, expected v1.6.1 ($EXPECTED_COMMIT)" >&2
@@ -67,7 +73,7 @@ emcc \
   -sMODULARIZE=1 \
   -sEXPORT_ES6=1 \
   -sEXPORT_NAME=createLibMypaintModule \
-  -sENVIRONMENT=web,node \
+  -sENVIRONMENT=web,worker,node \
   -sALLOW_MEMORY_GROWTH=1 \
   -sASSERTIONS=0 \
   -sEXPORTED_RUNTIME_METHODS=cwrap,HEAPU8,UTF8ToString \
@@ -81,6 +87,27 @@ if ! head -1 "$OUT_DIR/mypaint-wasm.mjs" | grep -q "eslint-disable"; then
   printf '%s\n' "$BANNER" | cat - "$OUT_DIR/mypaint-wasm.mjs" >"$OUT_DIR/mypaint-wasm.mjs.tmp"
   mv "$OUT_DIR/mypaint-wasm.mjs.tmp" "$OUT_DIR/mypaint-wasm.mjs"
 fi
+
+# Refresh only rebuilt artifact hashes; reviewed upstream components/licenses stay unchanged.
+python3 - "$OUT_DIR" <<'PYINVENTORY'
+import hashlib, json, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+path = root / "THIRD_PARTY_INVENTORY.json"
+if path.exists():
+    data = json.loads(path.read_text())
+    for artifact in data["artifacts"]:
+        artifact["sha256"] = hashlib.sha256((root / artifact["path"]).read_bytes()).hexdigest()
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    lock = root / "THIRD_PARTY_NOTICES.sha256"
+    if lock.exists():
+        updated = []
+        for line in lock.read_text().splitlines():
+            if line.endswith("  THIRD_PARTY_INVENTORY.json"):
+                line = hashlib.sha256(path.read_bytes()).hexdigest() + "  THIRD_PARTY_INVENTORY.json"
+            updated.append(line)
+        lock.write_text("\n".join(updated) + "\n")
+PYINVENTORY
 
 # Refresh the reproducible-release manifest (generated artifacts + the pinned
 # bridge sources; hand-written loader files are covered by lint/typecheck).

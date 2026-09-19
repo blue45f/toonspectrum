@@ -19,6 +19,15 @@ import type { LibMypaintEmscriptenModule } from "./mypaint-wasm";
  * `init({ module_or_path })` convention.
  */
 
+export interface LibMypaintDirtyFrame {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  /** Packed straight-alpha RGBA8. Replace these pixels; do not alpha-composite them again. */
+  readonly pixels: Uint8Array;
+}
+
 /** Typed, pointer-level view over the C bridge (mypaint-bridge.c). */
 export interface LibMypaintRaw {
   /** e.g. "libmypaint 1.6.1+2768251d (emcc)" */
@@ -68,12 +77,18 @@ export interface LibMypaintRaw {
   ): number;
   /** Whole surface as straight-alpha RGBA8 (fresh copy, width*height*4). */
   surfaceToRgba8(surface: number, width: number, height: number): Uint8Array;
+  /** Read only a bounded rectangle, with no full-surface temporary. */
+  surfaceToRgba8Region(surface: number, x: number, y: number, width: number, height: number): Uint8Array;
+  /** Consume accumulated native dirty bounds only after the packed copy succeeds. */
+  surfaceTakeDirtyFrame(surface: number): LibMypaintDirtyFrame | null;
   module: LibMypaintEmscriptenModule;
 }
 
 export interface LoadLibMypaintOptions {
   /** Explicit wasm bytes (hermetic loads / custom bundling). */
   wasmBinary?: Uint8Array;
+  /** Explicit emitted WASM asset URL for browser/Worker bundling. Bypasses the default cache. */
+  wasmUrl?: string;
 }
 
 function bindRaw(module: LibMypaintEmscriptenModule): LibMypaintRaw {
@@ -127,10 +142,38 @@ function bindRaw(module: LibMypaintEmscriptenModule): LibMypaintRaw {
     "number",
     "number",
   ]);
-  const surfaceToRgba8 = module.cwrap("lmp_surface_to_rgba8", null, [
-    "number",
-    "number",
+  const regionToRgba8 = module.cwrap("lmp_surface_region_to_rgba8", "number", [
+    "number", "number", "number", "number", "number", "number",
   ]);
+  const dirtyRect = module.cwrap("lmp_surface_dirty_rect", "number", ["number", "number"]);
+  const ackDirty = module.cwrap("lmp_surface_ack_dirty", null, ["number"]);
+  const surfaces = new Map<number, { width: number; height: number }>();
+  function dimensions(surface: number) {
+    const value = surfaces.get(surface);
+    if (!value) throw new RangeError("Unknown or released libmypaint surface handle");
+    return value;
+  }
+  function allocate(bytes: number): number {
+    const pointer = module._malloc(bytes);
+    if (!pointer) throw new Error("libmypaint pixel allocation failed");
+    return pointer;
+  }
+  function readRegion(surface: number, x: number, y: number, width: number, height: number): Uint8Array {
+    const bound = dimensions(surface);
+    if (![x, y, width, height].every(Number.isSafeInteger)
+      || x < 0 || y < 0 || width <= 0 || height <= 0
+      || x + width > bound.width || y + height > bound.height
+    ) throw new RangeError("libmypaint pixel region exceeds its surface");
+    const byteLength = width * height * 4;
+    const pointer = allocate(byteLength);
+    try {
+      if (regionToRgba8(surface, x, y, width, height, pointer) !== 1) {
+        throw new Error("libmypaint native pixel region was rejected");
+      }
+      // malloc may grow WASM memory; obtain its current heap only after allocation/call.
+      return new Uint8Array(module.HEAPU8.subarray(pointer, pointer + byteLength));
+    } finally { module._free(pointer); }
+  }
 
   return {
     version: () => module.UTF8ToString(version()),
@@ -155,23 +198,41 @@ function bindRaw(module: LibMypaintEmscriptenModule): LibMypaintRaw {
     brushNewStroke: (brush, seed) => {
       newStroke(brush, seed);
     },
-    surfaceNew: (width, height) => surfaceNew(width, height),
+    surfaceNew: (width, height) => {
+      if (![width, height].every(Number.isSafeInteger) || width <= 0 || height <= 0
+        || width > 4096 || height > 4096 || width * height > 4_194_304
+      ) throw new RangeError("libmypaint surface dimensions exceed the bounded allocation policy");
+      const surface = surfaceNew(width, height);
+      if (surface) surfaces.set(surface, { width, height });
+      return surface;
+    },
     surfaceFree: (surface) => {
+      dimensions(surface);
+      surfaces.delete(surface);
       surfaceFree(surface);
     },
     strokeTo: (brush, surface, x, y, pressure, tiltX, tiltY, dtimeSeconds) =>
       strokeTo(brush, surface, x, y, pressure, tiltX, tiltY, dtimeSeconds),
     surfaceToRgba8: (surface, width, height) => {
-      const byteLength = width * height * 4;
-      const pointer = module._malloc(byteLength);
-      try {
-        surfaceToRgba8(surface, pointer);
-        return new Uint8Array(
-          module.HEAPU8.subarray(pointer, pointer + byteLength),
-        );
-      } finally {
-        module._free(pointer);
+      const expected = dimensions(surface);
+      if (expected.width !== width || expected.height !== height) {
+        throw new RangeError("libmypaint full-frame dimensions do not match the native surface");
       }
+      return readRegion(surface, 0, 0, width, height);
+    },
+    surfaceToRgba8Region: readRegion,
+    surfaceTakeDirtyFrame: (surface) => {
+      dimensions(surface);
+      const pointer = allocate(16);
+      try {
+        if (!dirtyRect(surface, pointer)) return null;
+        const view = new DataView(module.HEAPU8.buffer, module.HEAPU8.byteOffset + pointer, 16);
+        const x = view.getInt32(0, true), y = view.getInt32(4, true);
+        const width = view.getInt32(8, true), height = view.getInt32(12, true);
+        const pixels = readRegion(surface, x, y, width, height);
+        ackDirty(surface);
+        return { x, y, width, height, pixels };
+      } finally { module._free(pointer); }
     },
     module,
   };
@@ -184,19 +245,20 @@ export function loadLibMypaint(
   options: LoadLibMypaintOptions = {},
 ): Promise<LibMypaintRaw> {
   if (options.wasmBinary) {
-    // Explicit bytes bypass the cache: hermetic loads stay hermetic.
-    // BufferSource cast: Uint8Array<ArrayBufferLike> (e.g. node Buffer) is not
-    // assignable to the DOM lib's BufferSource generic, but the runtime accepts
-    // any Uint8Array here.
-    const bytes = options.wasmBinary as unknown as BufferSource;
+    // Let Emscripten reject failed instantiations instead of leaving its initialization
+    // promise unresolved inside a custom instantiateWasm callback.
+    const bytes = new Uint8Array(options.wasmBinary);
+    return WebAssembly.compile(bytes).then(() => createLibMypaintModule({ wasmBinary: bytes })).then(bindRaw);
+  }
+  if (options.wasmUrl) {
     return createLibMypaintModule({
-      instantiateWasm: (imports, receiveInstance) => {
-        void WebAssembly.instantiate(bytes, imports).then((result) =>
-          receiveInstance(result.instance, result.module),
-        );
-      },
+      locateFile: (file, directory) => file.endsWith(".wasm") ? options.wasmUrl! : directory + file,
     }).then(bindRaw);
   }
-  cachedLoad ??= createLibMypaintModule().then(bindRaw);
+  if (!cachedLoad) {
+    const pending = createLibMypaintModule().then(bindRaw);
+    cachedLoad = pending;
+    void pending.catch(() => { if (cachedLoad === pending) cachedLoad = undefined; });
+  }
   return cachedLoad;
 }
