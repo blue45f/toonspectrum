@@ -1,10 +1,10 @@
 import {
-  NATIVE_BRUSH_PROBE_HEIGHT as HEIGHT, NATIVE_BRUSH_PROBE_WIDTH as WIDTH,
+  NATIVE_BRUSH_PROBE_SURFACE, NATIVE_BRUSH_PROBE_BATCH, NATIVE_BRUSH_PROBE_MAX_SAMPLES, validateNativeBrushSurface,
   nativeBrushProbeEngine, validateNativeBrushProbeConfig, validateNativeBrushProbeSamples,
 } from "./studio-native-brush-probe-contract";
 
-import type { NativeBrushProbeConfig, NativeBrushProbeEngine, NativeBrushProbeFrame, NativeBrushProbeReply, NativeBrushProbeRequest, NativeBrushProbeSample } from "./studio-native-brush-probe-contract";
-import type { LibMypaintIncrementalStrokeSession } from "@toonspectrum/studio-brush-platform";
+import type { NativeBrushProbeConfig, NativeBrushProbeEngine, NativeBrushProbeFrame, NativeBrushProbeReply, NativeBrushProbeRequest, NativeBrushProbeSample, NativeBrushSurface } from "./studio-native-brush-probe-contract";
+import type { LibMypaintIncrementalStrokeSession } from "@toonspectrum/studio-brush-platform/libmypaint";
 
 
 import { nativeBrushProbeMybDocument, nativeBrushProbeScene } from "./studio-native-brush-probe-program";
@@ -14,6 +14,7 @@ const scope = globalThis as unknown as {
   postMessage(value: NativeBrushProbeReply, transfer: Transferable[]): void;
 };
 let engine: NativeBrushProbeEngine | null = null;
+let surface: NativeBrushSurface = NATIVE_BRUSH_PROBE_SURFACE;
 let busy = false, failed = false, begun = false;
 let config: NativeBrushProbeConfig | null = null;
 let samples: NativeBrushProbeSample[] = [];
@@ -46,8 +47,8 @@ async function initialize(selected: NativeBrushProbeEngine) {
   } else if (selected === "canvaskit") {
     const { createSkiaGpuIslandBackend } = await import("@toonspectrum/studio-engine-skia");
     skia = createSkiaGpuIslandBackend();
-    const warm = await skia.render({ islandId: "test-prewarm", width: WIDTH, height: HEIGHT, revision: 0,
-      scene: { version: 11, width: WIDTH, height: HEIGHT, background: { r: 0, g: 0, b: 0, a: 0 }, nodes: [] } });
+    const warm = await skia.render({ islandId: "test-prewarm", width: surface.width, height: surface.height, revision: 0,
+      scene: { version: 11, width: surface.width, height: surface.height, background: { r: 0, g: 0, b: 0, a: 0 }, nodes: [] } });
     if (warm.status === "unavailable") throw new Error(warm.reason);
     if (warm.status === "transferred") warm.bitmap.close();
   } else {
@@ -59,7 +60,7 @@ async function initialize(selected: NativeBrushProbeEngine) {
     device.addEventListener("uncapturederror", () => { failed = true; });
     vello = await import("@toonspectrum/studio-engine-vello");
     await vello.loadVelloGpuBrowser(); await vello.adoptGpuDevice(device);
-    gpuCanvas = new OffscreenCanvas(WIDTH, HEIGHT);
+    gpuCanvas = new OffscreenCanvas(surface.width, surface.height);
     const context = gpuCanvas.getContext("webgpu") as unknown as GPUCanvasContext | null;
     if (!context || typeof context.configure !== "function") throw new Error("No WebGPU test canvas");
     gpuContext = context;
@@ -74,15 +75,15 @@ async function render(finish: boolean): Promise<NativeBrushProbeFrame | null> {
     return patch ? { kind: "pixels", ...patch } : null;
   }
   if (skia) {
-    const result = await skia.render({ islandId: "brush-test", width: WIDTH, height: HEIGHT, revision: ++revision, scene: nativeBrushProbeScene(config!, samples) });
+    const result = await skia.render({ islandId: "brush-test", width: surface.width, height: surface.height, revision: ++revision, scene: nativeBrushProbeScene(config!, samples, surface) });
     if (result.status !== "transferred") throw new Error(result.status === "unavailable" ? result.reason : "Unexpected cached test frame");
     return { kind: "bitmap", bitmap: result.bitmap };
   }
   if (vello && device && gpuCanvas && gpuContext) {
-    const texture = await vello.renderSceneToTextureGpu(nativeBrushProbeScene(config!, samples));
+    const texture = await vello.renderSceneToTextureGpu(nativeBrushProbeScene(config!, samples, surface));
     try {
       const encoder = device.createCommandEncoder();
-      encoder.copyTextureToTexture({ texture }, { texture: gpuContext.getCurrentTexture() }, [WIDTH, HEIGHT]);
+      encoder.copyTextureToTexture({ texture }, { texture: gpuContext.getCurrentTexture() }, [surface.width, surface.height]);
       device.queue.submit([encoder.finish()]);
       await device.queue.onSubmittedWorkDone();
       if (failed) throw new Error("Vello GPU execution failed");
@@ -95,24 +96,66 @@ async function execute(request: NativeBrushProbeRequest): Promise<NativeBrushPro
   const base = { version: 1 as const, id: request.id };
   if (request.type === "init") {
     if (!nativeBrushProbeEngine(request.engine)) throw new TypeError("Unknown native test engine");
+    validateNativeBrushSurface(request.surface ?? NATIVE_BRUSH_PROBE_SURFACE);
+    surface = { ...(request.surface ?? NATIVE_BRUSH_PROBE_SURFACE) };
     await initialize(request.engine);
     return { ...base, type: "ready", engine: request.engine };
   }
   if (!engine) throw new Error("Initialize the selected engine first");
+  if (request.type === "render-document") {
+    if (begun) throw new Error("Finish or cancel the active trial before document conversion");
+    if (!Array.isArray(request.samples) || request.samples.length < 1 || request.samples.length > NATIVE_BRUSH_PROBE_MAX_SAMPLES) {
+      throw new RangeError("Native document input budget exceeded");
+    }
+    const nextSurface = request.surface ?? surface;
+    validateNativeBrushSurface(nextSurface);
+    validateNativeBrushProbeConfig(request.config);
+    // Validate the entire source before allocating or changing native brush state.
+    for (let offset = 0; offset < request.samples.length; offset += NATIVE_BRUSH_PROBE_BATCH) {
+      validateNativeBrushProbeSamples(request.samples.slice(offset, offset + NATIVE_BRUSH_PROBE_BATCH),
+        offset ? request.samples[offset - 1]!.tMs : 0, offset, nextSurface);
+    }
+    if (nextSurface.width !== surface.width || nextSurface.height !== surface.height) {
+      // Resize only between settled operations; retain the selected engine/module, not old ink.
+      if (gpuCanvas && gpuContext && device) {
+        gpuContext.unconfigure();
+        gpuCanvas.width = nextSurface.width; gpuCanvas.height = nextSurface.height;
+        gpuContext.configure({ device, format: "rgba8unorm", alphaMode: "premultiplied",
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST });
+      }
+      surface = { ...nextSurface };
+    }
+    try {
+      await execute({ ...base, type: "begin", config: request.config });
+      for (let offset = 0; offset < request.samples.length; offset += NATIVE_BRUSH_PROBE_BATCH) {
+        const batch = request.samples.slice(offset, offset + NATIVE_BRUSH_PROBE_BATCH);
+        native?.append(batch); samples.push(...batch);
+      }
+      const { encodeNativeBrushDocumentFrame } = await import("./studio-native-brush-document-output");
+      const frame = await render(true);
+      begun = false;
+      const output = await encodeNativeBrushDocumentFrame(frame, surface, request.clipEdges);
+      return { ...base, type: "document", engine, ...surface, ...output, samples: samples.length };
+    } finally {
+      // Engine reuse must never reuse brush dynamics, previous seed, or native stroke pixels.
+      try { native?.dispose(); } finally { native = null; samples = []; config = null; begun = false; }
+    }
+  }
+
   if (request.type === "begin") {
     validateNativeBrushProbeConfig(request.config);
     native?.dispose(); native = null;
     config = { ...request.config }; samples = []; begun = true;
     if (mypaint) {
-      const { createLibMypaintIncrementalStrokeSession } = await import("@toonspectrum/studio-brush-platform");
-      native = createLibMypaintIncrementalStrokeSession(mypaint, nativeBrushProbeMybDocument(config), { width: WIDTH, height: HEIGHT, seed: config.seed });
+      const { createLibMypaintIncrementalStrokeSession } = await import("@toonspectrum/studio-brush-platform/libmypaint");
+      native = createLibMypaintIncrementalStrokeSession(mypaint, nativeBrushProbeMybDocument(config), { width: surface.width, height: surface.height, seed: config.seed });
       if (native.settings.unknownSettings.length || native.settings.unknownInputs.length) throw new Error("Unsupported native test settings");
     }
     return { ...base, type: "begun", engine };
   }
   if (!begun) throw new Error("No active native test stroke");
   if (request.type === "append") {
-    validateNativeBrushProbeSamples(request.samples, samples.at(-1)?.tMs ?? 0, samples.length);
+    validateNativeBrushProbeSamples(request.samples, samples.at(-1)?.tMs ?? 0, samples.length, surface);
     native?.append(request.samples); samples.push(...request.samples);
   } else if (request.type !== "finish") throw new TypeError("Unknown native test operation");
   const finished = request.type === "finish";
@@ -130,7 +173,7 @@ scope.onmessage = (event) => {
   busy = true;
   void execute(request).then((reply) => {
     const frame = reply.type === "frame" ? reply.frame : null;
-    try { scope.postMessage(reply, frame?.kind === "bitmap" ? [frame.bitmap] : frame?.kind === "pixels" ? [frame.pixels.buffer as ArrayBuffer] : []); }
+    try { scope.postMessage(reply, reply.type === "document" ? [reply.png] : frame?.kind === "bitmap" ? [frame.bitmap] : frame?.kind === "pixels" ? [frame.pixels.buffer as ArrayBuffer] : []); }
     catch (error) { if (frame?.kind === "bitmap") frame.bitmap.close(); throw error; }
   }).catch((error: unknown) => {
     failed = true;

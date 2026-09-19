@@ -1,3 +1,4 @@
+import type { StudioNativeBrushDocumentPrepare } from "./brush/studio-native-brush-document-commit";
 import type { StudioAiSettings } from "./ai/studio-ai-client";
 import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import type {
@@ -89,6 +90,7 @@ export interface StudioInspectorAsideHandlers {
   ) => void;
   addProceduralArtisticBrushRaster: (src: string, width: number, height: number, name: string, targetPageId: string, targetMasterEditMode: boolean) => boolean;
   replaceDrawWithHokusaiNaturalMedia: StudioHokusaiNaturalMediaReplaceHandler;
+  prepareNativeBrushDocumentConversion?: StudioNativeBrushDocumentPrepare;
   addAdvancedRuler: (type: StudioAdvancedRuler["type"]) => void;
   addBubbleShapePointFromInspector: () => void;
   addFilterMask: (fill: FilterMaskPaintMode) => void;

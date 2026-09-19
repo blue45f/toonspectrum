@@ -1278,8 +1278,10 @@ async function activatePenAndWatercolor(
     : await (async () => {
         const toolbar = page.locator('[data-studio-draw-options="true"]');
         await toolbar.waitFor({ state: "visible", timeout: 8_000 });
-        const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-        if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+        await page.waitForFunction(() =>
+          document.querySelector('[data-studio-draw-options="true"]')
+            ?.getAttribute("data-studio-active-draw-mode") === "pen"
+        );
         return toolbar;
       })();
   const catalogTrigger = pickerSurface.locator(

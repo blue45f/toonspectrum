@@ -25,7 +25,7 @@ export interface StudioLineWidthAdjustmentPanelProps {
 const ACTION_TABS: readonly { id: LineWidthAction; label: string }[] = [
   { id: "thicken", label: "굵게" },
   { id: "narrow", label: "가늘게" },
-  { id: "scale", label: "배율" },
+  { id: "scale", label: "배율 (×)" },
   { id: "fix", label: "고정" },
 ];
 

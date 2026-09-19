@@ -1,6 +1,6 @@
-import { NATIVE_BRUSH_PROBE_HEIGHT as HEIGHT, NATIVE_BRUSH_PROBE_WIDTH as WIDTH } from "./studio-native-brush-probe-contract";
+import { NATIVE_BRUSH_PROBE_SURFACE, validateNativeBrushSurface, validateNativeBrushDocumentOutput } from "./studio-native-brush-probe-contract";
 
-import type { NativeBrushProbeOperation, NativeBrushProbeReply } from "./studio-native-brush-probe-contract";
+import type { NativeBrushProbeOperation, NativeBrushProbeReply, NativeBrushSurface } from "./studio-native-brush-probe-contract";
 
 export interface NativeBrushProbeWorkerPort {
   postMessage(message: unknown): void;
@@ -11,14 +11,14 @@ export interface NativeBrushProbeWorkerPort {
 function releaseFrame(reply: NativeBrushProbeReply | undefined) {
   if (reply?.type === "frame" && reply.frame?.kind === "bitmap") reply.frame.bitmap?.close?.();
 }
-function validFrame(reply: Extract<NativeBrushProbeReply, { type: "frame" }>): boolean {
+function validFrame(reply: Extract<NativeBrushProbeReply, { type: "frame" }>, surface: NativeBrushSurface): boolean {
   if (!Number.isSafeInteger(reply.samples) || reply.samples < 0 || reply.samples > 8192) return false;
   const frame = reply.frame;
   if (frame === null) return true;
-  if (frame?.kind === "bitmap") return Boolean(frame.bitmap && frame.bitmap.width === WIDTH && frame.bitmap.height === HEIGHT && typeof frame.bitmap.close === "function");
+  if (frame?.kind === "bitmap") return Boolean(frame.bitmap && frame.bitmap.width === surface.width && frame.bitmap.height === surface.height && typeof frame.bitmap.close === "function");
   return frame?.kind === "pixels" && [frame.x, frame.y, frame.width, frame.height].every(Number.isSafeInteger)
     && frame.x >= 0 && frame.y >= 0 && frame.width > 0 && frame.height > 0
-    && frame.x + frame.width <= WIDTH && frame.y + frame.height <= HEIGHT
+    && frame.x + frame.width <= surface.width && frame.y + frame.height <= surface.height
     && frame.pixels instanceof Uint8Array && frame.pixels.byteLength === frame.width * frame.height * 4;
 }
 /** Exactly one in-flight request. Caller owns input batching; no input is silently dropped here. */
@@ -26,6 +26,7 @@ export class StudioNativeBrushProbeClient {
   private nextId = 1;
   private disposed = false;
   private engine: string | null = null;
+  private surface: NativeBrushSurface = NATIVE_BRUSH_PROBE_SURFACE;
   private pending: {
     id: number; operation: NativeBrushProbeOperation["type"];
     resolve(value: NativeBrushProbeReply): void; reject(error: Error): void;
@@ -42,10 +43,11 @@ export class StudioNativeBrushProbeClient {
     const pending = this.pending;
     if (!pending || !reply || reply.version !== 1 || reply.id !== pending.id) { releaseFrame(reply); return; }
     this.pending = null; clearTimeout(pending.timer);
-    if (reply.type === "error") { pending.reject(new Error(String(reply.message))); return; }
-    const expected = pending.operation === "init" ? "ready" : pending.operation === "begin" ? "begun" : "frame";
+    if (reply.type === "error") { pending.reject(new Error(String(reply.message))); this.dispose(); return; }
+    const expected = pending.operation === "init" ? "ready" : pending.operation === "begin" ? "begun" : pending.operation === "render-document" ? "document" : "frame";
     if (reply.engine !== this.engine || reply.type !== expected
-      || (reply.type === "frame" && (!validFrame(reply) || reply.finished !== (pending.operation === "finish")))
+      || (reply.type === "frame" && (!validFrame(reply, this.surface) || reply.finished !== (pending.operation === "finish")))
+      || (reply.type === "document" && !validateNativeBrushDocumentOutput(reply, this.surface))
     ) {
       releaseFrame(reply); pending.reject(new Error("시험 엔진이 잘못된 응답을 반환했습니다.")); this.dispose(); return;
     }
@@ -54,7 +56,13 @@ export class StudioNativeBrushProbeClient {
   request(operation: NativeBrushProbeOperation): Promise<NativeBrushProbeReply> {
     if (this.disposed) return Promise.reject(new Error("Native brush test client is disposed"));
     if (this.pending) return Promise.reject(new Error("Native brush test request already in flight"));
-    if (operation.type === "init") this.engine = operation.engine;
+    if (operation.type === "init" || (operation.type === "render-document" && operation.surface)) {
+      const surface = operation.surface ?? NATIVE_BRUSH_PROBE_SURFACE;
+      try { validateNativeBrushSurface(surface); } catch (error) { return Promise.reject(error); }
+      if (operation.type === "init") this.engine = operation.engine;
+      this.surface = { ...surface };
+    }
+    if (!Number.isSafeInteger(this.nextId)) return Promise.reject(new Error("Native brush request sequence exhausted"));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => this.dispose(new Error("시험 엔진 응답 시간이 초과되었습니다.")), this.timeoutMs);

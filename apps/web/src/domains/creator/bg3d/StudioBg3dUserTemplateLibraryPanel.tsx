@@ -1,5 +1,6 @@
 import { Loader2, RefreshCw, Trash2, Upload } from "lucide-react";
 
+import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { cx } from "@/shared/lib/cx";
 
 import type { Bg3dTemplateLibraryEntry } from "./studio-bg3d-template-library-loader";
@@ -156,8 +157,11 @@ export function StudioBg3dUserTemplateLibraryPanel({
               </button>
               <button
                 type="button"
-                aria-label={`${entry.name} 템플릿 삭제`}
-                title="템플릿 삭제"
+                aria-label={formatI18nTemplate(
+                  translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "{v0} 템플릿 삭제"),
+                  { v0: String(entry.name) },
+                )}
+                title={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dUserTemplateLibraryPanel", "ko", "템플릿 삭제")}
                 className="absolute right-1.5 top-1.5 grid size-11 place-items-center rounded-lg border border-line bg-panel/90 text-fg-3 transition-colors hover:bg-raised hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50 sm:size-7"
                 disabled={status !== "ready" || busy}
                 onClick={(event) => {

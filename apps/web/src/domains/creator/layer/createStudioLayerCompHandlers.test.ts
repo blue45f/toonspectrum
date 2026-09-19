@@ -83,7 +83,7 @@ describe("createStudioLayerCompHandlers", () => {
 
       expect(result).toBe(false);
       expect(options.commit).not.toHaveBeenCalled();
-      expect(options.reportError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("콤프 저장 용량"));
+      expect(options.reportError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("레이어 보기 저장 용량"));
       expect(getPage()).toBe(current);
       expect(options.acquire).toHaveBeenCalledExactlyOnceWith(null);
       expect(options.release).toHaveBeenCalledOnce();
