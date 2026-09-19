@@ -5,6 +5,7 @@ import { createBrushStudioV6Program } from "../../src/domains/creator/brush-lab/
 import { StudioBrushV6Workbench } from "../../src/domains/creator/brush-lab/StudioBrushV6Workbench";
 
 import { benchmarkBrushPigments } from "./brush-pigment-benchmark";
+import { benchmarkPigmentLayers } from "./brush-pigment-layer-benchmark";
 
 const storageKey = "toonspectrum.brush-program-v6:pigment-qa";
 if (!localStorage.getItem(storageKey)) {
@@ -15,7 +16,8 @@ const root = document.createElement("div");
 document.body.append(root);
 createRoot(root).render(createElement(StudioBrushV6Workbench, { scope: "pigment-qa" }));
 window.__pigmentBenchmark = benchmarkBrushPigments;
+window.__pigmentLayerBenchmark = benchmarkPigmentLayers;
 
 declare global {
-  interface Window { __pigmentBenchmark: typeof benchmarkBrushPigments; }
+  interface Window { __pigmentBenchmark: typeof benchmarkBrushPigments; __pigmentLayerBenchmark: typeof benchmarkPigmentLayers; }
 }

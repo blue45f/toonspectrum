@@ -3,6 +3,7 @@ import { useId, useMemo, useState } from "react";
 import { STUDIO_FOCUS_RING } from "../../studio-panel-ui";
 import { createBrushStudioV6PigmentPalette, type BrushStudioV6PigmentProviderId } from "../brush-studio-v6-pigment-provider";
 import { simulatePigmentLayer } from "./external-pigments";
+import { StudioPigmentLayerComparison } from "./StudioPigmentLayerComparison";
 
 const MODES: readonly { id: BrushStudioV6PigmentProviderId; node: string; label: string; note: string }[] = [
   { id: "spectral-js-v3", node: "pigment-spectral-js", label: "Spectral.js 3", note: "분광 K/S · 명도와 착색력으로 혼합 가중치 보정" },
@@ -63,6 +64,6 @@ export function StudioPigmentComparison({ primary, secondary, node, secondaryAct
     </div>
     <button type="button" aria-expanded={showOptics} onClick={() => setShowOptics((open) => !open)}
       className={`min-h-11 rounded-xl border border-line px-3 text-xs font-bold text-fg ${STUDIO_FOCUS_RING}`}>K–M 광학 층 실험 {showOptics ? "닫기" : "열기"}</button>
-    {showOptics ? <OpticalLayerProbe pigment={primary} /> : null}
+    {showOptics ? <><OpticalLayerProbe pigment={primary} /><StudioPigmentLayerComparison primary={primary} secondary={secondary} /></> : null}
   </section>;
 }

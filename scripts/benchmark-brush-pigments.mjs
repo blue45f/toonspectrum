@@ -46,6 +46,21 @@ try {
   assert.equal(await page.getByLabel("광학 층 계산 결과").textContent(), "#ffffff");
   await page.getByLabel(/광학 두께/).fill("0.5");
   await page.getByRole("region", { name: "안료 혼색 비교" }).screenshot({ path: resolve(output, "pigment-comparison.png") });
+  const layerLabels = ["미리 섞은 도막", "주 색을 위에 덧칠", "보조 색을 위에 덧칠"];
+  const initialLayers = await Promise.all(layerLabels.map((label) => page.getByLabel(label, { exact: true }).textContent()));
+  assert.equal(new Set(initialLayers).size, 3);
+  const programBeforeOptics = await page.evaluate(() => localStorage.getItem("toonspectrum.brush-program-v6:pigment-qa"));
+  await page.getByLabel(/주 색 도막 두께/).fill("0");
+  await page.getByLabel(/보조 색 도막 두께/).fill("0");
+  for (const label of layerLabels) assert.equal(await page.getByLabel(label, { exact: true }).textContent(), "#ffffff");
+  assert.equal(await page.evaluate(() => localStorage.getItem("toonspectrum.brush-program-v6:pigment-qa")), programBeforeOptics);
+  await page.getByLabel(/주 색 도막 두께/).fill("0.5");
+  await page.getByLabel(/보조 색 도막 두께/).fill("0.5");
+  await page.getByRole("region", { name: "KM 혼합과 겹칠 비교", exact: true }).screenshot({ path: resolve(output, "km-layers.png") });
+  const layers = await page.evaluate(() => window.__pigmentLayerBenchmark());
+  const layersRepeat = await page.evaluate(() => window.__pigmentLayerBenchmark());
+  assert.deepEqual(layers.swatches, layersRepeat.swatches);
+  assert.deepEqual(Object.values(layers.swatches), initialLayers);
   const first = await page.evaluate(() => window.__pigmentBenchmark());
   const repeat = await page.evaluate(() => window.__pigmentBenchmark());
   assert.deepEqual(first.rows.map((r) => r.paletteHash), repeat.rows.map((r) => r.paletteHash));
@@ -53,7 +68,7 @@ try {
   await page.getByRole("button", { name: "재료·질감", exact: true }).click();
   assert.equal(await page.getByRole("button", { name: "ColorMix.js Lab 선택", exact: true }).getAttribute("aria-pressed"), "true");
   assert.deepEqual(diagnostics, { pageErrors: [], consoleErrors: [] });
-  const report = { generatedAt: new Date().toISOString(), browser: browser.version(), cpu: os.cpus()[0]?.model, memoryBytes: os.totalmem(), selections, restored: true, diagnostics, first, repeat,
+  const report = { generatedAt: new Date().toISOString(), browser: browser.version(), cpu: os.cpus()[0]?.model, memoryBytes: os.totalmem(), selections, restored: true, diagnostics, first, repeat, layers, layersRepeat, loadAverage: os.loadavg(),
     scope: "Actual V6 workbench/provider modules on an isolated Vite fixture; local JSON authoring recovery. No full Studio, physical stylus latency, SQL/OPFS persistence, production GPU or deployed site verification." };
   writeFileSync(resolve(output, "report.json"), JSON.stringify(report, null, 2) + "\n");
   console.table(first.rows.map((row) => ({ provider: row.provider, paletteMs: row.paletteMs.median.toFixed(4), p95: row.paletteMs.p95.toFixed(4), cachedUs: row.cacheUs.median.toFixed(3), stroke1024Ms: row.stroke1024Ms.median.toFixed(3), midpoint: row.midpoint })));

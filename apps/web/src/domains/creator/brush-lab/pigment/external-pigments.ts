@@ -1,4 +1,5 @@
 import spectral from "spectral.js";
+import { prepareKmLayerComparison } from "./km-layer-comparison";
 // 3.2.0's root package points to missing index.* files; use its audited, DOM-idle ESM build.
 import colorMix from "colormix/dist/index.mjs";
 
@@ -100,4 +101,23 @@ export function simulatePigmentLayer(
   );
   if (thickness === 0) return substrate.toLowerCase();
   return new spectral.Color(reflectance).toString({ method: "map" }).toLowerCase();
+}
+
+/** Prepared optical comparison only: RGB reconstruction + assumed S=1, not measured pigment data. */
+export function prepareSyntheticPigmentLayers(primary: string, secondary: string, substrate: string) {
+  const first = new spectral.Color(validateHex(primary)), second = new spectral.Color(validateHex(secondary));
+  const baseHex = validateHex(substrate), paper = new spectral.Color(baseHex);
+  const pigment = (color: InstanceType<typeof spectral.Color>) => {
+    const absorption = physicalReflectance(color.R).map(kmRatioFromReflectance);
+    return { absorption, scattering: absorption.map(() => 1) };
+  };
+  const evaluate = prepareKmLayerComparison(pigment(first), pigment(second), physicalReflectance(paper.R));
+  const encode = (values: readonly number[]) => new spectral.Color([...values]).toString({ method: "map" }).toLowerCase();
+  return (firstThickness: number, secondThickness: number) => {
+    const result = evaluate(firstThickness, secondThickness);
+    if (firstThickness === 0 && secondThickness === 0) {
+      return Object.freeze({ premixed: baseHex, firstOnSecond: baseHex, secondOnFirst: baseHex });
+    }
+    return Object.freeze({ premixed: encode(result.premixed), firstOnSecond: encode(result.firstOnSecond), secondOnFirst: encode(result.secondOnFirst) });
+  };
 }
