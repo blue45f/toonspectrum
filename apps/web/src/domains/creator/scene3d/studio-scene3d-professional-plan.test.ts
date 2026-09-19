@@ -6,7 +6,10 @@ import { createStudioVrmSceneDocument } from "../vrm/studio-vrm-scene-document";
 import { createStudioScene3dAuthority } from "./studio-scene3d-authority";
 import { buildStudioScene3dProfessionalPlan } from "./studio-scene3d-professional-plan";
 
-import type { StudioScene3dDeviceCapabilities } from "./studio-scene3d-runtime-policy";
+import {
+  STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
+  type StudioScene3dDeviceCapabilities,
+} from "./studio-scene3d-runtime-policy";
 
 const CAPABILITIES: StudioScene3dDeviceCapabilities = Object.freeze({
   webgpu: true,
@@ -83,6 +86,52 @@ describe("Studio Scene3D professional plan", () => {
     expect(plan.characters).toMatchObject({ readyCount: 0, blockedCount: 1 });
     expect(plan.blockers.join(" ")).toContain("admission receipt");
     expect(plan.blockers.join(" ")).toContain("접지");
+  });
+
+  it("blocks requested advanced render features until their product runtime is admitted", () => {
+    const base = authority();
+    const advanced = {
+      ...base,
+      document: {
+        ...base.document,
+        render: {
+          ...base.document.render,
+          antialiasing: "taau" as const,
+          shadows: {
+            ...base.document.render.shadows,
+            mode: "csm" as const,
+            cascades: 3 as const,
+          },
+          effects: {
+            ...base.document.render.effects,
+            ssgi: true,
+          },
+        },
+      },
+    };
+    const blocked = buildStudioScene3dProfessionalPlan({
+      authority: advanced,
+      capabilities: CAPABILITIES,
+    });
+    expect(blocked.productionReady).toBe(false);
+    expect(blocked.blockers.join(" ")).toContain("TAAU");
+    expect(blocked.blockers.join(" ")).toContain("CSM");
+    expect(blocked.blockers.join(" ")).toContain("SSGI");
+
+    const admitted = buildStudioScene3dProfessionalPlan({
+      authority: advanced,
+      capabilities: CAPABILITIES,
+      software: {
+        ...STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
+        tslNprRenderGraph: true,
+        taau: true,
+        csmShadows: true,
+        ssgi: true,
+      },
+    });
+    expect(admitted.blockers.join(" ")).not.toContain("TAAU");
+    expect(admitted.blockers.join(" ")).not.toContain("CSM");
+    expect(admitted.blockers.join(" ")).not.toContain("SSGI");
   });
 
   it("keeps the Three WebGL editor usable when specialist FX is unavailable", () => {
