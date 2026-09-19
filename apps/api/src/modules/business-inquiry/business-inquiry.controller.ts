@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   Header,
   Headers,
@@ -13,7 +14,7 @@ import { BusinessInquiryService } from "./business-inquiry.service";
 
 @Controller()
 export class BusinessInquiryController {
-  constructor(private readonly service: BusinessInquiryService) {}
+  constructor(@Inject(BusinessInquiryService) private readonly service: BusinessInquiryService) {}
 
   @Post("business/inquiries")
   @Header("Cache-Control", "no-store, max-age=0")

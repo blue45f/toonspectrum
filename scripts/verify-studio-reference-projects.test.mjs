@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import test from "node:test";
 
 import {
   createReferenceProjectReceipt,
@@ -8,6 +7,8 @@ import {
   validateReferenceProjectManifest,
   verifyReferenceProjectEvidence,
 } from "./verify-studio-reference-projects.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "..");
 

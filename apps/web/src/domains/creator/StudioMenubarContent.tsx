@@ -123,11 +123,11 @@ import { cn } from "@/shared/lib/utils";
  * 형제 스튜디오 컴포넌트(`StudioMainMenu`)와 같은 관용구다.
  */
 function localizeText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
 ): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   // 한국어 팩에 남은 이전 `임시저장` 번역만 새 서버 초안 용어로 승격한다. 다른 언어의
   // Save draft 번역은 건드리지 않고, 팩이 갱신되면 이 분기는 자연스럽게 타지 않는다.
   if (fallback === "초안 저장" && translated === "임시저장") return fallback;
@@ -136,7 +136,7 @@ function localizeText(
 
 /** `슬롯 {index}` 처럼 자리표시자를 가진 팩 문구용. 한글 폴백에는 자리표시자가 없어 무해하다. */
 function localizeIndexedText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
   index: number,
@@ -1129,8 +1129,8 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
   const menuT = useT();
   const compositeMenuLabel = (id: "insert" | "create"): string | undefined => {
     const key = `studio.mainMenu.group.${id}.label`;
-    const translated = menuT(key);
-    return translated === key ? undefined : translated;
+    const translated = menuT(key, "");
+    return translated || undefined;
   };
   const mainMenuPresentation = createStudioMainMenuPresentation(studioMainMenuGroups, {
     labels: {

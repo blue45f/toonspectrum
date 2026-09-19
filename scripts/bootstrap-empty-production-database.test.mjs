@@ -426,6 +426,14 @@ describe("bootstrap SQL and repository contract", () => {
       "0067_creator_role_workspace_personalization",
       "0068_business_inquiries",
       "0069_account_consolidation",
+      "0070_user_region_settings",
+      "0071_supporter_payments",
+      "0072_creator_support_program",
+      "0073_commerce_payments",
+      "0074_creator_ecosystem",
+      "0075_membership_wallet_policy",
+      "0076_creator_role_profile_v2",
+      "0077_membership_operations",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
   });

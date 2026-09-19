@@ -1,10 +1,4 @@
-
-import {
-  translateBilingualValueForActiveLocale,
-} from "@/shared/lib/i18n-bilingual-copy";
-
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("studio-ai-generation-label", ko, en);/**
+/**
  * Studio AI Generation Label — 생성형 AI 표기가 **결과물 자체에 필요한지** 판정하는 순수 플래너.
  *
  * 왜 이 모듈이 필요한가
@@ -293,7 +287,7 @@ export function planStudioAiGenerationLabel(
   const usage = normalizeUsage(input.usage);
   const locale = normalizeLocale(input.locale);
   const jurisdiction = jurisdictionFor(locale);
-  const copy = bi(LABEL_COPY_KO, LABEL_COPY_EN);
+  const copy = locale.language === "ko" ? LABEL_COPY_KO : LABEL_COPY_EN;
 
   if (usage === "none") {
     return Object.freeze({

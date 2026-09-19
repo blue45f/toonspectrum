@@ -16,7 +16,7 @@ type ReviewSection = "layers" | "history" | "comments";
 type StudioReviewT = (key: string, fallback?: string) => string;
 
 function localizeText(t: StudioReviewT, fallback: string, key: string): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 

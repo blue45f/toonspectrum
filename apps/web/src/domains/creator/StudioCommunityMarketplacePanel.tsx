@@ -198,7 +198,8 @@ function publicRevalidationError(
 
 type StudioCommunityT = (key: string, fallback?: string) => string;
 function localizeText(t: StudioCommunityT, fallback: string, key: string): string {
-  return t(key) === key ? fallback : t(key);
+  const translated = t(key, fallback);
+  return translated === key ? fallback : translated;
 }
 
 function interpolateText(message: string, values?: Record<string, string | number>): string {

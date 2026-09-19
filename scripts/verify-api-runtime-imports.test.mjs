@@ -2,15 +2,16 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import test from "node:test";
 
 import { runtimeSpecifiers, smokeCompiledCreatorResources, verifyCompiledApiImports } from "./verify-api-runtime-imports.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), "api-runtime-imports-"));
   const dist = join(root, "dist");
   mkdirSync(dist);
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  (t.onTestFinished ?? t.after.bind(t))(() => rmSync(root, { recursive: true, force: true }));
   const write = (name, source) => {
     const filename = join(root, name);
     mkdirSync(dirname(filename), { recursive: true });

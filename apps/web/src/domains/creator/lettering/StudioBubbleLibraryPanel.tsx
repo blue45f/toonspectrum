@@ -31,8 +31,8 @@ export interface StudioBubbleLibraryPanelProps {
   readonly onToggleFavorite: (id: BubbleVariant) => void;
 }
 
-function localizeText(t: (key: string) => string, fallback: string, key: string): string {
-  const translated = t(key);
+function localizeText(t: (key: string, fallback?: string) => string, fallback: string, key: string): string {
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 

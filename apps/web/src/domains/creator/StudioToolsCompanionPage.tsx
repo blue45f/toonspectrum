@@ -124,7 +124,7 @@ type StudioCompanionT = (key: string, fallback?: string) => string;
 
 function localizeText(t: StudioCompanionT | undefined, fallback: string, key: string): string {
   if (!t) return fallback;
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 

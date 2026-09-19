@@ -75,12 +75,12 @@ const CARD_ACTION_CLASS =
   `flex min-h-11 w-full items-center justify-center gap-1 rounded-md px-1.5 text-[0.62rem] font-semibold transition-colors ${CONTROL_FOCUS_CLASS}`;
 
 function localizeText(
-  t: (key: string, params?: Record<string, string | number>) => string,
+  t: (key: string, params?: Record<string, string | number>, fallback?: string) => string,
   fallback: string,
   key: string,
   params?: Record<string, string | number>,
 ): string {
-  const translated = t(key, params);
+  const translated = t(key, params, fallback);
   return translated === key ? fallback : translated;
 }
 

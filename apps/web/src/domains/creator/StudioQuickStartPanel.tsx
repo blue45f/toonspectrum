@@ -29,11 +29,11 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 function localizeText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
 ): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 
