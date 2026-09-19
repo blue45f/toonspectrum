@@ -17,7 +17,7 @@ import {
   Headphones,
   Home,
   LayoutGrid,
-  Map,
+  Map as MapIcon,
   MessageCircle,
   Mic2,
   MousePointer2,
@@ -57,10 +57,6 @@ import { openStudioP2pHuddle } from "../live/huddle/studio-p2p-huddle-events";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
-  STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
-  STUDIO_VIRTUAL_SPACE_HEIGHT,
-  STUDIO_VIRTUAL_SPACE_WIDTH,
-  STUDIO_VIRTUAL_SPACE_ZONES,
   clampStudioVirtualSpacePoint,
   studioVirtualSpaceDestination,
   studioVirtualSpaceInitialPoint,
@@ -68,7 +64,6 @@ import {
   type StudioVirtualSpaceActivity,
   type StudioVirtualSpaceFacing,
   type StudioVirtualSpacePoint,
-  type StudioVirtualSpaceZone,
   type StudioVirtualSpaceZoneId,
 } from "./studio-virtual-space-model";
 import {
@@ -78,28 +73,33 @@ import {
   type StudioVirtualSpaceSnapshot,
 } from "./studio-virtual-space-presence";
 import {
-  selectNearestStudioVirtualSpaceInteraction,
-  type StudioVirtualSpaceInteraction,
-} from "./studio-virtual-space-interactions";
-import {
-  studioVirtualSpaceCanOccupy,
-} from "./studio-virtual-space-navigation";
+  clampStudioWorldPoint,
+  studioWorldCanOccupy,
+} from "./studio-virtual-space-world-pathfinding";
 import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
+import {
+  STUDIO_CHARACTER_SKINS,
+  studioCharacterSkinForAvatarIndex,
+} from "./studio-virtual-space-character-skins";
 import {
   StudioVirtualSpacePhaserCanvas,
   type StudioVirtualSpaceEngineLocalState,
 } from "./StudioVirtualSpacePhaserCanvas";
+import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 import {
   DEFAULT_STUDIO_WORLD_MANIFEST,
+  type StudioVirtualSpaceWorldManifest,
+  type StudioWorldInteractionDefinition,
   type StudioWorldPortalDefinition,
+  type StudioWorldRoomDefinition,
 } from "./studio-virtual-space-world-manifest";
 import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
-const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v1";
+const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v2";
 const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
   readonly id: StudioVirtualSpaceReaction;
@@ -131,8 +131,11 @@ function readVirtualSpaceSessionPoint(
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
     if (typeof parsed.x !== "number" || typeof parsed.y !== "number") return fallback;
-    const candidate = clampStudioVirtualSpacePoint({ x: parsed.x, y: parsed.y });
-    return studioVirtualSpaceCanOccupy(candidate) ? candidate : fallback;
+    const candidate = clampStudioWorldPoint(
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+      { x: parsed.x, y: parsed.y },
+    );
+    return studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, candidate) ? candidate : fallback;
   } catch {
     return fallback;
   }
@@ -149,12 +152,7 @@ function writeVirtualSpaceSessionPoint(projectId: string, point: StudioVirtualSp
     // Storage can be unavailable in privacy-constrained browsers; movement still works in memory.
   }
 }
-const VIRTUAL_AVATARS = [
-  { labelKo: "하늘", labelEn: "Haneul", skin: "pink" },
-  { labelKo: "시나", labelEn: "Sina", skin: "silver" },
-  { labelKo: "지훈", labelEn: "Jihun", skin: "dark" },
-  { labelKo: "리호", labelEn: "Riho", skin: "purple" },
-] as const;
+const VIRTUAL_AVATARS = STUDIO_CHARACTER_SKINS;
 
 function virtualAvatarIndex(identity: string): number {
   let hash = 2166136261;
@@ -168,7 +166,7 @@ function virtualAvatarIndex(identity: string): number {
 function resolveVirtualAvatarIndex(identity: string, preferredIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR): number {
   return Number.isInteger(preferredIndex)
     && preferredIndex >= 0
-    && preferredIndex < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+    && preferredIndex < VIRTUAL_AVATARS.length
     ? preferredIndex
     : virtualAvatarIndex(identity);
 }
@@ -178,7 +176,7 @@ function readVirtualSpaceAvatarIndex(): number {
   try {
     const raw = window.localStorage.getItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
     const index = raw == null ? NaN : Number(raw);
-    return Number.isInteger(index) && index >= 0 && index < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+    return Number.isInteger(index) && index >= 0 && index < VIRTUAL_AVATARS.length
       ? index
       : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
   } catch {
@@ -189,7 +187,7 @@ function readVirtualSpaceAvatarIndex(): number {
 function writeVirtualSpaceAvatarIndex(index: number): void {
   if (typeof window === "undefined") return;
   try {
-    if (index >= 0 && index < STUDIO_VIRTUAL_SPACE_AVATAR_COUNT) {
+    if (index >= 0 && index < VIRTUAL_AVATARS.length) {
       window.localStorage.setItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY, String(index));
     } else {
       window.localStorage.removeItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
@@ -199,7 +197,7 @@ function writeVirtualSpaceAvatarIndex(index: number): void {
   }
 }
 
-const ZONE_ICONS: Readonly<Record<StudioVirtualSpaceZoneId, typeof Coffee>> = {
+const ZONE_ICONS: Readonly<Partial<Record<StudioVirtualSpaceZoneId, typeof Coffee>>> = {
   lounge: Coffee,
   writers: BookOpen,
   storyboard: LayoutGrid,
@@ -210,7 +208,7 @@ const ZONE_ICONS: Readonly<Record<StudioVirtualSpaceZoneId, typeof Coffee>> = {
   live: Radio,
 };
 
-const ZONE_TONES: Readonly<Record<StudioVirtualSpaceZoneId, string>> = {
+const ZONE_TONES: Readonly<Partial<Record<StudioVirtualSpaceZoneId, string>>> = {
   lounge: "from-amber-100/75 via-card/85 to-card/70 dark:from-amber-950/25",
   writers: "from-violet-100/75 via-card/85 to-card/70 dark:from-violet-950/25",
   storyboard: "from-sky-100/75 via-card/85 to-card/70 dark:from-sky-950/25",
@@ -240,20 +238,25 @@ function validProjectId(projectId: string): boolean {
 }
 
 
-function stagePosition(point: StudioVirtualSpacePoint): CSSProperties {
+function stagePosition(
+  point: StudioVirtualSpacePoint,
+  manifest: StudioVirtualSpaceWorldManifest,
+): CSSProperties {
   return {
-    left: `${(point.x / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
-    top: `${(point.y / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
+    left: ((point.x / manifest.width) * 100) + "%",
+    top: ((point.y / manifest.height) * 100) + "%",
   };
 }
 
 function VirtualSpaceMiniMap({
   snapshot,
-  currentZone,
+  currentRoom,
+  manifest,
   onMoveTo,
 }: {
   readonly snapshot: StudioVirtualSpaceSnapshot;
-  readonly currentZone: StudioVirtualSpaceZone;
+  readonly currentRoom: StudioWorldRoomDefinition;
+  readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly onMoveTo: (point: StudioVirtualSpacePoint) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceMiniMap");
@@ -265,36 +268,37 @@ function VirtualSpaceMiniMap({
     >
       <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
         <span className="inline-flex items-center gap-1.5 text-[0.58rem] font-black uppercase tracking-[0.12em] text-fg-2">
-          <Map size={11} aria-hidden />
+          <MapIcon size={11} aria-hidden />
           {bt("스튜디오 맵", "Studio map")}
         </span>
         <span className="max-w-20 truncate text-[0.52rem] font-bold text-accent">
-          {bt(currentZone.labelKo, currentZone.labelEn)}
+          {bt(currentRoom.labelKo, currentRoom.labelEn)}
         </span>
       </div>
       <button
         type="button"
-        className="studio-vspace-minimap-stage relative block aspect-[59/36] w-full overflow-hidden rounded-xl border border-line/70 bg-canvas/80 text-left"
+        className="studio-vspace-minimap-stage relative block w-full overflow-hidden rounded-xl border border-line/70 bg-canvas/80 text-left"
+        style={{ aspectRatio: String(manifest.width) + "/" + String(manifest.height) }}
         aria-label={bt("미니맵에서 이동할 위치 선택", "Choose a destination on the minimap")}
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect();
           if (!rect.width || !rect.height) return;
-          onMoveTo(clampStudioVirtualSpacePoint({
-            x: ((event.clientX - rect.left) / rect.width) * STUDIO_VIRTUAL_SPACE_WIDTH,
-            y: ((event.clientY - rect.top) / rect.height) * STUDIO_VIRTUAL_SPACE_HEIGHT,
+          onMoveTo(clampStudioWorldPoint(manifest, {
+            x: ((event.clientX - rect.left) / rect.width) * manifest.width,
+            y: ((event.clientY - rect.top) / rect.height) * manifest.height,
           }));
         }}
       >
-        {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
+        {manifest.rooms.map((room) => (
           <span
-            key={zone.id}
+            key={room.id}
             className="studio-vspace-minimap-zone absolute rounded-[3px] border"
-            data-active={zone.id === currentZone.id || undefined}
+            data-active={room.id === currentRoom.id || undefined}
             style={{
-              left: `${(zone.x / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
-              top: `${(zone.y / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
-              width: `${(zone.width / STUDIO_VIRTUAL_SPACE_WIDTH) * 100}%`,
-              height: `${(zone.height / STUDIO_VIRTUAL_SPACE_HEIGHT) * 100}%`,
+              left: ((room.x / manifest.width) * 100) + "%",
+              top: ((room.y / manifest.height) * 100) + "%",
+              width: ((room.width / manifest.width) * 100) + "%",
+              height: ((room.height / manifest.height) * 100) + "%",
             }}
             aria-hidden
           />
@@ -303,21 +307,19 @@ function VirtualSpaceMiniMap({
           <span
             key={peer.participant.sessionId}
             className="studio-vspace-minimap-peer absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-good shadow-[0_0_6px_rgba(110,231,160,.8)]"
-            style={stagePosition(peer.state)}
+            style={stagePosition(peer.state, manifest)}
             aria-hidden
           />
         ))}
         <span
           className="studio-vspace-minimap-self absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-accent shadow-[0_0_10px_var(--color-accent)]"
-          style={stagePosition(snapshot.self)}
+          style={stagePosition(snapshot.self, manifest)}
           aria-hidden
         />
       </button>
     </div>
   );
 }
-
-const REFERENCE_PLAYER_SKINS = ["pink", "silver", "dark", "purple"] as const;
 
 function ChibiAvatar({
   identity,
@@ -343,7 +345,7 @@ function ChibiAvatar({
   readonly avatarIndex?: number;
 }) {
   const variant = resolveVirtualAvatarIndex(identity, avatarIndex);
-  const skin = REFERENCE_PLAYER_SKINS[variant % REFERENCE_PLAYER_SKINS.length] ?? "pink";
+  const skin = studioCharacterSkinForAvatarIndex(variant);
   const reactionEmoji = virtualSpaceReactionEmoji(reaction);
   const motion = moving
     ? "walk"
@@ -354,6 +356,10 @@ function ChibiAvatar({
         : nearby
           ? "talk"
           : "idle";
+  const stateTexture = motion === "talk" || motion === "draw" || motion === "review"
+    ? skin.state?.[motion]
+    : undefined;
+  const avatarTexture = stateTexture ?? skin.directional[facing];
 
   if (compact) {
     return (
@@ -365,7 +371,7 @@ function ChibiAvatar({
         aria-hidden
       >
         <img
-          src={`/assets/virtual-studio/reference/player-${skin}-direction-down.png`}
+          src={skin.directional.down}
           alt=""
           draggable={false}
           className="studio-vspace-reference-compact-player"
@@ -390,19 +396,11 @@ function ChibiAvatar({
         className="studio-vspace-reference-player"
         data-motion={motion}
         data-direction={facing}
-        data-skin={skin}
+        data-skin={skin.key}
         aria-hidden="true"
       >
         <img
-          src={
-            skin === "pink" && motion === "draw"
-              ? "/assets/virtual-studio/reference/player-pink-state-draw.png"
-              : skin === "pink" && motion === "review"
-                ? "/assets/virtual-studio/reference/player-pink-state-review.png"
-                : skin === "pink" && motion === "talk"
-                  ? "/assets/virtual-studio/reference/player-pink-state-talk.png"
-                  : `/assets/virtual-studio/reference/player-${skin}-direction-${facing}.png`
-          }
+          src={avatarTexture}
           alt=""
           draggable={false}
         />
@@ -478,20 +476,25 @@ function ConnectionBadge({
 }
 
 function MobileZoneCard({
-  zone,
+  room,
   projectId,
   onAssistant,
 }: {
-  readonly zone: StudioVirtualSpaceZone;
+  readonly room: StudioWorldRoomDefinition;
   readonly projectId: string;
   readonly onAssistant: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceMobileZone");
-  const Icon = ZONE_ICONS[zone.id];
-  const destination = studioVirtualSpaceDestination(projectId, zone.destination);
+  const Icon = ZONE_ICONS[room.id] ?? LayoutGrid;
+  const action = room.action;
+  const destination = action === "community"
+    ? "/community"
+    : action && action !== "assistant"
+      ? studioVirtualSpaceDestination(projectId, action)
+      : null;
   const className = cn(
     "relative flex min-h-28 flex-col overflow-hidden rounded-2xl border border-line bg-gradient-to-br p-4 text-left shadow-sm",
-    ZONE_TONES[zone.id],
+    ZONE_TONES[room.id] ?? "from-slate-100/70 via-card/85 to-card/70 dark:from-slate-950/25",
   );
   const body = (
     <>
@@ -501,13 +504,18 @@ function MobileZoneCard({
         <span className="grid size-9 place-items-center rounded-xl border border-line/70 bg-panel/80 text-accent">
           <Icon size={17} aria-hidden />
         </span>
-        {(destination || zone.destination === "assistant") && <ExternalLink size={14} className="text-fg-3" aria-hidden />}
+        {(destination || action === "assistant") && <ExternalLink size={14} className="text-fg-3" aria-hidden />}
       </span>
-      <strong className="relative mt-3 text-sm font-black text-fg">{bt(zone.labelKo, zone.labelEn)}</strong>
-      <span className="relative mt-1 text-xs leading-5 text-fg-3">{bt(zone.descriptionKo, zone.descriptionEn)}</span>
+      <strong className="relative mt-3 text-sm font-black text-fg">{bt(room.labelKo, room.labelEn)}</strong>
+      <span className="relative mt-1 text-xs leading-5 text-fg-3">
+        {bt(
+          room.descriptionKo ?? "이 공간에서 팀 작업을 이어가요.",
+          room.descriptionEn ?? "Continue team work in this space.",
+        )}
+      </span>
     </>
   );
-  if (zone.destination === "assistant") {
+  if (action === "assistant") {
     return <button type="button" className={className} onClick={onAssistant}>{body}</button>;
   }
   if (destination) return <Link href={destination} className={className}>{body}</Link>;
@@ -718,6 +726,10 @@ function VirtualSpaceExperience({
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
+  const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(
+    DEFAULT_STUDIO_WORLD_MANIFEST,
+  );
+  const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
@@ -729,6 +741,20 @@ function VirtualSpaceExperience({
     selfRef.current = snapshot.self;
     peersRef.current = snapshot.peers;
   }, [snapshot.peers, snapshot.self]);
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    void loadStudioVirtualSpaceWorldManifest(
+      undefined,
+      undefined,
+      abortController.signal,
+    ).then((manifest) => {
+      if (abortController.signal.aborted) return;
+      setWorldManifest(manifest);
+      setCurrentInteraction(null);
+    });
+    return () => abortController.abort();
+  }, []);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
@@ -841,36 +867,23 @@ function VirtualSpaceExperience({
     }));
   }, [activity]);
 
-  const activateInteraction = useCallback((interaction: StudioVirtualSpaceInteraction) => {
+  const activateAction = useCallback((action: StudioWorldInteractionDefinition["action"]) => {
     writeVirtualSpaceSessionPoint(projectId, selfRef.current);
-    if (interaction.action === "assistant") {
+    if (action === "assistant") {
       openAssistant();
       return;
     }
-    if (interaction.action === "community") {
+    if (action === "community") {
       navigate("/community");
       return;
     }
-    const destination = studioVirtualSpaceDestination(projectId, interaction.action);
+    const destination = studioVirtualSpaceDestination(projectId, action);
     if (destination) navigate(destination);
   }, [navigate, openAssistant, projectId]);
 
-  const activateCurrentZone = useCallback(() => {
-    const nearbyInteraction = selectNearestStudioVirtualSpaceInteraction(selfRef.current);
-    if (nearbyInteraction) {
-      activateInteraction(nearbyInteraction);
-      return;
-    }
-    writeVirtualSpaceSessionPoint(projectId, selfRef.current);
-    const zone = STUDIO_VIRTUAL_SPACE_ZONES.find((candidate) => candidate.id === selfRef.current.zoneId);
-    if (!zone) return;
-    if (zone.destination === "assistant") {
-      openAssistant();
-      return;
-    }
-    const destination = studioVirtualSpaceDestination(projectId, zone.destination);
-    if (destination) navigate(destination);
-  }, [activateInteraction, navigate, openAssistant, projectId]);
+  const activateInteraction = useCallback((interaction: StudioWorldInteractionDefinition) => {
+    activateAction(interaction.action);
+  }, [activateAction]);
 
   const handleEngineLocalState = useCallback((next: StudioVirtualSpaceEngineLocalState) => {
     if (movingRef.current !== next.moving) {
@@ -891,9 +904,30 @@ function VirtualSpaceExperience({
     setFollowingPeer(sessionId);
   }, [setFollowingPeer]);
 
-  const currentZone = STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === snapshot.self.zoneId)
-    ?? STUDIO_VIRTUAL_SPACE_ZONES[0]!;
-  const currentInteraction = selectNearestStudioVirtualSpaceInteraction(snapshot.self);
+  const roomById = useMemo(
+    () => new Map(worldManifest.rooms.map((room) => [room.id, room] as const)),
+    [worldManifest.rooms],
+  );
+  const currentRoom = roomById.get(snapshot.self.zoneId)
+    ?? worldManifest.rooms[0]
+    ?? DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
+
+  const activateCurrentRoom = useCallback(() => {
+    if (currentInteraction) {
+      activateInteraction(currentInteraction);
+      return;
+    }
+    if (currentRoom.action) activateAction(currentRoom.action);
+  }, [activateAction, activateInteraction, currentInteraction, currentRoom]);
+
+  const handleEngineInteract = useCallback((interaction: StudioWorldInteractionDefinition | null) => {
+    if (interaction) {
+      activateInteraction(interaction);
+      return;
+    }
+    activateCurrentRoom();
+  }, [activateCurrentRoom, activateInteraction]);
+
   const followingPeer = followingPeerId
     ? snapshot.peers.find((peer) => peer.participant.sessionId === followingPeerId) ?? null
     : null;
@@ -957,6 +991,7 @@ function VirtualSpaceExperience({
         next,
         current.self.moving,
         current.self.avatarIndex,
+        current.self.zoneId,
       ),
     }));
   };
@@ -965,7 +1000,7 @@ function VirtualSpaceExperience({
     if (
       !Number.isInteger(nextIndex)
       || nextIndex < STUDIO_VIRTUAL_SPACE_AUTO_AVATAR
-      || nextIndex >= STUDIO_VIRTUAL_SPACE_AVATAR_COUNT
+      || nextIndex >= VIRTUAL_AVATARS.length
     ) return;
     setAvatarIndex(nextIndex);
     writeVirtualSpaceAvatarIndex(nextIndex);
@@ -982,6 +1017,7 @@ function VirtualSpaceExperience({
         current.self.activity,
         current.self.moving,
         nextIndex,
+        current.self.zoneId,
       );
       selfRef.current = self;
       return { ...current, self };
@@ -1041,15 +1077,16 @@ function VirtualSpaceExperience({
               <div
                 role="application"
                 aria-label={bt("가상 스튜디오 공간. WASD 또는 방향키로 이동하고 E 키로 현재 방과 상호작용합니다.", "Virtual studio space. Move with WASD or arrow keys and press E to interact with the current room.")}
-                className="studio-vspace-stage relative aspect-[59/36] min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
+                className="studio-vspace-stage relative aspect-[850/798] min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 data-studio-virtual-space="true"
               >
                 <StudioVirtualSpacePhaserCanvas
-                  manifest={DEFAULT_STUDIO_WORLD_MANIFEST}
+                  manifest={worldManifest}
                   snapshot={snapshot}
                   bridge={engineBridge}
                   onLocalState={handleEngineLocalState}
-                  onInteract={activateCurrentZone}
+                  onInteract={handleEngineInteract}
+                  onNearbyInteractionChange={setCurrentInteraction}
                   onPeerSelect={handleEnginePeerSelect}
                   onCancelFollow={() => setFollowingPeer(null)}
                   onPortal={handleEnginePortal}
@@ -1057,7 +1094,8 @@ function VirtualSpaceExperience({
 
                 <VirtualSpaceMiniMap
                   snapshot={snapshot}
-                  currentZone={currentZone}
+                  currentRoom={currentRoom}
+                  manifest={worldManifest}
                   onMoveTo={queuePathTo}
                 />
 
@@ -1074,7 +1112,7 @@ function VirtualSpaceExperience({
                   </span>
                   <span className="inline-flex min-h-9 items-center gap-2 rounded-xl bg-accent-soft px-3 text-[0.7rem] font-black text-accent">
                     <CircleDot size={14} aria-hidden />
-                    {bt(currentZone.labelKo, currentZone.labelEn)}
+                    {bt(currentRoom.labelKo, currentRoom.labelEn)}
                   </span>
                   <span className={cn(
                     "inline-flex min-h-9 items-center gap-2 rounded-xl px-3 text-[0.7rem] font-black",
@@ -1113,7 +1151,7 @@ function VirtualSpaceExperience({
                     type="button"
                     className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 text-[0.7rem] font-black text-accent"
                     data-space-interactive="true"
-                    onClick={activateCurrentZone}
+                    onClick={activateCurrentRoom}
                   >
                     E · {currentInteraction
                       ? bt(currentInteraction.labelKo, currentInteraction.labelEn)
@@ -1132,7 +1170,7 @@ function VirtualSpaceExperience({
                   type="button"
                   className="absolute bottom-5 left-4 z-50 inline-flex min-h-12 max-w-[11rem] items-center gap-2 rounded-2xl border border-accent/35 bg-panel/90 px-4 text-xs font-black text-accent shadow-xl backdrop-blur lg:hidden"
                   data-space-interactive="true"
-                  onClick={activateCurrentZone}
+                  onClick={activateCurrentRoom}
                 >
                   <Gamepad2 size={15} aria-hidden />
                   <span className="truncate">
@@ -1142,7 +1180,7 @@ function VirtualSpaceExperience({
                   </span>
                 </button>
                 <div className="absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-line bg-panel/85 px-3 py-1.5 text-[0.65rem] font-black text-fg shadow-lg backdrop-blur lg:hidden">
-                  {bt(currentZone.labelKo, currentZone.labelEn)}
+                  {bt(currentRoom.labelKo, currentRoom.labelEn)}
                 </div>
                 <div className="absolute left-3 top-14 z-50 flex items-center gap-1 rounded-2xl border border-line bg-panel/85 p-1.5 shadow-lg backdrop-blur lg:hidden" data-space-interactive="true">
                   {VIRTUAL_SPACE_REACTIONS.map((reaction) => (
@@ -1161,10 +1199,10 @@ function VirtualSpaceExperience({
             </div>
 
             <div className="vs2-mobile-zone-cards grid gap-3 sm:grid-cols-2 lg:hidden">
-              {STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => (
+              {worldManifest.rooms.map((room) => (
                 <MobileZoneCard
-                  key={zone.id}
-                  zone={zone}
+                  key={room.id}
+                  room={room}
                   projectId={projectId}
                   onAssistant={openAssistant}
                 />
@@ -1200,7 +1238,7 @@ function VirtualSpaceExperience({
                     <div className="min-w-0">
                       <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
                       <p className="truncate text-[0.68rem] text-fg-3">
-                        {STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
+                        {roomById.get(peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
                       </p>
                     </div>
                   </div>
@@ -1246,8 +1284,8 @@ function VirtualSpaceExperience({
                         <strong>{peer.participant.displayName}</strong>
                         <small>
                           {bt(
-                            STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelKo ?? "스튜디오",
-                            STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelEn ?? "Studio",
+                            roomById.get(peer.state.zoneId)?.labelKo ?? "스튜디오",
+                            roomById.get(peer.state.zoneId)?.labelEn ?? "Studio",
                           )}
                         </small>
                       </span>
@@ -1287,7 +1325,7 @@ function VirtualSpaceExperience({
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-bold">{localName} · {bt("나", "Me")}</p>
-                    <p className="truncate text-[0.68rem] text-accent">{bt(currentZone.labelKo, currentZone.labelEn)}</p>
+                    <p className="truncate text-[0.68rem] text-accent">{bt(currentRoom.labelKo, currentRoom.labelEn)}</p>
                   </div>
                 </div>
                 {snapshot.peers.slice(0, 7).map((peer) => {
@@ -1304,7 +1342,7 @@ function VirtualSpaceExperience({
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
                         <p className="truncate text-[0.68rem] text-fg-3">
-                          {STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
+                          {roomById.get(peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
                         </p>
                       </div>
                       <button
@@ -1370,7 +1408,7 @@ function VirtualSpaceExperience({
                       onClick={() => selectAvatar(index)}
                     >
                       <img
-                        src={`/assets/virtual-studio/reference/player-${avatar.skin}-direction-down.png`}
+                        src={avatar.directional.down}
                         alt=""
                         draggable={false}
                         className={cn(

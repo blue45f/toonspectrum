@@ -5,7 +5,6 @@ import {
   STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
   STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS,
   STUDIO_VIRTUAL_SPACE_NEARBY_RADIUS,
-  clampStudioVirtualSpacePoint,
   selectNearbyStudioVirtualPeers,
   studioVirtualSpaceState,
   type StudioVirtualSpaceActivity,
@@ -17,7 +16,7 @@ import {
 } from "./studio-virtual-space-model";
 
 export const STUDIO_VIRTUAL_SPACE_WIRE = "toonspectrum-space-v1";
-export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 150;
+export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 90;
 export const STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS = 2_500;
 export const STUDIO_VIRTUAL_SPACE_STALE_MS = 10_000;
 export const STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES = 1_024;
@@ -88,6 +87,26 @@ function isFiniteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 10_000;
 }
 
+function runtimePresenceState(
+  point: StudioVirtualSpacePoint,
+  facing: StudioVirtualSpaceFacing = "down",
+  activity: StudioVirtualSpaceActivity = "available",
+  moving = false,
+  avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
+  zoneId?: StudioVirtualSpaceZoneId,
+): StudioVirtualSpacePresenceState {
+  // The Phaser/Tiled world may be larger than the built-in 850×798 master scene. Use the
+  // model helper for avatar/facing/activity sanitization and default-room fallback, but preserve
+  // the engine-clamped world coordinates so P2P peers do not snap to the default-world edge.
+  const fallback = studioVirtualSpaceState(point, facing, activity, moving, avatarIndex, zoneId);
+  return Object.freeze({
+    ...fallback,
+    x: point.x,
+    y: point.y,
+    zoneId: zoneId ?? fallback.zoneId,
+  });
+}
+
 function packetBytes(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
@@ -146,13 +165,13 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   ) {
     return null;
   }
-  const point = clampStudioVirtualSpacePoint({ x: state.x, y: state.y });
+  const point = { x: state.x, y: state.y };
   return {
     wire: STUDIO_VIRTUAL_SPACE_WIRE,
     kind: "presence",
     sequence: Number(packet.sequence),
     at: Number(packet.at),
-    state: studioVirtualSpaceState(
+    state: runtimePresenceState(
       point,
       state.facing as StudioVirtualSpaceFacing,
       state.activity as StudioVirtualSpaceActivity,
@@ -199,7 +218,7 @@ export class StudioVirtualSpacePresenceController {
     initialPoint: StudioVirtualSpacePoint,
     private readonly dependencies: StudioVirtualSpacePresenceDependencies = {},
   ) {
-    this.self = studioVirtualSpaceState(initialPoint);
+    this.self = runtimePresenceState(initialPoint);
   }
 
   private now(): number {
@@ -268,7 +287,7 @@ export class StudioVirtualSpacePresenceController {
     zoneId?: StudioVirtualSpaceZoneId,
   ): void {
     if (this.closed) return;
-    const next = studioVirtualSpaceState(point, facing, activity, moving, avatarIndex, zoneId);
+    const next = runtimePresenceState(point, facing, activity, moving, avatarIndex, zoneId);
     if (
       next.x === this.self.x
       && next.y === this.self.y

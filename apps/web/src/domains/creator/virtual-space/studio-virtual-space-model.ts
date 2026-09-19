@@ -1,12 +1,37 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 
-export const STUDIO_VIRTUAL_SPACE_WIDTH = 1180;
-export const STUDIO_VIRTUAL_SPACE_HEIGHT = 720;
-export const STUDIO_VIRTUAL_SPACE_NEARBY_RADIUS = 230;
+export const STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH = 1180;
+export const STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT = 720;
+// The approved master art is 700x656 and the original master SVG used an 850x798 viewBox.
+// Keep the game world on the same aspect ratio so the art is never stretched.
+export const STUDIO_VIRTUAL_SPACE_WIDTH = 850;
+export const STUDIO_VIRTUAL_SPACE_HEIGHT = 798;
+const STUDIO_VIRTUAL_SPACE_SCALE_X = STUDIO_VIRTUAL_SPACE_WIDTH / STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH;
+const STUDIO_VIRTUAL_SPACE_SCALE_Y = STUDIO_VIRTUAL_SPACE_HEIGHT / STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT;
+const STUDIO_VIRTUAL_SPACE_DISTANCE_SCALE = Math.sqrt(STUDIO_VIRTUAL_SPACE_SCALE_X * STUDIO_VIRTUAL_SPACE_SCALE_Y);
+export const STUDIO_VIRTUAL_SPACE_NEARBY_RADIUS = Math.round(230 * STUDIO_VIRTUAL_SPACE_DISTANCE_SCALE);
 export const STUDIO_VIRTUAL_SPACE_MAX_NEARBY_PEERS = 3;
 export const STUDIO_VIRTUAL_SPACE_MAX_PARTICIPANTS = 24;
-export const STUDIO_VIRTUAL_SPACE_AVATAR_COUNT = 4;
+// Wire-level capacity, not the number of currently registered skins. This lets the skin registry grow
+// without changing the P2P packet contract.
+export const STUDIO_VIRTUAL_SPACE_AVATAR_COUNT = 256;
 export const STUDIO_VIRTUAL_SPACE_AUTO_AVATAR = -1;
+
+export function studioVirtualSpaceScaleLegacyX(value: number): number {
+  return value * STUDIO_VIRTUAL_SPACE_SCALE_X;
+}
+export function studioVirtualSpaceScaleLegacyY(value: number): number {
+  return value * STUDIO_VIRTUAL_SPACE_SCALE_Y;
+}
+export function studioVirtualSpaceScaleLegacyDistance(value: number): number {
+  return value * STUDIO_VIRTUAL_SPACE_DISTANCE_SCALE;
+}
+export function studioVirtualSpaceScaleLegacyPoint(point: StudioVirtualSpacePoint): StudioVirtualSpacePoint {
+  return {
+    x: studioVirtualSpaceScaleLegacyX(point.x),
+    y: studioVirtualSpaceScaleLegacyY(point.y),
+  };
+}
 
 /**
  * Data-driven room id. Built-in ids are declared by the default manifest, while Tiled/custom
@@ -61,74 +86,73 @@ export interface StudioVirtualAvatarProfile {
   readonly expression: "bright" | "calm" | "sparkle" | "smile";
 }
 
+function legacyZone(zone: Omit<StudioVirtualSpaceZone, "x" | "y" | "width" | "height"> & {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}): StudioVirtualSpaceZone {
+  return Object.freeze({
+    ...zone,
+    x: studioVirtualSpaceScaleLegacyX(zone.x),
+    y: studioVirtualSpaceScaleLegacyY(zone.y),
+    width: studioVirtualSpaceScaleLegacyX(zone.width),
+    height: studioVirtualSpaceScaleLegacyY(zone.height),
+  });
+}
+
 export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Object.freeze([
-  {
-    id: "lounge",
-    labelKo: "라운지",
-    labelEn: "Lounge",
+  legacyZone({
+    id: "lounge", labelKo: "라운지", labelEn: "Lounge",
     descriptionKo: "가볍게 만나고 오늘의 작업을 공유해요.",
     descriptionEn: "Meet casually and share what everyone is working on.",
     x: 32, y: 32, width: 340, height: 190, destination: "none",
-  },
-  {
-    id: "writers",
-    labelKo: "작가실",
-    labelEn: "Writers Room",
+  }),
+  legacyZone({
+    id: "writers", labelKo: "작가실", labelEn: "Writers Room",
     descriptionKo: "시놉시스·대본·에피소드를 함께 정리해요.",
     descriptionEn: "Shape synopsis, scripts and episodes together.",
     x: 390, y: 32, width: 330, height: 190, destination: "story",
-  },
-  {
-    id: "storyboard",
-    labelKo: "콘티 보드",
-    labelEn: "Storyboard Wall",
+  }),
+  legacyZone({
+    id: "storyboard", labelKo: "콘티 보드", labelEn: "Storyboard Wall",
     descriptionKo: "컷 흐름과 장면 구성을 한눈에 검토해요.",
     descriptionEn: "Review panel flow and scene composition at a glance.",
     x: 738, y: 32, width: 410, height: 190, destination: "comic",
-  },
-  {
-    id: "assets",
-    labelKo: "에셋 라이브러리",
-    labelEn: "Asset Library",
+  }),
+  legacyZone({
+    id: "assets", labelKo: "에셋 라이브러리", labelEn: "Asset Library",
     descriptionKo: "캐릭터·배경·브러시·3D 자료를 찾아요.",
     descriptionEn: "Find characters, backgrounds, brushes and 3D assets.",
     x: 32, y: 250, width: 310, height: 190, destination: "assets",
-  },
-  {
-    id: "live",
-    labelKo: "크리에이터 플라자",
-    labelEn: "Creator Plaza",
+  }),
+  legacyZone({
+    id: "live", labelKo: "크리에이터 플라자", labelEn: "Creator Plaza",
     descriptionKo: "라이브 드로잉과 공동 작업 이벤트가 열리는 중앙 광장이에요.",
     descriptionEn: "The central plaza for live drawing and co-creation events.",
     x: 390, y: 250, width: 410, height: 190, destination: "live",
-  },
-  {
-    id: "drawing",
-    labelKo: "드로잉 스튜디오",
-    labelEn: "Drawing Studio",
+  }),
+  legacyZone({
+    id: "drawing", labelKo: "드로잉 스튜디오", labelEn: "Drawing Studio",
     descriptionKo: "같은 원고를 보며 실시간으로 작업해요.",
     descriptionEn: "Work on the same manuscript with live collaboration.",
     x: 838, y: 250, width: 310, height: 190, destination: "canvas",
-  },
-  {
-    id: "review",
-    labelKo: "리뷰 룸",
-    labelEn: "Review Room",
+  }),
+  legacyZone({
+    id: "review", labelKo: "리뷰 룸", labelEn: "Review Room",
     descriptionKo: "댓글·수정 요청·승인을 함께 처리해요.",
     descriptionEn: "Handle comments, change requests and approvals together.",
     x: 32, y: 462, width: 430, height: 226, destination: "review",
-  },
-  {
-    id: "assistant",
-    labelKo: "어시스트 데스크",
-    labelEn: "Assistant Desk",
+  }),
+  legacyZone({
+    id: "assistant", labelKo: "어시스트 데스크", labelEn: "Assistant Desk",
     descriptionKo: "어시스트 배정과 AI 프로듀서 도움을 한곳에서 처리해요.",
     descriptionEn: "Coordinate assistants and AI production support in one place.",
     x: 718, y: 462, width: 430, height: 226, destination: "assistant",
-  },
+  }),
 ]);
 
-const DEFAULT_POINT: StudioVirtualSpacePoint = Object.freeze({ x: 590, y: 640 });
+const DEFAULT_POINT: StudioVirtualSpacePoint = Object.freeze(studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 }));
 
 const SKIN = ["oklch(0.91 0.055 55)", "oklch(0.86 0.07 48)", "oklch(0.78 0.08 52)", "oklch(0.68 0.075 50)"] as const;
 const HAIR = ["oklch(0.31 0.055 25)", "oklch(0.36 0.07 300)", "oklch(0.72 0.1 335)", "oklch(0.72 0.11 235)", "oklch(0.77 0.12 95)", "oklch(0.58 0.12 155)"] as const;
@@ -171,12 +195,12 @@ export function studioVirtualSpaceInitialPoint(identity: string): StudioVirtualS
   // Spawn on the open entrance path between Review Room and Assistant Desk, mirroring the master scene.
   const spreadX = 535 + (hash % 110);
   const spreadY = 610 + ((hash >>> 8) % 42);
-  return Object.freeze({ x: spreadX, y: spreadY });
+  return Object.freeze(studioVirtualSpaceScaleLegacyPoint({ x: spreadX, y: spreadY }));
 }
 
 export function clampStudioVirtualSpacePoint(point: StudioVirtualSpacePoint): StudioVirtualSpacePoint {
-  const x = Math.max(20, Math.min(STUDIO_VIRTUAL_SPACE_WIDTH - 20, Math.round(point.x)));
-  const y = Math.max(20, Math.min(STUDIO_VIRTUAL_SPACE_HEIGHT - 20, Math.round(point.y)));
+  const x = Math.max(20, Math.min(STUDIO_VIRTUAL_SPACE_WIDTH - 20, point.x));
+  const y = Math.max(20, Math.min(STUDIO_VIRTUAL_SPACE_HEIGHT - 20, point.y));
   return Object.freeze({ x, y });
 }
 
