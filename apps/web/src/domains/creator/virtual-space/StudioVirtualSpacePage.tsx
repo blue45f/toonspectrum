@@ -77,6 +77,7 @@ import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import {
   STUDIO_CHARACTER_SKINS,
+  studioCharacterAppearanceForAvatarIndex,
   studioCharacterSkinForAvatarIndex,
 } from "./studio-virtual-space-character-skins";
 import {
@@ -108,8 +109,17 @@ import {
 import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
 import { StudioVirtualSpaceNpcPanel } from "./StudioVirtualSpaceNpcPanel";
+import { StudioVirtualSpaceDirectory } from "./StudioVirtualSpaceDirectory";
+import { StudioVirtualSpaceReviewPicker } from "./StudioVirtualSpaceReviewPicker";
+import { verifyStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-invitation";
+import { useStudioVirtualSpaceSlots } from "./use-studio-virtual-space-slots";
+import { StudioVirtualSpaceSeatsPanel } from "./StudioVirtualSpaceSeatsPanel";
 import { StudioVirtualSpaceSocialPanel, type StudioSpaceSocialRequest, type StudioSpaceSocialAction } from "./StudioVirtualSpaceSocialPanel";
 import { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
+import { useStudioVirtualSpaceConversation } from "./use-studio-virtual-space-conversation";
+import { StudioVirtualSpaceConversationPanel } from "./StudioVirtualSpaceConversationPanel";
+import { StudioVirtualSpaceGuide } from "./StudioVirtualSpaceGuide";
+import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
@@ -716,7 +726,12 @@ function VirtualSpaceExperience({
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
+  const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
+  const [openingReview, setOpeningReview] = useState(false);
+  const cancelSlotsRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const [sharedActivity, setSharedActivity] = useState<StudioSpaceSocialRequest | null>(null);
+  const [waveActorIds, setWaveActorIds] = useState<readonly string[]>([]);
+  const shownGreetings = useRef(new Set<string>());
   const sharedActivityRef = useRef<StudioSpaceSocialRequest | null>(null);
   const acceptedActivityHandler = useRef<(request: StudioSpaceSocialRequest) => void>(() => undefined);
   const [socialNotice, setSocialNotice] = useState("");
@@ -913,6 +928,7 @@ function VirtualSpaceExperience({
       room.participant,
       room.direct,
       selfRef.current,
+      { appearanceForAvatarIndex: studioCharacterAppearanceForAvatarIndex },
     );
     clearLocalReactionTimer();
     controllerRef.current = controller;
@@ -986,13 +1002,26 @@ function VirtualSpaceExperience({
 
   const queuePathTo = useCallback((point: StudioVirtualSpacePoint) => {
     if (!worldReady) return;
+    void cancelSlotsRef.current();
     setFollowingPeer(null);
     engineBridge.requestMove(point);
   }, [engineBridge, setFollowingPeer, worldReady]);
 
+  const slots = useStudioVirtualSpaceSlots({
+    room: live.room, manifest: worldManifest,
+    enabled: signedIn && worldReady && !authoringMode && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
+    point: snapshot.self, moving,
+    onApproach: (point) => { setFollowingPeer(null); engineBridge.requestMove(point); },
+  });
+  useEffect(() => { cancelSlotsRef.current = slots.cancel; }, [slots.cancel]);
+  const seatedActors = useMemo(() => studioVirtualSpaceSeatedActors({ manifest: worldManifest, lease: slots.snapshot,
+    selfSessionId: live.room?.participant.sessionId, selfActorId: fallbackIdentity,
+    self: snapshot.self, peers: snapshot.peers }), [worldManifest, slots.snapshot, live.room?.participant.sessionId, fallbackIdentity, snapshot.self, snapshot.peers]);
+
   const startFollowingPeer = useCallback((sessionId: string) => {
     const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === sessionId);
     if (!peer) return;
+    void cancelSlotsRef.current();
     setFollowingPeer(sessionId);
   }, [setFollowingPeer]);
 
@@ -1032,6 +1061,7 @@ function VirtualSpaceExperience({
   }, [engineBridge, setFollowingPeer]);
 
   const handleEnginePortal = useCallback((portal: StudioWorldPortalDefinition) => {
+    void cancelSlotsRef.current();
     if (portal.href) {
       navigate(portal.href);
       return;
@@ -1072,7 +1102,8 @@ function VirtualSpaceExperience({
     }, STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS);
   }, [clearLocalReactionTimer]);
 
-  const { snapshot: socialSnapshot, request: requestSocial, respond: respondSocial, cancel: cancelSocial } = useStudioVirtualSpaceSocial({
+  const { snapshot: socialSnapshot, interactive: socialInteractive, request: requestSocial, respond: respondSocial, cancel: cancelSocial, requestReview, respondReview, setPeerBlocked, wave } = useStudioVirtualSpaceSocial({
+    workId: projectId,
     participant: live.room?.participant,
     port: live.room?.direct,
     manifest: worldManifest,
@@ -1090,7 +1121,43 @@ function VirtualSpaceExperience({
     cancelSocial(current.id);
     closeStudioP2pHuddle({ conversationId: current.id });
   }, [cancelSocial, setFollowingPeer]);
+  const gestureGreeting = socialSnapshot.greetings.find((greeting) => greeting.status === "delivered" || greeting.status === "received");
+  useEffect(() => {
+    setWaveActorIds([]);
+    if (!socialSnapshot.available || !gestureGreeting || shownGreetings.current.has(gestureGreeting.id)
+      || Date.now() - gestureGreeting.createdAt > 4_000) return;
+    shownGreetings.current.add(gestureGreeting.id);
+    if (shownGreetings.current.size > 64) shownGreetings.current.delete(shownGreetings.current.values().next().value!);
+    setWaveActorIds([gestureGreeting.direction === "outgoing" ? fallbackIdentity : gestureGreeting.peer.sessionId]);
+    const timer = globalThis.setTimeout(() => setWaveActorIds([]), 1_600);
+    return () => globalThis.clearTimeout(timer);
+  }, [gestureGreeting, socialSnapshot.available, fallbackIdentity]);
+  useEffect(() => {
+    const suspend = () => { if (sharedActivityRef.current?.action === "follow") finishSharedActivity(); setReviewPeerId(null); };
+    const visibility = () => { if (document.visibilityState === "hidden") suspend(); };
+    globalThis.addEventListener("blur", suspend);
+    document.addEventListener("visibilitychange", visibility);
+    return () => { globalThis.removeEventListener("blur", suspend); document.removeEventListener("visibilitychange", visibility); };
+  }, [finishSharedActivity]);
+  const conversation = useStudioVirtualSpaceConversation({
+    participant: live.room?.participant, port: live.room?.direct, manifest: worldManifest,
+    enabled: signedIn && worldReady && !authoringMode && snapshot.direct
+      && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
+    blockedPeerIds: socialSnapshot.blockedPeerIds,
+    onReady: (scope) => {
+      finishSharedActivity();
+      setFollowingPeer(null);
+      openStudioP2pHuddle({ conversationId: scope.id,
+        peerIds: scope.memberIds.filter((id) => id !== live.room?.participant.sessionId), source: "virtual-space" });
+    },
+  });
+  const pairConversation = useMemo(() => sharedActivity?.action === "talk" && live.room?.participant
+    ? { id: sharedActivity.id, memberIds: [live.room.participant.sessionId, sharedActivity.peer.sessionId].sort() }
+    : null, [sharedActivity, live.room]);
+  const activeConversation = conversation.snapshot.active;
+  const leaveConversation = conversation.leave;
   const handleAcceptedActivity = useCallback((request: StudioSpaceSocialRequest) => {
+    if (activeConversation) leaveConversation(activeConversation.id);
     if (sharedActivityRef.current?.id !== request.id) finishSharedActivity();
     sharedActivityRef.current = request;
     setSharedActivity(request);
@@ -1103,7 +1170,7 @@ function VirtualSpaceExperience({
       // Current packs use a celebration reaction; do not claim an unsupported hand pose.
       sendReaction("sparkles");
     }
-  }, [finishSharedActivity, sendReaction, startFollowingPeer]);
+  }, [activeConversation, leaveConversation, finishSharedActivity, sendReaction, startFollowingPeer]);
   useEffect(() => { acceptedActivityHandler.current = handleAcceptedActivity; }, [handleAcceptedActivity]);
   useEffect(() => {
     const handleClosed = (event: Event) => {
@@ -1137,6 +1204,7 @@ function VirtualSpaceExperience({
   const requestActivity = (sessionId: string, action: StudioSpaceSocialAction) => {
     const peer = snapshot.peers.find((item) => item.participant.sessionId === sessionId);
     if (!peer) return;
+    if (action === "review") { setReviewPeerId(sessionId); return; }
     if ((action === "talk" || action === "high-five") && Math.hypot(peer.state.x - snapshot.self.x, peer.state.y - snapshot.self.y) > 120) {
       setSocialNotice(bt("조금 더 가까이 이동한 뒤 요청해 주세요.", "Move a little closer before sending this invitation."));
       return;
@@ -1148,12 +1216,27 @@ function VirtualSpaceExperience({
     if (sharedActivity?.id === id) finishSharedActivity();
     else cancelSocial(id);
   };
+  const openSharedReview = async () => {
+    const current = sharedActivityRef.current;
+    if (!current?.reviewSubject || openingReview || current.reviewSubject.workId !== projectId) return;
+    setOpeningReview(true);
+    try {
+      const verified = await verifyStudioVirtualSpaceReviewSubject(current.reviewSubject, "view");
+      if (sharedActivityRef.current?.id !== current.id) return;
+      if (!verified.ok) {
+        setSocialNotice(bt("검수본이나 열람 권한이 변경되어 열 수 없어요. 새 초대를 요청해 주세요.", "The review or your access changed. Ask for a new invitation.")); return;
+      }
+      writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current);
+      navigate(verified.href);
+    } finally { setOpeningReview(false); }
+  };
   const changeAtmosphere = (next: "focus" | "balanced" | "lively") => {
     setAtmosphere(next);
     try { localStorage.setItem("toonspectrum:virtual-atmosphere:v1", next); } catch { /* Session preference still applies. */ }
     if (next === "focus") { engineBridge.clearMovement(); finishSharedActivity(); }
   };
   const cancelFollowing = () => {
+    void slots.cancel();
     if (sharedActivity?.action === "follow") finishSharedActivity();
     else setFollowingPeer(null);
   };
@@ -1220,6 +1303,8 @@ function VirtualSpaceExperience({
                   snapshot={snapshot}
                   bridge={engineBridge}
                   selfIdentity={fallbackIdentity}
+                  seatedActors={seatedActors}
+                  waveActorIds={waveActorIds}
                   debugWorld={authoringMode}
                   atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
                   onNpcInteract={activateInteraction}
@@ -1363,6 +1448,10 @@ function VirtualSpaceExperience({
           </div>
 
           <aside className="vs2-rightbar vs2-rightbar--live">
+            {worldReady ? <StudioVirtualSpaceGuide manifest={worldManifest} onMove={queuePathTo} onOpen={activateAction}
+              onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")} /> : null}
+            {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
+              onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} /> : null}
             <section className="vs2-panel studio-vspace-atmosphere" data-space-interactive="true">
               <h2>{bt("작업실 분위기", "Studio atmosphere")}</h2>
               <div role="group" aria-label={bt("작업실 분위기", "Studio atmosphere")}>
@@ -1373,22 +1462,49 @@ function VirtualSpaceExperience({
               {connectivity.localOnly ? <details data-studio-virtual-offline="true"><summary>{bt("로컬 작업 중", "Working locally")}</summary><p>{bt("이동과 캐시된 작업은 계속할 수 있어요. 팀원 연결은 온라인으로 돌아오면 복구됩니다.", "Movement and cached work remain available. Teammates reconnect when you return online.")}</p></details> : null}
             </section>
             {worldReady ? <StudioVirtualSpaceNpcPanel manifest={worldManifest} onInteract={activateInteraction} /> : null}
+            {worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
+              snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
+              onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
             <StudioVirtualSpaceSocialPanel
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
-              disabled={!signedIn || !snapshot.direct || authoringMode}
+              disabled={!signedIn || !snapshot.direct || authoringMode || !socialInteractive}
               focused={activity === "focused" || activity === "away" || atmosphere === "focus"}
-              onSelect={setSelectedPeerId} onWave={() => sendReaction("wave")}
+              onSelect={setSelectedPeerId} onWave={() => {
+                if (selectedPeerId && !wave(selectedPeerId)) setSocialNotice(bt("인사를 보내지 못했어요. 상대 연결을 확인하거나 잠시 뒤 다시 시도해 주세요.", "The greeting was not sent. Check the connection or try again shortly."));
+              }}
               onRequest={requestActivity}
-              onRespond={(id, response) => { respondSocial(id, response); }}
+              onRespond={(id, response) => {
+                const request = socialSnapshot.requests.find((item) => item.id === id);
+                if (request?.action === "review") { void respondReview(id, response); }
+                else respondSocial(id, response);
+              }}
               onCancel={cancelSocialRequest}
+              onBlock={(id, blocked) => {
+                if (blocked) for (const record of conversation.snapshot.records) {
+                  if (record.memberIds.includes(id)) conversation.leave(record.id);
+                }
+                if (blocked && sharedActivityRef.current?.peer.sessionId === id) finishSharedActivity();
+                if (blocked && reviewPeerId === id) setReviewPeerId(null);
+                setPeerBlocked(id, blocked);
+              }}
             />
+            {signedIn && snapshot.peers.length > 0 ? <StudioVirtualSpaceConversationPanel
+              self={live.room?.participant} snapshot={conversation.snapshot} currentConversation={pairConversation}
+              onPropose={conversation.propose} onRespond={conversation.respond}
+              onLeave={(id) => { if (sharedActivityRef.current?.id === id) finishSharedActivity(); else conversation.leave(id); }} /> : null}
+            {reviewPeerId ? <StudioVirtualSpaceReviewPicker key={reviewPeerId} workId={projectId}
+              peerName={snapshot.peers.find((peer) => peer.participant.sessionId === reviewPeerId)?.participant.displayName ?? bt("팀원", "Teammate")}
+              disabled={!socialInteractive || !socialSnapshot.reviewReadyPeerIds.includes(reviewPeerId)}
+              onInvite={async (subject, signal) => Boolean(await requestReview(reviewPeerId, subject, signal))}
+              onClose={() => setReviewPeerId(null)} /> : null}
             {socialNotice ? <p className="studio-vspace-social-notice" role="status">{socialNotice}</p> : null}
             {sharedActivity?.action === "review" ? <section className="vs2-panel studio-vspace-shared-review">
               <h2>{bt("함께 검토하기", "Review together")}</h2>
-              <p>{bt(`${sharedActivity.peer.displayName} 님과 같은 프로젝트의 검토함을 엽니다. 검수본과 버전은 검토함에서 선택하세요.`, `Open this project's review inbox with ${sharedActivity.peer.displayName}. Select the review and version there.`)}</p>
+              <p>{bt(`${sharedActivity.peer.displayName} 님과 초대에서 선택한 같은 검수 버전을 확인합니다.`, `Review the same invited snapshot with ${sharedActivity.peer.displayName}.`)}</p>
+              <p className="break-all text-xs">{sharedActivity.reviewSubject?.revisionId ?? bt("검수 버전을 확인할 수 없어요.", "The review version could not be verified.")}</p>
               <button type="button" onClick={() => { const review = worldManifest.interactions.find((item) => item.action === "review"); if (review) queuePathTo(review.point); }}>{bt("리뷰 데스크로 이동", "Walk to review desk")}</button>
-              <button type="button" onClick={() => activateAction("review")}>{bt("검토함 바로 열기", "Open review inbox")}</button>
+              <button type="button" disabled={openingReview || !sharedActivity.reviewSubject} onClick={() => { void openSharedReview(); }}>{openingReview ? bt("권한 확인 중…", "Verifying access…") : bt("초대한 검수본 열기", "Open invited snapshot")}</button>
             </section> : null}
             <section className="vs2-panel vs2-live-huddle">
               <div className="flex items-start justify-between gap-3">

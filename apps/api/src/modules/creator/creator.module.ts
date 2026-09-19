@@ -131,6 +131,6 @@ const privateObjectStorageModule =
     StudioLiveSocketAuthService,
     StudioLiveGateway,
   ],
-  exports: [CreatorCollaborationRepository],
+  exports: [CreatorCollaborationRepository, StudioWorkAssetService, StudioWorkAssetUploadGuard],
 })
 export class CreatorModule {}

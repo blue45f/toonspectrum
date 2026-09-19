@@ -207,6 +207,8 @@ describe("Virtual Studio world manifest", () => {
       ...DEFAULT_STUDIO_WORLD_MANIFEST,
       width: 200,
       height: 100,
+      interactionSlots: [],
+      occlusionLayers: [],
       props: [],
       colliders: [],
       interactions: [],

@@ -93,6 +93,19 @@ test("protected core aggregates every lane without another checkout", () => {
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
+test("review database invariants execute with real PostgreSQL and the accepted graph triggers", () => {
+  const database = job("database");
+  assert.match(database, /image: postgres:16-alpine/u);
+  assert.match(database, /TEST_DATABASE_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
+  assert.match(database, /STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
+  assert.match(database, /node scripts\/prepare-studio-review-test-db\.mjs/u);
+  assert.match(database, /pnpm exec vitest run --no-file-parallelism/u);
+  for (const suite of ["studio-review-preview-producer.integration.test.ts", "studio-project-graph-review-race.integration.test.ts"]) {
+    assert.ok(database.includes(suite), `Missing real database suite: ${suite}`);
+  }
+  assert.ok(REQUIRED_CORE_GATES.includes("database"), "database failures must block protected core");
+});
+
 test("mandatory lanes start independently and dependency-free contracts run first", () => {
   assert.doesNotMatch(source, /^ {2}preflight:\n/m);
   for (const name of ["lint", "typecheck", "static", "serial", "build"]) {

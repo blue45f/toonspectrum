@@ -79,6 +79,8 @@ export type StudioLiveTransportControlEvent =
  * authenticated socket has received a successful work-room ACL acknowledgement.
  */
 export interface StudioLiveTransport {
+  /** Negotiated single-server lease authority; wrappers only forward their primary's capability. */
+  readonly authoritativeLockCapability?: "fenced-v2" | null;
   /** Strict RTC-only messages. Absence never grants permission to relay. */
   readonly direct?: StudioLiveDirectPort;
   /** Capability-scoped RTC-only feature lanes. Never imply durable server acknowledgement. */

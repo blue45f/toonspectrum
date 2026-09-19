@@ -41,7 +41,7 @@ import {
   type SetStateAction,
 } from "react";
 import { flushSync } from "react-dom";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, type NavigateOptions, type To } from "react-router-dom";
 import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
@@ -265,6 +265,8 @@ import { createStudioAutosaveBusyRetry } from "./studio-autosave-busy-retry";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import { StudioFormalSaveDialogMount as StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialogMount";
+import { StudioReviewCaptureDialogMount } from "./review-capture/StudioReviewCaptureDialogMount";
+import { useStudioReviewCapture } from "./review-capture/useStudioReviewCapture";
 import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
 import {
   chooseStudioProjectPackageSaveTarget,
@@ -24266,7 +24268,7 @@ No text, logo, watermark, or copyrighted character.`;
   // 가드(saveScopeStillCurrent·mutation ticket)·CRDT 승인 장벽·revision fencing 은 전부 함께
   // 이관됐고, 이 선언은 호출 시점 렌더 바인딩을 deps 로 흘리는 얇은 지점만 유지한다
   // (함수 선언 hoisting 으로 상단 handleSaveRef 배선이 그대로 동작한다).
-  async function handleSave(status: "published" | "draft") {
+  async function handleSave(status: "published" | "draft", options?: { preserveEditor?: boolean }) {
     const localProjectContext = localStudioProjectForSave();
     const explicitSaveAction = resolveStudioEditorExplicitSaveAction({
       status,
@@ -24288,7 +24290,14 @@ No text, logo, watermark, or copyrighted character.`;
     }
     await runStudioPageSavePipeline(status, {
       studioAuthUserId, workId, remixId, loggedIn, autosaveKey,
-      linkedTitleId, linkedSeriesId, linkedChallengeId, location, navigate,
+      linkedTitleId, linkedSeriesId, linkedChallengeId, location,
+      navigate: (to: To | number, navigationOptions?: NavigateOptions) => {
+        if (typeof to === "number") return navigate(to);
+        // Review capture must read back the acknowledged source before this editor unmounts.
+        // All other save navigation, including new-work and recovery flows, stays unchanged.
+        if (options?.preserveEditor && workId && to === `/create/${workId}`) return;
+        return navigate(to, navigationOptions);
+      },
       currentStudioDocumentScopeRef, editorMountedRef,
       captureStudioMutationTicket, canApplyStudioMutation,
       markStudioDocumentChanged, lockStudioMutationsNow, documentSaveInFlightRef,
@@ -26422,6 +26431,30 @@ function clearSelectionForEdit() {
     );
   }
 
+  const reviewCapture = useStudioReviewCapture(JSON.stringify([studioAuthUserId, workId]), {
+    getContext: () => {
+      const ticket = captureStudioMutationTicket();
+      return {
+        workId: ticket.workId,
+        scopeKey: JSON.stringify([ticket.authScopeKey, ticket.workId]),
+        generation: JSON.stringify([ticket.accessGeneration, ticket.documentGeneration,
+          studioRevisionProjectGenerationRef.current]),
+        available: loggedIn && editorMountedRef.current && canApplyStudioMutation(ticket)
+          && workHydrated && !sourceHydrationPending && !documentReloadRequired && !collaborationReadOnly
+          && !workHydrationFailed && !workHydrationUnsupportedFormat
+          && !drawingRef.current && !pendingStrokeCommitsRef.current,
+      };
+    },
+    projectRuntime: async (saved) => {
+      const snapshot = currentStudioProjectSnapshot();
+      const { projectStudioReviewCaptureSource } = await import("./review-capture/studio-review-capture-projection");
+      return projectStudioReviewCaptureSource(snapshot, saved, CANVAS_W, (surfaceId) =>
+        (studioCrdtDocumentRef.current?.getRasterOperationLog(surfaceId) ?? null) !== null);
+    },
+    save: (status) => handleSave(status, { preserveEditor: true }),
+    captureAll: () => handleCapturePagesForPreset("all"),
+  });
+
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
   // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
   // best-effort durable recovery request; normal editing still uses the debounced autosave.
@@ -27539,6 +27572,7 @@ function clearSelectionForEdit() {
     handleImportInterchangeArchive,
     handleImportPsd,
     handleSave,
+    openPinnedReviewCapture: reviewCapture.open,
     openAutoActions,
     openOwnerFxPanel,
     redo,
@@ -29645,6 +29679,13 @@ function clearSelectionForEdit() {
       >
         {editorSurface}
         {smartShapeDialog}
+        <StudioReviewCaptureDialogMount
+          open={reviewCapture.visible}
+          snapshot={reviewCapture.snapshot}
+          onSave={() => { void reviewCapture.save(); }}
+          onRetry={reviewCapture.retry}
+          onClose={() => { void reviewCapture.close(); }}
+        />
         <StudioFormalSaveDialog
           open={formalSaveOpen}
           locale={studioSaveLocale}

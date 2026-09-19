@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { decodeDrawnArtPng, DRAWN_ART_DIRECTORY, verifyDrawnArtFramePixels, verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
@@ -25,6 +26,32 @@ function syntheticPng(width, height) {
   bytes.writeUInt32BE(height, 20);
   return bytes;
 }
+
+test("verifies all 24 drawn sheets and 96 decoded frames against runtime bindings", async () => {
+  const result = await verifyVirtualStudioDrawnArt();
+  assert.equal(result.assetCount, 24);
+  assert.equal(result.frameCount, 96);
+  assert.equal(result.registryBindingsVerified, true);
+});
+
+test("rejects decoded drawn pixel drift and a false alpha/foot baseline", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const asset = manifest.assets["pink/walk-down"];
+  const decoded = decodeDrawnArtPng(await readFile(path.join(DRAWN_ART_DIRECTORY, "player-pink-walk-down.png")));
+  const wrongBounds = structuredClone(asset); wrongBounds.alphaBounds[0][3]--;
+  assert.throws(() => verifyDrawnArtFramePixels(decoded, wrongBounds), /alpha bounds drifted/u);
+  const wrongFoot = structuredClone(asset); wrongFoot.frames[0].originY = .2;
+  assert.throws(() => verifyDrawnArtFramePixels(decoded, wrongFoot), /feet origin/u);
+  decoded.rgba[0] ^= 1;
+  assert.throws(() => verifyDrawnArtFramePixels(decoded, asset), /decoded frame pixels drifted/u);
+});
+
+test("rejects unsupported drawn PNG decoding instead of trusting recorded dimensions", async () => {
+  const bytes = await readFile(path.join(DRAWN_ART_DIRECTORY, "player-pink-walk-down.png"));
+  const unsupported = Buffer.from(bytes); unsupported[28] = 1;
+  assert.throws(() => decodeDrawnArtPng(unsupported), /non-interlaced 8-bit RGBA/u);
+  assert.throws(() => decodeDrawnArtPng(bytes.subarray(0, 40)), /truncated/u);
+});
 
 async function createFixture(context, { dimensions = [10, 12], sha256 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-art-manifest-"));
@@ -49,6 +76,8 @@ test("verifies every current production-v2 output without claiming source revali
   const assets = new Map(result.assets.map((asset) => [asset.name, asset]));
 
   assert.equal(result.assetCount, 36);
+  assert.equal(result.drawnArt.assetCount, 24);
+  assert.equal(result.drawnArt.decodedPixelsVerified, true);
   assert(result.totalBytes > 0);
   assert.equal(result.outputIntegrityVerified, true);
   assert.equal(result.privateApprovedMasterSourceReverified, false);

@@ -66,6 +66,7 @@ const CONTEXT: StudioLiveTransportContext = {
 };
 
 class FakePrimaryTransport implements StudioLiveTransport {
+  authoritativeLockCapability: "fenced-v2" | null = null;
   readonly mode = "server" as const;
   readonly sent: StudioLiveEnvelope[] = [];
   readonly sentInk: StudioLiveInkWireMessage[] = [];
@@ -307,6 +308,20 @@ function harness(
 }
 
 describe("Studio purpose-routed live transport", () => {
+  it("advertises only the connected primary authority, never presence provider readiness", async () => {
+    const { primary, coordinator, transport } = harness();
+    expect(transport.authoritativeLockCapability).toBeNull();
+    await transport.connect(); coordinator.setReady("presence");
+    expect(transport.authoritativeLockCapability).toBeNull();
+    primary.authoritativeLockCapability = "fenced-v2";
+    expect(transport.authoritativeLockCapability).toBe("fenced-v2");
+    primary.ready = false;
+    expect(transport.authoritativeLockCapability).toBeNull();
+    primary.ready = true; primary.authoritativeLockCapability = null;
+    expect(transport.authoritativeLockCapability).toBeNull();
+    transport.close();
+  });
+
   it("routes only presence and screen signaling while CRDT, locks, and chat stay primary", async () => {
     const { primary, coordinator, transport } = harness();
     await transport.connect();

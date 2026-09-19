@@ -203,6 +203,16 @@ export function studioWorldManifestToTiledMap(
       0,
       { facing: spawn.facing },
     ))),
+    objectLayer("occlusion-layers", (manifest.occlusionLayers ?? []).map((layer) => ({
+      ...object(layer.id, 0, 0, 0, 0, { depth: layer.depth }), polygon: layer.polygon,
+    }))),
+    objectLayer("interaction-slots", (manifest.interactionSlots ?? []).map((slot) => object(
+      slot.id, slot.approachPoint.x, slot.approachPoint.y, 0, 0,
+      { roomId: slot.roomId, labelKo: slot.labelKo, labelEn: slot.labelEn,
+        anchorX: slot.anchorPoint.x, anchorY: slot.anchorPoint.y, exitX: slot.exitPoint.x, exitY: slot.exitPoint.y,
+        ...(slot.seatAttachmentPoint ? { seatX: slot.seatAttachmentPoint.x, seatY: slot.seatAttachmentPoint.y } : {}),
+        facing: slot.facing, radius: slot.radius },
+    ))),
     objectLayer("npcs", manifest.npcs.map((npc) => object(
       npc.id,
       npc.point.x,

@@ -242,9 +242,11 @@ describe("PostgreSQL integration test runner", () => {
     ).toBe("true");
   });
 
-  it("runs exactly the eleven direct PostgreSQL suites without file parallelism", () => {
-    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(11);
-    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 11);
+  it("runs exactly the thirteen direct PostgreSQL suites without file parallelism", () => {
+    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(13);
+    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 13);
+    expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts");
+    expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain(
       "scripts/bootstrap-runtime-login-gate.integration.test.mjs",
     );

@@ -229,8 +229,6 @@
     "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
     "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs",
-    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs",
-    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs",
     "verify:studio-3d-inplace": "vitest run apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx apps/web/src/domains/creator/scene3d/integration/scene3d-derivative-admission.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-meshopt.test.ts apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx apps/web/src/domains/creator/bg3d/studio-bg3d-libraries-sqlite-opfs.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-history-command-adapter.test.ts apps/web/src/domains/creator/bg3d/useStudioBg3dCanonicalDocumentState.test.tsx",
     "verify:studio-3d-inplace:browser": "node scripts/verify-studio-scene3d-inplace.mjs"
   },

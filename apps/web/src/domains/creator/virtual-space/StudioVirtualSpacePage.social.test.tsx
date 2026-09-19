@@ -6,18 +6,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioVirtualSpacePhaserCanvas } from "./StudioVirtualSpacePhaserCanvas";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualSpacePresenceState } from "./studio-virtual-space-model";
+import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
+import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
+import type { StudioVirtualSpacePresenceDependencies } from "./studio-virtual-space-presence";
+import { parseStudioVirtualSpacePacket } from "./studio-virtual-space-presence";
+import { studioCharacterAppearanceForAvatarIndex } from "./studio-virtual-space-character-skins";
 import type { StudioSpaceSocialRequest, StudioSpaceSocialSnapshot } from "./StudioVirtualSpaceSocialPanel";
 import type { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import { STUDIO_P2P_HUDDLE_OPEN_EVENT, STUDIO_P2P_HUDDLE_CLOSE_EVENT, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpacePage } from "./StudioVirtualSpacePage";
 
 type Engine = ComponentProps<typeof StudioVirtualSpacePhaserCanvas>;
+type ConversationOptions = Parameters<typeof import("./use-studio-virtual-space-conversation").useStudioVirtualSpaceConversation>[0];
 type SocialOptions = Parameters<typeof useStudioVirtualSpaceSocial>[0];
 const f = vi.hoisted(() => ({
+  realPresence: false,
   worldLoad: null as Promise<StudioVirtualSpaceWorldManifest> | null,
   engine: null as Engine | null,
   socialOptions: null as SocialOptions | null,
-  snapshot: { requests: [], readyPeerIds: ["bob", "cleo"], available: true } as StudioSpaceSocialSnapshot,
+  conversationOptions: null as ConversationOptions | null,
+  conversationSnapshot: { available: true, readyPeers: [], records: [], active: null } as import("./studio-virtual-space-conversation").StudioConversationSnapshot,
+  leaveConversation: vi.fn(),
+  snapshot: { requests: [], readyPeerIds: ["bob", "cleo"], reviewReadyPeerIds: ["bob", "cleo"], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: true } as StudioSpaceSocialSnapshot,
   cancel: vi.fn((_id: string) => true),
   request: vi.fn((_id: string, _action: string) => "pending"),
   respond: vi.fn((_id: string, _response: string) => true),
@@ -25,7 +35,7 @@ const f = vi.hoisted(() => ({
   connectivity: { serverAvailable: true, localOnly: false, mode: "online", browserOnline: true },
   live: { availability: "ready", room: {
     participant: { sessionId: "alice", displayName: "Alice", role: "editor" },
-    direct: { getPeers: () => [], subscribe: () => () => undefined, send: () => true },
+    direct: { getPeers: (): readonly StudioLiveParticipant[] => [], subscribe: () => () => undefined, send: (_target: string, _payload: string) => true },
   } },
   session: { ready: true, data: { user: { id: "alice", name: "Alice", email: "alice@example.test" } } },
 }));
@@ -49,16 +59,32 @@ vi.mock("./StudioVirtualSpacePhaserCanvas", () => ({
 vi.mock("./use-studio-virtual-space-social", () => ({
   useStudioVirtualSpaceSocial: (options: SocialOptions) => {
     f.socialOptions = options;
-    return { snapshot: f.snapshot, cancel: f.cancel, request: f.request, respond: f.respond };
+    return { snapshot: f.snapshot, interactive: f.snapshot.available, cancel: f.cancel, request: f.request, respond: f.respond, requestReview: vi.fn(), respondReview: f.respond, setPeerBlocked: vi.fn(), wave: vi.fn() };
   },
 }));
-vi.mock("./studio-virtual-space-presence", () => ({
-  STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS: 3000,
-  StudioVirtualSpacePresenceController: class {
-    constructor(_participant: unknown, _port: unknown, private self: StudioVirtualSpacePresenceState) {}
-    setAvatarIndex() {} start() {} close() {} setActivity() {} sendReaction() {}
-    subscribe() { return () => undefined; }
+vi.mock("./use-studio-virtual-space-conversation", () => ({
+  useStudioVirtualSpaceConversation: (options: ConversationOptions) => {
+    f.conversationOptions = options;
+    return { snapshot: f.conversationSnapshot, propose: vi.fn(), respond: vi.fn(), leave: f.leaveConversation };
+  },
+}));
+vi.mock("./studio-virtual-space-presence", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./studio-virtual-space-presence")>();
+  return { ...actual,
+    STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS: 3000,
+    StudioVirtualSpacePresenceController: class {
+    private readonly real: InstanceType<typeof actual.StudioVirtualSpacePresenceController> | null;
+    constructor(participant: StudioLiveParticipant, port: StudioLiveDirectPort, private self: StudioVirtualSpacePresenceState, dependencies?: StudioVirtualSpacePresenceDependencies) {
+      this.real = f.realPresence ? new actual.StudioVirtualSpacePresenceController(participant, port, self, dependencies) : null;
+    }
+    setAvatarIndex(index: number) { this.real?.setAvatarIndex(index); }
+    start() { this.real?.start(); }
+    close() { this.real?.close(); }
+    setActivity(activity: StudioVirtualSpacePresenceState["activity"]) { this.real?.setActivity(activity); }
+    sendReaction() {}
+    subscribe(listener: () => void) { return this.real?.subscribe(listener) ?? (() => undefined); }
     snapshot() {
+      if (this.real) return this.real.snapshot();
       const peers = ["bob", "cleo"].map((id, index) => ({
         participant: { sessionId: id, displayName: index ? "Cleo" : "Bob", role: "editor" as const },
         state: { ...this.self, x: this.self.x + 20 + index * 15, y: this.self.y }, lastSeen: Date.now(), sequence: 1,
@@ -66,13 +92,14 @@ vi.mock("./studio-virtual-space-presence", () => ({
       return { self: this.self, peers, nearbyPeers: peers, selfReaction: null, peerReactions: [], direct: true };
     }
   },
-}));
+}; });
 
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
-  f.worldLoad = null; f.engine = null; f.socialOptions = null;
-  f.snapshot = { requests: [], readyPeerIds: ["bob", "cleo"], available: true };
-  f.cancel.mockClear(); f.request.mockClear(); f.respond.mockClear();
+  f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
+  f.snapshot = { requests: [], readyPeerIds: ["bob", "cleo"], reviewReadyPeerIds: ["bob", "cleo"], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: true };
+  f.cancel.mockClear(); f.request.mockClear(); f.respond.mockClear(); f.leaveConversation.mockClear();
+  f.conversationSnapshot = { available: true, readyPeers: [], records: [], active: null }; f.conversationOptions = null;
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -96,6 +123,49 @@ function accept(request: StudioSpaceSocialRequest): void {
 // The transport and renderer are boundaries; these tests execute the real Page's
 // activity ownership, UI events, engine bridge and Huddle event integration.
 describe("Virtual Studio social activity ownership", () => {
+  it("advertises the Page's current registered character through the real direct presence controller", async () => {
+    f.realPresence = true;
+    vi.spyOn(f.live.room.direct, "getPeers").mockReturnValue([{ sessionId: "bob", displayName: "Bob", role: "editor" }]);
+    const send = vi.spyOn(f.live.room.direct, "send");
+    render(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
+      <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage />} /></Routes>
+    </MemoryRouter>);
+    await screen.findByTestId("engine-ready");
+    await waitFor(() => expect(send).toHaveBeenCalled());
+    const first = parseStudioVirtualSpacePacket(send.mock.calls[0]![1]);
+    expect(first?.kind).toBe("presence");
+    if (first?.kind !== "presence") throw new Error("Page did not advertise spatial presence");
+    expect(first.state.appearance).toEqual(studioCharacterAppearanceForAvatarIndex(first.state.avatarIndex, "alice"));
+
+    fireEvent.click(screen.getByRole("button", { name: "시나 캐릭터 선택" }));
+    await waitFor(() => {
+      const advertised = send.mock.calls.map(([, raw]) => parseStudioVirtualSpacePacket(raw));
+      expect(advertised.some((packet) => packet?.kind === "presence" && packet.state.appearance?.skinKey === "silver" && packet.state.avatarIndex === 1)).toBe(true);
+    });
+    expect(f.engine?.snapshot.self.appearance).toEqual(studioCharacterAppearanceForAvatarIndex(1, "alice"));
+  });
+  it("replaces pair ownership with an exact consented group, and leaves it before another pair activity", async () => {
+    await mount();
+    accept(accepted("pair-before-group", "talk"));
+    const open = vi.fn(), close = vi.fn();
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, open);
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, close);
+    try {
+      const scope = { id: "consented-group", memberIds: ["alice", "bob", "cleo"] };
+      f.conversationSnapshot = { ...f.conversationSnapshot, active: scope };
+      act(() => { f.conversationOptions?.onReady(scope); });
+      expect(f.cancel).toHaveBeenCalledWith("pair-before-group");
+      expect((close.mock.calls[0]?.[0] as CustomEvent).detail.conversationId).toBe("pair-before-group");
+      expect((open.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({ conversationId: scope.id, peerIds: ["bob", "cleo"], source: "virtual-space" });
+      expect(f.engine?.bridge.getFollowingPeer()).toBeNull();
+      accept(accepted("follow-after-group", "follow"));
+      expect(f.leaveConversation).toHaveBeenCalledExactlyOnceWith(scope.id);
+      expect(f.engine?.bridge.getFollowingPeer()).toBe("bob");
+    } finally {
+      globalThis.removeEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, open);
+      globalThis.removeEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, close);
+    }
+  });
   it("keeps world movement, room actions and NPC tool access unavailable until the world is ready", async () => {
     let finishLoad!: (world: StudioVirtualSpaceWorldManifest) => void;
     f.worldLoad = new Promise((resolve) => { finishLoad = resolve; });
@@ -186,7 +256,7 @@ describe("Virtual Studio social activity ownership", () => {
   it("finishes old consent when the hook replaces its controller and removes the accepted request", async () => {
     await mount();
     accept(accepted("follow-one", "follow"));
-    f.snapshot = { requests: [], readyPeerIds: [], available: false };
+    f.snapshot = { requests: [], readyPeerIds: [], reviewReadyPeerIds: [], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: false };
     fireEvent.click(screen.getByRole("button", { name: "Cleo" }));
     await waitFor(() => expect(f.cancel).toHaveBeenCalledWith("follow-one"));
     expect(f.engine?.bridge.getFollowingPeer()).toBeNull();

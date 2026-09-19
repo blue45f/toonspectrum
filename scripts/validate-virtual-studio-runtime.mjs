@@ -308,6 +308,12 @@ try {
     assert.deepEqual(incompatible.acceptedSocial, []);
     return { nativeRtc: true, worldContentMismatchRejected: true };
   });
+  await check("conversation: native four-person video, outsider isolation and leave cleanup", async () => {
+    return fixture.evaluate(async () => {
+      const { verifyNativeFourPersonConversation } = await import("/tools/browser-harnesses/virtual-studio-conversation-rtc.ts");
+      return verifyNativeFourPersonConversation();
+    });
+  });
   await check("engine: React StrictMode remount never leaves duplicate canvases", async () => {
     for (let i = 0; i < 5; i++) { await call(fixture, "mount", { ...world, version: i + 1 }, { x: 200, y: 250 }); await fixture.waitForTimeout(40); }
     await ready(fixture); await fixture.waitForTimeout(600); assert.equal(await fixture.locator("canvas").count(), 1);

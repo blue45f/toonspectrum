@@ -34,6 +34,8 @@ export const POSTGRES_INTEGRATION_SUITES = Object.freeze([
   "apps/api/src/realtime/studio-postgres-io.adapter.integration.test.ts",
   "apps/api/src/modules/creator/studio-live-lock.repository.integration.test.ts",
   "apps/api/src/modules/creator/studio-work-asset.repository.integration.test.ts",
+  "apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts",
+  "apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts",
 ]);
 
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);

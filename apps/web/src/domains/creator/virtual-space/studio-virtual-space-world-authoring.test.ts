@@ -72,6 +72,7 @@ describe("Virtual Studio world authoring", () => {
       DEFAULT_STUDIO_WORLD_MANIFEST.props.map((prop) => prop.id),
     );
     expect(restored.colliders).toHaveLength(DEFAULT_STUDIO_WORLD_MANIFEST.colliders.length);
+    expect(restored.occlusionLayers).toEqual(DEFAULT_STUDIO_WORLD_MANIFEST.occlusionLayers);
     expect(tiled).toMatchObject({
       width: DEFAULT_STUDIO_WORLD_MANIFEST.width,
       height: DEFAULT_STUDIO_WORLD_MANIFEST.height,

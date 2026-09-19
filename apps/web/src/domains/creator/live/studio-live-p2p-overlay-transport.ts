@@ -457,6 +457,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     };
   }
 
+  get authoritativeLockCapability() {
+    return this.ready ? this.primary.authoritativeLockCapability ?? null : null;
+  }
+
   acquireLock?(
     request: Parameters<NonNullable<StudioLiveTransport["acquireLock"]>>[0],
   ): ReturnType<NonNullable<StudioLiveTransport["acquireLock"]>> {

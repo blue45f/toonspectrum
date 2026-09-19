@@ -383,6 +383,7 @@ export class StudioLiveRoom {
   private readonly screenShares = new Map<string, StudioLiveRoomScreenShare>();
   private readonly voiceMembers = new Map<string, StudioLiveVoiceMember>();
   private readonly locks = new Map<string, StudioLiveLock>();
+  private readonly manuallyRenewedLocks = new Set<string>();
   private readonly pendingLockClaims = new Map<string, PendingStudioLiveLockClaim>();
   private readonly pendingLockReleases = new Map<string, PendingStudioLiveLockRelease>();
   private readonly chatMessages: StudioLiveChatMessage[] = [];
@@ -483,6 +484,25 @@ export class StudioLiveRoom {
 
   get mode(): StudioLiveTransportMode | null {
     return this.transport?.mode ?? null;
+  }
+
+  get authoritativeLockCapability(): "fenced-v2" | null {
+    return this.ready && this.transport?.mode === "server"
+      ? this.transport.authoritativeLockCapability ?? null : null;
+  }
+
+  /** Explicitly managed leases never fall back to local arbitration or automatic heartbeats. */
+  claimAuthoritativeLockAsync(resource: string, renewLeaseId?: string): Promise<StudioLiveLockAcquireResult> {
+    if (this.authoritativeLockCapability !== "fenced-v2") {
+      return Promise.resolve({ status: "denied", resource, requestId: "unavailable",
+        code: "unsupported_authority", message: "서버가 확인하는 공유 자리 기능을 사용할 수 없습니다." });
+    }
+    this.manuallyRenewedLocks.add(resource);
+    return this.claimLockAsync(resource, { renewLeaseId, leaseMs: 15_000 }).then((result) => {
+      if (result.status !== "acquired" && !this.getLocks().some((lock) => lock.resource === resource
+        && lock.owner.sessionId === this.participant.sessionId)) this.manuallyRenewedLocks.delete(resource);
+      return result;
+    });
   }
 
   /** Exposed only after existing work-room admission succeeds. */
@@ -842,12 +862,16 @@ export class StudioLiveRoom {
   }
 
   /** Waits for the server-authoritative lock decision and always correlates it by request UUID. */
-  claimLockAsync(resource: string): Promise<StudioLiveLockAcquireResult> {
+  claimLockAsync(resource: string, managed?: { renewLeaseId?: string; leaseMs: number }): Promise<StudioLiveLockAcquireResult> {
+    if (managed && this.authoritativeLockCapability !== "fenced-v2") {
+      return Promise.resolve({ status: "revoked", resource, requestId: "unavailable",
+        code: "authority_unavailable", message: "공유 자리 서버 연결이 변경되었습니다." });
+    }
     const pendingRelease = this.pendingLockReleases.get(resource);
     if (pendingRelease) {
       // A new gesture is serialized behind the previous lifecycle's ACK/timeout. Recursion occurs
       // only after completePendingLockRelease removes the map entry.
-      return pendingRelease.promise.then(() => this.claimLockAsync(resource));
+      return pendingRelease.promise.then(() => this.claimLockAsync(resource, managed));
     }
     const existingPending = this.pendingLockClaims.get(resource);
     if (existingPending) return existingPending.promise;
@@ -897,7 +921,7 @@ export class StudioLiveRoom {
     }
 
     const current = this.locks.get(resource);
-    if (current?.owner.sessionId === this.participant.sessionId && current.leaseUntil > now) {
+    if (!managed && current?.owner.sessionId === this.participant.sessionId && current.leaseUntil > now) {
       return Promise.resolve({
         status: "acquired",
         resource,
@@ -967,7 +991,8 @@ export class StudioLiveRoom {
     const request: StudioLiveLockRequest = {
       resource,
       requestId,
-      leaseMs: this.lockLeaseMs,
+      leaseMs: managed?.leaseMs ?? this.lockLeaseMs,
+      ...(managed?.renewLeaseId ? { renewLeaseId: managed.renewLeaseId } : {}),
     };
     let operation: Promise<StudioLiveLockAcquireResult>;
     try {
@@ -1327,6 +1352,7 @@ export class StudioLiveRoom {
     this.screenShares.clear();
     this.voiceMembers.clear();
     this.locks.clear();
+    this.manuallyRenewedLocks.clear();
     this.chatMessages.length = 0;
     this.lastSequenceBySession.clear();
     this.previewParticipantBySession.clear();
@@ -1779,6 +1805,7 @@ export class StudioLiveRoom {
   ): void {
     if (this.pendingLockReleases.get(pending.request.resource) !== pending) return;
     this.pendingLockReleases.delete(pending.request.resource);
+    this.manuallyRenewedLocks.delete(pending.request.resource);
     if (pending.timeout !== null) this.cancelTimeout(pending.timeout);
     pending.timeout = null;
     const current = this.locks.get(pending.request.resource);
@@ -1825,6 +1852,7 @@ export class StudioLiveRoom {
     if (this.transport?.mode === "local") this.sendPresence("presence:heartbeat");
     for (const lock of Array.from(this.locks.values())) {
       if (lock.owner.sessionId !== this.participant.sessionId) continue;
+      if (this.manuallyRenewedLocks.has(lock.resource)) continue;
       if (this.pendingLockReleases.has(lock.resource)) continue;
       const payload: StudioLiveLockClaimPayload = {
         resource: lock.resource,

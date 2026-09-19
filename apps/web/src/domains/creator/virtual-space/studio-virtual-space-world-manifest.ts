@@ -1,3 +1,5 @@
+import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
+import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import {
   STUDIO_VIRTUAL_SPACE_HEIGHT,
   STUDIO_VIRTUAL_SPACE_WIDTH,
@@ -103,6 +105,29 @@ export interface StudioWorldNpcDefinition {
   readonly patrol?: readonly StudioVirtualSpacePoint[];
 }
 
+/** One exclusive workspace position. Occupancy does not grant document permissions or imply a seated pose. */
+export interface StudioWorldInteractionSlotDefinition {
+  readonly id: string;
+  readonly roomId: string;
+  readonly labelKo: string;
+  readonly labelEn: string;
+  readonly approachPoint: StudioVirtualSpacePoint;
+  readonly anchorPoint: StudioVirtualSpacePoint;
+  /** Visual hip attachment on the furniture; physics and pathfinding keep using the floor anchors. */
+  readonly seatAttachmentPoint?: StudioVirtualSpacePoint;
+  readonly exitPoint: StudioVirtualSpacePoint;
+  readonly facing: StudioVirtualSpaceFacing;
+  readonly radius: number;
+}
+
+export interface StudioWorldOcclusionLayer {
+  readonly id: string;
+  /** World-space polygon exposing only this part of the unchanged background texture. */
+  readonly polygon: readonly StudioVirtualSpacePoint[];
+  /** Shares the actor/prop depth scale: actor ground y + 1001. */
+  readonly depth: number;
+}
+
 export interface StudioVirtualSpaceWorldManifest {
   readonly id: string;
   readonly version: number;
@@ -117,6 +142,8 @@ export interface StudioVirtualSpaceWorldManifest {
   readonly portals: readonly StudioWorldPortalDefinition[];
   readonly spawns: readonly StudioWorldSpawnDefinition[];
   readonly npcs: readonly StudioWorldNpcDefinition[];
+  readonly interactionSlots?: readonly StudioWorldInteractionSlotDefinition[];
+  readonly occlusionLayers?: readonly StudioWorldOcclusionLayer[];
 }
 
 function legacyProp(
@@ -158,7 +185,7 @@ const DEFAULT_PROPS: readonly StudioWorldPropDefinition[] = [
 
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
-  version: 3,
+  version: 4,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,
   backgroundAssetKey: "studio-master-background",
@@ -191,6 +218,22 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     { id: "main", point: studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 }), facing: "up" as const },
     { id: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 180, y: 210 }), facing: "up" as const },
     { id: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 995, y: 430 }), facing: "up" as const },
+  ],
+  // Exact clean-plate pixels behind the review sofa occupants; no replacement artwork.
+  occlusionLayers: [{ id: "review-sofa-front", depth: 1720, polygon: [
+    { x: 101.326, y: 692.082 }, { x: 107.905, y: 690.767 }, { x: 134.878, y: 710.503 }, { x: 208.560, y: 679.583 }, { x: 210.533, y: 667.083 }, { x: 242.769, y: 648.663 }, { x: 251.979, y: 649.979 }, { x: 254.611, y: 685.504 }, { x: 253.295, y: 702.608 }, { x: 136.852, y: 752.607 }, { x: 119.747, y: 748.002 }, { x: 101.326, y: 734.186 }
+  ] }],
+  interactionSlots: [
+    { id: "review-left", roomId: "review", labelKo: "리뷰 소파 왼쪽", labelEn: "Review sofa · left",
+      approachPoint: studioVirtualSpaceScaleLegacyPoint({ x: 210, y: 665 }),
+      anchorPoint: studioVirtualSpaceScaleLegacyPoint({ x: 210, y: 665 }),
+      seatAttachmentPoint: { x: 154, y: 690 },
+      exitPoint: studioVirtualSpaceScaleLegacyPoint({ x: 75, y: 665 }), facing: "up", radius: 10 },
+    { id: "review-right", roomId: "review", labelKo: "리뷰 소파 오른쪽", labelEn: "Review sofa · right",
+      approachPoint: studioVirtualSpaceScaleLegacyPoint({ x: 310, y: 665 }),
+      anchorPoint: studioVirtualSpaceScaleLegacyPoint({ x: 310, y: 665 }),
+      seatAttachmentPoint: { x: 220, y: 664 },
+      exitPoint: studioVirtualSpaceScaleLegacyPoint({ x: 390, y: 665 }), facing: "up", radius: 10 },
   ],
   // A small ambient cast. These actors are local decoration and never count as online peers.
   // The first point is a work approach; patrol points alternate reference checks and breaks.
@@ -306,10 +349,12 @@ export function studioWorldPresenceState(
     x: Math.max(9, Math.min(manifest.width - 9, Number.isFinite(state.x) ? state.x : fallback.x)),
     y: Math.max(9, Math.min(manifest.height - 9, Number.isFinite(state.y) ? state.y : fallback.y)),
   };
+  const appearance = parseStudioVirtualSpaceAppearance(state.appearance);
   return Object.freeze({
     ...studioVirtualSpaceState(point, state.facing, state.activity, state.moving, state.avatarIndex),
     ...point,
     zoneId: studioWorldRoomAt(manifest, point),
+    ...(appearance ? { appearance } : {}),
   });
 }
 
@@ -414,7 +459,9 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
     errors.push("background URL/key is invalid");
   }
   const count = manifest.rooms.length + manifest.props.length + manifest.colliders.length
-    + manifest.interactions.length + manifest.portals.length + manifest.spawns.length + manifest.npcs.length;
+    + manifest.interactions.length + manifest.portals.length + manifest.spawns.length + manifest.npcs.length
+    + (Array.isArray(manifest.interactionSlots) ? manifest.interactionSlots.length : 0)
+    + (Array.isArray(manifest.occlusionLayers) ? manifest.occlusionLayers.length : 0);
   if (count > STUDIO_WORLD_MAX_ENTITIES) errors.push("world entity budget exceeded");
   if (!manifest.rooms.length) errors.push("world must contain a room");
   if (!manifest.spawns.length) errors.push("world must contain a spawn");
@@ -424,6 +471,37 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
   identifiers(manifest.portals, "portal");
   identifiers(manifest.spawns, "spawn");
   identifiers(manifest.npcs, "npc");
+  const occlusionLayers = Array.isArray(manifest.occlusionLayers) ? manifest.occlusionLayers : [];
+  if (manifest.occlusionLayers !== undefined && !Array.isArray(manifest.occlusionLayers)) errors.push("occlusion layers must be an array");
+  if (occlusionLayers.length > 8) errors.push("occlusion layer budget exceeded");
+  identifiers(occlusionLayers.filter((layer) => layer && typeof layer === "object"), "occlusion layer");
+  for (const layer of occlusionLayers) {
+    if (!layer || !studioWorldOcclusionPolygonValid(layer.polygon, manifest.width, manifest.height)
+      || !finite(layer.depth) || layer.depth < 0 || layer.depth > manifest.height + 2000) errors.push(`occlusion layer is invalid: ${layer?.id ?? "unknown"}`);
+  }
+  const slots = Array.isArray(manifest.interactionSlots) ? manifest.interactionSlots : [];
+  if (manifest.interactionSlots !== undefined && !Array.isArray(manifest.interactionSlots)) errors.push("interaction slots must be an array");
+  if (slots.length > 128) errors.push("interaction slot budget exceeded");
+  identifiers(slots.filter((slot) => slot && typeof slot === "object"), "slot");
+  for (const slot of slots) {
+    if (!slot || typeof slot !== "object") { errors.push("interaction slot is invalid"); continue; }
+    if (!roomIds.has(slot.roomId)) errors.push(`slot references missing room: ${slot.id}`);
+    if (typeof slot.labelKo !== "string" || !slot.labelKo.trim() || slot.labelKo.length > 160
+      || typeof slot.labelEn !== "string" || !slot.labelEn.trim() || slot.labelEn.length > 160) errors.push(`slot label is invalid: ${slot.id}`);
+    if (!positive(slot.radius) || slot.radius > 24 || !["up", "down", "left", "right"].includes(slot.facing)) errors.push(`slot geometry is invalid: ${slot.id}`);
+    const points = [slot.approachPoint, slot.anchorPoint, slot.exitPoint];
+    if (points.some((point) => !inBounds(point) || !actorCanOccupy(point))) {
+      errors.push(`slot position is blocked: ${slot.id}`); continue;
+    }
+    if (slot.seatAttachmentPoint && (!inBounds(slot.seatAttachmentPoint)
+      || Math.hypot(slot.seatAttachmentPoint.x - slot.anchorPoint.x, slot.seatAttachmentPoint.y - slot.anchorPoint.y) > 128)) {
+      errors.push(`slot seat attachment is invalid: ${slot.id}`);
+    }
+    const slotRoom = manifest.rooms.find((room) => room.id === slot.roomId);
+    if (slotRoom && !(slot.anchorPoint.x >= slotRoom.x && slot.anchorPoint.x <= slotRoom.x + slotRoom.width
+      && slot.anchorPoint.y >= slotRoom.y && slot.anchorPoint.y <= slotRoom.y + slotRoom.height)) errors.push(`slot anchor is outside its room: ${slot.id}`);
+    if (!connectivity.connected(slot.approachPoint, slot.anchorPoint) || !connectivity.connected(slot.anchorPoint, slot.exitPoint)) errors.push(`slot approach or exit is unreachable: ${slot.id}`);
+  }
   for (const room of manifest.rooms) {
     if (!rectValid(room)) errors.push(`room geometry is invalid: ${room.id}`);
     if (!optionalActionValid(room.action)) errors.push(`room action is invalid: ${room.id}`);
