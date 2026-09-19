@@ -529,6 +529,8 @@ const captureSize = resolveStudioBg3dLtCaptureSize({
         height: captureSize.height,
         background: studioBg3dCaptureBackgroundRequestFromSnapshot(backgroundSnapshot),
         includeDepth: ltSettingsSnapshot.line.depthEnabled,
+        ...(captureAdapter.normalProfile && ltSettingsSnapshot.line.depthEnabled && !ltSettingsSnapshot.line.depthOutlineOnly
+          ? { includeNormals: true } : {}),
       }, { signal: insertController.signal, timeoutMs: 30_000 })
         // 성공·실패·취소 어느 쪽이든 라이브 카메라를 원래 view 창으로 되돌린다(멱등).
         .finally(releaseCaptureFrameViewOffset);
@@ -538,6 +540,7 @@ const captureSize = resolveStudioBg3dLtCaptureSize({
         height: captured.height,
         rgba: captured.rgba,
         ...(captured.depth ? { depth: captured.depth } : {}),
+        ...(captured.normalRgba ? { normalRgba: captured.normalRgba } : {}),
       });
       const rendered = await renderStudioBg3dLtLayersInWorker(
         ltRenderInput,

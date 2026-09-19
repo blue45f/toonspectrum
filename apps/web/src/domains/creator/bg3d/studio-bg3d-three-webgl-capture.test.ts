@@ -365,3 +365,22 @@ describe("WebGL HDR capture compatibility", () => {
     expectLiveRendererStateRestored(f);
   });
 });
+
+
+it("keeps WebGL color targets alive after a restoration error until readback finishes", async () => {
+  const fence = deferred<THREE.TypedArray>();
+  const f = fixture({ readback: fence.promise });
+  const original = f.renderer.setRenderTarget.bind(f.renderer);
+  vi.mocked(f.renderer.setRenderTarget).mockImplementation((target, cube, mip) => {
+    if (target === f.initialTarget) throw new Error("restore failed");
+    original(target, cube, mip);
+  });
+  const dispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
+  const pending = f.adapter.capture({ width: 2, height: 2, includeDepth: false,
+    background: { color: "#000000", alpha: 0 } });
+  const rejected = expect(pending).rejects.toThrow("restore failed");
+  expect(dispose).not.toHaveBeenCalled();
+  fence.resolve(new Uint8Array(16));
+  await rejected;
+  expect(dispose).toHaveBeenCalledTimes(2);
+});

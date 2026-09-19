@@ -28,6 +28,9 @@ import {
   depth as fragmentDepth,
   float,
   screenUV,
+  mrt,
+  output,
+  normalView,
   texture,
   vec3,
   vec4,
@@ -36,6 +39,8 @@ import { MeshBasicNodeMaterial, NodeMaterial, QuadMesh } from "three/webgpu";
 
 import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+  STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
+  assertStudioBg3dCaptureRequest,
 } from "./studio-bg3d-capture-adapter";
 import {
   hideStudioBg3dCaptureExcludedObjects,
@@ -59,6 +64,8 @@ export const STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V1 =
   "studio-three-webgpu-capture-adapter-v1";
 export const STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V2 =
   "studio-three-webgpu-capture-adapter-v2-hdr-owned";
+export const STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V3 =
+  "studio-three-webgpu-capture-adapter-v3-hdr-mrt-normals";
 
 export interface CreateStudioBg3dThreeWebGpuCaptureAdapterInput {
   readonly renderer: WebGPURenderer;
@@ -79,9 +86,10 @@ function assertCaptureDimensions(width: number, height: number, includeDepth = f
   assertStudioBg3dCaptureBudget({ width, height, includeDepth });
 }
 
-function createCaptureTarget(width: number, height: number, depthBuffer: boolean): THREE.RenderTarget {
+function createCaptureTarget(width: number, height: number, depthBuffer: boolean, count = 1): THREE.RenderTarget {
   const target = new THREE.RenderTarget(width, height, {
     depthBuffer,
+    count,
     stencilBuffer: false,
     format: THREE.RGBAFormat,
     type: THREE.UnsignedByteType,
@@ -212,6 +220,7 @@ interface CaptureResources {
   readonly outputQuad: QuadMesh;
   readonly depthTarget: THREE.RenderTarget | null;
   readonly depthMaterial: MeshBasicNodeMaterial | null;
+  readonly geometryMrt: ReturnType<typeof mrt> | null;
 }
 
 function createCaptureResources(request: StudioBg3dCaptureRequest, toneMapping: THREE.ToneMapping): CaptureResources {
@@ -225,11 +234,19 @@ function createCaptureResources(request: StudioBg3dCaptureRequest, toneMapping: 
     owned.push(outputTarget);
     const outputQuad = createOutputQuad(sceneTarget.texture, toneMapping);
     owned.push({ dispose: () => disposeQuadMaterial(outputQuad) });
-    const depthTarget = request.includeDepth ? createCaptureTarget(request.width, request.height, true) : null;
+    const depthTarget = request.includeDepth
+      ? createCaptureTarget(request.width, request.height, true, request.includeNormals ? 2 : 1) : null;
     if (depthTarget) owned.push(depthTarget);
     const depthMaterial = request.includeDepth ? createDepthNodeMaterial() : null;
     if (depthMaterial) owned.push(depthMaterial);
-    return { sceneTarget, outputTarget, outputQuad, depthTarget, depthMaterial };
+    let geometryMrt: ReturnType<typeof mrt> | null = null;
+    if (request.includeNormals && depthTarget) {
+      depthTarget.textures[0]!.name = "output";
+      depthTarget.textures[1]!.name = "studioNormal";
+      depthTarget.textures[1]!.colorSpace = THREE.NoColorSpace;
+      geometryMrt = mrt({ output, studioNormal: vec4(normalView.mul(0.5).add(0.5), 1) });
+    }
+    return { sceneTarget, outputTarget, outputQuad, depthTarget, depthMaterial, geometryMrt };
   } catch (error) {
     for (const resource of owned.reverse()) {
       try { resource.dispose(); } catch { /* Preserve the allocation failure. */ }
@@ -294,8 +311,8 @@ function releaseCapturePool(renderer: WebGPURenderer, shared: SharedCapturePool)
 function captureResourceBytes(request: StudioBg3dCaptureRequest): number {
   const pixels = request.width * request.height;
   const alignedRowBytes = Math.ceil(request.width * 4 / 256) * 256;
-  return pixels * (16 + (request.includeDepth ? 8 : 0))
-    + alignedRowBytes * request.height * (request.includeDepth ? 2 : 1);
+  return pixels * (16 + (request.includeDepth ? 8 : 0) + (request.includeNormals ? 4 : 0))
+    + alignedRowBytes * request.height * (1 + Number(request.includeDepth) + Number(request.includeNormals === true));
 }
 
 /**
@@ -316,7 +333,9 @@ function submitColorCapture(input: {
   const capturedBackground = scene.background;
   const capturedBackgroundRotation = scene.backgroundRotation.clone();
   const { sceneTarget, outputTarget, outputQuad } = input.resources;
-  let readback: Promise<unknown>;
+  let readback: Promise<unknown> | undefined;
+  let failed = false;
+  let failure: unknown;
   try {
     renderer.xr.enabled = false;
     renderer.autoClear = true;
@@ -344,27 +363,39 @@ function submitColorCapture(input: {
       request.height,
     );
   } catch (error) {
+    failed = true;
+    failure = error;
+  } finally {
     scene.background = capturedBackground;
     scene.backgroundRotation.copy(capturedBackgroundRotation);
-    restoreRendererState(renderer, state);
-    throw error;
+    try {
+      restoreRendererState(renderer, state);
+    } catch (error) {
+      if (!failed) { failed = true; failure = error; }
+    }
   }
-  scene.background = capturedBackground;
-  scene.backgroundRotation.copy(capturedBackgroundRotation);
-  restoreRendererState(renderer, state);
-  return readback.then(
-    (raw) => normalizeStudioBg3dRgbaReadback({
+  // Restoration may throw after a copy was submitted. Keep the pool lease until it settles.
+  if (failed && !readback) throw failure;
+  return Promise.allSettled(readback ? [readback] : []).then((results) => {
+    if (failed) throw failure;
+    const raw = results[0];
+    if (!raw) throw new Error("Missing color readback.");
+    if (raw.status === "rejected") throw raw.reason;
+    return normalizeStudioBg3dRgbaReadback({
       width: request.width,
       height: request.height,
-      // WebGPU readback is already top-down; the WebGL adapter flips because GL is bottom-up. The
-      // normalizer still resolves the 256-byte row alignment WebGPU buffer copies require.
       flipY: false,
-      rgba: toReadbackBytes(raw),
-    }),
-  );
+      rgba: toReadbackBytes(raw.value),
+    });
+  });
 }
 
-/** Submits the packed-depth pass; ownership and restore timing mirror the colour pass above. */
+interface GeometryCapture {
+  readonly depth: Float32Array;
+  readonly normalRgba?: Uint8ClampedArray;
+}
+
+/** Depth + optional view normals share one geometry draw, camera and exclusion snapshot. */
 function submitDepthCapture(input: {
   readonly renderer: WebGPURenderer;
   readonly scene: THREE.Scene;
@@ -372,60 +403,67 @@ function submitDepthCapture(input: {
   readonly width: number;
   readonly height: number;
   readonly resources: CaptureResources;
-}): Promise<Float32Array> {
-  const { renderer, scene, camera, width, height } = input;
+}): Promise<GeometryCapture> {
+  const { renderer, scene, camera, width, height, resources } = input;
   assertCaptureDimensions(width, height, true);
   const state = readRendererState(renderer);
   const capturedOverride = scene.overrideMaterial;
   const capturedBackground = scene.background;
-  const capturedBackgroundRotation = scene.backgroundRotation.clone();
-  const target = input.resources.depthTarget;
-  const depthMaterial = input.resources.depthMaterial;
-  if (!target || !depthMaterial) throw new Error("Depth capture resources were not acquired.");
+  const target = resources.depthTarget;
+  if (!target || !resources.depthMaterial) throw new Error("Depth capture resources were not acquired.");
   const restoreDepthExcludedObjects = hideStudioBg3dDepthExcludedObjects(scene);
-  const restoreSceneAndRenderer = (): void => {
-    scene.overrideMaterial = capturedOverride;
-    scene.background = capturedBackground;
-    scene.backgroundRotation.copy(capturedBackgroundRotation);
-    restoreRendererState(renderer, state);
-    // The submission already owns the draw, so beauty-only objects come back immediately rather
-    // than staying hidden in the live viewport while the readback fence settles.
-    restoreDepthExcludedObjects();
-  };
-  let readback: Promise<unknown>;
+  const pending: Promise<unknown>[] = [];
+  let failed = false;
+  let failure: unknown;
   try {
     renderer.xr.enabled = false;
     renderer.autoClear = true;
-    renderer.setMRT(null);
+    renderer.setMRT(resources.geometryMrt);
     renderer.setScissorTest(false);
-    scene.overrideMaterial = depthMaterial;
-    // Equirectangular backgrounds are colour-only decoration; packing one would fake a full-frame
-    // surface at the far plane.
+    scene.overrideMaterial = resources.depthMaterial;
     scene.background = null;
     renderer.setRenderTarget(target);
-    // White is the packed far plane, matching the WebGL depth pass exactly.
     renderer.setClearColor(0xffffff, 1);
     renderer.render(scene, camera);
-    readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height);
+    pending.push(renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height));
+    if (resources.geometryMrt) {
+      pending.push(renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, 1));
+    }
   } catch (error) {
-    restoreSceneAndRenderer();
-    throw error;
+    failed = true;
+    failure = error;
+  } finally {
+    scene.overrideMaterial = capturedOverride;
+    scene.background = capturedBackground;
+    try {
+      restoreRendererState(renderer, state);
+    } catch (error) {
+      if (!failed) { failed = true; failure = error; }
+    } finally {
+      restoreDepthExcludedObjects();
+    }
   }
-  restoreSceneAndRenderer();
-  return readback.then(
-    (packed) => decodeStudioBg3dThreeRgbaDepth({
-      width,
-      height,
-      // Row alignment padding is stripped first so the decoder sees one tightly packed raster.
-      rgba: normalizeStudioBg3dRgbaReadback({
-        width,
-        height,
-        flipY: false,
-        rgba: toReadbackBytes(packed),
-      }),
-      flipY: false,
-    }),
-  );
+  // A later copy can throw before returning a promise. Drain earlier fences before releasing MRT.
+  if (failed && pending.length === 0) throw failure;
+  return Promise.allSettled(pending).then((results) => {
+    if (failed) throw failure;
+    const rejected = results.find((result) => result.status === "rejected");
+    if (rejected?.status === "rejected") throw rejected.reason;
+    const packed = results[0];
+    if (packed?.status !== "fulfilled") throw new Error("Missing depth readback.");
+    const depth = decodeStudioBg3dThreeRgbaDepth({ width, height,
+      rgba: normalizeStudioBg3dRgbaReadback({ width, height, flipY: false, rgba: toReadbackBytes(packed.value) }),
+      flipY: false });
+    const normalResult = results[1];
+    if (normalResult?.status !== "fulfilled") return { depth };
+    const normalRgba = normalizeStudioBg3dRgbaReadback({ width, height, flipY: false,
+      rgba: toReadbackBytes(normalResult.value) });
+    // r184 clears all MRT attachments together. The packed far plane owns the no-surface mask.
+    for (let pixel = 0; pixel < depth.length; pixel += 1) {
+      if (depth[pixel]! >= 1) normalRgba.fill(0, pixel * 4, pixel * 4 + 4);
+    }
+    return { depth, normalRgba };
+  });
 }
 
 /**
@@ -449,13 +487,13 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
 
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
     if (disposed) throw new Error("3D capture adapter is disposed.");
-    assertCaptureDimensions(request.width, request.height, request.includeDepth);
+    assertStudioBg3dCaptureRequest(request);
     const snapshot = { ...request, background: { ...request.background } };
-    const key = `${snapshot.width}:${snapshot.height}:${snapshot.includeDepth}:${renderer.toneMapping}`;
+    const key = `${snapshot.width}:${snapshot.height}:${snapshot.includeDepth}:${snapshot.includeNormals === true}:${renderer.toneMapping}`;
     const lease = shared.pool.acquire(key, captureResourceBytes(snapshot),
       () => createCaptureResources(snapshot, renderer.toneMapping));
     let success = false;
-    const pending: Promise<Uint8ClampedArray | Float32Array>[] = [];
+    const pending: Promise<Uint8ClampedArray | GeometryCapture>[] = [];
     let submissionFailed = false;
     let submissionError: unknown;
     try {
@@ -486,7 +524,7 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
       }
       success = true;
       return { width: snapshot.width, height: snapshot.height, rgba: rgba.value,
-        ...(depth?.status === "fulfilled" ? { depth: depth.value as Float32Array } : {}) };
+        ...(depth?.status === "fulfilled" ? depth.value as GeometryCapture : {}) };
     } finally {
       lease.release(!success);
       retireCapturePoolIfUnused(renderer, shared);
@@ -503,7 +541,8 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
     backend: "three-webgpu" as const,
     engineId: "three" as const,
     engineVersion: String(THREE.REVISION).toLowerCase(),
-    implementationRevision: STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V2,
+    implementationRevision: STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V3,
+    normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
     graphicsApi: "webgpu" as const,
     profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
     getSourceSize: () => ({
