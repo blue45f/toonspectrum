@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
+  STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
   STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
   acquireStudioBg3dCaptureAdapterAfterViewTransition,
   captureStudioBg3dRaster,
@@ -317,5 +318,40 @@ describe("Studio 3D capture adapter contract", () => {
     expect(Object.isFrozen(identity)).toBe(true);
     expect(Reflect.set(identity as object, 0, "babylon")).toBe(false);
     expect(getStudioBg3dCaptureBackendIdentity("three-webgl")).toEqual(["three", "webgl2"]);
+  });
+});
+
+
+describe("optional normal capture contract", () => {
+  it("owns normal pixels independently of the renderer and snapshots the additive request", async () => {
+    const normalRgba = new Uint8Array(16).fill(128);
+    const capture = vi.fn(async () => ({ ...validRaster(), normalRgba }));
+    const result = await captureStudioBg3dRaster({ ...adapter(capture),
+      normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1 }, { ...REQUEST, includeNormals: true });
+    expect(result.normalRgba).toBeInstanceOf(Uint8ClampedArray);
+    expect(Array.from(result.normalRgba!)).toEqual(Array.from(normalRgba));
+    expect(result.normalRgba).not.toBe(normalRgba);
+    normalRgba.fill(0);
+    expect(result.normalRgba?.[0]).toBe(128);
+    expect(capture.mock.calls).toHaveLength(1);
+  });
+
+  it("rejects unsupported and unpaired normal requests before calling the renderer", async () => {
+    const capture = vi.fn(async () => validRaster());
+    await expect(captureStudioBg3dRaster(adapter(capture), { ...REQUEST, includeNormals: true }))
+      .rejects.toThrow(/normal profile/);
+    await expect(captureStudioBg3dRaster({ ...adapter(capture), normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1 },
+      { ...REQUEST, includeNormals: true, includeDepth: false })).rejects.toThrow(/matching depth/);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("refuses missing, malformed, and unrequested normal output instead of silently losing it", async () => {
+    for (const normalRgba of [undefined, new Uint8Array(15), new Float32Array(16)]) {
+      const faulty: StudioBg3dCaptureAdapter = { ...adapter(async () => ({ ...validRaster(), normalRgba } as StudioBg3dCapturedRaster)),
+        normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1 };
+      await expect(captureStudioBg3dRaster(faulty, { ...REQUEST, includeNormals: true })).rejects.toThrow(/normal raster/);
+    }
+    await expect(captureStudioBg3dRaster(adapter(async () => ({ ...validRaster(), normalRgba: new Uint8Array(16) })), REQUEST))
+      .rejects.toThrow(/unrequested surface normals/);
   });
 });

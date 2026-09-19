@@ -10,6 +10,8 @@
  * a separate post-process and must not be inferred from pixels by this trust boundary.
  */
 
+import { extractStudioBg3dLtNormalEdges } from "./studio-bg3d-lt-normal-edges";
+
 import {
   STUDIO_BG3D_LT_DEPTH_EDGE_MAX_PIXELS,
   extractStudioBg3dLtDepthEdges,
@@ -31,6 +33,7 @@ export interface StudioBg3dLtRasterInput {
   readonly rgba: Uint8Array | Uint8ClampedArray;
   /** Optional linear or device depth normalized to [0, 1], one value per pixel. */
   readonly depth?: Float32Array;
+  readonly normalRgba?: Uint8Array | Uint8ClampedArray;
 }
 
 export interface StudioBg3dThreeRgbaDepthInput {
@@ -68,6 +71,7 @@ interface ValidatedInput {
   readonly pixelCount: number;
   readonly rgba: Uint8Array | Uint8ClampedArray;
   readonly depth?: Float32Array;
+  readonly normalRgba?: Uint8Array | Uint8ClampedArray;
 }
 
 interface ValidatedRgbaShape {
@@ -149,7 +153,11 @@ function validateInput(input: StudioBg3dLtRasterInput): ValidatedInput {
       }
     }
   }
-  return { ...shape, ...(depth ? { depth } : {}) };
+  const normalRgba = input.normalRgba;
+  if (normalRgba !== undefined && (!depth || !isByteArray(normalRgba) || normalRgba.length !== shape.pixelCount * 4)) {
+    throw new TypeError("LT normals require packed RGBA8 and matching depth.");
+  }
+  return { ...shape, ...(depth ? { depth } : {}), ...(normalRgba ? { normalRgba } : {}) };
 }
 
 function validateLineSettings(line: StudioBg3dLineOutputSettings): void {
@@ -438,9 +446,13 @@ function renderMainLineResponse(
           width: input.width,
           height: input.height,
           depth: input.depth,
-          includeCreases: !line.depthOutlineOnly,
+          includeCreases: !line.depthOutlineOnly && !input.normalRgba,
         })
       : null;
+
+  const normalResponse = line.depthEnabled && !line.depthOutlineOnly && input.normalRgba && input.depth
+    ? extractStudioBg3dLtNormalEdges({ width: input.width, height: input.height,
+      normalRgba: input.normalRgba, depth: input.depth, creaseAngleDegrees: line.creaseAngleDegrees }) : null;
 
   for (let y = 0; y < input.height; y += 1) {
     for (let x = 0; x < input.width; x += 1) {
@@ -458,7 +470,8 @@ function renderMainLineResponse(
         const depthFeature = depthResponse[index] / 255;
         depthEdge = smoothResponse(depthFeature, threshold * 0.5, softness) * line.depthStrength;
       }
-      const combined = Math.max(luminanceEdge, exteriorEdge, depthEdge);
+      const normalEdge = normalResponse ? normalResponse[index]! / 255 * line.depthStrength : 0;
+      const combined = Math.max(luminanceEdge, exteriorEdge, depthEdge, normalEdge);
       response[index] = Math.round(clamp01(combined * line.strength) * 255);
     }
   }

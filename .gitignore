@@ -147,5 +147,5 @@ crates/**/target/
 # Local engine continuation logs, pixel reports, and screenshots.
 .qa/engine-resume/
 
-# Generated Scene3D GPU proof screenshots, logs, and Vite caches.
+# Generated Scene3D GPU proof screenshots, logs, and Vite dependency caches.
 /.qa/scene3d-output-quality/

@@ -169,6 +169,7 @@ export async function buildStudioBg3dShotArtifacts(
     height: input.captured.height,
     rgba: input.captured.rgba,
     ...(input.captured.depth ? { depth: input.captured.depth } : {}),
+    ...(input.captured.normalRgba ? { normalRgba: input.captured.normalRgba } : {}),
   };
   const rendered = await dependencies.renderLtInWorker(
     ltRenderInput,

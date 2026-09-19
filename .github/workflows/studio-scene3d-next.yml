@@ -9,6 +9,10 @@ on:
       - "scripts/verify-studio-scene3d-specialists.mjs"
       - "apps/web/src/domains/creator/bg3d/*capture*"
       - "apps/web/src/domains/creator/bg3d/*readback*"
+      - "apps/web/src/domains/creator/bg3d/*lt-*"
+      - "apps/web/src/domains/creator/bg3d/*shot-*"
+      - "scripts/scene3d-output-ci-policy.test.mjs"
+      - ".github/workflows/ci.yml"
       - "apps/web/src/domains/creator/bg3d/StudioBg3dCaptureBridge.tsx"
       - "apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer*"
       - "apps/web/tools/browser-harnesses/studio-scene3d-capture-resources.ts"
@@ -56,6 +60,13 @@ jobs:
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgl-capture.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-three-depth.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-normal-edges.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-capture-adapter.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-render-worker-client.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-insert-worker-boundary.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-shot-artifact-pipeline.test.ts
+          scripts/scene3d-output-ci-policy.test.mjs
       - name: Verify functional specialist runtimes and UI
         run: pnpm run verify:studio-3d-specialists
       - name: Type-check web workspace
