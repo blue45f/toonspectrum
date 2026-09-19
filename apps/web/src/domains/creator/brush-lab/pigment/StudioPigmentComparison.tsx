@@ -6,10 +6,10 @@ import { simulatePigmentLayer } from "./external-pigments";
 import { StudioPigmentLayerComparison } from "./StudioPigmentLayerComparison";
 
 const MODES: readonly { id: BrushStudioV6PigmentProviderId; node: string; label: string; note: string }[] = [
-  { id: "spectral-js-v3", node: "pigment-spectral-js", label: "Spectral.js 3", note: "분광 K/S · 명도와 착색력으로 혼합 가중치 보정" },
+  { id: "spectral-js-v3", node: "pigment-spectral-js", label: "Spectral.js", note: "분광 K/S · 명도와 착색력으로 혼합 가중치 보정" },
   { id: "open-km-spectral-v1", node: "pigment-open-km-spectral", label: "open-km 분광", note: "K와 S 개별 혼합 · 현재 RGB 복원 스펙트럼, S=1 가정" },
   { id: "colormix-lab-v3", node: "pigment-colormix-lab", label: "ColorMix.js Lab", note: "Lab 색공간 보간 · 물리 안료 모델이 아닌 비교 모드" },
-  { id: "mixbox-js-v2", node: "pigment-mixbox", label: "Mixbox 2", note: "기존 잠재 안료 혼색 · 비상업 라이선스" },
+  { id: "mixbox-js-v2", node: "pigment-mixbox", label: "Mixbox", note: "기존 잠재 안료 혼색 · 비상업 라이선스" },
   { id: "spectral-wgm-v1", node: "pigment-spectral", label: "기존 WGM", note: "저장된 브러시와의 비교 · Spectral.js가 아님" },
 ];
 

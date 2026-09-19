@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { studioWorldManifestFromTiled, type StudioTiledMapLike } from "./studio-virtual-space-tiled-adapter";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest, studioWorldPortals, studioWorldPresenceState } from "./studio-virtual-space-world-manifest";
 
-import { StudioWorldPortalTracker, studioWorldArrivalInput, studioWorldInputBlocked } from "./studio-virtual-space-runtime-policy";
+import {
+  StudioWorldPortalTracker,
+  studioWorldArrivalInput,
+  studioWorldHasModalBlocker,
+  studioWorldInputBlocked,
+} from "./studio-virtual-space-runtime-policy";
 import { stepStudioVirtualSpaceMotion } from "./studio-virtual-space-motion";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
 import { findStudioWorldPath } from "./studio-virtual-space-world-pathfinding";
@@ -185,6 +190,10 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     expect(studioWorldInputBlocked(state)).toBe(false);
     expect(studioWorldInputBlocked({ ...state, hidden: true })).toBe(true);
     expect(studioWorldInputBlocked({ ...state, hasFocus: () => false })).toBe(true);
+    expect(studioWorldInputBlocked(state, true)).toBe(true);
+    expect(studioWorldHasModalBlocker({
+      querySelectorAll: () => [{ closest: () => null }] as unknown as NodeListOf<Element>,
+    })).toBe(true);
   });
 
   it("does not invent a path across a sealed wall", () => {

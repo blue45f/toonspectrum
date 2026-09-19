@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
@@ -45,14 +45,34 @@ const B: StudioLiveParticipant = {
   role: "editor",
 };
 
+class SequenceStorage implements Storage {
+  private readonly values = new Map<string, string>();
+  get length(): number { return this.values.size; }
+  clear(): void { this.values.clear(); }
+  getItem(key: string): string | null { return this.values.get(key) ?? null; }
+  key(index: number): string | null { return [...this.values.keys()][index] ?? null; }
+  removeItem(key: string): void { this.values.delete(key); }
+  setItem(key: string, value: string): void { this.values.set(key, value); }
+}
+
 class DirectHub {
   readonly listeners = new Map<string, (sender: StudioLiveParticipant, payload: string) => void>();
   readonly participants = [A, B];
+  private droppedLeaveSessionId: string | null = null;
+
+  dropNextLeave(sessionId: string): void {
+    this.droppedLeaveSessionId = sessionId;
+  }
 
   port(self: StudioLiveParticipant): StudioLiveDirectPort {
     return {
       getPeers: () => this.participants.filter((participant) => participant.sessionId !== self.sessionId),
       send: (targetSessionId, payload) => {
+        const packet = parseStudioVirtualSpacePacket(payload);
+        if (packet?.kind === "leave" && this.droppedLeaveSessionId === self.sessionId) {
+          this.droppedLeaveSessionId = null;
+          return true;
+        }
         const target = this.listeners.get(targetSessionId);
         if (!target) return false;
         target(self, payload);
@@ -67,6 +87,10 @@ class DirectHub {
     };
   }
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("Studio virtual space model", () => {
   it("keeps avatar generation deterministic and varied", () => {
@@ -197,6 +221,143 @@ describe("Studio virtual space P2P presence", () => {
     a.close();
     expect(b.snapshot().peers).toHaveLength(0);
     b.close();
+  });
+
+  it("keeps outbound sequence monotonic when a lost leave is followed by reconnect", () => {
+    const hub = new DirectHub();
+    let now = 2_000;
+    const dependencies = {
+      now: () => now,
+      setInterval: () => 1,
+      clearInterval: () => undefined,
+    };
+    const receiver = new StudioVirtualSpacePresenceController(
+      B,
+      hub.port(B),
+      { x: 400, y: 400 },
+      dependencies,
+    );
+    const first = new StudioVirtualSpacePresenceController(
+      A,
+      hub.port(A),
+      { x: 105, y: 200 },
+      dependencies,
+    );
+    receiver.start();
+    first.start();
+    for (let index = 0; index < 7; index += 1) {
+      now += 1;
+      first.update({ x: 105 + index, y: 200 }, "right", "available", true);
+      first.refresh();
+    }
+    const previous = receiver.snapshot().peers.find((peer) => peer.participant.sessionId === A.sessionId)!;
+
+    hub.dropNextLeave(A.sessionId);
+    first.close();
+    now += 1;
+    const reconnected = new StudioVirtualSpacePresenceController(
+      A,
+      hub.port(A),
+      { x: 999, y: 200 },
+      dependencies,
+    );
+    reconnected.start();
+
+    const current = receiver.snapshot().peers.find((peer) => peer.participant.sessionId === A.sessionId)!;
+    expect(current.state.x).toBe(999);
+    expect(current.sequence).toBeGreaterThan(previous.sequence);
+
+    reconnected.close();
+    receiver.close();
+  });
+
+  it("persists the outbound high-water across a full module reload", async () => {
+    vi.stubGlobal("sessionStorage", new SequenceStorage());
+    vi.resetModules();
+    const firstRealm = await import("./studio-virtual-space-presence");
+    const hub = new DirectHub();
+    const dependencies = {
+      now: () => 3_000,
+      setInterval: () => 1,
+      clearInterval: () => undefined,
+    };
+    const receiver = new firstRealm.StudioVirtualSpacePresenceController(
+      B,
+      hub.port(B),
+      { x: 400, y: 400 },
+      dependencies,
+    );
+    const beforeReload = new firstRealm.StudioVirtualSpacePresenceController(
+      A,
+      hub.port(A),
+      { x: 105, y: 200 },
+      dependencies,
+    );
+    receiver.start();
+    beforeReload.start();
+    beforeReload.update({ x: 110, y: 200 }, "right", "available", true);
+    beforeReload.refresh();
+    const previous = receiver.snapshot().peers.find((peer) => peer.participant.sessionId === A.sessionId)!;
+    hub.dropNextLeave(A.sessionId);
+    beforeReload.close();
+
+    vi.resetModules();
+    const reloadedRealm = await import("./studio-virtual-space-presence");
+    const afterReload = new reloadedRealm.StudioVirtualSpacePresenceController(
+      A,
+      hub.port(A),
+      { x: 999, y: 200 },
+      dependencies,
+    );
+    afterReload.start();
+
+    const current = receiver.snapshot().peers.find((peer) => peer.participant.sessionId === A.sessionId)!;
+    expect(current.state.x).toBe(999);
+    expect(current.sequence).toBeGreaterThan(previous.sequence);
+
+    afterReload.close();
+    receiver.close();
+  });
+
+  it("keeps direct presence alive when session storage access is blocked", () => {
+    const hub = new DirectHub();
+    const original = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+    Object.defineProperty(globalThis, "sessionStorage", {
+      configurable: true,
+      get: () => { throw new DOMException("blocked", "SecurityError"); },
+    });
+    try {
+      const controller = new StudioVirtualSpacePresenceController(
+        A,
+        hub.port(A),
+        { x: 200, y: 200 },
+        { setInterval: () => 1, clearInterval: () => undefined },
+      );
+      expect(() => {
+        controller.start();
+        controller.sendReaction("wave");
+        controller.close();
+      }).not.toThrow();
+    } finally {
+      if (original) Object.defineProperty(globalThis, "sessionStorage", original);
+      else Reflect.deleteProperty(globalThis, "sessionStorage");
+    }
+
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => { throw new DOMException("blocked", "SecurityError"); },
+      setItem: () => { throw new DOMException("blocked", "SecurityError"); },
+    });
+    const controller = new StudioVirtualSpacePresenceController(
+      B,
+      hub.port(B),
+      { x: 210, y: 200 },
+      { setInterval: () => 1, clearInterval: () => undefined },
+    );
+    expect(() => {
+      controller.start();
+      controller.sendReaction("heart");
+      controller.close();
+    }).not.toThrow();
   });
 });
 

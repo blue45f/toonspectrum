@@ -435,3 +435,52 @@
     max-height:68%;
   }
 }
+
+/* Living studio: tools stay beside the artwork, and every invitation has an explicit response. */
+.studio-vspace-atmosphere,.studio-vspace-social,.studio-vspace-shared-review{padding:12px;color:var(--color-fg)}
+.studio-vspace-atmosphere h2,.studio-vspace-social h2,.studio-vspace-shared-review h2{margin:0;font-size:.875rem;font-weight:750}
+.studio-vspace-atmosphere p,.studio-vspace-social p,.studio-vspace-shared-review p{margin:8px 0;color:var(--color-fg-2);font-size:.75rem;line-height:1.6}
+.studio-vspace-atmosphere>div{display:flex;margin-top:10px;gap:4px}
+.studio-vspace-atmosphere button,.studio-vspace-social button,.studio-vspace-shared-review button{min-height:44px;padding:8px 10px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-card);color:var(--color-fg);font-size:.75rem;font-weight:650;cursor:pointer;transition:background .16s,color .16s}
+.studio-vspace-atmosphere button{flex:1}
+.studio-vspace-atmosphere button[aria-pressed=true],.studio-vspace-social button[aria-pressed=true]{background:var(--color-accent-soft);border-color:var(--color-accent);color:var(--color-accent)}
+.studio-vspace-social button:hover:enabled,.studio-vspace-atmosphere button:hover,.studio-vspace-shared-review button:hover{background:var(--color-raised)}
+.studio-vspace-social button:disabled{opacity:.5;cursor:not-allowed}
+.studio-vspace-social button:focus-visible,.studio-vspace-atmosphere button:focus-visible,.studio-vspace-shared-review button:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.studio-vspace-social>header,.studio-vspace-peer-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.studio-vspace-social>header{color:var(--color-fg)}
+.studio-vspace-peer-picker{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.studio-vspace-peer-picker button{display:flex;align-items:center;gap:6px;max-width:100%;overflow-wrap:anywhere}
+.studio-vspace-presence-dot{display:inline-block;width:6px;height:6px;flex:none;border-radius:50%;background:var(--color-good)}
+.studio-vspace-peer-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--color-line)}
+.studio-vspace-peer-heading{grid-column:1/-1;font-size:.8rem;overflow-wrap:anywhere}
+.studio-vspace-peer-heading button{display:grid;place-items:center;min-width:44px}
+.studio-vspace-peer-actions>button{display:flex;align-items:center;gap:7px;text-align:left}
+.studio-vspace-peer-actions svg{flex:none}
+.studio-vspace-social-request{display:grid;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid var(--color-line);font-size:.75rem;overflow-wrap:anywhere}
+.studio-vspace-social-request>span{color:var(--color-fg-2)}
+.studio-vspace-social-request>div{display:flex;gap:6px}
+.studio-vspace-social-request[data-request-status=offered]>div>button:first-child{border-color:var(--color-accent);color:var(--color-accent)}
+.studio-vspace-social-notice{padding:8px 12px;color:var(--color-warn);font-size:.75rem;line-height:1.5}
+.studio-vspace-shared-review>button{width:100%;margin-top:6px}
+.vs2-shell--project .studio-vspace-atmosphere [data-studio-virtual-offline=true]{position:static;max-width:none;margin:10px 0 0;background:var(--color-card);box-shadow:none;padding:8px;border:1px solid var(--color-line);border-radius:8px;color:var(--color-warn);font-size:.75rem}
+.studio-vspace-atmosphere summary{min-height:32px;align-content:center;cursor:pointer}
+.vs2-shell--project .vs2-rightbar--live{overflow-y:auto;scrollbar-color:var(--color-line-strong) var(--color-panel)}
+.vs2-shell--project .vs2-live-chat-button,.vs2-shell--project .vs2-live-huddle button{min-height:44px}
+.vs2-shell--project [data-space-interactive=true] button{min-width:36px;min-height:36px}
+@media(max-width:900px){.vs2-shell--project .vs2-rightbar--live{overflow:visible}.vs2-shell--project [data-space-interactive=true] button{min-height:44px;min-width:44px}.studio-vspace-social,.studio-vspace-atmosphere{min-width:0}.studio-vspace-social{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){.studio-vspace-social button,.studio-vspace-atmosphere button{transition:none}}
+.vs2-shell--project .vs2-rightbar--live>.vs2-panel{flex-shrink:0;overflow:visible}
+.vs2-shell--project .vs2-rightbar--live>.vs2-live-members{overflow:visible}
+.vs2-shell--project .studio-vspace-minimap>button:first-child{min-height:36px}
+
+.studio-vspace-npc-panel{padding:12px;color:var(--color-fg)}
+.studio-vspace-npc-panel h2{margin:0;font-size:.875rem;font-weight:750}
+.studio-vspace-npc-panel>p{margin:8px 0;color:var(--color-fg-2);font-size:.75rem;line-height:1.6}
+.studio-vspace-npc-list{display:grid;gap:6px;margin:10px 0 0;padding:0;list-style:none}
+.studio-vspace-npc-button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-card);color:var(--color-fg);text-align:left;cursor:pointer}
+.studio-vspace-npc-button:hover{background:var(--color-raised)}
+.studio-vspace-npc-button:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
+.studio-vspace-npc-identity{display:grid;gap:3px;font-size:.75rem}
+.studio-vspace-npc-identity small{color:var(--color-fg-2);font-size:.65rem}
+.studio-vspace-npc-action{color:var(--color-accent);font-size:.7rem;text-align:right}

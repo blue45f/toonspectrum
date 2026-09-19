@@ -1,6 +1,8 @@
-import { useCallback, useRef, useState, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+
+import { studioJoystickVector } from "./studio-virtual-space-joystick-input";
 
 export interface StudioVirtualSpaceJoystickVector {
   readonly x: number;
@@ -28,9 +30,7 @@ export function StudioVirtualSpaceJoystick({
     const radius = Math.max(1, Math.min(rect.width, rect.height) / 2);
     const dx = (event.clientX - (rect.left + rect.width / 2)) / radius;
     const dy = (event.clientY - (rect.top + rect.height / 2)) / radius;
-    const length = Math.hypot(dx, dy);
-    const scale = length > 1 ? 1 / length : 1;
-    publish({ x: dx * scale, y: dy * scale });
+    publish(studioJoystickVector(dx, dy));
   }, [publish]);
 
   const reset = useCallback((event?: PointerEvent<HTMLDivElement>) => {
@@ -38,6 +38,16 @@ export function StudioVirtualSpaceJoystick({
     pointerIdRef.current = null;
     publish({ x: 0, y: 0 });
   }, [publish]);
+
+  const latestPublish = useRef(onVectorChange);
+  latestPublish.current = onVectorChange;
+  useEffect(() => {
+    const stop = () => { pointerIdRef.current = null; setVector({ x: 0, y: 0 }); latestPublish.current({ x: 0, y: 0 }); };
+    const visibility = () => { if (document.hidden) stop(); };
+    globalThis.addEventListener("blur", stop);
+    document.addEventListener("visibilitychange", visibility);
+    return () => { globalThis.removeEventListener("blur", stop); document.removeEventListener("visibilitychange", visibility); latestPublish.current({ x: 0, y: 0 }); };
+  }, []);
 
   return (
     <div
@@ -47,6 +57,8 @@ export function StudioVirtualSpaceJoystick({
       aria-label={bt("캐릭터 이동 조이스틱", "Character movement joystick")}
       data-studio-virtual-joystick="true"
       onPointerDown={(event) => {
+        if (pointerIdRef.current !== null || (event.button !== 0 && event.button !== undefined)) return;
+        event.preventDefault();
         pointerIdRef.current = event.pointerId;
         try {
           event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -61,6 +73,7 @@ export function StudioVirtualSpaceJoystick({
       }}
       onPointerUp={reset}
       onPointerCancel={reset}
+      onLostPointerCapture={reset}
     >
       <span className="pointer-events-none absolute inset-3 rounded-full border border-white/10 bg-black/10" aria-hidden />
       <span

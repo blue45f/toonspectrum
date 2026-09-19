@@ -34,10 +34,10 @@ export function StudioBrushIntegratedWorkbench({ scope }: { readonly scope: stri
         setSnapshot(requested.program);
         setGeneration((current) => current + 1);
         setNotice(requested.productBrushId
-          ? `${requested.productBrushId} 제품 브러시를 V6 편집 레시피로 열었습니다. 실제 획을 확인한 뒤 저장하세요.`
-          : `${requested.program.name} V6 레시피를 열었습니다.`);
+          ? `${requested.productBrushId} 제품 브러시의 특성을 참고한 새 레시피를 열었습니다. 원본 엔진·설정을 그대로 편집하는 기능은 아닙니다.`
+          : `${requested.program.name} 레시피를 열었습니다.`);
       } catch {
-        setNotice("브라우저 저장소를 사용할 수 없어 이번 세션에서만 V6 레시피를 엽니다.");
+        setNotice("브라우저 저장소를 사용할 수 없어 이번 세션에서만 레시피를 엽니다.");
       }
     } else {
       try {
