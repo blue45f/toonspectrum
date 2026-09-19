@@ -128,6 +128,34 @@ describe("Studio virtual space P2P presence", () => {
     expect(parseStudioVirtualSpacePacket("not-json")).toBeNull();
   });
 
+  it("preserves coordinates and room ids from larger data-driven worlds", () => {
+    const parsed = parseStudioVirtualSpacePacket(JSON.stringify({
+      wire: "toonspectrum-space-v1",
+      kind: "presence",
+      sequence: 7,
+      at: 10,
+      state: {
+        x: 1_240.5,
+        y: 902.25,
+        zoneId: "meeting-room-2",
+        facing: "left",
+        activity: "available",
+        moving: true,
+        avatarIndex: 9,
+      },
+    }));
+    expect(parsed?.kind).toBe("presence");
+    if (parsed?.kind !== "presence") return;
+    expect(parsed.state).toMatchObject({
+      x: 1_240.5,
+      y: 902.25,
+      zoneId: "meeting-room-2",
+      facing: "left",
+      moving: true,
+      avatarIndex: 9,
+    });
+  });
+
   it("exchanges movement directly and clears leave state without persistence", () => {
     const hub = new DirectHub();
     const noTimer = () => 1;
@@ -151,6 +179,7 @@ describe("Studio virtual space P2P presence", () => {
     a.refresh();
     expect(b.snapshot().peers[0]?.state.activity).toBe("focused");
     expect(b.snapshot().peers[0]?.state.moving).toBe(true);
+    expect(b.snapshot().peers[0]?.state.x).toBe(900);
     expect(b.snapshot().nearbyPeers).toHaveLength(0);
 
     a.setMoving(false);
