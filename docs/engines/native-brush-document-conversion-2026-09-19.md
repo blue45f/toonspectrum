@@ -54,9 +54,9 @@ Master-page conversion remains disabled rather than guessing its page/group sema
 ## Verification and reproduction
 
 - Focused engine, geometry, inspector, source-boundary, document-codec and SVG regression suite:
-  **779 tests passed; 3 pre-existing optional Google Ink checks skipped** (46 passed files and
+  **780 tests passed; 3 pre-existing optional Google Ink checks skipped** (46 passed files and
   one entirely skipped file). These skips are not counted as successes.
-- New conversion tests: 34 source/transaction/PNG tests, 10 inspector tests and 3 product-wiring
+- New conversion tests: 34 source/transaction/PNG tests, 11 inspector tests and 3 product-wiring
   checks. Source/page/lock changes, cancellation/unmount, stale history, duplicate commits and
   malformed results are covered.
 - Frontend, brush-platform, Skia-package and benchmark-harness TypeScript checks passed.

@@ -32,6 +32,16 @@ describe("native document inspector", () => {
     expect(renderProduct).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "선택 획 변환" }).hasAttribute("disabled")).toBe(false);
   });
+  it("shows only ink when switching from a natural-media style to a vector renderer", () => {
+    render(<Inspector {...props()} />); open();
+    const style = screen.getByRole("combobox", { name: "문서 변환 재질" }) as HTMLSelectElement;
+    fireEvent.change(style, { target: { value: "wash" } });
+    expect(style.value).toBe("wash");
+    fireEvent.change(screen.getByRole("combobox", { name: "문서 변환 엔진" }), { target: { value: "canvaskit" } });
+    expect(style.value).toBe("ink"); expect(style.disabled).toBe(true);
+    expect(screen.getByText(/워시·초크는 libmypaint/)).toBeTruthy();
+    expect(renderProduct).not.toHaveBeenCalled();
+  });
   it("captures the document commit permission before calling the Worker", async () => {
     const calls: string[] = [], commit = vi.fn(() => { calls.push("commit"); return true; });
     renderProduct.mockImplementation(async () => { calls.push("worker"); return result; });

@@ -60,13 +60,18 @@ export default function StudioNativeBrushDocumentInspector(props: StudioNativeBr
     <section aria-label="선택 획 네이티브 엔진 변환" className="space-y-3 pt-2">
       <p className="text-xs leading-relaxed text-fg-3">완성된 획의 중심선·필압을 선택한 엔진으로 다시 그립니다. 기존 브러시 질감을 복제하는 기능은 아니며, 성공한 PNG만 문서에 추가하고 원본은 숨김 보존합니다.</p>
       <div className="flex flex-wrap gap-2">
-        <select aria-label="문서 변환 엔진" className={CONTROL} value={engine} disabled={busy} onChange={(event) => setEngine(event.target.value as NativeBrushProbeEngine)}>
+        <select aria-label="문서 변환 엔진" className={CONTROL} value={engine} disabled={busy} onChange={(event) => {
+          const next = event.target.value as NativeBrushProbeEngine;
+          setEngine(next);
+          if (next !== "libmypaint") setStyle("ink");
+        }}>
           <option value="libmypaint">libmypaint · 자연매체</option><option value="canvaskit">CanvasKit · WebGL2</option><option value="vello">Vello · WebGPU</option>
         </select>
         <select aria-label="문서 변환 재질" className={CONTROL} value={style} disabled={busy || engine !== "libmypaint"} onChange={(event) => setStyle(event.target.value as NativeBrushProbeStyle)}>
           <option value="ink">잉크</option><option value="wash">워시</option><option value="chalk">초크</option>
         </select>
       </div>
+      {engine !== "libmypaint" && <p className="text-xs text-fg-3">CanvasKit·Vello는 같은 필압 윤곽선을 잉크로 렌더링합니다. 워시·초크는 libmypaint에서 선택하세요.</p>}
       <p className="text-xs text-fg-3">원본 크기 그대로 변환합니다. 굵기 1–128px, 입력 8,192점, 획 영역 2048×2048 이내를 지원하며 초과하면 축소하지 않고 중단합니다.</p>
       {prepared.error && <p className="text-xs text-warn">{prepared.error}</p>}
       {prepared.plan?.warnings.map((message) => <p key={message} className="text-xs text-warn">{message}</p>)}
