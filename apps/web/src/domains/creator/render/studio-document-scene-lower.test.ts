@@ -4,10 +4,13 @@ import {
   documentIdsOwnedByVectorIslands,
   isStudioVelloDocumentGeometricDrawElement,
   isStudioVelloDocumentRadialLineElement,
+  isStudioVelloDocumentVectorFreehandElement,
   lowerStudioElementsToRenderScene,
   parseCssColorToIR,
   studioDocumentAllowsKonvaHide,
 } from "./studio-document-scene-lower";
+
+import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
 
 import type { El } from "../studio-element-model";
 
@@ -140,6 +143,66 @@ describe("lowerStudioElementsToRenderScene", () => {
       || node.kind !== "stroke-path"
       || node.join === "miter"
     ))).toBe(true);
+  });
+
+  it("lowers persisted perfect-freehand ink to a Vello fill-path without changing its outline planner", () => {
+    const element = {
+      id: "vector-ink",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      brush: "gpen",
+      points: [10, 50, 30, 36, 52, 58, 78, 42, 110, 50],
+      pressures: [0.2, 0.45, 0.82, 0.6, 0.35],
+      stroke: "#123456",
+      strokeWidth: 7,
+      opacity: 0.9,
+      outlineStroke: captureStudioOutlineStrokeContractV1({
+        brushId: "gpen",
+        pressureSource: "recorded",
+      }),
+    } as El;
+
+    expect(isStudioVelloDocumentVectorFreehandElement(element)).toBe(true);
+    const lowered = lowerStudioElementsToRenderScene([element], { width: 160, height: 100 });
+    expect(lowered.nodes).toHaveLength(1);
+    expect(lowered.nodes[0]?.kind).toBe("fill-path");
+    if (lowered.nodes[0]?.kind === "fill-path") {
+      expect(lowered.nodes[0].path.verbs.some((verb) => verb.v === "Q")).toBe(true);
+      expect(lowered.nodes[0].paint).toEqual({
+        kind: "solid",
+        color: { r: 0x12 / 255, g: 0x34 / 255, b: 0x56 / 255, a: 1 },
+      });
+    }
+    const owned = documentIdsOwnedByVectorIslands(lowered);
+    expect(owned).toEqual(["vector-ink"]);
+    expect(studioDocumentAllowsKonvaHide([element], owned)).toBe(true);
+  });
+
+  it("keeps styled or material freehand strokes outside the Vello brush island", () => {
+    const base = {
+      id: "styled-ink",
+      type: "draw",
+      kind: "freehand",
+      mode: "pen",
+      brush: "gpen",
+      points: [10, 50, 30, 36, 52, 58, 78, 42],
+      pressures: [0.2, 0.45, 0.82, 0.6],
+      stroke: "#123456",
+      strokeWidth: 7,
+      outlineStroke: captureStudioOutlineStrokeContractV1({
+        brushId: "gpen",
+        pressureSource: "recorded",
+      }),
+    };
+    expect(isStudioVelloDocumentVectorFreehandElement({
+      ...base,
+      blendMode: "multiply",
+    } as El)).toBe(false);
+    expect(isStudioVelloDocumentVectorFreehandElement({
+      ...base,
+      pattern: { src: "blob:pattern" },
+    } as El)).toBe(false);
   });
 
   it("rejects radial lines whose CSS color would be repainted by a permissive parser", () => {
