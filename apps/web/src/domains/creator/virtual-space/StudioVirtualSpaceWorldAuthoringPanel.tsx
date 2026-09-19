@@ -327,7 +327,6 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           point: center,
           radius: 40,
           targetRoomId: roomIds[0],
-          targetPoint: manifest.spawns[0]?.point ?? center,
         };
         next = { ...manifest, portals: [...manifest.portals, portal] };
         break;
@@ -577,7 +576,13 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           <GeometryFields x={item.point.x} y={item.point.y} includeSize={false} onChange={(patch) => updatePortal({ point: { ...item.point, ...patch } })} />
           <div className="grid grid-cols-2 gap-2">
             <NumberField label="Radius" value={item.radius} min={1} onChange={(radius) => radius != null && updatePortal({ radius })} />
-            <SelectField label="Target room" value={item.targetRoomId} options={roomIds} allowEmpty onChange={(targetRoomId) => updatePortal({ targetRoomId })} />
+            <SelectField
+              label="Target room"
+              value={item.targetRoomId}
+              options={roomIds}
+              allowEmpty
+              onChange={(targetRoomId) => updatePortal({ targetRoomId, targetPoint: undefined })}
+            />
           </div>
           <TextField label="Route href" value={item.href} onChange={(href) => updatePortal({ href: href || undefined })} />
           <div className="grid grid-cols-2 gap-2">

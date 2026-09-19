@@ -1,6 +1,7 @@
 import { collectStudioOfflineDrawingUrls } from "./apps/web/src/app/service-worker/studio-service-worker-drawing-plan";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
@@ -26,6 +27,13 @@ import {
 
 const webRoot = fileURLToPath(new URL("./apps/web", import.meta.url));
 const repositoryRoot = fileURLToPath(new URL("./", import.meta.url));
+const nodeRequire = createRequire(import.meta.url);
+
+const reactCompilerRuntimeInteropModule = path.resolve(
+  webRoot,
+  "config/react-compiler-runtime-interop.mjs",
+);
+const reactCompilerRuntimeCommonJsModule = nodeRequire.resolve("react/compiler-runtime");
 
 const apiTarget = process.env.NEST_API_URL ?? "http://127.0.0.1:4001";
 // Chunks that must never be pulled into the entry document's <link rel="modulepreload"> set.
@@ -508,7 +516,15 @@ function studioServiceWorkerPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => ({
+function viteServeCacheConfig(command: string): { cacheDir?: string } {
+  const configuredCacheDir = process.env.TOONSPECTRUM_VITE_CACHE_DIR?.trim();
+  return command === "serve" && configuredCacheDir
+    ? { cacheDir: path.resolve(repositoryRoot, configuredCacheDir) }
+    : {};
+}
+
+export default defineConfig(({ command, mode }) => ({
+  ...viteServeCacheConfig(command),
   plugins: [
     preferImplementationOverTestModulePlugin(),
     studioCrossOriginIsolationPlugin(),
@@ -535,6 +551,15 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(webRoot, "src"),
       "@toonspectrum/core/creator-role": path.resolve(repositoryRoot, "packages/core/src/creator-role.ts"),
+      ...(command === "serve"
+        ? {
+            // Vite 8.0.16 skips CommonJS named-import interop when React Compiler injects
+            // react/compiler-runtime into an optimized dependency. Keep this dev-only shim
+            // until Vite >=8.2.0 (vitejs/vite#23029) is the repository's locked version.
+            "react/compiler-runtime": reactCompilerRuntimeInteropModule,
+            "@toonspectrum/react-compiler-runtime-cjs": reactCompilerRuntimeCommonJsModule,
+          }
+        : {}),
     },
     // Workspace hooks and their auto-installed peers must share the app renderer's dispatcher.
     dedupe: ["react", "react-dom"],

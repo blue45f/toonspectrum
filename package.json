@@ -226,7 +226,9 @@
     "test:a11y": "PLAYWRIGHT_CHANNEL='' playwright test e2e/a11y-smoke.spec.ts",
     "studio:virtual-space-world:generate": "tsx scripts/generate-virtual-studio-default-world.mts",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
-    "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs"
+    "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs",
+    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs",
+    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

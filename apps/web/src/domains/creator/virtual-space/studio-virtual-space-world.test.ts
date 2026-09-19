@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import tiledWorld from "../../../../public/assets/virtual-studio/world/default-world.json";
+
 import {
   DEFAULT_STUDIO_WORLD_MANIFEST,
   studioWorldInteractions,
+  studioWorldPortalTarget,
   studioWorldRoomAt,
+  type StudioVirtualSpaceWorldManifest,
   validateStudioWorldManifest,
 } from "./studio-virtual-space-world-manifest";
 import {
@@ -58,9 +62,100 @@ describe("Virtual Studio world manifest", () => {
     });
     expect(derived?.zoneId).toBe(studioWorldRoomAt(manifest, { x: 410, y: 410 }));
   });
+
+  it("rejects an authored NPC whose skin is not in the production registry", () => {
+    const manifest: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      npcs: [{
+        id: "unknown-skin-npc",
+        skinKey: "typo-purplee",
+        point: { x: 425, y: 600 },
+        roomId: DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!.id,
+      }],
+    };
+
+    expect(validateStudioWorldManifest(manifest)).toContain(
+      "npc references missing skin: unknown-skin-npc",
+    );
+  });
+
+  it("rejects blocked spawns, portal targets and NPC routes before runtime", () => {
+    const collider = { x: 300, y: 300, width: 100, height: 100 };
+    const manifest: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      props: [],
+      colliders: [collider],
+      portals: [{
+        id: "blocked-portal",
+        point: { x: 250, y: 250 },
+        radius: 24,
+        targetPoint: { x: 350, y: 350 },
+      }],
+      spawns: [{ id: "main", point: { x: 350, y: 350 } }],
+      npcs: [{
+        id: "blocked-npc",
+        skinKey: "purple",
+        roomId: DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!.id,
+        point: { x: 350, y: 350 },
+        behavior: "patrol",
+        patrol: [{ x: 350, y: 350 }, { x: 250, y: 250 }],
+      }],
+    };
+
+    expect(validateStudioWorldManifest(manifest)).toEqual(expect.arrayContaining([
+      "portal target is blocked: blocked-portal",
+      "spawn is blocked: main",
+      "npc start is blocked: blocked-npc",
+      "npc patrol is blocked: blocked-npc",
+    ]));
+  });
+
+  it("rejects an authored world with no safe start floor", () => {
+    const manifest: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      props: [],
+      colliders: [{
+        x: 0,
+        y: 0,
+        width: DEFAULT_STUDIO_WORLD_MANIFEST.width,
+        height: DEFAULT_STUDIO_WORLD_MANIFEST.height,
+      }],
+    };
+    expect(validateStudioWorldManifest(manifest))
+      .toEqual(expect.arrayContaining(["spawn is blocked: main"]));
+  });
+
+  it("resolves room portals to that room's spawn unless coordinates override it", () => {
+    const drawingSpawn = DEFAULT_STUDIO_WORLD_MANIFEST.spawns.find((spawn) => spawn.id === "drawing")!;
+    expect(studioWorldPortalTarget(DEFAULT_STUDIO_WORLD_MANIFEST, {
+      id: "to-drawing",
+      point: { x: 400, y: 400 },
+      radius: 24,
+      targetRoomId: "drawing",
+    })).toEqual(drawingSpawn.point);
+    expect(studioWorldPortalTarget(DEFAULT_STUDIO_WORLD_MANIFEST, {
+      id: "to-explicit",
+      point: { x: 400, y: 400 },
+      radius: 24,
+      targetRoomId: "drawing",
+      targetPoint: { x: 420, y: 520 },
+    })).toEqual({ x: 420, y: 520 });
+  });
 });
 
 describe("Virtual Studio Tiled adapter", () => {
+  it("uses the production crop as the Tiled authoring reference", () => {
+    const background = tiledWorld.layers.find((layer) => layer.name === "background");
+    expect(background).toMatchObject({
+      type: "imagelayer",
+      image: "../production-v2/master-central-lossless.webp",
+      imagewidth: 869,
+      imageheight: 813,
+    });
+    expect(tiledWorld.properties.find((item) => item.name === "backgroundUrl")?.value)
+      .toBe("/assets/virtual-studio/production-v2/master-central-lossless.webp");
+  });
+
   it("supports new rooms, props, portals, spawns and NPCs from data", () => {
     const map: StudioTiledMapLike = {
       width: 500,
@@ -179,13 +274,13 @@ describe("Virtual Studio Tiled adapter", () => {
               id: 7,
               name: "producer-npc",
               x: 230,
-              y: 250,
+              y: 280,
               properties: [
                 property("skinKey", "dark"),
                 property("roomId", "meeting-room"),
                 property("behavior", "patrol"),
                 property("speed", 64),
-                property("patrol", "230,250;300,250;300,280"),
+                property("patrol", "230,280;300,280;300,320"),
               ],
             },
           ],
@@ -220,7 +315,7 @@ describe("Virtual Studio Tiled adapter", () => {
       skinKey: "dark",
       behavior: "patrol",
       speed: 64,
-      patrol: [{ x: 230, y: 250 }, { x: 300, y: 250 }, { x: 300, y: 280 }],
+      patrol: [{ x: 230, y: 280 }, { x: 300, y: 280 }, { x: 300, y: 320 }],
     });
     expect(validateStudioWorldManifest(manifest)).toEqual([]);
   });
