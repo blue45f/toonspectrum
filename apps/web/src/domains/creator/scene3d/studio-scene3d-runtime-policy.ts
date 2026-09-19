@@ -29,6 +29,14 @@ export interface StudioScene3dSoftwareCapabilities {
   readonly depthOfField: boolean;
   readonly assetReleasePipeline: boolean;
   readonly renderBundles: boolean;
+  readonly gpuProfiling: boolean;
+  readonly textureResidency: boolean;
+  readonly gpuDrivenCulling: boolean;
+  readonly clusterLod: boolean;
+  readonly mikkTangents: boolean;
+  readonly animationRetargetPipeline: boolean;
+  readonly offscreenRenderWorker: boolean;
+  readonly webGpuWebXr: boolean;
   readonly threeNativeGaussianSplat: boolean;
   readonly sparkGaussianSplat: boolean;
   readonly playcanvasGaussianSplat: boolean;
@@ -62,6 +70,14 @@ export const STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES:
     depthOfField: false,
     assetReleasePipeline: false,
     renderBundles: false,
+    gpuProfiling: false,
+    textureResidency: false,
+    gpuDrivenCulling: false,
+    clusterLod: false,
+    mikkTangents: false,
+    animationRetargetPipeline: false,
+    offscreenRenderWorker: false,
+    webGpuWebXr: false,
     threeNativeGaussianSplat: false,
     sparkGaussianSplat: false,
     playcanvasGaussianSplat: false,
