@@ -7,6 +7,7 @@ import type {
 export type StudioScene3dEvolutionCandidateId =
   | "tsl-npr-render-graph"
   | "asset-release-pipeline"
+  | "webgpu-render-bundles"
   | "bvh-webgpu-compute"
   | "gpu-xpbd"
   | "three-native-gsplat"
@@ -121,6 +122,16 @@ export const STUDIO_SCENE3D_EVOLUTION_CANDIDATES:
       authorityPolicy: "Source assets remain canonical; optimized derivatives are content-addressed runtime artifacts.",
       goal: "모든 production mesh에 LOD·geometry compression·KTX2·GPU budget receipt를 기본 강제",
       gates: gates("asset-round-trip", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "webgpu-render-bundles",
+      label: "WebGPU static render bundles",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["three"]),
+      authorityPolicy: "Bundle residency is transient; Scene3D entities and transforms remain canonical.",
+      goal: "정적 배경 subtree의 draw submission을 WebGPU render bundle로 묶어 대형 장면 CPU 비용을 줄임",
+      gates: gates("frame-budget", "bundle-budget", "device-loss-recovery"),
     }),
     Object.freeze({
       id: "bvh-webgpu-compute",
@@ -249,6 +260,12 @@ function admitted(
   software: StudioScene3dSoftwareCapabilities,
 ): boolean {
   switch (id) {
+    case "tsl-npr-render-graph":
+      return software.tslNprRenderGraph;
+    case "asset-release-pipeline":
+      return software.assetReleasePipeline;
+    case "webgpu-render-bundles":
+      return software.renderBundles;
     case "bvh-webgpu-compute":
       return software.bvhWebGpuCompute;
     case "gpu-xpbd":
@@ -273,9 +290,6 @@ function admitted(
       return software.openSubdiv;
     case "pathtraced-still":
       return software.pathTracer;
-    case "tsl-npr-render-graph":
-    case "asset-release-pipeline":
-      return false;
   }
 }
 
@@ -304,6 +318,14 @@ function applicability(
       return {
         applicable: document.assets.some(({ kind }) => kind !== "gaussian-splat"),
         reason: "Production mesh/character asset은 LOD·압축·GPU budget derivative가 필요합니다.",
+      };
+    case "webgpu-render-bundles":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu"
+          && environmentEntities > 0,
+        reason: runtimePlan.primaryRenderer === "three-webgpu" && environmentEntities > 0
+          ? "정적 배경 subtree의 CPU draw submission을 줄일 수 있습니다."
+          : "WebGPU 배경 장면이 아니면 render bundle 이득이 없습니다.",
       };
     case "bvh-webgpu-compute":
       return {
