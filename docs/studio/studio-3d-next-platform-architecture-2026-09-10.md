@@ -1,5 +1,11 @@
 # ToonStudio 3D Next Platform — 2026-09-10
 
+> **2026-09-19 구현 갱신:** 장기 승격 순서와 product-admitted capability 원장은
+> [Scene3D 장기 플랫폼 고도화](./studio-3d-platform-evolution-2026-09-19.md)를 따른다.
+> 이 문서의 PlayCanvas-first Gaussian Splat 계획과 WebGPU device만으로 CSM/TAAU/SSGI/SSS가
+> 제품 지원이라고 읽힐 수 있는 서술은 더 이상 현재 구현 상태가 아니다. 현재 코드는 실제 provider와
+> verification이 있는 기능만 software capability로 승격하며, splat backend가 없으면 fail-closed한다.
+
 ## 1. Product target
 
 ToonStudio 3D is rebuilt as one scene product, not four unrelated tools. The user flow is:
