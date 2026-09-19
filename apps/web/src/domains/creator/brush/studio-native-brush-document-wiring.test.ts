@@ -7,13 +7,13 @@ function source(file: string) { return readFileSync(new URL(file, import.meta.ur
 describe("native document product wiring", () => {
   it("captures a mutation ticket and reads the current history frontier before a single normal commit", () => {
     const host = source("../StudioCuttoonEditorHost.tsx");
-    const start = host.indexOf("prepareNativeBrushDocumentConversion: (target)");
-    expect(start).toBeGreaterThan(0);
-    const handler = host.slice(start, host.indexOf("replaceDrawWithHokusaiNaturalMedia:", start));
+    expect(host).toContain("prepareNativeBrushDocumentConversion: createNativeBrushDocumentEditorPreparer({");
+    const bridge = source("./studio-native-brush-editor-bridge.ts");
+    expect(bridge.indexOf("ports.captureStudioMutationTicket()")).toBeGreaterThan(bridge.indexOf("return (target, prepare) =>"));
     for (const token of ["captureStudioMutationTicket()", "canApplyStudioMutation(ticket)", "pagesHistoryRef.current",
       "pagesHiRef.current", "currentPageIdRef.current", "documentSaveInFlightRef.current",
-      "collaborationAccessRef.current.locked", "activeSurfaceReviewLockedRef.current", "pendingStrokeCommitsRef.current", "commit,"]) {
-      expect(handler).toContain(token);
+      "collaborationAccessRef.current.locked", "activeSurfaceReviewLockedRef.current", "pendingStrokeCommitsRef.current", "ports.commit(elements)"]) {
+      expect(bridge).toContain(token);
     }
   });
   it("reaches the document conversion from both drawing and selected-freehand inspectors", () => {
