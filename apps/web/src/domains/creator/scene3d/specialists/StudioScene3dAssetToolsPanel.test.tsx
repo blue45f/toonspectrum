@@ -112,6 +112,7 @@ describe("artist-facing specialist tools", () => {
         source: expect.any(ArrayBuffer),
       }),
       expect.any(AbortSignal),
+      expect.objectContaining({ onProgress: expect.any(Function) }),
     );
     view.unmount();
     expect(revokeUrl).toHaveBeenCalledWith("blob:fixture");
@@ -208,7 +209,7 @@ describe("selected object processing UI", () => {
   it("processes the selected source and applies the reviewed artifact without file input/download", async () => {
     const f = inplaceFixture(); const apply = await runSelected(f.bridge);
     expect(f.bridge.captureSelection).toHaveBeenCalledOnce();
-    expect(runScene3dSpecialistInWorker).toHaveBeenCalledWith(expect.objectContaining({ source: f.input.source }), expect.any(AbortSignal));
+    expect(runScene3dSpecialistInWorker).toHaveBeenCalledWith(expect.objectContaining({ source: f.input.source }), expect.any(AbortSignal), expect.objectContaining({ onProgress: expect.any(Function) }));
     fireEvent.click(apply);
     await screen.findByText(/선택 객체에 적용했습니다/);
     expect(f.bridge.apply).toHaveBeenCalledExactlyOnceWith(f.input, result, result.artifacts[0], expect.any(AbortSignal));
@@ -231,4 +232,23 @@ describe("selected object processing UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "Meshopt 압축" })); await screen.findByRole("link", { name: "compress.glb" });
     expect(screen.queryByRole("button", { name: "선택 모델에서 원본 가져오기" })).toBeNull(); expect(screen.queryByRole("button", { name: "compress.glb 선택 객체에 적용" })).toBeNull();
   });
+});
+
+
+it("shows real queue/stage updates, without invented percentages or stale post-cancel progress", async () => {
+  vi.mocked(runScene3dSpecialistInWorker).mockImplementation((_request, signal, options) => {
+    options?.onProgress?.({ phase: "queued", queuePosition: 2 });
+    return new Promise((_resolve, reject) => signal?.addEventListener("abort", () => reject(new Error("cancelled")), { once: true }));
+  });
+  render(<StudioScene3dAssetToolsPanel />); await load();
+  fireEvent.click(screen.getByRole("button", { name: "Meshopt 압축" }));
+  expect(screen.getByText(/대기 순서 2/)).toBeDefined();
+  const observer = vi.mocked(runScene3dSpecialistInWorker).mock.calls[0]![2]!.onProgress!;
+  act(() => observer({ phase: "decoding" }));
+  expect(screen.getByText("원본 검사·모델 디코딩 중")).toBeDefined();
+  expect(screen.queryByRole("progressbar")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "취소" }));
+  await screen.findByRole("alert");
+  act(() => observer({ phase: "processing" }));
+  expect(screen.queryByText("선택한 가공·인코딩 작업 실행 중")).toBeNull();
 });

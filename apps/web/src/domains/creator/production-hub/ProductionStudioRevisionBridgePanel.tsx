@@ -6,7 +6,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -73,17 +73,23 @@ export function ProductionStudioRevisionBridgePanel({
     () => new Set(),
   );
 
-  const refresh = useCallback(async (signal?: AbortSignal) => {
+  const refreshController = useRef<AbortController | null>(null);
+  const refresh = useCallback(async () => {
+    refreshController.current?.abort();
+    const controller = new AbortController();
+    refreshController.current = controller;
+    const { signal } = controller;
     if (!enabled) {
       setState({ kind: "idle" });
       return;
     }
     setState({ kind: "loading" });
     try {
-      const project = await getStudioProjectByWork(aggregate.workId);
+      const project = await getStudioProjectByWork(aggregate.workId, signal);
+      if (signal.aborted) return;
       const pairs = await Promise.all(project.artifacts.map(async (artifact) => [
         artifact.id,
-        await listStudioArtifactRevisions(artifact.id),
+        await listStudioArtifactRevisions(artifact.id, signal),
       ] as const));
       if (signal?.aborted) return;
       setState({
@@ -100,9 +106,8 @@ export function ProductionStudioRevisionBridgePanel({
   }, [aggregate.workId, enabled]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void refresh(controller.signal);
-    return () => controller.abort();
+    void refresh();
+    return () => refreshController.current?.abort();
   }, [refresh]);
 
   const audit = useMemo(() => {
