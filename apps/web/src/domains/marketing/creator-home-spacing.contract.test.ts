@@ -22,7 +22,7 @@ describe("creator home spacing and app install prompt contracts", () => {
       homeExperience.indexOf('className="cf-shell cf-home-wayfinding"'),
     );
     expect(homeExperience).toContain("<ProductIntentStart />");
-    expect(homeExperience).toContain('href="#creator-principles"');
+    expect(homeExperience).toContain('<CreatorSectionLink sectionId="creator-principles">');
   });
 
   it("loads the final spacing layer after each home implementation's base styles", () => {
@@ -55,7 +55,8 @@ describe("creator home spacing and app install prompt contracts", () => {
     expect(installCss).toContain("100dvw");
     expect(installCss).toContain("overflow-y: auto");
     expect(installCss).toContain('[data-surface="home"]');
-    expect(installCss).toContain("bottom: calc(4.5rem + env(safe-area-inset-bottom))");
+    expect(installCss).toContain("--pwa-install-mobile-nav-offset: 5.5rem");
+    expect(installCss).toContain("bottom: calc(var(--pwa-install-mobile-nav-offset) + env(safe-area-inset-bottom))");
   });
 
   it("preserves contrast, forced-color and reduced-motion behavior", () => {

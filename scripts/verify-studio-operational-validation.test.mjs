@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import test from "node:test";
 
 import {
   createOperationalValidationReceipt,
@@ -8,6 +7,8 @@ import {
   validateOperationalValidationManifest,
   verifyOperationalEvidence,
 } from "./verify-studio-operational-validation.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const ROOT = resolve(import.meta.dirname, "..");
 

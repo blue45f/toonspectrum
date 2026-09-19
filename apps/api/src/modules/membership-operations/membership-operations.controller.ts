@@ -1,5 +1,6 @@
 import {
   Controller,
+  Inject,
   Get,
   Header,
   Headers,
@@ -12,7 +13,7 @@ import { MembershipOperationsService } from "./membership-operations.service";
 
 @Controller()
 export class MembershipOperationsController {
-  constructor(private readonly service: MembershipOperationsService) {}
+  constructor(@Inject(MembershipOperationsService) private readonly service: MembershipOperationsService) {}
 
   @Get("membership/operations/overview")
   @Header("Cache-Control", "private, no-store, max-age=0")

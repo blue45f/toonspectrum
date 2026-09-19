@@ -79,3 +79,16 @@ describe("pinned geometry dependency CSP compatibility", () => {
     ).toBe(true);
   });
 });
+
+
+it("encodes real Basis KTX2 while dynamic JavaScript execution is prohibited", () => {
+  const output = execFileSync(process.execPath, ["--disallow-code-generation-from-strings", "--input-type=module", "--eval", `
+    import { encodeToKTX2 } from 'ktx2-encoder';
+    const data=new Uint8Array(16*16*4).fill(255);
+    const bytes=await encodeToKTX2(data,{isUASTC:true,isKTX2File:true,isPerceptual:true,isSetKTX2SRGBTransferFunc:true,needSupercompression:false,generateMipmap:true,imageDecoder:async()=>({width:16,height:16,data})});
+    const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+    console.log('KTX2_PROOF:'+JSON.stringify({magic:Array.from(bytes.subarray(0,4)),width:view.getUint32(20,true),height:view.getUint32(24,true),levels:view.getUint32(40,true),bytes:bytes.length}));
+  `], { encoding: "utf8", timeout: 20_000 });
+  const line=output.split("\n").find((line)=>line.startsWith("KTX2_PROOF:"));expect(line).toBeDefined();
+  expect(JSON.parse(line!.slice("KTX2_PROOF:".length))).toMatchObject({magic:[171,75,84,88],width:16,height:16,levels:5});
+});

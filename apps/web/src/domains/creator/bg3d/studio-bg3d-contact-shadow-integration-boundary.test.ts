@@ -51,9 +51,12 @@ describe("Studio BG3D shared-character contact-shadow integration boundary", () 
     expect(exclusion).toContain("const captureExcludedObjects = new WeakSet");
     expect(exclusion).toContain("const depthExcludedObjects = new WeakSet");
     expect(depth).toContain("hideStudioBg3dDepthExcludedObjects(scene)");
-    expect(depth.indexOf("restoreDepthExcludedObjects();")).toBeLessThan(
-      depth.indexOf("await readback;"),
-    );
+    const readbackSubmission = depth.indexOf("readback = renderer.readRenderTargetPixelsAsync(");
+    const restoreDepthExclusions = depth.indexOf("restoreDepthExcludedObjects();");
+    const drainReadbackFence = depth.indexOf("await Promise.allSettled(readback ? [readback] : [])");
+    expect(readbackSubmission).toBeGreaterThan(-1);
+    expect(restoreDepthExclusions).toBeGreaterThan(readbackSubmission);
+    expect(drainReadbackFence).toBeGreaterThan(restoreDepthExclusions);
     expect(character).toContain("current.userData.studioBg3dRendererOverlay === true");
   });
 });

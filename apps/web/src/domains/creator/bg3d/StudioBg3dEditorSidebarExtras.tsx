@@ -501,6 +501,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
                 engineFrameTimeMs={engineFrameTimeMs}
                 professionalReadiness={professionalRuntimeReadiness}
+                inplaceTools={h.inplaceTools}
                 onEnginePreferenceChange={engineRuntime.setPreference}
                 onOpenPrecisionModeler={handleOpenPrecisionModeler}
                 aiReferenceBusy={isCapturing}

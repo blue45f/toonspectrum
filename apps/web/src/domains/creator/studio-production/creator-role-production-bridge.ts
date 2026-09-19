@@ -80,7 +80,7 @@ export function creatorProfileProductionRoleRecommendations(
   profile: CreatorRoleProfile | null | undefined,
   projectKey?: string,
 ): readonly ProductionRole[] {
-  if (!profile?.primaryRole) return [];
+  if (!profile) return [];
   const result: ProductionRole[] = [];
   const seen = new Set<ProductionRole>();
   const selectedRoles = creatorRoleSelection(profile);
@@ -103,10 +103,12 @@ export function creatorProfileProductionRoleRecommendations(
 export function publicCreatorProfileProductionRoleRecommendations(
   profile: PublicCreatorRoleProfile | null | undefined,
 ): readonly ProductionRole[] {
-  if (!profile?.primaryRole) return [];
+  if (!profile) return [];
   const result: ProductionRole[] = [];
   const seen = new Set<ProductionRole>();
-  const roles = [profile.primaryRole, ...profile.secondaryRoles.filter((role) => role !== profile.primaryRole)];
+  const roles = profile.primaryRole
+    ? [profile.primaryRole, ...profile.secondaryRoles.filter((role) => role !== profile.primaryRole)]
+    : profile.secondaryRoles;
   for (const role of roles) appendDistinct(result, seen, ROLE_RECOMMENDATIONS[role]);
   for (const specialty of profile.specialties) {
     appendDistinct(result, seen, SPECIALTY_RECOMMENDATIONS[specialty]);

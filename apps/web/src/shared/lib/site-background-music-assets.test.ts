@@ -12,11 +12,21 @@ function hasMp3Signature(bytes: Uint8Array): boolean {
 }
 
 describe("site background music assets", () => {
-  it("ships a reviewed, playable same-origin vocal playlist", () => {
+  it("keeps the reviewed release catalogue explicitly empty until tracks are published", () => {
+    const manifest = JSON.parse(readFileSync(new URL("playlist.json", AUDIO_DIRECTORY), "utf8")) as {
+      version?: unknown;
+      publishedAt?: unknown;
+      tracks?: unknown;
+    };
+
+    expect(manifest).toMatchObject({ version: 2, publishedAt: null, tracks: [] });
+    expect(parseSiteBgmManifest(manifest)).toEqual([]);
+  });
+
+  it("validates every explicitly published entry against its same-origin media file", () => {
     const manifest = JSON.parse(readFileSync(new URL("playlist.json", AUDIO_DIRECTORY), "utf8")) as unknown;
     const tracks = parseSiteBgmManifest(manifest);
 
-    expect(tracks.length).toBeGreaterThanOrEqual(3);
     expect(new Set(tracks.map((track) => track.title)).size).toBe(tracks.length);
 
     for (const track of tracks) {
@@ -30,5 +40,41 @@ describe("site background music assets", () => {
       expect(size).toBeLessThan(10_000_000);
       if (filename.endsWith(".mp3")) expect(hasMp3Signature(bytes)).toBe(true);
     }
+  });
+
+  it("accepts a deterministic approved-catalog metadata fixture without publishing fixture media", () => {
+    const [track] = parseSiteBgmManifest({
+      tracks: [{
+        id: "approved-metadata-fixture",
+        src: "/audio/original/approved-metadata-fixture.mp3",
+        title: "Approved metadata fixture",
+        artist: "ToonSpectrum test fixture",
+        role: "opening",
+        origin: "original",
+        vocalMode: "vocal",
+        language: "ko",
+        summary: "Deterministic fixture for the approved manifest path.",
+        license: "Test fixture only; no media is published by this test.",
+        creditUrl: "https://example.invalid/toonspectrum-ost-fixture",
+        profiles: ["animation"],
+        intensity: "normal",
+        durationMs: 210_000,
+        bpm: 128,
+        provider: "elevenlabs",
+        model: "music_v2_5",
+        sha256: "a".repeat(64),
+        generatedAt: "2026-09-18T00:00:00.000Z",
+        provenance: "c2pa-requested",
+        c2paRequested: true,
+        status: "published",
+      }],
+    });
+
+    expect(track).toMatchObject({
+      id: "approved-metadata-fixture",
+      src: "/audio/original/approved-metadata-fixture.mp3",
+      origin: "original",
+      status: "published",
+    });
   });
 });

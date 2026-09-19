@@ -64,6 +64,7 @@ function text(value: unknown, max = 300): string {
       if (character === ">") markupDepth -= 1;
       continue;
     }
+    if (character === ">") continue;
     if (/\s/u.test(character) || character.charCodeAt(0) < 0x20 || character === "\u007f") {
       pendingSpace = plain.length > 0;
       continue;
@@ -274,5 +275,5 @@ export function buildCreationKit(format: KitFormat, subject: string, notes: stri
     study: ["관찰 3분: 외곽선·비례·시선 흐름을 메모합니다.", "형태 5분: 사각형·원·원기둥만으로 소재를 재구성합니다.", "명암 5분: 밝음·중간·어두움의 세 단계로 정리합니다.", "변형 7분: 재질·크기·시점을 바꿔 자신의 장면으로 그립니다."],
     article: ["도입: 이번 큐레이션 주제와 자료를 고른 이유를 직접 적습니다.", "자료 카드: 각각의 형태·색·용도를 관찰하고 원문에 있는 정보만 사실로 서술합니다.", "비교: 공통점 2개와 차이점 2개를 정리합니다. 원문에 없는 역사·해석을 사실처럼 만들지 않습니다.", "활용: 독자가 직접 시도할 드로잉 과제와 확인할 원문 링크를 덧붙입니다."],
   };
-  return [`# ${topic} — ${title}`, "", "> 로컬 규칙 기반 초안입니다. AI 추론·사실 검증·이미지/영상 생성 결과가 아닙니다.", "", "## 창작 방향", `주제: ${topic}`, `참고 소재: ${material}`, `작가 메모: ${markdown(notes) || "직접 입력"}`, "", "## 제작 구성", ...sections[format].map((line) => `- ${line}`), "", "## 자료 관찰 메모", ...selected.map((item, index) => `${index + 1}. ${markdown(item.title)}: 형태 / 색 / 재질 / 이야기 속 역할을 관찰해 적으세요.`), "", "## 출처·권리 기록", ...selected.flatMap((item, index) => [`### ${index + 1}. ${markdown(item.title)}`, `- 원문: ${safeOpenUrl(item.sourceUrl)}`, `- 저작자/기관: ${markdown(item.creator || item.provider)}`, `- 시대/날짜: ${markdown(item.date || "원문 확인")}`, `- 표시된 권리: ${item.rights}${item.rights === "CC0" ? ` (${CC0})` : " — 이미지·본문 재사용 허락 아님"}`, `- 크레딧: ${markdown(item.credit || "원문 확인")}`, `- 조회일: ${markdown(item.fetchedAt)}`, ""]), "## 공개 전 확인", "- 원문에서 최신 이용조건과 초상·상표 등 제3자 권리를 확인하세요.", "- 도서 표지·위키 본문·현대 번역·음원은 별도 권리 확인 없이 복제하지 마세요.", "- 메타데이터 검색 결과를 각색 허락이나 사실 검증 완료로 간주하지 마세요.", ""].join("\n");
+  return [`# ${topic} — ${title}`, "", "**로컬 규칙 기반 초안입니다. AI 추론·사실 검증·이미지/영상 생성 결과가 아닙니다.**", "", "## 창작 방향", `주제: ${topic}`, `참고 소재: ${material}`, `작가 메모: ${markdown(notes) || "직접 입력"}`, "", "## 제작 구성", ...sections[format].map((line) => `- ${line}`), "", "## 자료 관찰 메모", ...selected.map((item, index) => `${index + 1}. ${markdown(item.title)}: 형태 / 색 / 재질 / 이야기 속 역할을 관찰해 적으세요.`), "", "## 출처·권리 기록", ...selected.flatMap((item, index) => [`### ${index + 1}. ${markdown(item.title)}`, `- 원문: ${safeOpenUrl(item.sourceUrl)}`, `- 저작자/기관: ${markdown(item.creator || item.provider)}`, `- 시대/날짜: ${markdown(item.date || "원문 확인")}`, `- 표시된 권리: ${item.rights}${item.rights === "CC0" ? ` (${CC0})` : " — 이미지·본문 재사용 허락 아님"}`, `- 크레딧: ${markdown(item.credit || "원문 확인")}`, `- 조회일: ${markdown(item.fetchedAt)}`, ""]), "## 공개 전 확인", "- 원문에서 최신 이용조건과 초상·상표 등 제3자 권리를 확인하세요.", "- 도서 표지·위키 본문·현대 번역·음원은 별도 권리 확인 없이 복제하지 마세요.", "- 메타데이터 검색 결과를 각색 허락이나 사실 검증 완료로 간주하지 마세요.", ""].join("\n");
 }

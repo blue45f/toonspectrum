@@ -1220,6 +1220,8 @@ const TransitionRiskResponseCommandSchema = z.object({
   responseId: IdentitySchema,
   toStatus: ProductionRiskResponseStatusSchema,
   actualEffect: z.string().trim().min(1).max(4_000).nullable(),
+  reason: z.string().trim().min(1).max(4_000).nullable().optional(),
+  expectedResponseRevision: z.number().int().min(0).max(2_147_483_647).optional(),
 }).strict();
 const SuppressRiskSignalCommandSchema = z.object({
   type: z.literal("suppress-risk-signal"),

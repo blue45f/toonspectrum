@@ -1,3 +1,4 @@
+import type { Scene3dInplaceToolsBridge } from "../scene3d/integration/scene3d-inplace-contract";
 import { createContext, useContext } from "react";
 
 import type { StudioBg3dProductionLookState } from "./studio-bg3d-production-pass-readiness";
@@ -63,6 +64,7 @@ export interface StudioBg3dProductionBatchRuntime {
  * create a second store or bypass undo/redo, capture locks, or AI consent gates.
  */
 export interface StudioBg3dProSuiteRuntimeValue {
+  readonly inplaceTools?: Scene3dInplaceToolsBridge;
   readonly disabled: boolean;
   /** Actual view-tab visibility; hidden, never-opened specialist tools must not load. */
   readonly proSuiteActive?: boolean;

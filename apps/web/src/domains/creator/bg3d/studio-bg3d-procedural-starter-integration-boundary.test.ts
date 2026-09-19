@@ -40,6 +40,9 @@ describe("BG3D procedural starter UI integration boundary", () => {
       "const live = physicsRuntimeSourceRef.current;",
     );
     expect(backgroundSource).toContain(
+      "replaceCanonicalDocumentState({ primitives: nextPrimitives });",
+    );
+    expect(backgroundSource).not.toContain(
       "physicsRuntimeSourceRef.current = { ...live, primitives: nextPrimitives };",
     );
     expect(backgroundSource).toContain(

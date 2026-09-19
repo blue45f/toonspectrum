@@ -2,6 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  loadStudioAiRecentPrompts,
+  pushStudioAiRecentPrompt,
+  STUDIO_AI_RECENT_PROMPTS_MAX,
+} from "./ai/studio-ai-assist-ux";
+
 function source(name: string): string {
   return readFileSync(new URL(name, import.meta.url), "utf8");
 }
@@ -31,9 +37,8 @@ describe("sensitive Studio browser state stays session-scoped", () => {
     expect(page).toContain(
       "loadStudioAiRecentPrompts(globalThis.sessionStorage)",
     );
-    expect(page).toContain(
-      "pushStudioAiRecentPrompt(globalThis.sessionStorage",
-    );
+    expect(page.match(/pushStudioAiRecentPrompt\(globalThis\.sessionStorage/gu))
+      .toHaveLength(1);
     expect(page).toContain(
       "globalThis.localStorage.removeItem(STUDIO_AI_RECENT_PROMPTS_KEY)",
     );
@@ -41,11 +46,26 @@ describe("sensitive Studio browser state stays session-scoped", () => {
       "loadStudioAiRecentPrompts(globalThis.localStorage)",
     );
     expect(toolPopover.match(/pushStudioAiRecentPrompt\(globalThis\.sessionStorage/gu))
-      // 6: the four original sites plus applyEpisodeBatchPrompt and applySuperSuitePrompt.
-      .toHaveLength(6);
+      // The popover owns four tool-specific sites plus the shared super-suite handoff.
+      .toHaveLength(5);
     expect(toolPopover).not.toContain(
       "pushStudioAiRecentPrompt(globalThis.localStorage",
     );
+  });
+
+  it("caps tab-scoped recent prompt history at the product maximum", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    for (let index = 0; index < STUDIO_AI_RECENT_PROMPTS_MAX + 3; index += 1) {
+      pushStudioAiRecentPrompt(storage, "background", `prompt-${index}`, index);
+    }
+    const recent = loadStudioAiRecentPrompts(storage);
+    expect(recent.entries).toHaveLength(STUDIO_AI_RECENT_PROMPTS_MAX);
+    expect(recent.entries[0]?.prompt).toBe(`prompt-${STUDIO_AI_RECENT_PROMPTS_MAX + 2}`);
+    expect(recent.entries.at(-1)?.prompt).toBe("prompt-3");
   });
 
   it("keeps fallback pose clipboards in sessionStorage and removes legacy copies", () => {

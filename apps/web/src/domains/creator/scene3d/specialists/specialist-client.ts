@@ -70,23 +70,49 @@ export function runScene3dSpecialistInWorker(
         id: number;
         result?: unknown;
         message?: string;
+        code?: unknown;
       }>,
     ) => {
       if (settled) return;
-      if (
-        !event.data ||
-        event.data.id !== request.id ||
-        !event.data.ok ||
-        !event.data.result
-      ) {
+      const data: unknown = event.data;
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        fail(new SpecialistError("runtime", "Invalid worker response."));
+        return;
+      }
+      const response = data as Record<string, unknown>;
+      if (response.id !== request.id || typeof response.ok !== "boolean") {
         fail(
           new SpecialistError(
             "runtime",
-            typeof event.data?.message === "string"
-              ? event.data.message
-              : "Invalid worker response.",
+            "Invalid or mismatched worker response.",
           ),
         );
+        return;
+      }
+      if (response.ok === false) {
+        const code = response.code;
+        const supported =
+          code === "invalid-input" ||
+          code === "unsupported" ||
+          code === "budget" ||
+          code === "cancelled" ||
+          code === "timeout" ||
+          code === "runtime";
+        if (
+          !supported ||
+          typeof response.message !== "string" ||
+          !response.message.length ||
+          response.message.length > 2048
+        ) {
+          fail(
+            new SpecialistError(
+              "runtime",
+              "Malformed worker failure response.",
+            ),
+          );
+          return;
+        }
+        fail(new SpecialistError(code, response.message));
         return;
       }
       try {

@@ -141,6 +141,7 @@ const WIDTH_TUNED_WORKSPACE_IDS = new Set<string>([
   "mobile-draw",
   "photo-edit",
   "vector-design",
+  "slides-deck",
   "animation",
   "pose-3d",
 ]);
@@ -181,10 +182,10 @@ describe("built-in Studio workspaces", () => {
       "pro-comic",
       ...STUDIO_EXPANDED_WORKSPACE_IDS,
     ]);
-    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(15);
+    expect(STUDIO_DEFAULT_WORKSPACE_IDS).toHaveLength(16);
     expect(new Set(STUDIO_DEFAULT_WORKSPACES.map((workspace) => workspace.name)).size)
-      .toBe(15);
-    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(15);
+      .toBe(16);
+    expect(new Set(STUDIO_DEFAULT_WORKSPACE_IDS).size).toBe(16);
 
     for (const workspace of STUDIO_DEFAULT_WORKSPACES) {
       expect(Object.isFrozen(workspace)).toBe(true);
@@ -296,6 +297,42 @@ describe("built-in Studio workspaces", () => {
       .filter((entry) => entry.workspaceId !== null)
       .map((entry) => entry.workspaceId);
     expect(new Set(claimed).size).toBe(claimed.length);
+  });
+
+  it("adds a dedicated Slides layout without replacing vector design or its launch surface", () => {
+    const slides = resolveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "slides-deck");
+    expect(slides).toMatchObject({
+      id: "slides-deck",
+      name: "발표 자료",
+      layout: {
+        inspector: { primary: "layers", image: "transform", document: "navigator" },
+        desktop: { leftPanelOpen: true, rightPanelOpen: true, leftPanelWidth: 224, rightPanelWidth: 320 },
+      },
+    });
+    expect(QUICK_ACTION_SLOTS.map((slot) => slides?.layout.quickActions.slots[slot]))
+      .toEqual(["undo", "redo", "select", "duplicate", "properties", "fit-width"]);
+    expect(resolveStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "vector-design")).toMatchObject({
+      id: "vector-design",
+      name: "벡터 디자인",
+      layout: {
+        inspector: { primary: "layers", image: "transform", document: "canvas" },
+        desktop: { leftPanelOpen: true, rightPanelOpen: true, rightPanelWidth: 344 },
+      },
+    });
+    expect(studioWorkspaceLaunchSurface("slides-deck")).toBeNull();
+  });
+
+  it.each(STUDIO_DEFAULT_WORKSPACE_IDS)("round-trips %s through the unchanged v4 workspace contract", (id) => {
+    const storage = memoryStorage();
+    const state = switchStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, id);
+    const saved = saveStudioWorkspaceState(storage, "layout-owner", state);
+    const loaded = loadStudioWorkspacePersistence(storage, "layout-owner");
+    expect(saved).toMatchObject({ status: "persisted", failure: null });
+    expect(loaded.state).toEqual(state);
+    expect(loaded.state.activeWorkspaceId).toBe(id);
+    const envelope = JSON.parse(storage.values.get(studioWorkspaceStorageKey("layout-owner"))!);
+    expect(envelope.payloadVersion).toBe(4);
+    expect(loaded.state.version).toBe(4);
   });
 
   it("maps the three specialist profiles to real one-shot production surfaces", () => {

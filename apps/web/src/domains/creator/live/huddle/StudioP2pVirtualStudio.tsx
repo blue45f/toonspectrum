@@ -55,9 +55,9 @@ const P2P_ZONE_PROP: Record<StudioP2pSpaceZoneId, string> = {
 
 const ZONE_META: Record<StudioP2pSpaceZoneId, { icon: LucideIcon; image: string; href: string; ko: string }> = {
   lobby: { icon: Sparkles, image: "/brand/studio-scene.svg", href: "/studio/home", ko: "프로젝트의 현재 상황과 다음 작업을 확인합니다." },
-  writers: { icon: BookOpenText, image: "/assets/studio/backgrounds/webtoon_classroom.jpg", href: "/story-lab", ko: "시놉시스·대본·설정을 함께 다듬습니다." },
+  writers: { icon: BookOpenText, image: "/assets/studio/cc0-20260906/assets/polyhaven-background-cayley-interior/background.webp", href: "/story-lab", ko: "시놉시스·대본·설정을 함께 다듬습니다." },
   storyboard: { icon: MapPinned, image: "/assets/studio/backgrounds/webtoon_creator_room.png", href: "/studio/new", ko: "에피소드와 컷 흐름을 한눈에 검토합니다." },
-  lounge: { icon: MessageCircle, image: "/assets/studio/backgrounds/webtoon_cafe.jpg", href: "/community", ko: "작업 사이 가볍게 대화하고 아이디어를 나눕니다." },
+  lounge: { icon: MessageCircle, image: "/assets/studio/cc0-20260906/assets/polyhaven-background-wooden-lounge/background.webp", href: "/community", ko: "작업 사이 가볍게 대화하고 아이디어를 나눕니다." },
   assets: { icon: Boxes, image: "/brand/atelier-materials-640.webp", href: "/studio/assets", ko: "배경·브러시·캐릭터·3D 에셋을 찾습니다." },
   drawing: { icon: Brush, image: "/assets/studio/backgrounds/webtoon_creator_room.png", href: "/studio", ko: "원고와 캔버스의 실제 제작 작업으로 이동합니다." },
   review: { icon: ClipboardCheck, image: "/assets/studio/backgrounds/webtoon_drama_boardroom.jpg", href: "/production", ko: "코멘트·수정 요청·승인 흐름을 확인합니다." },

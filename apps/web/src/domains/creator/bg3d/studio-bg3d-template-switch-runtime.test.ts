@@ -46,15 +46,20 @@ describe("BG3D built-in template switch runtime boundary", () => {
       "const before = createStudioBg3dHistorySnapshot({",
     );
     const history = templateSwitchHostSource.indexOf("commitImmediateHistoryTransition(");
-    const runtime = templateSwitchHostSource.indexOf("physicsRuntimeSourceRef.current =");
-    const primitives = templateSwitchHostSource.indexOf("setPrimitives(nextPrimitives)");
-    const models = templateSwitchHostSource.indexOf("setCustomModels(nextCustomModels)");
+    const canonicalCommit = templateSwitchHostSource.indexOf(
+      "replaceCanonicalDocumentState({",
+    );
 
     expect(snapshot).toBeGreaterThan(-1);
     expect(history).toBeGreaterThan(snapshot);
-    expect(runtime).toBeGreaterThan(history);
-    expect(primitives).toBeGreaterThan(runtime);
-    expect(models).toBeGreaterThan(runtime);
+    expect(canonicalCommit).toBeGreaterThan(history);
+    expect(templateSwitchHostSource.match(/commitImmediateHistoryTransition\(/gu)).toHaveLength(1);
+    expect(templateSwitchHostSource.match(/replaceCanonicalDocumentState\(\{/gu)).toHaveLength(1);
+    expect(templateSwitchHostSource).not.toContain("physicsRuntimeSourceRef.current =");
+    expect(templateSwitchHostSource).not.toContain("setPrimitives(nextPrimitives)");
+    expect(templateSwitchHostSource).not.toContain("setCustomModels(nextCustomModels)");
+    expect(templateSwitchHostSource).toContain("primitives: nextPrimitives");
+    expect(templateSwitchHostSource).toContain("customModels: nextCustomModels");
     expect(templateSwitchHostSource).toContain("primitives: live.primitives");
     expect(templateSwitchHostSource).toContain("customModels: live.customModels");
     expect(templateSwitchHostSource).toContain("document: live.document");

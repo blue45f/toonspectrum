@@ -137,7 +137,7 @@ describe("CharacterShaperLandingPage", () => {
       "투명 PNG와 레이어 PSD",
     );
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href")).toBe(
-      "https://www.toonstudio.cloud/shaper",
+      "https://www.toonstudio.cloud/studio/assets/characters/new",
     );
     expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content")).toBe(
       `캐릭터 셰이퍼 · ${brand}`,
@@ -147,7 +147,7 @@ describe("CharacterShaperLandingPage", () => {
     expect(jsonLd).not.toBeNull();
     const parsed = JSON.parse(jsonLd!.textContent ?? "{}") as Record<string, unknown>;
     expect(parsed["@type"]).toBe("WebPage");
-    expect(parsed.url).toBe("https://www.toonstudio.cloud/shaper");
+    expect(parsed.url).toBe("https://www.toonstudio.cloud/studio/assets/characters/new");
   });
 });
 
@@ -156,25 +156,29 @@ describe("/shaper registration", () => {
     // AppRouter now renders one <Route> per entry of the grouped route table, so the /shaper
     // registration lives in the creator group rather than in the router JSX.
     expect(readRepoFile("apps/web/src/app/routes/groups/creator.routes.tsx")).toContain(
-      '{ id: "creator-character-shaper", path: "/shaper", element: <CharacterShaperLandingPage /> }',
+      '{ id: "creator-character-shaper", path: "/shaper", element: <Navigate to={studioRoutePath("asset-character-new")} replace /> }',
     );
     expect(readRepoFile("apps/web/src/app/routes/route-titles.ts")).toContain('"/shaper": "route.shaper"');
     expect(readRepoFile("apps/web/src/app/routes/route-manifest.ts")).toContain(
       '{ path: "/shaper", label: "route.shaper" }',
     );
-    expect(readRepoFile("scripts/build-static-catalog.ts")).toContain('"/shaper"');
+    // Editors stay in site navigation, not in the indexable SEO sitemap.
+    const staticRoutes = readRepoFile("scripts/build-static-catalog.ts")
+      .match(/const STATIC_ROUTES = \[([\s\S]*?)\];/u)?.[1] ?? "";
+    expect(staticRoutes).not.toBe("");
+    expect(staticRoutes).not.toContain('"/shaper"');
+    expect(staticRoutes).not.toContain('"/studio/assets/characters/new"');
 
     const navigation = readRepoFile("apps/web/src/shared/components/site-navigation.ts");
-    expect(navigation).toContain('shaper: item("shaper", "/shaper"');
-    expect(navigation).toContain("items: [I.make, I.studio, I.comic, I.shaper, I.market]");
-    // Footer and mobile menu both render from the same navigation groups rather than
-    // maintaining duplicate hard-coded destination lists.
-    expect(readRepoFile("apps/web/src/shared/components/site-footer.tsx")).toContain(
-      "SITE_NAVIGATION_GROUPS.map",
-    );
-    expect(readRepoFile("apps/web/src/shared/components/site-header-mobile-nav.tsx")).toContain(
-      "SITE_NAVIGATION_GROUPS.map",
-    );
+    expect(navigation).toContain('"/studio/assets/characters/new"');
+    expect(readRepoFile("apps/web/src/app/routes/groups/creator.routes.tsx")).toContain('path: studioRoutePath("asset-character-new"), element: <CharacterShaperLandingPage />');
+    expect(navigation).toContain("I.studioAssets");
+    expect(readRepoFile("apps/web/src/domains/legal/site-directory-data.ts")).toContain('"/studio/assets/characters/new"');
+    // Desktop footer and context-aware mobile menus share the centralized navigation authority.
+    expect(readRepoFile("apps/web/src/shared/components/site-footer.tsx")).toContain("SITE_NAVIGATION_GROUPS.map");
+    const mobileNavigation = readRepoFile("apps/web/src/shared/components/site-header-mobile-nav.tsx");
+    expect(mobileNavigation).toContain("siteNavigationGroupsForPath(pathname)");
+    expect(mobileNavigation).toContain("navigationGroups.map");
   });
 
   it("publishes the new app-shell keys in the built-in locales", () => {

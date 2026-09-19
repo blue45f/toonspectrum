@@ -133,7 +133,7 @@ describe("research command center", () => {
     expect(screen.getByRole("heading", { name: "다시 볼 자료" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "자료가 많은가보다 무엇이 비어 있는가" })).toBeTruthy();
     expect(container.querySelector('img[src="https://images.metmuseum.org/CRDImages/as/original/DP251139.jpg"]')).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "조사와 기획을 실제 장면으로 옮길 차례입니다" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "찾는 데서 끝나지 않는 작업 경로" })).toBeTruthy();
 
     const board = screen.getByRole("heading", { name: "저장한 자료 찾기" }).closest("section")!;
     const boardQuery = within(board).getByRole("searchbox", { name: "제목·저작자·설명·ISBN 검색" });

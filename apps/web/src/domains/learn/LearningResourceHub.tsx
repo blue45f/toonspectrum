@@ -61,7 +61,7 @@ export function LearningResourceHub() {
     setParams(updateParam(params, key, value), { replace });
   };
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 pb-20 pt-8 sm:px-6" lang="ko">
+    <div className="mx-auto w-full max-w-7xl px-4 pb-20 pt-8 sm:px-6" lang="ko">
       <header className="grid gap-8 rounded-[2rem] border border-line bg-panel p-6 shadow-sm lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,.65fr)] lg:p-10">
         <div>
           <p className="text-xs font-black tracking-[.18em] text-accent">TOONSTUDIO ACADEMY / RESOURCE HUB</p>
@@ -146,6 +146,6 @@ export function LearningResourceHub() {
       <footer className="mt-10 border-t border-line pt-6 text-sm leading-6 text-fg-2">
         <p>외부 콘텐츠의 저작권과 이용 조건은 각 원문 제공자의 정책을 따릅니다. ToonStudio는 원문을 복제하지 않고 학습 목적의 메타데이터·링크·자체 분류와 실습 연결을 제공합니다.</p>
       </footer>
-    </main>
+    </div>
   );
 }

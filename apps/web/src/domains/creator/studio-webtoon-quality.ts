@@ -318,10 +318,15 @@ export function placeStudioBalloon(request: StudioBalloonPlacementRequest): Stud
   const offsets = [
     [0, -1], [1, -1], [-1, -1], [0, 0], [1, 0], [-1, 0], [0, 1], [1, 1], [-1, 1],
   ] as const;
-  for (const [ox, oy] of offsets) {
-    const x = clamp(anchor.x - request.size.width / 2 + ox * request.size.width * 0.65, inner.x, inner.x + inner.width - request.size.width);
-    const y = clamp(anchor.y - request.size.height / 2 + oy * request.size.height * 0.65, inner.y, inner.y + inner.height - request.size.height);
-    candidates.push({ x, y, width: request.size.width, height: request.size.height });
+  // The near ring preserves the original anchor-biased layout. The outer ring reaches beyond a
+  // same-sized occupied balloon, so a free slot is not missed merely because every near candidate
+  // still overlaps the preferred position.
+  for (const offsetScale of [0.65, 1.05] as const) {
+    for (const [ox, oy] of offsets) {
+      const x = clamp(anchor.x - request.size.width / 2 + ox * request.size.width * offsetScale, inner.x, inner.x + inner.width - request.size.width);
+      const y = clamp(anchor.y - request.size.height / 2 + oy * request.size.height * offsetScale, inner.y, inner.y + inner.height - request.size.height);
+      candidates.push({ x, y, width: request.size.width, height: request.size.height });
+    }
   }
 
   let best = candidates[0]!;

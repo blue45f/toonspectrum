@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   Header,
   Headers,
@@ -21,7 +22,7 @@ type ActivityClaimBody = {
 
 @Controller()
 export class MembershipWalletController {
-  constructor(private readonly service: MembershipWalletService) {}
+  constructor(@Inject(MembershipWalletService) private readonly service: MembershipWalletService) {}
 
   @Get("membership/catalog")
   @Header("Cache-Control", "no-store, max-age=0")

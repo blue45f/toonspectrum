@@ -69,7 +69,7 @@ export function StudioAiToolPopoverBody({
   const { data: session, ready: sessionReady, status: sessionStatus } = useSession();
   useUserAi();
   const lt = (fallback: string, key: string) => {
-    const translated = t(key);
+    const translated = t(key, fallback);
     return translated === key ? fallback : translated;
   };
 

@@ -38,6 +38,13 @@ const inspectorSources = [
     ),
   },
   {
+    file: "StudioInspectorBubbleShadowControls.tsx",
+    source: readFileSync(
+      new URL("./StudioInspectorBubbleShadowControls.tsx", import.meta.url),
+      "utf8"
+    ),
+  },
+  {
     file: "StudioInspectorSelectionStrokeControls.tsx",
     source: readFileSync(
       new URL("./StudioInspectorSelectionStrokeControls.tsx", import.meta.url),
@@ -50,14 +57,37 @@ const inspectorSources = [
   },
 ] as const;
 const inspectorSource = inspectorSources.map(({ source }) => source).join("\n");
+const selectionStrokeSource = readFileSync(
+  new URL("./StudioInspectorSelectionStrokeControls.tsx", import.meta.url),
+  "utf8",
+);
+const shapeSource = readFileSync(
+  new URL("./StudioInspectorShapeSection.tsx", import.meta.url),
+  "utf8",
+);
+const colorFieldSource = readFileSync(
+  new URL("./StudioColorField.tsx", import.meta.url),
+  "utf8",
+);
+const lazyColorPopoverSource = readFileSync(
+  new URL("./StudioLazyColorPopover.tsx", import.meta.url),
+  "utf8",
+);
+const colorTriggerSource = readFileSync(
+  new URL("./StudioColorTrigger.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("Studio inspector accessibility boundary", () => {
   it("keeps inspector-only form controls explicitly named", () => {
     expect(inspectorSource).toContain('t("studio.canvas.guideLabel")');
     expect(inspectorSource).toContain('t("studio.canvas.guidesPosition")');
     expect(inspectorSource).toContain("#${index + 1}");
-    expect(inspectorSource).toContain('aria-label="선 색상"');
-    expect(inspectorSource).toContain('aria-label="채우기 색상"');
+    expect(selectionStrokeSource).toContain('label="선 색상"');
+    expect(shapeSource).toContain('label="채우기 색상"');
+    expect(colorFieldSource).toContain("label={label}");
+    expect(lazyColorPopoverSource).toContain("label={label}");
+    expect(colorTriggerSource).toContain("aria-label={label}");
     expect(inspectorSource).toContain('aria-label="말풍선 배경 투명"');
     expect(inspectorSource).toContain('aria-label="말풍선 테두리 커스텀"');
     expect(inspectorSource).toContain('aria-label="말풍선 그림자 사용"');

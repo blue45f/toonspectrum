@@ -17,6 +17,8 @@ const {
   LegalController,
 } = require("../apps/api/dist/apps/api/src/modules/legal/legal.controller.js");
 
+// Privacy revision 456b874bd (2026-09-18) added business-inquiry disclosures.
+// Pin that reviewed version; a runtime/build repair must never rewrite the policy body.
 for (const [policy, digest] of [
   ["terms-of-service", "725b4f7dff126f76bb68ed7c1c8cac1df0f69e62f536725168b28b2ef269fb73"],
   ["privacy-policy", "ad3bb0df4f268212e049aebb4ba14e4b484f23e76d2bb144d261fda87f14f5f8"],
@@ -25,6 +27,10 @@ for (const [policy, digest] of [
     const document = getStaticPolicyDocument(policy);
     assert.equal(createHash("sha256").update(document.body).digest("hex"), digest);
     assert.equal(document.source, "static");
+    if (policy === "privacy-policy") {
+      assert.equal(document.versionLabel, "내장본 v2026.09.18");
+      assert.equal(document.contentHash, "static-privacy-20260918-toonspectrum-business-inquiries");
+    }
     assert.equal(document, getStaticPolicyDocument(policy));
     assert.equal(Object.isFrozen(document), true);
     assert.throws(() => { document.body = "changed"; }, TypeError);

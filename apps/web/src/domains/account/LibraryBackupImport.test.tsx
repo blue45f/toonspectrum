@@ -2,6 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { useI18n } from "@/shared/lib/i18n-core";
+
 import { LibraryBackupImport } from "./LibraryBackupImport";
 
 const backup = { _app: "toonspectrum-library", version: 1, ratings: { work: 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
@@ -11,7 +13,10 @@ function file(data: unknown): File {
   Object.defineProperty(result, "text", { value: async () => text });
   return result;
 }
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  useI18n.getState().setLang("ko");
+});
 
 describe("deliberate library restore", () => {
   it("does not mutate records on selection or cancellation; requires explicit replacement", async () => {
@@ -42,6 +47,7 @@ describe("deliberate library restore", () => {
   });
   it("discards a pending preview on account changes", async () => {
     const restore = vi.fn();
+    useI18n.getState().setLang("en");
     const view = render(<LibraryBackupImport onRestore={restore} locale="en" ownerId="first" />);
     fireEvent.change(screen.getByLabelText("Library backup file"), { target: { files: [file(backup)] } });
     await screen.findByRole("region");

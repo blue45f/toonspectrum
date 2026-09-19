@@ -2,6 +2,14 @@ import { createStudioIntentLazyLoader } from "./studio-intent-lazy-loader";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
+export const LazyStudioInsertBatchPreflight = lazyRetry(
+  () =>
+    import("./StudioInsertBatchPreflight").then((module) => ({
+      default: module.StudioInsertBatchPreflight,
+    })),
+  "StudioInsertBatchPreflight",
+);
+
 const studioUnifiedAssetToolPopoverContentLoader =
   createStudioIntentLazyLoader(() =>
     Promise.all([

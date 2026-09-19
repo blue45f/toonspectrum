@@ -1,4 +1,4 @@
-import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { translateBilingualValueForLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, BookOpen, Boxes, Compass, FolderKanban, Images, PackageCheck, Palette, Sparkles, Store, Workflow } from "lucide-react";
 import { useEffect, useRef } from "react";
 
@@ -10,8 +10,6 @@ import Link from "@/compat/router-link";
 import "./public-site-shell.css";
 import "./public-site-vibrance.css";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("public-site-journey", ko, en);
 
 const ICONS = { discover: Compass, learn: BookOpen, market: Store, make: Palette, share: Images };
 const PRODUCTION_ICONS = { production: Workflow, projects: FolderKanban, make: Palette, assets: Boxes, publish: PackageCheck };
@@ -24,8 +22,10 @@ const PRODUCTION_JOURNEY = [
 ] as const;
 
 /** The active step stays visible in the mobile rail without scrolling the page. */
-export function PublicSiteJourney({ pathname, locale: _locale }: { pathname: string; locale: "ko" | "en" }) {
+export function PublicSiteJourney({ pathname, locale }: { pathname: string; locale: "ko" | "en" }) {
   useBilingualI18nRevision();
+  const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+    translateBilingualValueForLocale(locale, "public-site-journey", ko, en);
   const railRef = useRef<HTMLElement>(null);
   const isProductionHome = pathname === "/";
   const active = isProductionHome ? undefined : activePublicJourney(pathname);
@@ -52,7 +52,7 @@ export function PublicSiteJourney({ pathname, locale: _locale }: { pathname: str
               ? PRODUCTION_ICONS[id as keyof typeof PRODUCTION_ICONS]
               : ICONS[id as keyof typeof ICONS];
             return (
-              <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "resources") : id === "make" ? translateCurrentStaticSourceText("shared.components.public.site.journey", "en", "create") : id} aria-current={active === id ? "step" : undefined} data-active={active === id || undefined}>
+              <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? "resources" : id === "make" ? "create" : id} aria-current={active === id ? "step" : undefined} data-active={active === id || undefined}>
                 <span aria-hidden="true" className="public-site-journey__step">{String(index + 1).padStart(2, "0")}</span>
                 <Icon size={13} aria-hidden="true" />
                 <span>{bi(ko, en)}</span>

@@ -150,6 +150,7 @@ const DEFAULT_WORKSPACE_ICONS: Record<StudioDefaultWorkspaceId, LucideIcon> = {
   "mobile-draw": Smartphone,
   "photo-edit": SunMedium,
   "vector-design": PenTool,
+  "slides-deck": LayoutPanelTop,
   animation: LayoutPanelTop,
   "pose-3d": Scan,
 };

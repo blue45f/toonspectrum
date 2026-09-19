@@ -862,6 +862,7 @@ export function StudioDrawOptionsBar({
               </button>
             ) : null}
             {onToggleFavoriteBrush ? (
+              <StudioToolHintTarget hint={studioToolHintFromLabel(isFavorite ? "브러시 즐겨찾기 해제" : "브러시 즐겨찾기 추가", "현재 브러시의 즐겨찾기 여부를 바꿉니다. 색과 굵기는 유지됩니다.", undefined, "brush-favorite", isFavorite ? "remove" : "add")}>
               <button
                 type="button"
                 aria-pressed={isFavorite}
@@ -877,6 +878,7 @@ export function StudioDrawOptionsBar({
               >
                 <Star size={13} fill={isFavorite ? "currentColor" : "none"} aria-hidden />
               </button>
+              </StudioToolHintTarget>
             ) : null}
             {onToggleEyedropper && drawMode !== "eraser" ? (
               <button
@@ -896,6 +898,7 @@ export function StudioDrawOptionsBar({
               </button>
             ) : null}
             {onToggleCanvasFlipH ? (
+              <StudioToolHintTarget hint={studioToolHintFromLabel("캔버스 좌우 반전", "작업물을 바꾸지 않고 보기만 좌우 반전합니다.", undefined, "flip-view", canvasFlipH ? "restore" : "flip")}>
               <button
                 type="button"
                 aria-pressed={canvasFlipH}
@@ -911,8 +914,10 @@ export function StudioDrawOptionsBar({
               >
                 <FlipHorizontal2 size={13} aria-hidden />
               </button>
+              </StudioToolHintTarget>
             ) : null}
             {drawMode === "pen" && onOpenBrushStudio ? (
+              <StudioToolHintTarget hint={studioToolHintFromLabel("현재 브러시 편집", "현재 브러시의 재질과 동작을 브러시 스튜디오에서 편집합니다.", undefined, "brush-studio")}>
               <button
                 type="button"
                 onClick={onOpenBrushStudio}
@@ -921,8 +926,10 @@ export function StudioDrawOptionsBar({
               >
                 <Wand2 size={13} aria-hidden />
               </button>
+              </StudioToolHintTarget>
             ) : null}
             {drawMode === "pen" ? (
+              <StudioToolHintTarget hint={studioToolHintFromLabel(quickShapeActive ? "스마트 도형 끄기" : "스마트 도형 켜기", "그린 획을 도형으로 보정하는 기능을 전환합니다.", undefined, "smart-shape", quickShapeActive ? "disable" : "enable")}>
               <button
                 type="button"
                 aria-pressed={quickShapeActive}
@@ -938,6 +945,7 @@ export function StudioDrawOptionsBar({
               >
                 {quickShapeActive ? <Sparkles size={13} aria-hidden /> : <Shapes size={13} aria-hidden />}
               </button>
+              </StudioToolHintTarget>
             ) : null}
           </div>
 

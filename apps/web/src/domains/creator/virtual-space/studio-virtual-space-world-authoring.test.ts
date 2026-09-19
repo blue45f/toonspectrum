@@ -147,6 +147,21 @@ describe("Virtual Studio world authoring", () => {
       DEFAULT_STUDIO_WORLD_MANIFEST,
     )).toThrow("Unsupported world JSON format");
   });
+  it("clears only the requested project's draft", () => {
+    expect(writeStudioWorldAuthoringDraft("project-a", DEFAULT_STUDIO_WORLD_MANIFEST)).toBe(true);
+    expect(writeStudioWorldAuthoringDraft("project-b", DEFAULT_STUDIO_WORLD_MANIFEST)).toBe(true);
+    clearStudioWorldAuthoringDraft("project-a");
+    expect(readStudioWorldAuthoringDraft("project-a")).toBeNull();
+    expect(readStudioWorldAuthoringDraft("project-b")).toEqual(DEFAULT_STUDIO_WORLD_MANIFEST);
+  });
+  it("reports blocked browser writes and rejects corrupt stored JSON", () => {
+    localStorage.setItem(studioWorldDraftStorageKey("corrupt"), "{");
+    expect(readStudioWorldAuthoringDraft("corrupt")).toBeNull();
+    vi.spyOn(localStorage, "setItem").mockImplementation(() => { throw new Error("quota"); });
+    expect(writeStudioWorldAuthoringDraft("blocked", DEFAULT_STUDIO_WORLD_MANIFEST)).toBe(false);
+    expect(readStudioWorldAuthoringDraft("blocked")).toBeNull();
+  });
+
 
   it("rejects direct JSON with missing required interaction and portal fields", () => {
     const malformed = {

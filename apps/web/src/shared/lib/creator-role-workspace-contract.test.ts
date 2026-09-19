@@ -281,9 +281,10 @@ describe("creator role workspace contract", () => {
         userId: "artist",
         name: "김작가",
         roleProfile: {
-          version: 1,
+          version: 2,
           primaryRole: "background",
           secondaryRoles: ["three-d"],
+          roleAliases: [],
           specialties: ["background-2d", "background-3d"],
           experienceLevel: "professional",
           collaborationStatus: "available",
@@ -299,9 +300,10 @@ describe("creator role workspace contract", () => {
         userId: "busy",
         name: "박작가",
         roleProfile: {
-          version: 1,
+          version: 2,
           primaryRole: "background",
           secondaryRoles: [],
+          roleAliases: [],
           specialties: ["background-2d"],
           experienceLevel: "professional",
           collaborationStatus: "unavailable",
@@ -326,6 +328,10 @@ describe("creator role workspace contract", () => {
       "협업 가능",
     ]));
     expect(recommendations.at(-1)?.userId).toBe("busy");
+    expect(recommendations.map(({ userId, score }) => ({ userId, score }))).toEqual([
+      { userId: "artist", score: 159 },
+      { userId: "busy", score: -15 },
+    ]);
 
     expect(scoreCreatorRoleMatch(candidates[0]!, {
       role: "background",
@@ -335,5 +341,63 @@ describe("creator role workspace contract", () => {
     expect(scoreCreatorRoleMatch(candidates[0]!, {
       role: "story",
     })).toBe(0);
+  });
+
+  it("ranks secondary-role and specialty evidence without a primary role or status-only matches", () => {
+    const emptyProfile = {
+      version: 2,
+      primaryRole: null,
+      secondaryRoles: [],
+      specialties: [],
+      experienceLevel: null,
+      collaborationStatus: null,
+      roleAliases: [],
+    } as const;
+    const candidates: readonly PublicCreatorRoleCandidate[] = [
+      {
+        userId: "secondary",
+        name: "Secondary artist",
+        roleProfile: {
+          ...emptyProfile,
+          secondaryRoles: ["background"],
+          roleAliases: [{ role: "background", label: "Background artist" }],
+          collaborationStatus: "available",
+        },
+      },
+      {
+        userId: "specialist",
+        name: "Specialist",
+        roleProfile: { ...emptyProfile, specialties: ["background-3d"] },
+      },
+      {
+        userId: "status-only",
+        name: "Available creator",
+        roleProfile: {
+          ...emptyProfile,
+          experienceLevel: "professional",
+          collaborationStatus: "available",
+        },
+      },
+    ];
+
+    expect(recommendCreatorTeamRoles(candidates, ["background"])).toEqual([
+      {
+        userId: "secondary",
+        name: "Secondary artist",
+        productionRole: "background",
+        score: 47,
+        reasons: ["보조 직무와 일치", "협업 가능"],
+      },
+      {
+        userId: "specialist",
+        name: "Specialist",
+        productionRole: "background",
+        score: 30,
+        reasons: ["전문 분야와 일치"],
+      },
+    ]);
+    expect(scoreCreatorRoleMatch(candidates[0]!, { role: "background" })).toBe(45);
+    expect(scoreCreatorRoleMatch(candidates[1]!, { specialties: ["background-3d"] })).toBe(15);
+    expect(candidates.every(({ roleProfile }) => roleProfile.primaryRole === null)).toBe(true);
   });
 });

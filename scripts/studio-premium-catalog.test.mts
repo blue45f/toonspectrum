@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
 
 import { filterStudioCc0Assets, parseStudioCc0Catalog, studioCc0AssetUrl } from '../apps/web/src/domains/creator/studio-cc0-asset-delivery';
 import { curateStudioCc0Selection, studioCc0StyleLabel } from '../apps/web/src/domains/creator/studio-cc0-curation';
+
+const test: (name: string, body: () => void) => unknown = process.env.VITEST
+  ? (await import("vitest")).test
+  : (await import("node:test")).test;
 
 function image(kind = 'background', changes: Record<string, unknown> = {}) {
   return { id: 'polyhaven-background-test', name: '골목 거리 · Alley', kind,
