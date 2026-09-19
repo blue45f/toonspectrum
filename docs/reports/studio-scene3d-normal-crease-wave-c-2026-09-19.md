@@ -85,6 +85,7 @@ Depth/normal/LT는 기존 8,388,608 pixels 예산을 유지한다. 4K 정사각�
 - GPU proof는 `verify-studio-scene3d-capture-resources.mjs`에서 두 lane 모두 통과.
 
 재개 검증 JSON/PNG/로그는 `.qa/scene3d-output-quality/resume/`에 있고 Git에 넣지 않는다.
+검증 중 생성된 Vite dependency cache까지 소스로 검사되지 않도록 `/.qa/scene3d-output-quality/`만 정확히 ignore한다. 제품 소스와 테스트 검사 범위는 줄이지 않는다.
 위 회귀 집합에는 겹치는 테스트가 있어 통과 수를 더해 독립 테스트 수로 표시하지 않는다.
 CI 입력 회귀도 올바른 Vitest runner로 2개 테스트가 통과했다.
 
