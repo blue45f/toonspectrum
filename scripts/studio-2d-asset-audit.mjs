@@ -52,6 +52,23 @@ export function readImageDimensions(bytes) { // NOSONAR javascript:S3776
   throw new Error("JPEG has no supported frame header");
 }
 
+export function studio2dOriginalIsLarge(dimensions) {
+  return Math.min(dimensions.width, dimensions.height) >= 900
+    && Math.max(dimensions.width, dimensions.height) >= 1024;
+}
+
+export function studio2dAssetRecommendationError(asset, dimensions) {
+  if (!asset?.recommended) return null;
+  if (
+    !studio2dOriginalIsLarge(dimensions)
+    || asset.review?.status !== "usable"
+    || asset.review?.method !== "full-image"
+  ) {
+    return "Recommendation requires full-image review and original resolution";
+  }
+  return null;
+}
+
 export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
   root ??= ROOT;
   const webPublic = path.join(root, "apps", "web", "public");
@@ -108,10 +125,9 @@ export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
       if (asset.provenance?.kind !== "legacy-catalog" || asset.provenance?.licenseStatus !== "unverified") {
         throw new Error("Legacy rights cannot be promoted without a separate provenance review");
       }
-      const large = Math.min(asset.width, asset.height) >= 900 && Math.max(asset.width, asset.height) >= 1024;
-      if (asset.recommended && (!large || asset.review.status !== "usable" || asset.review.method !== "full-image")) {
-        throw new Error("Recommendation requires full-image review and original resolution");
-      }
+      const large = studio2dOriginalIsLarge(dimensions);
+      const recommendationError = studio2dAssetRecommendationError(asset, dimensions);
+      if (recommendationError) throw new Error(recommendationError);
       recommended += Number(asset.recommended);
       largeOriginals += Number(large);
       totalBytes += bytes.length;

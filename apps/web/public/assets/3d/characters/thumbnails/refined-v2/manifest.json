@@ -3091,8 +3091,14 @@
       "sourceMaterials": 1,
       "sourceSha256": "7a0ed74aedd060d11f7856d0e7838238b7cc3a58efdebb24c0de26d2407d4ee6",
       "originalThumbnailSha256": "846da9df31d322d916a0b0a22955a732c522f6b17420b230c6de27791944b3ed",
-      "thumbnailSha256": "a9a181ee07bf8d35680a68826bd2ad1038811886acbcf4ea814cb6573e0842c4",
-      "thumbnailBytes": 286865
+      "thumbnailSha256": "adff0afc4233a35e337bb88a4301123bf4a9547f324b0870d0f8e450ce70a6c0",
+      "thumbnailBytes": 177531,
+      "losslessReencode": {
+        "sourceThumbnailSha256": "a9a181ee07bf8d35680a68826bd2ad1038811886acbcf4ea814cb6573e0842c4",
+        "sourceThumbnailBytes": 286865,
+        "decodedRgbaSha256": "2d0055741772a1af1f79e99d889278d2a3686411fcb35a2fb38b1227d5a31a10",
+        "pixelIdentical": true
+      }
     },
     {
       "id": "kiba",
@@ -3826,8 +3832,14 @@
       "sourceMaterials": 1,
       "sourceSha256": "fb93f935c9b9e083bfc3b61574c79b5c4f223dc60992703584da4a89711ae3bb",
       "originalThumbnailSha256": "927af4578dd985739e962485e7354d74524505134d35cd17b3e9e022ea224ba2",
-      "thumbnailSha256": "eba291c69c27619b02b7f192f3ff2e02b09becafd1ceaf46345e1b7d8efa3d2a",
-      "thumbnailBytes": 221263
+      "thumbnailSha256": "4d56367c221dbc5899287272d3927df396ab1c00757c2f3a7c51034a6a944afd",
+      "thumbnailBytes": 146049,
+      "losslessReencode": {
+        "sourceThumbnailSha256": "eba291c69c27619b02b7f192f3ff2e02b09becafd1ceaf46345e1b7d8efa3d2a",
+        "sourceThumbnailBytes": 221263,
+        "decodedRgbaSha256": "3ad3c53426528dd37a7f14e25674aa696d9669d7c0b99ce5527c7d49a41ed4f0",
+        "pixelIdentical": true
+      }
     },
     {
       "id": "bot-bunny",

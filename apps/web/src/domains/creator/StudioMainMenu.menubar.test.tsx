@@ -247,7 +247,7 @@ describe("StudioMainMenu composite dropdown sections", () => {
   function renderComposite(): HTMLElement {
     const view = presentedGroups().find((group) => group.id === "view");
     expect(view?.label).toBe("보기");
-    expect(view?.items).toHaveLength(4);
+    expect(view?.items).toHaveLength(2);
     return openPanel("보기");
   }
 
@@ -262,9 +262,8 @@ describe("StudioMainMenu composite dropdown sections", () => {
     const sections = sectionWrappers(panel);
 
     expect(sections.map((section) => section.getAttribute("data-studio-main-menu-section-group")))
-      .toEqual(["보기", "캔버스", "창"]);
+      .toEqual(["보기", "창"]);
     expect(sections.map((section) => section.getAttribute("role"))).toEqual([
-      "group",
       "group",
       "group",
     ]);
@@ -279,7 +278,7 @@ describe("StudioMainMenu composite dropdown sections", () => {
     const panel = renderComposite();
     const captions = panel.querySelectorAll("[data-studio-main-menu-section]");
 
-    expect(captions).toHaveLength(3);
+    expect(captions).toHaveLength(2);
     for (const caption of captions) {
       expect(caption.getAttribute("aria-hidden")).toBeNull();
       expect(caption.id).not.toBe("");
@@ -293,25 +292,25 @@ describe("StudioMainMenu composite dropdown sections", () => {
 
     expect(items.map((item) => item.getAttribute("data-studio-menu-item-id"))).toEqual([
       "zoom-in",
-      "canvas-size",
-      "canvas-rotate",
       "reference",
     ]);
     expect(items.map((item) => item.getAttribute("data-studio-main-menu-item-index"))).toEqual([
       "0",
       "1",
-      "2",
-      "3",
     ]);
 
     items[0]!.focus();
     fireEvent.keyDown(items[0]!, { key: "ArrowDown" });
-    fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
-    expect(document.activeElement).toBe(items[2]);
+    expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(document.activeElement!, { key: "End" });
-    expect(document.activeElement).toBe(items[3]);
+    expect(document.activeElement).toBe(items[1]);
     fireEvent.keyDown(document.activeElement!, { key: "Home" });
     expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("keeps canvas commands reachable under the dedicated Canvas title", () => {
+    const panel = openPanel("캔버스");
+    expect(within(panel).getAllByRole("menuitem").map((item) => item.getAttribute("data-studio-menu-item-id"))).toEqual(["canvas-size", "canvas-rotate"]);
   });
 
   it("does not invent section wrappers for standalone Layer", () => {

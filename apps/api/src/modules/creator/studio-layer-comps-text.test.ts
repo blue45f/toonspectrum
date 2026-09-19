@@ -66,8 +66,8 @@ describe("layer comp text has the same web and API admission", () => {
     expect(parseStudioLayerComps([comp])).toBeNull();
     expect(() => studioPageToCrdtPage(page(comp))).toThrow();
     const project = { version: 2, pagesList: [page(comp)] };
-    expect(() => parseStudioProjectFile(project)).toThrow(/콤프/u);
-    expect(() => serializeStudioProjectFile(project)).toThrow(/콤프/u);
+    expect(() => parseStudioProjectFile(project)).toThrow(/레이어 보기/u);
+    expect(() => serializeStudioProjectFile(project)).toThrow(/레이어 보기/u);
   });
 
   it.each(textFields)("preserves Korean, newline and quote characters in $name", ({ withText }) => {

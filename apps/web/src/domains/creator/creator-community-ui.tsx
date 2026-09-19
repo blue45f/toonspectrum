@@ -97,7 +97,7 @@ export function WorkCard({ work, showAuthor = true }: { work: WorkSummary; showA
           </span>
         )}
         {work.community && (work.community.provenance !== "human" || work.community.portfolio) && (
-          <span className="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.68rem] font-medium text-cool backdrop-blur-md">
+          <span className="absolute bottom-2 right-2 inline-flex items-center rounded-full border border-cool/40 bg-[oklch(0.16_0.01_70/0.78)] px-2 py-0.5 text-[0.7rem] font-medium text-cool backdrop-blur-md">
             {work.community.portfolio
               ? "포트폴리오"
               : CREATOR_COMMUNITY_PROVENANCE_LABEL[work.community.provenance]}

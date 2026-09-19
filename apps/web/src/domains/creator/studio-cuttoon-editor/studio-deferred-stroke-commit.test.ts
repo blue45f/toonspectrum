@@ -122,7 +122,7 @@ describe("offline page changes preserve the layer comp wire limit", () => {
     expect(editor.state.recordStudioHistoryTransition).not.toHaveBeenCalled();
     expect(editor.state.publishStudioCrdtSceneTransition).not.toHaveBeenCalled();
     expect(editor.state.invalidateAdvancedFillWork).not.toHaveBeenCalled();
-    expect(editor.state.setError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("콤프 저장 용량"));
+    expect(editor.state.setError).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("레이어 보기 저장 용량"));
   }
 
   it.each(["duplicate", "mirror"] as const)("rejects %s when remapped UUIDs make the preset exceed its budget", (operation) => {

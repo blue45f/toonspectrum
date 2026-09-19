@@ -1128,6 +1128,10 @@ const EXPANSION_TUNING: Readonly<
       jitter: { mode: "multiply", amount: 0.52 },
     },
     opacity: { jitter: { mode: "multiply", amount: 0.26 } },
+    // Keep the fast-path carrier sparse even when width jitter produces a run of small flakes.
+    // The 1.8 ceiling retains full six-segment coverage across the deterministic seed audit while
+    // bounding a 504 px one-move stroke to 20–28 marks instead of the observed 23–33 spread.
+    spacing: { mappings: [{ source: "speed", from: 0.78, to: 1.8 }] },
     angle: { jitter: { mode: "add", amount: 180 } },
     scatter: {
       mappings: [{ source: "speed", from: 0.76, to: 1.2 }],

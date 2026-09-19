@@ -35,7 +35,7 @@ describe("StudioToolHint focus takeover contract", () => {
 
     expect(scheduleShow).toContain("if (open) {");
     expect(scheduleShow).toContain('reveal(false, "hover");');
-    expect(reveal).toContain("if (!richCoachEnabled) {");
+    expect(reveal).toContain("if (!richPreviewAllowed) {");
     expect(reveal).toContain("if (expanded) return;");
     expect(reveal.indexOf("setExpanded(false);")).toBeLessThan(
       reveal.indexOf("if (expanded) return;")

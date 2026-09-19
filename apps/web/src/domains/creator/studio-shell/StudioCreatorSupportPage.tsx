@@ -71,7 +71,7 @@ export function StudioCreatorSupportPage() {
   ] as const;
 
   return (
-    <main className="min-h-screen bg-canvas py-8 sm:py-12">
+    <div className="min-h-screen bg-canvas py-8 sm:py-12">
       <Container size="wide">
         <section className="overflow-hidden rounded-3xl border border-line bg-card shadow-sm">
           <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.8fr)] lg:items-center">
@@ -130,6 +130,6 @@ export function StudioCreatorSupportPage() {
           </div>
         </section>
       </Container>
-    </main>
+    </div>
   );
 }

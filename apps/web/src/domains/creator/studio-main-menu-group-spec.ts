@@ -14,7 +14,6 @@
  * Source: `docs/architecture/ToonStudio_…_V5_2026-08-07.md` §15.3 (lines 574-645).
  * Audit that ordered the regroup: `docs/rewrite/ux-audit-v5.md` §2.7, §4 Wave C.
  */
-
 import { STUDIO_MENU_HELP_GROUP_SPEC } from "./studio-main-menu-group-spec-help";
 import { gap, has, ours, part } from "./studio-main-menu-group-spec-model";
 

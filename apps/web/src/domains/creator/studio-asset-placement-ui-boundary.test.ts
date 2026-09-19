@@ -33,10 +33,11 @@ describe("Studio asset placement UI boundary", () => {
   it("uses one drag writer for image-backed elements and native insertions", () => {
     const elementPanel = read("./StudioElementsPanel.tsx");
     const bubbleMenu = read("./lettering/StudioBubbleToolPopoverBody.tsx");
+    const bubbleLibrary = read("./lettering/StudioBubbleLibraryPanel.tsx");
     const assetMenu = read("./StudioAssetMenuPanel.tsx");
 
     expect(elementPanel).toContain("writeStudioAssetDragPayload(");
-    expect(bubbleMenu).toContain("writeStudioInsertDragPayload(event.dataTransfer");
+    expect(bubbleLibrary).toContain("writeStudioInsertDragPayload(event.dataTransfer");
     expect(assetMenu).toContain("writeStudioAssetDragPayload(");
     expect(elementPanel).toContain("정확한 위치 · Esc 취소");
     expect(bubbleMenu).toContain("드래그는");

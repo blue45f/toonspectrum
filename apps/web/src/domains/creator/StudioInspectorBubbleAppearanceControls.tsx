@@ -14,6 +14,7 @@ import {
   StudioGradientEnginePanel,
 } from "./studio-page-lazy-ui";
 import { StudioColorField } from "./StudioColorField";
+import { StudioInspectorBubbleShadowControls } from "./StudioInspectorBubbleShadowControls";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
 
 import type { BubbleEl } from "./studio-element-model";
@@ -83,13 +84,6 @@ export function StudioInspectorBubbleAppearanceControls({
     color: selected.stroke || "#16100c",
     width: selected.strokeWidth && selected.strokeWidth > 0 ? selected.strokeWidth : 3,
   });
-  const lastShadowRef = useRef({
-    color: selected.shadowColor || "#000000",
-    blur: selected.shadowBlur ?? 6,
-    offsetX: selected.shadowOffsetX ?? 2,
-    offsetY: selected.shadowOffsetY ?? 3,
-    opacity: selected.shadowOpacity ?? 0.15,
-  });
   useEffect(() => {
     if (!selected.stroke) return;
     lastStrokeRef.current = {
@@ -97,22 +91,6 @@ export function StudioInspectorBubbleAppearanceControls({
       width: selected.strokeWidth && selected.strokeWidth > 0 ? selected.strokeWidth : 3,
     };
   }, [selected.stroke, selected.strokeWidth]);
-  useEffect(() => {
-    if (selected.shadowColor === undefined) return;
-    lastShadowRef.current = {
-      color: selected.shadowColor || "#000000",
-      blur: selected.shadowBlur ?? 6,
-      offsetX: selected.shadowOffsetX ?? 2,
-      offsetY: selected.shadowOffsetY ?? 3,
-      opacity: selected.shadowOpacity ?? 0.15,
-    };
-  }, [
-    selected.shadowBlur,
-    selected.shadowColor,
-    selected.shadowOffsetX,
-    selected.shadowOffsetY,
-    selected.shadowOpacity,
-  ]);
 
   return (
     <>
@@ -191,7 +169,7 @@ export function StudioInspectorBubbleAppearanceControls({
             recentColors={recentColors}
             documentColors={documentColors}
             onChange={(color) => onPatch({ fill: color ?? "#ffffff" })}
-            onPreview={(color) => previewAppearancePatch({ fill: color }, `color:${selected.id}:fill`)}
+            onPreview={(color) => previewAppearancePatch({ fill: color }, "fill")}
             onUseColor={onRememberColor}
             onLoadRecentColors={onEnsureRecentColorsLoaded}
             onInteractionEnd={onFinishColorPreview}
@@ -263,7 +241,7 @@ export function StudioInspectorBubbleAppearanceControls({
               recentColors={recentColors}
               documentColors={documentColors}
               onChange={(color) => onPatch({ stroke: color ?? undefined })}
-              onPreview={(color) => previewAppearancePatch({ stroke: color }, `color:${selected.id}:stroke`)}
+              onPreview={(color) => previewAppearancePatch({ stroke: color }, "stroke")}
               onUseColor={onRememberColor}
               onLoadRecentColors={onEnsureRecentColorsLoaded}
               onInteractionEnd={onFinishColorPreview}
@@ -354,151 +332,17 @@ export function StudioInspectorBubbleAppearanceControls({
         />
       </Suspense>
 
-      <div className="mt-2.5 space-y-2.5 border-t border-line/40 pt-2.5">
-        <p className="text-[0.66rem] font-semibold uppercase tracking-wider text-fg-3">
-          말풍선 그림자 (Shadow)
-        </p>
-
-        <div className="flex items-center justify-between gap-2 text-sm text-fg-2">
-          그림자 사용
-          <input
-            type="checkbox"
-            checked={selected.shadowColor !== undefined}
-            aria-label="말풍선 그림자 사용"
-            onChange={(event) => {
-              const enabled = event.currentTarget.checked;
-              if (!enabled && selected.shadowColor !== undefined) {
-                lastShadowRef.current = {
-                  color: selected.shadowColor || "#000000",
-                  blur: selected.shadowBlur ?? 6,
-                  offsetX: selected.shadowOffsetX ?? 2,
-                  offsetY: selected.shadowOffsetY ?? 3,
-                  opacity: selected.shadowOpacity ?? 0.15,
-                };
-              }
-              onPatch({
-                shadowColor: enabled ? lastShadowRef.current.color : undefined,
-                shadowBlur: enabled ? lastShadowRef.current.blur : undefined,
-                shadowOffsetX: enabled ? lastShadowRef.current.offsetX : undefined,
-                shadowOffsetY: enabled ? lastShadowRef.current.offsetY : undefined,
-                shadowOpacity: enabled ? lastShadowRef.current.opacity : undefined,
-              });
-            }}
-            className="size-4 cursor-pointer accent-accent"
-          />
-        </div>
-
-        {selected.shadowColor !== undefined && (
-          <>
-            <StudioColorField
-              label="그림자 색상"
-              value={selected.shadowColor ?? null}
-              fallbackColor="#000000"
-              purpose="shadow"
-              recentColors={recentColors}
-              documentColors={documentColors}
-              onChange={(color) => onPatch({ shadowColor: color ?? undefined })}
-              onPreview={(color) => previewAppearancePatch({ shadowColor: color }, `color:${selected.id}:shadow`)}
-              onUseColor={onRememberColor}
-              onLoadRecentColors={onEnsureRecentColorsLoaded}
-              onInteractionEnd={onFinishColorPreview}
-              onRequestCanvasEyedropper={
-                onRequestColorSample
-                  ? () =>
-                      onRequestColorSample((color) => {
-                        onPatch({ shadowColor: color });
-                        onRememberColor(color);
-                      })
-                  : undefined
-              }
-            />
-
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              흐림 정도 (Blur)
-              <span className="flex items-center gap-2">
-                <input
-                  type="range"
-                  aria-label="흐림 정도 (Blur)"
-                  min={0}
-                  max={24}
-                  step={1}
-                  value={selected.shadowBlur ?? 6}
-                  onChange={(event) =>
-                    onPatch({ shadowBlur: Number(event.currentTarget.value) })
-                  }
-                  className="h-2 w-24 cursor-pointer accent-accent sm:w-28"
-                />
-                <span className="w-8 text-right text-xs tabular-nums text-fg-3">
-                  {selected.shadowBlur ?? 6}px
-                </span>
-              </span>
-            </label>
-
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              가로 오프셋 (X)
-              <span className="flex items-center gap-2">
-                <input
-                  type="range"
-                  aria-label="가로 오프셋 (X)"
-                  min={-15}
-                  max={15}
-                  step={1}
-                  value={selected.shadowOffsetX ?? 2}
-                  onChange={(event) =>
-                    onPatch({ shadowOffsetX: Number(event.currentTarget.value) })
-                  }
-                  className="h-2 w-24 cursor-pointer accent-accent sm:w-28"
-                />
-                <span className="w-8 text-right text-xs tabular-nums text-fg-3">
-                  {selected.shadowOffsetX ?? 2}px
-                </span>
-              </span>
-            </label>
-
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              세로 오프셋 (Y)
-              <span className="flex items-center gap-2">
-                <input
-                  type="range"
-                  aria-label="세로 오프셋 (Y)"
-                  min={-15}
-                  max={15}
-                  step={1}
-                  value={selected.shadowOffsetY ?? 3}
-                  onChange={(event) =>
-                    onPatch({ shadowOffsetY: Number(event.currentTarget.value) })
-                  }
-                  className="h-2 w-24 cursor-pointer accent-accent sm:w-28"
-                />
-                <span className="w-8 text-right text-xs tabular-nums text-fg-3">
-                  {selected.shadowOffsetY ?? 3}px
-                </span>
-              </span>
-            </label>
-
-            <label className="flex items-center justify-between gap-2 text-sm text-fg-2">
-              불투명도
-              <span className="flex items-center gap-2">
-                <input
-                  type="range"
-                  aria-label="불투명도"
-                  min={0.05}
-                  max={1}
-                  step={0.05}
-                  value={selected.shadowOpacity ?? 0.15}
-                  onChange={(event) =>
-                    onPatch({ shadowOpacity: Number(event.currentTarget.value) })
-                  }
-                  className="h-2 w-24 cursor-pointer accent-accent sm:w-28"
-                />
-                <span className="w-8 text-right text-xs tabular-nums text-fg-3">
-                  {Math.round((selected.shadowOpacity ?? 0.15) * 100)}%
-                </span>
-              </span>
-            </label>
-          </>
-        )}
-      </div>
+      <StudioInspectorBubbleShadowControls
+        selected={selected}
+        recentColors={recentColors}
+        documentColors={documentColors}
+        onEnsureRecentColorsLoaded={onEnsureRecentColorsLoaded}
+        onPatch={onPatch}
+        onPreviewPatch={previewAppearancePatch}
+        onFinishColorPreview={onFinishColorPreview}
+        onRequestColorSample={onRequestColorSample}
+        onRememberColor={onRememberColor}
+      />
     </>
   );
 }

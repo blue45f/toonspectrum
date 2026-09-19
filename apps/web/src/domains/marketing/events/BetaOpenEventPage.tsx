@@ -74,7 +74,7 @@ export function BetaOpenEventPage() {
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[oklch(0.145_0.025_270)] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[oklch(0.145_0.025_270)] text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_5%,oklch(0.8_0.16_75/0.20),transparent_28%),radial-gradient(circle_at_86%_18%,oklch(0.72_0.19_318/0.18),transparent_31%),radial-gradient(circle_at_50%_100%,oklch(0.68_0.15_235/0.14),transparent_36%)]" />
       <div className="relative mx-auto max-w-7xl px-4 pb-20 pt-6 sm:px-6 sm:pb-28">
         <nav className="flex items-center justify-between gap-3" aria-label={text({ ko: "이벤트 탐색", en: "Event navigation" })}>
@@ -209,7 +209,7 @@ export function BetaOpenEventPage() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

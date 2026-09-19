@@ -2,7 +2,10 @@ import { Suspense } from "react";
 
 import { StudioAssetToolPopoverBody } from "./StudioAssetToolPopoverBody";
 import { StudioPanelLoading } from "./StudioLazySurfaceFallback";
-import { LazyStudioUnifiedAssetToolPopoverContent } from "./studio-unified-asset-lazy-ui";
+import {
+  LazyStudioInsertBatchPreflight,
+  LazyStudioUnifiedAssetToolPopoverContent,
+} from "./studio-unified-asset-lazy-ui";
 
 import type { StudioToolBeltContentProps } from "./StudioToolBeltContent";
 
@@ -19,6 +22,7 @@ export function StudioAssetToolPopoverWorkspace({
 
   return (
     <Suspense fallback={<StudioPanelLoading label="통합 에셋을 여는 중..." />}>
+      <LazyStudioInsertBatchPreflight toolBelt={toolBelt} />
       <LazyStudioUnifiedAssetToolPopoverContent toolBelt={toolBelt} />
     </Suspense>
   );

@@ -15401,19 +15401,23 @@ const puppetWarpArmed =
       setError("생성한 에셋을 라이브러리에 저장하려면 로그인이 필요해요.");
       return;
     }
-    // BYOK가 설정되어 있으면 기존 직접 호출 경로를 유지하고, 그렇지 않으면 서버 관리형
-    // creator/assets/generate 경로를 사용한다. 서버 경로가 비활성화된 배포에서는 API가
-    // 명시적인 오류를 반환하므로 사용자가 설정 화면으로 이동할 수 있다.
+    if (!isStudioAiConfigured(aiSettings)) {
+      setError("설정에서 사용자 API 키를 등록한 뒤 다시 시도해 주세요.");
+      return;
+    }
+    // 이미지 생성은 사용자가 선택한 BYOK 제공자만 사용한다. 키가 없거나 호출이 실패해도
+    // 운영자 과금 경로로 자동 전환하지 않는다.
     runWithAiNotice(() => void executeGenerateAsset(prompt));
   }
   async function executeGenerateAsset(prompt: string) {
     if (collaborationAccessRef.current.locked) return;
+    if (!isStudioAiConfigured(aiSettings)) {
+      setError("설정에서 사용자 API 키를 등록한 뒤 다시 시도해 주세요.");
+      return;
+    }
     const mutationTicket = captureStudioMutationTicket();
     const insertionPlacement = nextAssetInsertionPlacement();
-    const useByok = isStudioAiConfigured(aiSettings);
-    const provider = useByok
-      ? studioImageAiProviderContext(aiSettings)
-      : { provider: "openai", model: "gpt-image-2", transport: "server" as const };
+    const provider = studioImageAiProviderContext(aiSettings);
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
     const aiImageSize: StudioAiImageSize = assetPromptSize === "1536x1024"
       ? "1792x1024"
@@ -15442,7 +15446,7 @@ No text, logo, watermark, or copyrighted character.`;
         promptVersion: 1,
         prompt: providerPrompt,
         target: { pageId: activePage.id },
-        requestedSize: parseStudioAiRequestedSize(useByok ? aiImageSize : assetPromptSize),
+        requestedSize: parseStudioAiRequestedSize(aiImageSize),
         references: [],
       });
       const result = await generateBackgroundImage(aiSettings, providerPrompt, {

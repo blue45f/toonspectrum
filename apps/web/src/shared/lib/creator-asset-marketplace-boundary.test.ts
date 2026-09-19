@@ -33,6 +33,8 @@ const creatorModuleSource = readFileSync(
   "utf8"
 );
 const ciSource = readFileSync(new URL("../../../../../.github/workflows/ci.yml", import.meta.url), "utf8");
+const migrationWorkflowSource = readFileSync(new URL("../../../../../.github/workflows/production-database-migrations.yml", import.meta.url), "utf8");
+const migrationRunnerSource = readFileSync(new URL("../../../../../scripts/run-production-database-migrations.mjs", import.meta.url), "utf8");
 const productionMigrationManifestSource = readFileSync(
   new URL("../../../../../scripts/production-database-migrations.manifest",
     import.meta.url
@@ -89,8 +91,11 @@ describe("creator asset marketplace persistence boundary", () => {
     expect(productionMigrationManifestSource).toContain(
       "apps/api/src/db/migrations/0013_creator_asset_marketplace.sql"
     );
-    expect(ciSource).toContain("scripts/production-database-migrations.manifest");
-    expect(ciSource).toContain("run-production-database-migrations.mjs");
+    expect(migrationRunnerSource).toContain('"production-database-migrations.manifest"');
+    expect(migrationWorkflowSource).toContain("node scripts/run-production-database-migrations.mjs");
+    expect(migrationWorkflowSource).toContain("environment: production-database");
+    expect(migrationWorkflowSource).toContain("workflow_dispatch:");
+    expect(ciSource).not.toContain("node scripts/run-production-database-migrations.mjs");
   });
 
   it("repairs every owned index to its canonical table, key, direction, and predicate", () => {

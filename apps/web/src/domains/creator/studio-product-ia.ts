@@ -14,9 +14,9 @@
 
 export const STUDIO_GLOBAL_NAVIGATION = [
   { id: "production", label: "제작 관리", href: "/production" },
-  { id: "studio", label: "작업실", href: "/studio" },
-  { id: "studio-assets", label: "소재", href: "/studio/assets" },
-  { id: "publish", label: "연재", href: "/studio/publish" },
+  { id: "studio", label: "프로젝트", href: "/studio" },
+  { id: "research", label: "리서치 데스크", href: "/research" },
+  { id: "market", label: "소재 마켓", href: "/market" },
 ] as const;
 
 export const STUDIO_PROJECT_NAVIGATION = [

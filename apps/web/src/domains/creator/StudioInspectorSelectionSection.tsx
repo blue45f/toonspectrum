@@ -276,7 +276,11 @@ export function StudioInspectorSelectionSection({
                   onEnsureRecentColorsLoaded={ensureRecentColorsLoaded}
                   onPatch={(patch) => patchEl(selected.id, patch as Partial<El>)}
                   onPreviewPatch={(patch, key) =>
-                    previewColorPatch(selected.id, patch as Partial<El>, key)
+                    previewColorPatch(
+                      selected.id,
+                      patch as Partial<El>,
+                      `color:${selected.id}:${key}`,
+                    )
                   }
                   onFinishColorPreview={finishPatchElCoalescing}
                   onRequestColorSample={requestInspectorColorSample}

@@ -29,7 +29,7 @@ describe("project layer comp wire admission", () => {
       const original = structuredClone(input);
       expect(parseStudioLayerComps(page.layerComps)).not.toBeNull();
       expect(() => studioPageToCrdtPage(page)).toThrow();
-      expect(() => accept(input)).toThrow(/콤프.*범위/);
+      expect(() => accept(input)).toThrow(/레이어 보기.*범위/);
       expect(input).toEqual(original);
     },
   );
@@ -44,7 +44,7 @@ describe("project layer comp wire admission", () => {
     expect(restored.pagesList[0]).toMatchObject(page);
     const overBudget = { ...page, note: `${page.note}x` };
     expect(() => studioPageToCrdtPage(overBudget)).toThrow();
-    expect(() => parseStudioProjectFile(project(overBudget))).toThrow(/콤프.*범위/);
+    expect(() => parseStudioProjectFile(project(overBudget))).toThrow(/레이어 보기.*범위/);
   });
 
   it("preserves the existing import scope for legacy pages without presets", () => {
