@@ -205,6 +205,7 @@
     "toonbridge:probe": "node tools/toonbridge/probe.mjs",
     "test:toonbridge": "node --test tools/toonbridge/test/*.test.mjs",
     "test:production-toolchain": "vitest run apps/web/src/domains/creator/toolchain && node --test tools/toonbridge/test/*.test.mjs",
+    "test:desktop-sync-release": "node --test scripts/desktop-sync-release.test.mjs",
     "verify:studio-production-toolchain": "pnpm run test:production-toolchain",
     "verify:mobile-native-media": "node scripts/verify-mobile-native-media-permissions.mjs",
     "mobile:doctor": "pnpm run verify:mobile-native-media && pnpm run mobile:sync && cap doctor",
