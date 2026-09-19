@@ -34,6 +34,8 @@ const sceneCounts={
   interiorTablet:filterStudio2dScenes(groups,{...baseFilters,query:'실내 태블릿'}).length,
   largeIndoorNightTextFree:filterStudio2dScenes(groups,{...baseFilters,quality:'large',environment:'실내',timeOfDay:'밤',textFreeOnly:true}).length,
   large:filterStudio2dScenes(groups,{...baseFilters,quality:'large'}).length,
+  largePortrait:filterStudio2dScenes(groups,{...baseFilters,quality:'large',orientation:'portrait'}).length,
+  emptyQuery:filterStudio2dScenes(groups,{...baseFilters,query:'__studio_2d_smoke_no_matching_scene__'}).length,
 };
 const total=sceneCounts.total;
 function Harness(){const[q,setQ]=useState('');const[g,setG]=useState('all');const[picks,setPicks]=useState<string[]>([]);const[placed,setPlaced]=useState('');
@@ -112,6 +114,11 @@ try {
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();
     await page.getByLabel("소재 구분", { exact: true }).selectOption("large");
     await page.getByLabel("원본 비율", { exact: true }).selectOption("portrait");
+    await expectSceneCount(page, sceneCounts.largePortrait);
+    // Portrait assets are now part of the real catalog. Exercise the empty state with a
+    // independently checked nonmatching query instead of assuming a valid category is empty.
+    assert.equal(sceneCounts.emptyQuery, 0, "the empty-state query must not match the catalog");
+    await page.getByLabel("배경 이름·장소·분위기 검색", { exact: true }).fill("__studio_2d_smoke_no_matching_scene__");
     await expectSceneCount(page, 0);
     await expect(page.getByText(/조건에 맞는 배경이 없습니다/u)).toBeVisible();
     await page.getByRole("button", { name: "필터 초기화", exact: true }).click();

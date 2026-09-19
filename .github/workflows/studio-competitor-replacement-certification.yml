@@ -73,7 +73,7 @@ jobs:
       - name: Verify workstream evidence, desktop sync, and claim policy
         run: pnpm run verify:studio-competitor-replacement
       - name: Execute deterministic reference projects A-D
-        run: pnpm run verify:studio-reference-projects
+        run: node scripts/verify-studio-reference-projects.mjs --run --receipt qa-results/studio-reference-projects/receipt.json
       - name: Upload certification receipts
         if: always()
         uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action

@@ -43,6 +43,8 @@ jobs:
             /*
             !/apps/web/public/assets/
             /apps/web/public/assets/3d/environments/refined-v6/
+            /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
+            /apps/web/public/assets/virtual-studio/world/default-world.json
             /apps/web/public/assets/3d/characters/thumbnails/refined-v2/
             !/apps/web/public/vrm/
             !/artifacts/
