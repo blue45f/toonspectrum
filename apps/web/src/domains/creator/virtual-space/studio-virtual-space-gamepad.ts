@@ -72,3 +72,23 @@ export function readStudioVirtualSpaceGamepadInput(
     interact: buttonPressed(gamepad, 0),
   };
 }
+
+/** Prefer the controller that is actually active instead of the lowest browser slot. */
+export function readStudioVirtualSpaceGamepadsInput(
+  gamepads: readonly (StudioVirtualSpaceGamepadLike | null | undefined)[],
+): StudioVirtualSpaceGamepadInput {
+  let selected = { x: 0, y: 0, sprint: false, interact: false };
+  let selectedScore = -1;
+  for (const gamepad of gamepads) {
+    if (!gamepad || gamepad.connected === false) continue;
+    const input = readStudioVirtualSpaceGamepadInput(gamepad);
+    const score = Math.hypot(input.x, input.y)
+      + (input.sprint ? 0.5 : 0)
+      + (input.interact ? 2 : 0);
+    if (score > selectedScore) {
+      selected = input;
+      selectedScore = score;
+    }
+  }
+  return selected;
+}

@@ -223,10 +223,10 @@ export function studioWorldManifestToTiledMap(
 
   return {
     compressionlevel: -1,
-    height: manifest.height / 2,
-    width: manifest.width / 2,
-    tileheight: 2,
-    tilewidth: 2,
+    height: manifest.height,
+    width: manifest.width,
+    tileheight: 1,
+    tilewidth: 1,
     infinite: false,
     orientation: "orthogonal",
     renderorder: "right-down",

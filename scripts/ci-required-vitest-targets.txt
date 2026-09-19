@@ -104,6 +104,7 @@ apps/web/src/domains/creator/contracts/studio-work-asset-contract.test.ts
 apps/web/src/domains/creator/export
 apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts
 apps/web/src/domains/creator/layer
+apps/web/src/domains/creator/live/huddle
 apps/web/src/domains/creator/offline
 apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts
 apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts
@@ -155,6 +156,7 @@ apps/web/src/domains/creator/studio-workspace-route.test.ts
 apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx
 apps/web/src/domains/creator/useStudioOnDemandModule.test.tsx
 apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx
+apps/web/src/domains/creator/virtual-space
 apps/web/src/domains/creator/vrm/StudioVrmXpbdSkirtAttachment.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts
@@ -176,6 +178,7 @@ apps/web/src/infrastructure/search-client.test.ts
 apps/web/src/infrastructure/use-paginated-search.test.tsx
 apps/web/src/shared/catalog/catalog-pagination.test.ts
 apps/web/src/shared/lib/__tests__/search.test.ts
+apps/web/tests/vite-react-compiler-runtime-interop.test.ts
 packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts
 packages/core/src/search-normalization.test.ts
@@ -183,6 +186,7 @@ packages/core/src/server/home.cpu-cache.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/lib/character-psd-reference-compositor.test.mjs
 scripts/lib/studio-3d-production-audit-policy.test.mjs
+scripts/pigment-dependency-install-policy.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/verify-studio-3d-console.test.ts
 scripts/verify-studio-engine-editor-entry.test.ts
@@ -191,4 +195,3 @@ scripts/verify-studio-hybrid-dcc-integration.test.ts
 scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
 scripts/verify-studio-living-ink-integration.test.ts
 scripts/verify-studio-menus.test.ts
-scripts/pigment-dependency-install-policy.test.mjs

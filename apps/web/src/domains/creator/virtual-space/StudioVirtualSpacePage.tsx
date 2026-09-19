@@ -1,5 +1,4 @@
 import {
-  Bell,
   Bot,
   BookOpen,
   Boxes,
@@ -7,7 +6,6 @@ import {
   CalendarDays,
   CircleDot,
   ClipboardCheck,
-  CloudOff,
   Coffee,
   ExternalLink,
   Footprints,
@@ -35,7 +33,7 @@ import {
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
@@ -53,7 +51,7 @@ import {
 } from "../offline/studio-connectivity";
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
-import { openStudioP2pHuddle } from "../live/huddle/studio-p2p-huddle-events";
+import { openStudioP2pHuddle, closeStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../live/huddle/studio-p2p-huddle-events";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
@@ -73,7 +71,7 @@ import {
 } from "./studio-virtual-space-presence";
 import {
   clampStudioWorldPoint,
-  studioWorldCanOccupy,
+  resolveStudioWorldSpawn,
 } from "./studio-virtual-space-world-pathfinding";
 import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
@@ -101,12 +99,20 @@ import {
   type StudioWorldPortalDefinition,
   type StudioWorldRoomDefinition,
 } from "./studio-virtual-space-world-manifest";
+import {
+  resolveStudioVirtualSpaceSessionPoint,
+  studioVirtualSpacePositionScope,
+  studioVirtualSpacePositionStorageKey,
+  writeStudioVirtualSpaceSessionPoint,
+} from "./studio-virtual-space-session-position";
 import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
+import { StudioVirtualSpaceNpcPanel } from "./StudioVirtualSpaceNpcPanel";
+import { StudioVirtualSpaceSocialPanel, type StudioSpaceSocialRequest, type StudioSpaceSocialAction } from "./StudioVirtualSpaceSocialPanel";
+import { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
-const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v2";
 const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
   readonly id: StudioVirtualSpaceReaction;
@@ -124,43 +130,6 @@ function virtualSpaceReactionEmoji(reaction: StudioVirtualSpaceReaction | null |
   return VIRTUAL_SPACE_REACTIONS.find((candidate) => candidate.id === reaction)?.emoji ?? null;
 }
 
-function virtualSpacePositionStorageKey(projectId: string): string {
-  return `${VIRTUAL_SPACE_POSITION_STORAGE_PREFIX}:${projectId}`;
-}
-
-function readVirtualSpaceSessionPoint(
-  projectId: string,
-  fallback: StudioVirtualSpacePoint,
-  manifest = DEFAULT_STUDIO_WORLD_MANIFEST,
-): StudioVirtualSpacePoint {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.sessionStorage.getItem(virtualSpacePositionStorageKey(projectId));
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
-    if (typeof parsed.x !== "number" || typeof parsed.y !== "number"
-      || !Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) return fallback;
-    const candidate = clampStudioWorldPoint(
-      manifest,
-      { x: parsed.x, y: parsed.y },
-    );
-    return studioWorldCanOccupy(manifest, candidate) ? candidate : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeVirtualSpaceSessionPoint(projectId: string, point: StudioVirtualSpacePoint): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(
-      virtualSpacePositionStorageKey(projectId),
-      JSON.stringify({ x: Math.round(point.x), y: Math.round(point.y) }),
-    );
-  } catch {
-    // Storage can be unavailable in privacy-constrained browsers; movement still works in memory.
-  }
-}
 const VIRTUAL_AVATARS = STUDIO_CHARACTER_SKINS;
 
 function virtualAvatarIndex(identity: string): number {
@@ -269,13 +238,14 @@ function VirtualSpaceMiniMap({
   readonly onMoveTo: (point: StudioVirtualSpacePoint) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceMiniMap");
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <div
-      className="studio-vspace-minimap absolute right-3 top-3 z-50 hidden w-44 overflow-hidden rounded-2xl border border-white/15 bg-panel/90 p-2 shadow-2xl backdrop-blur-xl sm:block"
+      className="studio-vspace-minimap absolute right-3 top-3 z-50 hidden w-36 overflow-hidden rounded-2xl border border-white/15 bg-panel/90 p-2 shadow-2xl backdrop-blur-xl sm:block"
       data-space-interactive="true"
     >
-      <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+      <button type="button" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded} aria-label={bt("미니맵 펼치기", "Toggle minimap")} className="flex min-h-9 w-full items-center justify-between gap-2 px-1">
         <span className="inline-flex items-center gap-1.5 text-[0.58rem] font-black uppercase tracking-[0.12em] text-fg-2">
           <MapIcon size={11} aria-hidden />
           {bt("스튜디오 맵", "Studio map")}
@@ -283,8 +253,8 @@ function VirtualSpaceMiniMap({
         <span className="max-w-20 truncate text-[0.52rem] font-bold text-accent">
           {bt(currentRoom.labelKo, currentRoom.labelEn)}
         </span>
-      </div>
-      <button
+      </button>
+      {expanded ? <button
         type="button"
         className="studio-vspace-minimap-stage relative block w-full overflow-hidden rounded-xl border border-line/70 bg-canvas/80 text-left"
         style={{ aspectRatio: String(manifest.width) + "/" + String(manifest.height) }}
@@ -325,7 +295,7 @@ function VirtualSpaceMiniMap({
           style={stagePosition(snapshot.self, manifest)}
           aria-hidden
         />
-      </button>
+      </button> : null}
     </div>
   );
 }
@@ -555,10 +525,10 @@ function LiveStudioTopbar({
       <div className="vs2-project">
         <span className="vs2-project-icon"><Sparkles size={15} aria-hidden /></span>
         <strong>{projectId}</strong><span aria-hidden>⌄</span>
-        <em>EP 38⌄</em>
+
         <span className="vs2-studio-pill">◉ {bt("스튜디오", "Studio")}</span>
         <ConnectionBadge preparing={preparing} />
-        <span className="vs2-online">● {snapshot.peers.length + 1}{bt("명 접속 중", " online")}</span>
+        <span className="vs2-online">● {snapshot.peers.length + 1}{snapshot.direct ? bt("명 접속 중", " online") : bt("명 · 로컬", " · local")}</span>
         <div className="vs2-stack" aria-label={bt("접속 중인 멤버", "Online members")}>
           <span className="vs2-tiny-avatar" title={localName}>
             <ChibiAvatar
@@ -584,7 +554,6 @@ function LiveStudioTopbar({
       </div>
       <div className="vs2-top-actions">
         <Link href="/calendar" aria-label={bt("캘린더", "Calendar")}><CalendarDays size={17} /></Link>
-        <button type="button" aria-label={bt("알림", "Notifications")}><Bell size={17} /><i /></button>
         <Link href={`/studio/p/${encodeURIComponent(projectId)}/settings`} aria-label={bt("프로젝트 설정", "Project settings")}><Settings size={17} /></Link>
         <span className="vs2-mascot"><StudioChibiSprite variant={10} size={45} motion="idle" /></span>
         <span className="vs2-slogan">{bt("좋은 이야기가", "Good stories")}<br />{bt("세상을 바꿔요! ✨", "change the world! ✨")}</span>
@@ -652,7 +621,7 @@ function LiveStudioSidebar({
             avatarIndex={snapshot.self.avatarIndex}
           />
         </span>
-        <span><strong>{localName}</strong><small>● {bt("온라인", "Online")}</small></span>
+        <span><strong>{localName}</strong><small>● {snapshot.direct ? bt("온라인", "Online") : bt("로컬 작업", "Local work")}</small></span>
         <Settings size={15} aria-hidden />
       </div>
     </aside>
@@ -683,7 +652,7 @@ function LiveStudioBottom({
         <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-board.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </Link>
       <button type="button" className="vs2-feature text-left" onClick={openAssistant}>
-        <header><strong>{bt("AI 프로듀서", "AI Producer")}</strong><small>{bt("항상 함께하는 든든한 PD", "Your always-on production partner")}</small></header>
+        <header><strong>{bt("AI 프로듀서", "AI Producer")}</strong><small>{bt("요청할 때 함께하는 제작 도우미", "Production help when you ask")}</small></header>
         <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-ai.jpg" alt="" className="vs2-reference-feature-img" /></div>
       </button>
       <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
@@ -708,6 +677,13 @@ function VirtualSpaceExperience({
   readonly signedIn: boolean;
 }) {
   const bt = useBilingual("StudioVirtualSpaceExperience");
+  const location = useLocation();
+  const authoringMode = new URLSearchParams(location.search).get("worldEdit") === "1";
+  const positionScope = useMemo(
+    () => studioVirtualSpacePositionScope(projectId, authoringMode),
+    [authoringMode, projectId],
+  );
+  const positionScopeKey = studioVirtualSpacePositionStorageKey(positionScope);
   const navigate = useNavigate();
   const live = useStudioLiveCollaboration();
   const connectivity = useSyncExternalStore(
@@ -718,9 +694,13 @@ function VirtualSpaceExperience({
   const controllerRef = useRef<StudioVirtualSpacePresenceController | null>(null);
   const fallbackIdentity = live.room?.participant.sessionId ?? `space:${projectId}`;
   const initial = useMemo(() => {
-    const fallback = studioVirtualSpaceInitialPoint(fallbackIdentity);
-    return readVirtualSpaceSessionPoint(projectId, fallback);
-  }, [fallbackIdentity, projectId]);
+    const preferred = studioVirtualSpaceInitialPoint(fallbackIdentity);
+    return resolveStudioVirtualSpaceSessionPoint(
+      positionScope,
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+      preferred,
+    ) ?? preferred;
+  }, [fallbackIdentity, positionScope]);
   const initialAvatarIndex = useMemo(() => readVirtualSpaceAvatarIndex(), []);
   const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
     self: studioVirtualSpaceState(initial, "down", "available", false, initialAvatarIndex),
@@ -735,10 +715,16 @@ function VirtualSpaceExperience({
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
-  const [authoringMode] = useState(() =>
-    typeof globalThis.location !== "undefined"
-    && new URLSearchParams(globalThis.location.search).get("worldEdit") === "1"
-  );
+  const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
+  const [sharedActivity, setSharedActivity] = useState<StudioSpaceSocialRequest | null>(null);
+  const sharedActivityRef = useRef<StudioSpaceSocialRequest | null>(null);
+  const acceptedActivityHandler = useRef<(request: StudioSpaceSocialRequest) => void>(() => undefined);
+  const [socialNotice, setSocialNotice] = useState("");
+  const [atmosphere, setAtmosphere] = useState<"focus" | "balanced" | "lively">(() => {
+    try { const saved = localStorage.getItem("toonspectrum:virtual-atmosphere:v1"); return saved === "focus" || saved === "lively" ? saved : "balanced"; }
+    catch { return "balanced"; }
+  });
+
   const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(
     DEFAULT_STUDIO_WORLD_MANIFEST,
   );
@@ -747,6 +733,8 @@ function VirtualSpaceExperience({
   );
   const baselineWorldManifestRef = useRef<StudioVirtualSpaceWorldManifest>(DEFAULT_STUDIO_WORLD_MANIFEST);
   const [worldLoaded, setWorldLoaded] = useState(false);
+  const [loadedPositionScope, setLoadedPositionScope] = useState<string | null>(null);
+  const [worldLoadError, setWorldLoadError] = useState(false);
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   const selfRef = useRef(snapshot.self);
@@ -754,6 +742,7 @@ function VirtualSpaceExperience({
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const movingRef = useRef(false);
   const visibleParticipantCount = connectivity.serverAvailable ? snapshot.peers.length + 1 : 1;
+  const worldReady = worldLoaded && loadedPositionScope === positionScopeKey;
 
   useEffect(() => {
     selfRef.current = snapshot.self;
@@ -762,6 +751,14 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     const abortController = new AbortController();
+    engineBridge.clearMovement();
+    movingRef.current = false;
+    setMoving(false);
+    setFollowingPeerId(null);
+    setCurrentInteraction(null);
+    setWorldLoaded(false);
+    setLoadedPositionScope(null);
+    setWorldLoadError(false);
     void loadStudioVirtualSpaceWorldManifest(
       undefined,
       undefined,
@@ -772,20 +769,28 @@ function VirtualSpaceExperience({
       const activeManifest = authoringMode
         ? readStudioWorldAuthoringDraft(projectId) ?? manifest
         : manifest;
-      const fallback = studioWorldCanOccupy(activeManifest, selfRef.current)
-        ? selfRef.current
-        : studioWorldSpawn(activeManifest).point;
-      const point = readVirtualSpaceSessionPoint(projectId, fallback, activeManifest);
-      const self = studioWorldPresenceState(activeManifest, { ...selfRef.current, ...point, moving: false });
-      selfRef.current = self;
-      setSnapshot((current) => ({ ...current, self }));
+      const point = resolveStudioVirtualSpaceSessionPoint(
+        positionScope,
+        activeManifest,
+        studioWorldSpawn(activeManifest).point,
+      );
       setWorldManifest(activeManifest);
       setAuthoringDraft(activeManifest);
       setCurrentInteraction(null);
+      if (!point) {
+        setWorldLoaded(false);
+        setWorldLoadError(true);
+        return;
+      }
+      const self = studioWorldPresenceState(activeManifest, { ...selfRef.current, ...point, moving: false });
+      selfRef.current = self;
+      setSnapshot((current) => ({ ...current, self }));
+      setWorldLoadError(false);
+      setLoadedPositionScope(positionScopeKey);
       setWorldLoaded(true);
     });
     return () => abortController.abort();
-  }, [authoringMode, projectId]);
+  }, [authoringMode, engineBridge, positionScope, positionScopeKey, projectId]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
@@ -801,9 +806,8 @@ function VirtualSpaceExperience({
     setMoving(false);
 
     const current = selfRef.current;
-    const point = studioWorldCanOccupy(nextManifest, current)
-      ? { x: current.x, y: current.y }
-      : studioWorldSpawn(nextManifest).point;
+    const point = resolveStudioWorldSpawn(nextManifest, current);
+    if (!point) return;
     const self = studioWorldPresenceState(nextManifest, {
       ...current,
       ...point,
@@ -829,13 +833,13 @@ function VirtualSpaceExperience({
   }, [engineBridge, setFollowingPeer]);
 
   useEffect(() => {
-    if (!authoringMode || !worldLoaded) return;
+    if (!authoringMode || !worldReady) return;
     if (validateStudioWorldManifest(authoringDraft).length > 0) return;
     const timeout = globalThis.setTimeout(() => {
       applyAuthoringManifest(authoringDraft);
     }, 180);
     return () => globalThis.clearTimeout(timeout);
-  }, [applyAuthoringManifest, authoringDraft, authoringMode, worldLoaded]);
+  }, [applyAuthoringManifest, authoringDraft, authoringMode, worldReady]);
 
   const resetAuthoringManifest = useCallback(() => {
     clearStudioWorldAuthoringDraft(projectId);
@@ -843,23 +847,29 @@ function VirtualSpaceExperience({
   }, [projectId]);
 
   useEffect(() => {
-    if (!worldLoaded) return;
+    if (!worldReady) return;
     const timeout = globalThis.setTimeout(() => {
-      writeVirtualSpaceSessionPoint(projectId, {
+      writeStudioVirtualSpaceSessionPoint(positionScope, {
         x: snapshot.self.x,
         y: snapshot.self.y,
       });
     }, 180);
     return () => globalThis.clearTimeout(timeout);
-  }, [projectId, snapshot.self.x, snapshot.self.y, worldLoaded]);
+  }, [positionScope, snapshot.self.x, snapshot.self.y, worldReady]);
 
   useEffect(() => {
-    const save = () => { if (worldLoaded) writeVirtualSpaceSessionPoint(projectId, selfRef.current); };
+    const save = () => { if (worldReady) writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current); };
     globalThis.addEventListener("pagehide", save);
     return () => { globalThis.removeEventListener("pagehide", save); save(); };
-  }, [projectId, worldLoaded]);
+  }, [positionScope, worldReady]);
 
   useEffect(() => startStudioConnectivityRuntime(), []);
+
+  const clearLocalReactionTimer = useCallback(() => {
+    if (localReactionTimerRef.current === null) return;
+    globalThis.clearTimeout(localReactionTimerRef.current);
+    localReactionTimerRef.current = null;
+  }, []);
 
   useEffect(() => {
     const syncGamepad = () => {
@@ -877,12 +887,7 @@ function VirtualSpaceExperience({
     };
   }, []);
 
-  useEffect(() => () => {
-    if (localReactionTimerRef.current !== null) {
-      globalThis.clearTimeout(localReactionTimerRef.current);
-      localReactionTimerRef.current = null;
-    }
-  }, []);
+  useEffect(() => () => clearLocalReactionTimer(), [clearLocalReactionTimer]);
 
   const openAssistant = useCallback(() => {
     globalThis.dispatchEvent(new CustomEvent("toonspectrum:command-palette:open"));
@@ -890,8 +895,8 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     const room = live.room;
-    if (!worldLoaded) return;
-    if (!connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
+    if (!worldReady) return;
+    if (authoringMode || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
       setSnapshot((current) => ({
@@ -909,6 +914,7 @@ function VirtualSpaceExperience({
       room.direct,
       selfRef.current,
     );
+    clearLocalReactionTimer();
     controllerRef.current = controller;
     controller.setAvatarIndex(selfRef.current.avatarIndex);
     const refresh = () => setSnapshot(controller.snapshot());
@@ -920,7 +926,7 @@ function VirtualSpaceExperience({
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [connectivity.serverAvailable, live.availability, live.room, worldLoaded]);
+  }, [authoringMode, clearLocalReactionTimer, connectivity.serverAvailable, live.availability, live.room, worldReady]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -953,7 +959,7 @@ function VirtualSpaceExperience({
   }, [activity, worldManifest]);
 
   const activateAction = useCallback((action: StudioWorldInteractionDefinition["action"]) => {
-    writeVirtualSpaceSessionPoint(projectId, selfRef.current);
+    writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current);
     if (action === "assistant") {
       openAssistant();
       return;
@@ -964,7 +970,7 @@ function VirtualSpaceExperience({
     }
     const destination = studioVirtualSpaceDestination(projectId, action);
     if (destination) navigate(destination);
-  }, [navigate, openAssistant, projectId]);
+  }, [navigate, openAssistant, positionScope, projectId]);
 
   const activateInteraction = useCallback((interaction: StudioWorldInteractionDefinition) => {
     activateAction(interaction.action);
@@ -979,9 +985,10 @@ function VirtualSpaceExperience({
   }, [updatePosition]);
 
   const queuePathTo = useCallback((point: StudioVirtualSpacePoint) => {
+    if (!worldReady) return;
     setFollowingPeer(null);
     engineBridge.requestMove(point);
-  }, [engineBridge, setFollowingPeer]);
+  }, [engineBridge, setFollowingPeer, worldReady]);
 
   const startFollowingPeer = useCallback((sessionId: string) => {
     const peer = peersRef.current.find((candidate) => candidate.participant.sessionId === sessionId);
@@ -998,12 +1005,13 @@ function VirtualSpaceExperience({
     ?? DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
 
   const activateCurrentRoom = useCallback(() => {
+    if (!worldReady) return;
     if (currentInteraction) {
       activateInteraction(currentInteraction);
       return;
     }
     if (currentRoom.action) activateAction(currentRoom.action);
-  }, [activateAction, activateInteraction, currentInteraction, currentRoom]);
+  }, [activateAction, activateInteraction, currentInteraction, currentRoom, worldReady]);
 
   const handleEngineInteract = useCallback((interaction: StudioWorldInteractionDefinition | null) => {
     if (interaction) {
@@ -1018,13 +1026,10 @@ function VirtualSpaceExperience({
     : null;
 
   const handleEnginePeerSelect = useCallback((sessionId: string) => {
-    const nearby = snapshot.nearbyPeers.some((peer) => peer.participant.sessionId === sessionId);
-    if (nearby && connectivity.serverAvailable) {
-      openStudioP2pHuddle({ peerIds: [sessionId], source: "virtual-space" });
-      return;
-    }
-    startFollowingPeer(sessionId);
-  }, [connectivity.serverAvailable, snapshot.nearbyPeers, startFollowingPeer]);
+    setSelectedPeerId(sessionId);
+    engineBridge.clearMovement();
+    setFollowingPeer(null);
+  }, [engineBridge, setFollowingPeer]);
 
   const handleEnginePortal = useCallback((portal: StudioWorldPortalDefinition) => {
     if (portal.href) {
@@ -1036,21 +1041,19 @@ function VirtualSpaceExperience({
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
 
   const startNearbyHuddle = useCallback(() => {
-    if (!connectivity.serverAvailable || !snapshot.nearbyPeers.length) return;
-    openStudioP2pHuddle({
-      peerIds: snapshot.nearbyPeers.map((peer) => peer.participant.sessionId),
-      source: "virtual-space",
-    });
-  }, [connectivity.serverAvailable, snapshot.nearbyPeers]);
+    const peer = snapshot.nearbyPeers[0];
+    if (peer) setSelectedPeerId(peer.participant.sessionId);
+  }, [snapshot.nearbyPeers]);
 
   const openStudioChat = useCallback(() => {
-    if (!connectivity.serverAvailable) return;
-    openStudioP2pHuddle({ source: "virtual-space" });
-  }, [connectivity.serverAvailable]);
+    const peer = snapshot.nearbyPeers[0] ?? snapshot.peers[0];
+    if (peer) setSelectedPeerId(peer.participant.sessionId);
+  }, [snapshot.nearbyPeers, snapshot.peers]);
 
   const sendReaction = useCallback((reaction: StudioVirtualSpaceReaction) => {
     const controller = controllerRef.current;
     if (controller) {
+      clearLocalReactionTimer();
       controller.sendReaction(reaction);
       setSnapshot(controller.snapshot());
       return;
@@ -1060,12 +1063,103 @@ function VirtualSpaceExperience({
       globalThis.clearTimeout(localReactionTimerRef.current);
     }
     localReactionTimerRef.current = globalThis.setTimeout(() => {
+      if (controllerRef.current) {
+        localReactionTimerRef.current = null;
+        return;
+      }
       setSnapshot((current) => ({ ...current, selfReaction: null }));
       localReactionTimerRef.current = null;
     }, STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS);
+  }, [clearLocalReactionTimer]);
+
+  const { snapshot: socialSnapshot, request: requestSocial, respond: respondSocial, cancel: cancelSocial } = useStudioVirtualSpaceSocial({
+    participant: live.room?.participant,
+    port: live.room?.direct,
+    manifest: worldManifest,
+    enabled: signedIn && worldReady && !authoringMode && snapshot.direct
+      && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
+    onAccepted: (request) => acceptedActivityHandler.current(request),
+  });
+  const finishSharedActivity = useCallback(() => {
+    const current = sharedActivityRef.current;
+    if (!current) return;
+    // Clear ownership first: closing Huddle synchronously notifies the social surface.
+    sharedActivityRef.current = null;
+    setSharedActivity(null);
+    setFollowingPeer(null);
+    cancelSocial(current.id);
+    closeStudioP2pHuddle({ conversationId: current.id });
+  }, [cancelSocial, setFollowingPeer]);
+  const handleAcceptedActivity = useCallback((request: StudioSpaceSocialRequest) => {
+    if (sharedActivityRef.current?.id !== request.id) finishSharedActivity();
+    sharedActivityRef.current = request;
+    setSharedActivity(request);
+    setSelectedPeerId(request.peer.sessionId);
+    if (request.action === "talk") {
+      openStudioP2pHuddle({ conversationId: request.id, peerIds: [request.peer.sessionId], source: "virtual-space" });
+    } else if (request.action === "follow" && request.direction === "outgoing") {
+      startFollowingPeer(request.peer.sessionId);
+    } else if (request.action === "high-five") {
+      // Current packs use a celebration reaction; do not claim an unsupported hand pose.
+      sendReaction("sparkles");
+    }
+  }, [finishSharedActivity, sendReaction, startFollowingPeer]);
+  useEffect(() => { acceptedActivityHandler.current = handleAcceptedActivity; }, [handleAcceptedActivity]);
+  useEffect(() => {
+    const handleClosed = (event: Event) => {
+      const id = (event as CustomEvent<StudioP2pHuddleClosedDetail>).detail?.conversationId;
+      if (id && sharedActivityRef.current?.id === id) finishSharedActivity();
+    };
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_CLOSED_EVENT, handleClosed);
+    return () => globalThis.removeEventListener(STUDIO_P2P_HUDDLE_CLOSED_EVENT, handleClosed);
+  }, [finishSharedActivity]);
+  useEffect(() => {
+    if (!sharedActivity) return;
+    const peer = snapshot.peers.find((item) => item.participant.sessionId === sharedActivity.peer.sessionId);
+    const request = socialSnapshot.requests.find((item) => item.id === sharedActivity.id);
+    const distance = peer ? Math.hypot(peer.state.x - snapshot.self.x, peer.state.y - snapshot.self.y) : Infinity;
+    if (!peer || activity === "focused" || activity === "away" || atmosphere === "focus"
+      || peer.state.activity === "focused" || peer.state.activity === "away"
+      || !socialSnapshot.available || !request || request.status !== "accepted"
+      || ((sharedActivity.action === "talk" || sharedActivity.action === "high-five") && distance > 156)
+      || (sharedActivity.action === "follow" && sharedActivity.direction === "outgoing" && !followingPeerId)) finishSharedActivity();
+  }, [sharedActivity, snapshot.peers, snapshot.self.x, snapshot.self.y, activity, atmosphere, socialSnapshot, followingPeerId, finishSharedActivity]);
+  useEffect(() => () => {
+    const current = sharedActivityRef.current;
+    sharedActivityRef.current = null;
+    if (current) closeStudioP2pHuddle({ conversationId: current.id });
   }, []);
+  useEffect(() => {
+    if (sharedActivity?.action !== "high-five") return;
+    const timer = globalThis.setTimeout(finishSharedActivity, STUDIO_VIRTUAL_SPACE_REACTION_TTL_MS);
+    return () => globalThis.clearTimeout(timer);
+  }, [sharedActivity?.action, sharedActivity?.id, finishSharedActivity]);
+  const requestActivity = (sessionId: string, action: StudioSpaceSocialAction) => {
+    const peer = snapshot.peers.find((item) => item.participant.sessionId === sessionId);
+    if (!peer) return;
+    if ((action === "talk" || action === "high-five") && Math.hypot(peer.state.x - snapshot.self.x, peer.state.y - snapshot.self.y) > 120) {
+      setSocialNotice(bt("조금 더 가까이 이동한 뒤 요청해 주세요.", "Move a little closer before sending this invitation."));
+      return;
+    }
+    const id = requestSocial(sessionId, action);
+    setSocialNotice(id ? "" : bt("아직 연결을 확인 중입니다. 잠시 후 다시 요청해 주세요.", "Still confirming the connection. Please try again shortly."));
+  };
+  const cancelSocialRequest = (id: string) => {
+    if (sharedActivity?.id === id) finishSharedActivity();
+    else cancelSocial(id);
+  };
+  const changeAtmosphere = (next: "focus" | "balanced" | "lively") => {
+    setAtmosphere(next);
+    try { localStorage.setItem("toonspectrum:virtual-atmosphere:v1", next); } catch { /* Session preference still applies. */ }
+    if (next === "focus") { engineBridge.clearMovement(); finishSharedActivity(); }
+  };
+  const cancelFollowing = () => {
+    if (sharedActivity?.action === "follow") finishSharedActivity();
+    else setFollowingPeer(null);
+  };
 
   const setPresenceActivity = (next: StudioVirtualSpaceActivity) => {
+    if (next === "focused" || next === "away") { engineBridge.clearMovement(); finishSharedActivity(); }
     setActivity(next);
     controllerRef.current?.setActivity(next);
     setSnapshot((current) => ({
@@ -1111,36 +1205,6 @@ function VirtualSpaceExperience({
           snapshot={snapshot}
         />
 
-        {connectivity.localOnly ? (
-          <section
-            className="mt-4 flex flex-col gap-3 rounded-2xl border border-warning/35 bg-warning-soft/10 p-4 sm:flex-row sm:items-center sm:justify-between"
-            role="status"
-            aria-live="polite"
-            data-studio-virtual-offline="true"
-          >
-            <div className="flex min-w-0 items-start gap-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning-soft/20 text-warning">
-                <CloudOff size={17} aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <strong className="text-sm text-fg">
-                  {connectivity.mode === "offline"
-                    ? bt("오프라인 로컬 모드", "Offline local mode")
-                    : bt("서버 연결 없이 로컬 모드", "Local mode without server connection")}
-                </strong>
-                <p className="mt-1 text-xs leading-5 text-fg-3">
-                  {bt(
-                    "공간 탐색과 캐시된 프로젝트 작업은 계속할 수 있습니다. 팀원 발견·P2P 대화·화상·실시간 동기화는 잠시 중지되고 온라인 복귀 시 자동으로 다시 연결됩니다.",
-                    "You can keep exploring the space and working with cached project data. Teammate discovery, P2P huddles, video and live sync pause temporarily and reconnect automatically when the network returns.",
-                  )}
-                </p>
-              </div>
-            </div>
-            <span className="shrink-0 rounded-full border border-warning/30 bg-card/70 px-3 py-2 text-[0.68rem] font-bold text-warning">
-              {bt("로컬 작업 유지", "Local work stays available")}
-            </span>
-          </section>
-        ) : null}
 
         <section className="vs2-live-layout">
           <div className="vs2-world-wrap vs2-world-wrap--live">
@@ -1151,20 +1215,25 @@ function VirtualSpaceExperience({
                 className="studio-vspace-stage relative aspect-[850/798] min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 data-studio-virtual-space="true"
               >
-                {worldLoaded ? <StudioVirtualSpacePhaserCanvas
+                {worldReady ? <StudioVirtualSpacePhaserCanvas
                   manifest={worldManifest}
                   snapshot={snapshot}
                   bridge={engineBridge}
                   selfIdentity={fallbackIdentity}
                   debugWorld={authoringMode}
+                  atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
+                  onNpcInteract={activateInteraction}
                   onLocalState={handleEngineLocalState}
                   onInteract={handleEngineInteract}
                   onNearbyInteractionChange={setCurrentInteraction}
                   onPeerSelect={handleEnginePeerSelect}
-                  onCancelFollow={() => setFollowingPeer(null)}
+                  onCancelFollow={cancelFollowing}
                   onPortal={handleEnginePortal}
-                /> : <div className="studio-vspace-engine-message" role="status">{bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
+                /> : <div className="studio-vspace-engine-message" role="status">{worldLoadError
+                  ? bt("이 월드에는 안전하게 시작할 수 있는 바닥이 없습니다.", "This world has no safe floor where a player can start.")
+                  : bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
 
+                {worldReady ? <>
                 <VirtualSpaceMiniMap
                   snapshot={snapshot}
                   currentRoom={currentRoom}
@@ -1199,7 +1268,7 @@ function VirtualSpaceExperience({
                       type="button"
                       className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-good/30 bg-good/10 px-3 text-[0.7rem] font-black text-good"
                       data-space-interactive="true"
-                      onClick={() => setFollowingPeer(null)}
+                      onClick={cancelFollowing}
                     >
                       <Footprints size={13} aria-hidden />
                       {bt(`${followingPeer.participant.displayName} 따라가는 중`, `Following ${followingPeer.participant.displayName}`)}
@@ -1268,10 +1337,11 @@ function VirtualSpaceExperience({
                     </button>
                   ))}
                 </div>
+                </> : null}
               </div>
             </div>
 
-            {authoringMode && worldLoaded ? (
+            {authoringMode && worldReady ? (
               <StudioVirtualSpaceWorldAuthoringPanel
                 projectId={projectId}
                 manifest={authoringDraft}
@@ -1280,7 +1350,7 @@ function VirtualSpaceExperience({
               />
             ) : null}
 
-            <div className="vs2-mobile-zone-cards grid gap-3 sm:grid-cols-2 lg:hidden">
+            {worldReady ? <div className="vs2-mobile-zone-cards grid gap-3 sm:grid-cols-2 lg:hidden">
               {worldManifest.rooms.map((room) => (
                 <MobileZoneCard
                   key={room.id}
@@ -1289,22 +1359,48 @@ function VirtualSpaceExperience({
                   onAssistant={openAssistant}
                 />
               ))}
-            </div>
+            </div> : null}
           </div>
 
           <aside className="vs2-rightbar vs2-rightbar--live">
+            <section className="vs2-panel studio-vspace-atmosphere" data-space-interactive="true">
+              <h2>{bt("작업실 분위기", "Studio atmosphere")}</h2>
+              <div role="group" aria-label={bt("작업실 분위기", "Studio atmosphere")}>
+                {([ ["focus", "집중", "Focus"], ["balanced", "일상", "Balanced"], ["lively", "활기", "Lively"] ] as const).map(([mode, ko, en]) =>
+                  <button key={mode} type="button" aria-pressed={atmosphere === mode} onClick={() => changeAtmosphere(mode)}>{bt(ko, en)}</button>)}
+              </div>
+              <p>{bt("NPC의 움직임과 인사 빈도를 조절해요. 집중 모드에서는 대화 요청도 잠시 쉬어갑니다.", "Adjust NPC movement and greetings. Focus mode also pauses social invitations.")}</p>
+              {connectivity.localOnly ? <details data-studio-virtual-offline="true"><summary>{bt("로컬 작업 중", "Working locally")}</summary><p>{bt("이동과 캐시된 작업은 계속할 수 있어요. 팀원 연결은 온라인으로 돌아오면 복구됩니다.", "Movement and cached work remain available. Teammates reconnect when you return online.")}</p></details> : null}
+            </section>
+            {worldReady ? <StudioVirtualSpaceNpcPanel manifest={worldManifest} onInteract={activateInteraction} /> : null}
+            <StudioVirtualSpaceSocialPanel
+              selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
+              peers={snapshot.peers} social={socialSnapshot}
+              disabled={!signedIn || !snapshot.direct || authoringMode}
+              focused={activity === "focused" || activity === "away" || atmosphere === "focus"}
+              onSelect={setSelectedPeerId} onWave={() => sendReaction("wave")}
+              onRequest={requestActivity}
+              onRespond={(id, response) => { respondSocial(id, response); }}
+              onCancel={cancelSocialRequest}
+            />
+            {socialNotice ? <p className="studio-vspace-social-notice" role="status">{socialNotice}</p> : null}
+            {sharedActivity?.action === "review" ? <section className="vs2-panel studio-vspace-shared-review">
+              <h2>{bt("함께 검토하기", "Review together")}</h2>
+              <p>{bt(`${sharedActivity.peer.displayName} 님과 같은 프로젝트의 검토함을 엽니다. 검수본과 버전은 검토함에서 선택하세요.`, `Open this project's review inbox with ${sharedActivity.peer.displayName}. Select the review and version there.`)}</p>
+              <button type="button" onClick={() => { const review = worldManifest.interactions.find((item) => item.action === "review"); if (review) queuePathTo(review.point); }}>{bt("리뷰 데스크로 이동", "Walk to review desk")}</button>
+              <button type="button" onClick={() => activateAction("review")}>{bt("검토함 바로 열기", "Open review inbox")}</button>
+            </section> : null}
             <section className="vs2-panel vs2-live-huddle">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[0.64rem] font-black uppercase tracking-[0.14em] text-accent">NEARBY HUDDLE</p>
                   <h2 className="mt-1 text-base font-black">{bt("근처 팀원", "Nearby teammates")}</h2>
                 </div>
                 <Headphones size={18} className="text-accent" aria-hidden />
               </div>
               <p className="mt-2 text-xs leading-5 text-fg-3">
                 {bt(
-                  "가까운 사람 최대 3명만 P2P 대화 대상으로 잡습니다. 마이크와 카메라는 직접 켤 때만 권한을 요청합니다.",
-                  "Only the three nearest people become P2P huddle candidates. Mic and camera permissions are requested only when you turn them on.",
+                  "가까운 팀원에게 대화를 요청할 수 있어요. 서로 수락한 참여자끼리만 연결되며 마이크와 카메라는 직접 켭니다.",
+                  "Invite a nearby teammate. Only mutually accepted participants connect; you turn on your own mic and camera.",
                 )}
               </p>
               <div className="mt-3 space-y-2">
@@ -1337,7 +1433,7 @@ function VirtualSpaceExperience({
                 className={buttonClass({ className: "mt-3 w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" })}
               >
                 <Mic2 size={15} aria-hidden />
-                {bt("근처 P2P 대화 열기", "Open nearby P2P huddle")}
+                {bt("근처 팀원 선택", "Choose nearby teammate")}
               </button>
               {!signedIn ? (
                 <p className="mt-2 text-[0.68rem] leading-5 text-fg-3">
@@ -1385,7 +1481,7 @@ function VirtualSpaceExperience({
                 className="vs2-live-chat-button"
               >
                 <MessageCircle size={14} aria-hidden />
-                {bt("P2P 채팅 열기", "Open P2P chat")}
+                {bt("대화할 팀원 선택", "Choose someone to talk to")}
               </button>
             </section>
 
@@ -1436,10 +1532,10 @@ function VirtualSpaceExperience({
                             ? "border-good/40 bg-good/10 text-good"
                             : "border-line bg-card text-fg-3 hover:border-accent/40 hover:text-accent",
                         )}
-                        title={following ? bt("따라가기 중지", "Stop following") : bt("이 팀원 따라가기", "Follow this teammate")}
+                        aria-label={following ? bt("따라가기 중지", "Stop following") : bt(`${peer.participant.displayName} 님과 상호작용`, `Interact with ${peer.participant.displayName}`)}
                         onClick={() => following
-                          ? setFollowingPeer(null)
-                          : startFollowingPeer(peer.participant.sessionId)}
+                          ? cancelFollowing()
+                          : handleEnginePeerSelect(peer.participant.sessionId)}
                       >
                         <Footprints size={13} aria-hidden />
                       </button>

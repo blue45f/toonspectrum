@@ -73,6 +73,53 @@ export interface StudioVirtualSpacePresenceDependencies {
   readonly clearInterval?: (handle: unknown) => void;
 }
 
+const outboundSequenceBySessionId = new Map<string, number>();
+const OUTBOUND_SEQUENCE_STORAGE_PREFIX = "toonspectrum:virtual-space-sequence:v1";
+
+function outboundSequenceStorageKey(sessionId: string): string {
+  return `${OUTBOUND_SEQUENCE_STORAGE_PREFIX}:${sessionId.length}:${sessionId}`;
+}
+
+function outboundSequenceStorage(): Storage | null {
+  try {
+    return globalThis.sessionStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readStoredOutboundSequence(sessionId: string): number {
+  try {
+    const value = Number(outboundSequenceStorage()?.getItem(outboundSequenceStorageKey(sessionId)));
+    return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeStoredOutboundSequence(sessionId: string, sequence: number): void {
+  try {
+    outboundSequenceStorage()?.setItem(outboundSequenceStorageKey(sessionId), String(sequence));
+  } catch {
+    // Direct presence remains available when browser storage is privacy-restricted.
+  }
+}
+
+function nextOutboundSequence(sessionId: string): number {
+  const timeFloor = Date.now() * 1_000;
+  const sequence = Math.max(
+    outboundSequenceBySessionId.get(sessionId) ?? 0,
+    readStoredOutboundSequence(sessionId),
+    timeFloor,
+  ) + 1;
+  if (!Number.isSafeInteger(sequence)) {
+    throw new Error("Virtual Studio presence sequence exhausted the safe integer range");
+  }
+  outboundSequenceBySessionId.set(sessionId, sequence);
+  writeStoredOutboundSequence(sessionId, sequence);
+  return sequence;
+}
+
 function isSafeZoneId(value: unknown): value is StudioVirtualSpaceZoneId {
   return typeof value === "string"
     && value.length > 0
@@ -205,7 +252,6 @@ export class StudioVirtualSpacePresenceController {
   private readonly reactionSequences = new Map<string, number>();
   private selfReaction: StudioVirtualSpaceReactionSnapshot | null = null;
   private readonly listeners = new Set<() => void>();
-  private sequence = 0;
   private dirty = true;
   private lastSentAt = 0;
   private closed = false;
@@ -225,6 +271,10 @@ export class StudioVirtualSpacePresenceController {
 
   private now(): number {
     return this.dependencies.now?.() ?? Date.now();
+  }
+
+  private nextSequence(): number {
+    return nextOutboundSequence(this.participant.sessionId);
   }
 
   private scheduleInterval(handler: () => void, delayMs: number): unknown {
@@ -329,7 +379,7 @@ export class StudioVirtualSpacePresenceController {
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
       kind: "reaction",
-      sequence: ++this.sequence,
+      sequence: this.nextSequence(),
       at: now,
       reaction,
     });
@@ -405,7 +455,7 @@ export class StudioVirtualSpacePresenceController {
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
       kind: "presence",
-      sequence: ++this.sequence,
+      sequence: this.nextSequence(),
       at: now,
       state: this.self,
     });
@@ -467,7 +517,7 @@ export class StudioVirtualSpacePresenceController {
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
       kind: "leave",
-      sequence: ++this.sequence,
+      sequence: this.nextSequence(),
       at: this.now(),
     });
     if (packet) {

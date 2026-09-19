@@ -413,3 +413,120 @@ describe("P2P huddle consent and delivery", () => {
     expect(setRemoteDescription).not.toHaveBeenCalled();
   });
 });
+
+function scopedMediaFixture(conversation: HuddleDependencies["conversation"] = { id: "conversation-one", peerIds: ["b"] }) {
+  const listeners = new Set<(sender: StudioLiveParticipant, raw: string) => void>();
+  const send = vi.fn((_target: string, _raw: string) => true);
+  const connections: RTCPeerConnection[] = [];
+  const createPeerConnection = vi.fn(() => {
+    const pc = {
+      connectionState: "new", signalingState: "stable", localDescription: null, remoteDescription: null,
+      addTransceiver: vi.fn(() => ({ sender: { replaceTrack: vi.fn(async () => undefined) } })),
+      setLocalDescription: vi.fn(async () => undefined), setRemoteDescription: vi.fn(async () => undefined),
+      addIceCandidate: vi.fn(async () => undefined), close: vi.fn(),
+      onicecandidate: null, ontrack: null, onnegotiationneeded: null, onconnectionstatechange: null,
+    } as unknown as RTCPeerConnection;
+    connections.push(pc); return pc;
+  });
+  const microphone = track("audio");
+  const camera = track("video");
+  const getUserMedia = vi.fn(async (constraints: MediaStreamConstraints) => stream([constraints.audio ? microphone : camera]));
+  const controller = new StudioP2pHuddleController(A, {
+    getPeers: () => [B, C], send,
+    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  }, { conversation, createPeerConnection, createStream: stream, getUserMedia, id: () => "epoch-a" });
+  sessions.push(controller); controller.start();
+  const receive = (sender: StudioLiveParticipant, packet: object) => {
+    for (const listener of listeners) listener(sender, JSON.stringify(packet));
+  };
+  const state = (extra: object = {}) => ({ kind: "state", epoch: "epoch-b", muted: false,
+    camera: true, sharing: false, hand: false, conversationId: "conversation-one", memberIds: ["a", "b"], ...extra });
+  return { controller, receive, state, send, createPeerConnection, connections, getUserMedia, microphone, camera };
+}
+
+describe("consented conversation media isolation", () => {
+  it("rejects outsiders, other conversations, and mismatched membership before creating RTC links", async () => {
+    const f = scopedMediaFixture();
+    f.receive(C, f.state());
+    f.receive(B, f.state({ conversationId: "conversation-other" }));
+    f.receive(B, f.state({ memberIds: ["a", "b", "c"] }));
+    f.receive(B, f.state({ conversationId: undefined, memberIds: undefined }));
+    expect(f.createPeerConnection).not.toHaveBeenCalled();
+    expect(f.controller.snapshot().peers).toEqual([]);
+    expect(f.getUserMedia).not.toHaveBeenCalled();
+
+    f.receive(B, f.state());
+    expect(f.createPeerConnection).toHaveBeenCalledOnce();
+    expect(f.controller.snapshot().peers.map((peer) => peer.participant.sessionId)).toEqual(["b"]);
+    const connection = f.connections[0]!;
+    const badSignal = { kind: "description", epoch: "epoch-b", toEpoch: "epoch-a", type: "offer", sdp: "private-sdp" };
+    f.receive(B, { ...badSignal, conversationId: "conversation-other", memberIds: ["a", "b"] });
+    f.receive(B, { ...badSignal, conversationId: "conversation-one", memberIds: ["a", "b", "c"] });
+    await Promise.resolve();
+    expect(connection.setRemoteDescription).not.toHaveBeenCalled();
+    f.receive(B, { ...badSignal, conversationId: "conversation-one", memberIds: ["a", "b"] });
+    await vi.waitFor(() => expect(connection.setRemoteDescription).toHaveBeenCalledWith({ type: "offer", sdp: "private-sdp" }));
+    await f.controller.setMicrophone(true);
+    expect(f.send.mock.calls.every(([target, raw]) => target === "b"
+      && JSON.parse(raw).conversationId === "conversation-one"
+      && JSON.stringify(JSON.parse(raw).memberIds) === '["a","b"]')).toBe(true);
+    expect(f.createPeerConnection).toHaveBeenCalledOnce();
+  });
+
+  it("cannot widen a conversation to outsiders through the proximity toggle", () => {
+    const f = scopedMediaFixture();
+    f.controller.setMediaPeerScope(["c"]);
+    f.receive(C, f.state({ epoch: "epoch-c", memberIds: ["a", "b", "c"] }));
+    f.receive(B, f.state());
+    expect(f.createPeerConnection).not.toHaveBeenCalled();
+    f.controller.setMediaPeerScope(null);
+    expect(f.createPeerConnection).toHaveBeenCalledOnce();
+    expect(f.controller.snapshot().peers.map((peer) => peer.participant.sessionId)).toEqual(["b"]);
+  });
+
+  it("stops remote tracks when a member loses media scope and drops late track events", () => {
+    const f = scopedMediaFixture(); f.receive(B, f.state());
+    const connection = f.connections[0]!;
+    const ontrack = connection.ontrack!;
+    const remote = track("audio");
+    ontrack.call(connection, { track: remote } as RTCTrackEvent);
+    expect(f.controller.snapshot().peers[0]?.stream?.getTracks()).toEqual([remote]);
+    f.controller.setMediaPeerScope([]);
+    expect(connection.close).toHaveBeenCalledOnce();
+    expect(remote.stop).toHaveBeenCalledOnce();
+    expect(f.controller.snapshot().peers[0]?.stream).toBeNull();
+    const late = track("video");
+    ontrack.call(connection, { track: late } as RTCTrackEvent);
+    expect(late.stop).toHaveBeenCalledOnce();
+    expect(f.controller.snapshot().peers[0]?.stream).toBeNull();
+  });
+
+  it("closes every local and remote media track when the consented conversation ends", async () => {
+    const f = scopedMediaFixture(); f.receive(B, f.state());
+    const connection = f.connections[0]!;
+    const remote = track("audio");
+    connection.ontrack?.call(connection, { track: remote } as RTCTrackEvent);
+    await f.controller.setMicrophone(true);
+    await f.controller.setVideo("camera");
+    f.controller.close();
+    expect(f.microphone.stop).toHaveBeenCalledOnce();
+    expect(f.camera.stop).toHaveBeenCalledOnce();
+    expect(remote.stop).toHaveBeenCalledOnce();
+    expect(connection.close).toHaveBeenCalledOnce();
+    expect(f.controller.snapshot().localStream).toBeNull();
+  });
+
+  it("does not admit scoped conversation packets into the general toolbar huddle", () => {
+    const receiveRef: { current?: (sender: StudioLiveParticipant, raw: string) => void } = {};
+    const controller = new StudioP2pHuddleController(A, {
+      getPeers: () => [B], send: () => true,
+      subscribe: (listener) => { receiveRef.current = listener; return () => undefined; },
+    });
+    sessions.push(controller); controller.start();
+    receiveRef.current?.(B, JSON.stringify({
+      kind: "state", epoch: "epoch-b", muted: true, camera: false, sharing: false, hand: false,
+      conversationId: "conversation-one", memberIds: ["a", "b"],
+    }));
+    expect(controller.snapshot().peers).toEqual([]);
+  });
+});

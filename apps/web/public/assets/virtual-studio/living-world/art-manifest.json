@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "kind": "virtual-studio-living-world",
+  "background": {
+    "output": "master-clean-plate.webp",
+    "runtimeUrl": "/assets/virtual-studio/living-world/master-clean-plate.webp",
+    "technique": "imagegen edit of the existing authored background",
+    "referencePixelIdentity": false,
+    "singleFlattenedLayer": true,
+    "removalIntent": ["baked human figures", "character nameplates", "speech bubbles", "cats"],
+    "preservationIntent": ["room layout", "furniture", "fountain mascot", "warm isometric art direction"]
+  },
+  "provenance": {
+    "reference": {
+      "path": "../production-v2/master-central-lossless.webp",
+      "sha256": "49b5bb57cebe4afeeb4c4b481ba17da2b10adc47aad27101fcf90f49180f146e",
+      "bytes": 1091280,
+      "dimensions": [869, 813]
+    },
+    "originalAuthoredMaster": {
+      "sourceSha256": "62d42f5fead432be3589504641f16ebf99c147c28091e1977c87a41bed23b14e",
+      "sourcePixelsReverified": false,
+      "provenance": "carried forward from production-v2/art-manifest.json"
+    },
+    "generation": {
+      "tool": "image_gen",
+      "mode": "edit",
+      "date": "2026-09-20",
+      "promptSummary": "Remove baked people, character labels, speech bubbles and cats while preserving the existing studio layout, furniture, fountain mascot and warm isometric art direction.",
+      "outputArtifact": "exec-70d77608-9c6a-47c5-851e-90e2176a3618.png",
+      "outputSha256": "06d79f1539f24afac01bf7ffba8adc48b8be3198975f31f68347c442a4fef096",
+      "outputBytes": 2716789,
+      "outputDimensions": [1296, 1213],
+      "outputStoredInRepository": false
+    },
+    "encoding": {
+      "tool": "cwebp",
+      "version": "1.6.0",
+      "commandTemplate": "cwebp -lossless -z 9 <imagegen-output.png> -o apps/web/public/assets/virtual-studio/living-world/master-clean-plate.webp",
+      "lossless": true,
+      "generatedPngPixelsCompared": true,
+      "decodedRgbaSha256": "94874295b03977492f41ee81a9cb155d0445e6e580191822731758ae95f28675"
+    }
+  },
+  "limitations": [
+    "generated clean plate, not pixel-identical to the authored reference",
+    "occluded floor and furniture pixels were reconstructed by image generation",
+    "single flattened background, not independently movable furniture layers",
+    "generated PNG pixel comparison is a recorded preparation check, not repeated by the repository verifier",
+    "existing character animation remains cutout-rig deformation, not redrawn poses"
+  ],
+  "outputs": {
+    "master-clean-plate.webp": {
+      "sha256": "4ddf70d019b26261a49eb1e16b7ab6b2bbe91b95593afa191dbb0724086c6f55",
+      "bytes": 2062398,
+      "dimensions": [1296, 1213]
+    }
+  }
+}

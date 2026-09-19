@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyStudioVirtualSpaceGamepadDeadzone,
   readStudioVirtualSpaceGamepadInput,
+  readStudioVirtualSpaceGamepadsInput,
   type StudioVirtualSpaceGamepadLike,
 } from "./studio-virtual-space-gamepad";
 
@@ -49,5 +50,14 @@ describe("Studio virtual space gamepad", () => {
       sprint: false,
       interact: false,
     });
+  });
+
+  it("uses an active second controller when the first connected pad is idle", () => {
+    const input = readStudioVirtualSpaceGamepadsInput([
+      pad(),
+      pad([0.8, 0], [10]),
+    ]);
+    expect(input.x).toBeGreaterThan(0);
+    expect(input.sprint).toBe(true);
   });
 });
