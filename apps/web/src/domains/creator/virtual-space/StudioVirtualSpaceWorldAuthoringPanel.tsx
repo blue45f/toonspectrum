@@ -25,6 +25,7 @@ import {
   writeStudioWorldAuthoringDraft,
 } from "./studio-virtual-space-world-authoring";
 import {
+  studioWorldRoomAt,
   validateStudioWorldManifest,
   type StudioVirtualSpaceWorldManifest,
   type StudioWorldInteractionDefinition,
@@ -35,6 +36,7 @@ import {
   type StudioWorldRoomDefinition,
   type StudioWorldSpawnDefinition,
 } from "./studio-virtual-space-world-manifest";
+import { resolveStudioWorldSpawn } from "./studio-virtual-space-world-pathfinding";
 
 type AuthoringSection =
   | "rooms"
@@ -275,6 +277,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
 
   const addEntity = () => {
     const center = { x: manifest.width / 2, y: manifest.height / 2 };
+    const safeCenter = resolveStudioWorldSpawn(manifest, center) ?? center;
     let next = manifest;
     const nextIndex = sectionLength(manifest, section);
     switch (section) {
@@ -311,8 +314,8 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
       case "interactions": {
         const interaction: StudioWorldInteractionDefinition = {
           id: uniqueId("interaction", manifest.interactions),
-          zoneId: roomIds[0] ?? "lounge",
-          point: center,
+          zoneId: studioWorldRoomAt(manifest, safeCenter),
+          point: safeCenter,
           radius: 64,
           labelKo: "새 상호작용",
           labelEn: "New Interaction",
@@ -324,10 +327,11 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
       case "portals": {
         const portal: StudioWorldPortalDefinition = {
           id: uniqueId("portal", manifest.portals),
-          point: center,
+          point: safeCenter,
           radius: 40,
-          targetRoomId: roomIds[0],
-          targetPoint: manifest.spawns[0]?.point ?? center,
+          targetRoomId: manifest.spawns[0]
+            ? studioWorldRoomAt(manifest, manifest.spawns[0].point)
+            : roomIds[0],
         };
         next = { ...manifest, portals: [...manifest.portals, portal] };
         break;
@@ -335,7 +339,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
       case "spawns": {
         const spawn: StudioWorldSpawnDefinition = {
           id: uniqueId("spawn", manifest.spawns),
-          point: center,
+          point: safeCenter,
           facing: "down",
         };
         next = { ...manifest, spawns: [...manifest.spawns, spawn] };
@@ -345,8 +349,8 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
         const npc: StudioWorldNpcDefinition = {
           id: uniqueId("npc", manifest.npcs),
           skinKey: "pink",
-          point: center,
-          roomId: roomIds[0] ?? "lounge",
+          point: safeCenter,
+          roomId: studioWorldRoomAt(manifest, safeCenter),
           facing: "down",
           scale: 1,
           speed: 72,
@@ -577,7 +581,13 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           <GeometryFields x={item.point.x} y={item.point.y} includeSize={false} onChange={(patch) => updatePortal({ point: { ...item.point, ...patch } })} />
           <div className="grid grid-cols-2 gap-2">
             <NumberField label="Radius" value={item.radius} min={1} onChange={(radius) => radius != null && updatePortal({ radius })} />
-            <SelectField label="Target room" value={item.targetRoomId} options={roomIds} allowEmpty onChange={(targetRoomId) => updatePortal({ targetRoomId })} />
+            <SelectField
+              label="Target room"
+              value={item.targetRoomId}
+              options={roomIds}
+              allowEmpty
+              onChange={(targetRoomId) => updatePortal({ targetRoomId, targetPoint: undefined })}
+            />
           </div>
           <TextField label="Route href" value={item.href} onChange={(href) => updatePortal({ href: href || undefined })} />
           <div className="grid grid-cols-2 gap-2">

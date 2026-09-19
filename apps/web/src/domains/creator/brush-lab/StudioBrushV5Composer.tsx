@@ -342,7 +342,7 @@ export function StudioBrushV5Composer({ scope }: { scope: string }) {
     const next = [entry, ...library.filter((candidate) => candidate.id !== draft.id)].slice(0, 40);
     setLibrary(next);
     writeLibrary(next);
-    setMessage(`"${draft.name}" 브러시 프로그램을 내 V5 라이브러리에 저장했습니다.`);
+    setMessage(`"${draft.name}" 브러시 프로그램을 내 라이브러리에 저장했습니다.`);
   }
 
   function duplicateProgram() {
@@ -361,7 +361,7 @@ export function StudioBrushV5Composer({ scope }: { scope: string }) {
     if (!file) return;
     try {
       if (file.size > 2 * 1024 * 1024) throw new Error("브러시 파일은 2MiB 이하만 가져올 수 있습니다.");
-      replace(parseBrushStudioV5Draft(await file.text()), `"${file.name}"에서 V5 브러시 프로그램을 가져왔습니다.`);
+      replace(parseBrushStudioV5Draft(await file.text()), `"${file.name}"에서 브러시 프로그램을 가져왔습니다.`);
     } catch (reason) {
       setImportError(reason instanceof Error ? reason.message : "브러시 파일을 읽지 못했습니다.");
     }
@@ -372,7 +372,7 @@ export function StudioBrushV5Composer({ scope }: { scope: string }) {
       <section className={`${CARD} overflow-hidden`} aria-labelledby="brush-v5-preview-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-accent">Brush Studio V5</p>
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-accent">Brush Studio</p>
             <h2 id="brush-v5-preview-heading" className="mt-1 text-xl font-black text-fg">{draft.name}</h2>
             <p className="mt-1 max-w-3xl text-xs leading-relaxed text-fg-3">실제 엔진 선택 계획과 물성 조합을 저장하는 새 브러시 프로그램입니다. 아래 캔버스는 조합을 빠르게 비교하기 위한 결정적 미리보기이며, provider 런타임의 최종 픽셀은 Engine Compare에서 검증합니다.</p>
           </div>
@@ -510,14 +510,14 @@ export function StudioBrushV5Composer({ scope }: { scope: string }) {
 
           <section className={CARD}>
             <h2 className="text-base font-bold text-fg">저장·공유</h2>
-            <p className="mt-1 text-xs leading-relaxed text-fg-3">현재 V5 프로그램은 브라우저 로컬 라이브러리와 독립 JSON에 저장됩니다.</p>
-            <div className="mt-3 grid gap-2"><button type="button" className={PRIMARY_BUTTON} disabled={!analysis.valid} onClick={saveToLibrary}>내 V5 브러시에 저장</button><button type="button" className={BUTTON} onClick={duplicateProgram}>새 ID로 복제</button><button type="button" className={BUTTON} onClick={() => downloadJson(draft)}>JSON 내보내기</button><button type="button" className={BUTTON} onClick={() => importRef.current?.click()}>JSON 가져오기</button><button type="button" className={BUTTON} onClick={() => replace(createDefaultBrushStudioV5Draft(), "새 기본 브러시로 초기화했습니다.")}>새로 만들기</button></div>
+            <p className="mt-1 text-xs leading-relaxed text-fg-3">현재 브러시 프로그램은 브라우저 로컬 라이브러리와 독립 JSON에 저장됩니다.</p>
+            <div className="mt-3 grid gap-2"><button type="button" className={PRIMARY_BUTTON} disabled={!analysis.valid} onClick={saveToLibrary}>내 브러시에 저장</button><button type="button" className={BUTTON} onClick={duplicateProgram}>새 ID로 복제</button><button type="button" className={BUTTON} onClick={() => downloadJson(draft)}>JSON 내보내기</button><button type="button" className={BUTTON} onClick={() => importRef.current?.click()}>JSON 가져오기</button><button type="button" className={BUTTON} onClick={() => replace(createDefaultBrushStudioV5Draft(), "새 기본 브러시로 초기화했습니다.")}>새로 만들기</button></div>
             <input ref={importRef} type="file" accept="application/json,.json" className="sr-only" onChange={(event) => void importProgram(event)} />
             {importError ? <p role="alert" className="mt-2 text-xs text-warn">{importError}</p> : null}
             <p className="mt-3 rounded-xl border border-line bg-bg-2/45 p-3 text-xs leading-relaxed text-fg-3" aria-live="polite">{message}</p>
           </section>
 
-          {library.length ? <section className={CARD}><h2 className="text-base font-bold text-fg">내 V5 브러시 · {library.length}</h2><ul className="mt-3 space-y-2">{library.map((entry) => <li key={entry.id} className="rounded-xl border border-line bg-bg-2/45 p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><strong className="block truncate text-sm text-fg">{entry.name}</strong><span className="mt-0.5 block text-[0.62rem] text-fg-3">{new Date(entry.updatedAt).toLocaleString()}</span></div><button type="button" className={`min-h-9 rounded-lg border border-line px-2 text-xs text-fg-3 hover:text-warn ${STUDIO_FOCUS_RING}`} onClick={() => deleteProgram(entry.id)}>삭제</button></div><button type="button" className={`${BUTTON} mt-2 w-full`} onClick={() => replace(entry.program, `"${entry.name}"을 불러왔습니다.`)}>불러오기</button></li>)}</ul></section> : null}
+          {library.length ? <section className={CARD}><h2 className="text-base font-bold text-fg">내 브러시 · {library.length}</h2><ul className="mt-3 space-y-2">{library.map((entry) => <li key={entry.id} className="rounded-xl border border-line bg-bg-2/45 p-3"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><strong className="block truncate text-sm text-fg">{entry.name}</strong><span className="mt-0.5 block text-[0.62rem] text-fg-3">{new Date(entry.updatedAt).toLocaleString()}</span></div><button type="button" className={`min-h-9 rounded-lg border border-line px-2 text-xs text-fg-3 hover:text-warn ${STUDIO_FOCUS_RING}`} onClick={() => deleteProgram(entry.id)}>삭제</button></div><button type="button" className={`${BUTTON} mt-2 w-full`} onClick={() => replace(entry.program, `"${entry.name}"을 불러왔습니다.`)}>불러오기</button></li>)}</ul></section> : null}
 
           <section className={CARD}>
             <h2 className="text-sm font-bold text-fg">현재 선택 요약</h2>

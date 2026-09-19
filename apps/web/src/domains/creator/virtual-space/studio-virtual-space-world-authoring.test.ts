@@ -72,6 +72,21 @@ describe("Virtual Studio world authoring", () => {
       DEFAULT_STUDIO_WORLD_MANIFEST.props.map((prop) => prop.id),
     );
     expect(restored.colliders).toHaveLength(DEFAULT_STUDIO_WORLD_MANIFEST.colliders.length);
+    expect(tiled).toMatchObject({
+      width: DEFAULT_STUDIO_WORLD_MANIFEST.width,
+      height: DEFAULT_STUDIO_WORLD_MANIFEST.height,
+      tilewidth: 1,
+      tileheight: 1,
+    });
+  });
+
+  it("exports odd integer pixel dimensions as valid integer Tiled dimensions", () => {
+    const manifest = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 869, height: 813 };
+    const tiled = studioWorldManifestToTiledMap(manifest);
+    expect(tiled).toMatchObject({ width: 869, height: 813, tilewidth: 1, tileheight: 1 });
+    expect(validateStudioWorldManifest({ ...manifest, width: 869.5 })).toContain(
+      "world dimensions must be integer pixels between 32 and 10000",
+    );
   });
 
   it("persists a valid project-scoped browser draft and clears it", () => {
@@ -104,6 +119,22 @@ describe("Virtual Studio world authoring", () => {
     expect(localStorage.length).toBe(0);
   });
 
+  it("does not persist a draft that would hide the editor behind an unsafe world", () => {
+    const invalid = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      props: [],
+      colliders: [{
+        x: 0,
+        y: 0,
+        width: DEFAULT_STUDIO_WORLD_MANIFEST.width,
+        height: DEFAULT_STUDIO_WORLD_MANIFEST.height,
+      }],
+    };
+
+    expect(writeStudioWorldAuthoringDraft("blocked-world", invalid)).toBe(false);
+    expect(localStorage.length).toBe(0);
+  });
+
   it("accepts a direct manifest import and rejects unsupported JSON", () => {
     const imported = parseStudioWorldAuthoringImport(
       JSON.stringify(DEFAULT_STUDIO_WORLD_MANIFEST),
@@ -115,5 +146,42 @@ describe("Virtual Studio world authoring", () => {
       JSON.stringify({ nope: true }),
       DEFAULT_STUDIO_WORLD_MANIFEST,
     )).toThrow("Unsupported world JSON format");
+  });
+
+  it("rejects direct JSON with missing required interaction and portal fields", () => {
+    const malformed = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      interactions: [{
+        id: "missing-interaction-fields",
+        zoneId: DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!.id,
+      }],
+      portals: [{
+        id: "missing-portal-radius",
+        point: { x: 420, y: 520 },
+        targetPoint: { x: 430, y: 530 },
+      }],
+    };
+
+    expect(() => parseStudioWorldAuthoringImport(
+      JSON.stringify(malformed),
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+    )).toThrow(/interaction geometry is invalid|interaction action is invalid/u);
+    expect(() => parseStudioWorldAuthoringImport(
+      JSON.stringify({ ...malformed, interactions: DEFAULT_STUDIO_WORLD_MANIFEST.interactions }),
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+    )).toThrow(/portal geometry is invalid/u);
+  });
+
+  it("rejects direct JSON whose required entity id is missing", () => {
+    const [firstRoom, ...remainingRooms] = DEFAULT_STUDIO_WORLD_MANIFEST.rooms;
+    const malformed = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      rooms: [{ ...firstRoom, id: undefined }, ...remainingRooms],
+    };
+
+    expect(() => parseStudioWorldAuthoringImport(
+      JSON.stringify(malformed),
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+    )).toThrow(/invalid room id/u);
   });
 });
