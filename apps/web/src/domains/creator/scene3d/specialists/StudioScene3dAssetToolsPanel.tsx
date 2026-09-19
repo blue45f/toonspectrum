@@ -1,3 +1,5 @@
+import { StudioScene3dJobStatus } from "./StudioScene3dJobStatus";
+import type { SpecialistJobProgress } from "./specialist-job-progress";
 import { SCENE3D_INPLACE_OPERATIONS } from "../integration/scene3d-inplace-contract";
 import type { Scene3dInplaceToolsBridge, Scene3dSelectedAssetInput } from "../integration/scene3d-inplace-contract";
 import type { SpecialistArtifact,
@@ -34,6 +36,7 @@ export function StudioScene3dAssetToolsPanel({
   const [name, setName] = useState("");
   const [secondName, setSecondName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [jobProgress, setJobProgress] = useState<SpecialistJobProgress | null>(null);
   const [activity, setActivity] = useState<"read-source" | "process" | "apply">("process");
   const [result, setResult] = useState<SpecialistResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +157,7 @@ export function StudioScene3dAssetToolsPanel({
   async function run(options: SpecialistOptions) {
     if (!source.current || busy || disabled) return;
     setActivity("process");
+    setJobProgress(null);
     const ticket = ++generation.current;
     const controller = new AbortController();
     active.current?.abort();
@@ -174,6 +178,9 @@ export function StudioScene3dAssetToolsPanel({
           options,
         },
         controller.signal,
+        { onProgress: (progress) => {
+          if (ticket === generation.current && !controller.signal.aborted) setJobProgress(progress);
+        } },
       );
       if (ticket === generation.current) {
         setResult(next);
@@ -509,10 +516,10 @@ export function StudioScene3dAssetToolsPanel({
         </button>
       </details>
       {busy && (
-        <div role="status" className="flex items-center gap-2 text-xs">
+        <div role="status" aria-live="polite" aria-atomic="true" className="flex items-center gap-2 text-xs">
           <span>{activity === "apply" ? t("파생본 저장·검증 후 장면에 적용 중…", "Saving and validating the derivative before applying it…")
             : activity === "read-source" ? t("원본을 안전하게 읽는 중…", "Reading the source…")
-            : t("Worker에서 가공 중…", "Processing in a worker…")}</span>
+            : <StudioScene3dJobStatus progress={jobProgress} />}</span>
           <button className={BUTTON} onClick={cancel}>
             {t("취소", "Cancel")}
           </button>

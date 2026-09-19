@@ -12,7 +12,10 @@ scope.onmessage = (event: MessageEvent<unknown>) => {
     .then(() => {
       const request = parseSpecialistRequest(event.data);
       id = request.id;
-      return runScene3dSpecialist(request);
+      let sequence = 0;
+      return runScene3dSpecialist(request, (phase) => {
+        scope.postMessage({ kind: "progress", version: 1, id, sequence: ++sequence, phase });
+      });
     })
     .then((result) => {
       const transfers = result.artifacts.map(
