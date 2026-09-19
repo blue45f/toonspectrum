@@ -49,6 +49,7 @@ scope.addEventListener("message", (event: MessageEvent<unknown>) => {
       width: request.input.width,
       height: request.input.height,
       rgba: new Uint8Array(request.input.rgbaBuffer),
+      ...(request.input.normalBuffer ? { normalRgba: new Uint8Array(request.input.normalBuffer) } : {}),
       ...(request.input.depthBuffer
         ? { depth: new Float32Array(request.input.depthBuffer) }
         : {}),

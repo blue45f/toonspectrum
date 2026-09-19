@@ -5,7 +5,7 @@ const tslNode = () => {
   const node: Record<string, unknown> = {};
   const chain = () => node;
   for (const method of [
-    "clamp", "mul", "div", "fract", "floor", "greaterThan", "select", "renderOutput", "toVar",
+    "add", "clamp", "mul", "div", "fract", "floor", "greaterThan", "select", "renderOutput", "toVar",
   ]) node[method] = chain;
   node.a = node;
   node.rgb = node;
@@ -15,6 +15,9 @@ const tslNode = () => {
 vi.mock("three/tsl", () => ({
   Fn: (body: (args: readonly unknown[]) => unknown) => (...args: readonly unknown[]) => body(args),
   depth: tslNode(),
+  output: tslNode(),
+  normalView: tslNode(),
+  mrt: (nodes: unknown) => ({ nodes }),
   float: () => tslNode(),
   screenUV: tslNode(),
   texture: () => tslNode(),
@@ -62,12 +65,14 @@ function createStudioBg3dThreeWebGpuCaptureAdapter(...args: Parameters<typeof cr
 interface FakeRendererOptions {
   readonly colorBytes?: Uint8Array;
   readonly depthBytes?: Uint8Array;
+  readonly normalBytes?: Uint8Array;
 }
 
 function createFakeWebGpuRenderer(options: FakeRendererOptions = {}) {
   const reads: Uint8Array[] = [];
   if (options.colorBytes) reads.push(options.colorBytes);
   if (options.depthBytes) reads.push(options.depthBytes);
+  if (options.normalBytes) reads.push(options.normalBytes);
   let readIndex = 0;
   const state = {
     isWebGPURenderer: true,
@@ -113,7 +118,7 @@ function createFakeWebGpuRenderer(options: FakeRendererOptions = {}) {
       );
     },
     readRenderTargetPixelsAsync: vi.fn(async (_target?: THREE.RenderTarget, _x?: number,
-      _y?: number, _width?: number, _height?: number) => {
+      _y?: number, _width?: number, _height?: number, _textureIndex?: number) => {
       const next = reads[Math.min(readIndex, reads.length - 1)];
       readIndex += 1;
       return next ?? new Uint8Array(0);
@@ -387,4 +392,50 @@ it("replacement Views cannot bypass the GPU budget of an unmounted pending captu
   expect(renderer.renderCalls).toBe(1);
   reject(new Error("copy cancelled")); await rejected;
   second.dispose?.();
+});
+
+
+it("captures paired depth and normals from one MRT geometry draw without changing legacy color", async () => {
+  const renderer = createFakeWebGpuRenderer({ colorBytes: new Uint8Array(16),
+    depthBytes: new Uint8Array([128, 0, 0, 0, 255, 255, 255, 255, 128, 0, 0, 0, 128, 0, 0, 0]),
+    normalBytes: new Uint8Array([128, 128, 255, 255, 255, 255, 255, 255, 128, 128, 255, 255, 255, 128, 128, 255]) });
+  const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never, scene: scene(), camera });
+  const result = await adapter.capture({ width: 2, height: 2, includeDepth: true, includeNormals: true,
+    background: { color: "#000000", alpha: 0 } });
+  expect(renderer.renderCalls).toBe(2); // beauty + a single shared depth/normal traversal
+  expect(renderer.targetsAtDraw[1]?.textures).toHaveLength(2);
+  expect(renderer.readRenderTargetPixelsAsync.mock.calls[2]?.[5]).toBe(1);
+  expect(Array.from(result.normalRgba!.slice(4, 8))).toEqual([0, 0, 0, 0]);
+  expect(Array.from(result.normalRgba!.slice(0, 4))).toEqual([128, 128, 255, 255]);
+  expect(renderer.mrt).toEqual({ test: "existing-mrt" });
+});
+
+it("rejects normals without paired depth before any rendering", async () => {
+  const renderer = createFakeWebGpuRenderer();
+  const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never, scene: scene(), camera });
+  await expect(adapter.capture({ width: 2, height: 2, includeDepth: false, includeNormals: true,
+    background: { color: "#000000", alpha: 0 } })).rejects.toThrow(/matching depth/);
+  expect(renderer.renderCalls).toBe(0);
+});
+
+
+it("drains an in-flight depth read when the normal copy fails before returning a promise", async () => {
+  const renderer = createFakeWebGpuRenderer({ colorBytes: new Uint8Array(16) });
+  let finishDepth!: (value: Uint8Array) => void;
+  renderer.readRenderTargetPixelsAsync
+    .mockImplementationOnce(async () => new Uint8Array(16))
+    .mockImplementationOnce(() => new Promise((resolve) => { finishDepth = resolve; }))
+    .mockImplementationOnce(() => { throw new Error("normal copy failed"); });
+  const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never, scene: scene(), camera });
+  const pending = adapter.capture({ width: 2, height: 2, includeDepth: true, includeNormals: true,
+    background: { color: "#000000", alpha: 0 } });
+  const geometryTarget = renderer.targetsAtDraw[1]!;
+  const destroy = vi.spyOn(geometryTarget, "dispose");
+  const rejected = expect(pending).rejects.toThrow("normal copy failed");
+  adapter.dispose?.();
+  expect(destroy).not.toHaveBeenCalled();
+  finishDepth(new Uint8Array(16));
+  await rejected;
+  expect(destroy).toHaveBeenCalledOnce();
+  expect(renderer.mrt).toEqual({ test: "existing-mrt" });
 });

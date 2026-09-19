@@ -4,9 +4,10 @@ import * as THREE from "three";
 
 import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
-  STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+  STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
+  assertStudioBg3dCaptureRequest,
 } from "./studio-bg3d-capture-adapter";
-import { assertStudioBg3dCaptureBudget } from "./studio-bg3d-capture-budget";
+import { captureStudioBg3dThreeNormals } from "./studio-bg3d-three-normal-capture";
 import { hideStudioBg3dCaptureExcludedObjects } from "./studio-bg3d-capture-exclusion";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
@@ -159,10 +160,11 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
   }
 
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
-    assertStudioBg3dCaptureBudget(request);
+    assertStudioBg3dCaptureRequest(request);
     const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
     let colorReadback: Promise<Uint8ClampedArray>;
     let depthReadback: Promise<Float32Array> | undefined;
+    let normalReadback: Promise<Uint8ClampedArray> | undefined;
     try {
       colorReadback = captureStudioBg3dThreeWebglColor({ camera, renderer, request, scene });
       if (request.includeDepth) {
@@ -174,21 +176,30 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
           height: request.height,
         });
       }
+      if (request.includeNormals) {
+        normalReadback = captureStudioBg3dThreeNormals({ renderer, scene, camera,
+          width: request.width, height: request.height });
+      }
     } finally {
-      // Both GPU passes submit their readback work before their first await and restore renderer
+      // All GPU passes submit their readback work before their first await and restore renderer
       // state themselves. Keep viewport-only objects hidden through both submissions, then restore
       // their exact original visibility while the GPU fence(s) are pending.
       restoreCaptureExcludedObjects();
     }
-    const [rgba, depth] = await Promise.all([
-      colorReadback!,
-      depthReadback ?? Promise.resolve(undefined),
-    ]);
+    // Drain every submitted copy before propagating failure; never abandon a GPU fence.
+    const results = await Promise.allSettled([colorReadback!, depthReadback, normalReadback]);
+    const rejected = results.find((result) => result.status === "rejected");
+    if (rejected?.status === "rejected") throw rejected.reason;
+    const rgba = results[0].status === "fulfilled" ? results[0].value : undefined;
+    const depth = results[1].status === "fulfilled" ? results[1].value : undefined;
+    const normalRgba = results[2].status === "fulfilled" ? results[2].value : undefined;
+    if (!rgba) throw new Error("Missing WebGL color capture.");
     return {
       width: request.width,
       height: request.height,
       rgba,
       ...(depth ? { depth } : {}),
+      ...(normalRgba ? { normalRgba } : {}),
     };
   }
 
@@ -197,8 +208,9 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
     engineId: "three" as const,
     engineVersion: String(THREE.REVISION).toLowerCase(),
     implementationRevision: renderer.extensions?.has("EXT_color_buffer_float")
-      ? "studio-three-webgl-capture-adapter-v2-hdr"
-      : STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+      ? "studio-three-webgl-capture-adapter-v3-hdr-normals"
+      : "studio-three-webgl-capture-adapter-v3-ldr-normals",
+    normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
     graphicsApi: "webgl2" as const,
     profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
     getSourceSize: () => ({

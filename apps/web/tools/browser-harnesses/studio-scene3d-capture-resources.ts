@@ -1,5 +1,7 @@
 import * as THREE from "three";
 
+import { renderStudioBg3dLtLayersInWorker } from "../../src/domains/creator/bg3d/studio-bg3d-lt-render-worker-client";
+import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "../../src/domains/creator/bg3d/studio-bg3d-scene-document";
 import { createStudioBg3dThreeWebglCaptureAdapter } from "../../src/domains/creator/bg3d/studio-bg3d-three-webgl-capture";
 import { createStudioBg3dThreeWebGpuCaptureAdapter } from "../../src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture";
 import { createStudioBg3dThreeWebGpuRenderer } from "../../src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer";
@@ -49,10 +51,19 @@ async function run() {
   const glAdapter = createStudioBg3dThreeWebglCaptureAdapter({ renderer: gl, scene, camera });
   try {
     assert(gl.extensions.has("EXT_color_buffer_float"), "WebGL float-target extension is unavailable for HDR parity.");
-    const request = { width: 64, height: 64, includeDepth: true,
+    const request = { width: 64, height: 64, includeDepth: true, includeNormals: true,
       background: { color: "#000000", alpha: 0 } } as const;
     const first = await gpuAdapter.capture(request);
     const reference = await glAdapter.capture(request);
+    assert(first.normalRgba && reference.normalRgba, "Requested normals were not produced.");
+    const normalCenter = Array.from(first.normalRgba.slice((32 * 64 + 32) * 4, (32 * 64 + 32) * 4 + 4));
+    assert(normalCenter.every((value, index) => Math.abs(value - [128, 128, 255, 255][index]!) <= 1),
+      `View normal differs from the independent plane oracle: ${normalCenter}`);
+    let maxNormalDelta = 0;
+    for (let i = 0; i < first.normalRgba.length; i += 1) {
+      maxNormalDelta = Math.max(maxNormalDelta, Math.abs(first.normalRgba[i]! - reference.normalRgba[i]!));
+    }
+    assert(maxNormalDelta <= 1, `WebGPU/WebGL normal parity failed: ${maxNormalDelta}`);
     const expected = [expectedChannel(4), expectedChannel(1), expectedChannel(0.25), 255];
     const actual = center(first); const glPixel = center(reference);
     assert(actual.every((value, index) => Math.abs(value - expected[index]!) <= 2),
@@ -72,18 +83,81 @@ async function run() {
       durations.push(performance.now() - start);
       assert(next.rgba.every((value, index) => value === first.rgba[index]), "Reused capture changed pixels.");
       assert(next.depth?.every((value, index) => value === first.depth?.[index]), "Reused capture changed depth.");
+      assert(next.normalRgba?.every((value, index) => value === first.normalRgba?.[index]), "Reused capture changed normals.");
       assert(tracked.size === warmTargetCount, "Warm capture allocated another render target.");
     }
     const largeCaptures = [];
     for (const size of [2048, 4096]) {
       const start = performance.now();
-      const image = await gpuAdapter.capture({ ...request, width: size, height: size, includeDepth: false });
+      const image = await gpuAdapter.capture({ ...request, width: size, height: size, includeDepth: false, includeNormals: false });
       assert(image.rgba.length === size * size * 4, "High-resolution capture dimensions were changed.");
       assert(center(image).every((value, index) => Math.abs(value - expected[index]!) <= 2),
         "High-resolution capture changed HDR pixels.");
       largeCaptures.push({ width: size, height: size, byteLength: image.rgba.length,
         centerRgba: center(image), elapsedMs: performance.now() - start });
     }
+    // Actual mesh -> paired geometry MRT -> real module Worker -> artist-facing crease control.
+    const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const cube = new THREE.Mesh(cubeGeometry, material);
+    cube.rotation.set(0.2, 0.55, 0);
+    scene.clear(); scene.add(cube);
+    const cubeRaster = await gpuAdapter.capture({ ...request, width: 128, height: 128 });
+    assert(cubeRaster.normalRgba?.some((value, index) => index % 4 === 3 && value === 0),
+      "Normal background did not preserve the no-surface mask.");
+    const settings = { line: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.line,
+      enabled: true, strength: 1, depthEnabled: true, depthStrength: 1, depthOutlineOnly: false,
+      exteriorOutlineStrength: 0, textureLineEnabled: false, creaseAngleDegrees: 25 },
+      tone: { ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.output.tone, mode: "none" as const } };
+    const lower = await renderStudioBg3dLtLayersInWorker(cubeRaster, settings);
+    const higher = await renderStudioBg3dLtLayersInWorker(cubeRaster,
+      { ...settings, line: { ...settings.line, creaseAngleDegrees: 150 } });
+    const alphaSum = (layers: typeof lower.layers) => layers.reduce((total, layer) => {
+      if (layer.role !== "main-line") return total;
+      for (let i = 3; i < layer.data.length; i += 4) total += layer.data[i]!;
+      return total;
+    }, 0);
+    const crease = { lowAngleAlphaSum: alphaSum(lower.layers), highAngleAlphaSum: alphaSum(higher.layers) };
+    assert(crease.lowAngleAlphaSum > crease.highAngleAlphaSum, "Changing crease angle did not change real Worker line pixels.");
+    const perspectiveCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 10);
+    perspectiveCamera.position.set(0.1, 0.15, 2.2);
+    perspectiveCamera.lookAt(0, 0, 0); perspectiveCamera.updateMatrixWorld(true);
+    const perspectiveGpu = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer, scene, camera: perspectiveCamera });
+    const perspectiveGl = createStudioBg3dThreeWebglCaptureAdapter({ renderer: gl, scene, camera: perspectiveCamera });
+    const perspective = { comparedSurfacePixels: 0, coverageMismatchPixels: 0, maxNormalDelta: 0 };
+    try {
+      // Odd dimensions exercise WebGPU's aligned rows as well as the perspective normal matrix.
+      const perspectiveRequest = { ...request, width: 65, height: 63 };
+      const gpu = await perspectiveGpu.capture(perspectiveRequest);
+      const reference = await perspectiveGl.capture(perspectiveRequest);
+      assert(gpu.normalRgba && reference.normalRgba, "Perspective normals missing.");
+      for (let offset = 0; offset < gpu.normalRgba.length; offset += 4) {
+        const a = gpu.normalRgba[offset + 3]!;
+        const b = reference.normalRgba[offset + 3]!;
+        if (a !== b) perspective.coverageMismatchPixels += 1;
+        if (!a || !b) continue;
+        perspective.comparedSurfacePixels += 1;
+        for (let channel = 0; channel < 3; channel += 1) {
+          perspective.maxNormalDelta = Math.max(perspective.maxNormalDelta,
+            Math.abs(gpu.normalRgba[offset + channel]! - reference.normalRgba[offset + channel]!));
+        }
+      }
+      assert(perspective.comparedSurfacePixels > 100, "Perspective proof had no meaningful geometry coverage.");
+      assert(perspective.coverageMismatchPixels <= 4 && perspective.maxNormalDelta <= 2,
+        `Perspective normal parity exceeded the explicit raster tolerance: ${JSON.stringify(perspective)}`);
+    } finally { perspectiveGpu.dispose?.(); perspectiveGl.dispose?.(); }
+    const appendPreview = (label: string, rgba: Uint8Array | Uint8ClampedArray) => {
+      const title = document.createElement("h2"); title.textContent = label; document.body.append(title);
+      const preview = document.createElement("canvas"); preview.width = 128; preview.height = 128;
+      preview.style.cssText = "width:256px;height:256px;background:white;image-rendering:pixelated";
+      preview.getContext("2d")?.putImageData(new ImageData(new Uint8ClampedArray(rgba), 128, 128), 0, 0);
+      document.body.append(preview);
+    };
+    appendPreview("Cube geometry normals", cubeRaster.normalRgba!);
+    for (const [label, result] of [["Crease angle 25 degrees", lower], ["Crease angle 150 degrees", higher]] as const) {
+      const line = result.layers.find((layer) => layer.role === "main-line");
+      if (line) appendPreview(label, line.data);
+    }
+    cubeGeometry.dispose();
     const device = (renderer.backend as unknown as { device?: { adapterInfo?: {
       vendor?: string; architecture?: string; isFallbackAdapter?: boolean;
     } } }).device;
@@ -97,9 +171,10 @@ async function run() {
     return { status: "ok", implementationRevision: gpuAdapter.implementationRevision,
       actualDevice: { vendor: info?.vendor ?? null, architecture: info?.architecture ?? null,
         isFallbackAdapter: info?.isFallbackAdapter ?? null },
+      normals: { center: normalCenter, maxBackendDelta: maxNormalDelta, perspective }, crease,
       hdr: { expected, webgpu: actual, webgl: glPixel, maxChannelDelta },
       reuse: { captures: 9, warmTargetCount, extraTargetsDuringEightWarmCaptures: 0,
-        targetCountAfterLargeCaptures: tracked.size, disposedTargets: disposedTargets.size },
+        totalTargetCount: tracked.size, disposedTargets: disposedTargets.size },
       warmCaptureElapsedMs: durations, largeCaptures };
   } finally {
     gpuAdapter.dispose?.(); glAdapter.dispose?.();
