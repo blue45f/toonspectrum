@@ -330,7 +330,7 @@ function renderNodes(ctx: RenderContext, nodes: SceneNodeIR[]): void {
   }
 }
 
-function renderScene(
+export function renderSceneToCanvas(
   ck: CanvasKit,
   canvas: Canvas,
   scene: SceneIR,
@@ -366,7 +366,7 @@ export function renderSceneToPixels(
 ): Uint8Array {
   const surface = makeRasterSurface(ck, scene.width, scene.height);
   try {
-    renderScene(ck, surface.getCanvas(), scene, options);
+    renderSceneToCanvas(ck, surface.getCanvas(), scene, options);
     surface.flush();
     const pixels = surface
       .getCanvas()
@@ -398,7 +398,7 @@ export function renderSceneToPng(
 ): Uint8Array {
   const surface = makeRasterSurface(ck, scene.width, scene.height);
   try {
-    renderScene(ck, surface.getCanvas(), scene, options);
+    renderSceneToCanvas(ck, surface.getCanvas(), scene, options);
     surface.flush();
     const image = surface.makeImageSnapshot();
     try {

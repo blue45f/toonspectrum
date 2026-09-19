@@ -1,6 +1,6 @@
 import { standardZigzagStrokeSamples } from "./raster-compile";
 
-import type { LibMypaintRaw } from "./libmypaint/index";
+import type { LibMypaintDirtyFrame, LibMypaintRaw } from "./libmypaint/index";
 import type { RasterStrokeSample } from "./raster-compile";
 
 /**
@@ -21,6 +21,8 @@ import type { RasterStrokeSample } from "./raster-compile";
  * - finish pumps up to 8 idle events of 16 ms at the last position/pressure
  *   so slow-tracking tails resolve (the Hokusai finishStroke behavior).
  */
+
+export type { LibMypaintDirtyFrame } from "./libmypaint/index";
 
 export type LibMypaintCurvePoint = [number, number];
 
@@ -104,11 +106,227 @@ export interface RenderLibMypaintStrokeResult {
   settings: ApplyMybSettingsResult;
 }
 
+export interface LibMypaintIncrementalStrokeOptions {
+  width: number;
+  height: number;
+  /** Seed for libmypaint's stroke-local random state. */
+  seed?: number;
+  /** Number of 16 ms idle samples used to resolve slow-tracking tails. */
+  finishTailSteps?: number;
+}
+
+export interface LibMypaintIncrementalAppendResult {
+  /** Number of source samples accepted by this append. */
+  readonly sampleCount: number;
+  /** Number of samples for which libmypaint reported visible paint. */
+  readonly paintedSamples: number;
+}
+
+export interface LibMypaintIncrementalStrokeSession {
+  readonly width: number;
+  readonly height: number;
+  readonly settings: ApplyMybSettingsResult;
+  /** Append absolute-time samples. Chunk boundaries never alter dtime semantics. */
+  append(samples: readonly RasterStrokeSample[]): LibMypaintIncrementalAppendResult;
+  /** Fresh straight-alpha RGBA8 snapshot of the current bounded surface. */
+  frame(): Uint8Array;
+  /** Consume changed pixels since the last successful take; null when no native tiles changed. */
+  takeDirtyFrame(): LibMypaintDirtyFrame | null;
+  /** Finish the tail once, then consume only its pending dirty pixels (never a full-frame copy). */
+  finishDirty(): LibMypaintDirtyFrame | null;
+  /**
+   * Resolve the configured slow-tracking tail once and return the final frame.
+   * Repeated calls are idempotent and never advance the brush a second time.
+   */
+  finish(): Uint8Array;
+  /** Idempotently release the brush and surface allocated in WASM. */
+  dispose(): void;
+}
+
+export const LIBMYPAINT_MAX_SURFACE_DIMENSION = 4_096;
+export const LIBMYPAINT_MAX_SURFACE_PIXELS = 4_194_304;
+// The pinned bridge reseeds libc's module-global RNG. Two active high-level strokes must not
+// interleave on one WASM instance; separate workers/instances remain independent.
+const activeLibMypaintModules = new WeakSet<object>();
+
+function positiveSurfaceDimension(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0 || value > LIBMYPAINT_MAX_SURFACE_DIMENSION) {
+    throw new RangeError("libmypaint " + name + " must be a positive integer no larger than 4096");
+  }
+  return value;
+}
+
+function finiteSample(sample: RasterStrokeSample): boolean {
+  return Number.isFinite(sample.x)
+    && Number.isFinite(sample.y)
+    && Number.isFinite(sample.pressure)
+    && Number.isFinite(sample.tiltX)
+    && Number.isFinite(sample.tiltY)
+    && Number.isFinite(sample.tMs);
+}
+
+function clampUnit(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function clampSignedUnit(value: number): number {
+  return Math.min(1, Math.max(-1, value));
+}
+
+/**
+ * Persistent libmypaint session for a live/Worker product lane.
+ *
+ * The old parity renderer recreated a brush+surface for every whole-stroke call. Product input
+ * arrives in coalesced pointer batches, so a real provider needs one brush state and one bounded
+ * surface for the complete stroke. This session preserves exactly the old timing/tail semantics
+ * while making batching explicit; tests lock batch partitioning to byte-identical final pixels.
+ *
+ * takeDirtyFrame()/finishDirty() copy only the union of native end_atomic dirty bounds.
+ * frame()/finish() remain explicit whole-surface reference/export snapshots. Patch consumers
+ * replace RGBA bytes at x/y; source-over blending would double-apply translucent paint.
+ */
+export function createLibMypaintIncrementalStrokeSession(
+  lmp: LibMypaintRaw,
+  document: LibMypaintBrushDocument,
+  options: LibMypaintIncrementalStrokeOptions,
+): LibMypaintIncrementalStrokeSession {
+  const width = positiveSurfaceDimension(options.width, "width");
+  const height = positiveSurfaceDimension(options.height, "height");
+  if (width * height > LIBMYPAINT_MAX_SURFACE_PIXELS) {
+    throw new RangeError("libmypaint stroke surface exceeds the 16 MiB RGBA8 budget");
+  }
+  const seed = options.seed ?? 7;
+  if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffff_ffff) {
+    throw new RangeError("libmypaint seed must be an unsigned 32-bit integer");
+  }
+  const finishTailSteps = options.finishTailSteps ?? 8;
+  if (!Number.isSafeInteger(finishTailSteps) || finishTailSteps < 0 || finishTailSteps > 64) {
+    throw new RangeError("libmypaint finishTailSteps must be an integer in [0, 64]");
+  }
+
+  const moduleIdentity = lmp.module;
+  if (activeLibMypaintModules.has(moduleIdentity)) {
+    throw new Error("libmypaint WASM instance already has an active stroke; finish/dispose it or use a separate instance");
+  }
+  activeLibMypaintModules.add(moduleIdentity);
+  let ownsModule = true;
+  let brush = 0;
+  let surface = 0;
+  function releaseModule(): void {
+    if (!ownsModule) return;
+    ownsModule = false;
+    activeLibMypaintModules.delete(moduleIdentity);
+  }
+  function freeHandles(): void {
+    const previousSurface = surface;
+    const previousBrush = brush;
+    surface = 0;
+    brush = 0;
+    try {
+      if (previousSurface) lmp.surfaceFree(previousSurface);
+    } finally {
+      try { if (previousBrush) lmp.brushFree(previousBrush); } finally { releaseModule(); }
+    }
+  }
+  let settings: ApplyMybSettingsResult;
+  try {
+    brush = lmp.brushNew();
+    if (!brush) throw new Error("libmypaint could not allocate a brush");
+    surface = lmp.surfaceNew(width, height);
+    if (!surface) throw new Error("libmypaint could not allocate " + width + "x" + height + " surface");
+    settings = applyMybSettings(lmp, brush, document);
+    lmp.brushNewStroke(brush, seed);
+  } catch (error) {
+    try { freeHandles(); } catch { /* Retain the original allocation/configuration error. */ }
+    throw error;
+  }
+
+  let previousTMs: number | undefined;
+  let lastSample: RasterStrokeSample | null = null;
+  let phase: "active" | "finished" | "failed" | "disposed" = "active";
+  function assertUsable(operation: string): void {
+    if (phase === "disposed" || phase === "failed") {
+      throw new Error("libmypaint stroke session is " + phase + "; cannot " + operation);
+    }
+  }
+  function fail(error: unknown): never {
+    phase = "failed";
+    try { freeHandles(); } catch { /* Teardown cannot replace the original native error. */ }
+    throw error;
+  }
+  function append(samples: readonly RasterStrokeSample[]): LibMypaintIncrementalAppendResult {
+    assertUsable("append");
+    if (phase === "finished") throw new Error("libmypaint stroke session is finished; cannot append");
+    // Validate the entire batch before painting. A bad final sample must not leave an
+    // undocumented partially-accepted prefix on the native surface.
+    let clock = previousTMs ?? 0;
+    for (const sample of samples) {
+      if (!finiteSample(sample)) throw new TypeError("libmypaint stroke sample contains a non-finite channel");
+      if (sample.tMs < clock) throw new RangeError("libmypaint sample timestamps must be nonnegative and monotonic");
+      clock = sample.tMs;
+    }
+    let paintedSamples = 0;
+    try {
+      for (const sample of samples) {
+        const dtime = previousTMs === undefined ? 0.0001 : (sample.tMs - previousTMs) / 1000;
+        const accepted = {
+          x: sample.x, y: sample.y, pressure: clampUnit(sample.pressure),
+          tiltX: clampSignedUnit(sample.tiltX), tiltY: clampSignedUnit(sample.tiltY), tMs: sample.tMs,
+        };
+        paintedSamples += lmp.strokeTo(
+          brush, surface, accepted.x, accepted.y, accepted.pressure,
+          accepted.tiltX, accepted.tiltY, dtime,
+        ) ? 1 : 0;
+        previousTMs = accepted.tMs;
+        lastSample = accepted; // Never retain a caller-owned mutable sample for the finish tail.
+      }
+    } catch (error) { return fail(error); }
+    return Object.freeze({ sampleCount: samples.length, paintedSamples });
+  }
+  function frame(): Uint8Array {
+    assertUsable("read frame");
+    try {
+      const pixels = lmp.surfaceToRgba8(surface, width, height);
+      if (!(pixels instanceof Uint8Array) || pixels.byteLength !== width * height * 4) {
+        throw new Error("libmypaint returned an invalid RGBA8 surface");
+      }
+      return pixels;
+    } catch (error) { return fail(error); }
+  }
+  function resolveTail(): void {
+    assertUsable("finish");
+    if (phase === "active") {
+      try {
+        if (lastSample) {
+          for (let step = 0; step < finishTailSteps; step += 1) {
+            lmp.strokeTo(brush, surface, lastSample.x, lastSample.y, lastSample.pressure, 0, 0, 0.016);
+          }
+        }
+        phase = "finished";
+        releaseModule();
+      } catch (error) { return fail(error); }
+    }
+  }
+  function takeDirtyFrame(): LibMypaintDirtyFrame | null {
+    assertUsable("read dirty frame");
+    try { return lmp.surfaceTakeDirtyFrame(surface); } catch (error) { return fail(error); }
+  }
+  function finish(): Uint8Array { resolveTail(); return frame(); }
+  function finishDirty(): LibMypaintDirtyFrame | null { resolveTail(); return takeDirtyFrame(); }
+  return {
+    width, height, settings, append, frame, finish, takeDirtyFrame, finishDirty,
+    dispose() {
+      if (phase === "disposed") return;
+      phase = "disposed";
+      freeHandles();
+    },
+  };
+}
+
 /**
  * Render one deterministic stroke with a `.myb`-programmed libmypaint brush.
- * A fresh brush is created per render: libmypaint's per-brush RngDouble is
- * seeded only at construction (constant 1000), so reusing one brush across
- * renders would drift its RNG stream and break same-input-same-sha.
+ * A fresh brush is created per render and the pinned bridge resets both brush dynamics
+ * and the module-global libc RNG. Only one active session can own each WASM module.
  */
 export function renderLibMypaintStroke(
   lmp: LibMypaintRaw,
@@ -121,53 +339,21 @@ export function renderLibMypaintStroke(
   const sampleCount = options.sampleCount ?? 96;
   const samples =
     options.samples ?? standardZigzagStrokeSamples(width, height, sampleCount);
-
-  const brush = lmp.brushNew();
-  const surface = lmp.surfaceNew(width, height);
+  const session = createLibMypaintIncrementalStrokeSession(lmp, document, {
+    width,
+    height,
+    seed,
+  });
   try {
-    const settings = applyMybSettings(lmp, brush, document);
-    lmp.brushNewStroke(brush, seed);
-
-    let previousTMs: number | undefined;
-    let lastX = 0;
-    let lastY = 0;
-    let lastPressure = 0;
-    for (const sample of samples) {
-      const dtime =
-        previousTMs === undefined
-          ? 0.0001
-          : Math.max(0, sample.tMs - previousTMs) / 1000;
-      lmp.strokeTo(
-        brush,
-        surface,
-        sample.x,
-        sample.y,
-        Math.min(1, Math.max(0, sample.pressure)),
-        Math.min(1, Math.max(-1, sample.tiltX)),
-        Math.min(1, Math.max(-1, sample.tiltY)),
-        dtime,
-      );
-      previousTMs = sample.tMs;
-      lastX = sample.x;
-      lastY = sample.y;
-      lastPressure = sample.pressure;
-    }
-    // Pointer-up tail: resolve slow-tracking lag with idle 16 ms events.
-    if (samples.length > 0) {
-      for (let step = 0; step < 8; step += 1) {
-        lmp.strokeTo(brush, surface, lastX, lastY, lastPressure, 0, 0, 0.016);
-      }
-    }
-
+    session.append(samples);
     return {
-      frame: lmp.surfaceToRgba8(surface, width, height),
+      frame: session.finish(),
       width,
       height,
-      settings,
+      settings: session.settings,
     };
   } finally {
-    lmp.surfaceFree(surface);
-    lmp.brushFree(brush);
+    session.dispose();
   }
 }
 

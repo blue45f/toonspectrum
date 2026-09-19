@@ -76,7 +76,6 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-project-document", path: studioRoutePath("project-document"), element: <StudioDocumentWorkspaceRoute /> },
   { id: "creator-studio-draft-document", path: studioRoutePath("draft-document"), element: <StudioDocumentWorkspaceRoute /> },
 
-  // Canonical six-stage project shell. The route registry keeps every section under one owner.
   { id: "creator-studio-project-root", path: studioRoutePath("project-root"), element: <Navigate to="overview" replace /> },
   { id: "creator-studio-project-overview", path: studioRoutePath("project-overview"), element: <StudioProjectShellPage section="overview" /> },
   { id: "creator-studio-project-story", path: studioRoutePath("project-story"), element: <StudioProjectShellPage section="story" /> },

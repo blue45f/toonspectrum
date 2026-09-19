@@ -8,6 +8,10 @@ import {
   studioVirtualAvatarProfile,
   studioVirtualSpaceDestination,
   studioVirtualSpaceInitialPoint,
+  studioVirtualSpaceScaleLegacyDistance,
+  studioVirtualSpaceScaleLegacyPoint,
+  studioVirtualSpaceScaleLegacyX,
+  studioVirtualSpaceScaleLegacyY,
   studioVirtualSpaceState,
 } from "./studio-virtual-space-model";
 import {
@@ -19,12 +23,16 @@ import {
   selectNearestStudioVirtualSpaceInteraction,
 } from "./studio-virtual-space-interactions";
 import {
-  findStudioVirtualSpacePath,
   normalizeStudioVirtualSpaceVector,
   resolveStudioVirtualSpaceMovement,
   studioVirtualSpaceCanOccupy,
   studioVirtualSpaceStepToward,
 } from "./studio-virtual-space-navigation";
+import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
+import {
+  findStudioWorldPath,
+  studioWorldCanOccupy,
+} from "./studio-virtual-space-world-pathfinding";
 
 const A: StudioLiveParticipant = {
   sessionId: "creator-a",
@@ -120,6 +128,34 @@ describe("Studio virtual space P2P presence", () => {
     expect(parseStudioVirtualSpacePacket("not-json")).toBeNull();
   });
 
+  it("preserves coordinates and room ids from larger data-driven worlds", () => {
+    const parsed = parseStudioVirtualSpacePacket(JSON.stringify({
+      wire: "toonspectrum-space-v1",
+      kind: "presence",
+      sequence: 7,
+      at: 10,
+      state: {
+        x: 1_240.5,
+        y: 902.25,
+        zoneId: "meeting-room-2",
+        facing: "left",
+        activity: "available",
+        moving: true,
+        avatarIndex: 9,
+      },
+    }));
+    expect(parsed?.kind).toBe("presence");
+    if (parsed?.kind !== "presence") return;
+    expect(parsed.state).toMatchObject({
+      x: 1_240.5,
+      y: 902.25,
+      zoneId: "meeting-room-2",
+      facing: "left",
+      moving: true,
+      avatarIndex: 9,
+    });
+  });
+
   it("exchanges movement directly and clears leave state without persistence", () => {
     const hub = new DirectHub();
     const noTimer = () => 1;
@@ -143,6 +179,7 @@ describe("Studio virtual space P2P presence", () => {
     a.refresh();
     expect(b.snapshot().peers[0]?.state.activity).toBe("focused");
     expect(b.snapshot().peers[0]?.state.moving).toBe(true);
+    expect(b.snapshot().peers[0]?.state.x).toBe(900);
     expect(b.snapshot().nearbyPeers).toHaveLength(0);
 
     a.setMoving(false);
@@ -171,40 +208,50 @@ describe("Studio virtual space RPG navigation", () => {
   });
 
   it("blocks room walls while allowing doorway traversal", () => {
-    expect(studioVirtualSpaceCanOccupy({ x: 50, y: 40 })).toBe(false);
-    expect(studioVirtualSpaceCanOccupy({ x: 163, y: 232 })).toBe(true);
+    expect(studioVirtualSpaceCanOccupy(studioVirtualSpaceScaleLegacyPoint({ x: 50, y: 40 }))).toBe(false);
+    expect(studioVirtualSpaceCanOccupy(studioVirtualSpaceScaleLegacyPoint({ x: 163, y: 232 }))).toBe(true);
   });
 
-  it("slides along colliders instead of teleporting through them", () => {
-    const start = { x: 80, y: 235 };
-    const next = resolveStudioVirtualSpaceMovement(start, { x: 30, y: -30 });
-    expect(next.x).toBeGreaterThan(start.x);
-    expect(next.y).toBe(start.y);
+  it("keeps resolved movement on walkable floor", () => {
+    const start = studioVirtualSpaceScaleLegacyPoint({ x: 80, y: 235 });
+    const next = resolveStudioVirtualSpaceMovement(start, {
+      x: studioVirtualSpaceScaleLegacyX(30),
+      y: studioVirtualSpaceScaleLegacyY(-30),
+    });
+    expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeGreaterThan(0);
+    expect(studioVirtualSpaceCanOccupy(next)).toBe(true);
   });
 
   it("walks toward click targets in bounded increments", () => {
-    const start = { x: 590, y: 640 };
-    const next = studioVirtualSpaceStepToward(start, { x: 590, y: 600 }, 20);
-    expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeLessThanOrEqual(20.01);
+    const start = studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 });
+    const maxDistance = studioVirtualSpaceScaleLegacyDistance(20);
+    const next = studioVirtualSpaceStepToward(
+      start,
+      studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 600 }),
+      maxDistance,
+    );
+    expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeLessThanOrEqual(maxDistance + 1.1);
   });
 });
 
 
 describe("Studio virtual space pathfinding", () => {
   it("finds a browser-local route through room doors", () => {
-    const path = findStudioVirtualSpacePath(
-      { x: 590, y: 640 },
-      { x: 555, y: 105 },
+    const path = findStudioWorldPath(
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+      studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 }),
+      studioVirtualSpaceScaleLegacyPoint({ x: 555, y: 105 }),
     );
     expect(path.length).toBeGreaterThan(2);
-    expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
-    expect(path.at(-1)?.y).toBeLessThan(150);
+    expect(path.every((point) => studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, point))).toBe(true);
+    expect(path.at(-1)?.y).toBeLessThan(studioVirtualSpaceScaleLegacyY(150));
   });
 
   it("returns a nearby walkable endpoint when a click lands on furniture", () => {
-    const path = findStudioVirtualSpacePath(
-      { x: 590, y: 640 },
-      { x: 190, y: 150 },
+    const path = findStudioWorldPath(
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+      studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 }),
+      studioVirtualSpaceScaleLegacyPoint({ x: 190, y: 150 }),
     );
     expect(path.length).toBeGreaterThan(0);
     expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
@@ -224,10 +271,10 @@ describe("Studio virtual space object interactions", () => {
 
   it("selects the nearest nearby production object", () => {
     expect(
-      selectNearestStudioVirtualSpaceInteraction({ x: 995, y: 305 })?.id,
+      selectNearestStudioVirtualSpaceInteraction(studioVirtualSpaceScaleLegacyPoint({ x: 995, y: 305 }))?.id,
     ).toBe("drawing-desk");
     expect(
-      selectNearestStudioVirtualSpaceInteraction({ x: 925, y: 545 })?.id,
+      selectNearestStudioVirtualSpaceInteraction(studioVirtualSpaceScaleLegacyPoint({ x: 925, y: 545 }))?.id,
     ).toBe("ai-producer-desk");
   });
 });

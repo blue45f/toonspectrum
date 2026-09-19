@@ -74,6 +74,7 @@ describe("BG3D → Scene3D projection", () => {
     expect(projected.output.width).toBe(480);
     expect(projected.output.pixelRatio).toBe(1);
     expect(projected.lights.map((light) => light.id)).toEqual(["light:key", "light:fill"]);
+    expect(projected.render.shadows).toMatchObject({ mode: "standard", cascades: 1 });
   });
 
   it("creates independent shot cameras instead of dropping legacy camera overrides", () => {

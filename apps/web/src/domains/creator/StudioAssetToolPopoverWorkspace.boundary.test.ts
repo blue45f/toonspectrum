@@ -72,7 +72,7 @@ describe("Studio asset workspace boundaries", () => {
     expect(previewSource).toContain("<StudioSceneTemplateMap");
     expect(previewSource).toContain('import("three")');
     expect(previewSource).toContain('import("three/examples/jsm/loaders/GLTFLoader.js")');
-    expect(previewSource).toContain("toDataURL(\"image/webp\"");
+    expect(previewSource).toContain('canvasToDataUrlAsync(renderer.domElement, "image/webp", 0.86)');
     expect(previewSource).toContain("disposeObject");
     expect(workspaceSource).toContain("<StudioUnifiedAssetPreviewSurface");
   });

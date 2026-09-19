@@ -22,6 +22,8 @@ import { getStroke, type StrokeOptions } from "perfect-freehand";
 
 import { resampleStrokePressures } from "./studio-brush";
 
+import type { PathIR } from "@toonspectrum/studio-project-model";
+
 /** 렌더러가 perfect-freehand 타입에 직접 의존하지 않도록 재노출하는 스트로커 핸들 타입. */
 export type StudioPerfectFreehandStroker = (
   points: (number[] | { x: number; y: number; pressure?: number })[],
@@ -408,6 +410,28 @@ function round2(value: number): number {
  * 이차 곡선(Q) 체인으로 폴리곤을 부드럽게 닫는다. 정점이 3개 미만이거나 비유한 좌표가
  * 섞여 있으면 빈 문자열을 반환한다(렌더러는 깨끗한 Line 폴백).
  */
+/** The SVG/Canvas and Vello adapters share the same rounded quadratic geometry. */
+export function studioPerfectFreehandOutlineToPathIR(
+  outline: readonly (readonly number[])[],
+): PathIR | null {
+  if (outline.length < 3 || outline.some((vertex) => (
+    vertex.length < 2 || !Number.isFinite(vertex[0]) || !Number.isFinite(vertex[1])
+  ))) return null;
+  const first = outline[0]!;
+  const verbs: PathIR["verbs"] = [{ v: "M", x: round2(first[0]!), y: round2(first[1]!) }];
+  for (let index = 0; index < outline.length; index += 1) {
+    const current = outline[index]!;
+    const next = outline[(index + 1) % outline.length]!;
+    verbs.push({
+      v: "Q", cx: round2(current[0]!), cy: round2(current[1]!),
+      x: round2((current[0]! + next[0]!) / 2),
+      y: round2((current[1]! + next[1]!) / 2),
+    });
+  }
+  verbs.push({ v: "Z" });
+  return { verbs };
+}
+
 export function studioPerfectFreehandOutlineToPathData(
   outline: readonly (readonly number[])[]
 ): string {

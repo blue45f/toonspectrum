@@ -1,0 +1,557 @@
+import type { StudioScene3dDocumentV1 } from "./studio-scene3d-document";
+import type {
+  StudioScene3dRuntimePlan,
+  StudioScene3dSoftwareCapabilities,
+} from "./studio-scene3d-runtime-policy";
+
+export type StudioScene3dEvolutionCandidateId =
+  | "tsl-npr-render-graph"
+  | "asset-release-pipeline"
+  | "webgpu-render-bundles"
+  | "gpu-profiler"
+  | "texture-residency"
+  | "gpu-driven-culling"
+  | "mesh-cluster-lod"
+  | "mikk-tangent-pipeline"
+  | "animation-retarget-compression"
+  | "offscreen-output-worker"
+  | "webgpu-webxr"
+  | "bvh-webgpu-compute"
+  | "gpu-xpbd"
+  | "three-native-gsplat"
+  | "closed-chain-ik"
+  | "three-bvh-csg-preview"
+  | "tiles3d-streaming"
+  | "spark-gsplat"
+  | "playcanvas-supersplat"
+  | "recast-navigation"
+  | "libigl-deformation"
+  | "opensubdiv"
+  | "pathtraced-still";
+
+export type StudioScene3dEvolutionMaturity =
+  | "next"
+  | "evaluate"
+  | "research";
+
+export type StudioScene3dEvolutionHost =
+  | "three-primary"
+  | "worker-kernel"
+  | "specialist-renderer"
+  | "offline-toolchain"
+  | "solver";
+
+export type StudioScene3dPromotionGate =
+  | "renderer-neutral-authority"
+  | "golden-visual-parity"
+  | "capture-contract"
+  | "webgpu-webgl-compatibility"
+  | "mobile-browser"
+  | "input-p95-100ms"
+  | "frame-budget"
+  | "bundle-budget"
+  | "memory-stability"
+  | "resource-disposal"
+  | "30-minute-soak"
+  | "device-loss-recovery"
+  | "asset-round-trip"
+  | "license-review";
+
+export interface StudioScene3dEvolutionCandidate {
+  readonly id: StudioScene3dEvolutionCandidateId;
+  readonly label: string;
+  readonly maturity: StudioScene3dEvolutionMaturity;
+  readonly host: StudioScene3dEvolutionHost;
+  readonly packageCandidates: readonly string[];
+  readonly authorityPolicy: string;
+  readonly goal: string;
+  readonly gates: readonly StudioScene3dPromotionGate[];
+}
+
+export interface StudioScene3dEvolutionCandidateState
+  extends StudioScene3dEvolutionCandidate {
+  readonly applicable: boolean;
+  readonly admitted: boolean;
+  readonly reason: string;
+}
+
+export interface StudioScene3dEvolutionPlan {
+  readonly version: 1;
+  readonly candidates: readonly StudioScene3dEvolutionCandidateState[];
+  readonly next: readonly StudioScene3dEvolutionCandidateState[];
+  readonly evaluate: readonly StudioScene3dEvolutionCandidateState[];
+  readonly research: readonly StudioScene3dEvolutionCandidateState[];
+}
+
+const BASE_GATES = Object.freeze([
+  "renderer-neutral-authority",
+  "golden-visual-parity",
+  "capture-contract",
+  "memory-stability",
+  "resource-disposal",
+  "30-minute-soak",
+] as const satisfies readonly StudioScene3dPromotionGate[]);
+
+function gates(
+  ...extra: readonly StudioScene3dPromotionGate[]
+): readonly StudioScene3dPromotionGate[] {
+  return Object.freeze([...BASE_GATES, ...extra]);
+}
+
+/**
+ * Long-term Scene3D technology ledger.
+ *
+ * This is deliberately not an import registry. A package listed here is not product support.
+ * Product code may only import a candidate after its own gated provider/runtime is implemented and
+ * the corresponding software capability is explicitly admitted.
+ */
+export const STUDIO_SCENE3D_EVOLUTION_CANDIDATES:
+  readonly StudioScene3dEvolutionCandidate[] = Object.freeze([
+    Object.freeze({
+      id: "tsl-npr-render-graph",
+      label: "Three WebGPU / TSL NPR RenderGraph",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["three"]),
+      authorityPolicy: "Three keeps scene ownership; render passes consume immutable Scene3D state.",
+      goal: "MRT beauty/depth/normal/ID/velocity 기반 CSM·line·tone·SSGI·SSS·TAAU를 실제 pixel pipeline으로 승격",
+      gates: gates("webgpu-webgl-compatibility", "frame-budget", "device-loss-recovery"),
+    }),
+    Object.freeze({
+      id: "asset-release-pipeline",
+      label: "LOD + Meshopt + KTX2 production asset pipeline",
+      maturity: "next",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze([
+        "@gltf-transform/core",
+        "@gltf-transform/functions",
+        "meshoptimizer/gltfpack",
+      ]),
+      authorityPolicy: "Source assets remain canonical; optimized derivatives are content-addressed runtime artifacts.",
+      goal: "모든 production mesh에 LOD·geometry compression·KTX2·GPU budget receipt를 기본 강제",
+      gates: gates("asset-round-trip", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "webgpu-render-bundles",
+      label: "WebGPU static render bundles",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["three"]),
+      authorityPolicy: "Bundle residency is transient; Scene3D entities and transforms remain canonical.",
+      goal: "정적 배경 subtree의 draw submission을 WebGPU render bundle로 묶어 대형 장면 CPU 비용을 줄임",
+      gates: gates("frame-budget", "bundle-budget", "device-loss-recovery"),
+    }),
+    Object.freeze({
+      id: "gpu-profiler",
+      label: "WebGPU timestamp profiler",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["WebGPU timestamp-query"]),
+      authorityPolicy: "Profiling never changes renderer choice or document state; it only emits bounded telemetry receipts.",
+      goal: "pass별 GPU 시간·warmup·capture 비용을 실측해 품질 tier와 승격 결정을 wall-clock 추정 대신 증거로 만듦",
+      gates: gates("frame-budget", "resource-disposal"),
+    }),
+    Object.freeze({
+      id: "texture-residency",
+      label: "Scene3D texture residency manager",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["internal AssetCache", "KTX2"]),
+      authorityPolicy: "Residency/eviction is transient and content-addressed; source and derivative identities remain canonical.",
+      goal: "quality tier·visibility·recent use에 따라 GPU texture budget을 강제하고 inactive texture를 안전하게 evict",
+      gates: gates("memory-stability", "mobile-browser", "30-minute-soak"),
+    }),
+    Object.freeze({
+      id: "gpu-driven-culling",
+      label: "GPU-driven culling / indirect draw",
+      maturity: "evaluate",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["Three WebGPU", "WebGPU compute"]),
+      authorityPolicy: "Visibility buffers are transient derivatives; canonical visibility flags and transforms stay in Scene3D.",
+      goal: "대형 정적/반정적 장면에서 frustum·occlusion candidate를 compute로 압축하고 indirect draw 제출 비용을 절감",
+      gates: gates("frame-budget", "memory-stability", "device-loss-recovery"),
+    }),
+    Object.freeze({
+      id: "mesh-cluster-lod",
+      label: "Mesh cluster / hierarchical LOD",
+      maturity: "evaluate",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze(["meshoptimizer", "gltfpack"]),
+      authorityPolicy: "Cluster/LOD structures are release derivatives; source mesh topology remains canonical.",
+      goal: "대형 배경을 cluster 단위로 simplify/stream하여 draw-call과 triangle residency를 함께 낮춤",
+      gates: gates("asset-round-trip", "frame-budget", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "mikk-tangent-pipeline",
+      label: "MikkTSpace tangent quality",
+      maturity: "next",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze(["@gltf-transform/functions", "MikkTSpace"]),
+      authorityPolicy: "Tangents are deterministic asset derivatives and never mutate the source silently.",
+      goal: "normal-map seam과 mirrored UV shading 차이를 줄여 renderer backend 간 tangent-space 품질을 고정",
+      gates: gates("golden-visual-parity", "asset-round-trip"),
+    }),
+    Object.freeze({
+      id: "animation-retarget-compression",
+      label: "Animation retarget / compression pipeline",
+      maturity: "next",
+      host: "offline-toolchain",
+      packageCandidates: Object.freeze(["@pixiv/three-vrm", "@gltf-transform/functions"]),
+      authorityPolicy: "CharacterDocument pose/clip identity stays canonical; retargeted/compressed clips are versioned derivatives.",
+      goal: "VRM humanoid retarget, keyframe resample/optimization, clip LOD로 캐릭터 재사용성과 runtime CPU/bytes를 개선",
+      gates: gates("asset-round-trip", "golden-visual-parity", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "offscreen-output-worker",
+      label: "Off-main-thread 3D output worker",
+      maturity: "evaluate",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["OffscreenCanvas", "WebGPU/WebGL2"]),
+      authorityPolicy: "Worker receives immutable Scene3D snapshots and returns artifacts; UI/input authority remains on the main thread.",
+      goal: "2K/4K capture·thumbnail·batch output의 main-thread long task를 분리하고 cancellation/backpressure를 통합",
+      gates: gates("capture-contract", "memory-stability", "resource-disposal", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "webgpu-webxr",
+      label: "WebGPU WebXR convergence",
+      maturity: "research",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["Three WebGPU", "WebXR"]),
+      authorityPolicy: "XR session never changes canonical renderer preference; unsupported sessions fail visibly.",
+      goal: "현재 WebGL2 전용 XR 브리지와 동등한 WebGPU XR 경로가 상류/브라우저에서 안정될 때 재평가",
+      gates: gates("webgpu-webgl-compatibility", "device-loss-recovery", "mobile-browser"),
+    }),
+    Object.freeze({
+      id: "bvh-webgpu-compute",
+      label: "WebGPU BVH batch queries",
+      maturity: "next",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["three-mesh-bvh"]),
+      authorityPolicy: "BVH remains an acceleration derivative; selections and Surface Ink anchors stay canonical.",
+      goal: "surface paint/contact/lasso/placement의 대량 공간 질의를 WebGPU batch compute로 가속",
+      gates: gates("webgpu-webgl-compatibility", "input-p95-100ms", "frame-budget"),
+    }),
+    Object.freeze({
+      id: "gpu-xpbd",
+      label: "WebGPU XPBD hair / cloth",
+      maturity: "next",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["three", "WebGPU compute"]),
+      authorityPolicy: "Documents persist XPBD parameters and attachments, never GPU buffers.",
+      goal: "현재 CPU XPBD와 같은 constraint 계약을 GPU compute로 실행해 헤어·의상 secondary motion 고도화",
+      gates: gates("webgpu-webgl-compatibility", "frame-budget", "device-loss-recovery"),
+    }),
+    Object.freeze({
+      id: "three-native-gsplat",
+      label: "Three native Gaussian Splat",
+      maturity: "next",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["three"]),
+      authorityPolicy: "Splat is a Scene3D entity rendered by Three; no second persistent scene authority.",
+      goal: "Three 업그레이드 후 native/KHR gaussian splat path를 우선 검증해 specialist renderer 필요성을 최소화",
+      gates: gates("webgpu-webgl-compatibility", "frame-budget", "bundle-budget"),
+    }),
+    Object.freeze({
+      id: "closed-chain-ik",
+      label: "Generalized closed-chain IK",
+      maturity: "next",
+      host: "solver",
+      packageCandidates: Object.freeze(["closed-chain-ik-js"]),
+      authorityPolicy: "Solver outputs bounded pose commands; CharacterDocument remains pose authority.",
+      goal: "양손 소품·발 고정·골반·손바닥 접촉을 동시에 푸는 generalized IK를 golden pose corpus로 검증",
+      gates: gates("input-p95-100ms", "asset-round-trip"),
+    }),
+    Object.freeze({
+      id: "three-bvh-csg-preview",
+      label: "Interactive BVH CSG preview",
+      maturity: "evaluate",
+      host: "solver",
+      packageCandidates: Object.freeze(["three-bvh-csg", "manifold-3d"]),
+      authorityPolicy: "BVH CSG is preview-only; Manifold remains robust canonical boolean commit.",
+      goal: "drag 중 Boolean preview 지연을 줄이고 pointer-up에서 Manifold 결과로 확정",
+      gates: gates("input-p95-100ms", "asset-round-trip"),
+    }),
+    Object.freeze({
+      id: "tiles3d-streaming",
+      label: "3D Tiles environment streaming",
+      maturity: "evaluate",
+      host: "three-primary",
+      packageCandidates: Object.freeze(["3d-tiles-renderer"]),
+      authorityPolicy: "Tile residency is transient; Scene3D stores a stable environment asset reference.",
+      goal: "도시·대형 건축 배경을 screen-space-error 기반으로 스트리밍하고 메모리 residency를 제한",
+      gates: gates("mobile-browser", "frame-budget", "bundle-budget"),
+    }),
+    Object.freeze({
+      id: "spark-gsplat",
+      label: "Spark Gaussian Splat specialist",
+      maturity: "evaluate",
+      host: "specialist-renderer",
+      packageCandidates: Object.freeze(["@sparkjsdev/spark"]),
+      authorityPolicy: "Specialist receives immutable splat assets and camera state; Three retains scene authority.",
+      goal: "대형 splat progressive streaming/LOD가 native Three보다 유의미하게 나을 때만 승격",
+      gates: gates("frame-budget", "bundle-budget", "license-review"),
+    }),
+    Object.freeze({
+      id: "playcanvas-supersplat",
+      label: "PlayCanvas / SuperSplat specialist",
+      maturity: "evaluate",
+      host: "specialist-renderer",
+      packageCandidates: Object.freeze(["playcanvas", "SuperSplat"]),
+      authorityPolicy: "Never owns React state or Scene3D persistence; isolated splat render/capture only.",
+      goal: "GPU sort·projection·culling·compaction이 대형 캡처 배경에서 측정 우위를 보일 때 제한 도입",
+      gates: gates("frame-budget", "bundle-budget", "license-review"),
+    }),
+    Object.freeze({
+      id: "recast-navigation",
+      label: "Recast / Detour navigation",
+      maturity: "evaluate",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["recast-navigation-js"]),
+      authorityPolicy: "Navigation mesh is a derivative; multiplayer position authority remains outside the renderer.",
+      goal: "향후 3D Virtual Studio의 navmesh·pathfinding·crowd를 Three/Rapier와 분리",
+      gates: gates("input-p95-100ms", "mobile-browser", "bundle-budget"),
+    }),
+    Object.freeze({
+      id: "libigl-deformation",
+      label: "libigl deformation specialist",
+      maturity: "evaluate",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["libigl WASM"]),
+      authorityPolicy: "ARAP/biharmonic results become bounded mesh/morph commands; native handles never persist.",
+      goal: "얼굴·체형·의상 fit의 단순 scale 변형을 ARAP/biharmonic 정밀 변형으로 보강",
+      gates: gates("asset-round-trip", "license-review"),
+    }),
+    Object.freeze({
+      id: "opensubdiv",
+      label: "OpenSubdiv specialist",
+      maturity: "evaluate",
+      host: "worker-kernel",
+      packageCandidates: Object.freeze(["OpenSubdiv WASM"]),
+      authorityPolicy: "Subdivision surfaces are generated derivatives; control topology stays canonical.",
+      goal: "얼굴·바디·의상 authoring과 고품질 preview의 subdivision 품질을 단계적으로 승격",
+      gates: gates("asset-round-trip", "frame-budget", "license-review"),
+    }),
+    Object.freeze({
+      id: "pathtraced-still",
+      label: "Experimental WebGPU path-traced still",
+      maturity: "research",
+      host: "specialist-renderer",
+      packageCandidates: Object.freeze([
+        "internal studio-pathtrace-*",
+        "three-gpu-pathtracer",
+      ]),
+      authorityPolicy: "Never replaces the interactive renderer; output is an explicit opt-in still-render job.",
+      goal: "기존 renderer-neutral CPU/WebGPU path-trace reference를 Scene3D still 계약에 먼저 연결하고 외부 후보는 동일 corpus로 A/B",
+      gates: gates("golden-visual-parity", "bundle-budget", "license-review"),
+    }),
+  ]);
+
+function unreachableCandidate(value: never): never {
+  throw new Error(`Unhandled Scene3D evolution candidate: ${String(value)}`);
+}
+
+function admitted(
+  id: StudioScene3dEvolutionCandidateId,
+  software: StudioScene3dSoftwareCapabilities,
+): boolean {
+  switch (id) {
+    case "tsl-npr-render-graph":
+      return software.tslNprRenderGraph;
+    case "asset-release-pipeline":
+      return software.assetReleasePipeline;
+    case "webgpu-render-bundles":
+      return software.renderBundles;
+    case "gpu-profiler":
+      return software.gpuProfiling;
+    case "texture-residency":
+      return software.textureResidency;
+    case "gpu-driven-culling":
+      return software.gpuDrivenCulling;
+    case "mesh-cluster-lod":
+      return software.clusterLod;
+    case "mikk-tangent-pipeline":
+      return software.mikkTangents;
+    case "animation-retarget-compression":
+      return software.animationRetargetPipeline;
+    case "offscreen-output-worker":
+      return software.offscreenRenderWorker;
+    case "webgpu-webxr":
+      return software.webGpuWebXr;
+    case "bvh-webgpu-compute":
+      return software.bvhWebGpuCompute;
+    case "gpu-xpbd":
+      return software.gpuXpbd;
+    case "three-native-gsplat":
+      return software.threeNativeGaussianSplat;
+    case "closed-chain-ik":
+      return software.closedChainIk;
+    case "three-bvh-csg-preview":
+      return software.interactiveBvhCsg;
+    case "tiles3d-streaming":
+      return software.tiles3dStreaming;
+    case "spark-gsplat":
+      return software.sparkGaussianSplat;
+    case "playcanvas-supersplat":
+      return software.playcanvasGaussianSplat;
+    case "recast-navigation":
+      return software.recastNavigation;
+    case "libigl-deformation":
+      return software.libiglDeformation;
+    case "opensubdiv":
+      return software.openSubdiv;
+    case "pathtraced-still":
+      return software.pathTracer;
+    default:
+      return unreachableCandidate(id);
+  }
+}
+
+function applicability(
+  candidate: StudioScene3dEvolutionCandidate,
+  document: StudioScene3dDocumentV1,
+  runtimePlan: StudioScene3dRuntimePlan,
+): { readonly applicable: boolean; readonly reason: string } {
+  const hasCharacter = document.entities.some(({ kind }) => kind === "character");
+  const hasSplat = document.entities.some(({ kind }) => kind === "gaussian-splat")
+    || document.assets.some(({ kind }) => kind === "gaussian-splat");
+  const environmentEntities = document.entities.filter(({ kind }) =>
+    kind === "model" || kind === "primitive" || kind === "gaussian-splat"
+  ).length;
+  const highQualityStill = document.output.width >= 2048 || document.output.height >= 2048;
+
+  switch (candidate.id) {
+    case "tsl-npr-render-graph":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu",
+        reason: runtimePlan.primaryRenderer === "three-webgpu"
+          ? "현재 WebGPU primary에서 계획된 NPR pass를 실제 GPU graph로 내릴 수 있습니다."
+          : "WebGL2 compatibility 세션에서는 TSL/WebGPU 승격을 적용하지 않습니다.",
+      };
+    case "asset-release-pipeline":
+      return {
+        applicable: document.assets.some(({ kind }) => kind !== "gaussian-splat"),
+        reason: "Production mesh/character asset은 LOD·압축·GPU budget derivative가 필요합니다.",
+      };
+    case "webgpu-render-bundles":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu"
+          && environmentEntities > 0,
+        reason: runtimePlan.primaryRenderer === "three-webgpu" && environmentEntities > 0
+          ? "정적 배경 subtree의 CPU draw submission을 줄일 수 있습니다."
+          : "WebGPU 배경 장면이 아니면 render bundle 이득이 없습니다.",
+      };
+    case "gpu-profiler":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu",
+        reason: runtimePlan.primaryRenderer === "three-webgpu"
+          ? "WebGPU pass별 실측이 가능한 세션에서 우선 적용합니다."
+          : "WebGL2 세션에서는 WebGPU timestamp-query profiler를 적용하지 않습니다.",
+      };
+    case "texture-residency":
+      return {
+        applicable: document.assets.length > 0,
+        reason: document.assets.length > 0
+          ? "GPU resident texture/geometry budget을 자산 단위로 관리할 수 있습니다."
+          : "자산이 없는 장면에서는 residency manager 우선순위가 낮습니다.",
+      };
+    case "gpu-driven-culling":
+    case "mesh-cluster-lod":
+      return {
+        applicable: environmentEntities >= 32 || runtimePlan.workload === "environment-compose",
+        reason: "대형 환경 장면에서 CPU 제출량과 resident geometry를 줄이기 위한 후보입니다.",
+      };
+    case "mikk-tangent-pipeline":
+    case "animation-retarget-compression":
+      return {
+        applicable: document.assets.length > 0,
+        reason: "3D asset release derivative의 shading/animation 품질을 표준화하는 후보입니다.",
+      };
+    case "offscreen-output-worker":
+      return {
+        applicable: highQualityStill,
+        reason: highQualityStill
+          ? "2K 이상 output/capture를 main thread에서 분리할 가치가 있습니다."
+          : "저해상도 preview에는 worker output 전환 우선순위가 낮습니다.",
+      };
+    case "webgpu-webxr":
+      return {
+        applicable: runtimePlan.primaryRenderer === "three-webgpu",
+        reason: "WebGPU primary와 현재 WebGL2 XR bridge의 기능 동등성을 장기 검증합니다.",
+      };
+    case "bvh-webgpu-compute":
+      return {
+        applicable: runtimePlan.features.gpuCompute && document.entities.length > 0,
+        reason: "대량 surface/contact/selection query가 있는 WebGPU 장면에서 후보입니다.",
+      };
+    case "gpu-xpbd":
+    case "closed-chain-ik":
+    case "libigl-deformation":
+    case "opensubdiv":
+      return {
+        applicable: hasCharacter,
+        reason: hasCharacter
+          ? "캐릭터 pose/deformation/secondary-motion 품질을 높이는 후보입니다."
+          : "캐릭터가 없는 장면에서는 우선순위가 낮습니다.",
+      };
+    case "three-native-gsplat":
+    case "spark-gsplat":
+    case "playcanvas-supersplat":
+      return {
+        applicable: hasSplat,
+        reason: hasSplat
+          ? "Gaussian Splat entity가 있어 backend 품질·성능 비교가 필요합니다."
+          : "Splat 자산이 없는 장면에서는 로드하지 않습니다.",
+      };
+    case "three-bvh-csg-preview":
+      return {
+        applicable: document.entities.some(({ kind }) => kind === "model" || kind === "primitive"),
+        reason: "Interactive modeling/Boolean preview가 필요한 mesh 장면에서 후보입니다.",
+      };
+    case "tiles3d-streaming":
+      return {
+        applicable: environmentEntities >= 32 || runtimePlan.workload === "environment-compose",
+        reason: "대형 구조화 배경에서 resident geometry를 제한하기 위한 후보입니다.",
+      };
+    case "recast-navigation":
+      return {
+        applicable: environmentEntities > 0,
+        reason: "3D Virtual Studio/agent 이동을 장면 렌더러와 분리할 때 사용합니다.",
+      };
+    case "pathtraced-still":
+      return {
+        applicable: highQualityStill,
+        reason: highQualityStill
+          ? "2K 이상 명시 출력에서만 실험적인 still renderer를 비교합니다."
+          : "일반 preview에는 path tracing을 사용하지 않습니다.",
+      };
+    default:
+      return unreachableCandidate(candidate.id);
+  }
+}
+
+export function buildStudioScene3dEvolutionPlan(input: {
+  readonly document: StudioScene3dDocumentV1;
+  readonly runtimePlan: StudioScene3dRuntimePlan;
+  readonly software: StudioScene3dSoftwareCapabilities;
+}): StudioScene3dEvolutionPlan {
+  const candidates = STUDIO_SCENE3D_EVOLUTION_CANDIDATES.map((candidate) => {
+    const match = applicability(candidate, input.document, input.runtimePlan);
+    return Object.freeze({
+      ...candidate,
+      applicable: match.applicable,
+      admitted: admitted(candidate.id, input.software),
+      reason: match.reason,
+    });
+  });
+  const applicable = (maturity: StudioScene3dEvolutionMaturity) =>
+    Object.freeze(candidates.filter((candidate) =>
+      candidate.maturity === maturity && candidate.applicable
+    ));
+  return Object.freeze({
+    version: 1 as const,
+    candidates: Object.freeze(candidates),
+    next: applicable("next"),
+    evaluate: applicable("evaluate"),
+    research: applicable("research"),
+  });
+}

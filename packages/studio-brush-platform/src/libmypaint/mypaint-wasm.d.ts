@@ -24,6 +24,7 @@ export interface LibMypaintEmscriptenModule {
 }
 
 export interface LibMypaintModuleOverrides {
+  wasmBinary?: Uint8Array;
   instantiateWasm?(
     imports: WebAssembly.Imports,
     receiveInstance: (

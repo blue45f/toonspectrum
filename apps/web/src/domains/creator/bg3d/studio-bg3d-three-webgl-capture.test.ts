@@ -348,3 +348,20 @@ describe("Three WebGL Studio 3D capture adapter", () => {
     ).toThrow(/requires/u);
   });
 });
+
+
+describe("WebGL HDR capture compatibility", () => {
+  it("preserves HDR before tone mapping when float render targets are supported", async () => {
+    const f = fixture();
+    Object.defineProperty(f.renderer, "extensions", { value: { has: () => true } });
+    await f.adapter.capture({ width: 2, height: 2, includeDepth: false,
+      background: { color: "#ffffff", alpha: 0 } });
+    const sceneTarget = vi.mocked(f.renderer.setRenderTarget).mock.calls[0]?.[0];
+    const sceneTexture = sceneTarget?.texture;
+    expect(sceneTexture && !Array.isArray(sceneTexture) && sceneTexture.type).toBe(THREE.HalfFloatType);
+    const output = vi.mocked(f.renderer.readRenderTargetPixelsAsync).mock.calls[0]?.[0];
+    const outputTexture = output?.texture;
+    expect(outputTexture && !Array.isArray(outputTexture) && outputTexture.type).toBe(THREE.UnsignedByteType);
+    expectLiveRendererStateRestored(f);
+  });
+});

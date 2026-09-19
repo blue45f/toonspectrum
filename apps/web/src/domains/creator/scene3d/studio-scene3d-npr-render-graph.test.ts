@@ -52,7 +52,7 @@ describe("Studio Scene3D NPR render graph", () => {
     expect(graph.runtimePlan.primaryRenderer).toBe("three-webgpu");
     expect(graph.passes.find(({ id }) => id === "depth")).toMatchObject({
       executor: "three-primary",
-      fallbackRuntime: "three-webgl2",
+      runtime: "three-webgpu",
     });
   });
 
@@ -69,7 +69,6 @@ describe("Studio Scene3D NPR render graph", () => {
     expect(graph.passes.find(({ id }) => id === "fx-overlay")).toMatchObject({
       executor: "babylon-specialist",
       runtime: "babylon",
-      fallbackRuntime: null,
     });
     expect(graph.passes.filter(({ executor }) => executor === "babylon-specialist"))
       .toHaveLength(1);

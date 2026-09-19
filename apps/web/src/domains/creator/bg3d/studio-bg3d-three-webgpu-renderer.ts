@@ -16,6 +16,7 @@
  */
 
 import { WebGPURenderer } from "three/webgpu";
+import { disposeStudioScene3dResourceOwner } from "../scene3d/studio-scene3d-resource-owner";
 
 import {
   STUDIO_BG3D_WEBGPU_MIN_BUFFER_SIZE,
@@ -254,6 +255,7 @@ async function initializeStudioBg3dThreeWebGpuRenderer(
     value: (): unknown => {
       if (disposed) return;
       disposed = true;
+      disposeStudioScene3dResourceOwner(renderer);
       try {
         return rendererDispose();
       } finally {
@@ -261,9 +263,10 @@ async function initializeStudioBg3dThreeWebGpuRenderer(
       }
     },
   });
-  if (options.onDeviceLost) {
-    observeDeviceLoss(lifecycle.backend, () => disposed, options.onDeviceLost);
-  }
+  observeDeviceLoss(lifecycle.backend, () => disposed, (loss) => {
+    disposeStudioScene3dResourceOwner(renderer);
+    options.onDeviceLost?.(loss);
+  });
   return Object.freeze({
     renderer,
     async dispose() {

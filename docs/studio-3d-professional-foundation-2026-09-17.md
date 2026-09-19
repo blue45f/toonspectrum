@@ -1,5 +1,9 @@
 # Studio 3D 전문가 작업공간 기반 — 2026-09-17
 
+> **2026-09-19 후속 계획:** 엔진·커널·자산·캐릭터의 장기 승격 순서는
+> [Scene3D 장기 플랫폼 고도화](./studio/studio-3d-platform-evolution-2026-09-19.md)를 따른다.
+> 이 문서는 workspace/professional baseline의 근거로 유지한다.
+
 ## 결정
 
 - 대화형 편집 장면의 주 엔진은 Three.js/R3F/three-vrm을 유지한다.

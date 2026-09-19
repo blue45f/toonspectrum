@@ -160,7 +160,10 @@ describe("Studio Scene3D asset admission", () => {
       },
     });
 
-    expect(result.status).toBe("review");
-    expect(result.warnings.length).toBeGreaterThanOrEqual(2);
+    expect(result.status).toBe("reject");
+    expect(result.blockers).toEqual(expect.arrayContaining([
+      "GPU texture가 KTX2/Basis production 경로를 사용하지 않습니다.",
+      "meshoptimizer/Draco geometry compression receipt가 없습니다.",
+    ]));
   });
 });
