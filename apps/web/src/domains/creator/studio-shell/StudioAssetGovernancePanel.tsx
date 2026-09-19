@@ -3,6 +3,8 @@ import {
   translateCurrentStaticSourceText,
   useBilingual,
   useBilingualI18nRevision,
+  useBilingualLocalizer,
+  type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -36,9 +38,7 @@ import {
   type StudioPluginPermission,
 } from "../studio-plugin-registry";
 import Link from "@/compat/router-link";
-import { useBilingualLocalizer, type BilingualText } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
-
 
 const DESTINATION_LABELS: Readonly<
   Record<StudioAssetDestination, BilingualText>
