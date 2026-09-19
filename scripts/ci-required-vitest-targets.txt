@@ -149,6 +149,7 @@ apps/web/src/domains/creator/studio-router/studio-route-manifest.test.ts
 apps/web/src/domains/creator/studio-selection
 apps/web/src/domains/creator/studio-shared-document-client.test.ts
 apps/web/src/domains/creator/studio-shell/StudioAssetGovernancePanel.test.tsx
+apps/web/src/domains/creator/studio-shell/StudioMarketplaceSellerPanel.async-ownership.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioProjectCreatePage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx
