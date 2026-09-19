@@ -52,6 +52,7 @@ apps/web/src/domains/creator/bg3d/studio-bg3d-camera-framing.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-camera-selection.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-camera-surface-integration.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-engine-remount-safety.test.ts
+apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx
@@ -110,6 +111,7 @@ apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts
 apps/web/src/domains/creator/layer
 apps/web/src/domains/creator/live/huddle
 apps/web/src/domains/creator/offline
+apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts
 apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts
 apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts
 apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts
@@ -197,6 +199,8 @@ packages/core/src/fortune/fortune-observatory.test.ts
 packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
 scripts/browser-core-entry-isolation.test.ts
+scripts/deploy-cloudflare-static.test.mjs
+scripts/free-infrastructure-policy.test.mjs
 scripts/lib/character-psd-reference-compositor.test.mjs
 scripts/lib/studio-3d-production-audit-policy.test.mjs
 scripts/lib/studio-inapp-sweep-harness.test.ts

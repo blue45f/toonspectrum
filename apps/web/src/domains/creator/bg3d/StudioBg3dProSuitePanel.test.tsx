@@ -145,3 +145,16 @@ it("does not open specialist tools while the parent editor is locked", () => {
   const opener = screen.getByRole("button", { name: "3D 자산 고급 가공 · LOD / 불리언 / 이동 경로" }) as HTMLButtonElement;
   expect(opener.disabled).toBe(true);
 });
+
+
+it("forwards the selected-scene command bridge through the existing professional workspace", async () => {
+  const bridge = {
+    describeSelection: () => ({ available: true, label: "선택한 배경 모델", reason: null }),
+    captureSelection: vi.fn(), apply: vi.fn(),
+  };
+  render(workbench(runtime({ inplaceTools: bridge })));
+  fireEvent.click(screen.getByRole("button", { name: "3D 자산 고급 가공 · LOD / 불리언 / 이동 경로" }));
+  const source = await screen.findByRole("button", { name: "선택 모델에서 원본 가져오기" });
+  expect((source as HTMLButtonElement).disabled).toBe(false);
+  expect(screen.getByText("현재 선택: 선택한 배경 모델")).toBeDefined();
+});
