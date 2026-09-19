@@ -91,20 +91,35 @@ function runCommand(command: string, args: string[], options: { timeoutMs?: numb
 }
 
 function pickFirstCommand(candidates: string[]): string | undefined {
+  const searchPaths = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
+  const windowsExtensions = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter(Boolean);
+
   for (const candidate of candidates) {
     const target = candidate.trim();
     if (!target) continue;
-    const available = spawnSync(process.platform === "win32" ? "where" : "command", process.platform === "win32" ? [target] : ["-v", target], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-    if (available.status === 0) {
-      const line = (String(available.stdout ?? "").split("\n")[0] ?? "").trim();
-      if (process.platform === "win32") {
-        return line.split("\r")[0] || target;
+
+    const explicitPath = path.isAbsolute(target)
+      || target.includes("/")
+      || (process.platform === "win32" && target.includes("\\"));
+    const variants = explicitPath
+      ? [target]
+      : searchPaths.flatMap((directory) => {
+          if (process.platform !== "win32" || path.extname(target)) {
+            return [path.join(directory, target)];
+          }
+          return windowsExtensions.map((extension) =>
+            path.join(directory, `${target}${extension.toLowerCase()}`)
+          );
+        });
+
+    for (const executable of variants) {
+      try {
+        if (existsSync(executable) && statSync(executable).isFile()) return executable;
+      } catch {
+        // Continue through PATH candidates that disappear or are inaccessible.
       }
-      return target;
     }
   }
   return undefined;
