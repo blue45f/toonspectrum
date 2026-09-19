@@ -1,6 +1,8 @@
 import {
+  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  useBilingualI18nRevision, useBilingual
+  useBilingual,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -180,7 +182,16 @@ export function StudioAssetGovernancePanel({
   readonly projectId: string;
   readonly locale?: string;
 }) {
-  const bt = useBilingual("StudioAssetGovernancePanel");
+  const activeBt = useBilingual("StudioAssetGovernancePanel");
+  const bt = (ko: string, en: string): string =>
+    locale === "ko" || locale === "en"
+      ? translateBilingualValueForLocale(
+          locale,
+          "domains.creator.studio.shell.StudioAssetGovernancePanel",
+          ko,
+          en,
+        )
+      : activeBt(ko, en);
   const [evaluatedAt, setEvaluatedAt] = useState(() => new Date().toISOString());
   const [preferences, setPreferences] = useState<StudioAssetGovernancePreferences>(
     createDefaultStudioAssetGovernancePreferences,
