@@ -280,6 +280,43 @@ GPU 후보:
 - inactive asset GPU eviction
 - explicit ref-counted asset cache
 
+### 8.4 GPU profiler
+
+WebGPU timestamp-query가 허용되는 장치에서는 pass별 GPU 시간을 별도 receipt로 수집한다.
+
+- warmup / steady-state 구분
+- shadow / G-buffer / line / post / capture 구분
+- wall-clock만으로 feature 승격 결정 금지
+- profiler가 renderer 선택이나 document state를 바꾸지 않음
+
+### 8.5 GPU-driven culling / indirect draw
+
+Render Bundle만으로 CPU 제출 병목이 충분히 줄지 않을 때 평가한다.
+
+- compute frustum candidate
+- optional Hi-Z/occlusion candidate
+- compact visible instance list
+- indirect draw command generation
+- selected/gizmo/live-deformed entity는 보수적으로 CPU-visible lane 유지
+
+### 8.6 Mesh cluster / hierarchical LOD
+
+대형 구조화 mesh 환경에는 release 단계에서 cluster/LOD derivative를 생성하는 방안을 평가한다.
+원본 topology는 보존하고 runtime derivative만 교체 가능하게 만든다.
+
+### 8.7 Tangent / animation release quality
+
+- MikkTSpace-compatible tangent derivative로 normal-map seam/backend 차이를 고정
+- VRM humanoid retarget receipt
+- animation resample/keyframe optimization
+- clip quality tier / animation LOD
+- 원본 clip과 retargeted/compressed clip의 hash/version 분리
+
+### 8.8 Off-main-thread output
+
+2K/4K still, thumbnail, shot batch는 immutable Scene3D snapshot을 Worker에 넘겨 main-thread long task를 줄이는
+방향을 평가한다. UI/input renderer를 Worker로 강제 이동하지 않고 output job부터 분리한다.
+
 ## 9. P1 — 캐릭터 품질
 
 ### 9.1 generalized IK
@@ -472,7 +509,9 @@ material/VRM/toon/alpha/semantic pass parity가 준비되지 않으면 research 
 - Three upgrade branch
 - BVH/Rapier/three-vrm/glTF Transform 검증 업그레이드
 - TSL render target/MRT foundation
-- resource owner/cache
+- GPU timestamp profiler
+- resource owner/cache + texture residency
+- Mikk tangent / animation derivative contract
 
 ### Wave C — pixel quality
 
@@ -488,8 +527,11 @@ material/VRM/toon/alpha/semantic pass parity가 준비되지 않으면 research 
 - release derivative pipeline
 - render bundles
 - GPU BVH batch
+- cluster/hierarchical LOD
+- GPU-driven culling/indirect draw A/B
 - native splat A/B
 - 3D Tiles experiment
+- offscreen output worker
 
 ### Wave E — character
 
