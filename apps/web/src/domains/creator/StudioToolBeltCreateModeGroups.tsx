@@ -206,7 +206,7 @@ export const StudioToolBeltCreateModeGroups = memo(function StudioToolBeltCreate
                 onClose: () => setMenu(null),
                 minWidth: 400,
                 minHeight: 320,
-                maxWidth: 860,
+                maxWidth: 1320,
                 maxHeight: 1100,
                 contentClassName: "overflow-y-auto overflow-x-hidden",
               }}
