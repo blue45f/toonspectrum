@@ -1247,7 +1247,8 @@ import {
   WET_MIX_STRENGTH_DEFAULT,
   WET_MIX_WETNESS_DEFAULT,
 } from "./brush/studio-wet-mix";
-import { exportStudioPageToWillV1, type StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
+import { exportStudioPageToWillV1 } from "./export/studio-will-v1-export-bridge";
+import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import {
   studioWorkAssetDestructiveEditReason,
   studioWorkAssetDocumentSourceTransitionReason,
