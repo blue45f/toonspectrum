@@ -36,6 +36,7 @@ export const BRUSH_STUDIO_V6_MATERIAL_ENGINE = Object.freeze({
   id: "cpu-contact-v2",
   backend: "cpu",
   pigments: Object.freeze([
+    "spectral-js-v3", "open-km-spectral-v1", "colormix-lab-v3",
     "rgb-linear-v1",
     "spectral-wgm-v1",
     "mixbox-js-v2",

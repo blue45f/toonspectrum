@@ -1,10 +1,16 @@
 import mixbox from "mixbox";
+import {
+  createExternalPigmentPalette, EXTERNAL_PIGMENT_PROVIDERS,
+  isExternalPigmentProvider, prepareExternalPigmentPair,
+  type ExternalPigmentProvider,
+} from "./pigment/external-pigments";
 
 import { mixStudioSpectralWgm } from "../studio-spectral-wgm-mix-v1";
 
 import type { BrushStudioV6Rights } from "./brush-studio-v6-license-profile";
 
 export type BrushStudioV6PigmentProviderId =
+  | ExternalPigmentProvider
   | "rgb-linear-v1"
   | "spectral-wgm-v1"
   | "mixbox-js-v2"
@@ -29,6 +35,7 @@ function descriptor(
 }
 
 export const BRUSH_STUDIO_V6_PIGMENT_PROVIDERS = Object.freeze([
+  ...EXTERNAL_PIGMENT_PROVIDERS.map((entry) => descriptor({ ...entry, rights: "permissive", execution: "native" })),
   descriptor({ id: "rgb-linear-v1", nodeId: "pigment-rgb", label: "RGB Linear", version: "1", rights: "internal", execution: "native" }),
   descriptor({ id: "spectral-wgm-v1", nodeId: "pigment-spectral", label: "Spectral WGM", version: "1", rights: "permissive", execution: "native" }),
   descriptor({ id: "mixbox-js-v2", nodeId: "pigment-mixbox", label: "Mixbox Latent Pigment", version: "2.0.0", rights: "noncommercial", execution: "native" }),
@@ -118,7 +125,9 @@ export function createBrushStudioV6PigmentPalette(
   if (!PROVIDER_BY_ID.has(providerId)) {
     throw new BrushStudioV6PigmentProviderUnavailableError(providerId);
   }
+  if (!Number.isFinite(steps)) throw new RangeError("Palette steps must be finite");
   const count = Math.max(2, Math.min(257, Math.round(steps)));
+  if (isExternalPigmentProvider(providerId)) return createExternalPigmentPalette(primary, secondary, providerId, count);
   const first = parseColor(primary);
   const second = parseColor(secondary);
   if (providerId === "mixbox-js-v2") return mixboxPalette(first, second, count);
@@ -136,7 +145,10 @@ export function mixBrushStudioV6PigmentColors(
   weight: number,
   providerId: BrushStudioV6PigmentProviderId = "spectral-wgm-v1",
 ): string {
+  if (!PROVIDER_BY_ID.has(providerId)) throw new BrushStudioV6PigmentProviderUnavailableError(providerId);
+  if (!Number.isFinite(weight)) throw new RangeError("Pigment weight must be finite");
   const ratio = unit(weight);
+  if (isExternalPigmentProvider(providerId)) return prepareExternalPigmentPair(first, second, providerId)(ratio);
   if (ratio === 0) return hexColor(parseColor(first));
   if (ratio === 1) return hexColor(parseColor(second));
   if (providerId === "mixbox-js-v2") {

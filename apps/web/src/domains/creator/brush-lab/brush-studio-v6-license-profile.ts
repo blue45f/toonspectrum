@@ -71,6 +71,24 @@ export const BRUSH_STUDIO_V6_PROVIDER_MANIFEST = Object.freeze([
     roles: ["contact", "surface", "physics", "pattern", "output"], nodeIds: INTERNAL_MATERIAL_NODE_IDS,
   }),
   provider({
+    id: "spectral-js-v3", label: "Spectral.js · 분광 K/S", version: "3.0.0",
+    license: "MIT", rights: "permissive", runtime: "javascript",
+    integration: "connected", productPath: "material-contact", materialExecution: "native",
+    roles: ["pigment", "palette"], nodeIds: ["pigment-spectral-js"],
+  }),
+  provider({
+    id: "open-km-spectral-v1", label: "open-km · 합성 분광 K/S", version: "1",
+    license: "MIT (open-km + spectral.js)", rights: "permissive", runtime: "javascript",
+    integration: "connected", productPath: "material-contact", materialExecution: "native",
+    roles: ["pigment", "palette"], nodeIds: ["pigment-open-km-spectral"],
+  }),
+  provider({
+    id: "colormix-lab-v3", label: "ColorMix.js · Lab 비교", version: "3.2.0",
+    license: "MIT", rights: "permissive", runtime: "javascript",
+    integration: "connected", productPath: "material-contact", materialExecution: "native",
+    roles: ["pigment", "palette"], nodeIds: ["pigment-colormix-lab"],
+  }),
+  provider({
     id: "mixbox-js-v2", label: "Mixbox", version: "2.0.0",
     license: "CC-BY-NC-4.0", rights: "noncommercial", runtime: "javascript",
     integration: "connected", productPath: "material-contact", materialExecution: "native",

@@ -57,6 +57,10 @@ const A = ["wasm"] as const;
 const G = ["webgl2"] as const;
 const T = ["webgpu", "tilt"] as const;
 const NODE_SPECS: readonly CompactNode[] = [
+  ["pigment-spectral-js", "pigment", "main", "live", "pigment", "permissive"],
+  ["pigment-open-km-spectral", "pigment", "main", "live", "pigment", "permissive"],
+  ["pigment-colormix-lab", "pigment", "main", "live", "pigment", "permissive"],
+
   ...BRUSH_STUDIO_V6_TOPOLOGIES.map((entry): CompactNode => [entry.id, "carrier", "main", "live", "carrier", "internal"]),
   ["input-pointer-v3", "input", "input-worker", "preview", "input", "internal", ["pressure"]],
   ["motion-direct", "motion", "input-worker", "preview", "motion", "internal"], ["motion-adaptive-ema", "motion", "input-worker", "preview", "motion", "internal"], ["motion-spring", "motion", "input-worker", "preview", "motion", "internal"], ["motion-google-ink", "motion", "wasm-worker", "preview", "motion", "permissive", ["wasm", "predicted-events"]], ["motion-brush-inertia", "motion", "input-worker", "preview", "motion", "internal"], ["motion-lazy-leash", "motion", "input-worker", "preview", "motion", "internal"],
@@ -75,6 +79,10 @@ const NODE_SPECS: readonly CompactNode[] = [
 ];
 
 const LABELS: Readonly<Record<string, string>> = Object.freeze({
+  "pigment-spectral-js": "Spectral.js · 분광 K/S",
+  "pigment-open-km-spectral": "open-km · 합성 분광 K/S",
+  "pigment-colormix-lab": "ColorMix.js · Lab 비교",
+
   "input-pointer-v3": "Pointer Input V3", "motion-direct": "Direct", "motion-adaptive-ema": "Adaptive EMA", "motion-spring": "Spring", "motion-google-ink": "Google Ink Modeler", "motion-brush-inertia": "Brush Inertia", "motion-lazy-leash": "Lazy Leash",
   "carrier-webgpu-centerline": "WebGPU Centerline", "carrier-perfect-outline": "Perfect Freehand Outline", "carrier-google-mesh": "Google Ink Mesh", "carrier-webgpu-ribbon": "WebGPU Tilt Ribbon", "carrier-libmypaint-dabs": "libmypaint Dabs", "carrier-hokusai-dabs": "Hokusai Dabs", "carrier-krita-hairy": "Krita Hairy Carrier", "carrier-webgpu-particles": "WebGPU Particle Stream", "carrier-p5-flow": "p5.brush Flow Carrier",
   "tip-round-sdf": "Round SDF", "tip-chisel-sdf": "Chisel SDF", "tip-grain-exemplar": "Captured Grain Tip", "tip-krita-dual": "Krita Dual Tip", "tip-pigment-normal": "Normal-mapped Tip", "tip-motif-atlas": "Motif Atlas",
@@ -265,7 +273,7 @@ export function replaceBrushStudioV6Slot(program: BrushStudioV6Program, slot: Ex
       finish: program.slots.finish.filter((node) => node === "finish-neon"), output: "output-contact-canvas-svg",
       tip: ["tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar"].includes(program.slots.tip) ? program.slots.tip : "tip-round-sdf",
       deposition: ["deposit-ink", "deposit-marker", "deposit-dry", "deposit-wet", "deposit-oil"].includes(program.slots.deposition) ? program.slots.deposition : "deposit-ink",
-      pigment: ["pigment-rgb", "pigment-spectral", "pigment-mixbox"].includes(program.slots.pigment) ? program.slots.pigment : "pigment-spectral",
+      pigment: ["pigment-rgb", "pigment-spectral", "pigment-mixbox", "pigment-spectral-js", "pigment-open-km-spectral", "pigment-colormix-lab"].includes(program.slots.pigment) ? program.slots.pigment : "pigment-spectral",
     } }));
   }
   return normalizeBrushStudioV6Program(patch(program, { slots: { [slot]: validNode(id, slot, program.slots[slot] as string) } }));
