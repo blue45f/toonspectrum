@@ -7,7 +7,8 @@ import {
 
 const GRID = 6;
 const MAX_EXPANSIONS = 30_000;
-const DEFAULT_RADIUS = 9;
+export const STUDIO_WORLD_PLAYER_RADIUS = 9;
+const DEFAULT_RADIUS = STUDIO_WORLD_PLAYER_RADIUS;
 
 function circleIntersectsRect(
   point: StudioVirtualSpacePoint,
@@ -28,7 +29,8 @@ function canOccupyWithColliders(
   radius: number,
 ): boolean {
   if (
-    point.x < radius
+    !Number.isFinite(point.x) || !Number.isFinite(point.y)
+    || point.x < radius
     || point.y < radius
     || point.x > manifest.width - radius
     || point.y > manifest.height - radius
@@ -187,6 +189,7 @@ function nearestWalkableNode(
   colliders: readonly StudioWorldRect[],
   point: StudioVirtualSpacePoint,
   radius: number,
+  requireConnection = false,
 ): Node | null {
   const gx = Math.round(point.x / GRID);
   const gy = Math.round(point.y / GRID);
@@ -194,8 +197,11 @@ function nearestWalkableNode(
     for (let dy = -ring; dy <= ring; dy += 1) {
       for (let dx = -ring; dx <= ring; dx += 1) {
         if (ring > 0 && Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+        if ((gx + dx) * GRID < 0 || (gy + dy) * GRID < 0
+          || (gx + dx) * GRID > manifest.width || (gy + dy) * GRID > manifest.height) continue;
         const node = createNode(manifest, gx + dx, gy + dy, radius);
-        if (canOccupyWithColliders(manifest, colliders, node.point, radius)) return node;
+        if (canOccupyWithColliders(manifest, colliders, node.point, radius)
+          && (!requireConnection || lineWalkable(manifest, colliders, point, node.point, radius))) return node;
       }
     }
   }
@@ -208,16 +214,18 @@ export function findStudioWorldPath(
   target: StudioVirtualSpacePoint,
   radius = DEFAULT_RADIUS,
 ): readonly StudioVirtualSpacePoint[] {
+  if (![start.x, start.y, target.x, target.y, radius].every(Number.isFinite) || radius <= 0) return [];
   const colliders = studioWorldCollisionRects(manifest);
   const boundedStart = clampStudioWorldPoint(manifest, start, radius);
   const boundedTarget = clampStudioWorldPoint(manifest, target, radius);
 
+  if (!canOccupyWithColliders(manifest, colliders, boundedStart, radius)) return [];
   if (lineWalkable(manifest, colliders, boundedStart, boundedTarget, radius)) {
     return [boundedTarget];
   }
 
-  const startNode = nearestWalkableNode(manifest, colliders, boundedStart, radius);
-  const targetNode = nearestWalkableNode(manifest, colliders, boundedTarget, radius);
+  const startNode = nearestWalkableNode(manifest, colliders, boundedStart, radius, true);
+  const targetNode = nearestWalkableNode(manifest, colliders, boundedTarget, radius, canOccupyWithColliders(manifest, colliders, boundedTarget, radius));
   if (!startNode || !targetNode) return [];
 
   const startKey = nodeKey(startNode.gx, startNode.gy);
@@ -255,7 +263,8 @@ export function findStudioWorldPath(
         reversed.push(createNode(manifest, gx!, gy!, radius).point);
       }
       reversed.reverse();
-      if (canOccupyWithColliders(manifest, colliders, boundedTarget, radius)) {
+      if (canOccupyWithColliders(manifest, colliders, boundedTarget, radius)
+        && lineWalkable(manifest, colliders, targetNode.point, boundedTarget, radius)) {
         reversed.push(boundedTarget);
       }
       return smoothPath(manifest, colliders, boundedStart, reversed, radius);
@@ -266,6 +275,8 @@ export function findStudioWorldPath(
     const currentG = gScore.get(currentKey) ?? Number.POSITIVE_INFINITY;
 
     for (const [dx, dy] of directions) {
+      if ((current.gx + dx) * GRID < 0 || (current.gy + dy) * GRID < 0
+        || (current.gx + dx) * GRID > manifest.width || (current.gy + dy) * GRID > manifest.height) continue;
       const next = createNode(manifest, current.gx + dx, current.gy + dy, radius);
       if (!canOccupyWithColliders(manifest, colliders, next.point, radius)) continue;
 

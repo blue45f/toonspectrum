@@ -103,6 +103,10 @@ const layers = [
       interactionRadius: prop.interactionRadius,
       labelKo: prop.labelKo,
       labelEn: prop.labelEn,
+      targetRoomId: prop.portal?.targetRoomId,
+      targetX: prop.portal?.targetPoint?.x,
+      targetY: prop.portal?.targetPoint?.y,
+      href: prop.portal?.href,
     },
   ))),
   objectLayer("interactions", manifest.interactions.map((interaction) => object(
@@ -177,6 +181,7 @@ const tiled = {
     backgroundUrl: manifest.backgroundUrl,
     backgroundAssetKey: manifest.backgroundAssetKey,
     manifestVersion: manifest.version,
+    manifestId: manifest.id,
   }),
   layers,
 };

@@ -52,8 +52,13 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export function studioCharacterSkinForAvatarIndex(index: number): StudioCharacterSkin {
-  const safe = Number.isInteger(index) && index >= 0 ? index : 0;
+export function studioCharacterSkinForAvatarIndex(index: number, identity?: string): StudioCharacterSkin {
+  let hash = 2166136261;
+  for (const char of identity ?? "") {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const safe = Number.isInteger(index) && index >= 0 ? index : identity ? hash >>> 0 : 0;
   return STUDIO_CHARACTER_SKINS[safe % STUDIO_CHARACTER_SKINS.length] ?? FALLBACK_SKIN;
 }
 
