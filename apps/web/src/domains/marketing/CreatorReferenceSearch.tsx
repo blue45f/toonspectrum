@@ -1,11 +1,8 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Search, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
-
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("CreatorReferenceSearch", ko, en);
 
 const COPY = {
   ko: {
@@ -30,9 +27,14 @@ const COPY = {
   },
 } as const;
 
-export function CreatorReferenceSearch({ locale: _locale }: { locale: "ko" | "en" }) {
+export function CreatorReferenceSearch({ locale }: { locale: "ko" | "en" }) {
   useBilingualI18nRevision();
-  const copy = bi((COPY).ko, (COPY).en);
+  const copy = translateBilingualValueForLocale(
+    locale,
+    "CreatorReferenceSearch",
+    COPY.ko,
+    COPY.en,
+  );
   const navigate = useNavigate();
   const id = useId();
   const composing = useRef(false);
