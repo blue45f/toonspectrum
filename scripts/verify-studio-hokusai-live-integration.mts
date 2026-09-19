@@ -994,9 +994,11 @@ async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
 async function activatePen(page: Page): Promise<void> {
   await page.keyboard.press("b");
   const toolbar = page.locator('[data-studio-draw-options="true"]');
-  await toolbar.waitFor({ state: "visible", timeout: 8_000 });
-  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  await toolbar.waitFor({ state: "visible", timeout: $2 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
   await toolbar.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
 }
 

@@ -228,8 +228,11 @@ async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
   await page.keyboard.press("b");
   const toolbar = page.getByRole("toolbar", { name: /그리기 옵션/u });
   await toolbar.waitFor({ state: "visible", timeout: 20_000 });
-  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-  if ((await pen.getAttribute("aria-pressed")) !== "true") await pen.click();
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
+  await toolbar.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
   await page.waitForTimeout(400);
 }
 

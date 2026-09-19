@@ -54,13 +54,13 @@ test("promo editor uploads, edits, plans, exports and cancels", async ({ page },
   await page.locator(".promo-shot textarea").first().fill("밤의 도시를 바라보는 주인공");
   await page.getByRole("button", { name: "로컬 연출 템플릿", exact: true }).click();
   await expect(page.locator(".promo-feedback")).toContainText("AI 생성 결과가 아니며");
-  await page.getByRole("button", { name: "AI로 홍보 콘티 구성", exact: true }).click();
+  await page.getByRole("button", { name: "자동 무료 AI로 홍보 콘티 구성", exact: true }).click();
   await expect(page.locator(".promo-feedback")).toContainText("무료 텍스트 AI 구성 적용");
   expect(posted).not.toContain("base64");
   expect(posted).not.toContain('"src"');
   await expect(page.locator('input[id^="caption-"]').first()).toHaveValue("예고편 자막 1");
   malformed = true;
-  await page.getByRole("button", { name: "AI로 홍보 콘티 구성", exact: true }).click();
+  await page.getByRole("button", { name: "자동 무료 AI로 홍보 콘티 구성", exact: true }).click();
   await expect(page.locator(".promo-error")).toContainText("컷 수");
   await expect(page.locator('input[id^="caption-"]').first()).toHaveValue("예고편 자막 1");
   await page.getByRole("button", { name: "로컬 연출 템플릿", exact: true }).click();

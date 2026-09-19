@@ -42,6 +42,7 @@
       "default": "./src/carousel/index.ts"
     },
     "./collaboration": "./src/collaboration.ts",
+    "./creator-role": "./src/creator-role.ts",
     "./fortune": "./src/fortune/index.ts",
     "./promotion": "./src/promotion.ts",
     "./production": {

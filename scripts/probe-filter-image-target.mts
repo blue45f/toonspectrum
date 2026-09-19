@@ -67,7 +67,10 @@ async function main(): Promise<void> {
     await page.keyboard.press("b");
     const toolbar = page.locator('[data-studio-draw-options="true"]');
     await toolbar.waitFor({ state: "visible", timeout: 10_000 });
-    await toolbar.getByRole("button", { name: "펜", exact: true }).click();
+    await page.waitForFunction(() =>
+      document.querySelector('[data-studio-draw-options="true"]')
+        ?.getAttribute("data-studio-active-draw-mode") === "pen"
+    );
     const vp = page.locator("[data-studio-canvas-viewport]");
     const box = await vp.boundingBox();
     if (!box) throw new Error("no viewport box");

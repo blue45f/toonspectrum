@@ -23,7 +23,23 @@ export * from "./command/journal-store";
 export * from "./command/recovery";
 export * from "./command/bus";
 export * from "./testing/fault-injection";
-export * from "./graph/scope-ref";
+export {
+  STUDIO_SCOPE_LEVELS,
+  isStudioScopeIdentity,
+  validateStudioScopeRef,
+  assertStudioScopeRef,
+  createStudioScopeRef,
+  studioScopeKey,
+  studioScopeDepth,
+  studioScopeContains,
+  scopeRefKey,
+  scopeRefContains,
+} from "./graph/scope-ref";
+export type {
+  StudioScopeLevel,
+  StudioScopeRefV1,
+  StudioScopeIssue,
+} from "./graph/scope-ref";
 export * from "./graph/artifact-revision";
 export * from "./graph/project-graph";
 export * from "./graph/external-file-binding";

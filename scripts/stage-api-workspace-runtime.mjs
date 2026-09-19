@@ -4,13 +4,30 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   {
+    name: "@toonspectrum/contracts",
+    exports: {
+      "./security/csrf": "./security/csrf.js",
+    },
+    subpathEntries: [
+      {
+        target: "security/csrf.js",
+        compiledEntry: "packages/contracts/src/security/csrf.js",
+      },
+    ],
+  },
+  {
     name: "@toonspectrum/core",
     compiledEntry: "packages/core/src/index.js",
     exports: {
       ".": "./index.js",
+      "./creator-role": "./creator-role.js",
       "./production": "./production/index.js",
     },
     subpathEntries: [
+      {
+        target: "creator-role.js",
+        compiledEntry: "packages/core/src/creator-role.js",
+      },
       {
         target: "production/index.js",
         compiledEntry: "packages/core/src/production/index.js",
@@ -43,17 +60,21 @@ export async function stageApiWorkspaceRuntime(
   const staged = [];
 
   for (const definition of WORKSPACE_RUNTIME_PACKAGES) {
-    const compiledEntry = resolve(root, definition.compiledEntry);
-    await access(compiledEntry);
+    const compiledEntry = definition.compiledEntry
+      ? resolve(root, definition.compiledEntry)
+      : null;
+    if (compiledEntry) await access(compiledEntry);
 
     const targetDirectory = packageDirectory(root, definition.name);
     await mkdir(targetDirectory, { recursive: true });
-    const shimTarget = requirePath(targetDirectory, compiledEntry);
-    await writeFile(
-      resolve(targetDirectory, "index.js"),
-      `"use strict";\nmodule.exports = require(${JSON.stringify(shimTarget)});\n`,
-      "utf8",
-    );
+    if (compiledEntry) {
+      const shimTarget = requirePath(targetDirectory, compiledEntry);
+      await writeFile(
+        resolve(targetDirectory, "index.js"),
+        `"use strict";\nmodule.exports = require(${JSON.stringify(shimTarget)});\n`,
+        "utf8",
+      );
+    }
     for (const subpath of definition.subpathEntries ?? []) {
       const compiledSubpathEntry = resolve(root, subpath.compiledEntry);
       await access(compiledSubpathEntry);
@@ -73,7 +94,7 @@ export async function stageApiWorkspaceRuntime(
       `${JSON.stringify({
         name: definition.name,
         private: true,
-        main: "./index.js",
+        ...(compiledEntry ? { main: "./index.js" } : {}),
         ...(definition.exports ? { exports: definition.exports } : {}),
       }, null, 2)}\n`,
       "utf8",

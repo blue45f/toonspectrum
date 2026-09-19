@@ -1,12 +1,21 @@
+import { parseArtifact, type Artifact } from "./artifact";
 import {
   createStudioArtifact,
   type StudioArtifactRevisionV1,
   type StudioArtifactV1,
 } from "./artifact-revision";
 import {
+  assertSameImmutableRevision,
+  parseRevisionManifest,
+  revisionParentKindIssues,
+  type RevisionManifest,
+} from "./revision";
+import {
   assertStudioScopeRef,
   type StudioScopeRefV1,
 } from "./scope-ref";
+
+import type { ProjectId } from "./ids";
 
 export const STUDIO_PROJECT_NODE_KINDS = [
   "series",
@@ -285,4 +294,190 @@ export function appendStudioRevisionToGraph(
   const issues = validateStudioProjectGraph(next);
   if (issues.length > 0) throw new Error(issues.map((issue) => issue.message).join(" "));
   return next;
+}
+
+
+/**
+ * Durable ProjectGraph v3 compatibility surface.
+ *
+ * The v1 platform graph above is used by the current product adapter, while the v3 graph is the
+ * append-only revision authority consumed by the engine and legacy-shadow migration. Keeping both
+ * contracts here avoids making either caller reinterpret the other's persistence shape.
+ */
+type ProjectAuthorityVersion = "legacy-v2" | "project-graph-v3";
+
+export interface ProjectGraphLegacyProjection {
+  readonly snapshotVersion: 2;
+  readonly sceneDigest: string;
+  readonly projectDigest: string;
+}
+
+export interface ProjectGraphV3 {
+  readonly version: 3;
+  readonly projectId: ProjectId;
+  readonly authorityVersion: ProjectAuthorityVersion;
+  readonly artifacts: Readonly<Record<string, Artifact>>;
+  readonly revisions: Readonly<Record<string, RevisionManifest>>;
+  readonly legacyProjection?: ProjectGraphLegacyProjection;
+}
+
+export class ProjectGraphInvariantError extends Error {
+  constructor(readonly issues: readonly string[]) {
+    super(`ProjectGraph v3 invariant failed: ${issues.join("; ")}`);
+    this.name = "ProjectGraphInvariantError";
+  }
+}
+
+function frozenRecord<T>(entries: readonly (readonly [string, T])[]): Readonly<Record<string, T>> {
+  return Object.freeze(Object.fromEntries(entries));
+}
+
+export function createProjectGraphV3(
+  projectId: ProjectId,
+  authorityVersion: ProjectAuthorityVersion = "project-graph-v3",
+): ProjectGraphV3 {
+  return Object.freeze({
+    version: 3,
+    projectId,
+    authorityVersion,
+    artifacts: frozenRecord<Artifact>([]),
+    revisions: frozenRecord<RevisionManifest>([]),
+  });
+}
+
+export function validateProjectGraphV3(graph: ProjectGraphV3): readonly string[] {
+  const issues: string[] = [];
+  if (graph.version !== 3) issues.push("graph version must be 3");
+  if (graph.authorityVersion !== "legacy-v2" && graph.authorityVersion !== "project-graph-v3") {
+    issues.push("graph authority version is invalid");
+  }
+
+  for (const [key, artifact] of Object.entries(graph.artifacts)) {
+    try {
+      parseArtifact(artifact);
+    } catch {
+      issues.push(`artifact ${key} is invalid`);
+      continue;
+    }
+    if (key !== artifact.id) issues.push(`artifact key ${key} does not match id ${artifact.id}`);
+    if (artifact.projectId !== graph.projectId || artifact.scope.projectId !== graph.projectId) {
+      issues.push(`artifact ${artifact.id} belongs to another project`);
+    }
+    const head = graph.revisions[artifact.headRevisionId];
+    if (!head || head.artifactId !== artifact.id) {
+      issues.push(`artifact ${artifact.id} head revision is missing or belongs to another artifact`);
+    }
+    if (artifact.approvedRevisionId !== undefined) {
+      const approved = graph.revisions[artifact.approvedRevisionId];
+      if (!approved || approved.artifactId !== artifact.id || approved.kind !== "approved") {
+        issues.push(`artifact ${artifact.id} approved revision is invalid`);
+      }
+    }
+  }
+
+  for (const [key, revision] of Object.entries(graph.revisions)) {
+    try {
+      parseRevisionManifest(revision);
+    } catch {
+      issues.push(`revision ${key} is invalid`);
+      continue;
+    }
+    if (key !== revision.id) issues.push(`revision key ${key} does not match id ${revision.id}`);
+    const artifact = graph.artifacts[revision.artifactId];
+    if (!artifact) {
+      issues.push(`revision ${revision.id} references a missing artifact`);
+      continue;
+    }
+    const parents = revision.parentIds.flatMap((parentId) => {
+      const parent = graph.revisions[parentId];
+      if (!parent) {
+        issues.push(`revision ${revision.id} parent ${parentId} is missing`);
+        return [];
+      }
+      return [parent];
+    });
+    if (parents.length === revision.parentIds.length) {
+      for (const issue of revisionParentKindIssues(revision, parents)) {
+        issues.push(`revision ${revision.id}: ${issue}`);
+      }
+    }
+  }
+  return Object.freeze(issues);
+}
+
+function assertProjectGraphV3(graph: ProjectGraphV3): ProjectGraphV3 {
+  const issues = validateProjectGraphV3(graph);
+  if (issues.length > 0) throw new ProjectGraphInvariantError(issues);
+  return graph;
+}
+
+export function addArtifactWithInitialRevision(
+  graph: ProjectGraphV3,
+  artifactInput: Artifact,
+  revisionInput: RevisionManifest,
+): ProjectGraphV3 {
+  const artifact = parseArtifact(artifactInput);
+  const revision = parseRevisionManifest(revisionInput);
+  if (graph.artifacts[artifact.id]) {
+    throw new ProjectGraphInvariantError([`artifact ${artifact.id} already exists`]);
+  }
+  if (graph.revisions[revision.id]) {
+    throw new ProjectGraphInvariantError([`revision ${revision.id} already exists`]);
+  }
+  if (
+    artifact.projectId !== graph.projectId
+    || artifact.scope.projectId !== graph.projectId
+    || revision.artifactId !== artifact.id
+    || artifact.headRevisionId !== revision.id
+    || revision.parentIds.length !== 0
+  ) {
+    throw new ProjectGraphInvariantError(["initial artifact and revision do not form a valid graph root"]);
+  }
+  const next: ProjectGraphV3 = Object.freeze({
+    ...graph,
+    artifacts: frozenRecord([...Object.entries(graph.artifacts), [artifact.id, Object.freeze({ ...artifact })]]),
+    revisions: frozenRecord([...Object.entries(graph.revisions), [revision.id, Object.freeze({ ...revision })]]),
+  });
+  return assertProjectGraphV3(next);
+}
+
+export function appendRevision(
+  graph: ProjectGraphV3,
+  revisionInput: RevisionManifest,
+): ProjectGraphV3 {
+  const revision = parseRevisionManifest(revisionInput);
+  const existing = graph.revisions[revision.id];
+  if (existing) {
+    assertSameImmutableRevision(existing, revision);
+    return graph;
+  }
+
+  const artifact = graph.artifacts[revision.artifactId];
+  if (!artifact) {
+    throw new ProjectGraphInvariantError([`revision ${revision.id} references a missing artifact`]);
+  }
+  const parents: RevisionManifest[] = [];
+  for (const parentId of revision.parentIds) {
+    const parent = graph.revisions[parentId];
+    if (!parent) {
+      throw new ProjectGraphInvariantError([`revision ${revision.id} parent ${parentId} is missing`]);
+    }
+    parents.push(parent);
+  }
+  const parentIssues = revisionParentKindIssues(revision, parents);
+  if (parentIssues.length > 0) throw new ProjectGraphInvariantError(parentIssues);
+
+  const nextArtifact: Artifact = Object.freeze({
+    ...artifact,
+    ...(revision.kind === "release" ? {} : { headRevisionId: revision.id }),
+    ...(revision.kind === "approved" ? { approvedRevisionId: revision.id } : {}),
+    updatedAt: revision.createdAt,
+  });
+  const next: ProjectGraphV3 = Object.freeze({
+    ...graph,
+    artifacts: frozenRecord(Object.entries(graph.artifacts).map(([id, current]) =>
+      id === artifact.id ? [id, nextArtifact] as const : [id, current] as const)),
+    revisions: frozenRecord([...Object.entries(graph.revisions), [revision.id, Object.freeze({ ...revision })]]),
+  });
+  return assertProjectGraphV3(next);
 }

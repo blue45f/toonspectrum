@@ -86,8 +86,11 @@ try {
     if (await button.isVisible()) await button.click();
   }
   await page.keyboard.press("b");
-  const pen = page.locator('[data-studio-draw-options="true"]').getByRole("button", { name: "펜", exact: true });
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
+  await page.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
   const box = await page.locator("[data-studio-canvas-viewport]").boundingBox();
   assert(box);
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.3);

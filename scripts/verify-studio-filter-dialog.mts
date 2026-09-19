@@ -174,10 +174,12 @@ async function dismissTransientChrome(page: Page): Promise<void> {
 async function activatePenAndDraw(page: Page): Promise<void> {
   await page.keyboard.press("b");
   const toolbar = page.locator('[data-studio-draw-options="true"]');
-  await toolbar.waitFor({ state: "visible", timeout: 10_000 });
-  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-  if ((await pen.getAttribute("aria-pressed")) !== "true") await pen.click();
-  await page.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
+  await toolbar.waitFor({ state: "visible", timeout: $2 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
+  await toolbar.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
 
   const viewport = page.locator("[data-studio-canvas-viewport]");
   await viewport.waitFor({ state: "visible", timeout: 10_000 });

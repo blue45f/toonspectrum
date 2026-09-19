@@ -15,6 +15,7 @@ const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
 const createModeGroupsSource = read("./StudioToolBeltCreateModeGroups.tsx");
 const globalsSource = read("../../styles/globals.css");
+const floatingLayoutsSource = read("./studio-floating-menu-layouts.ts");
 
 describe("Studio asset workspace boundaries", () => {
   it("loads unified catalogs and the visual workspace only after the asset menu is active", () => {
@@ -71,7 +72,7 @@ describe("Studio asset workspace boundaries", () => {
     expect(previewSource).toContain("<StudioSceneTemplateMap");
     expect(previewSource).toContain('import("three")');
     expect(previewSource).toContain('import("three/examples/jsm/loaders/GLTFLoader.js")');
-    expect(previewSource).toContain("toDataURL(\"image/webp\"");
+    expect(previewSource).toContain('canvasToDataUrlAsync(renderer.domElement, "image/webp", 0.86)');
     expect(previewSource).toContain("disposeObject");
     expect(workspaceSource).toContain("<StudioUnifiedAssetPreviewSurface");
   });
@@ -127,7 +128,7 @@ describe("Studio asset workspace boundaries", () => {
   });
 
   it("sizes the desktop asset window for the visual workspace without forcing horizontal scroll", () => {
-    expect(createModeGroupsSource).toContain("width: 1080, height: 760");
+    expect(floatingLayoutsSource).toContain("asset: floatingMenuLayout(0.02, 0.08, 1080, 760)");
     expect(createModeGroupsSource).toContain("maxWidth: 1320");
     expect(createModeGroupsSource).toContain(
       'contentClassName: "overflow-y-auto overflow-x-hidden"',
