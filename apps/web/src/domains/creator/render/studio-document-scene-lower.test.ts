@@ -10,7 +10,8 @@ import {
   studioDocumentAllowsKonvaHide,
 } from "./studio-document-scene-lower";
 
-import { captureStudioOutlineStrokeContractV1 } from "../studio-outline-stroke-contract";
+import { captureStudioOutlineStrokeContractV1, planStudioPerfectFreehandRender } from "../studio-outline-stroke-contract";
+import { peekStudioPerfectFreehandStroker, studioPerfectFreehandOutlineToPathData, studioPerfectFreehandOutlineToPathIR } from "../studio-perfect-freehand";
 
 import type { El } from "../studio-element-model";
 
@@ -152,8 +153,8 @@ describe("lowerStudioElementsToRenderScene", () => {
       kind: "freehand",
       mode: "pen",
       brush: "gpen",
-      points: [10, 50, 30, 36, 52, 58, 78, 42, 110, 50],
-      pressures: [0.2, 0.45, 0.82, 0.6, 0.35],
+      points: Array.from({ length: 40 }, (_, i) => [10.123 + i * 3.17, 50.456 + Math.sin(i / 6) * 15.71]).flat(),
+      pressures: Array.from({ length: 40 }, (_, i) => 0.2 + Math.sin(i / 39 * Math.PI) * 0.65),
       stroke: "#123456",
       strokeWidth: 7,
       opacity: 0.9,
@@ -174,9 +175,40 @@ describe("lowerStudioElementsToRenderScene", () => {
         color: { r: 0x12 / 255, g: 0x34 / 255, b: 0x56 / 255, a: 1 },
       });
     }
+    if (element.type !== "draw") throw new Error("expected ink");
+    const plan = planStudioPerfectFreehandRender({
+      contract: element.outlineStroke, stroker: peekStudioPerfectFreehandStroker(),
+      points: element.points, pressures: element.pressures, strokeWidth: element.strokeWidth,
+    });
+    expect(plan.kind).toBe("outline");
+    if (plan.kind === "outline" && lowered.nodes[0]?.kind === "fill-path") {
+      expect(lowered.nodes[0].path).toEqual(studioPerfectFreehandOutlineToPathIR(plan.outline));
+      expect(studioPerfectFreehandOutlineToPathData(plan.outline)).toBe(plan.pathData);
+      const svg = lowered.nodes[0].path.verbs.map((verb) => {
+        if (verb.v === "M") return `M${verb.x} ${verb.y}`;
+        if (verb.v === "Q") return `Q${verb.cx} ${verb.cy} ${verb.x} ${verb.y}`;
+        return "Z";
+      }).join(" ");
+      expect(svg).toBe(plan.pathData);
+    }
     const owned = documentIdsOwnedByVectorIslands(lowered);
     expect(owned).toEqual(["vector-ink"]);
     expect(studioDocumentAllowsKonvaHide([element], owned)).toBe(true);
+  });
+
+  it("never claims sparse Line-plan ink or missing-pressure ink as Vello-owned", () => {
+    const element = {
+      id: "sparse", type: "draw", kind: "freehand", mode: "pen", brush: "gpen",
+      points: [10, 50, 30, 36, 52, 58, 78, 42, 110, 50],
+      pressures: [0.2, 0.45, 0.82, 0.6, 0.35], stroke: "#123456", strokeWidth: 7,
+      outlineStroke: captureStudioOutlineStrokeContractV1({ brushId: "gpen", pressureSource: "recorded" }),
+    } as El;
+    for (const candidate of [element, { ...element, pressures: undefined } as El]) {
+      expect(isStudioVelloDocumentVectorFreehandElement(candidate)).toBe(false);
+      const lowered = lowerStudioElementsToRenderScene([candidate], { width: 160, height: 100 });
+      expect(documentIdsOwnedByVectorIslands(lowered)).toEqual([]);
+      expect(studioDocumentAllowsKonvaHide([candidate], [])).toBe(false);
+    }
   });
 
   it("keeps styled or material freehand strokes outside the Vello brush island", () => {
@@ -201,7 +233,7 @@ describe("lowerStudioElementsToRenderScene", () => {
     } as El)).toBe(false);
     expect(isStudioVelloDocumentVectorFreehandElement({
       ...base,
-      pattern: { src: "blob:pattern" },
+      pattern: { patternId: "dots", fg: "#123456", scale: 1 },
     } as El)).toBe(false);
   });
 
