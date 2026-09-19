@@ -255,6 +255,10 @@ export const STUDIO_SCENE3D_EVOLUTION_CANDIDATES:
     }),
   ]);
 
+function unreachableCandidate(value: never): never {
+  throw new Error(`Unhandled Scene3D evolution candidate: ${String(value)}`);
+}
+
 function admitted(
   id: StudioScene3dEvolutionCandidateId,
   software: StudioScene3dSoftwareCapabilities,
@@ -290,6 +294,8 @@ function admitted(
       return software.openSubdiv;
     case "pathtraced-still":
       return software.pathTracer;
+    default:
+      return unreachableCandidate(id);
   }
 }
 
@@ -373,6 +379,8 @@ function applicability(
           ? "2K 이상 명시 출력에서만 실험적인 still renderer를 비교합니다."
           : "일반 preview에는 path tracing을 사용하지 않습니다.",
       };
+    default:
+      return unreachableCandidate(candidate.id);
   }
 }
 
