@@ -52,6 +52,8 @@ export interface StudioDurableProjectPagesInput<
   fallbackPages: readonly Page[];
   /** Released ink that is still intentionally outside React history. */
   pendingStrokeCommits?: StudioPendingStrokeBatch<Stroke> | null;
+  /** Optional runtime receipt gate; rejected ink remains pending in its original owner. */
+  isPendingStrokeDurable?: (stroke: Stroke) => boolean;
 }
 
 /**
@@ -75,9 +77,14 @@ export function resolveStudioDurableProjectPages<
   );
   const authoritativePages =
     input.pagesHistory[boundedHistoryIndex] ?? input.fallbackPages;
+  let pending = input.pendingStrokeCommits;
+  if (pending && input.isPendingStrokeDurable) {
+    const strokes = pending.strokes.filter(input.isPendingStrokeDurable);
+    pending = strokes.length ? { pageId: pending.pageId, strokes } : null;
+  }
   return projectStudioPendingStrokes(
     authoritativePages,
-    input.pendingStrokeCommits
+    pending
   );
 }
 
