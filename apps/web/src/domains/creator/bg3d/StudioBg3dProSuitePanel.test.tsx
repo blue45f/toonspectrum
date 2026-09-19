@@ -129,3 +129,19 @@ describe("production workbench scene integration", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+
+it("opens the real asset toolchain and local splat viewer from the existing production workbench", async () => {
+  render(workbench(runtime()));
+  const opener = screen.getByRole("button", { name: "3D 자산 고급 가공 · LOD / 불리언 / 이동 경로" });
+  expect(opener.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(opener);
+  expect(await screen.findByRole("region", { name: "3D 자산 고급 가공" })).toBeDefined();
+  expect(await screen.findByRole("region", { name: "Gaussian Splat 참고 뷰어" })).toBeDefined();
+  expect(opener.getAttribute("aria-expanded")).toBe("true");
+});
+it("does not open specialist tools while the parent editor is locked", () => {
+  render(workbench(runtime({ disabled: true })));
+  const opener = screen.getByRole("button", { name: "3D 자산 고급 가공 · LOD / 불리언 / 이동 경로" }) as HTMLButtonElement;
+  expect(opener.disabled).toBe(true);
+});

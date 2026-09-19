@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "apps/web/src/domains/creator/scene3d/**"
+      - "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanelContent.tsx"
+      - "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx"
+      - "scripts/verify-studio-scene3d-specialists.mjs"
       - "apps/web/src/domains/creator/bg3d/*capture*"
       - "apps/web/src/domains/creator/bg3d/*readback*"
       - "apps/web/src/domains/creator/bg3d/StudioBg3dCaptureBridge.tsx"
@@ -53,5 +56,41 @@ jobs:
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgl-capture.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts
+      - name: Verify functional specialist runtimes and UI
+        run: pnpm run verify:studio-3d-specialists
       - name: Type-check web workspace
         run: pnpm exec tsc -p tsconfig.json --noEmit
+
+
+  scene3d-specialists-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=12288
+      SCENE3D_SPECIALISTS_GPU_LANE: swiftshader
+      SCENE3D_SPECIALISTS_PRODUCTION_WORKER: "1"
+      TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.qa/scene3d-output-quality/specialist-ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Build actual production worker and CSP headers
+        run: pnpm run build:bundle
+      - name: Verify real worker, artifact, IK and splat user paths
+        run: pnpm run verify:studio-3d-specialists:browser
+      - name: Preserve specialist verification evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: scene3d-specialist-browser-evidence
+          path: |
+            .qa/scene3d-output-quality/specialist-ci/*.json
+            .qa/scene3d-output-quality/specialist-ci/*.png
+            .qa/scene3d-output-quality/specialist-ci/*.glb
+          if-no-files-found: warn
+          retention-days: 7
