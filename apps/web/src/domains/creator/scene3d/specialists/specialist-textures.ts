@@ -54,6 +54,10 @@ export async function processTextureDerivatives(
     const mime = texture.getMimeType();
     const info = inspectSpecialistImage(image, mime);
     if (mime === "image/ktx2") {
+      if (info.width > options.maxTextureSize || info.height > options.maxTextureSize) {
+        throw new SpecialistError("unsupported",
+          "An existing KTX2 texture exceeds the selected maximum edge. Choose a larger limit or re-encode from the original PNG/JPEG/WebP source.");
+      }
       receipts.push({
         index,
         action: "preserved-ktx2",

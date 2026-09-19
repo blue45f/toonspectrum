@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -6,6 +6,7 @@ import { WebIO } from "@gltf-transform/core";
 import {
   createTexturedSpecialistFixture,
   textureFixtureRgba,
+  textureFixturePng,
 } from "./specialist-texture-fixtures";
 import { createSpecialistIo, preflightSpecialistGlb } from "./specialist-gltf";
 import { processTextureDerivatives } from "./specialist-textures";
@@ -162,4 +163,26 @@ describe("real texture derivatives and release pipeline", () => {
     });
     expect(derivativeTextureSize(1, 1, 512)).toEqual({ width: 4, height: 4 });
   });
+});
+
+
+it("enforces the selected edge on already-compressed KTX2 without altering source bytes", async () => {
+  const io = await createSpecialistIo();
+  const document = await io.readBinary(await createTexturedSpecialistFixture());
+  document.getRoot().listTextures()[0]!.setImage(await textureFixturePng(1024, 4));
+  const original = new Uint8Array(await io.writeBinary(document));
+  const encoded = await processTextureDerivatives(io, original,
+    { kind: "textures", textureMode: "uastc", maxTextureSize: 2048 }, decoder);
+  const source = encoded.artifacts[0]!.bytes; const snapshot = source.slice();
+  const forbiddenDecoder = vi.fn(decoder);
+  for (const kind of ["textures", "release"] as const) {
+    await expect(processTextureDerivatives(io, source,
+      { kind, textureMode: "uastc", maxTextureSize: 512, ...(kind === "release" ? { error: 0.01 } : {}) } as Parameters<typeof processTextureDerivatives>[2],
+      forbiddenDecoder)).rejects.toMatchObject({ code: "unsupported" });
+  }
+  expect(source).toEqual(snapshot); expect(forbiddenDecoder).not.toHaveBeenCalled();
+  const kept = await processTextureDerivatives(io, source,
+    { kind: "release", textureMode: "uastc", maxTextureSize: 1024, error: 0.03 }, forbiddenDecoder);
+  expect(inspectSpecialistGlbImages(kept.artifacts[0]!.bytes)[0]).toMatchObject({ width: 1024, height: 4 });
+  expect(forbiddenDecoder).not.toHaveBeenCalled();
 });
