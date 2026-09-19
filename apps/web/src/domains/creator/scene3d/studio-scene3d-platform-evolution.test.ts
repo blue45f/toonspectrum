@@ -45,6 +45,12 @@ function runtime(document: StudioScene3dDocumentV1) {
 }
 
 describe("Studio Scene3D platform evolution registry", () => {
+  it("does not claim planned software capabilities before product promotion", () => {
+    expect(Object.values(STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES).every(
+      (value) => value === false,
+    )).toBe(true);
+  });
+
   it("keeps candidate packages non-admitted until a product runtime lands", () => {
     const document = createStudioScene3dDocument(
       "scene:evolution",
