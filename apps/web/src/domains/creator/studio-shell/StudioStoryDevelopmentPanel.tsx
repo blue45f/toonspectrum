@@ -81,23 +81,26 @@ export function StudioStoryDevelopmentPanel({
 }) {
   const bt = useBilingual("StudioStoryDevelopmentPanel");
   const [development, setDevelopment] = useState(() => loadDevelopment(projectId));
+  const [loadedProjectId, setLoadedProjectId] = useState(projectId);
   const [selectedChapterId, setSelectedChapterId] = useState(() => development.chapters[0]?.id ?? "");
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const next = loadDevelopment(projectId);
     setDevelopment(next);
+    setLoadedProjectId(projectId);
     setSelectedChapterId(next.chapters[0]?.id ?? "");
   }, [projectId]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    // Never write the previous project state during the scope-change render.
+    if (loadedProjectId !== projectId || typeof window === "undefined") return;
     try {
       window.localStorage.setItem(storyDevelopmentStorageKey(projectId), JSON.stringify(development));
     } catch {
       // The editor remains usable when storage is unavailable; only persistence is lost.
     }
-  }, [development, projectId]);
+  }, [development, projectId, loadedProjectId]);
 
   const chapter = development.chapters.find((item) => item.id === selectedChapterId)
     ?? development.chapters[0]!;

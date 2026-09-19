@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { join, win32 } from "node:path";
@@ -82,6 +85,12 @@ test("packages a reproducible, self-contained desktop sync release", {
   const firstRoot = join(temporaryRoot, "first");
   const secondRoot = join(temporaryRoot, "second");
   const version = "0.0.0-release-test";
+  // A clean clone has no ignored dist tree. Build the real agent before exercising packaging.
+  execFileSync(process.execPath, [
+    createRequire(import.meta.url).resolve("typescript/bin/tsc"),
+    "-p", fileURLToPath(new URL("../apps/desktop-sync/tsconfig.build.json", import.meta.url)),
+  ], { encoding: "utf8", timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+
 
   const first = await packageDesktopSyncRelease(packageOptions(firstRoot, version));
   const second = await packageDesktopSyncRelease(packageOptions(secondRoot, version));

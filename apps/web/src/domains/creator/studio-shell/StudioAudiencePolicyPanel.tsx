@@ -65,16 +65,21 @@ const ISSUE_COPY: Readonly<Record<string, readonly [string, string]>> = {
 export function StudioAudiencePolicyPanel({ projectId }: { readonly projectId: string }) {
   const bt = useBilingual("StudioAudiencePolicyPanel");
   const [policy, setPolicy] = useState(() => loadPolicy(projectId));
+  const [loadedProjectId, setLoadedProjectId] = useState(projectId);
 
-  useEffect(() => setPolicy(loadPolicy(projectId)), [projectId]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    setPolicy(loadPolicy(projectId));
+    setLoadedProjectId(projectId);
+  }, [projectId]);
+  useEffect(() => {
+    // Never write the previous project state during the scope-change render.
+    if (loadedProjectId !== projectId || typeof window === "undefined") return;
     try {
       window.localStorage.setItem(audiencePolicyStorageKey(projectId), JSON.stringify(policy));
     } catch {
       // Policy editing remains available even if the browser blocks persistence.
     }
-  }, [policy, projectId]);
+  }, [policy, projectId, loadedProjectId]);
 
   const report = useMemo(() => evaluateStudioAudiencePolicy(policy), [policy]);
   const patch = (next: Partial<StudioAudiencePolicy>) => setPolicy((current) => ({ ...current, ...next }));

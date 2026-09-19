@@ -261,7 +261,9 @@ export const useI18n = create<I18nState>()(
           const normalized = resolveSelectableLocale(state.lang || FALLBACK_LANG);
           state.lang = normalized;
           applyDocumentLocale(normalized);
-          void loadRuntimeTranslationBundle(normalized);
+          // Hydration runs during store construction, before circular locale-loader
+          // imports have finished. Restore state here; useT's effect loads the saved
+          // locale when a translated surface mounts, after module initialization.
         }
       },
     },

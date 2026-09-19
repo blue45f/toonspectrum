@@ -14,7 +14,7 @@ describe("BG3D release runtime gate wiring", () => {
     expect(scripts["verify:studio-bg3d-webgpu-rotation"]).toBe(
       "STUDIO_BG3D_WEBGPU_GIZMO=1 playwright test --config=playwright.bg3d-runtime.config.ts",
     );
-    expect(read("../.github/workflows/ci.yml"))
+    expect(read("../.github/workflows/main-full-qa-studio.yml"))
       .toContain("pnpm run verify:studio-bg3d-webgpu-rotation");
   });
 
@@ -24,12 +24,15 @@ describe("BG3D release runtime gate wiring", () => {
     );
   });
 
-  it("keeps the independent gate read-only and requires a real browser result", () => {
-    const workflow = read("../.github/workflows/bg3d-runtime-regression.yml");
+  it("keeps the exhaustive gate read-only and requires a real browser result", () => {
+    const workflow = read("../.github/workflows/main-full-qa-studio.yml");
     expect(workflow).toContain("contents: read");
     expect(workflow).not.toContain("contents: write");
     expect(workflow).not.toContain("continue-on-error: true");
-    expect(workflow).toContain("pnpm exec playwright test --config=playwright.bg3d-runtime.config.ts");
+    expect(workflow).toContain("pnpm run verify:studio-bg3d-webgpu-rotation");
     expect(workflow).toContain("set -euo pipefail");
+    expect(workflow).toContain("local status=${PIPESTATUS[0]}");
+    expect(workflow).toContain('if [[ -s "$output_dir/failures.txt" ]]');
+    expect(workflow).toContain("exit 1");
   });
 });

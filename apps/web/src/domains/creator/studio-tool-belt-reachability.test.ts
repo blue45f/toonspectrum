@@ -25,6 +25,7 @@ function source(fileName: string): string {
 
 const page = readStudioCuttoonEditorSource();
 const menubar = source("./StudioMenubarContent.tsx");
+const projectCenterSurface = source("./StudioProjectCenterSurface.tsx");
 const reviewActions = source("./StudioProjectReviewActions.tsx");
 
 /** `<StudioToolBelt …>` 여는 태그 전체 (호스트의 뷰포트 게이트가 여기에 있다). */
@@ -69,12 +70,12 @@ describe("툴벨트 전용 기능 도달성", () => {
   );
 
   it("대체 진입점 호스트에는 벨트를 죽였던 뷰포트 게이트가 없다", () => {
-    const dialogStart = menubar.indexOf('data-studio-project-actions-menu="true"');
+    const dialogStart = projectCenterSurface.indexOf('data-studio-project-actions-menu="true"');
     const mountPoint = menubar.indexOf("<StudioProjectReviewActions");
     expect(dialogStart).toBeGreaterThan(-1);
-    expect(mountPoint).toBeGreaterThan(dialogStart);
+    expect(mountPoint).toBeGreaterThan(-1);
 
-    const dialog = menubar.slice(dialogStart, mountPoint);
+    const dialog = projectCenterSurface.slice(dialogStart);
     expect(dialog).not.toMatch(/\blg:hidden\b/u);
     expect(dialog).not.toMatch(/\bmax-lg:hidden\b/u);
     expect(dialog).not.toContain("mobileImmersive");

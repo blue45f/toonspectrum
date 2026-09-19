@@ -5,11 +5,13 @@
 // onSaveToLibrary가 실제로 호출되는지는 이벤트 시뮬레이션이 필요해 이 스위트의 스코프 밖이다(콜백은
 // 절대 호출되지 않는 no-op으로 넘긴다).
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { StudioPaletteSuggestPanel } from "./StudioPaletteSuggestPanel";
 
 import type { PaletteSuggestion } from "./studio-palette-suggest";
+
+import { useI18n } from "@/shared/lib/i18n";
 
 const noop = () => {
   // 이 스위트는 정적 마운트 렌더만 검증한다 — 이벤트 콜백은 절대 호출되지 않는다.
@@ -22,6 +24,16 @@ const SUGGESTION: PaletteSuggestion = {
     { hex: "#c94f4f", role: "포인트색" },
   ],
 };
+
+const INITIAL_LANGUAGE = useI18n.getState().lang;
+
+beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
+});
+
+afterEach(() => {
+  useI18n.setState({ lang: INITIAL_LANGUAGE });
+});
 
 function renderPanel(overrides: Partial<Parameters<typeof StudioPaletteSuggestPanel>[0]> = {}) {
   return renderToStaticMarkup(
@@ -41,20 +53,21 @@ function renderPanel(overrides: Partial<Parameters<typeof StudioPaletteSuggestPa
 }
 
 describe("StudioPaletteSuggestPanel mount-time render contract", () => {
-  it("shows the settings guidance and disables the textarea/button when not configured", () => {
+  it("keeps drafting available while guiding configuration and blocking generation", () => {
     const html = renderPanel({ configured: false });
 
-    expect(html).toContain("AI 어시스트 설정");
-    expect(html).toContain("로그인하면 자동 무료 AI를 먼저 사용합니다");
-    expect(html).toContain("개인 무료 API 키 또는 로컬 AI를 연결하세요");
-    expect(html).toMatch(/<textarea[^>]*disabled=""/);
+    expect(html).toContain("AI 연결을 준비해 주세요");
+    expect(html).toContain("장르와 분위기 문장은 먼저 작성할 수 있어요");
+    expect(html).toContain("AI 설정 열기");
+    expect(html).toContain('href="/settings/ai"');
+    expect(html).not.toMatch(/<textarea[^>]*disabled=""/);
     expect(html).toMatch(/<button type="button"[^>]*disabled=""/);
   });
 
   it("hides the settings guidance and enables the textarea when configured", () => {
     const html = renderPanel({ configured: true });
 
-    expect(html).not.toContain("자동 무료 AI를 먼저 사용합니다");
+    expect(html).not.toContain("AI 연결을 준비해 주세요");
     expect(html).not.toMatch(/<textarea[^>]*disabled=""/);
   });
 

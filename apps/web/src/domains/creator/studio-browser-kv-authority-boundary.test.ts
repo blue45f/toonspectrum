@@ -479,7 +479,7 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("apps/web/src/domains/creator/StudioHelpHubDialog.tsx", "local-storage-write", "key", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/StudioProjectCenterSearch.tsx", "local-storage-write", "key", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/StudioUnifiedAssetSmartLibrary.tsx", "local-storage-write", "STUDIO_UNIFIED_ASSET_LIBRARY_STORAGE_KEY", 1, UI_ONLY, UI_PROOF),
-  allow("apps/web/src/domains/creator/bg3d/studio-bg3d-professional-workspace-layout.ts", "durable-storage-write", '"toonspectrum.studio.bg3d.workspace-layout.v1"', 1, UI_ONLY, UI_PROOF),
+  allow("apps/web/src/domains/creator/bg3d/studio-bg3d-professional-workspace-layout.ts", "durable-storage-write", "studioBg3dProfessionalWorkspaceStorageKey(scopeKey)", 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/brush/studio-pen-button-policy-store.ts", "durable-storage-write", '"toonstudio:pen-button-policy:v1"', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/brush/studio-stylus-pressure-profile-store.ts", "durable-storage-write", '"toonstudio:stylus-pressure-profile:v1"', 1, UI_ONLY, UI_PROOF),
   allow("apps/web/src/domains/creator/lettering/studio-bubble-library.ts", "durable-storage-write", '"toonstudio.studio.bubble-library.v1"', 1, UI_ONLY, UI_PROOF),
@@ -522,6 +522,23 @@ const ALLOWANCES: readonly BrowserKvAllowance[] = Object.freeze([
   allow("apps/web/src/domains/creator/studio-shell/useStudioProjectLibraryManagementController.ts", "local-storage-cleanup", "studioProjectDocumentStorageKey(projectId)", 1, CLEANUP_ONLY, CLEANUP_PROOF),
   allow("apps/web/src/domains/creator/promo/promo-draft.ts", "indexeddb-open", '"toonstudio-promo-drafts"', 1, STANDALONE_DRAFT_IDB, STANDALONE_DRAFT_IDB_PROOF),
   allow("apps/web/src/domains/creator/promo/promo-draft.ts", "indexeddb-write", "put", 1, STANDALONE_DRAFT_IDB, STANDALONE_DRAFT_IDB_PROOF),
+
+  // 2026-09-20 review of existing main additions: only the exact adjunct-draft calls below.
+  // These are not canvas/revision authority. Project switching and blocked storage are exercised
+  // by StudioProjectDraftIsolation.test.tsx; no directory-level or key-prefix exemption is added.
+  allow("apps/web/src/domains/creator/studio-shell/StudioAudiencePolicyPanel.tsx", "local-storage-write", "audiencePolicyStorageKey(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "StudioProjectDraftIsolation.test.tsx exercises actual render, project switching, exact per-project writes, reload, and blocked browser storage."),
+  allow("apps/web/src/domains/creator/studio-shell/StudioIpOpportunityPanel.tsx", "local-storage-write", "ipOpportunityStorageKey(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "StudioProjectDraftIsolation.test.tsx exercises actual render, project switching, exact per-project writes, reload, and blocked browser storage."),
+  allow("apps/web/src/domains/creator/studio-shell/StudioStaffingSourcingPanel.tsx", "local-storage-write", "staffingBriefStorageKey(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "StudioProjectDraftIsolation.test.tsx exercises actual render, project switching, exact per-project writes, reload, and blocked browser storage."),
+  allow("apps/web/src/domains/creator/studio-shell/StudioStoryDevelopmentPanel.tsx", "local-storage-write", "storyDevelopmentStorageKey(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "StudioProjectDraftIsolation.test.tsx exercises actual render, project switching, exact per-project writes, reload, and blocked browser storage."),
+
+  allow("apps/web/src/domains/creator/creator-intelligence/studio-creator-intelligence-store.ts", "durable-storage-write", "storageKey(next.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "studio-creator-intelligence-store.test.ts verifies isolated, bounded, provenance-preserving research metadata, not imported canvas assets."),
+  allow("apps/web/src/domains/creator/studio-mode-handoff.ts", "durable-storage-write", "handoffStorageKey(record.projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "studio-mode-handoff.test.ts verifies the project-scoped, bounded source-to-derived-document provenance record and rejects invalid project identities."),
+  allow("apps/web/src/domains/creator/studio-shell/StudioCreatorSupportPage.tsx", "local-storage-write", "\"toonstudio:creator-support-request:v1\"", 1, OPTIONAL_LOCAL_TOOL_STATE, "The explicitly local support-request form exports JSON on user action; no server ticket or canonical project save is claimed."),
+  allow("apps/web/src/domains/creator/studio-shell/StudioWebtoonProductionCompanion.tsx", "local-storage-write", "progressKey(projectId,stageId)", 1, UI_ONLY, "StudioWebtoonProductionCompanion.test.tsx proves presentation-only helper checkmarks reload without modifying project production tasks."),
+  allow("apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePage.tsx", "local-storage-write", "\"toonspectrum:virtual-space-avatar:v1\"", 1, UI_ONLY, "Only the normalized built-in avatar index is stored; no authored image, document, world geometry or remote room state is written."),
+  allow("apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePage.tsx", "local-storage-cleanup", "\"toonspectrum:virtual-space-avatar:v1\"", 1, CLEANUP_ONLY, "Clears an invalid cosmetic avatar index only; the separate single index-write allowance cannot authorize another payload."),
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-world-authoring.ts", "local-storage-write", "studioWorldDraftStorageKey(projectId)", 1, REVIEWED_LOCAL_WORKING_COPY, "studio-virtual-space-world-authoring.test.ts verifies explicit Tiled JSON round-trip, project-scoped authoring drafts and rejection of invalid manifests."),
+  allow("apps/web/src/domains/creator/virtual-space/studio-virtual-space-world-authoring.ts", "local-storage-cleanup", "studioWorldDraftStorageKey(projectId)", 1, CLEANUP_ONLY, "studio-virtual-space-world-authoring.test.ts verifies deletion only affects the requested project draft, not other projects or canonical revisions."),
 
   // Explicit legacy IndexedDB seams. Operation counts prevent a file-level blanket exemption.
   allow("apps/web/src/domains/creator/bg3d/bg3d-model-library.ts", "indexeddb-open", '"toonspectrum-studio-bg3d-model-library"', 1, LEGACY_IDB, LEGACY_IDB_PROOF),

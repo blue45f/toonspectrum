@@ -11,6 +11,7 @@ on:
       - "apps/web/src/domains/creator/**"
       - "scripts/verify-studio-**"
       - "scripts/qa/**"
+      - "scripts/lib/studio-verify-preview-harness.mts"
       - ".github/workflows/main-full-qa-studio.yml"
   workflow_dispatch:
 

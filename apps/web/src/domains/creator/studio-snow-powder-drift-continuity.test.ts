@@ -55,6 +55,9 @@ describe("snow-powder-drift sparse route continuity", () => {
     expect(selection.brushDynamics).toMatchObject({
       spacingRatio: 0.36,
       scatterRatio: 0.46,
+      spacing: {
+        mappings: [{ source: "speed", from: 0.78, to: 1.8 }],
+      },
       scatter: {
         mappings: [{ source: "speed", from: 0.76, to: 1.2 }],
         jitter: { mode: "add", amount: 0.24 },

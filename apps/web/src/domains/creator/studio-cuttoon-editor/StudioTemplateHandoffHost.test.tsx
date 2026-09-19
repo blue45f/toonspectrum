@@ -31,7 +31,7 @@ describe("StudioTemplateHandoffHost", () => {
       window.localStorage,
       createStudioTemplateHandoff(
         "webtoon-four-panel",
-        "2026-09-12T00:00:00.000Z",
+        new Date().toISOString(),
         3_600_000,
       ),
     );

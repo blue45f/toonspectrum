@@ -56,7 +56,7 @@ describe("studio shell floating integration", () => {
     expect(huddle).toContain("studio-p2p-huddle-dock pointer-events-none");
     expect(huddle).toContain("studio-p2p-huddle-panel pointer-events-auto");
     expect(huddle).toContain('className="pointer-events-auto ml-auto');
-    expect(manager).toContain("var(--studio-canvas-bottom-inset,0px)+0.75rem");
+    expect(manager).toContain("var(--studio-canvas-bottom-inset,7rem)+0.75rem");
     expect(manager).toContain("보기 설정");
     expect(manager).toContain("{visibleCount}개");
   });

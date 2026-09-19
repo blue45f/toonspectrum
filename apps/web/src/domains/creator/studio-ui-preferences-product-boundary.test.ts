@@ -33,7 +33,13 @@ describe("Studio product UI preference authority", () => {
     ]
       .map((relativePath) => readFileSync(resolve(process.cwd(), relativePath), "utf8"))
       .join("\n");
-    const viewport = readStudioCanvasViewportStack(import.meta.url, "./canvas/");
+    const viewport = [
+      readStudioCanvasViewportStack(import.meta.url, "./canvas/"),
+      readFileSync(resolve(
+        process.cwd(),
+        "apps/web/src/domains/creator/canvas/StudioCanvasModalsBody.tsx",
+      ), "utf8"),
+    ].join("\n");
 
     expect(page).toContain("acquireProductStudioUiPreferencesRepository");
     expect(page).toContain("repository.loadAppSettings()");

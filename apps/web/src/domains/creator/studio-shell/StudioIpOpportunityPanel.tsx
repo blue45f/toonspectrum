@@ -99,16 +99,21 @@ function downloadPitch(document: StudioIpOpportunityDocument) {
 export function StudioIpOpportunityPanel({ projectId }: { readonly projectId: string }) {
   const bt = useBilingual("StudioIpOpportunityPanel");
   const [document, setDocument] = useState(() => loadDocument(projectId));
+  const [loadedProjectId, setLoadedProjectId] = useState(projectId);
   const [company, setCompany] = useState("");
   const [contact, setContact] = useState("");
   const [media, setMedia] = useState<StudioIpMedia>("film");
   const report = useMemo(() => evaluateStudioIpReadiness(document), [document]);
 
-  useEffect(() => setDocument(loadDocument(projectId)), [projectId]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    setDocument(loadDocument(projectId));
+    setLoadedProjectId(projectId);
+  }, [projectId]);
+  useEffect(() => {
+    // Never write the previous project state during the scope-change render.
+    if (loadedProjectId !== projectId || typeof window === "undefined") return;
     try { window.localStorage.setItem(ipOpportunityStorageKey(projectId), JSON.stringify(document)); } catch { /* optional persistence */ }
-  }, [document, projectId]);
+  }, [document, projectId, loadedProjectId]);
 
   const patch = (next: Partial<StudioIpOpportunityDocument>) => setDocument((current) => ({ ...current, ...next }));
   const toggleMedia = (value: StudioIpMedia, checked: boolean) => patch({

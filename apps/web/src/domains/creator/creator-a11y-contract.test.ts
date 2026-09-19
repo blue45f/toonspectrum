@@ -97,8 +97,17 @@ describe("창작 화면 a11y 계약", () => {
   });
 
   it("폼 컨트롤이 접근 가능한 이름(aria-label 또는 label 연결)을 가진다", () => {
-    // 댓글 입력(placeholder 만으로는 접근 가능한 이름이 불안정)
-    expect(readGuarded("CreateWorkPage.tsx")).toContain('aria-label="댓글 입력"');
+    // 작품 페이지는 댓글 작성기를 공용 스레드 컴포넌트에 위임한다. 호출자가 번역된 이름을
+    // 전달하고 실제 textarea owner가 그 값을 접근 가능한 이름으로 연결하는 양쪽 경계를 지킨다.
+    const workPage = readGuarded("CreateWorkPage.tsx");
+    const commentComposer = readFileSync(
+      join(HERE, "../../shared/components/comments/threaded-comment-section.tsx"),
+      "utf-8",
+    );
+    expect(workPage).toContain(
+      'placeholder={translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "응원의 한마디를 남겨 보세요.")}',
+    );
+    expect(commentComposer).toContain("aria-label={placeholder}");
     // 시리즈 생성/수정 폼 3필드
     const communityUi = readGuarded("creator-community-ui.tsx");
     expect(communityUi).toContain('aria-label="시리즈 제목"');

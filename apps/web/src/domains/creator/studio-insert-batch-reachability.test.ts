@@ -2,8 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-const insertionHubSource = readFileSync(
-  new URL("./StudioUnifiedAssetToolPopoverContent.tsx", import.meta.url),
+const assetWorkspaceSource = readFileSync(
+  new URL("./StudioAssetToolPopoverWorkspace.tsx", import.meta.url),
+  "utf8",
+);
+const lazyAssetSource = readFileSync(
+  new URL("./studio-unified-asset-lazy-ui.ts", import.meta.url),
   "utf8",
 );
 
@@ -12,21 +16,19 @@ function occurrenceCount(source: string, pattern: string): number {
 }
 
 describe("studio batch insertion reachability", () => {
-  it("mounts one preflight between the insertion subtabs and smart library", () => {
-    const importStatement =
-      'import { StudioInsertBatchPreflight } from "./StudioInsertBatchPreflight";';
+  it("mounts one lazy preflight before the unified asset workspace", () => {
     const preflightElement =
-      "<StudioInsertBatchPreflight toolBelt={toolBelt} />";
-    const subtabIndex = insertionHubSource.indexOf("<StudioMenuSubtabs");
-    const preflightIndex = insertionHubSource.indexOf(preflightElement);
-    const libraryIndex = insertionHubSource.indexOf(
-      "<StudioUnifiedAssetSmartLibrary",
+      "<LazyStudioInsertBatchPreflight toolBelt={toolBelt} />";
+    const preflightIndex = assetWorkspaceSource.indexOf(preflightElement);
+    const unifiedWorkspaceIndex = assetWorkspaceSource.indexOf(
+      "<LazyStudioUnifiedAssetToolPopoverContent",
     );
 
-    expect(occurrenceCount(insertionHubSource, importStatement)).toBe(1);
-    expect(occurrenceCount(insertionHubSource, preflightElement)).toBe(1);
-    expect(subtabIndex).toBeGreaterThanOrEqual(0);
-    expect(preflightIndex).toBeGreaterThan(subtabIndex);
-    expect(libraryIndex).toBeGreaterThan(preflightIndex);
+    expect(occurrenceCount(assetWorkspaceSource, preflightElement)).toBe(1);
+    expect(assetWorkspaceSource).toContain("LazyStudioInsertBatchPreflight,");
+    expect(lazyAssetSource).toContain('import("./StudioInsertBatchPreflight")');
+    expect(lazyAssetSource).toContain("default: module.StudioInsertBatchPreflight");
+    expect(preflightIndex).toBeGreaterThanOrEqual(0);
+    expect(unifiedWorkspaceIndex).toBeGreaterThan(preflightIndex);
   });
 });

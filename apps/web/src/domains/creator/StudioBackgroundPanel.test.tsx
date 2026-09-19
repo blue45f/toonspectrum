@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createStudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 import { StudioBackgroundPanel } from "./StudioBackgroundPanel";
+
+import { useI18n } from "@/shared/lib/i18n";
 
 function createUiPreferencesHarness(initial: Readonly<Record<string, string>> = {}) {
   const values = new Map(Object.entries(initial));
@@ -16,7 +18,16 @@ function createUiPreferencesHarness(initial: Readonly<Record<string, string>> = 
   return { values, acquire: async () => repository };
 }
 
-afterEach(() => cleanup());
+const INITIAL_LANGUAGE = useI18n.getState().lang;
+
+beforeEach(() => {
+  useI18n.setState({ lang: "ko" });
+});
+
+afterEach(() => {
+  cleanup();
+  useI18n.setState({ lang: INITIAL_LANGUAGE });
+});
 
 describe("StudioBackgroundPanel SQLite preferences", () => {
   it("hydrates recent backgrounds and persists a newly selected preset", async () => {
@@ -35,7 +46,7 @@ describe("StudioBackgroundPanel SQLite preferences", () => {
     );
 
     await waitFor(() => {
-      const recentHeading = screen.getByText(/^(?:Recent|최근)$/u);
+      const recentHeading = screen.getByText("최근 사용");
       expect(recentHeading.nextElementSibling?.querySelector("button")).not.toBeNull();
       expect(
         container.firstElementChild?.getAttribute("data-studio-ui-preferences-authority"),

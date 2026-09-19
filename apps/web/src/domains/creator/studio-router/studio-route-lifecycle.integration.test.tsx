@@ -201,12 +201,12 @@ describe("Studio document layout runtime", () => {
 
   it("publishes the instant jam room into ?room= once and then leaves it alone", () => {
     nextRuntimeProbeId = 0;
-    const view = render(routedDocument(<ResolvedStudioDocument pathname="/studio" />));
+    const view = render(routedDocument(<ResolvedStudioDocument pathname="/studio/canvas" />));
     const published = { ...probe() };
     expect(published.workId).toBe("");
     expect(published.liveRoom).toBe(published.instantWorkId);
 
-    view.rerender(routedDocument(<ResolvedStudioDocument pathname="/studio/canvas" />));
+    view.rerender(routedDocument(<ResolvedStudioDocument pathname="/studio/comic" />));
     expect(probe().mountId).toBe(published.mountId);
     expect(probe().liveRoom).toBe(published.liveRoom);
   });

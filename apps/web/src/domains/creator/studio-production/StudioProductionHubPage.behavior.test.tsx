@@ -25,6 +25,11 @@ class Channel {
   constructor(readonly name: string) { Channel.instances.push(this); }
   receive(data: unknown) { this.onmessage?.(new MessageEvent("message", { data })); }
 }
+function productionChannel() {
+  const channel = Channel.instances.find((item) => item.name === `studio-production-command-center-v1:${SCOPE}`);
+  expect(channel).toBeDefined();
+  return channel!;
+}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
@@ -80,12 +85,12 @@ describe("production hub durable user operations", () => {
     fireEvent.click(screen.getByRole("button", { name: "재개" }));
     await screen.findByRole("button", { name: "완료" });
     expect(row().tasks[0]).toMatchObject({ progress: 90, status: "doing" });
-    expect(Channel.instances[0]!.postMessage).toHaveBeenLastCalledWith({
+    expect(productionChannel().postMessage).toHaveBeenLastCalledWith({
       type: "studio-production-workspace-invalidated", scopeKey: SCOPE, revision: 4, sourceClientId: expect.any(String),
     });
     expect(storage.kvSet).toHaveBeenCalledWith(STUDIO_PRODUCTION_NAMESPACE, SCOPE, expect.any(String));
     const reads = storage.kvGet.mock.calls.length;
-    Channel.instances[0]!.receive({ ...Channel.instances[0]!.postMessage.mock.lastCall![0], revision: 999 });
+    productionChannel().receive({ ...productionChannel().postMessage.mock.lastCall![0], revision: 999 });
     expect(storage.kvGet).toHaveBeenCalledTimes(reads);
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(screen.queryByText("작업 상태를 갱신했습니다.")).toBeNull();
@@ -207,7 +212,7 @@ describe("production hub durable user operations", () => {
   it("reloads only a newer same-scope peer receipt and closes the channel on unmount", async () => {
     seed({ revision: 3 });
     const view = mount(); await saved();
-    const channel = Channel.instances[0]!;
+    const channel = productionChannel();
     const invalid = [{}, { type: "studio-production-workspace-invalidated", scopeKey: "remix:else", revision: 4, sourceClientId: "peer" },
       { type: "studio-production-workspace-invalidated", scopeKey: SCOPE, revision: 3, sourceClientId: "peer" }];
     for (const receipt of invalid) channel.receive(receipt);

@@ -151,4 +151,3 @@ crates/**/target/
 /.qa/scene3d-output-quality/
 # Generated desktop runtime; source and release reproducibility tests are tracked.
 /apps/desktop-sync/dist/
-

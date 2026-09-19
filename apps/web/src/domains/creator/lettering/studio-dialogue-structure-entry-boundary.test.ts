@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
 
 
 const studioCanvasViewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
+const studioCanvasModalsSource = readFileSync(
+  new URL("../canvas/StudioCanvasModalsBody.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("Studio dialogue structure entry boundary", () => {
   it("connects split, merge, move, copy, text→bubble, multi-format, and ruby to the shipped story panel", () => {
@@ -14,17 +19,17 @@ describe("Studio dialogue structure entry boundary", () => {
     expect(studioCanvasViewportSource).toContain("applyDialogueFormatPatch(pages");
     expect(studioCanvasViewportSource).toContain("applyDialogueRubySpan(pages");
     expect(studioCanvasViewportSource).toContain("clearDialogueRubyRange(pages");
-    expect(studioCanvasViewportSource).toContain("onSplitText={splitDialogueText}");
-    expect(studioCanvasViewportSource).toContain("onMergeWithNext={mergeDialogueTextWithNext}");
-    expect(studioCanvasViewportSource).toContain("onTransferElement={transferDialogueText}");
-    expect(studioCanvasViewportSource).toContain("onConvertTextToBubble={convertDialogueTextToBubble}");
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasModalsSource).toContain("onSplitText={splitDialogueText}");
+    expect(studioCanvasModalsSource).toContain("onMergeWithNext={mergeDialogueTextWithNext}");
+    expect(studioCanvasModalsSource).toContain("onTransferElement={transferDialogueText}");
+    expect(studioCanvasModalsSource).toContain("onConvertTextToBubble={convertDialogueTextToBubble}");
+    expect(studioCanvasModalsSource).toContain(
       "onConvertTextsToBubbles={convertDialogueTextsToBubbles}",
     );
-    expect(studioCanvasViewportSource).toContain("onApplyFormat={applyDialogueMultiFormat}");
-    expect(studioCanvasViewportSource).toContain("onApplyDialogueRuby={applyDialogueRuby}");
-    expect(studioCanvasViewportSource).toContain("onClearDialogueRuby={clearDialogueRuby}");
-    expect(studioCanvasViewportSource).toContain(
+    expect(studioCanvasModalsSource).toContain("onApplyFormat={applyDialogueMultiFormat}");
+    expect(studioCanvasModalsSource).toContain("onApplyDialogueRuby={applyDialogueRuby}");
+    expect(studioCanvasModalsSource).toContain("onClearDialogueRuby={clearDialogueRuby}");
+    expect(studioCanvasModalsSource).toContain(
       "selectedIds={marqueeIds.length > 0 ? marqueeIds : selectedId ? [selectedId] : []}"
     );
   });

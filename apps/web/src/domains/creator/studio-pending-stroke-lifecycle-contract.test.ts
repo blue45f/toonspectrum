@@ -13,8 +13,8 @@ const studioCanvasStickyBannersSource = readFileSync(
   new URL("./canvas/StudioCanvasStickyBanners.tsx", import.meta.url),
   "utf8",
 );
-const studioCanvasModalsOverlaySource = readFileSync(
-  new URL("./canvas/StudioCanvasModalsOverlay.tsx", import.meta.url),
+const studioCanvasModalsBodySource = readFileSync(
+  new URL("./canvas/StudioCanvasModalsBody.tsx", import.meta.url),
   "utf8",
 );
 // 의도된 변경(2026-08, B-09): handleSave 오케스트레이션이 studio-page-save-pipeline.ts 의
@@ -186,7 +186,7 @@ describe("pending stroke lifecycle source contract", () => {
     expect(pageSelection).toContain("drawingRef.current || requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()");
     expect(studioCanvasViewportSource).toContain("<StudioCanvasViewportHudOverlays");
     expect(studioCanvasStickyBannersSource).toContain("if (!setCurrentPageId(pageId)) return;");
-    expect(studioCanvasModalsOverlaySource).toContain("if (!setCurrentPageId(pageId)) return;");
+    expect(studioCanvasModalsBodySource).toContain("if (!setCurrentPageId(pageId)) return;");
     expect(drawingStart).toContain("if (!h.prepareStrokeCommitPage())");
     const strokePagePreparation = sourceBetween(
       "function prepareStrokeCommitPage(): boolean",

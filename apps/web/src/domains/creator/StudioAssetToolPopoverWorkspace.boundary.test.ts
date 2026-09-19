@@ -15,6 +15,7 @@ const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
 const createModeGroupsSource = read("./StudioToolBeltCreateModeGroups.tsx");
 const globalsSource = read("../../styles/globals.css");
+const floatingLayoutsSource = read("./studio-floating-menu-layouts.ts");
 
 describe("Studio asset workspace boundaries", () => {
   it("loads unified catalogs and the visual workspace only after the asset menu is active", () => {

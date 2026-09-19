@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "./brush/studio-brush-catalog";
+import { STUDIO_ALL_BRUSH_CATALOG_ITEMS, STUDIO_PRO_BRUSH_CATALOG_ITEMS } from "./brush/studio-brush-catalog";
 import { isStudioBrushMaterialGroup } from "./brush/studio-brush-material-group";
 import {
   STUDIO_BRUSH_QUARANTINED_PRESET_IDS,
@@ -131,7 +131,7 @@ describe("studio creative ux", () => {
   });
 
   it("resolves Pro favorites and recent brushes from the expanded catalogue", () => {
-    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(BRUSH_PRESETS.length + 160);
+    expect(STUDIO_ALL_BRUSH_CATALOG_ITEMS).toHaveLength(BRUSH_PRESETS.length + STUDIO_PRO_BRUSH_CATALOG_ITEMS.length);
 
     const quick = listStudioQuickBrushTrayItems({
       catalogItems: STUDIO_ALL_BRUSH_CATALOG_ITEMS,

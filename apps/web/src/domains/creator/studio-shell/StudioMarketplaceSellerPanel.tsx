@@ -9,7 +9,7 @@ import {
   Store,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   evaluateStudioMarketplaceSubmission,
@@ -23,7 +23,11 @@ import {
   readStudioMarketplaceSubmissionDraft,
   writeStudioMarketplaceSubmissionDraft,
 } from "../studio-marketplace-submission-store";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
@@ -87,25 +91,30 @@ function statusLabel(status: string, bt: (ko: string, en: string) => string): st
 /** A real seller draft, file checksum, readiness and moderation-state workflow. */
 export function StudioMarketplaceSellerPanel({
   sellerId,
-  locale: _locale,
+  locale,
 }: {
   readonly sellerId: string;
   readonly locale?: string;
 }) {
-  const bt = useBilingual("StudioMarketplaceSellerPanel");
+  useBilingualI18nRevision();
+  const resolvedLocale = locale ?? getCurrentUiLocale();
+  const bt = (ko: string, en: string) =>
+    translateBilingualValueForLocale(resolvedLocale, "StudioMarketplaceSellerPanel", ko, en);
   const [submission, setSubmission] = useState<StudioMarketplaceSubmission>(() => (
     createStudioMarketplaceSubmissionDraft(sellerId)
   ));
+  const submissionRef = useRef(submission);
   const [busyRole, setBusyRole] = useState<StudioMarketplaceFileRole | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setSubmission(
+    const next =
       readStudioMarketplaceSubmissionDraft(window.localStorage, sellerId)
-      ?? createStudioMarketplaceSubmissionDraft(sellerId),
-    );
+      ?? createStudioMarketplaceSubmissionDraft(sellerId);
+    submissionRef.current = next;
+    setSubmission(next);
   }, [sellerId]);
 
   const readiness = useMemo(
@@ -114,10 +123,16 @@ export function StudioMarketplaceSellerPanel({
   );
   const editable = submission.status === "draft" || submission.status === "changes-requested";
 
-  const commit = (next: StudioMarketplaceSubmission, nextMessage?: string) => {
+  const commit = (
+    update: StudioMarketplaceSubmission
+      | ((current: StudioMarketplaceSubmission) => StudioMarketplaceSubmission),
+    nextMessage?: string,
+  ) => {
+    const next = typeof update === "function" ? update(submissionRef.current) : update;
     const stored = typeof window === "undefined"
       ? next
       : writeStudioMarketplaceSubmissionDraft(window.localStorage, next, window);
+    submissionRef.current = stored;
     setSubmission(stored);
     setMessage(nextMessage ?? (bt("판매 초안을 저장했습니다.", "Saved seller draft.")));
     setError(null);
@@ -126,11 +141,11 @@ export function StudioMarketplaceSellerPanel({
   const patch = <K extends keyof StudioMarketplaceSubmission>(
     key: K,
     value: StudioMarketplaceSubmission[K],
-  ) => commit({
-    ...submission,
+  ) => commit((current) => ({
+    ...current,
     [key]: value,
     updatedAt: new Date().toISOString(),
-  });
+  }));
 
   const attachFile = async (role: StudioMarketplaceFileRole, file: File | null) => {
     if (!file) return;
@@ -144,14 +159,14 @@ export function StudioMarketplaceSellerPanel({
         sizeBytes: file.size,
         checksum: await checksum(file),
       });
-      commit({
-        ...submission,
+      commit((current) => ({
+        ...current,
         files: Object.freeze([
-          ...submission.files.filter((item) => item.role !== role),
+          ...current.files.filter((item) => item.role !== role),
           nextFile,
         ]),
         updatedAt: new Date().toISOString(),
-      }, bt(`${file.name}의 무결성을 확인했습니다.`, `Verified ${file.name}.`));
+      }), bt(`${file.name}의 무결성을 확인했습니다.`, `Verified ${file.name}.`));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : (bt("파일을 확인하지 못했습니다.", "Could not verify the file.")));
     } finally {
@@ -161,7 +176,7 @@ export function StudioMarketplaceSellerPanel({
 
   const submit = () => {
     try {
-      commit(transitionStudioMarketplaceSubmission(submission, {
+      commit((current) => transitionStudioMarketplaceSubmission(current, {
         type: "submit",
         at: new Date().toISOString(),
       }), bt("심사 요청을 준비했습니다. 서버 연결 시 안전하게 제출됩니다.", "Review request is prepared and will submit through the configured server."));
@@ -172,7 +187,7 @@ export function StudioMarketplaceSellerPanel({
 
   const withdraw = () => {
     try {
-      commit(transitionStudioMarketplaceSubmission(submission, {
+      commit((current) => transitionStudioMarketplaceSubmission(current, {
         type: "withdraw",
         at: new Date().toISOString(),
       }), bt("심사 요청을 철회했습니다.", "Withdrew the review request."));

@@ -203,31 +203,38 @@ function BatchLayoutPreview({
   readonly target: StudioInsertBatchRect;
 }) {
   if (items.length === 0) return null;
-  const scale = Math.min(
+  const previewScale = Math.min(
     PREVIEW_WIDTH / target.width,
     PREVIEW_HEIGHT / target.height,
   );
-  if (!Number.isFinite(scale) || scale <= 0) return null;
+  if (!Number.isFinite(previewScale) || previewScale <= 0) return null;
   const previewTarget = {
-    x: (PREVIEW_WIDTH - target.width * scale) / 2,
-    y: (PREVIEW_HEIGHT - target.height * scale) / 2,
-    width: target.width * scale,
-    height: target.height * scale,
+    x: (PREVIEW_WIDTH - target.width * previewScale) / 2,
+    y: (PREVIEW_HEIGHT - target.height * previewScale) / 2,
+    width: target.width * previewScale,
+    height: target.height * previewScale,
   };
   let placements: readonly StudioInsertBatchPlacement[];
   try {
     placements = computeStudioInsertBatchPlacements(
       items.map((item) => ({
         id: item.id,
-        width: item.prepared.width * scale,
-        height: item.prepared.height * scale,
+        width: item.prepared.width,
+        height: item.prepared.height,
       })),
-      { layout, spacing, target: previewTarget },
+      { layout, spacing, target },
     );
   } catch {
     return null;
   }
   const itemById = new Map(items.map((item) => [item.id, item] as const));
+  const previewPlacements = placements.map((placement) => ({
+    ...placement,
+    x: previewTarget.x + (placement.x - target.x) * previewScale,
+    y: previewTarget.y + (placement.y - target.y) * previewScale,
+    width: placement.width * previewScale,
+    height: placement.height * previewScale,
+  }));
 
   return (
     <div className="mt-3 rounded-xl border border-line bg-panel p-2">
@@ -253,7 +260,7 @@ function BatchLayoutPreview({
             height: `${(previewTarget.height / PREVIEW_HEIGHT) * 100}%`,
           }}
         />
-        {placements.map((placement, index) => {
+        {previewPlacements.map((placement, index) => {
           const item = itemById.get(placement.id);
           if (!item) return null;
           return (

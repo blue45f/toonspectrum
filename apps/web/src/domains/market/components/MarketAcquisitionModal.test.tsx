@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MarketAcquisitionModal } from "./MarketAcquisitionModal";
@@ -10,6 +10,7 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
 
 const mocks = vi.hoisted(() => ({
   acquireResource: vi.fn(),
+  getQuote: vi.fn(),
   navigate: vi.fn(),
   resolveCurrent: vi.fn(),
 }));
@@ -20,6 +21,10 @@ vi.mock("../hooks/use-market-library", () => ({
 
 vi.mock("../models/market-acquisition-target", () => ({
   resolveCurrentMarketAcquisitionRecord: mocks.resolveCurrent,
+}));
+
+vi.mock("../commerce-api", () => ({
+  getMarketplaceCommerceQuote: mocks.getQuote,
 }));
 
 vi.mock("react-router-dom", async (importOriginal) => {
@@ -88,15 +93,34 @@ const target = {
   },
 };
 
-function agreeAndSubmit(buttonName: string | RegExp): void {
+async function agreeAndSubmit(buttonName: string | RegExp): Promise<void> {
   fireEvent.click(screen.getByRole("checkbox"));
-  fireEvent.click(screen.getByRole("button", { name: buttonName }));
+  const button = screen.getByRole("button", { name: buttonName }) as HTMLButtonElement;
+  await waitFor(() => expect(button.disabled).toBe(false));
+  fireEvent.click(button);
 }
 
 describe("MarketAcquisitionModal", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.acquireResource.mockResolvedValue(true);
+    mocks.getQuote.mockImplementation(async (resourceId: string) => ({
+      resourceId,
+      productId: resourceId,
+      productType: "market-resource",
+      productName: "테스트 에셋",
+      operationMode: "free",
+      checkoutRequired: false,
+      alreadyEntitled: false,
+      amount: 0,
+      currency: "KRW",
+      provider: "mock",
+      providerMode: null,
+      checkoutEnabled: false,
+      disabledReason: null,
+      paymentMethods: [],
+      policyNotice: "무료 운영 테스트 정책",
+    }));
     mocks.resolveCurrent
       .mockResolvedValueOnce({
         requestedReleaseId: HISTORICAL_ID,
@@ -131,7 +155,8 @@ describe("MarketAcquisitionModal", () => {
       />,
     );
 
-    agreeAndSubmit("내 에셋에 추가");
+    await screen.findByText("무료 운영 테스트 정책");
+    await agreeAndSubmit("내 에셋에 추가");
 
     await screen.findByText(/현재 공개 버전 v2\.0\.0으로 설치 대상이 변경되었습니다/);
     expect(mocks.acquireResource).not.toHaveBeenCalled();
@@ -139,7 +164,8 @@ describe("MarketAcquisitionModal", () => {
     expect(screen.getByText("현재 버전 출처", { exact: false })).toBeTruthy();
     expect(screen.queryByText("이전 버전 출처", { exact: false })).toBeNull();
 
-    agreeAndSubmit(/현재 v2\.0\.0 조건 확인 후 추가/);
+    await screen.findByText("무료 운영 테스트 정책");
+    await agreeAndSubmit(/현재 v2\.0\.0 조건 확인 후 추가/);
 
     await screen.findByText("내 에셋에 안전하게 보관했습니다");
     expect(mocks.resolveCurrent).toHaveBeenNthCalledWith(
