@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -144,6 +146,55 @@ test("PR lint is scoped while push and merge validation stay repository-wide", (
   ]) {
     assert.ok(lint.includes(path), `lint sparse checkout is missing ${path}`);
   }
+});
+
+test("sparse core lanes retain the imported virtual world while excluding artwork binaries", () => {
+  const world = "apps/web/public/assets/virtual-studio/world/default-world.json";
+  const excluded = [
+    "apps/web/public/assets/virtual-studio/production-v2/player-pink-walk-down.webp",
+    "apps/web/public/assets/virtual-studio/living-world/master-clean-plate.webp",
+    "apps/web/public/assets/3d/environments/refined-v6/large-model.glb",
+  ];
+  const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    git("init", "--quiet");
+    for (const file of [world, ...excluded, "package.json"]) {
+      const path = join(scratch, file);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, "{}\n");
+    }
+    git("add", ".");
+    git("-c", "user.name=Virtual Studio CI Test", "-c", "user.email=ci@example.invalid",
+      "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture");
+    git("config", "core.sparseCheckout", "true");
+    git("config", "core.sparseCheckoutCone", "false");
+    for (const lane of ["lint", "typecheck", "static"]) {
+      const checkout = job(lane).match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
+      assert.ok(checkout, `${lane} must declare its minimal checkout`);
+      writeFileSync(join(scratch, ".git/info/sparse-checkout"), checkout.replace(/^ {12}/gmu, ""));
+      git("read-tree", "-mu", "HEAD");
+      assert.ok(existsSync(join(scratch, world)), `${lane} must include imported world JSON`);
+      for (const file of excluded) assert.equal(existsSync(join(scratch, file)), false,
+        `${lane} must not download artwork/model binaries: ${file}`);
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("production build verifies Virtual Studio art after the single existing build", () => {
+  const build = job("build");
+  const buildAt = build.indexOf("pnpm run build:bundle");
+  const testsAt = build.indexOf("pnpm run test:studio-virtual-art");
+  const verificationAt = build.indexOf("pnpm run verify:studio-virtual-art");
+  assert.ok(buildAt >= 0 && testsAt > buildAt && verificationAt > testsAt,
+    "the protected build must run art regression tests and output integrity verification");
+  assert.equal(build.split("pnpm run build:bundle").length - 1, 1);
+  assert.doesNotMatch(build, /sparse-checkout:/u, "art verification needs the existing full build checkout");
 });
 
 test("PR caches restore without paying cache-save post steps", () => {

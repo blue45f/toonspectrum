@@ -142,7 +142,7 @@ export function VirtualStudioMasterBackdrop() {
   return (
     <div className="vs-master-reference-backdrop" aria-hidden="true">
       <img
-        src="/assets/virtual-studio/reference/master-central-reference.jpg"
+        src="/assets/virtual-studio/production-v2/master-central-lossless.webp"
         alt=""
         draggable={false}
         className="vs-master-reference-image"

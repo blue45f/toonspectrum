@@ -225,6 +225,8 @@
     "verify:asset-postcuration": "pnpm run audit:visual-assets:strict && pnpm run audit:studio-cc0-classification && pnpm run audit:marketplace-asset-similarity",
     "test:a11y": "PLAYWRIGHT_CHANNEL='' playwright test e2e/a11y-smoke.spec.ts",
     "studio:virtual-space-world:generate": "tsx scripts/generate-virtual-studio-default-world.mts",
+    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs",
+    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
     "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs"
   },

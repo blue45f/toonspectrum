@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EMPTY_STUDIO_LIVE_CONTEXT, StudioLiveCollaborationContext } from "../studio-live-collaboration-context";
 import type { StudioLiveRoom } from "../studio-live-collaboration-room";
 import StudioP2pHuddleLauncher from "./StudioP2pHuddleLauncher";
+import { closeStudioP2pHuddle, openStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "./studio-p2p-huddle-events";
 import { resetStudioStrokeFocusActivityForTests, setStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 
 const track = { kind: "audio", stop: vi.fn(), onended: null };
@@ -84,4 +85,95 @@ describe("P2P launcher consent and lifetime", () => {
     environment(); render(view(fixture(), false));
     expect(screen.queryByRole("button", { name: "채팅·통화" })).toBeNull();
   });
+  it("keeps an accepted conversation fixed and closes only its matching leave event", async () => {
+    environment(); render(view(fixture()));
+    act(() => openStudioP2pHuddle({ source: "virtual-space", conversationId: "conversation-one", peerIds: ["b"] }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    expect(screen.queryByRole("checkbox", { name: /근접 미디어/ })).toBeNull();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
+
+    act(() => closeStudioP2pHuddle({ conversationId: "conversation-old" }));
+    act(() => openStudioP2pHuddle({ conversationId: "conversation-one", peerIds: ["b"] }));
+    expect(track.stop).not.toHaveBeenCalled();
+    act(() => closeStudioP2pHuddle({ conversationId: "conversation-one" }));
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(document.querySelector<HTMLElement>("[data-studio-p2p-huddle]")?.hidden).toBe(true);
+  });
+  it.each([
+    { conversationId: "conversation-two", peerIds: ["b"] },
+    { conversationId: "conversation-one", peerIds: ["b", "c"] },
+    { source: "toolbar" as const },
+  ])("revokes capture before changing the consented audience to %j", async (next) => {
+    environment(); render(view(fixture()));
+    act(() => openStudioP2pHuddle({ conversationId: "conversation-one", peerIds: ["b"] }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
+    act(() => openStudioP2pHuddle(next));
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    expect(screen.getByRole("button", { name: "마이크 켜기" })).toBeTruthy();
+    expect(getUserMedia).toHaveBeenCalledOnce();
+  });
+  it("does not let virtual cleanup close a general toolbar call", async () => {
+    environment(); render(view(fixture()));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
+    act(() => closeStudioP2pHuddle({ conversationId: "conversation-old" }));
+    expect(track.stop).not.toHaveBeenCalled();
+  });
+
+  it.each(["manual", "command", "switch", "transport", "unmount"])("notifies scoped %s closure once after capture stops, even if social cleanup replies", async (reason) => {
+    environment();
+    let terminate: (() => void) | undefined;
+    const room = { ...fixture(), subscribeVoice: (listener: (event: { type: string }) => void) => {
+      terminate = () => listener({ type: "terminal" }); return () => undefined;
+    } } as unknown as StudioLiveRoom;
+    const rendered = render(view(room));
+    act(() => openStudioP2pHuddle({ conversationId: "conversation-one", peerIds: ["b"] }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
+    const closed = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId: string }>).detail;
+      expect(track.stop).toHaveBeenCalledOnce();
+      expect(detail).toEqual({ conversationId: "conversation-one" });
+      closeStudioP2pHuddle(detail);
+    });
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_CLOSED_EVENT, closed);
+    try {
+      if (reason === "manual") fireEvent.click(screen.getByRole("button", { name: "나가기" }));
+      else if (reason === "command") act(() => closeStudioP2pHuddle({ conversationId: "conversation-one" }));
+      else if (reason === "switch") act(() => openStudioP2pHuddle({ conversationId: "conversation-two", peerIds: ["c"] }));
+      else if (reason === "transport") act(() => terminate?.());
+      else rendered.unmount();
+      expect(closed).toHaveBeenCalledOnce();
+      act(() => closeStudioP2pHuddle({ conversationId: "conversation-one" }));
+      expect(closed).toHaveBeenCalledOnce();
+    } finally {
+      globalThis.removeEventListener(STUDIO_P2P_HUDDLE_CLOSED_EVENT, closed);
+    }
+  });
+  it("notifies cancellation of a pending scoped join without notifying general calls", () => {
+    environment(); render(view(fixture()));
+    const closed = vi.fn();
+    globalThis.addEventListener(STUDIO_P2P_HUDDLE_CLOSED_EVENT, closed);
+    try {
+      act(() => openStudioP2pHuddle({ conversationId: "conversation-pending", peerIds: ["b"] }));
+      act(() => closeStudioP2pHuddle({ conversationId: "conversation-pending" }));
+      expect(closed).toHaveBeenCalledOnce();
+      expect(getUserMedia).not.toHaveBeenCalled();
+      act(() => openStudioP2pHuddle({ source: "toolbar" }));
+      act(() => closeStudioP2pHuddle());
+      expect(closed).toHaveBeenCalledOnce();
+    } finally {
+      globalThis.removeEventListener(STUDIO_P2P_HUDDLE_CLOSED_EVENT, closed);
+    }
+  });
+
 });
