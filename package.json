@@ -220,7 +220,8 @@
     "audit:visual-assets:strict": "node scripts/audit-visual-asset-quality.mjs --strict",
     "audit:marketplace-asset-similarity": "tsx scripts/audit-marketplace-asset-similarity.mts --strict",
     "audit:studio-cc0-classification": "tsx scripts/audit-studio-cc0-classification.mts --strict",
-    "verify:asset-postcuration": "pnpm run audit:visual-assets:strict && pnpm run audit:studio-cc0-classification && pnpm run audit:marketplace-asset-similarity"
+    "verify:asset-postcuration": "pnpm run audit:visual-assets:strict && pnpm run audit:studio-cc0-classification && pnpm run audit:marketplace-asset-similarity",
+    "test:a11y": "playwright test e2e/a11y-smoke.spec.ts"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
