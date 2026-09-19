@@ -111,6 +111,7 @@ peerDependencyRules:
 patchedDependencies:
   '@gltf-transform/functions@4.4.2': patches/@gltf-transform__functions@4.4.2.patch
   '@react-three/fiber@9.6.1': patches/@react-three__fiber@9.6.1.patch
+  ktx2-encoder@0.6.0: patches/ktx2-encoder@0.6.0.patch
   manifold-3d@3.5.1: patches/manifold-3d@3.5.1.patch
   'minimatch@3.1.5': patches/minimatch@3.1.5.patch
   p5.brush@2.2.1: patches/p5.brush@2.2.1.patch

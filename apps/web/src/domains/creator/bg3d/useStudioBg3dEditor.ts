@@ -5,6 +5,8 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { useStudioBg3dInplaceTools } from "./useStudioBg3dInplaceTools";
+import { isStudioBg3dPhysicsTransientPhase } from "./studio-bg3d-physics-ui";
 import { useStudioBg3dEditorState } from "./useStudioBg3dEditorState";
 import { bindStudioBg3dEditorViewModel } from "./studio-bg3d-editor-view-model";
 import { bindStudioBg3dEditorSelectionViewModel } from "./studio-bg3d-editor-selection-view-model";
@@ -74,6 +76,16 @@ export function useStudioBg3dEditor(props) {
   h.handleUploadModelFiles = actions.handleUploadModelFiles;
   h.importMarketplaceModelFiles = actions.importModelFiles;
   h.marketplaceModelId = props.marketplaceModelId;
+  h.inplaceTools = useStudioBg3dInplaceTools({
+    live: h.physicsRuntimeSourceRef, selectedIds: h.selectedIds, session: h.modalAssetSessionRef.current,
+    ready: h.open && !h.isRestoringScene && !h.physicsInteractionLocked && !h.isCapturing && !h.isBatchRenderingShots,
+    renderer: h.modelRenderer, quality: h.deviceQuality, cache: h.modelRootCacheRef.current,
+    attachments: h.attachmentByStorageModelIdRef.current, storageIds: h.storageModelIdByAttachmentIdRef.current,
+    isSessionCurrent: h.isModalAssetSessionCurrent,
+    isBlocked: () => h.captureInFlightRef.current || h.sceneRestoreAbortRef.current !== null || h.modelImportAbortRef.current !== null || h.destructiveMutationGuardRef.current.blocksClose || isStudioBg3dPhysicsTransientPhase(h.physicsPhaseRef.current) || h.placementSessionRef.current.phase === "preview",
+    replace: h.replaceCanonicalDocumentState, commitHistory: h.commitImmediateHistoryTransition,
+    notify: () => h.setRefTick((value) => value + 1),
+  });
   bindStudioBg3dEditorSceneGraph(h);
 
   const outlinerMutationDependencies = {

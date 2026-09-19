@@ -166,3 +166,41 @@ it("does not transfer a stale CSG operand during another operation", async () =>
   controller.abort();
   await rejected;
 });
+
+it.each([
+  "invalid-input",
+  "unsupported",
+  "budget",
+  "cancelled",
+  "timeout",
+  "runtime",
+] as const)("preserves the correlated worker failure code %s", async (code) => {
+  vi.stubGlobal("Worker", FakeWorker);
+  const pending = runScene3dSpecialistInWorker(request());
+  const rejected = expect(pending).rejects.toMatchObject({
+    code,
+    message: "A user-correctable input problem.",
+  });
+  FakeWorker.latest.onmessage?.({
+    data: {
+      id: 1,
+      ok: false,
+      code,
+      message: "A user-correctable input problem.",
+    },
+  } as MessageEvent);
+  await rejected;
+  expect(FakeWorker.latest.terminate).toHaveBeenCalledOnce();
+});
+it.each(["unknown", null, 42])(
+  "rejects unsupported worker error classifications %s",
+  async (code) => {
+    vi.stubGlobal("Worker", FakeWorker);
+    const pending = runScene3dSpecialistInWorker(request());
+    const rejected = expect(pending).rejects.toMatchObject({ code: "runtime" });
+    FakeWorker.latest.onmessage?.({
+      data: { id: 1, ok: false, code, message: "not trusted" },
+    } as MessageEvent);
+    await rejected;
+  },
+);

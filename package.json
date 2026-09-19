@@ -206,7 +206,7 @@
     "toonbridge:probe": "node tools/toonbridge/probe.mjs",
     "test:toonbridge": "node --test tools/toonbridge/test/*.test.mjs",
     "test:production-toolchain": "vitest run apps/web/src/domains/creator/toolchain && node --test tools/toonbridge/test/*.test.mjs",
-    "test:desktop-sync-release": "node --test scripts/desktop-sync-release.test.mjs",
+    "test:desktop-sync-release": "pnpm --filter @toonspectrum/desktop-sync-agent run build && node --test scripts/desktop-sync-release.test.mjs",
     "verify:studio-production-toolchain": "pnpm run test:production-toolchain",
     "verify:mobile-native-media": "node scripts/verify-mobile-native-media-permissions.mjs",
     "mobile:doctor": "pnpm run verify:mobile-native-media && pnpm run mobile:sync && cap doctor",
@@ -226,7 +226,9 @@
     "test:a11y": "PLAYWRIGHT_CHANNEL='' playwright test e2e/a11y-smoke.spec.ts",
     "studio:virtual-space-world:generate": "tsx scripts/generate-virtual-studio-default-world.mts",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
-    "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs"
+    "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs",
+    "verify:studio-3d-inplace": "vitest run apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx apps/web/src/domains/creator/scene3d/integration/scene3d-derivative-admission.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-meshopt.test.ts apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx apps/web/src/domains/creator/bg3d/studio-bg3d-libraries-sqlite-opfs.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-history-command-adapter.test.ts apps/web/src/domains/creator/bg3d/useStudioBg3dCanonicalDocumentState.test.tsx",
+    "verify:studio-3d-inplace:browser": "node scripts/verify-studio-scene3d-inplace.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",
@@ -285,6 +287,7 @@
     "image-js": "^1.7.0",
     "js-base64": "^3.9.0",
     "konva": "^10.3.0",
+    "ktx2-encoder": "0.6.0",
     "ky": "^2.0.2",
     "lazy-brush": "^2.0.2",
     "lucide-react": "^1.17.0",

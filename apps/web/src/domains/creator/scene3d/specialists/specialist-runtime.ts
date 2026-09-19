@@ -24,7 +24,10 @@ export async function runScene3dSpecialist(
     .listNodes()
     .map((node) => node.getName().slice(0, 256));
   let processed;
-  if (request.options.kind === "inspect") {
+  if (request.options.kind === "textures" || request.options.kind === "release") {
+    const { processTextureDerivatives } = await import("./specialist-textures");
+    processed = await processTextureDerivatives(io, source, request.options);
+  } else if (request.options.kind === "inspect") {
     const bytes = new TextEncoder().encode(
       JSON.stringify(
         {
@@ -95,7 +98,7 @@ export async function runScene3dSpecialist(
       meshoptimizer: "1.2.0",
       threeBvhCsg: "0.0.18",
       recastNavigation: "0.43.1",
-      manifold: "3.5.1",
+      manifold: "3.5.1", ktx2Encoder: "0.6.0",
       closedChainIk: "0.0.3",
       tangentAlgorithm: "meshoptimizer Compatible (MikkTSpace convention)",
     },

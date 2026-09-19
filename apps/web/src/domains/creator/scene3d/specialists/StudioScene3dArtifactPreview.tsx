@@ -1,3 +1,4 @@
+import { inspectSpecialistGlbImages } from "./specialist-image-budget";
 import { useEffect, useRef, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { createArtifactPreviewResourceOwner } from "./artifact-preview-resource-owner";
@@ -21,10 +22,16 @@ export function StudioScene3dArtifactPreview({
     if (!element) return;
     let dead = false;
     let dispose: (() => void) | undefined;
+    const abort = new AbortController();
+    let textureRuntime:
+      | import("../../bg3d/studio-bg3d-ktx2-renderer-runtime").StudioBg3dKtx2RendererRuntime
+      | undefined;
     setError(null);
     setReady(false);
     navigation.current = null;
     void (async () => {
+      // Guard independently: a forged/stale artifact must not allocate image decode resources.
+      const imageInfo = inspectSpecialistGlbImages(artifact.bytes);
       const [THREE, { GLTFLoader }, { OrbitControls }, { MeshoptDecoder }] =
         await Promise.all([
           import("three"),
@@ -60,7 +67,9 @@ export function StudioScene3dArtifactPreview({
           render();
         };
         const observer = new ResizeObserver(resize);
-        let resources: ReturnType<typeof createArtifactPreviewResourceOwner> | null = null;
+        let resources: ReturnType<
+          typeof createArtifactPreviewResourceOwner
+        > | null = null;
         let disposed = false;
         dispose = () => {
           if (disposed) return;
@@ -68,15 +77,32 @@ export function StudioScene3dArtifactPreview({
           observer.disconnect();
           controls.dispose();
           resources?.dispose();
+          textureRuntime?.dispose();
           scene.clear();
           renderer.dispose();
           renderer.forceContextLoss();
           renderer.domElement.remove();
         };
         await MeshoptDecoder.ready;
-        const parsed = await new GLTFLoader()
-          .setMeshoptDecoder(MeshoptDecoder)
-          .parseAsync(artifact.bytes.slice().buffer, "");
+        const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+        if (imageInfo.some((image) => image.mime === "image/ktx2")) {
+          const { createStudioBg3dKtx2RendererRuntime } = await import(
+            "../../bg3d/studio-bg3d-ktx2-renderer-runtime"
+          );
+          textureRuntime = await createStudioBg3dKtx2RendererRuntime({
+            renderer,
+            signal: abort.signal,
+          });
+          if (dead) {
+            textureRuntime.dispose();
+            return;
+          }
+          loader.setKTX2Loader(textureRuntime.loader);
+        }
+        const parsed = await loader.parseAsync(
+          artifact.bytes.slice().buffer,
+          "",
+        );
         resources = createArtifactPreviewResourceOwner(
           parsed.scenes.length ? parsed.scenes : [parsed.scene],
         );
@@ -84,6 +110,11 @@ export function StudioScene3dArtifactPreview({
           resources.dispose();
           return;
         }
+        if (textureRuntime?.hasDecodeFailure())
+          throw new Error("KTX2 preview decoding failed.");
+        renderer.domElement.dataset.textureRuntime = textureRuntime
+          ? "ktx2-basis"
+          : "standard";
         const root = parsed.scene;
         scene.add(root);
         const bounds = new THREE.Box3().setFromObject(root);
@@ -148,6 +179,7 @@ export function StudioScene3dArtifactPreview({
     });
     return () => {
       dead = true;
+      abort.abort();
       navigation.current = null;
       dispose?.();
     };
