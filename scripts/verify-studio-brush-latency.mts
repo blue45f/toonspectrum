@@ -221,8 +221,10 @@ async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
   await page.keyboard.press("b");
   const toolbar = page.getByRole("toolbar", { name: /그리기 옵션/u });
   await toolbar.waitFor({ state: "visible" });
-  const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
 }
 
 function escapeRegExp(value: string): string {
@@ -234,13 +236,13 @@ async function selectBrush(
   brush: Pick<StudioBrushCatalogItem, "id" | "name" | "operation">,
 ): Promise<void> {
   const toolbar = page.getByRole("toolbar", { name: /그리기 옵션/u });
-  if (brush.operation === "erase") {
-    const eraser = toolbar.getByRole("button", { name: "지우개", exact: true });
-    if (await eraser.getAttribute("aria-pressed") !== "true") await eraser.click();
-  } else {
-    const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-    if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
-  }
+  const nextMode = brush.operation === "erase" ? "eraser" : "pen";
+  await page.keyboard.press(brush.operation === "erase" ? "e" : "b");
+  await page.waitForFunction((expectedMode) =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === expectedMode,
+    nextMode,
+  );
   await toolbar.getByRole("button", {
     name: brush.operation === "erase" ? /지우개 선택 열기$/u : /브러시 선택 열기$/u,
   }).click();
