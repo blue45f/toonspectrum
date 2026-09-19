@@ -84,11 +84,12 @@ describe("bounded whole-stroke material replay", () => {
 
   it.each([1, 2] as const)("streams exact SVG order for material receipt %s and preserves its budget", (version) => {
     const current = element();
-    const { runtime, ...material } = current.brushEnginePrograms!.material!;
+    const material = current.brushEnginePrograms!.material!;
     const source: StudioMaterialBrushElement = {
       ...current,
-      brushEnginePrograms: { version: 1, material: { ...material, version,
-        ...(version === 2 ? { runtime } : {}),
+      brushEnginePrograms: { version: 1, material: version === 2 ? material : {
+        version: 1, seed: material.seed, slots: material.slots,
+        input: material.input, tuning: material.tuning,
       } },
       symmetry: { type: "radial", radialCount: 4, centerX: 100, centerY: 100 },
     };
