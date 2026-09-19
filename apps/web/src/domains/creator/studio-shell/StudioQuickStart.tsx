@@ -1,5 +1,4 @@
 import {
-  getCurrentUiLocale,
   translateBilingualValueForLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
@@ -63,7 +62,7 @@ export function StudioQuickStart({ locale }: { readonly locale: "ko" | "en" }) {
         title: copy(item.titleKo, item.titleEn),
         kind: item.kind,
         templateId: item.templateId,
-        primaryLocale: getCurrentUiLocale(),
+        primaryLocale: locale,
         document: {
           kind: plan.document.kind,
           defaultWorkspace: plan.document.workspace,
