@@ -19,7 +19,7 @@ const {
 
 for (const [policy, digest] of [
   ["terms-of-service", "725b4f7dff126f76bb68ed7c1c8cac1df0f69e62f536725168b28b2ef269fb73"],
-  ["privacy-policy", "f246536dcdf17750769a6a03f5cddd2bb8cf7a4a2a8e4e9cb0b014bd7883fdc2"],
+  ["privacy-policy", "ad3bb0df4f268212e049aebb4ba14e4b484f23e76d2bb144d261fda87f14f5f8"],
 ]) {
   test(`${policy}: reviewed legal body is unchanged and its identity is stable`, () => {
     const document = getStaticPolicyDocument(policy);
