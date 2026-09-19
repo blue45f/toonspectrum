@@ -59,7 +59,7 @@ describe("Studio Scene3D platform evolution registry", () => {
     expect(STUDIO_SCENE3D_EVOLUTION_CANDIDATES.length).toBeGreaterThanOrEqual(15);
     expect(plan.candidates.filter(({ admitted }) => admitted)).toEqual([]);
     expect(plan.next.some(({ id }) => id === "tsl-npr-render-graph")).toBe(true);
-    expect(plan.research.some(({ id }) => id === "pathtraced-still")).toBe(false);
+    expect(plan.research.some(({ id }) => id === "pathtraced-still")).toBe(true);
   });
 
   it("surfaces character-specific IK, XPBD and deformation work without changing authority", () => {
