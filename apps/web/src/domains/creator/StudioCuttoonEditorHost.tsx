@@ -333,7 +333,7 @@ import {
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
-import { deleteSavedClipInMemory, prepareStudioSavedClipElements, upsertSavedClipInMemory } from "./studio-clips";
+import { deleteSavedClipInMemory, prepareStudioSavedClipElements, upsertSavedClipInMemory, type StudioClip } from "./studio-clips";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
   COLOR_RANGE_MAX_SAMPLES,
@@ -594,7 +594,7 @@ import {
   invertLayerMaskAlpha,
   type LayerMaskPaintMode,
 } from "./layer/studio-layer-mask";
-import { normalizeStudioLayerColor, normalizeStudioLayerRole } from "./layer/studio-layer-navigator";
+import { normalizeStudioLayerColor, normalizeStudioLayerRole, type StudioLayerNavigatorItem } from "./layer/studio-layer-navigator";
 import { createStudioLayerOperations } from "./layer/studio-layer-operations";
 import {
   EMPTY_STUDIO_LAYER_SOLO_STATE,
@@ -745,7 +745,7 @@ import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindi
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
 import { studioBrushLabHref } from "./studio-main-menu-items-brush";
 import { StudioFilterDialogIntentContext } from "./studio-filter-dialog-intent";
-import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
+import { bindStudioMainMenuSurfaceActions, type StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
 import {
   composeThumbPage,
   normalizeDocumentMaster,
@@ -1247,7 +1247,7 @@ import {
   WET_MIX_STRENGTH_DEFAULT,
   WET_MIX_WETNESS_DEFAULT,
 } from "./brush/studio-wet-mix";
-import { exportStudioPageToWillV1 } from "./export/studio-will-v1-export-bridge";
+import { exportStudioPageToWillV1, type StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import {
   studioWorkAssetDestructiveEditReason,
   studioWorkAssetDocumentSourceTransitionReason,
@@ -1344,7 +1344,6 @@ import type { StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 import type { SvgExportEl, SvgExportResult } from "./export/studio-svg-export";
 import type { StudioFilterDraft, StudioFilterKind, StudioFilterPreview } from "./filter/studio-filter-menu";
-import type { StudioLayerNavigatorItem } from "./layer/studio-layer-navigator";
 import type { StudioLayerLiftReviewOptions } from "./layer/StudioLayerLiftDialog";
 import type {
   StudioDialogueImportApplyResult,
@@ -1375,7 +1374,6 @@ import type {
   StudioAutoActionScope,
   StudioAutoActionSet,
 } from "./studio-auto-actions";
-import type { StudioClip } from "./studio-clips";
 import type {
   StudioElementLike,
   StudioPageInsertState,
@@ -1405,7 +1403,6 @@ import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import type { StudioLivingInkExecutionConfig } from "./studio-living-ink-execution-protocol";
 import type { StudioLivingInkSelectionMask } from "./studio-living-ink-field";
-import type { StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
 import type {
   StudioMainMenuSurfaceState,
   StudioPixelSelectionToolId,
@@ -1431,7 +1428,6 @@ import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutati
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
 import type { StudioWatermarkPreferenceRuntime, StudioWatermarkPreferenceSnapshot } from "./studio-watermark-preferences-sqlite";
-import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type { StudioWorkspacePersistenceRuntime } from "./studio-workspace-sqlite-runtime";
 import type { StudioAssetShareOptions, StudioAssetSortOrder, StudioAssetTab } from "./StudioAssetMenuPanel";
