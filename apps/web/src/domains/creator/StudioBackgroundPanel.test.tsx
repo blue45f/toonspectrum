@@ -35,7 +35,7 @@ describe("StudioBackgroundPanel SQLite preferences", () => {
     );
 
     await waitFor(() => {
-      const recentHeading = screen.getByText(/^(?:Recent|최근)$/u);
+      const recentHeading = screen.getByText(/^(?:Recent|최근 사용)$/u);
       expect(recentHeading.nextElementSibling?.querySelector("button")).not.toBeNull();
       expect(
         container.firstElementChild?.getAttribute("data-studio-ui-preferences-authority"),

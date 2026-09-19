@@ -320,6 +320,20 @@ describe("PostgresHealthReadinessRepository", () => {
     await expect(repository.isSchemaReady()).resolves.toBe(false);
   });
 
+  it("requires only real legacy cutovers while retaining every managed migration checksum", () => {
+    const directory = new URL("../../db/migrations/", import.meta.url);
+    const markerPattern = /INSERT INTO (?:public\.)?"?toonspectrum_schema_migration"?\s*\([^;]+?VALUES\s*\(\s*'([^']+)'/giu;
+    const emittedMarkers = new Set(readdirSync(directory).filter((name) => name.endsWith(".sql"))
+      .flatMap((name) => [...readFileSync(new URL(name, directory), "utf8").matchAll(markerPattern)])
+      .map((match) => match[1]));
+    for (const id of REQUIRED_DATABASE_MIGRATIONS) expect(emittedMarkers.has(id), id).toBe(true);
+    const manifest = readFileSync(new URL("../../../../../scripts/production-database-migrations.manifest", import.meta.url), "utf8");
+    for (const id of ["0065_creator_series_lifecycle", "0066_share_analytics_events", "0067_creator_role_workspace_personalization"]) {
+      expect(manifest).toContain(`apps/api/src/db/migrations/${id}.sql`);
+      expect(emittedMarkers.has(id), "managed migration must not masquerade as a legacy cutover").toBe(false);
+    }
+  });
+
   it("keeps the required relation inventory unique and deterministic", () => {
     const sorted = [...REQUIRED_DATABASE_RELATIONS].sort();
     expect(REQUIRED_DATABASE_RELATIONS).toEqual(sorted);
@@ -384,6 +398,7 @@ describe("PostgresHealthReadinessRepository", () => {
     const unquotedMigrationRelations = [
       "../../db/migrations/0036_traffic_analytics_relations.sql",
       "../../db/migrations/0066_share_analytics_events.sql",
+      "../../db/migrations/0077_membership_operations.sql",
     ].flatMap((path) => [
       ...readFileSync(new URL(path, import.meta.url), "utf8").matchAll(
         /\bCREATE TABLE(?: IF NOT EXISTS)? public\.([a-z_]+)/gu,
@@ -396,6 +411,11 @@ describe("PostgresHealthReadinessRepository", () => {
     expect(migrationRelations.toSorted()).toEqual([
       ...ASSET_PLATFORM_RELATIONS,
       "creator_role_workspace_preference",
+      "membership_notice",
+      "membership_policy_change",
+      "membership_resource_state",
+      "membership_resource_usage_event",
+      "membership_reward_reversal",
       "traffic_page_view",
       "traffic_session",
       "traffic_share_event",

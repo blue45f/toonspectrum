@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   Header,
   Headers,
@@ -13,7 +14,7 @@ import { SupporterPaymentService } from "./supporter-payment.service";
 
 @Controller()
 export class SupporterPaymentController {
-  constructor(private readonly service: SupporterPaymentService) {}
+  constructor(@Inject(SupporterPaymentService) private readonly service: SupporterPaymentService) {}
 
   @Get("supporter-payments/config")
   @Header("Cache-Control", "no-store, max-age=0")

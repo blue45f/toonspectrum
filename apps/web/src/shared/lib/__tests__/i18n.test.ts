@@ -21,6 +21,9 @@ import {
 } from "@/shared/lib/i18n";
 import { APP_I18N_BUILT_IN_LOCALES } from "@/shared/lib/i18n-locale-catalog";
 import "@/domains/creator/studio-app-settings-center-i18n";
+import "@/domains/legal/creator-support-i18n";
+import "@/domains/legal/support-us-i18n";
+import { getRuntimeTranslationPendingKeys } from "../i18n-runtime-translation";
 
 function mockTranslationResponseForRequest(url: string): Response {
   const parsed = new URL(url);
@@ -49,6 +52,7 @@ function makeCachedLocalePayload(locale: string, dict: Record<string, string>) {
 
 async function withLocalStorage<T>(fn: () => T | Promise<T>): Promise<T> {
   const originalStorage = (globalThis as { localStorage?: Storage | undefined }).localStorage;
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const map = new Map<string, string>();
   const mockStorage: Storage = {
     get length() {
@@ -73,9 +77,18 @@ async function withLocalStorage<T>(fn: () => T | Promise<T>): Promise<T> {
     writable: true,
   });
 
+  // The production cache is explicitly browser-only. Model the browser storage owner
+  // instead of relying on Node's unrelated global localStorage implementation.
+  if (typeof window === "undefined") {
+    Object.defineProperty(globalThis, "window", {
+      value: { localStorage: mockStorage }, configurable: true,
+    });
+  }
   try {
     return await fn();
   } finally {
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
     if (originalStorage === undefined) {
       Object.defineProperty(globalThis, "localStorage", {
         value: undefined,
@@ -114,6 +127,7 @@ function collectSourceI18nKeys(): Set<string> {
       }
 
       if (![".ts", ".tsx", ".js", ".jsx"].includes(extname(full))) continue;
+      if (/\.(?:test|spec)\.[jt]sx?$/u.test(name)) continue;
 
       const text = readFileSync(full, "utf8");
       for (const match of text.matchAll(keyRe)) {
@@ -360,6 +374,7 @@ describe("runtime translation bundles", () => {
         cacheKey,
         JSON.stringify(
           makeCachedLocalePayload("ia", {
+            ...Object.fromEntries(getRuntimeTranslationPendingKeys("ia").map((key) => [key, `${key}-cached`])),
             "app.name": "ToonSpectrum Cached",
             "common.loading": "Cargando cached",
           })
@@ -382,6 +397,23 @@ describe("runtime translation bundles", () => {
       expect(resolveI18nValue("ia", "common.loading")).toBe("Cargando cached");
 
       fetchSpy.mockRestore();
+    });
+  });
+
+  it("fills missing keys in a partial cache without retranslating cached entries", async () => {
+    await withLocalStorage(async () => {
+      const dictionary = Object.fromEntries(
+        getRuntimeTranslationPendingKeys("ie").map((key) => [key, `${key}-cached`]),
+      );
+      delete dictionary["common.loading"];
+      localStorage.setItem("toonspectrum-i18n-runtime:v3:ie", JSON.stringify(makeCachedLocalePayload("ie", dictionary)));
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) =>
+        Promise.resolve(mockTranslationResponseForRequest(url.toString())),
+      );
+      await ensureRuntimeLocaleBundle("ie");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(resolveI18nValue("ie", "app.name")).toBe("app.name-cached");
+      expect(resolveI18nValue("ie", "common.loading")).toBe(`${i18nDict.en["common.loading"]}-translated`);
     });
   });
 

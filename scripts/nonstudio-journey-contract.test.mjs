@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { test } from "node:test";
 
 import { readBrowserPreference, writeBrowserPreference } from "../apps/web/src/shared/lib/browser-preferences.ts";
 import { createNavigationMemory } from "../apps/web/src/shared/lib/navigation-memory.ts";
 import { safeDecodeRouteText } from "../apps/web/src/shared/lib/safe-route-text.ts";
 import { MAX_LIBRARY_BACKUP_BYTES, parseLibraryBackup } from "../apps/web/src/shared/lib/library-backup.ts";
 import { EXPERIENCE_DESTINATIONS, experienceDestinationForHref, nextExperienceDestinations, parseExperienceMode, supportsSiteExperience } from "../apps/web/src/shared/components/site-experience/site-experience-model.ts";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const backup = () => ({ _app: "toonspectrum-library", version: 1, ratings: { a: 4.5 }, reads: { a: "reading" }, subscriptions: { a: true }, likedReviews: { r: false }, reviews: { a: { titleId: "a", rating: 4.5, text: "좋은 작품", tags: ["추천"], spoiler: false, createdAt: "2026-09-13T00:00:00Z" } }, collections: [{ id: "collection-1", name: "즐겨찾기", emoji: "📚", titleIds: ["a"], createdAt: "2026-09-13T00:00:00Z" }] });
 

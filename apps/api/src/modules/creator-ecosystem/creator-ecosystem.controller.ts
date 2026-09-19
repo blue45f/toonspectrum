@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Delete,
   Get,
   Header,
@@ -16,7 +17,7 @@ import { CreatorEcosystemService } from "./creator-ecosystem.service";
 
 @Controller()
 export class CreatorEcosystemController {
-  constructor(private readonly service: CreatorEcosystemService) {}
+  constructor(@Inject(CreatorEcosystemService) private readonly service: CreatorEcosystemService) {}
 
   @Get("creator-ecosystem/collaboration/creators")
   @Header("Cache-Control", "no-store, max-age=0")

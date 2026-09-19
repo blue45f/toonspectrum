@@ -25,11 +25,11 @@ export interface StudioPaperSurfacePickerProps {
 }
 
 function localizeText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
 ): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 

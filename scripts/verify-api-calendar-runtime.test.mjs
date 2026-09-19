@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import test from "node:test";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const api = JSON.parse(readFileSync(new URL("../apps/api/package.json", import.meta.url), "utf8"));
 const core = JSON.parse(readFileSync(new URL("../packages/core/package.json", import.meta.url), "utf8"));

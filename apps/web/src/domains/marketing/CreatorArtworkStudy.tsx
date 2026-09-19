@@ -1,11 +1,9 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowLeftRight, Brush, Grid2X2, Move3D, Pause, Play } from "lucide-react";
 import { useId, useState, type CSSProperties } from "react";
 
 import { CREATOR_ART_ASSETS, type CreatorArtAsset } from "./creator-theme-art";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("CreatorArtworkStudy", ko, en);
 
 const COPY = {
   ko: {
@@ -24,8 +22,10 @@ const COPY = {
 const GUIDE_ICONS = [Brush, Grid2X2, Move3D] as const;
 
 /** A real tonal comparison of the same artwork, with illustrative composition guides. */
-export function CreatorArtworkStudy({ locale: _locale, stage, image = CREATOR_ART_ASSETS.world }: { locale: "ko" | "en"; stage: number; image?: CreatorArtAsset }) {
+export function CreatorArtworkStudy({ locale, stage, image = CREATOR_ART_ASSETS.world }: { locale: "ko" | "en"; stage: number; image?: CreatorArtAsset }) {
   useBilingualI18nRevision();
+  const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+    translateBilingualValueForLocale(locale, "CreatorArtworkStudy", ko, en);
   const text = bi((COPY).ko, (COPY).en);
   const id = useId();
   const [colorAmount, setColorAmount] = useState(68);
