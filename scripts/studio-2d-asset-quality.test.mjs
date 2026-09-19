@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,15 +20,15 @@ const modified = (change) => {
 test("every declared original matches its bytes, dimensions, format and reviewed hash", () => {
   const result = auditStudio2dAssets(root);
   assert.equal(result.ok, true, result.errors.join("\n"));
-  assert.equal(result.originalCount, 29);
+  assert.equal(result.originalCount, 9);
   assert.equal(result.largeOriginals, 9);
-  assert.equal(result.smallOriginals, 20);
+  assert.equal(result.smallOriginals, 0);
   assert.equal(result.recommended, 5);
 });
 
-test("JPEG originals use .jpg while all 25 legacy .png aliases preserve identical bytes", () => {
+test("JPEG originals use .jpg while all retained legacy .png aliases preserve identical bytes", () => {
   const aliases = original.assets.filter((asset) => asset.legacySrc);
-  assert.equal(aliases.length, 25);
+  assert.equal(aliases.length, 5);
   for (const asset of aliases) {
     assert.equal(asset.mediaType, "image/jpeg");
     assert.ok(asset.src.endsWith(".jpg"));
@@ -55,8 +57,21 @@ test("extension-based PNG claims cannot disguise JPEG payloads", () => {
   assert.match(modified((manifest) => { manifest.assets[0].mediaType = "image/png"; }).errors.join(), /signature/u);
 });
 
-test("small originals cannot be promoted into recommendations", () => {
-  assert.match(modified((manifest) => { manifest.assets[0].recommended = true; }).errors.join(), /Recommendation/u);
+test("small originals cannot be promoted into recommendations even when the main catalog contains only large originals", () => {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "studio-small-original-"));
+  try {
+    const directory = path.join(fixtureRoot, "apps/web/public/assets/studio/backgrounds"); mkdirSync(directory, { recursive: true });
+    const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+afoQAAAAASUVORK5CYII=", "base64");
+    writeFileSync(path.join(directory,"small.png"), bytes);
+    const item = { ...structuredClone(original.assets[0]), id: "small-fixture", src: "/assets/studio/backgrounds/small.png", legacySrc: null,
+      mediaType: "image/png", width: 1, height: 1, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), recommended: true,
+      review: { status: "usable", method: "full-image", notes: [] } };
+    const result = auditStudio2dAssets(fixtureRoot, { version: 1, assets: [item] });
+    assert.match(result.errors.join(), /Recommendation/u);
+    assert.doesNotMatch(result.errors.join(), /ENOENT|SHA-256|dimensions/u);
+    item.recommended = false;
+    assert.equal(auditStudio2dAssets(fixtureRoot, { version: 1, assets: [item] }).ok, true);
+  } finally { rmSync(fixtureRoot, { recursive: true, force: true }); }
 });
 
 test("contact-sheet-only inspection cannot pass full-image recommendation", () => {

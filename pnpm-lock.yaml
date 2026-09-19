@@ -52,6 +52,7 @@ overrides:
 patchedDependencies:
   '@gltf-transform/functions@4.4.2': bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d
   '@react-three/fiber@9.6.1': 68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222
+  ktx2-encoder@0.6.0: 20ab5cce62142bddaf85f69af8a41633b64f264f931b3ef71c8a57c3e0de5c74
   manifold-3d@3.5.1: 53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad
   minimatch@3.1.5: fe761a9f2ee67f36ecef95437aff71cccde54f98d08053c41eb3f815a907be71
   p5.brush@2.2.1: 6b307bc36f52c10edfb448c81f93799eeba30e77015abf4031960ce9907a78cb
@@ -225,6 +226,9 @@ importers:
       konva:
         specifier: ^10.3.0
         version: 10.3.0
+      ktx2-encoder:
+        specifier: 0.6.0
+        version: 0.6.0(patch_hash=20ab5cce62142bddaf85f69af8a41633b64f264f931b3ef71c8a57c3e0de5c74)
       ky:
         specifier: ^2.0.2
         version: 2.0.2
@@ -5667,6 +5671,9 @@ packages:
 
   ktx-parse@1.1.0:
     resolution: {integrity: sha512-mKp3y+FaYgR7mXWAbyyzpa/r1zDWeaunH+INJO4fou3hb45XuNSwar+7llrRyvpMWafxSIi99RNFJ05MHedaJQ==}
+
+  ktx2-encoder@0.6.0:
+    resolution: {integrity: sha512-gEWkw2YUlhKO4hXhqVLQQWJ+fGJObsXIwz0pGjJMclnQ4MQU3SAtN1MzutjFxO3ejWvxHyvFk5kr8+RtLmHiTA==}
 
   ky@2.0.2:
     resolution: {integrity: sha512-/GmXpo9F9W+f8n4Ivr2iH+7h7wL7jLbLKWkMlpflcCRb6kGjBfTlASEXaZ9qUgNTn4VgS0P2pwxxzQ4EM6Ulgg==}
@@ -12716,6 +12723,10 @@ snapshots:
   korean-lunar-calendar@0.4.0: {}
 
   ktx-parse@1.1.0: {}
+
+  ktx2-encoder@0.6.0(patch_hash=20ab5cce62142bddaf85f69af8a41633b64f264f931b3ef71c8a57c3e0de5c74):
+    dependencies:
+      ktx-parse: 1.1.0
 
   ky@2.0.2: {}
 

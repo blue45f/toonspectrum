@@ -284,7 +284,7 @@ export function assertStudioBg3dCaptureRequest(request: unknown): asserts reques
     throw new TypeError("3D surface normals require the matching depth raster.");
   }
   assertStudioBg3dCaptureBudget({ width: request.width, height: request.height,
-    includeDepth: candidate.includeDepth });
+    includeDepth: candidate.includeDepth, includeNormals: candidate.includeNormals });
   if (!candidate.background || typeof candidate.background !== "object") {
     throw new TypeError("3D capture background must be an object.");
   }
