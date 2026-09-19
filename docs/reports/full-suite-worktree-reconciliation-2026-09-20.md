@@ -29,7 +29,9 @@ Other active brush, 3D and virtual-world feature worktrees are not folded into t
 - Match the background history assertion to the current visible `최근 사용` copy while retaining
   SQLite hydration, preset selection and persistence assertions.
 - Build the desktop sync CLI locally before its real reproducible-release/tamper test.
-- Combined targeted verification: **91 files / 925 tests passed**, no unhandled rejections.
+- Move cross-domain dictionary completeness coverage to an app-level integration test;
+  preserve every assertion and the unchanged shared-to-domain budget (49/49).
+- Combined targeted verification: **92 files / 925 tests passed**, no unhandled rejections.
 - This is not a claim that the full repository suite, remote CI or production deployment passed.
 
 ## Snapshot boundary
