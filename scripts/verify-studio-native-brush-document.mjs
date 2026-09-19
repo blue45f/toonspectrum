@@ -30,7 +30,7 @@ const server = await createServer({
       if (id !== entry) return;
       return `import React, { useState } from 'react'; import { createRoot } from 'react-dom/client';
         import Inspector from '/apps/web/src/domains/creator/brush/StudioNativeBrushDocumentInspector.tsx';
-        import { prepareStudioNativeBrushDocumentCommit } from '/apps/web/src/domains/creator/brush/studio-native-brush-document-commit.ts';
+        import { createNativeBrushDocumentEditorPreparer } from '/apps/web/src/domains/creator/brush/studio-native-brush-editor-bridge.ts';
         import { serializeStudioProjectDocument, parseStudioProjectDocument } from '/apps/web/src/domains/creator/studio-project-document.ts';
         import { exportPageToSvg } from '/apps/web/src/domains/creator/export/studio-svg-export.ts';
         const makeSource = () => ({ id:'original',type:'draw',kind:'freehand',mode:'pen',brush:'gpen',stroke:'#123456',strokeWidth:12,opacity:0.45,
@@ -52,9 +52,18 @@ const server = await createServer({
             return {bytes:json.length,elements,svg:exported.svg};
           }
         };
+        const pageHistories=new WeakMap();
+        const pageHistory=()=>{let mapped=pageHistories.get(history);if(!mapped){mapped=history.map(elements=>[{id:'p',elements,canvasH:1000}]);pageHistories.set(history,mapped);}return mapped;};
         function App(){const [,setTick]=useState(0);updates=()=>setTick(n=>n+1);
-          const onPrepare=(target)=>prepareStudioNativeBrushDocumentCommit(target,{read,canMutate:()=>true,
-            commit:(elements)=>{history=[...history.slice(0,index+1),elements];index++;updates();return true;},onCommitted:()=>{}});
+          const onPrepare=createNativeBrushDocumentEditorPreparer({
+            captureStudioMutationTicket:()=>history,canApplyStudioMutation:(ticket)=>ticket===history,
+            editorMountedRef:{current:true},documentSaveInFlightRef:{current:false},
+            collaborationAccessRef:{current:{locked:false}},activeSurfaceReviewLockedRef:{current:false},
+            drawingRef:{current:false},pendingStrokeCommitsRef:{current:false},
+            pagesHistoryRef:{get current(){return pageHistory();}},pagesHiRef:{get current(){return index;}},
+            currentPageIdRef:{current:'p'},masterEditModeRef:{current:false},documentWidth:720,
+            commit:(elements)=>{history=[...history.slice(0,index+1),elements];index++;updates();return true;},
+            setSelectedId:()=>{},announceDrawingShortcut:()=>{}});
           return <Inspector selected={history[index][0]} documentWidth={720} documentHeight={1000} pageId="p" masterEditMode={false} disabled={false} onPrepare={onPrepare}/>;
         }
         createRoot(document.getElementById('root')).render(<App/>);`;

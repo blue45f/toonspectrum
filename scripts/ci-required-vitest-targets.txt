@@ -35,6 +35,7 @@ apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.lens.test.tsx
 apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel.test.tsx
 apps/web/src/domains/creator/bg3d/StudioBg3dViewPanelLazy.test.tsx
 apps/web/src/domains/creator/bg3d/StudioMarketplaceModelImport.test.tsx
+apps/web/src/domains/creator/bg3d/StudioMarketplaceModelImportMount.failure.test.tsx
 apps/web/src/domains/creator/bg3d/StudioMarketplaceModelImportMount.test.tsx
 apps/web/src/domains/creator/bg3d/studio-bg3d-a11y-boundary.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-artifact-capture.test.ts

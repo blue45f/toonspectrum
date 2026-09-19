@@ -38,6 +38,7 @@ describe("browser focused core entrypoints", () => {
     expect(wrapper).toContain('if (!props.modelId) return null');
     expect(wrapper).toContain('const loadModelImport = () => import("./StudioMarketplaceModelImport")');
     expect(wrapper).toContain('useStudioOnDemandModule(loadModelImport, Boolean(props.modelId))');
+    expect(wrapper).toContain('현재 장면은 유지됩니다.');
     expect(wrapper).not.toContain('studio-marketplace-cc0-registry');
   });
 });

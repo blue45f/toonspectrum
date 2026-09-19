@@ -26,7 +26,11 @@ export interface StudioNativeBrushDocumentTarget {
   readonly sourceRevision: string;
 }
 export type StudioNativeBrushDocumentCommit = (result: StudioNativeBrushDocumentResult) => boolean;
-export type StudioNativeBrushDocumentPrepare = (target: StudioNativeBrushDocumentTarget) => StudioNativeBrushDocumentCommit | null;
+/** The lazy inspector supplies its existing validator synchronously; no early host import is needed. */
+export type StudioNativeBrushDocumentPrepare = (
+  target: StudioNativeBrushDocumentTarget,
+  prepare: typeof prepareStudioNativeBrushDocumentCommit,
+) => StudioNativeBrushDocumentCommit | null;
 
 /** Source and image remain ordinary document elements; existing history/save/export own them. */
 export function planStudioNativeBrushDocumentReplacement(
