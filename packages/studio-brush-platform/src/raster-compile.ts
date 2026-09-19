@@ -1,9 +1,14 @@
 import { BrushCompileError } from "./compile";
+import { standardZigzagStrokeSamples } from "./raster-stroke-samples";
 
+import type { RasterStrokeSample } from "./raster-stroke-samples";
 import type {
   BrushProgramIR,
   DynamicMappingIR,
 } from "@toonspectrum/studio-project-model";
+
+export { standardZigzagStrokeSamples } from "./raster-stroke-samples";
+export type { RasterStrokeSample } from "./raster-stroke-samples";
 
 /**
  * BrushProgramIR compiler for the raster-tiles natural-media lane (V12 §6.1).
@@ -558,47 +563,6 @@ export interface HokusaiModuleLike {
     height: number,
     seed: number,
   ) => HokusaiCanvasLike;
-}
-
-export interface RasterStrokeSample {
-  x: number;
-  y: number;
-  pressure: number;
-  tiltX: number;
-  tiltY: number;
-  tMs: number;
-}
-
-/**
- * The standard fidelity path: x sweeps left→right while y zigzags through
- * three triangle cycles, carrying a linear 0→1 pressure ramp. Deterministic,
- * shared by the compile-bridge gates so goldens stay comparable.
- */
-export function standardZigzagStrokeSamples(
-  width: number,
-  height: number,
-  sampleCount: number,
-): RasterStrokeSample[] {
-  const margin = 16;
-  // Leave real headroom for wide, high-pressure dabs: clipping ink at the
-  // zigzag peaks would corrupt the pressure→mass profile the gates measure.
-  const amplitude = Math.max(4, height / 2 - 24);
-  const cycles = 3;
-  const samples: RasterStrokeSample[] = [];
-  for (let index = 0; index < sampleCount; index += 1) {
-    const t = sampleCount === 1 ? 0 : index / (sampleCount - 1);
-    const phase = (t * cycles) % 1;
-    const zig = phase < 0.5 ? 4 * phase - 1 : 3 - 4 * phase;
-    samples.push({
-      x: margin + t * (width - 2 * margin),
-      y: height / 2 + zig * amplitude,
-      pressure: t,
-      tiltX: 0,
-      tiltY: 0,
-      tMs: index * 6,
-    });
-  }
-  return samples;
 }
 
 export interface RenderCompiledBrushStrokeOptions {
