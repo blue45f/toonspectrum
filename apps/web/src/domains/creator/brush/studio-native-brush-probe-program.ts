@@ -1,8 +1,8 @@
 import { getStroke } from "perfect-freehand";
 
-import { NATIVE_BRUSH_PROBE_HEIGHT as HEIGHT, NATIVE_BRUSH_PROBE_WIDTH as WIDTH } from "./studio-native-brush-probe-contract";
+import { NATIVE_BRUSH_PROBE_SURFACE } from "./studio-native-brush-probe-contract";
 
-import type { NativeBrushProbeConfig, NativeBrushProbeSample } from "./studio-native-brush-probe-contract";
+import type { NativeBrushProbeConfig, NativeBrushProbeSample, NativeBrushSurface } from "./studio-native-brush-probe-contract";
 import type { PathIR, SceneIR } from "@toonspectrum/studio-project-model";
 
 function color(colorHex: string) {
@@ -23,7 +23,7 @@ export function nativeBrushProbeMybDocument(value: NativeBrushProbeConfig) {
     color_h: base(hue), color_s: base(max ? delta / max : 0), color_v: base(max),
   } };
 }
-export function nativeBrushProbeScene(config: NativeBrushProbeConfig, samples: readonly NativeBrushProbeSample[]): SceneIR {
+export function nativeBrushProbeScene(config: NativeBrushProbeConfig, samples: readonly NativeBrushProbeSample[], surface: NativeBrushSurface = NATIVE_BRUSH_PROBE_SURFACE): SceneIR {
   const outline = getStroke(samples.map((s) => [s.x, s.y, s.pressure]), {
     size: config.size, thinning: 0.7, smoothing: 0.5, streamline: 0.1, simulatePressure: false, last: true,
   });
@@ -31,7 +31,7 @@ export function nativeBrushProbeScene(config: NativeBrushProbeConfig, samples: r
   const verbs: PathIR["verbs"] =
     outline.map(([x, y], index) => ({ v: index ? "L" : "M", x: x!, y: y! }));
   if (outline.length) verbs.push({ v: "Z" });
-  return { version: 11, width: WIDTH, height: HEIGHT, background: { r: 0, g: 0, b: 0, a: 0 },
+  return { version: 11, width: surface.width, height: surface.height, background: { r: 0, g: 0, b: 0, a: 0 },
     nodes: outline.length ? [{ id: "test-outline", kind: "fill-path", path: { verbs }, fillRule: "nonzero",
       opacity: 1, blend: "src-over", paint: { kind: "solid", color: { r, g, b, a: 1 } } }] : [] };
 }
