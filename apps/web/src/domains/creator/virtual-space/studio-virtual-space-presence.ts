@@ -16,7 +16,7 @@ import {
 } from "./studio-virtual-space-model";
 
 export const STUDIO_VIRTUAL_SPACE_WIRE = "toonspectrum-space-v1";
-export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 150;
+export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 90;
 export const STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS = 2_500;
 export const STUDIO_VIRTUAL_SPACE_STALE_MS = 10_000;
 export const STUDIO_VIRTUAL_SPACE_PACKET_MAX_BYTES = 1_024;
