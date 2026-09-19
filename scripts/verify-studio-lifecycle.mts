@@ -284,10 +284,12 @@ async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
 async function activatePen(page: Page): Promise<void> {
   await page.keyboard.press("b");
   const drawOptions = page.locator('[data-studio-draw-options="true"]');
-  await drawOptions.waitFor({ state: "visible", timeout: 8_000 });
-  const pen = drawOptions.getByRole("button", { name: "펜", exact: true });
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
-  await page.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
+  await drawOptions.waitFor({ state: "visible", timeout: $2 });
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
+  await drawOptions.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
 }
 
 async function enabledHistoryButton(
