@@ -14,6 +14,7 @@ const previewModelSource = read("./studio-unified-asset-preview.ts");
 const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
 const createModeGroupsSource = read("./StudioToolBeltCreateModeGroups.tsx");
+const floatingLayoutsSource = read("./studio-floating-menu-layouts.ts");
 const globalsSource = read("../../styles/globals.css");
 
 describe("Studio asset workspace boundaries", () => {
@@ -127,7 +128,7 @@ describe("Studio asset workspace boundaries", () => {
   });
 
   it("sizes the desktop asset window for the visual workspace without forcing horizontal scroll", () => {
-    expect(createModeGroupsSource).toContain("width: 1080, height: 760");
+    expect(floatingLayoutsSource).toContain("asset: floatingMenuLayout(0.02, 0.08, 1080, 760)");
     expect(createModeGroupsSource).toContain("maxWidth: 1320");
     expect(createModeGroupsSource).toContain(
       'contentClassName: "overflow-y-auto overflow-x-hidden"',
