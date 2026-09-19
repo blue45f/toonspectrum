@@ -192,6 +192,9 @@ importers:
       colorjs.io:
         specifier: ^0.7.1
         version: 0.7.1
+      colormix:
+        specifier: 3.2.0
+        version: 3.2.0
       culori:
         specifier: ^4.0.2
         version: 4.0.2
@@ -309,6 +312,9 @@ importers:
       socket.io-client:
         specifier: ^4.8.3
         version: 4.8.3
+      spectral.js:
+        specifier: 3.0.0
+        version: 3.0.0
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
@@ -3925,6 +3931,9 @@ packages:
   babel-plugin-react-compiler@1.0.0:
     resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
 
+  babel-runtime@6.26.0:
+    resolution: {integrity: sha512-ITKNuq2wKlW1fJg9sSW52eepoYgZBggvOAHC0u/CYu/qxQ9EVzThCgR69BnSXLHjy2f7SY5zaQ4yt7H9ZVxY2g==}
+
   babylonjs-gltf2interface@9.19.0:
     resolution: {integrity: sha512-VyXEf5QKcE5XaHfUVUmzjqyUro89zZaDjBxRXtbUuc4suHNrBfqOHecfCRvD3PaHtdtN+ZF8A4g1n06Pi70Rlw==}
 
@@ -4161,6 +4170,10 @@ packages:
   colorjs.io@0.7.1:
     resolution: {integrity: sha512-LY7OHnJZxHwT5UlzNa9bbhHHDbzB6yE5+3MIPwJEQKRvSCt/T4G7epsj+9j2BExUIIfXFIJGsIXUKdfrK9Q5tA==}
 
+  colormix@3.2.0:
+    resolution: {integrity: sha512-KjfbemFzV/fuvZ6AiX0lm09VTmykAUwCZIqfJ9GdCMGOtvPCfpPyh6J/wPx97QBpps3pqeBKaE8Ffhx9KYveHg==}
+    engines: {node: '>=0.10.0'}
+
   comlink@4.4.2:
     resolution: {integrity: sha512-OxGdvBmJuNKSCMO4NTl1L47VRp6xn2wG4F/2hYzB6tiCb709otOxtEYCSvK80PtjODfXXZu8ds+Nw5kVCjqd2g==}
 
@@ -4241,6 +4254,10 @@ packages:
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
+
+  core-js@2.6.12:
+    resolution: {integrity: sha512-Kb2wC0fvsWfQrgk8HU5lW6U/Lcs8+9aaYcy4ZFc6DDlo4nZ7n70dEgE5rtR0oG6ufKDUnrwfWL1mXR5ljDatrQ==}
+    deprecated: core-js@<3.23.3 is no longer maintained and not recommended for usage due to the number of issues. Because of the V8 engine whims, feature detection in old core-js versions could cause a slowdown up to 100x even if nothing is polyfilled. Some versions have web compatibility issues. Please, upgrade your dependencies to the actual version of core-js.
 
   cors@2.8.6:
     resolution: {integrity: sha512-tJtZBBHA6vjIAaF6EnIaq6laBBP9aq/Y3ouVJjEfoHbRBcHBAHYcMh/w8LDrk2PvIMMq8gmopa5D4V8RmbrxGw==}
@@ -6692,6 +6709,9 @@ packages:
     resolution: {integrity: sha512-00o4I+DVrefhv+nX0ulyi3biSHCPDe+yLv5o/p6d/UVlirijB8E16FtfwSAi4g3tcqrQ4lRAqQSoFEZJehYEcw==}
     engines: {node: '>= 0.4'}
 
+  regenerator-runtime@0.11.1:
+    resolution: {integrity: sha512-MguG95oij0fC3QV3URf4V2SDYGJhJnJGqvIIgdECeODCT98wSWDAJ94SSuVpYQUoTcGUIL6L4yNB7j1DFFHSBg==}
+
   regexp-to-ast@0.5.0:
     resolution: {integrity: sha512-tlbJqcMHnPKI9zSrystikWKwHkBqu2a/Sgw01h3zFjvYrMxEDYHzzoMZnUrbIfpTFEsoRnnviOXNCzFiSc54Qw==}
 
@@ -6988,6 +7008,9 @@ packages:
 
   spdx-license-ids@3.0.24:
     resolution: {integrity: sha512-cLS9TtWkIQFyLkJ3/5aFQAOHOSKTlOs/7WDut/XPSdjom1fJhUdkepeJAKXa9Y05+FabHd0sti+Et559vDtkpQ==}
+
+  spectral.js@3.0.0:
+    resolution: {integrity: sha512-vIvoUfuB0jrj8bdCXvKks5nmp4Zx1DeKhSojJxN8Pk7jIpH2KMwF8cAhDPto0dEwk0/0qa06eL0owRZ2tAJB5w==}
 
   splaytree@3.2.3:
     resolution: {integrity: sha512-7OXrNWzy6CK+r7Ch9OLPBDTKfB6XlWHjX4P0RU5B3IgFuWPeYN0XtRtlexGRjgbQxpfaUve6jTAwBGWuGntz/w==}
@@ -10858,6 +10881,11 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.7
 
+  babel-runtime@6.26.0:
+    dependencies:
+      core-js: 2.6.12
+      regenerator-runtime: 0.11.1
+
   babylonjs-gltf2interface@9.19.0: {}
 
   balanced-match@1.0.2: {}
@@ -11104,6 +11132,10 @@ snapshots:
 
   colorjs.io@0.7.1: {}
 
+  colormix@3.2.0:
+    dependencies:
+      babel-runtime: 6.26.0
+
   comlink@4.4.2:
     optional: true
 
@@ -11163,6 +11195,8 @@ snapshots:
   cookie@0.7.2: {}
 
   cookie@1.1.1: {}
+
+  core-js@2.6.12: {}
 
   cors@2.8.6:
     dependencies:
@@ -13823,6 +13857,8 @@ snapshots:
       get-proto: 1.0.1
       which-builtin-type: 1.2.1
 
+  regenerator-runtime@0.11.1: {}
+
   regexp-to-ast@0.5.0: {}
 
   regexp.prototype.flags@1.5.4:
@@ -14252,6 +14288,8 @@ snapshots:
       spdx-license-ids: 3.0.24
 
   spdx-license-ids@3.0.24: {}
+
+  spectral.js@3.0.0: {}
 
   splaytree@3.2.3: {}
 

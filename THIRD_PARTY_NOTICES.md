@@ -194,3 +194,33 @@ not a Studio browser runtime. The post-build audit fails if a libvips or sharp
 native runtime marker appears in the Vite distribution. If a future server or
 desktop release intentionally distributes those binaries, its packaging must
 carry the applicable LGPL source-and-relinking obligations separately.
+
+
+## open-km (pinned optical-kernel port)
+
+Source: https://github.com/lwander/open-km/tree/24222a131c94cdaf8cbbe76c0c228d44a536c99a
+
+The scalar K/S-mixture and opaque-reflectance kernels are adapted with validation and a numerically stable inverse. The original browser demo, approximate gamma, hard-coded interface correction and fictitious example pigment spectra are not used in production. Original source and license are retained in `apps/web/src/domains/creator/brush-lab/pigment/vendor/`.
+
+MIT License
+
+Copyright (c) 2023 Lars Wander
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
