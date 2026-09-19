@@ -1,9 +1,8 @@
 import {
+  getCurrentUiLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  useBilingual,
   useBilingualI18nRevision,
-  useBilingualLocalizer,
   type BilingualText,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -103,7 +102,7 @@ function StatusCard({
   label,
   status,
   description,
-  locale: _locale,
+  locale,
 }: {
   readonly icon: typeof ShieldCheck;
   readonly label: string;
@@ -111,7 +110,10 @@ function StatusCard({
   readonly description: string;
   readonly locale?: string;
 }) {
-  const bt = useBilingualLocalizer("studioAssetGovernance.status");
+  useBilingualI18nRevision();
+  const resolvedLocale = locale ?? getCurrentUiLocale();
+  const bt = (ko: string, en: string) =>
+    translateBilingualValueForLocale(resolvedLocale, "studioAssetGovernance.status", ko, en);
   return (
     <article className="rounded-2xl border border-line bg-panel p-4">
       <div className="flex items-start justify-between gap-3">
@@ -182,16 +184,10 @@ export function StudioAssetGovernancePanel({
   readonly projectId: string;
   readonly locale?: string;
 }) {
-  const activeBt = useBilingual("StudioAssetGovernancePanel");
-  const bt = (ko: string, en: string): string =>
-    locale === "ko" || locale === "en"
-      ? translateBilingualValueForLocale(
-          locale,
-          "domains.creator.studio.shell.StudioAssetGovernancePanel",
-          ko,
-          en,
-        )
-      : activeBt(ko, en);
+  useBilingualI18nRevision();
+  const resolvedLocale = locale ?? getCurrentUiLocale();
+  const bt = (ko: string, en: string) =>
+    translateBilingualValueForLocale(resolvedLocale, "StudioAssetGovernancePanel", ko, en);
   const [evaluatedAt, setEvaluatedAt] = useState(() => new Date().toISOString());
   const [preferences, setPreferences] = useState<StudioAssetGovernancePreferences>(
     createDefaultStudioAssetGovernancePreferences,
