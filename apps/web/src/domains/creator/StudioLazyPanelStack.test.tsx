@@ -78,7 +78,8 @@ vi.mock("./studio-page-lazy-ui", async () => {
     StudioPublicationOperationsPanel: panel("publication-operations"),
     StudioPublishPackagePanel: panel("publish-package"),
     StudioPublishPreflightPanel: panel("publish-preflight"),
-    StudioQuickActionsMenu: panel("quick-actions"),
+    StudioQuickActionsMenu: ({ open }: { open: boolean }) =>
+      open ? <div data-optional-panel="quick-actions">quick-actions</div> : null,
     StudioReferencePanel: panel("reference"),
     StudioScenarioAutoLayoutPanel: panel("scenario"),
     StudioScrollPreviewPanel: panel("scroll-preview"),
