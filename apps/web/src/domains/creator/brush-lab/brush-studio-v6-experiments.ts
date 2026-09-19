@@ -1,3 +1,4 @@
+import { BRUSH_AUTHORING_MAX_CHARACTERS, hasBrushStudioV6AuthoringEnvelope, parseBrushStudioV6Authoring } from "./brush-studio-v6-authoring-document";
 import {
   normalizeBrushStudioV6Program,
   patchBrushStudioV6Tuning,
@@ -134,8 +135,11 @@ export function compareBrushStudioV6Programs(
 
 /** Refuse unrelated/future files before normalization can replace the user's work with defaults. */
 export function parseBrushStudioV6Import(serialized: string): BrushStudioV6Program {
+  if (serialized.length > BRUSH_AUTHORING_MAX_CHARACTERS) throw new Error("브러시 파일이 허용 크기를 초과했습니다.");
   const parsed: unknown = JSON.parse(serialized);
+  if (hasBrushStudioV6AuthoringEnvelope(parsed)) return parseBrushStudioV6Authoring(parsed);
   const source = parsed && typeof parsed === "object" && "program" in parsed ? parsed.program : parsed;
+  if (hasBrushStudioV6AuthoringEnvelope(source)) return parseBrushStudioV6Authoring(source);
   if (!source || typeof source !== "object" || !("schemaVersion" in source) || source.schemaVersion !== 6
     || !("slots" in source) || !source.slots || typeof source.slots !== "object"
     || !("tuning" in source) || !source.tuning || typeof source.tuning !== "object") {

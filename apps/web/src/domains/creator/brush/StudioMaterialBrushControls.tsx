@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
-import { normalizeBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
+import { createBrushStudioV6ExactEditorProgram, serializeBrushStudioV6Authoring } from "../brush-lab/brush-studio-v6-authoring-document";
 import {
   brushStudioV6MaterialActiveTuningKeys,
   normalizeBrushStudioV6MaterialConfig,
@@ -20,7 +20,7 @@ const FIELDS = [
   { key: "plasticity", label: "물감 소성", min: 0, max: 1, step: 0.01 },
   { key: "gravity", label: "중력", min: -1, max: 1, step: 0.01 },
 
-  { key: "flow", label: "도포 유량", min: 0.01, max: 1, step: 0.01 },
+  { key: "flow", label: "도포 유량", min: 0, max: 1, step: 0.01 },
   { key: "spacing", label: "접촉 간격", min: 0.01, max: 4, step: 0.01 },
   { key: "surfaceTooth", label: "종이 요철", min: 0, max: 1, step: 0.01 },
   { key: "granulation", label: "안료 과립", min: 0, max: 1, step: 0.01 },
@@ -65,24 +65,17 @@ export function StudioMaterialBrushControls({ material, programSet, currentSnaps
   const topologyKeys = new Set(topology?.controls.map((control) => control.key));
   const fields = [...FIELDS.filter((field) => active.has(field.key) && !topologyKeys.has(field.key)), ...(topology?.controls.filter((control) => active.has(control.key)) ?? [])];
   const label = materialLabel(material);
-  const editorId = `material-${material.seed}`;
-  const editorHref = `/studio/assets/brushes/${editorId}/edit`;
-
   const openEditor = () => {
     try {
-      const program = normalizeBrushStudioV6Program({
-        ...material, schemaVersion: 6, id: editorId, name: label,
-        tuning: currentSnapshot ? {
-          ...material.tuning,
-          size: currentSnapshot.strokeWidth,
-          primaryColor: currentSnapshot.color,
-          opacity: currentSnapshot.brushOpacity,
-        } : material.tuning,
-      });
-      window.localStorage.setItem(`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`, JSON.stringify(program));
-      navigate(editorHref);
-    } catch {
-      setNotice("브러시 편집기로 설정을 전달하지 못했습니다. 현재 원고 설정은 유지됩니다.");
+      const editorId = `material-${crypto.randomUUID()}`;
+      const program = createBrushStudioV6ExactEditorProgram(material, editorId, label, currentSnapshot);
+      const key = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
+      const serialized = serializeBrushStudioV6Authoring(program);
+      window.localStorage.setItem(key, serialized);
+      if (window.localStorage.getItem(key) !== serialized) throw new Error("편집 설정의 저장 결과가 일치하지 않습니다.");
+      navigate(`/studio/assets/brushes/${editorId}/edit`);
+    } catch (error) {
+      setNotice(`브러시 편집기로 설정을 전달하지 못했습니다. ${error instanceof Error ? error.message : "현재 원고 설정은 유지됩니다."}`);
     }
   };
 

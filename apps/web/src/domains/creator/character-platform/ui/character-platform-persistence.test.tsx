@@ -87,6 +87,24 @@ function Workbench() {
 }
 
 describe("character SQLite persistence", () => {
+  it("settles empty-model hydration when the host facade is recreated on every render", async () => {
+    let renders = 0;
+    const hook = renderHook(() => {
+      renders += 1;
+      // Bound an effect-loop regression before it exhausts the worker heap.
+      if (renders > 20) throw new Error("character workbench hydration did not settle");
+      return useWorkbench("model-a");
+    });
+    await act(async () => {});
+    const reads = database.get.mock.calls.length;
+    hook.rerender();
+    await act(async () => {});
+    expect(database.get.mock.calls.length).toBe(reads);
+    expect(hook.result.current.canonicalManifest).toBeNull();
+    expect(hook.result.current.canonicalParts.selections).toEqual({});
+    expect(renders).toBeLessThanOrEqual(20);
+  });
+
   it("serializes overlapping preset saves and deletes and reopens through the product SQLite factory", async () => {
     const browserRead = vi.spyOn(Storage.prototype, "getItem");
     const browserWrite = vi.spyOn(Storage.prototype, "setItem");

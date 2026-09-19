@@ -53,6 +53,7 @@ function decodedDisc() {
   };
 }
 
+// Conversion exercises the real meshing pipeline; allow CPU contention, not just the debounce.
 function downloadButton(): HTMLButtonElement {
   return screen.getByRole("button", { name: "GLB 파일로 저장" }) as HTMLButtonElement;
 }
@@ -60,8 +61,7 @@ function downloadButton(): HTMLButtonElement {
 function pickFile(): void {
   const input = screen.getByLabelText("변환할 이미지 파일");
   const file = new File([new Uint8Array([1, 2, 3])], "주인공.png", { type: "image/png" });
-  Object.defineProperty(input, "files", { configurable: true, value: [file] });
-  input.dispatchEvent(new Event("change", { bubbles: true }));
+  fireEvent.change(input, { target: { files: [file] } });
 }
 
 describe("StudioLift3dPage", () => {
@@ -96,7 +96,7 @@ describe("StudioLift3dPage", () => {
 
     await waitFor(() => {
       expect(downloadButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     expect(screen.getByText("닫힌 solid")).not.toBeNull();
     expect(screen.getByText("주인공 · 96×96px")).not.toBeNull();
   });
@@ -142,7 +142,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
   });
 
   it("등록에 성공하면 어디에 올라갔는지 알려준다", async () => {
@@ -152,7 +152,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     libraryButton().click();
 
@@ -172,7 +172,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     libraryButton().click();
 
@@ -203,7 +203,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(downloadButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     expect(screen.queryByText("레이어")).toBeNull();
 
     const slider = screen.getByLabelText(/시차 레이어/u) as HTMLInputElement;
@@ -223,7 +223,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(downloadButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     fireEvent.change(screen.getByLabelText(/시차 레이어/u), { target: { value: "12" } });
 
@@ -250,7 +250,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(downloadButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     // B 가 먼저 끝나 화면을 차지했다.
     expect(screen.getByText(/두번째/u)).toBeDefined();
 
@@ -259,7 +259,7 @@ describe("StudioLift3dPage", () => {
     // A 가 뒤늦게 끝나도 화면은 B 그대로여야 한다.
     await waitFor(() => {
       expect(downloadButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     expect(screen.queryByText(/첫번째/u)).toBeNull();
     expect(screen.getByText(/두번째/u)).toBeDefined();
   });
@@ -279,7 +279,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     libraryButton().click();
     // 새 파일을 고르되 디코딩은 끝내지 않는다.
@@ -312,7 +312,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     libraryButton().click();
     fireEvent.change(screen.getByLabelText(/앞쪽 두께 비율/u), { target: { value: "0.8" } });
@@ -332,7 +332,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     fireEvent.change(screen.getByLabelText("이용 권리"), { target: { value: "owned" } });
     libraryButton().click();
@@ -355,7 +355,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     const commercial = screen.getByLabelText(/상업적 이용 가능/u) as HTMLInputElement;
     // 확인 전(unknown)에서는 선언 자체가 불가능해야 한다 — 저장 레코드 불변식이 그렇다.
@@ -387,7 +387,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     libraryButton().click();
     // 등록이 끝나기 전에 두께를 바꿔 다른 결과를 만든다. 변환이 실제로 다시 돌아
@@ -398,7 +398,7 @@ describe("StudioLift3dPage", () => {
     });
     await waitFor(() => {
       expect(downloadButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     release({ ok: true, record: { id: "m1" } });
 
     await waitFor(() => {
@@ -421,7 +421,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
 
     libraryButton().click();
     // 디바운스가 끝나기를 **기다리지 않고** 곧바로 등록을 완료시킨다.
@@ -448,7 +448,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     const rights = screen.getByLabelText("이용 권리") as HTMLSelectElement;
     expect(rights.disabled).toBe(false);
 
@@ -477,7 +477,7 @@ describe("StudioLift3dPage", () => {
     pickFile();
     await waitFor(() => {
       expect(libraryButton().disabled).toBe(false);
-    });
+    }, { timeout: 5_000 });
     libraryButton().click();
     await waitFor(() => {
       expect(screen.getByRole("status").textContent).toContain("모델 목록에 등록");

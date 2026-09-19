@@ -72,6 +72,7 @@ import {
   captureStudioAiGeneratedAssetProvenance,
   finalizeStudioAiGeneratedAssetProvenance,
 } from "./ai/studio-ai-generated-asset-model";
+import { buildStudioAiAssetImageRequest } from "./ai/studio-ai-asset-image-request";
 import { resolveStudioAiImageReferences } from "./ai/studio-ai-image-reference-resolution";
 import { hydrateStudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import { normalizeStudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
@@ -15418,20 +15419,9 @@ const puppetWarpArmed =
     const insertionPlacement = nextAssetInsertionPlacement();
     const provider = studioImageAiProviderContext(aiSettings);
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
-    const aiImageSize: StudioAiImageSize = assetPromptSize === "1536x1024"
-      ? "1792x1024"
-      : assetPromptSize === "1024x1536" ? "1024x1792" : assetPromptSize;
-    const qualityDirection = assetPromptQuality === "low"
-      ? "Create a fast preview with a clean silhouette and restrained detail."
-      : assetPromptQuality === "high"
-        ? "Create production-ready detail with crisp edges and coherent lighting."
-        : assetPromptQuality === "medium"
-          ? "Balance production detail, clarity, and generation speed."
-          : "Choose detail appropriate for a reusable webtoon asset.";
-    const providerPrompt = `${prompt}
-
-${qualityDirection}
-No text, logo, watermark, or copyrighted character.`;
+    const { prompt: providerPrompt, size: aiImageSize } = buildStudioAiAssetImageRequest(
+      prompt, assetPromptSize, assetPromptQuality,
+    );
     setAssetGenerating(true);
     setError(null);
     let operationId: string | null = null;

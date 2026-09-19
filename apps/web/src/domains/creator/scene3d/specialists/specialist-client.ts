@@ -1,4 +1,14 @@
 import {
+  scene3dSpecialistJobQueue,
+  type SpecialistJobQueue,
+} from "./specialist-job-queue";
+import {
+  notifySpecialistProgress,
+  readSpecialistWorkerProgress,
+  specialistFailurePhase,
+} from "./specialist-job-progress";
+import type { SpecialistProgressListener } from "./specialist-job-progress";
+import {
   SPECIALIST_LIMITS,
   SpecialistError,
   parseSpecialistRequest,
@@ -10,9 +20,10 @@ import type {
 } from "./specialist-contract";
 
 /** One worker per explicit job bounds WASM lifetime. Cancellation terminates synchronous kernels. */
-export function runScene3dSpecialistInWorker(
+function executeSpecialistWorker(
   request: SpecialistRequest,
   signal?: AbortSignal,
+  onProgress?: SpecialistProgressListener,
 ): Promise<SpecialistResult> {
   if (signal?.aborted)
     return Promise.reject(new SpecialistError("cancelled", "Cancelled."));
@@ -27,6 +38,7 @@ export function runScene3dSpecialistInWorker(
       { type: "module" },
     );
     let settled = false;
+    let progressSequence = 0;
     const cleanup = () => {
       clearTimeout(timer);
       signal?.removeEventListener("abort", cancel);
@@ -80,6 +92,25 @@ export function runScene3dSpecialistInWorker(
         return;
       }
       const response = data as Record<string, unknown>;
+      if (response.kind === "progress") {
+        try {
+          const phase = readSpecialistWorkerProgress(
+            response,
+            request.id,
+            progressSequence,
+          );
+          progressSequence++;
+          notifySpecialistProgress(onProgress, { phase });
+        } catch {
+          fail(
+            new SpecialistError(
+              "runtime",
+              "Invalid or out-of-order worker progress.",
+            ),
+          );
+        }
+        return;
+      }
       if (response.id !== request.id || typeof response.ok !== "boolean") {
         fail(
           new SpecialistError(
@@ -133,9 +164,9 @@ export function runScene3dSpecialistInWorker(
       }
     };
     try {
-      // The caller retains the originals for other operations, preview and re-export.
-      const source = request.source.slice(0);
-      const secondary = request.secondary?.slice(0);
+      // These are private snapshots reserved before queueing, never the caller's originals.
+      const source = request.source;
+      const secondary = request.secondary;
       worker.postMessage(
         { ...request, source, secondary },
         secondary ? [source, secondary] : [source],
@@ -147,4 +178,56 @@ export function runScene3dSpecialistInWorker(
     }
     if (signal?.aborted) cancel();
   });
+}
+
+/** Shared tab-scoped queue; the caller retains canonical input buffers. No automatic retry. */
+export function runScene3dSpecialistInWorker(
+  request: SpecialistRequest,
+  signal?: AbortSignal,
+  options: {
+    readonly onProgress?: SpecialistProgressListener;
+    readonly queue?: SpecialistJobQueue;
+  } = {},
+): Promise<SpecialistResult> {
+  const report = options.onProgress;
+  const rejected = (error: unknown): Promise<SpecialistResult> => {
+    notifySpecialistProgress(report, { phase: specialistFailurePhase(error) });
+    return Promise.reject(error);
+  };
+  if (signal?.aborted)
+    return rejected(new SpecialistError("cancelled", "Cancelled."));
+  let parsed: SpecialistRequest;
+  try {
+    parsed = parseSpecialistRequest(request);
+  } catch (error) {
+    return rejected(
+      error instanceof SpecialistError
+        ? error
+        : new SpecialistError("invalid-input", "Invalid specialist request."),
+    );
+  }
+  const queued = (options.queue ?? scene3dSpecialistJobQueue).run({
+    bytes: parsed.source.byteLength + (parsed.secondary?.byteLength ?? 0),
+    signal,
+    onPosition: (position) =>
+      notifySpecialistProgress(
+        report,
+        position === 0
+          ? { phase: "starting" }
+          : { phase: "queued", queuePosition: position },
+      ),
+    prepare: () => {
+      // Snapshot before the call returns so a queued caller cannot change future input/parameters.
+      const owned: SpecialistRequest = {
+        ...parsed,
+        source: parsed.source.slice(0),
+        secondary: parsed.secondary?.slice(0),
+      };
+      return () => executeSpecialistWorker(owned, signal, report);
+    },
+  });
+  return queued.then((result) => {
+    notifySpecialistProgress(report, { phase: "ready" });
+    return result;
+  }, rejected);
 }

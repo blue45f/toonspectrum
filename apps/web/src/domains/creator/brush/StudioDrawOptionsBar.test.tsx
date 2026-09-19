@@ -37,7 +37,7 @@ describe("StudioDrawOptionsBar", () => {
     const opacity = screen.getByRole("slider", { name: "브러시 불투명도" }) as HTMLInputElement;
     expect(width.max).toBe("240");
     expect(width.value).toBe("240");
-    expect(opacity.min).toBe("1");
+    expect(opacity.min).toBe("0");
     expect(opacity.value).toBe("1");
     fireEvent.change(width, { target: { value: "180" } });
     fireEvent.change(opacity, { target: { value: "2" } });

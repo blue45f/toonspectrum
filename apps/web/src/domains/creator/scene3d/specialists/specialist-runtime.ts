@@ -1,3 +1,4 @@
+import type { SpecialistWorkerPhase } from "./specialist-job-progress";
 import {
   parseSpecialistRequest,
   SPECIALIST_LIMITS,
@@ -13,9 +14,12 @@ import type { SpecialistResult } from "./specialist-contract";
 
 export async function runScene3dSpecialist(
   value: unknown,
+  onPhase?: (phase: SpecialistWorkerPhase) => void,
 ): Promise<SpecialistResult> {
+  onPhase?.("validating");
   const request = parseSpecialistRequest(value);
   const source = new Uint8Array(request.source);
+  onPhase?.("decoding");
   const io = await createSpecialistIo();
   const original = await readSpecialistDocument(io, source);
   const before = specialistStats(original);
@@ -23,6 +27,7 @@ export async function runScene3dSpecialist(
     .getRoot()
     .listNodes()
     .map((node) => node.getName().slice(0, 256));
+  onPhase?.("processing");
   let processed;
   if (request.options.kind === "textures" || request.options.kind === "release") {
     const { processTextureDerivatives } = await import("./specialist-textures");
@@ -76,6 +81,7 @@ export async function runScene3dSpecialist(
     const { processAssetDerivatives } = await import("./specialist-assets");
     processed = await processAssetDerivatives(io, source, request.options);
   }
+  onPhase?.("verifying");
   if (
     processed.artifacts.reduce(
       (sum, artifact) => sum + artifact.bytes.length,
