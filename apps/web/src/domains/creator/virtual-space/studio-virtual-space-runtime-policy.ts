@@ -12,7 +12,7 @@ export function studioWorldArrivalInput(
   const dx = target.x - current.x;
   const dy = target.y - current.y;
   const distance = Math.hypot(dx, dy);
-  if (!Number.isFinite(distance) || distance <= stopDistance || maxSpeed <= 0) return { x: 0, y: 0 };
+  if (![distance, maxSpeed, deceleration, stopDistance].every(Number.isFinite) || distance <= stopDistance || maxSpeed <= 0 || deceleration <= 0) return { x: 0, y: 0 };
   const speed = Math.min(maxSpeed, Math.sqrt(2 * deceleration * Math.max(0, distance - stopDistance)));
   const magnitude = speed / maxSpeed;
   return { x: dx / distance * magnitude, y: dy / distance * magnitude };
@@ -38,8 +38,27 @@ export class StudioWorldPortalTracker {
   }
 }
 
-export function studioWorldInputBlocked(document: Pick<Document, "activeElement" | "hidden" | "hasFocus">): boolean {
+type StudioInputDocument = Pick<Document, "activeElement" | "hidden" | "hasFocus">
+  & Partial<Pick<Document, "querySelectorAll">>;
+
+/** This DOM scan belongs on mutations, not every Phaser render frame. */
+export function studioWorldHasModalBlocker(
+  document: Partial<Pick<Document, "querySelectorAll">>,
+): boolean {
+  const dialogs = document.querySelectorAll?.('dialog[open],[role="dialog"][aria-modal="true"],[data-studio-input-blocker="true"]');
+  if (!dialogs) return false;
+  for (const dialog of dialogs) {
+    if (!dialog.closest('[hidden],[aria-hidden="true"],[data-state="closed"]')) return true;
+  }
+  return false;
+}
+
+export function studioWorldInputBlocked(
+  document: StudioInputDocument,
+  modalBlocked = studioWorldHasModalBlocker(document),
+): boolean {
   if (document.hidden || !document.hasFocus()) return true;
+  if (modalBlocked) return true;
   const active = document.activeElement;
   return Boolean(active?.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="dialog"],[aria-modal="true"]'));
 }

@@ -1,0 +1,3866 @@
+{
+  "version": 2,
+  "frameSize": [
+    384,
+    512
+  ],
+  "framesPerDirection": 8,
+  "footAnchor": [
+    0.5,
+    0.9609375
+  ],
+  "animationTechnique": "cutout-rig mesh deformation of existing art; not redrawn poses",
+  "generator": {
+    "path": "scripts/build-virtual-studio-art.py",
+    "sha256": "82bf3cbd5587147ba4aaad7b43663659f4b46e5a95c0d52195f614b688f14d04",
+    "rigAlgorithmVersion": "flattened-cutout-discrete-gait-v1",
+    "meshStep": 16,
+    "screenLobeTransitionPixels": 2,
+    "transformAlpha": "premultiplied",
+    "resampling": "bicubic"
+  },
+  "gait": {
+    "phaseTable": [
+      [
+        1.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.55,
+        0.0,
+        -0.35,
+        0.55,
+        0.35
+      ],
+      [
+        0.0,
+        0.0,
+        0.1,
+        1.0,
+        0.65
+      ],
+      [
+        -0.55,
+        0.0,
+        0.6,
+        0.45,
+        0.35
+      ],
+      [
+        -1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        -0.35,
+        0.55,
+        0.55,
+        0.0,
+        0.35
+      ],
+      [
+        0.1,
+        1.0,
+        0.0,
+        0.0,
+        0.65
+      ],
+      [
+        0.6,
+        0.45,
+        -0.55,
+        0.0,
+        0.35
+      ]
+    ],
+    "frameLabels": [
+      "double-contact-a",
+      "screen-lobe-b-swing-early",
+      "screen-lobe-b-swing-apex",
+      "screen-lobe-b-swing-late",
+      "double-contact-b",
+      "screen-lobe-a-swing-early",
+      "screen-lobe-a-swing-apex",
+      "screen-lobe-a-swing-late"
+    ],
+    "limbModel": "two screen-space silhouette lobes; not anatomical reconstruction"
+  },
+  "limitations": [
+    "flattened single-layer source",
+    "occluded limbs are not reconstructed",
+    "mesh-deformed cutout rig, not redrawn walk poses"
+  ],
+  "toolchain": {
+    "pillowVersion": "11.3.0",
+    "libwebpVersion": "1.5.0",
+    "webpEncoding": {
+      "lossless": true,
+      "method": 6,
+      "exactTransparentRgb": true
+    }
+  },
+  "skins": {
+    "pink": {
+      "directions": {
+        "down": {
+          "sourceSha256": "b8ef9ca15466fa2e1bfd1f5481f212e6205579ac4752ec4d21a3b1c1b15aa103",
+          "atlas": "player-pink-walk-down.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 871,
+          "postRigMattePixelsCorrected": 1566,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              164.603,
+              216.28
+            ],
+            "splitX": 190,
+            "centerDerivedSplitX": 190,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              17,
+              16
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              81,
+              62,
+              302,
+              492
+            ],
+            "sourceVisiblePixels": 63223
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "7d86cd51f6fb1b72ade4e374de4ac10aed26ef12c06d7f6cfee68737f143d370",
+            "13f055578c6414fd6c78fb8b3b956a0c7bfc6d2ff40f30e5f18050cc00eaccfb",
+            "6382086a7ffc599a9460cf5f4be72b0b46d02b2f4f23cd2b97dec2cedf128933",
+            "12725b9877c95c2b7cd12476889270888b519b6c3ac1bd414db971f5c74d04da",
+            "0119c8a8d954ab0ee981a8d64e77d8243633dc8753af3d3ce9ffda163b0e67a5",
+            "a256e494767f91a8676dc147ee8607a06e044c4418553bbcf15d77650a8146db",
+            "e459d0dbb475b1d52e0283af948a495c4ac9c492f48e270582f97c6cafa7905a",
+            "f397a07eefe963c8e268e683f5cd9277fdc4c09315b545fadbf4d933b8ee10df"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6650,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            46,
+            23,
+            23,
+            23,
+            46,
+            22,
+            22,
+            22
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              23,
+              23
+            ],
+            [
+              23,
+              0
+            ],
+            [
+              23,
+              0
+            ],
+            [
+              23,
+              0
+            ],
+            [
+              23,
+              23
+            ],
+            [
+              0,
+              22
+            ],
+            [
+              0,
+              22
+            ],
+            [
+              0,
+              22
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.009158,
+              1.006691,
+              1.001107,
+              1.001582,
+              0.99913,
+              1.001914,
+              1.002562,
+              1.008241
+            ],
+            "decodedAlphaBounds": [
+              [
+                81,
+                62,
+                302,
+                492
+              ],
+              [
+                81,
+                61,
+                302,
+                492
+              ],
+              [
+                81,
+                60,
+                302,
+                492
+              ],
+              [
+                81,
+                61,
+                302,
+                492
+              ],
+              [
+                81,
+                62,
+                302,
+                492
+              ],
+              [
+                81,
+                61,
+                302,
+                492
+              ],
+              [
+                81,
+                60,
+                302,
+                492
+              ],
+              [
+                81,
+                61,
+                302,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "left": {
+          "sourceSha256": "92e223d8320684ea9e973cfe3ece09b1ca60040bcb9f9eeb9d0d7d8b1696a633",
+          "atlas": "player-pink-walk-left.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 1694,
+          "postRigMattePixelsCorrected": 2089,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              161.599,
+              197.88
+            ],
+            "splitX": 188,
+            "centerDerivedSplitX": 180,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              6,
+              7
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              81,
+              62,
+              303,
+              492
+            ],
+            "sourceVisiblePixels": 59904
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "ee4103f80df57c1872e0b00cf715ae451739701de7661a742e85024a0f459e8c",
+            "7c6476c1094220730ceff852e0bf504281392ca64bac9f0098a4d05b2e4ecbe1",
+            "4ba198a257745f481781b08d81d0390dcca89494cd7efdf32464494976a9bf32",
+            "2cea723077474b75c5c8b6517c433292ed53ba2377dc06d259cd3fa7b30cc63d",
+            "09015aa61aa54001ad15ea748cdbf5475eb2adf7ae00c4854c6c220776000157",
+            "fbfd8caa3fbaf81dfdd991e681a44ad6921c0f04dcb659c13db699a7f63c1da4",
+            "2357b4347e23c865fd7b3ae1294436ad0775bbc76c710e0c96e4e16084c87839",
+            "9fb7c78fd8ba7f8b7ef385c0420f8961158c2e88f487497ee14c29ce436ebb31"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6644,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            38,
+            13,
+            8,
+            3,
+            4,
+            7,
+            12,
+            17
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              18,
+              20
+            ],
+            [
+              13,
+              0
+            ],
+            [
+              8,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              2,
+              2
+            ],
+            [
+              1,
+              6
+            ],
+            [
+              1,
+              11
+            ],
+            [
+              1,
+              16
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.007812,
+              1.005359,
+              1.00232,
+              1.000735,
+              0.997429,
+              1.000017,
+              1.000835,
+              1.005609
+            ],
+            "decodedAlphaBounds": [
+              [
+                81,
+                62,
+                303,
+                492
+              ],
+              [
+                81,
+                61,
+                303,
+                492
+              ],
+              [
+                81,
+                60,
+                303,
+                492
+              ],
+              [
+                81,
+                61,
+                303,
+                492
+              ],
+              [
+                81,
+                62,
+                303,
+                492
+              ],
+              [
+                81,
+                61,
+                303,
+                492
+              ],
+              [
+                81,
+                60,
+                303,
+                492
+              ],
+              [
+                81,
+                61,
+                303,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "right": {
+          "sourceSha256": "62501e254c307e84b1b7c21d7447c005d0503d075380299fe2770c74fd2b16c8",
+          "atlas": "player-pink-walk-right.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 699,
+          "postRigMattePixelsCorrected": 1451,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              183.118,
+              230.454
+            ],
+            "splitX": 192,
+            "centerDerivedSplitX": 207,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              7,
+              8
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              78,
+              62,
+              306,
+              492
+            ],
+            "sourceVisiblePixels": 61916
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "2819e79fbb380ffa1fbc9afa35fb428c2533cac74bd1fd5d87d024b185c98076",
+            "4269dfb193840221794ee52e75d787ff3883df527f1ea4cfa2f76167a1965f09",
+            "afe71b9623692035aee1512548c1be4a815d05d8929035c8f554d21c860a3f78",
+            "80d9344eb2fea324b96e93724d88a3ce66f9b441a3c903296eb7e7842590a9d1",
+            "828f6271aca6c24bd010b7918b1e8e4e5c9ce3e3f12e8a09a3eaf45357f97238",
+            "10bbae36950a955243ebd14443012de27155a7231b437ba487252c0038daeca3",
+            "a6e4efba256759a13283ec64eae2c9a66789a59caa1bbaf5555c6e6f8fce043a",
+            "22f36b781a7e7b95026644db1ddc5c055e8bfaf2a69c968dde15b61d01a19353"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 8065,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            4,
+            5,
+            10,
+            15,
+            40,
+            17,
+            12,
+            7
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              2,
+              2
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              10,
+              0
+            ],
+            [
+              15,
+              0
+            ],
+            [
+              20,
+              20
+            ],
+            [
+              1,
+              16
+            ],
+            [
+              1,
+              11
+            ],
+            [
+              1,
+              6
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.004958,
+              1.001857,
+              0.999774,
+              1.002439,
+              1.00252,
+              1.002584,
+              1.001793,
+              1.004183
+            ],
+            "decodedAlphaBounds": [
+              [
+                78,
+                62,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ],
+              [
+                78,
+                60,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ],
+              [
+                78,
+                62,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ],
+              [
+                78,
+                60,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "up": {
+          "sourceSha256": "a3767ccf6c4f7282b946f2cc5deb3071dcae032ddf0e70573fcc373e1a3be783",
+          "atlas": "player-pink-walk-up.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 873,
+          "postRigMattePixelsCorrected": 1845,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              162.46,
+              219.54
+            ],
+            "splitX": 191,
+            "centerDerivedSplitX": 191,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              14,
+              14
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              85,
+              62,
+              298,
+              492
+            ],
+            "sourceVisiblePixels": 62279
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "3b257627b53d6d145fb3e4d6d19c5f356cdeacaba4632c9d0965d6c6d8b98a28",
+            "4db3b4400422e86a3da78de860cd52e25058faff38141c167c4c05dd2fbf6987",
+            "00bfbe89b6a9e3ee18dc5269f138b1f1e1d55aa17a4d3d687f17ad68d2c2dfce",
+            "8e2dc08aeb620088d6bfc874388ad45b23429640406fc074991509d88b51dff8",
+            "94c9feb4b273655723e97a164dab5693cfd770db385eb673c895e3dff2b19936",
+            "3be1455a86a2f1df79fcfcb15bb1a1f6dc01e43e5e671346211b7cf05697a1c5",
+            "ce5b81ecae8c84f93724b20fef30916cca9ff003d59ca3fc994c75edec44768f",
+            "3e6267baae0706465e4e22e27042dbcbdee6e3e7c9b9d889f0ffd5ecb54e8b7a"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6510,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            40,
+            20,
+            21,
+            21,
+            40,
+            20,
+            20,
+            20
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              20,
+              20
+            ],
+            [
+              20,
+              0
+            ],
+            [
+              21,
+              0
+            ],
+            [
+              21,
+              0
+            ],
+            [
+              20,
+              20
+            ],
+            [
+              0,
+              20
+            ],
+            [
+              0,
+              20
+            ],
+            [
+              0,
+              20
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.008398,
+              1.004384,
+              0.999936,
+              0.999823,
+              0.997302,
+              1.000128,
+              1.001381,
+              1.005652
+            ],
+            "decodedAlphaBounds": [
+              [
+                82,
+                62,
+                301,
+                492
+              ],
+              [
+                83,
+                61,
+                300,
+                492
+              ],
+              [
+                85,
+                60,
+                298,
+                492
+              ],
+              [
+                85,
+                61,
+                298,
+                492
+              ],
+              [
+                85,
+                62,
+                298,
+                492
+              ],
+              [
+                85,
+                61,
+                298,
+                492
+              ],
+              [
+                84,
+                60,
+                298,
+                492
+              ],
+              [
+                83,
+                61,
+                300,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        }
+      },
+      "states": {
+        "draw": {
+          "sourceSha256": "5be0ee908dfa5187e908d51c0d005a2aa215dee9c53d0e581efc902a9b3b7bec",
+          "output": "player-pink-state-draw.png",
+          "mattePixelsCorrected": 901
+        },
+        "review": {
+          "sourceSha256": "f83ce111a0d4d4369251f5073e7bd4a80a1c8a630dfdce216a4abe1ede14ec28",
+          "output": "player-pink-state-review.png",
+          "mattePixelsCorrected": 787
+        },
+        "talk": {
+          "sourceSha256": "34a6fb733606fe0a67ef38651a6e72182335cfd0391458f7e564c48b4cab6706",
+          "output": "player-pink-state-talk.png",
+          "mattePixelsCorrected": 916
+        }
+      },
+      "mattePixelsCorrected": 6741
+    },
+    "silver": {
+      "directions": {
+        "down": {
+          "sourceSha256": "cbf09ad3c96ee28379e07b725aefa7263f4109ee46d903f8b9c9d22bc4565dcd",
+          "atlas": "player-silver-walk-down.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 855,
+          "postRigMattePixelsCorrected": 274,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              162.057,
+              222.358
+            ],
+            "splitX": 192,
+            "centerDerivedSplitX": 192,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              15,
+              14
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              69,
+              62,
+              315,
+              492
+            ],
+            "sourceVisiblePixels": 58888
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "f63bb74fcc54e78240c0e3a6dc64979ceb7da2b8456906ec2a60f7789955a705",
+            "6752a5592958cbe2b3919cf773968bad78480ae5fcc20669bf6f2e54430cf6f1",
+            "5633711eba6e5a69471e0f7de559aaee23584330e5cf0e6ba7c8f9542e62ca72",
+            "52af142f877e20fb11ea47a9bb2cfd689dd329de2159850302b372a5ce016490",
+            "3669d8a0db6e48a78e7e20dd5a71a6a005728798d842490fdc272b3deaa1abec",
+            "d06dab49a9c350576be0c19ae9ae9c022d12eadc1fa2f1203f033fe601bf99c1",
+            "7156d63e4bc24b054cd9dba418e7211a5e715799d859a5b3d09950c72567bee5",
+            "d58db1aa8070762c0f60f43e37f14694a3d663a2af588e134af500d91bd8455e"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6389,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            54,
+            27,
+            27,
+            27,
+            52,
+            27,
+            27,
+            26
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              27,
+              27
+            ],
+            [
+              27,
+              0
+            ],
+            [
+              27,
+              0
+            ],
+            [
+              27,
+              0
+            ],
+            [
+              26,
+              26
+            ],
+            [
+              0,
+              27
+            ],
+            [
+              0,
+              27
+            ],
+            [
+              0,
+              26
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.009561,
+              1.008015,
+              1.000051,
+              1.004228,
+              1.000238,
+              1.004109,
+              1.001325,
+              1.009068
+            ],
+            "decodedAlphaBounds": [
+              [
+                69,
+                62,
+                315,
+                492
+              ],
+              [
+                69,
+                61,
+                315,
+                492
+              ],
+              [
+                69,
+                60,
+                315,
+                492
+              ],
+              [
+                69,
+                61,
+                315,
+                492
+              ],
+              [
+                69,
+                62,
+                315,
+                492
+              ],
+              [
+                69,
+                61,
+                315,
+                492
+              ],
+              [
+                69,
+                60,
+                315,
+                492
+              ],
+              [
+                69,
+                61,
+                315,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "left": {
+          "sourceSha256": "e09f10504408fb873ee37f7b13203c4d9c1b2f4b260e6de34e3e39765db00d4e",
+          "atlas": "player-silver-walk-left.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 673,
+          "postRigMattePixelsCorrected": 156,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              160.517,
+              202.189
+            ],
+            "splitX": 188,
+            "centerDerivedSplitX": 181,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              12,
+              12
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              74,
+              62,
+              310,
+              492
+            ],
+            "sourceVisiblePixels": 51972
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "1a45c6c5ba4140f7f81c6aa4bf17f3e70bbfb7e44596e85eef50edc770d48f6b",
+            "ff4e304d17d5f38c58aa4a7db674a65703af9fb060deec84f57eeb228809bee5",
+            "af9546916845bba3bf7078aadb6702d59f44a085093ec233f5db39195f03812d",
+            "caa22f2feb2034054d0a76e609f2abcdba0a2f2ba0a19caf373d8d49af4344d9",
+            "9a3a774a2761664440d9cc3335b2caa41d6b1e6ab69c7ff3d781dbc0cfe0b3d3",
+            "c1b4017163c15c632725afcaf2b05b7a63059e89b09b2fdba647eacb2636e9f5",
+            "85099200e87672f74342f7c2fae5ed6988e786beac05dc31214ed2cbfe084ee8",
+            "8004ce7780ac7ca3c39ee880bcb0eb180dd2f44e5c8de525e7c85fdbb57f758a"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6069,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            51,
+            21,
+            16,
+            11,
+            16,
+            13,
+            17,
+            22
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              26,
+              25
+            ],
+            [
+              21,
+              0
+            ],
+            [
+              16,
+              0
+            ],
+            [
+              11,
+              0
+            ],
+            [
+              8,
+              8
+            ],
+            [
+              1,
+              12
+            ],
+            [
+              1,
+              16
+            ],
+            [
+              1,
+              21
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.018953,
+              1.011679,
+              0.999885,
+              0.998288,
+              0.989052,
+              0.998884,
+              0.999981,
+              1.0137
+            ],
+            "decodedAlphaBounds": [
+              [
+                74,
+                62,
+                310,
+                492
+              ],
+              [
+                74,
+                61,
+                310,
+                492
+              ],
+              [
+                74,
+                60,
+                310,
+                492
+              ],
+              [
+                74,
+                61,
+                310,
+                492
+              ],
+              [
+                74,
+                62,
+                310,
+                492
+              ],
+              [
+                74,
+                61,
+                310,
+                492
+              ],
+              [
+                74,
+                60,
+                310,
+                492
+              ],
+              [
+                74,
+                61,
+                310,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "right": {
+          "sourceSha256": "4e5ab9ca5e61ad576d38fd2bec69d6f0bd2df4a7c168e1ad82ee5b843ac6d4a0",
+          "atlas": "player-silver-walk-right.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 627,
+          "postRigMattePixelsCorrected": 206,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              180.15,
+              222.979
+            ],
+            "splitX": 196,
+            "centerDerivedSplitX": 202,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              10,
+              11
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              80,
+              62,
+              304,
+              492
+            ],
+            "sourceVisiblePixels": 50467
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "d434956e16678596c48369cdbb9389aaf17b2441e5cf690470dc82ebad65d23a",
+            "4301d35081e60257a9f48770afb072c4b96ae30e2f9f1f8aced21a05e5aa6fa9",
+            "9e44dabbef2e15a90183d61f6241485564cdb999db2d991a0f8769baa684354c",
+            "a310b096377fabc6e54284115ba7ce59e258ab7ba958fe8a40df3b09f53584aa",
+            "301b2838497acf8b3eb584d3bd53136274d2923adcd7392b6d339a010277862a",
+            "70429528eb769a05c0bd5547b944ff847686050991137a6b5b692c02c0287764",
+            "1112b0df327737216f91addca876bf1a39f07e29ea3ad003712222676afb0865",
+            "f728ee394e66113758d86056d770854c8dc0129ba870e22ef28cec24c7b53ef3"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6138,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            15,
+            8,
+            13,
+            18,
+            51,
+            25,
+            20,
+            15
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              5,
+              10
+            ],
+            [
+              8,
+              0
+            ],
+            [
+              13,
+              0
+            ],
+            [
+              18,
+              0
+            ],
+            [
+              23,
+              28
+            ],
+            [
+              1,
+              24
+            ],
+            [
+              1,
+              19
+            ],
+            [
+              1,
+              14
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              0.993303,
+              0.999802,
+              1.000198,
+              1.01183,
+              1.015911,
+              1.009987,
+              1.000416,
+              0.999604
+            ],
+            "decodedAlphaBounds": [
+              [
+                80,
+                62,
+                304,
+                492
+              ],
+              [
+                80,
+                61,
+                304,
+                492
+              ],
+              [
+                80,
+                60,
+                304,
+                492
+              ],
+              [
+                80,
+                61,
+                304,
+                492
+              ],
+              [
+                80,
+                62,
+                304,
+                492
+              ],
+              [
+                80,
+                61,
+                304,
+                492
+              ],
+              [
+                80,
+                60,
+                304,
+                492
+              ],
+              [
+                80,
+                61,
+                304,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "up": {
+          "sourceSha256": "d37d01fae727a8a164fee591d47849dcbe0428b567febd36447401912b322263",
+          "atlas": "player-silver-walk-up.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 836,
+          "postRigMattePixelsCorrected": 434,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              156.807,
+              224.401
+            ],
+            "splitX": 191,
+            "centerDerivedSplitX": 191,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              22,
+              25
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              78,
+              62,
+              306,
+              492
+            ],
+            "sourceVisiblePixels": 57303
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "c40f2277c73e9064f985c3a2b8e118f319c7b1d5e66731c0969e1e4903fc9bf0",
+            "40a435eb84c851940c86edfc82bc4c55325760efb7677ae5153fb704bbb43823",
+            "d5618e9135381fdf19d54feb8be371469a1b212c647e8fb6f0743e327744ea0e",
+            "cedd79ae970ff91efbbc8c535c8d26a1ddb0d8444dc6c950313b1c1088bdf487",
+            "7183fea3fbcf23fb0472f18cb7b28c8ea645ee09cba8b1bce1e4a175aff1b87f",
+            "b4eab5e52884dd5eb0f6f0c7de245a71e55b94a2894133fd84d596995ca9762f",
+            "7a93d24d2a32e1f8e22cc63d41e18030d1579c31012988a173872f794e0c52d9",
+            "de8ddf6c568335db7735a4b6751fa6ac028717043d55aaade3795e8d2ae3e4e7"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6440,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            56,
+            28,
+            28,
+            28,
+            56,
+            28,
+            28,
+            28
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              28,
+              28
+            ],
+            [
+              28,
+              0
+            ],
+            [
+              28,
+              0
+            ],
+            [
+              28,
+              0
+            ],
+            [
+              28,
+              28
+            ],
+            [
+              0,
+              28
+            ],
+            [
+              0,
+              28
+            ],
+            [
+              0,
+              28
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.010523,
+              1.008429,
+              0.999354,
+              1.003228,
+              0.999005,
+              1.003263,
+              1.001466,
+              1.009668
+            ],
+            "decodedAlphaBounds": [
+              [
+                78,
+                62,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ],
+              [
+                78,
+                60,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ],
+              [
+                78,
+                62,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ],
+              [
+                78,
+                60,
+                306,
+                492
+              ],
+              [
+                78,
+                61,
+                306,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        }
+      },
+      "states": {},
+      "mattePixelsCorrected": 2991
+    },
+    "dark": {
+      "directions": {
+        "down": {
+          "sourceSha256": "ad919930d7be3ca596bba07a3f9edfe835be082f7ade91b6f6566e3fe969d58e",
+          "atlas": "player-dark-walk-down.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 806,
+          "postRigMattePixelsCorrected": 416,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              157.788,
+              228.154
+            ],
+            "splitX": 193,
+            "centerDerivedSplitX": 193,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              20,
+              20
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              75,
+              62,
+              308,
+              492
+            ],
+            "sourceVisiblePixels": 58112
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "1144029e78bc3609bdea27548e22f95fecc7d5db2a1f5189221454b910e5d03a",
+            "8edb0c12b74766a4d7bdae11816c13626260ab0d0562d0e3579d5f3a371dac14",
+            "3a1c242c74779af9d0e860c4a179d598129e5240e691717f11994e3b55f89d0d",
+            "39f715d00585e63a1902a844bb8cb9840a41438e3f52da4d4c7b5613672cce05",
+            "de5f27fdf5793e446e8b79b1a3ef8e5c7d4f34379837417916b2bfa42bd53a66",
+            "3abbdeba270596a5bd040bc67bb17cd4545046f89edeef18dd7249feaaa12c1e",
+            "448c8220f22fb1fcc57e96fa524b8daee186165161b9c7083239691af91c92b0",
+            "c4fa205239112ba5164da4afac871226b3240f5427cccee3c88688b4b1f09aa4"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6950,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            55,
+            29,
+            29,
+            28,
+            56,
+            28,
+            28,
+            28
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              28,
+              27
+            ],
+            [
+              29,
+              0
+            ],
+            [
+              29,
+              0
+            ],
+            [
+              28,
+              0
+            ],
+            [
+              28,
+              28
+            ],
+            [
+              0,
+              28
+            ],
+            [
+              0,
+              28
+            ],
+            [
+              0,
+              28
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.010239,
+              1.009361,
+              1.000998,
+              1.004646,
+              0.998658,
+              1.004474,
+              1.002564,
+              1.011237
+            ],
+            "decodedAlphaBounds": [
+              [
+                75,
+                62,
+                308,
+                492
+              ],
+              [
+                75,
+                61,
+                308,
+                492
+              ],
+              [
+                75,
+                60,
+                308,
+                492
+              ],
+              [
+                75,
+                61,
+                308,
+                492
+              ],
+              [
+                75,
+                62,
+                308,
+                492
+              ],
+              [
+                75,
+                61,
+                308,
+                492
+              ],
+              [
+                75,
+                60,
+                308,
+                492
+              ],
+              [
+                75,
+                61,
+                308,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "left": {
+          "sourceSha256": "9799b22ed1f0c2126700a9aee4ba6212f271d97449cb4d1f3e81bf66a31ef944",
+          "atlas": "player-dark-walk-left.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 726,
+          "postRigMattePixelsCorrected": 281,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              158.893,
+              201.908
+            ],
+            "splitX": 191,
+            "centerDerivedSplitX": 180,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              10,
+              11
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              70,
+              62,
+              313,
+              492
+            ],
+            "sourceVisiblePixels": 56570
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "0d9f55848df191f58490f740029326d3d81b043d04c9adc305d8d0809fef1525",
+            "201eb04eae4958ea4a77bfc37e97574ecbf00e80724398c0fd500c32dae2c6f4",
+            "208d50c42607cbdc7c6ae35a1fa82cec6ad87eded9289b7405d1b2607d8da7a5",
+            "0142ce8f47fa1bd68a7595c955824d3cbfa8b4c00755981c17cf2ff198fd44ed",
+            "8a68a52fae874140ee31aa9420b89c36c6ff38262f32f22756e9688ddb2cbcdf",
+            "cc6ca188bf1d53ae1b7e6076bd76ae0157659a1c2c539035cee5493385caa1b7",
+            "691551c164fcbf12c38ba29de053956dea10c30610ac592bf3b62dd52645f716",
+            "3ce7a75373862536c65694b8c937d548a78283bd616a0cf13aeb7d171f5b9302"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6606,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            46,
+            18,
+            14,
+            9,
+            12,
+            11,
+            16,
+            20
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              23,
+              23
+            ],
+            [
+              18,
+              0
+            ],
+            [
+              14,
+              0
+            ],
+            [
+              9,
+              0
+            ],
+            [
+              6,
+              6
+            ],
+            [
+              1,
+              10
+            ],
+            [
+              1,
+              15
+            ],
+            [
+              1,
+              19
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.017288,
+              1.013081,
+              1.002245,
+              1.001326,
+              0.991621,
+              1.001467,
+              1.001273,
+              1.014425
+            ],
+            "decodedAlphaBounds": [
+              [
+                70,
+                62,
+                313,
+                492
+              ],
+              [
+                70,
+                61,
+                313,
+                492
+              ],
+              [
+                70,
+                60,
+                313,
+                492
+              ],
+              [
+                70,
+                61,
+                313,
+                492
+              ],
+              [
+                70,
+                62,
+                313,
+                492
+              ],
+              [
+                70,
+                61,
+                313,
+                492
+              ],
+              [
+                70,
+                60,
+                313,
+                492
+              ],
+              [
+                70,
+                61,
+                313,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "right": {
+          "sourceSha256": "2ef501ac86c9294fddea8a8308d51bfb3bf1c2ee87920fefc05a26044d7f9af4",
+          "atlas": "player-dark-walk-right.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 610,
+          "postRigMattePixelsCorrected": 415,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              175.451,
+              215.987
+            ],
+            "splitX": 191,
+            "centerDerivedSplitX": 196,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              12,
+              12
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              72,
+              62,
+              312,
+              492
+            ],
+            "sourceVisiblePixels": 54436
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "eec8036538e94e0b01fa0ae699a3f66b4359b3440c66b6e182e1b397e034f4eb",
+            "0ddc46364b89358565ab4b5ddc1075d72ca04409016399c75ef670633056a9bb",
+            "4c1ddfd761810dd4ff6a559711e4ba50ce6cfcb0f48f1339ac4d643ec75a87cd",
+            "d6f7d781633c29a0222579675ff4f9e3ecb9d7b125f143e0991cc53f7d11da2a",
+            "d0f5dd1418a28616af434734b2e00c5b781a6a19fbe527ad42bbef6a7ffa1df6",
+            "4d2de484b8f1b58792e04b20bfa538924de34cb2bcd14816a6ee0044fd1bbf17",
+            "cc484856a30792c4a27ee1dfb22855fd0c450d83bd0fc1f72a9a84caf7d0509d",
+            "54b5ce37940d3ca25a5e6fb688718437d4dc08069d21b57561aef2bbf1c0d005"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6467,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            17,
+            12,
+            17,
+            21,
+            51,
+            22,
+            18,
+            13
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              9,
+              8
+            ],
+            [
+              12,
+              0
+            ],
+            [
+              17,
+              0
+            ],
+            [
+              21,
+              0
+            ],
+            [
+              26,
+              25
+            ],
+            [
+              1,
+              21
+            ],
+            [
+              1,
+              17
+            ],
+            [
+              1,
+              12
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              0.996326,
+              1.003215,
+              1.001286,
+              1.012455,
+              1.014182,
+              1.01139,
+              1.002664,
+              1.003307
+            ],
+            "decodedAlphaBounds": [
+              [
+                72,
+                62,
+                312,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ],
+              [
+                72,
+                60,
+                312,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ],
+              [
+                72,
+                62,
+                312,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ],
+              [
+                72,
+                60,
+                312,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "up": {
+          "sourceSha256": "be2bc024c2c38a6b6d3fe54fc1006cfb8b1a4624cf9f7b306f9f126667e2e2ff",
+          "atlas": "player-dark-walk-up.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 770,
+          "postRigMattePixelsCorrected": 686,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              159.738,
+              228.276
+            ],
+            "splitX": 194,
+            "centerDerivedSplitX": 194,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              17,
+              16
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              77,
+              62,
+              306,
+              492
+            ],
+            "sourceVisiblePixels": 57174
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "c9ed8cc7aa0c77f81fad0bfb6bc13dc7c1ab0b8d975f1a7487f37d80d07669a8",
+            "c4391e74f6ffb0c45eb1d3cf5702e04916d87bb3d32f10310925018a5e292806",
+            "19f835cc9457703a6bbe8c2563969a5eacf7bf184ff458bc68ffaf8942b0a010",
+            "ffd07cc8b6eb2f5438e91e1b769a60ef844fb765e6dcd920c58e77269c8f8ab4",
+            "783584eeae90b7a7ef2cc83a83fd3550b3fd3160f940d45fabe40d64b9744337",
+            "ef75d90ef194b352fcbcb0c315298235b73c112af7a670f48c3f2d3a074c3dad",
+            "deb51a95a3058d18af24767fd526e00d39bfd163bbb1fa7da6b5082697e17790",
+            "d9c30a0d094711acb71ff022f0d3a72e7b579e74ab80a831559a9820b88af1d4"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 7151,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            47,
+            25,
+            25,
+            24,
+            47,
+            23,
+            24,
+            23
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              24,
+              23
+            ],
+            [
+              25,
+              0
+            ],
+            [
+              25,
+              0
+            ],
+            [
+              24,
+              0
+            ],
+            [
+              24,
+              23
+            ],
+            [
+              0,
+              23
+            ],
+            [
+              0,
+              24
+            ],
+            [
+              0,
+              23
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.010879,
+              1.010057,
+              1.000455,
+              1.004495,
+              0.998443,
+              1.004565,
+              1.002204,
+              1.011369
+            ],
+            "decodedAlphaBounds": [
+              [
+                77,
+                62,
+                306,
+                492
+              ],
+              [
+                77,
+                61,
+                306,
+                492
+              ],
+              [
+                77,
+                60,
+                306,
+                492
+              ],
+              [
+                77,
+                61,
+                306,
+                492
+              ],
+              [
+                77,
+                62,
+                306,
+                492
+              ],
+              [
+                77,
+                61,
+                306,
+                492
+              ],
+              [
+                77,
+                60,
+                306,
+                492
+              ],
+              [
+                77,
+                61,
+                306,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        }
+      },
+      "states": {},
+      "mattePixelsCorrected": 2912
+    },
+    "purple": {
+      "directions": {
+        "down": {
+          "sourceSha256": "e85de3d43f550ba099676e14c494a3bd1db714de71d42fc2ad8f8f10ac7e6b1d",
+          "atlas": "player-purple-walk-down.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 2369,
+          "postRigMattePixelsCorrected": 1099,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              167.818,
+              215.995
+            ],
+            "splitX": 192,
+            "centerDerivedSplitX": 192,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              14,
+              14
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              60,
+              62,
+              324,
+              492
+            ],
+            "sourceVisiblePixels": 69930
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "02401c8aeaca128a69ffe4b416f1b77628f94013525babf8d3eede591b1e2e80",
+            "f8287dd6b25f7e5b465727aee4f7caa7d13804f0730a67dd4e0f3ce5734114e0",
+            "18bd87f34765a2f4e72460f9e7561e5741ee8ce1e947c7fcab824bbddbdd08a3",
+            "87f495b42c80cb83df40efd0cec7052c6f79d3b9ad1b9e721af0d2ed03d71a6d",
+            "9cad6ab11a0b4c9b4e4dee31f3ca97112271dc00a77365142086bf94b96deb6a",
+            "ac7fa0361eca0500dc00ea06ea3e1ccd9402877f4d82072127ccdc878a78e09d",
+            "c7901a83e909f139cc221480274f63c2960cfb2f35bf849390317c81d0a8be35",
+            "4d804c8518fba3ab475f2a2d28aab90e83c4e6f000e86af7c0ae255ed1c6ea23"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 7779,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            38,
+            20,
+            20,
+            19,
+            40,
+            19,
+            20,
+            20
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              19,
+              19
+            ],
+            [
+              20,
+              0
+            ],
+            [
+              20,
+              0
+            ],
+            [
+              19,
+              0
+            ],
+            [
+              20,
+              20
+            ],
+            [
+              0,
+              19
+            ],
+            [
+              0,
+              20
+            ],
+            [
+              0,
+              20
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.010339,
+              1.008923,
+              1.003132,
+              1.004605,
+              1.000901,
+              1.004376,
+              1.00449,
+              1.01021
+            ],
+            "decodedAlphaBounds": [
+              [
+                58,
+                62,
+                326,
+                492
+              ],
+              [
+                59,
+                61,
+                325,
+                492
+              ],
+              [
+                60,
+                60,
+                324,
+                492
+              ],
+              [
+                59,
+                61,
+                325,
+                492
+              ],
+              [
+                60,
+                62,
+                325,
+                492
+              ],
+              [
+                59,
+                61,
+                325,
+                492
+              ],
+              [
+                59,
+                60,
+                324,
+                492
+              ],
+              [
+                59,
+                61,
+                326,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "left": {
+          "sourceSha256": "d1765b912e36ceb4c9e540e9389ee5114064d0c87da17a7a23a572b0fd5016c6",
+          "atlas": "player-purple-walk-left.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 1252,
+          "postRigMattePixelsCorrected": 819,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              152.325,
+              188.515
+            ],
+            "splitX": 177,
+            "centerDerivedSplitX": 170,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              9,
+              9
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              72,
+              62,
+              311,
+              492
+            ],
+            "sourceVisiblePixels": 63489
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "ffa67062fb19b412bf7b3c659bfa5b02aa1315b4adb65b0203f60de518a4a968",
+            "a8a2290c63ed2af855362ba5bd685b3653a7bab2a92eb7bd5a2601e0b84e84bb",
+            "a594496f9a0678c0661006ae7294822fa23fe77cd38151ae2bdfdbd713e072ec",
+            "4bdb9d0bad141891f2c7f36530eb852d74af1c3c1d5e6dffb486f0bb7f25b0f8",
+            "1aca7a520d1e6b282dcc048f765d89af67d42b9df2950d09e2806d3e77c7664e",
+            "06e2bf572accd94dda8a677a008f9821257186970f8b93c63e37478b9d34a465",
+            "d4421c6302bc8d4ef35b7bd35985597f377f62b8a6746776a6de4fc4af0efd13",
+            "cca9f48f4611e4d6768af28b0e4700e33655882d213d006e3b6a4a3c99077a33"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 7036,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            43,
+            16,
+            12,
+            8,
+            9,
+            9,
+            14,
+            19
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              21,
+              22
+            ],
+            [
+              16,
+              0
+            ],
+            [
+              12,
+              0
+            ],
+            [
+              8,
+              0
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              0,
+              9
+            ],
+            [
+              0,
+              14
+            ],
+            [
+              1,
+              18
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.014207,
+              1.010884,
+              1.003875,
+              1.002489,
+              0.996015,
+              1.00104,
+              1.003402,
+              1.011482
+            ],
+            "decodedAlphaBounds": [
+              [
+                72,
+                62,
+                311,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ],
+              [
+                72,
+                60,
+                312,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ],
+              [
+                72,
+                62,
+                313,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ],
+              [
+                72,
+                60,
+                311,
+                492
+              ],
+              [
+                72,
+                61,
+                312,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "right": {
+          "sourceSha256": "1e7c661ee0af0c0db3bc23c655acc5e376fb747ceca532320c956b7d0d57f4aa",
+          "atlas": "player-purple-walk-right.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 1299,
+          "postRigMattePixelsCorrected": 885,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              191.849,
+              229.846
+            ],
+            "splitX": 205,
+            "centerDerivedSplitX": 211,
+            "splitMethod": "side-view-contact-median",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              9,
+              9
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              78,
+              62,
+              305,
+              492
+            ],
+            "sourceVisiblePixels": 58309
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "1d7d46f540dfb7254a27f4ce9a40911314588d2fee48d62e383354f2a3b235ff",
+            "dc8ff29ab85fc2e4317e5f887c082549a1d27f442e6e26ae1bf315d28d1d8dc4",
+            "62b1b70ca27a6bb8c482baa90898a680c774ab85f37ed98bb0224a913d8338ff",
+            "7036eed7cb513b1746443645e7128231711379ce5b87fe1a2ed964a3ba318698",
+            "1535b943237c5852c67288a0a8853c37a9cd5a2ee3bc19ef6c7f51ba5645e933",
+            "d445e418813bc1e96bbdcfdffd1c6bfff9aa111bd90a1c4a7c0ed2382fb2b4eb",
+            "7e6f2354e13890dbffab9ffea929539c8069a51eec2e9450b1a7b4472d9b3dc9",
+            "8ee3487b6fa92f85779b2c20fce00d3adc1a6e907da3f22b299f7a00608c5f4c"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 7158,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            9,
+            7,
+            12,
+            16,
+            43,
+            20,
+            15,
+            10
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              4,
+              5
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              12,
+              0
+            ],
+            [
+              16,
+              0
+            ],
+            [
+              21,
+              22
+            ],
+            [
+              1,
+              19
+            ],
+            [
+              1,
+              14
+            ],
+            [
+              1,
+              9
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              3,
+              0
+            ],
+            [
+              5,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.004682,
+              1.003859,
+              1.003018,
+              1.008129,
+              1.008335,
+              1.007392,
+              1.003704,
+              1.005814
+            ],
+            "decodedAlphaBounds": [
+              [
+                77,
+                62,
+                305,
+                492
+              ],
+              [
+                77,
+                61,
+                305,
+                492
+              ],
+              [
+                78,
+                60,
+                305,
+                492
+              ],
+              [
+                78,
+                61,
+                305,
+                492
+              ],
+              [
+                78,
+                62,
+                305,
+                492
+              ],
+              [
+                78,
+                61,
+                305,
+                492
+              ],
+              [
+                77,
+                60,
+                305,
+                492
+              ],
+              [
+                77,
+                61,
+                305,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        },
+        "up": {
+          "sourceSha256": "defa662a3d03c440630c5a5cda85a141a197f727c5e5ef052aea9f43cccf8fe4",
+          "atlas": "player-purple-walk-up.webp",
+          "frames": 8,
+          "technique": "cutout-rig",
+          "mattePixelsCorrected": 897,
+          "postRigMattePixelsCorrected": 1054,
+          "rigProfile": "screen-space-lobes-v1",
+          "lowerBodyLandmarks": {
+            "screenLobeCenters": [
+              166.602,
+              220.819
+            ],
+            "splitX": 194,
+            "centerDerivedSplitX": 194,
+            "splitMethod": "lower-body-center-midpoint",
+            "sourceOpaqueBottomY": [
+              491,
+              491
+            ],
+            "sourceBottomPixels": [
+              19,
+              18
+            ],
+            "plantedDropPixels": [
+              0,
+              0
+            ],
+            "plantedContactCompensationPixels": 1,
+            "sourceAlphaBounds": [
+              86,
+              62,
+              297,
+              492
+            ],
+            "sourceVisiblePixels": 60129
+          },
+          "decodedUniqueVisibleFrames": 8,
+          "decodedVisibleFrameSha256": [
+            "ebd9c287f43853d3fa23e87701456a3778ff041e8d93881c84ba13d5d4dbeb21",
+            "8a8ad4b7ecdbae8790d45ab15ad982483403a5af815a63db3d4b529d185218d9",
+            "9d6d2f54296d1226168562d9a9356cae2e343eff19b144d63eea0b913b67ea7a",
+            "44e8e6a73b1bc67eab50780cda5f272c3cf33f28379826869cf34fa77b2bab53",
+            "6c41a1b558d4a059f95156a3d2ab5af7c30d381fefe938c886dced3a97a4c111",
+            "8616c7a4cd57b072371f2a1333bd707e54d5f893be9982a79ce8f974aa049a3d",
+            "8c63e45a31ccf224cd562639a6a4fbeafc73906d4f5a9b86df5e1befeeb38dd5",
+            "bc43e40f4943ee18de91244863b0ace755189d53be1b67548f7beca701239eef"
+          ],
+          "visibleDifferenceThreshold": 4,
+          "minimumPairwiseVisibleDifferencePixels": 6354,
+          "footContactBaselineY": 491,
+          "footContactPixels": [
+            50,
+            25,
+            25,
+            25,
+            50,
+            25,
+            25,
+            25
+          ],
+          "footContactPixelsByScreenLobe": [
+            [
+              25,
+              25
+            ],
+            [
+              25,
+              0
+            ],
+            [
+              25,
+              0
+            ],
+            [
+              25,
+              0
+            ],
+            [
+              25,
+              25
+            ],
+            [
+              0,
+              25
+            ],
+            [
+              0,
+              25
+            ],
+            [
+              0,
+              25
+            ]
+          ],
+          "footClearancePixelsByScreenLobe": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              4
+            ],
+            [
+              0,
+              7
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              0,
+              0
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              7,
+              0
+            ],
+            [
+              3,
+              0
+            ]
+          ],
+          "decodedVisualIntegrity": {
+            "transparentRgbPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visibleGreenSpillPixels": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "visiblePixelRatios": [
+              1.010461,
+              1.008465,
+              1.001231,
+              1.002794,
+              0.999667,
+              1.00331,
+              1.002378,
+              1.009962
+            ],
+            "decodedAlphaBounds": [
+              [
+                85,
+                62,
+                298,
+                492
+              ],
+              [
+                85,
+                61,
+                298,
+                492
+              ],
+              [
+                86,
+                60,
+                297,
+                492
+              ],
+              [
+                86,
+                61,
+                297,
+                492
+              ],
+              [
+                86,
+                62,
+                297,
+                492
+              ],
+              [
+                86,
+                61,
+                297,
+                492
+              ],
+              [
+                86,
+                60,
+                297,
+                492
+              ],
+              [
+                85,
+                61,
+                298,
+                492
+              ]
+            ],
+            "sourceBoundsMargin": 20
+          }
+        }
+      },
+      "states": {},
+      "mattePixelsCorrected": 5817
+    }
+  },
+  "outputs": {
+    "master-central-lossless.webp": {
+      "sha256": "49b5bb57cebe4afeeb4c4b481ba17da2b10adc47aad27101fcf90f49180f146e",
+      "bytes": 1091280,
+      "dimensions": [
+        869,
+        813
+      ]
+    },
+    "player-dark-direction-down.png": {
+      "sha256": "056418cee120278c645b02173428212a173ba6b18a3699a4da04379b0f8b15de",
+      "bytes": 136824,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-dark-direction-left.png": {
+      "sha256": "527cb33352cfc8939456553577bc2452f6289eeacb67c5bfa02acb4e3e8f2bfb",
+      "bytes": 133224,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-dark-direction-right.png": {
+      "sha256": "d1e83c5dae37a602cebd6e0e5fd02ad7a26eab63af9cbe008fa0bad1c29ce29b",
+      "bytes": 128978,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-dark-direction-up.png": {
+      "sha256": "83a5046807ba5eac405acb950099d72c8577a4ce7bde98e3abc1766bc55e0136",
+      "bytes": 131818,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-dark-walk-down.webp": {
+      "sha256": "6d590a90b349b531968e35ddfeab24ec48de83f36730b1902b54509daf8c7b16",
+      "bytes": 473546,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-dark-walk-left.webp": {
+      "sha256": "440f28e0959fe97c1c8d76cec9464af4c3b5816f1a44db79c20f16f3faa64af0",
+      "bytes": 435550,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-dark-walk-right.webp": {
+      "sha256": "899b6b7b5f370895f9f1f58d7d77ff7e1230d386b3c86152ed17853e23032783",
+      "bytes": 416298,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-dark-walk-up.webp": {
+      "sha256": "933b9d365ffd2329dd5715d59dc7ebaa16f6e54408178ea911aeaa507bd8a929",
+      "bytes": 459482,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-pink-direction-down.png": {
+      "sha256": "bdc7798b527b04385c5618d6e05ec23d93e2d75c1cc68c13b29dee481612195e",
+      "bytes": 141148,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-direction-left.png": {
+      "sha256": "b1d956018f82335b8ffddf6d2175f5cc6929df691de77f1befbc72fe1f762aa1",
+      "bytes": 140503,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-direction-right.png": {
+      "sha256": "db0f3c32ec818a6f991144a6ecedb8fd0eb2faff91c494c636268a566686517c",
+      "bytes": 140776,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-direction-up.png": {
+      "sha256": "ba66a0ea323c2a9caef8b952e7606534b902bffca174f251676ae1eb70fac23e",
+      "bytes": 125856,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-state-draw.png": {
+      "sha256": "bf39afaf60fbf2158353e1d892bc5afef64ea6edfb09b0f3c9ef678f328d8c68",
+      "bytes": 140545,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-state-review.png": {
+      "sha256": "3f4441c29d6b60987f46d59b4bfab6638e413757e5e7963f6f388df881f47c00",
+      "bytes": 137348,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-state-talk.png": {
+      "sha256": "b61fa005f9f89af4a23d5eb1a1226e6b2776a6f42c93ff3626af2d2a3445511f",
+      "bytes": 156724,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-pink-walk-down.webp": {
+      "sha256": "29cef37e832508a2d1f9c0e3bcb0e920164142ad9c93884b100f75d80c416924",
+      "bytes": 522920,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-pink-walk-left.webp": {
+      "sha256": "6c59864e6d4a7721a09e7f128b025b56ec455841c2a200b9bee09a223147ae6c",
+      "bytes": 473316,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-pink-walk-right.webp": {
+      "sha256": "430545c24a537706eb667daf87e0f011914a6581bd8d559ef5c018640b898769",
+      "bytes": 477760,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-pink-walk-up.webp": {
+      "sha256": "a21ea3bd49b3ed76d5e9257c27ff32956ebfa0097e98f06594afb03daac841b5",
+      "bytes": 458498,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-purple-direction-down.png": {
+      "sha256": "01651d42d1598f357041975d4241f6b691ea29334a535b181e8c21a8606cffe9",
+      "bytes": 162114,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-purple-direction-left.png": {
+      "sha256": "6fa370303f53d2d73f49266c3e10caa97338e96c02b41647f23bf9952571cff7",
+      "bytes": 148542,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-purple-direction-right.png": {
+      "sha256": "3276ae39cc3762c92930731efcfe06058a0c755c3cac59c16152908b92aa8e75",
+      "bytes": 137055,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-purple-direction-up.png": {
+      "sha256": "c13961834cd5961ac3097fd9dc010ee9441fa50d04bac63cf63c46da02488b8a",
+      "bytes": 131340,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-purple-walk-down.webp": {
+      "sha256": "4897c1b4931a3f54205e4c21f16bc30c2e548c2e1427dc4af37b307558c8b81f",
+      "bytes": 601462,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-purple-walk-left.webp": {
+      "sha256": "1bf54e5c40a1ada6ad496a5982519eb477ac552f3424c602d60283a40feb84e0",
+      "bytes": 529566,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-purple-walk-right.webp": {
+      "sha256": "ea6d83b85b578dbff8581ffa6150e7fc088d8aaa2e15db8ea96eda529533a69f",
+      "bytes": 485320,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-purple-walk-up.webp": {
+      "sha256": "a67ada083b9361f8a63633d2597eaf46276de13f6f0f1fe6a3eb87f722a63e49",
+      "bytes": 492842,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-silver-direction-down.png": {
+      "sha256": "8898e0c45c2c35caf49e87f0c06e2288aa1057069a144bf17ea39bafb80b5f80",
+      "bytes": 140995,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-silver-direction-left.png": {
+      "sha256": "7556e3abb3e6db9b1831fb481af677436f1b7e2eed86e6ecc48f93ce4fbd4810",
+      "bytes": 124083,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-silver-direction-right.png": {
+      "sha256": "edc7fdb96c13062f44f8668bde605b1c1dfc717d73c9a81879ad3f2c8f47abd0",
+      "bytes": 120445,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-silver-direction-up.png": {
+      "sha256": "ecd9e413c09791fc11f87136df925bcab0c4e2ff2b9d52216c2676de0f03f93e",
+      "bytes": 126579,
+      "dimensions": [
+        384,
+        512
+      ]
+    },
+    "player-silver-walk-down.webp": {
+      "sha256": "84b6849b1faaa06dd3f9b79a86f4f2b672bfe654094a6937296c0c151b0ee6c1",
+      "bytes": 478724,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-silver-walk-left.webp": {
+      "sha256": "2eafcd82d855c9298ee0da5e3818cb79f8c1f7a36f0dde6ef7bf4b24a49158cc",
+      "bytes": 392298,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-silver-walk-right.webp": {
+      "sha256": "7fef0ab7fe840f6a25c60f9c244f649f85b726189f58fd701a1bbc09d4f780e6",
+      "bytes": 385502,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    },
+    "player-silver-walk-up.webp": {
+      "sha256": "ac5d90d7b1bb7ffeeb5313c71a8b0e62eeca1feae6190454b6da721167d35362",
+      "bytes": 443210,
+      "dimensions": [
+        1536,
+        1024
+      ]
+    }
+  },
+  "background": {
+    "sourceSha256": "62d42f5fead432be3589504641f16ebf99c147c28091e1977c87a41bed23b14e",
+    "crop": [
+      194,
+      55,
+      1063,
+      868
+    ],
+    "nativeSize": [
+      869,
+      813
+    ],
+    "losslessPixelVerified": true,
+    "bakedOccupants": true,
+    "sourcePixelsComparedThisBuild": false,
+    "outputIntegrityVerifiedThisBuild": true,
+    "provenanceMode": "carried-forward",
+    "carriedFromManifestSha256": "00e39f6d4cc69ef05dbb65678290dd5ac361253e380e26912335e1c6c757620f"
+  }
+}

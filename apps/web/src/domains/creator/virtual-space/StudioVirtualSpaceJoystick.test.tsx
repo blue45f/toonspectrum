@@ -48,3 +48,28 @@ describe("StudioVirtualSpaceJoystick", () => {
     expect(onVectorChange).toHaveBeenLastCalledWith({ x: 0, y: 0 });
   });
 });
+
+describe("joystick capture safety", () => {
+  it("ignores a second touch and stops when the captured pointer is lost", () => {
+    const change = vi.fn();
+    const view = render(<StudioVirtualSpaceJoystick onVectorChange={change} />);
+    const pad = view.container.querySelector('[data-studio-virtual-joystick]')!;
+    vi.spyOn(pad, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 112, height: 112 } as DOMRect);
+    fireEvent.pointerDown(pad, { pointerId: 1, button: 0, clientX: 110, clientY: 56 });
+    const owned = change.mock.calls.at(-1)?.[0];
+    fireEvent.pointerDown(pad, { pointerId: 2, button: 0, clientX: 1, clientY: 56 });
+    fireEvent.pointerUp(pad, { pointerId: 2 });
+    expect(change.mock.calls.at(-1)?.[0]).toEqual(owned);
+    fireEvent.lostPointerCapture(pad, { pointerId: 1 });
+    expect(change).toHaveBeenLastCalledWith({ x: 0, y: 0 });
+    view.unmount();
+  });
+  it("clears held movement on window blur and unmount", () => {
+    const change = vi.fn();
+    const view = render(<StudioVirtualSpaceJoystick onVectorChange={change} />);
+    fireEvent.blur(window);
+    expect(change).toHaveBeenLastCalledWith({ x: 0, y: 0 });
+    change.mockClear(); view.unmount();
+    expect(change).toHaveBeenLastCalledWith({ x: 0, y: 0 });
+  });
+});

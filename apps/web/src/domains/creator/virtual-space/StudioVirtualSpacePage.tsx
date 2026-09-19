@@ -35,7 +35,7 @@ import {
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
@@ -73,7 +73,7 @@ import {
 } from "./studio-virtual-space-presence";
 import {
   clampStudioWorldPoint,
-  studioWorldCanOccupy,
+  resolveStudioWorldSpawn,
 } from "./studio-virtual-space-world-pathfinding";
 import { StudioVirtualSpaceJoystick } from "./StudioVirtualSpaceJoystick";
 import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-bridge";
@@ -101,12 +101,17 @@ import {
   type StudioWorldPortalDefinition,
   type StudioWorldRoomDefinition,
 } from "./studio-virtual-space-world-manifest";
+import {
+  resolveStudioVirtualSpaceSessionPoint,
+  studioVirtualSpacePositionScope,
+  studioVirtualSpacePositionStorageKey,
+  writeStudioVirtualSpaceSessionPoint,
+} from "./studio-virtual-space-session-position";
 import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 
-const VIRTUAL_SPACE_POSITION_STORAGE_PREFIX = "toonspectrum:virtual-space-position:v2";
 const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
   readonly id: StudioVirtualSpaceReaction;
@@ -124,43 +129,6 @@ function virtualSpaceReactionEmoji(reaction: StudioVirtualSpaceReaction | null |
   return VIRTUAL_SPACE_REACTIONS.find((candidate) => candidate.id === reaction)?.emoji ?? null;
 }
 
-function virtualSpacePositionStorageKey(projectId: string): string {
-  return `${VIRTUAL_SPACE_POSITION_STORAGE_PREFIX}:${projectId}`;
-}
-
-function readVirtualSpaceSessionPoint(
-  projectId: string,
-  fallback: StudioVirtualSpacePoint,
-  manifest = DEFAULT_STUDIO_WORLD_MANIFEST,
-): StudioVirtualSpacePoint {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.sessionStorage.getItem(virtualSpacePositionStorageKey(projectId));
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as { x?: unknown; y?: unknown };
-    if (typeof parsed.x !== "number" || typeof parsed.y !== "number"
-      || !Number.isFinite(parsed.x) || !Number.isFinite(parsed.y)) return fallback;
-    const candidate = clampStudioWorldPoint(
-      manifest,
-      { x: parsed.x, y: parsed.y },
-    );
-    return studioWorldCanOccupy(manifest, candidate) ? candidate : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeVirtualSpaceSessionPoint(projectId: string, point: StudioVirtualSpacePoint): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(
-      virtualSpacePositionStorageKey(projectId),
-      JSON.stringify({ x: Math.round(point.x), y: Math.round(point.y) }),
-    );
-  } catch {
-    // Storage can be unavailable in privacy-constrained browsers; movement still works in memory.
-  }
-}
 const VIRTUAL_AVATARS = STUDIO_CHARACTER_SKINS;
 
 function virtualAvatarIndex(identity: string): number {
@@ -708,6 +676,13 @@ function VirtualSpaceExperience({
   readonly signedIn: boolean;
 }) {
   const bt = useBilingual("StudioVirtualSpaceExperience");
+  const location = useLocation();
+  const authoringMode = new URLSearchParams(location.search).get("worldEdit") === "1";
+  const positionScope = useMemo(
+    () => studioVirtualSpacePositionScope(projectId, authoringMode),
+    [authoringMode, projectId],
+  );
+  const positionScopeKey = studioVirtualSpacePositionStorageKey(positionScope);
   const navigate = useNavigate();
   const live = useStudioLiveCollaboration();
   const connectivity = useSyncExternalStore(
@@ -718,9 +693,13 @@ function VirtualSpaceExperience({
   const controllerRef = useRef<StudioVirtualSpacePresenceController | null>(null);
   const fallbackIdentity = live.room?.participant.sessionId ?? `space:${projectId}`;
   const initial = useMemo(() => {
-    const fallback = studioVirtualSpaceInitialPoint(fallbackIdentity);
-    return readVirtualSpaceSessionPoint(projectId, fallback);
-  }, [fallbackIdentity, projectId]);
+    const preferred = studioVirtualSpaceInitialPoint(fallbackIdentity);
+    return resolveStudioVirtualSpaceSessionPoint(
+      positionScope,
+      DEFAULT_STUDIO_WORLD_MANIFEST,
+      preferred,
+    ) ?? preferred;
+  }, [fallbackIdentity, positionScope]);
   const initialAvatarIndex = useMemo(() => readVirtualSpaceAvatarIndex(), []);
   const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
     self: studioVirtualSpaceState(initial, "down", "available", false, initialAvatarIndex),
@@ -735,10 +714,7 @@ function VirtualSpaceExperience({
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
-  const [authoringMode] = useState(() =>
-    typeof globalThis.location !== "undefined"
-    && new URLSearchParams(globalThis.location.search).get("worldEdit") === "1"
-  );
+
   const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(
     DEFAULT_STUDIO_WORLD_MANIFEST,
   );
@@ -747,6 +723,8 @@ function VirtualSpaceExperience({
   );
   const baselineWorldManifestRef = useRef<StudioVirtualSpaceWorldManifest>(DEFAULT_STUDIO_WORLD_MANIFEST);
   const [worldLoaded, setWorldLoaded] = useState(false);
+  const [loadedPositionScope, setLoadedPositionScope] = useState<string | null>(null);
+  const [worldLoadError, setWorldLoadError] = useState(false);
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   const selfRef = useRef(snapshot.self);
@@ -754,6 +732,7 @@ function VirtualSpaceExperience({
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const movingRef = useRef(false);
   const visibleParticipantCount = connectivity.serverAvailable ? snapshot.peers.length + 1 : 1;
+  const worldReady = worldLoaded && loadedPositionScope === positionScopeKey;
 
   useEffect(() => {
     selfRef.current = snapshot.self;
@@ -762,6 +741,8 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     const abortController = new AbortController();
+    setLoadedPositionScope(null);
+    setWorldLoadError(false);
     void loadStudioVirtualSpaceWorldManifest(
       undefined,
       undefined,
@@ -772,20 +753,28 @@ function VirtualSpaceExperience({
       const activeManifest = authoringMode
         ? readStudioWorldAuthoringDraft(projectId) ?? manifest
         : manifest;
-      const fallback = studioWorldCanOccupy(activeManifest, selfRef.current)
-        ? selfRef.current
-        : studioWorldSpawn(activeManifest).point;
-      const point = readVirtualSpaceSessionPoint(projectId, fallback, activeManifest);
-      const self = studioWorldPresenceState(activeManifest, { ...selfRef.current, ...point, moving: false });
-      selfRef.current = self;
-      setSnapshot((current) => ({ ...current, self }));
+      const point = resolveStudioVirtualSpaceSessionPoint(
+        positionScope,
+        activeManifest,
+        studioWorldSpawn(activeManifest).point,
+      );
       setWorldManifest(activeManifest);
       setAuthoringDraft(activeManifest);
       setCurrentInteraction(null);
+      if (!point) {
+        setWorldLoaded(false);
+        setWorldLoadError(true);
+        return;
+      }
+      const self = studioWorldPresenceState(activeManifest, { ...selfRef.current, ...point, moving: false });
+      selfRef.current = self;
+      setSnapshot((current) => ({ ...current, self }));
+      setWorldLoadError(false);
+      setLoadedPositionScope(positionScopeKey);
       setWorldLoaded(true);
     });
     return () => abortController.abort();
-  }, [authoringMode, projectId]);
+  }, [authoringMode, positionScope, positionScopeKey, projectId]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
@@ -801,9 +790,8 @@ function VirtualSpaceExperience({
     setMoving(false);
 
     const current = selfRef.current;
-    const point = studioWorldCanOccupy(nextManifest, current)
-      ? { x: current.x, y: current.y }
-      : studioWorldSpawn(nextManifest).point;
+    const point = resolveStudioWorldSpawn(nextManifest, current);
+    if (!point) return;
     const self = studioWorldPresenceState(nextManifest, {
       ...current,
       ...point,
@@ -829,13 +817,13 @@ function VirtualSpaceExperience({
   }, [engineBridge, setFollowingPeer]);
 
   useEffect(() => {
-    if (!authoringMode || !worldLoaded) return;
+    if (!authoringMode || !worldReady) return;
     if (validateStudioWorldManifest(authoringDraft).length > 0) return;
     const timeout = globalThis.setTimeout(() => {
       applyAuthoringManifest(authoringDraft);
     }, 180);
     return () => globalThis.clearTimeout(timeout);
-  }, [applyAuthoringManifest, authoringDraft, authoringMode, worldLoaded]);
+  }, [applyAuthoringManifest, authoringDraft, authoringMode, worldReady]);
 
   const resetAuthoringManifest = useCallback(() => {
     clearStudioWorldAuthoringDraft(projectId);
@@ -843,21 +831,21 @@ function VirtualSpaceExperience({
   }, [projectId]);
 
   useEffect(() => {
-    if (!worldLoaded) return;
+    if (!worldReady) return;
     const timeout = globalThis.setTimeout(() => {
-      writeVirtualSpaceSessionPoint(projectId, {
+      writeStudioVirtualSpaceSessionPoint(positionScope, {
         x: snapshot.self.x,
         y: snapshot.self.y,
       });
     }, 180);
     return () => globalThis.clearTimeout(timeout);
-  }, [projectId, snapshot.self.x, snapshot.self.y, worldLoaded]);
+  }, [positionScope, snapshot.self.x, snapshot.self.y, worldReady]);
 
   useEffect(() => {
-    const save = () => { if (worldLoaded) writeVirtualSpaceSessionPoint(projectId, selfRef.current); };
+    const save = () => { if (worldReady) writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current); };
     globalThis.addEventListener("pagehide", save);
     return () => { globalThis.removeEventListener("pagehide", save); save(); };
-  }, [projectId, worldLoaded]);
+  }, [positionScope, worldReady]);
 
   useEffect(() => startStudioConnectivityRuntime(), []);
 
@@ -890,8 +878,8 @@ function VirtualSpaceExperience({
 
   useEffect(() => {
     const room = live.room;
-    if (!worldLoaded) return;
-    if (!connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
+    if (!worldReady) return;
+    if (authoringMode || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
       setSnapshot((current) => ({
@@ -920,7 +908,7 @@ function VirtualSpaceExperience({
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [connectivity.serverAvailable, live.availability, live.room, worldLoaded]);
+  }, [authoringMode, connectivity.serverAvailable, live.availability, live.room, worldReady]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -953,7 +941,7 @@ function VirtualSpaceExperience({
   }, [activity, worldManifest]);
 
   const activateAction = useCallback((action: StudioWorldInteractionDefinition["action"]) => {
-    writeVirtualSpaceSessionPoint(projectId, selfRef.current);
+    writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current);
     if (action === "assistant") {
       openAssistant();
       return;
@@ -964,7 +952,7 @@ function VirtualSpaceExperience({
     }
     const destination = studioVirtualSpaceDestination(projectId, action);
     if (destination) navigate(destination);
-  }, [navigate, openAssistant, projectId]);
+  }, [navigate, openAssistant, positionScope, projectId]);
 
   const activateInteraction = useCallback((interaction: StudioWorldInteractionDefinition) => {
     activateAction(interaction.action);
@@ -1151,7 +1139,7 @@ function VirtualSpaceExperience({
                 className="studio-vspace-stage relative aspect-[850/798] min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 data-studio-virtual-space="true"
               >
-                {worldLoaded ? <StudioVirtualSpacePhaserCanvas
+                {worldReady ? <StudioVirtualSpacePhaserCanvas
                   manifest={worldManifest}
                   snapshot={snapshot}
                   bridge={engineBridge}
@@ -1163,7 +1151,9 @@ function VirtualSpaceExperience({
                   onPeerSelect={handleEnginePeerSelect}
                   onCancelFollow={() => setFollowingPeer(null)}
                   onPortal={handleEnginePortal}
-                /> : <div className="studio-vspace-engine-message" role="status">{bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
+                /> : <div className="studio-vspace-engine-message" role="status">{worldLoadError
+                  ? bt("이 월드에는 안전하게 시작할 수 있는 바닥이 없습니다.", "This world has no safe floor where a player can start.")
+                  : bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
 
                 <VirtualSpaceMiniMap
                   snapshot={snapshot}
@@ -1271,7 +1261,7 @@ function VirtualSpaceExperience({
               </div>
             </div>
 
-            {authoringMode && worldLoaded ? (
+            {authoringMode && worldReady ? (
               <StudioVirtualSpaceWorldAuthoringPanel
                 projectId={projectId}
                 manifest={authoringDraft}

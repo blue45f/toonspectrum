@@ -306,3 +306,27 @@ export function findStudioWorldPath(
 
   return [];
 }
+
+/** Validate both remembered positions and map spawns. Fail closed if no floor exists. */
+export function resolveStudioWorldSpawn(
+  manifest: StudioVirtualSpaceWorldManifest,
+  preferred: StudioVirtualSpacePoint,
+): StudioVirtualSpacePoint | null {
+  const colliders = studioWorldCollisionRects(manifest);
+  const candidates = [preferred, ...manifest.spawns.map((spawn) => spawn.point), { x: manifest.width / 2, y: manifest.height / 2 }];
+  for (const candidate of candidates) {
+    if (![candidate.x, candidate.y].every(Number.isFinite)) continue;
+    const bounded = clampStudioWorldPoint(manifest, candidate);
+    if (canOccupyWithColliders(manifest, colliders, bounded, DEFAULT_RADIUS)) return bounded;
+    const nearby = nearestWalkableNode(manifest, colliders, bounded, DEFAULT_RADIUS);
+    if (nearby) return nearby.point;
+  }
+  // Bounded emergency scan only; never start inside geometry or teleport through it while walking.
+  const dx = Math.max(GRID, manifest.width / 64), dy = Math.max(GRID, manifest.height / 64);
+  for (let y = DEFAULT_RADIUS; y <= manifest.height - DEFAULT_RADIUS; y += dy) {
+    for (let x = DEFAULT_RADIUS; x <= manifest.width - DEFAULT_RADIUS; x += dx) {
+      if (canOccupyWithColliders(manifest, colliders, { x, y }, DEFAULT_RADIUS)) return { x, y };
+    }
+  }
+  return null;
+}

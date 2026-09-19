@@ -2,8 +2,8 @@ import type { StudioLiveParticipant } from "../live/studio-live-collaboration-pr
 
 export const STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH = 1180;
 export const STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT = 720;
-// The approved master art is 700x656 and the original master SVG used an 850x798 viewBox.
-// Keep the game world on the same aspect ratio so the art is never stretched.
+// Preserve the established 850x798 collision/P2P coordinate space. The approved production
+// crop is 869x813 and is rendered with an aspect-preserving cover scale inside this world.
 export const STUDIO_VIRTUAL_SPACE_WIDTH = 850;
 export const STUDIO_VIRTUAL_SPACE_HEIGHT = 798;
 const STUDIO_VIRTUAL_SPACE_SCALE_X = STUDIO_VIRTUAL_SPACE_WIDTH / STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH;

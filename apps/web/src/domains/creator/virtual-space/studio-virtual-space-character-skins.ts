@@ -12,6 +12,9 @@ export interface StudioCharacterAtlasClip {
   readonly end: number;
   readonly frameRate: number;
   readonly repeat?: number;
+  /** Preserve phase while speed/direction changes. */
+  readonly distancePerCycle?: number;
+  readonly technique?: "cutout-rig" | "drawn";
 }
 
 export interface StudioCharacterSkin {
@@ -24,7 +27,7 @@ export interface StudioCharacterSkin {
 }
 
 function directionUrls(skin: string): Readonly<Record<StudioVirtualSpaceFacing, string>> {
-  const root = "/assets/virtual-studio/reference";
+  const root = "/assets/virtual-studio/production-v2";
   return {
     down: `${root}/player-${skin}-direction-down.png`,
     left: `${root}/player-${skin}-direction-left.png`,
@@ -33,21 +36,31 @@ function directionUrls(skin: string): Readonly<Record<StudioVirtualSpaceFacing, 
   };
 }
 
+function walkClips(skin: string): NonNullable<StudioCharacterSkin["clips"]> {
+  const clip = (direction: StudioVirtualSpaceFacing): StudioCharacterAtlasClip => ({
+    textureUrl: `/assets/virtual-studio/production-v2/player-${skin}-walk-${direction}.webp`,
+    frameWidth: 384, frameHeight: 512, start: 0, end: 7, frameRate: 18,
+    repeat: -1, distancePerCycle: 84, technique: "cutout-rig",
+  });
+  return { "walk-down": clip("down"), "walk-left": clip("left"), "walk-right": clip("right"), "walk-up": clip("up") };
+}
+
 export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.freeze([
   {
     key: "pink",
     labelKo: "하늘",
     labelEn: "Haneul",
     directional: directionUrls("pink"),
+    clips: walkClips("pink"),
     state: {
-      talk: "/assets/virtual-studio/reference/player-pink-state-talk.png",
-      draw: "/assets/virtual-studio/reference/player-pink-state-draw.png",
-      review: "/assets/virtual-studio/reference/player-pink-state-review.png",
+      talk: "/assets/virtual-studio/production-v2/player-pink-state-talk.png",
+      draw: "/assets/virtual-studio/production-v2/player-pink-state-draw.png",
+      review: "/assets/virtual-studio/production-v2/player-pink-state-review.png",
     },
   },
-  { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver") },
-  { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark") },
-  { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple") },
+  { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver"), clips: walkClips("silver") },
+  { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark"), clips: walkClips("dark") },
+  { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: walkClips("purple") },
 ]);
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;

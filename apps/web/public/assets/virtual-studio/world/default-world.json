@@ -16,7 +16,7 @@
     {
       "name": "backgroundUrl",
       "type": "string",
-      "value": "/assets/virtual-studio/reference/master-central-reference.jpg"
+      "value": "/assets/virtual-studio/production-v2/master-central-lossless.webp"
     },
     {
       "name": "backgroundAssetKey",
@@ -39,7 +39,9 @@
       "id": 1,
       "name": "background",
       "type": "imagelayer",
-      "image": "../reference/master-central-reference.jpg",
+      "image": "../production-v2/master-central-lossless.webp",
+      "imagewidth": 869,
+      "imageheight": 813,
       "x": 0,
       "y": 0,
       "opacity": 1,

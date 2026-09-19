@@ -1,13 +1,42 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+
+import {
+  verifyVirtualStudioArtManifest,
+  VIRTUAL_STUDIO_PRODUCTION_ART_DIRECTORY,
+} from "./verify-virtual-studio-art-manifest.mjs";
 
 const origin = process.env.STUDIO_QA_BASE_URL ?? "http://127.0.0.1:5226";
 assert(["127.0.0.1", "localhost"].includes(new URL(origin).hostname), "Run the QA harness against a local development server only");
 const output = path.resolve(".qa/virtual-studio-runtime-acceptance");
 await fs.mkdir(output, { recursive: true });
 const results = [];
+const artIntegrity = await verifyVirtualStudioArtManifest();
+const artMetadata = new Map(artIntegrity.assets.map((asset) => [asset.name, asset]));
+const productionArtUrl = `${origin}/assets/virtual-studio/production-v2`;
+const representativeArtFiles = [
+  "master-central-lossless.webp",
+  "player-pink-direction-down.png",
+  "player-pink-walk-down.webp",
+  "player-pink-state-draw.png",
+];
+const verifyServedArtAsset = async (request, fileName) => {
+  const expected = artMetadata.get(fileName);
+  assert(expected, `Missing verified manifest metadata for ${fileName}`);
+  const response = await request.get(`${productionArtUrl}/${fileName}`);
+  assert.equal(response.status(), 200, `${fileName} must be served without an error`);
+  const bytes = await response.body();
+  assert.equal(bytes.length, expected.bytes, `${fileName} served byte length must match its manifest`);
+  assert.equal(
+    createHash("sha256").update(bytes).digest("hex"),
+    expected.sha256,
+    `${fileName} served SHA-256 must match its manifest`,
+  );
+  return { fileName, bytes: bytes.length, sha256: expected.sha256 };
+};
 const browser = await chromium.launch({ headless: true });
 const fixtureUrl = `${origin}/tools/browser-harnesses/virtual-studio-runtime-acceptance.html`;
 const fixtureModule = "/tools/browser-harnesses/virtual-studio-runtime-acceptance.tsx";
@@ -64,7 +93,7 @@ try {
     await page.evaluate(() => { delete navigator.getGamepads; delete window.qaPad; });
     return { before: before.x, after: after.x, simulatedStandardGamepad: true };
   });
-  await check("project: reference assets, WebGL, layout and screenshots", async () => {
+  await check("project: production art integrity, WebGL, layout and screenshots", async () => {
     assert.equal(await page.locator(".vs2-feature").count(), 6);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     const webgl = await page.locator('[data-studio-phaser-runtime] canvas').evaluate((canvas) => {
@@ -72,11 +101,22 @@ try {
       return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
     });
     assert.equal(webgl, true, "The real product route must use Phaser WebGL/AUTO, not the lifecycle harness Canvas renderer");
-    const response = await page.request.get(`${origin}/assets/virtual-studio/reference/master-central-reference.jpg`);
-    assert.equal(response.status(), 200);
+    const servedProductionArt = [];
+    for (const fileName of representativeArtFiles) {
+      servedProductionArt.push(await verifyServedArtAsset(page.request, fileName));
+    }
     await page.screenshot({ path: path.join(output, "project-desktop.png"), fullPage: true });
     assert.deepEqual(errors, []);
-    return { viewport: "1312x1199", renderer: "webgl", artwork: "unchanged repository crop" };
+    return {
+      viewport: "1312x1199",
+      renderer: "webgl",
+      artwork: {
+        manifestAssetCount: artIntegrity.assetCount,
+        outputIntegrity: "local SHA-256, byte lengths, and dimensions verified",
+        servedProductionArt,
+        privateApprovedMasterSourceReverified: false,
+      },
+    };
   });
   await check("project: large edited world hydrates and retains positions", async () => {
     const layers = [
@@ -182,7 +222,10 @@ try {
     await fixture.route("**/qa-missing-bg.png", async (route) => {
       requests++;
       if (requests === 1) return route.fulfill({ status: 404, body: "Missing QA asset" });
-      return route.fulfill({ path: path.resolve("apps/web/public/assets/virtual-studio/reference/master-central-reference.jpg"), contentType: "image/jpeg" });
+      return route.fulfill({
+        path: path.join(VIRTUAL_STUDIO_PRODUCTION_ART_DIRECTORY, "master-central-lossless.webp"),
+        contentType: "image/webp",
+      });
     });
     await call(fixture, "mount", { ...world, backgroundUrl: "/qa-missing-bg.png" }, { x: 200, y: 250 });
     await fixture.waitForSelector('[data-studio-engine-status="error"]', { timeout: 30000 });

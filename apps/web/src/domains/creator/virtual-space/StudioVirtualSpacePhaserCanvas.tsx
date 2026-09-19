@@ -4,10 +4,20 @@ import {
   useState,
 } from "react";
 
+import {
+  StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_CHARACTER_FOOT_ORIGIN,
+  studioGaitFrame, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
+} from "./studio-virtual-space-presentation";
+import { advanceStudioWorldPath } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import { StudioWorldPortalTracker, studioWorldArrivalInput, studioWorldInputBlocked } from "./studio-virtual-space-runtime-policy";
+import {
+  StudioWorldPortalTracker,
+  studioWorldArrivalInput,
+  studioWorldHasModalBlocker,
+  studioWorldInputBlocked,
+} from "./studio-virtual-space-runtime-policy";
 
-import { readStudioVirtualSpaceGamepadInput } from "./studio-virtual-space-gamepad";
+import { readStudioVirtualSpaceGamepadsInput } from "./studio-virtual-space-gamepad";
 import {
   STUDIO_VIRTUAL_SPACE_WALK_SPEED,
 } from "./studio-virtual-space-navigation";
@@ -33,6 +43,7 @@ import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engi
 import {
   studioWorldCollisionRects,
   studioWorldInteractions,
+  studioWorldPortalTarget,
   studioWorldPropDepth,
   studioWorldPortals,
   studioWorldRoomAt,
@@ -45,6 +56,7 @@ import {
 } from "./studio-virtual-space-world-manifest";
 import {
   findStudioWorldPath,
+  resolveStudioWorldSpawn,
   studioWorldCanOccupy,
   STUDIO_WORLD_PLAYER_RADIUS,
 } from "./studio-virtual-space-world-pathfinding";
@@ -77,6 +89,7 @@ interface InputEventLike {
 }
 
 interface PeerVisual {
+  readonly timeline: StudioPeerTimeline;
   readonly sprite: import("phaser").GameObjects.Sprite;
   readonly label: import("phaser").GameObjects.Text;
   readonly reaction: import("phaser").GameObjects.Text;
@@ -98,11 +111,6 @@ interface NpcVisual {
   path: readonly StudioVirtualSpacePoint[];
   patrolIndex: number;
   pauseUntil: number;
-}
-
-function facingFromVector(x: number, y: number): StudioVirtualSpaceFacing {
-  if (Math.abs(x) > Math.abs(y)) return x < 0 ? "left" : "right";
-  return y < 0 ? "up" : "down";
 }
 
 function staticTextureKey(
@@ -239,6 +247,8 @@ export function StudioVirtualSpacePhaserCanvas({
     let sceneReady = false;
     const cleanup: (() => void)[] = [];
     const fail = () => { if (!cancelled) { setFailure(true); setReady(false); } };
+    const bootDeadline = globalThis.setTimeout(fail, 25000);
+    cleanup.push(() => globalThis.clearTimeout(bootDeadline));
     let game: import("phaser").Game | null = null;
 
     void (async () => {
@@ -248,6 +258,7 @@ export function StudioVirtualSpacePhaserCanvas({
       await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
       if (cancelled || !mount.isConnected) return;
       const mountRect = parent.getBoundingClientRect();
+      let viewport = studioRenderViewport(mountRect.width, mountRect.height, globalThis.devicePixelRatio || 1);
       mount.style.width = `${Math.max(1, Math.round(mountRect.width || parent.clientWidth || 1))}px`;
       mount.style.height = `${Math.max(1, Math.round(mountRect.height || parent.clientHeight || 1))}px`;
 
@@ -265,10 +276,23 @@ export function StudioVirtualSpacePhaserCanvas({
       const interactionMarkers = new Map<string, import("phaser").GameObjects.Text>();
       const interactions = studioWorldInteractions(manifest);
       const portals = studioWorldPortals(manifest);
+      const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}`;
       const portalTracker = new StudioWorldPortalTracker();
       const failedTextures = new Set<string>();
+      const requestedWalkSheets = new Set<string>();
+      // Keep full-resolution artwork, but do not upload absent characters' atlases at boot.
+      const warmWalkSkins = new Set([
+        studioCharacterSkinForAvatarIndex(snapshotRef.current.self.avatarIndex, identityRef.current).key,
+        ...snapshotRef.current.peers.map((peer) => studioCharacterSkinForAvatarIndex(peer.state.avatarIndex, peer.participant.sessionId).key),
+        ...manifest.npcs.map((npc) => studioCharacterSkinByKey(npc.skinKey).key),
+      ]);
       const interactionById = new Map(interactions.map((interaction) => [interaction.id, interaction] as const));
 
+      let localPose = new StudioFixedStepPose(snapshotRef.current.self);
+      const fixedStepClock = new StudioFixedStepClock();
+      const cameraTarget = { x: snapshotRef.current.self.x, y: snapshotRef.current.self.y };
+      let localDistance = 0;
+      let previousRendered: StudioVirtualSpacePoint | null = null;
       let localBody: import("phaser").GameObjects.Zone | null = null;
       let localBodyPhysics: import("phaser").Physics.Arcade.Body | null = null;
       let localSprite: import("phaser").GameObjects.Sprite | null = null;
@@ -276,6 +300,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let localLabel: import("phaser").GameObjects.Text | null = null;
       let localReaction: import("phaser").GameObjects.Text | null = null;
       let path: readonly StudioVirtualSpacePoint[] = [];
+      let routeOverlay: import("phaser").GameObjects.Graphics | null = null;
       let motion = { velocity: { x: 0, y: 0 } };
       let facing: StudioVirtualSpaceFacing = snapshotRef.current.self.facing;
       let moving = false;
@@ -286,12 +311,29 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastFollowPathAt = -Infinity;
       let gamepadInteractHeld = false;
       let keyboardInteractQueued = false;
+      let wasInputBlocked = false;
+      let modalInputBlocked = studioWorldHasModalBlocker(document);
       let lastStopRevision = bridge.getStopRevision();
       let lastPosition: StudioVirtualSpacePoint | null = null;
       let lastMovedAt = -Infinity;
       let lastPublishedPoint: StudioVirtualSpacePoint | null = null;
       let nearbyInteractionId: string | null = null;
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
+
+      const requestWalkSheet = (skin: StudioCharacterSkin, direction: StudioVirtualSpaceFacing) => {
+        const clip = studioCharacterWalkClip(skin, direction);
+        const key = walkSheetKey(skin, direction);
+        if (!clip || !sceneReady || cancelled || scene.textures.exists(key) || failedTextures.has(key) || requestedWalkSheets.has(key)) return;
+        requestedWalkSheets.add(key);
+        scene.load.once(`filecomplete-spritesheet-${key}`, () => {
+          if (cancelled || scene.anims.exists(walkAnimationKey(skin, direction))) return;
+          const texture = scene.textures.get(key);
+          if (clip.end < clip.start || clip.start < 0 || clip.end >= texture.frameTotal - 1) return;
+          scene.anims.create({ key: walkAnimationKey(skin, direction), frames: scene.anims.generateFrameNumbers(key, { start: clip.start, end: clip.end }), frameRate: clip.frameRate, repeat: clip.repeat ?? -1 });
+        });
+        scene.load.spritesheet(key, clip.textureUrl, { frameWidth: clip.frameWidth, frameHeight: clip.frameHeight });
+        scene.load.start();
+      };
 
       const updateDisplaySize = (sprite: import("phaser").GameObjects.Sprite) => {
         sprite.setDisplaySize(Number(sprite.getData("visualWidth") ?? 92), Number(sprite.getData("visualHeight") ?? 123));
@@ -305,8 +347,18 @@ export function StudioVirtualSpacePhaserCanvas({
         if (nextState === "walk") {
           const clip = studioCharacterWalkClip(skin, nextFacing);
           const animationKey = walkAnimationKey(skin, nextFacing);
+          if (clip && !scene.anims.exists(animationKey)) requestWalkSheet(skin, nextFacing);
           if (clip && scene.anims.exists(animationKey)) {
-            sprite.play(animationKey, true);
+            if (clip.distancePerCycle || reducedMotion.matches) {
+              if (sprite.anims.isPlaying) sprite.stop();
+              const frame = clip.start + (reducedMotion.matches ? 0 : studioGaitFrame(
+                Number(sprite.getData("walkDistance") ?? 0), clip.end - clip.start + 1, clip.distancePerCycle,
+              ));
+              const sheet = walkSheetKey(skin, nextFacing);
+              if (sprite.texture.key !== sheet || String(sprite.frame.name) !== String(frame)) sprite.setTexture(sheet, frame);
+            } else {
+              sprite.play(animationKey, true);
+            }
             updateDisplaySize(sprite);
             return;
           }
@@ -336,7 +388,7 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!localBody) return;
         path = findStudioWorldPath(
           manifest,
-          { x: localBody.x, y: localBody.y },
+          { x: localBodyPhysics?.center.x ?? localBody.x, y: localBodyPhysics?.center.y ?? localBody.y },
           point,
         );
       };
@@ -349,7 +401,7 @@ export function StudioVirtualSpacePhaserCanvas({
         const key = staticTextureKey(skin, peer.state.facing, state);
         if (!visual) {
           const sprite = scene.add.sprite(peer.state.x, peer.state.y, key)
-            .setOrigin(0.5, 0.88)
+            .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
             .setData({ visualWidth: 92, visualHeight: 123 })
             .setDisplaySize(92, 123)
             .setDepth(Math.round(peer.state.y) + 1_001)
@@ -377,6 +429,7 @@ export function StudioVirtualSpacePhaserCanvas({
             fontSize: "24px", backgroundColor: "#182332", padding: { x: 6, y: 4 },
           }).setOrigin(0.5).setDepth(160_000).setVisible(false);
           visual = {
+            timeline: new StudioPeerTimeline(),
             sprite,
             label,
             reaction,
@@ -390,6 +443,14 @@ export function StudioVirtualSpacePhaserCanvas({
           };
           peers.set(id, visual);
         }
+        visual.timeline.push({
+          x: peer.state.x,
+          y: peer.state.y,
+          at: peer.lastSeen,
+          sequence: peer.sequence,
+          moving: peer.state.moving,
+          facing: peer.state.facing,
+        });
         visual.targetX = peer.state.x;
         visual.targetY = peer.state.y;
         visual.avatarIndex = peer.state.avatarIndex;
@@ -425,6 +486,8 @@ export function StudioVirtualSpacePhaserCanvas({
           if (!moving && distance > 96 && studioWorldCanOccupy(manifest, next.self)) {
             localBody.setPosition(next.self.x, next.self.y);
             localBodyPhysics.reset(next.self.x, next.self.y);
+            localPose.reset(next.self, fixedStepClock.time);
+            previousRendered = null;
           }
           applyAvatarVisual(
             localSprite,
@@ -441,7 +504,7 @@ export function StudioVirtualSpacePhaserCanvas({
 
       scene.preload = function preload() {
         this.load.on("loaderror", (file: import("phaser").Loader.File) => failedTextures.add(file.key));
-        this.load.image(manifest.backgroundAssetKey, manifest.backgroundUrl);
+        this.load.image(backgroundTextureKey, manifest.backgroundUrl);
 
         const loadedStatic = new Set<string>();
         for (const skin of STUDIO_CHARACTER_SKINS) {
@@ -460,7 +523,7 @@ export function StudioVirtualSpacePhaserCanvas({
               this.load.image(stateKey, url);
             }
             const clip = studioCharacterWalkClip(skin, direction);
-            if (clip) {
+            if (clip && warmWalkSkins.has(skin.key)) {
               this.load.spritesheet(walkSheetKey(skin, direction), clip.textureUrl, {
                 frameWidth: clip.frameWidth,
                 frameHeight: clip.frameHeight,
@@ -482,13 +545,22 @@ export function StudioVirtualSpacePhaserCanvas({
       scene.create = function create() {
         if (cancelled) return;
         const fallbackTexture = staticTextureKey(STUDIO_CHARACTER_SKINS[0]!, "down");
-        if (failedTextures.has(manifest.backgroundAssetKey) || !this.textures.exists(fallbackTexture)) { fail(); return; }
+        if (failedTextures.has(backgroundTextureKey) || !this.textures.exists(fallbackTexture)) { fail(); return; }
         this.physics.world.setBounds(0, 0, manifest.width, manifest.height);
 
-        this.add.image(0, 0, manifest.backgroundAssetKey)
+        const backgroundSource = this.textures.get(backgroundTextureKey).getSourceImage();
+        const backgroundRect = studioCoverRect(
+          manifest.width,
+          manifest.height,
+          backgroundSource.width,
+          backgroundSource.height,
+        );
+        this.add.image(backgroundRect.x, backgroundRect.y, backgroundTextureKey)
           .setOrigin(0)
-          .setDisplaySize(manifest.width, manifest.height)
+          .setDisplaySize(backgroundRect.width, backgroundRect.height)
           .setDepth(-1_000);
+
+        routeOverlay = this.add.graphics().setDepth(650);
 
         if (debugWorld) {
           const graphics = this.add.graphics().setDepth(170_000);
@@ -578,12 +650,15 @@ export function StudioVirtualSpacePhaserCanvas({
 
         const self = snapshotRef.current.self;
         const spawn = studioWorldSpawn(manifest);
-        const initialPoint = studioWorldCanOccupy(manifest, self)
-          ? { x: self.x, y: self.y }
-          : spawn.point;
+        const initialPoint = resolveStudioWorldSpawn(manifest, self);
+        if (!initialPoint) { fail(); return; }
         facing = studioWorldCanOccupy(manifest, self)
           ? self.facing
           : spawn.facing ?? "down";
+        localPose = new StudioFixedStepPose(initialPoint);
+        fixedStepClock.reset(this.game.loop.time);
+        localPose.reset(initialPoint, fixedStepClock.time);
+        cameraTarget.x = initialPoint.x; cameraTarget.y = initialPoint.y;
 
         const bodyZone = this.add.zone(initialPoint.x, initialPoint.y, STUDIO_WORLD_PLAYER_RADIUS * 2, STUDIO_WORLD_PLAYER_RADIUS * 2);
         localBody = bodyZone;
@@ -592,6 +667,11 @@ export function StudioVirtualSpacePhaserCanvas({
         localBodyPhysics.setCircle(STUDIO_WORLD_PLAYER_RADIUS);
         localBodyPhysics.setCollideWorldBounds(true);
         localBodyPhysics.setMaxVelocity(STUDIO_VIRTUAL_SPACE_WALK_SPEED * 1.4);
+        const observePhysics = (fixedDelta: number) => {
+          if (localBodyPhysics) localPose.observe(localBodyPhysics.center, fixedStepClock.advance(fixedDelta));
+        };
+        this.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, observePhysics);
+        cleanup.push(() => this.physics.world.off(Phaser.Physics.Arcade.Events.WORLD_STEP, observePhysics));
 
         for (const collider of studioWorldCollisionRects(manifest)) {
           const zone = this.add.zone(collider.x, collider.y, collider.width, collider.height).setOrigin(0);
@@ -606,7 +686,7 @@ export function StudioVirtualSpacePhaserCanvas({
           initialPoint.x,
           initialPoint.y,
           staticTextureKey(localSkin, facing),
-        ).setOrigin(0.5, 0.88)
+        ).setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
           .setData({ visualWidth: 98, visualHeight: 131 })
           .setDisplaySize(98, 131)
           .setDepth(Math.round(initialPoint.y) + 1_001);
@@ -673,7 +753,7 @@ export function StudioVirtualSpacePhaserCanvas({
             npcDefinition.point.x,
             npcDefinition.point.y,
             staticTextureKey(skin, npcFacing, npcState),
-          ).setOrigin(0.5, 0.88)
+          ).setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
             .setData({ visualWidth: 92 * (npcDefinition.scale ?? 1), visualHeight: 123 * (npcDefinition.scale ?? 1) })
             .setDisplaySize(92 * (npcDefinition.scale ?? 1), 123 * (npcDefinition.scale ?? 1))
             .setDepth(Math.round(npcDefinition.point.y) + 1_000);
@@ -712,11 +792,11 @@ export function StudioVirtualSpacePhaserCanvas({
 
         const camera = this.cameras.main;
         camera.setBounds(0, 0, manifest.width, manifest.height);
-        camera.startFollow(bodyZone, false, reducedMotion.matches ? 1 : 0.065, reducedMotion.matches ? 1 : 0.065);
+        camera.startFollow(cameraTarget, false, reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
         camera.setDeadzone(150, 100);
         const resizeCamera = (gameSize: { width: number; height: number }) => {
           const cover = Math.max(gameSize.width / manifest.width, gameSize.height / manifest.height);
-          camera.setZoom(Math.max(0.72, Math.min(1.28, cover)));
+          camera.setZoom(Math.max(0.72 * viewport.ratio, Math.min(1.28 * viewport.ratio, cover)));
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });
         this.scale.on("resize", (gameSize: { width: number; height: number }) => resizeCamera(gameSize));
@@ -736,6 +816,7 @@ export function StudioVirtualSpacePhaserCanvas({
           bridge.clearMovement();
           path = [];
           motion = { velocity: { x: 0, y: 0 } };
+          keyboardInteractQueued = false;
           localBodyPhysics?.setVelocity(0, 0);
           this.input.keyboard?.resetKeys();
           gamepadInteractHeld = true;
@@ -755,13 +836,22 @@ export function StudioVirtualSpacePhaserCanvas({
           if (document.activeElement !== canvas) stopMovement();
         };
         const visibility = () => { if (document.hidden) stopMovement(); };
-        const reduceMotionChanged = () => camera.setLerp(reducedMotion.matches ? 1 : 0.065, reducedMotion.matches ? 1 : 0.065);
+        const reduceMotionChanged = () => camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
         canvas.addEventListener("pointerdown", focusCanvas);
         canvas.addEventListener("keydown", preventGameScrolling);
         document.addEventListener("focusin", refocus);
         document.addEventListener("visibilitychange", visibility);
         globalThis.addEventListener("blur", stopMovement);
         reducedMotion.addEventListener("change", reduceMotionChanged);
+        const modalObserver = new MutationObserver(() => {
+          modalInputBlocked = studioWorldHasModalBlocker(document);
+        });
+        modalObserver.observe(document.body, {
+          subtree: true,
+          childList: true,
+          attributes: true,
+          attributeFilter: ["open", "role", "aria-modal", "aria-hidden", "hidden", "data-state", "data-studio-input-blocker"],
+        });
         cleanup.push(() => {
           this.input.keyboard?.off("keydown-E", queueKeyboardInteraction);
           canvas.removeEventListener("pointerdown", focusCanvas);
@@ -770,10 +860,16 @@ export function StudioVirtualSpacePhaserCanvas({
           document.removeEventListener("visibilitychange", visibility);
           globalThis.removeEventListener("blur", stopMovement);
           reducedMotion.removeEventListener("change", reduceMotionChanged);
+          modalObserver.disconnect();
         });
         portalTracker.seed(portals, initialPoint);
         sceneReady = true;
+        globalThis.clearTimeout(bootDeadline);
+        setFailure(false);
         setReady(true);
+        const contextLost = (event: Event) => { event.preventDefault(); stopMovement(); fail(); };
+        canvas.addEventListener("webglcontextlost", contextLost);
+        cleanup.push(() => canvas.removeEventListener("webglcontextlost", contextLost));
         if (document.activeElement === document.body) focusCanvas();
         syncSnapshot(snapshotRef.current);
       };
@@ -782,7 +878,18 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!localBody || !localBodyPhysics || !localSprite || !localShadow || !localLabel) return;
         const dt = Math.min(0.05, Math.max(0, deltaMs / 1000));
         if (!sceneReady || cancelled) return;
-        const blocked = studioWorldInputBlocked(document);
+        fixedStepClock.reconcile(this.game.loop.time);
+        const blocked = studioWorldInputBlocked(document, modalInputBlocked);
+        if (blocked && !wasInputBlocked) {
+          bridge.clearMovement();
+          path = [];
+          motion = { velocity: { x: 0, y: 0 } };
+          keyboardInteractQueued = false;
+          localBodyPhysics.setVelocity(0, 0);
+          this.input.keyboard?.resetKeys();
+          callbacksRef.current.onCancelFollow();
+        }
+        wasInputBlocked = blocked;
         const typing = blocked || document.activeElement !== this.game.canvas;
         if (bridge.getStopRevision() !== lastStopRevision) {
           lastStopRevision = bridge.getStopRevision();
@@ -802,11 +909,16 @@ export function StudioVirtualSpacePhaserCanvas({
         const pads = typeof navigator !== "undefined" && typeof navigator.getGamepads === "function"
           ? Array.from(navigator.getGamepads())
           : [];
-        const pad = pads.find((candidate) => Boolean(candidate?.connected)) ?? null;
-        const gamepad = readStudioVirtualSpaceGamepadInput(pad);
+        const gamepad = readStudioVirtualSpaceGamepadsInput(pads);
         if (!typing) { ix += gamepad.x; iy += gamepad.y; }
 
-        const currentPoint = { x: localBody.x, y: localBody.y };
+        const sprint = !typing && Boolean(keys?.shift?.isDown || gamepad.sprint);
+        const config = {
+          ...DEFAULT_STUDIO_MOTION_CONFIG,
+          maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1),
+        };
+
+        const currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
         const nearbyInteraction = nearestInteraction(interactions, currentPoint);
         const nextNearbyId = nearbyInteraction?.id ?? null;
         if (nextNearbyId !== nearbyInteractionId) {
@@ -852,66 +964,83 @@ export function StudioVirtualSpacePhaserCanvas({
             callbacksRef.current.onCancelFollow();
           }
         } else if (!blocked && path.length > 0) {
+          path = advanceStudioWorldPath(manifest, currentPoint, path, Math.hypot(motion.velocity.x, motion.velocity.y));
           const target = path[0]!;
-          const dx = target.x - localBody.x;
-          const dy = target.y - localBody.y;
+          const dx = target.x - currentPoint.x;
+          const dy = target.y - currentPoint.y;
           const distance = Math.hypot(dx, dy);
           if (distance <= 3) {
             path = path.slice(1);
           } else {
-            const input = studioWorldArrivalInput(currentPoint, target, STUDIO_VIRTUAL_SPACE_WALK_SPEED, DEFAULT_STUDIO_MOTION_CONFIG.deceleration);
+            const input = studioWorldArrivalInput(currentPoint, target, config.maxSpeed, config.deceleration);
             ix = input.x;
             iy = input.y;
           }
         }
 
-        const sprint = !typing && Boolean(keys?.shift?.isDown || gamepad.sprint);
-        const config = {
-          ...DEFAULT_STUDIO_MOTION_CONFIG,
-          maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1),
-        };
         motion = stepStudioVirtualSpaceMotion(motion, { x: ix, y: iy }, dt, config);
         localBodyPhysics.setVelocity(motion.velocity.x, motion.velocity.y);
 
+        if (routeOverlay) {
+          routeOverlay.clear();
+          const destination = path.at(-1);
+          if (destination) {
+            routeOverlay.lineStyle(1.5, 0xc8b8ff, 0.42);
+            routeOverlay.beginPath(); routeOverlay.moveTo(currentPoint.x, currentPoint.y);
+            for (const waypoint of path) routeOverlay.lineTo(waypoint.x, waypoint.y);
+            routeOverlay.strokePath();
+            routeOverlay.lineStyle(2, 0xe8ddff, 0.8);
+            routeOverlay.strokeEllipse(destination.x, destination.y, 20, 10);
+          }
+        }
         const speed = Math.hypot(motion.velocity.x, motion.velocity.y);
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
         // Render frames can outnumber fixed physics steps. Do not toggle idle/walk on zero-step frames.
         const nextMoving = !blocked && speed > 5 && time - lastMovedAt < 100;
         lastPosition = currentPoint;
-        if (speed > 10) facing = facingFromVector(motion.velocity.x, motion.velocity.y);
+        if (speed > 10) facing = studioStableFacing(motion.velocity, facing);
 
         const activity = snapshotRef.current.self.activity;
         const localState = activityState(nextMoving, false, activity);
         const localSkin = studioCharacterSkinForAvatarIndex(snapshotRef.current.self.avatarIndex, identityRef.current);
+        const rendered = localPose.sample(this.game.loop.time);
+        if (previousRendered) {
+          const distance = Math.hypot(rendered.x - previousRendered.x, rendered.y - previousRendered.y);
+          if (distance < 64) localDistance += distance;
+        }
+        previousRendered = rendered;
+        localSprite.setData("walkDistance", localDistance);
         applySpriteVisual(localSprite, localSkin, facing, localState);
+        cameraTarget.x = rendered.x; cameraTarget.y = rendered.y;
+        const followAmount = reducedMotion.matches ? 1 : studioCameraLerp(dt);
+        this.cameras.main.setLerp(followAmount, followAmount);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
         const bob = nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0;
-        localSprite.setPosition(localBody.x, localBody.y + 6 + bob);
+        localSprite.setPosition(rendered.x, rendered.y + bob);
         localSprite.setAngle(nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0);
         localSprite.setDepth(Math.round(localBody.y) + 1_001);
-        localShadow.setPosition(localBody.x, localBody.y + 7);
+        localShadow.setPosition(rendered.x, rendered.y + 1);
         localShadow.setScale(nextMoving && !reducedMotion.matches ? 0.86 + Math.cos(time * 0.024) * 0.07 : 1, 1);
         localShadow.setDepth(Math.round(localBody.y) + 990);
-        localLabel.setPosition(localBody.x, localBody.y + 20).setDepth(Math.round(localBody.y) + 1_002);
-        localReaction?.setPosition(localBody.x, localBody.y - 125);
+        localLabel.setPosition(rendered.x, rendered.y + 12).setDepth(Math.round(currentPoint.y) + 1_002);
+        localReaction?.setPosition(rendered.x, rendered.y - 125);
 
         for (const [peerId, visual] of peers) {
-          const dx = visual.targetX - visual.sprite.x;
-          const dy = visual.targetY - visual.sprite.y;
-          const distance = Math.hypot(dx, dy);
-          if (distance > 260) {
-            visual.sprite.setPosition(visual.targetX, visual.targetY);
-          } else {
-            const factor = 1 - Math.exp(-11 * dt);
-            visual.sprite.x += dx * factor;
-            visual.sprite.y += dy * factor;
-          }
-          const peerState = activityState(visual.moving, visual.nearby, visual.activity);
+          const target = visual.timeline.sample(Date.now()) ?? {
+            x: visual.targetX,
+            y: visual.targetY,
+            moving: visual.moving,
+            facing: visual.facing,
+          };
+          const distance = Math.hypot(target.x - visual.sprite.x, target.y - visual.sprite.y);
+          if (distance < 128) visual.sprite.setData("walkDistance", Number(visual.sprite.getData("walkDistance") ?? 0) + distance);
+          visual.sprite.setPosition(target.x, target.y);
+          const peerState = activityState(target.moving, visual.nearby, visual.activity);
           const peerSkin = studioCharacterSkinForAvatarIndex(visual.avatarIndex, peerId);
-          applySpriteVisual(visual.sprite, peerSkin, visual.facing, peerState);
-          if (visual.moving && !reducedMotion.matches && !scene.anims.exists(walkAnimationKey(peerSkin, visual.facing))) {
+          applySpriteVisual(visual.sprite, peerSkin, target.facing, peerState);
+          if (target.moving && !reducedMotion.matches && !scene.anims.exists(walkAnimationKey(peerSkin, target.facing))) {
             visual.sprite.setAngle(Math.sin(time * 0.017 + visual.targetX * 0.01) * 0.65);
           } else {
             visual.sprite.setAngle(0);
@@ -948,6 +1077,7 @@ export function StudioVirtualSpacePhaserCanvas({
           const dx = target.x - npc.sprite.x;
           const dy = target.y - npc.sprite.y;
           const distance = Math.hypot(dx, dy);
+          let appliedStep = 0;
           if (distance <= 5) {
             npc.path = npc.path.slice(1);
             if (npc.path.length === 0 && Math.hypot(patrolTarget.x - npc.sprite.x, patrolTarget.y - npc.sprite.y) <= 12) {
@@ -955,21 +1085,27 @@ export function StudioVirtualSpacePhaserCanvas({
               npc.pauseUntil = time + 500;
             }
           } else {
-            const step = Math.min(distance, (npc.definition.speed ?? 72) * dt);
-            npc.sprite.x += dx / distance * step;
-            npc.sprite.y += dy / distance * step;
-            npc.facing = facingFromVector(dx, dy);
+            appliedStep = Math.min(distance, (npc.definition.speed ?? 72) * dt);
+            npc.sprite.x += dx / distance * appliedStep;
+            npc.sprite.y += dy / distance * appliedStep;
+            npc.facing = studioStableFacing({ x: dx, y: dy }, npc.facing);
           }
-          applySpriteVisual(npc.sprite, npc.skin, npc.facing, "walk");
+          if (appliedStep > 0) {
+            npc.sprite.setData("walkDistance", Number(npc.sprite.getData("walkDistance") ?? 0) + appliedStep);
+            applySpriteVisual(npc.sprite, npc.skin, npc.facing, "walk");
+          } else {
+            applySpriteVisual(npc.sprite, npc.skin, npc.facing, "idle");
+          }
           npc.sprite.setDepth(Math.round(npc.sprite.y) + 1_000);
         }
 
         const portal = blocked ? null : portalTracker.enter(portals, currentPoint);
         if (portal) {
-          const target = portal.targetPoint ?? (portal.targetRoomId
-            ? manifest.spawns.find((spawn) => spawn.id === portal.targetRoomId)?.point : undefined);
+          const target = studioWorldPortalTarget(manifest, portal);
           if (target && studioWorldCanOccupy(manifest, target)) {
             localBodyPhysics.reset(target.x, target.y);
+            localPose.reset(target, fixedStepClock.time);
+            previousRendered = null;
             motion = { velocity: { x: 0, y: 0 } };
             path = [];
             bridge.clearMovement();
@@ -983,7 +1119,7 @@ export function StudioVirtualSpacePhaserCanvas({
           || nextMoving !== lastPublishedMoving || facing !== lastPublishedFacing;
         const shouldPublish = changed && (time - lastPublishAt >= 80 || nextMoving !== lastPublishedMoving || Boolean(portal));
         if (shouldPublish) {
-          const point = { x: localBody.x, y: localBody.y };
+          const point = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
           callbacksRef.current.onLocalState({
             point,
             facing,
@@ -997,8 +1133,15 @@ export function StudioVirtualSpacePhaserCanvas({
         }
         if (import.meta.env.DEV && time - lastDiagnosticAt >= 100) {
           lastDiagnosticAt = time;
-          parent.dataset.localX = localBody.x.toFixed(3);
-          parent.dataset.localY = localBody.y.toFixed(3);
+          parent.dataset.localX = currentPoint.x.toFixed(3);
+          parent.dataset.localY = currentPoint.y.toFixed(3);
+          parent.dataset.renderX = rendered.x.toFixed(3);
+          parent.dataset.renderY = rendered.y.toFixed(3);
+          parent.dataset.walkFrame = String(localSprite.frame.name);
+          parent.dataset.pathLength = String(path.length);
+          parent.dataset.loadedWalkSheets = String(this.textures.getTextureKeys().filter((key) => key.includes("walk-sheet")).length);
+          parent.dataset.walkDistance = localDistance.toFixed(2);
+          parent.dataset.pixelRatio = viewport.ratio.toFixed(2);
           parent.dataset.localMoving = String(nextMoving);
           parent.dataset.localFacing = facing;
           parent.dataset.texture = localSprite.texture.key;
@@ -1025,9 +1168,10 @@ export function StudioVirtualSpacePhaserCanvas({
         roundPixels: false,
         pixelArt: false,
         scale: {
-          mode: Phaser.Scale.RESIZE,
-          width: parent.clientWidth || 842,
-          height: parent.clientHeight || 827,
+          mode: Phaser.Scale.NONE,
+          width: viewport.width,
+          height: viewport.height,
+          zoom: 1 / viewport.ratio,
         },
         physics: {
           default: "arcade",
@@ -1040,6 +1184,21 @@ export function StudioVirtualSpacePhaserCanvas({
         },
         scene,
       });
+      const resize = () => {
+        if (cancelled || !mount.isConnected) return;
+        const rect = parent.getBoundingClientRect();
+        const next = studioRenderViewport(rect.width, rect.height, globalThis.devicePixelRatio || 1);
+        mount.style.width = `${next.cssWidth}px`; mount.style.height = `${next.cssHeight}px`;
+        if (game?.isBooted && (next.width !== viewport.width || next.height !== viewport.height || next.ratio !== viewport.ratio)) {
+          viewport = next;
+          game.scale.setZoom(1 / next.ratio);
+          game.scale.resize(next.width, next.height);
+        }
+      };
+      const observer = new ResizeObserver(resize);
+      observer.observe(parent);
+      globalThis.addEventListener("resize", resize);
+      cleanup.push(() => { observer.disconnect(); globalThis.removeEventListener("resize", resize); });
     })().catch(fail);
 
     return () => {
