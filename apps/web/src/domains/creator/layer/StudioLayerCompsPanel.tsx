@@ -360,6 +360,7 @@ return (
                     )}
                     onClick={() => handleApplyComp(comp)}
                     title="이 보기 불러오기"
+                    aria-label={`${comp.name} 보이는 레이어 ${visibleCount} / ${totalCount}개`}
                     aria-current={isActive ? "true" : undefined}
                   >
                     <Eye size={14} className={isActive ? "text-accent" : "text-fg-3"} aria-hidden />
