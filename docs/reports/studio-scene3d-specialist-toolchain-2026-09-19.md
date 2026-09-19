@@ -135,6 +135,26 @@ certification is inferred from these bounded fixtures.
 
 ## Verification
 
+Final re-execution on code commit `d75f0916d` based on main `6cafbb293`:
+
+| Check | Observed result |
+| --- | --- |
+| Frozen pnpm install and pinned patches | Passed |
+| Web and API TypeScript | Passed |
+| Native specialist + existing provider/UI integration | 8 files / 66 tests passed |
+| Main-based professional completion suite | 28 files / 132 tests passed |
+| Changed specialist/UI/harness strict lint | Passed, zero lint warnings/errors |
+| Production bundle, third-party notices and static CSP | Passed; existing vendor/build warnings remain |
+| Production Worker under actual deployment CSP | All 9 real processing jobs passed |
+| UI generation, artifact preview and download | Passed |
+| Spark software GPU reference | 256 splats, 5 rendered frames; actual driver identified as SwiftShader; close disposed canvas |
+| Browser page/console/request errors | 0; upstream deprecation/readback warnings recorded |
+
+Synthetic evidence: [validation receipt](../evidence/studio-scene3d-specialist-toolchain-20260919.json).
+The earlier 201-test completion run included unmerged PR #1838. The independently rebased PR uses
+main's 132-test completion suite; no existing main tests were removed to obtain a passing result.
+
+
 The committed browser verifier exercises nine real module-worker operations, the actual UI file input,
 LOD generation/download/3D preview, and the Spark viewer. Its production mode verifies built output,
 not an interpreter stub. Software GPU mode checks the actual exposed driver is SwiftShader.
