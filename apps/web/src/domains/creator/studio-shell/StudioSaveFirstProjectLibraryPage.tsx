@@ -4,7 +4,7 @@ import {
   resolveUiLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateLocaleBranchForLocale, useBilingual 
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   CheckCircle2,
@@ -26,7 +26,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { Container } from "@/shared/components/section";

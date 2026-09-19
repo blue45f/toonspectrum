@@ -13,7 +13,10 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualLocalizer ,
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import {
   WEBTOON_PLATFORM_SPECS,
@@ -38,7 +41,6 @@ import { auditStudioRightsGraph } from "../studio-rights-graph";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import {
@@ -48,11 +50,6 @@ import {
 } from "./studio-platform-delivery-plan";
 import { useStudioProjectDocuments } from "./useStudioProjectDocuments";
 import { useStudioProjectWorkspace } from "./useStudioProjectWorkspace";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type DeliveryView = "publish" | "package" | "archive";

@@ -1,5 +1,7 @@
 import {
   translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { Compass, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -11,10 +13,6 @@ import {
 } from "@/shared/lib/catalog-discovery-state";
 
 import { cn } from "@/shared/lib/utils";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("discovery-workspace-nav", ko, en);

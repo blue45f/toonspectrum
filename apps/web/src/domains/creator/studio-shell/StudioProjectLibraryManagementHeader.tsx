@@ -2,6 +2,9 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
@@ -17,11 +20,6 @@ import {
   type StudioProjectLibrarySortMode,
 } from "./studio-project-library-management-model";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectLibraryManagementHeader", ko, en);

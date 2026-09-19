@@ -3,7 +3,9 @@ import { Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingualLocalizer,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { cn } from "@/shared/lib/utils";
 
@@ -11,10 +13,6 @@ import type { StudioDocumentWorkspaceId } from "../studio-document-workspace";
 import type { StudioProjectSection } from "../studio-project-views";
 
 import { useStudioDocumentLayout } from "../studio-router/studio-document-layout-context";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const StudioProjectFeatureSuitePanel = lazyRetry(
   () => import("./StudioProjectFeatureSuitePanel").then((module) => ({

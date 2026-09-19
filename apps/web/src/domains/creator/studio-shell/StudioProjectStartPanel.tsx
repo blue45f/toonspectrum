@@ -1,10 +1,11 @@
 import {
   translateBilingualValueForLocale,
-  translateCurrentStaticSourceText,
+  translateCurrentStaticSourceText, useBilingual ,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import { FileText, FileUp, Lightbulb, PlayCircle, UsersRound } from "lucide-react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 
 import {
@@ -13,10 +14,6 @@ import {
   type StudioIntentAction,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioProjectStartPanel", ko, en);

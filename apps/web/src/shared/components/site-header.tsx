@@ -1,6 +1,8 @@
 import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   Menu,
@@ -31,10 +33,6 @@ import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
 import { useUi } from "@/shared/lib/ui-store";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("site-header", ko, en);

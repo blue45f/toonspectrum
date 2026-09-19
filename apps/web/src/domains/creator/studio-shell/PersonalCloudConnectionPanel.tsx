@@ -9,7 +9,10 @@ import {
 } from "lucide-react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { PersonalCloudProviderId } from "../save-first/personal-cloud-client";
@@ -17,11 +20,6 @@ import {
   PERSONAL_CLOUD_CONNECTION_PROVIDER_ORDER,
   type PersonalCloudConnectionsController,
 } from "./usePersonalCloudConnections";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 function timeLabel(value: string | null, locale: string, bt: (ko: string, en: string) => string): string {
   if (!value || !Number.isFinite(Date.parse(value))) {

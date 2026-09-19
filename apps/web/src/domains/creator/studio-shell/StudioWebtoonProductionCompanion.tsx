@@ -9,7 +9,9 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual, useBilingualLocalizer ,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import Link from "@/compat/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
@@ -17,14 +19,9 @@ import {
   webtoonProductionStagesForProjectView,
   type WebtoonProductionStageSupport,
 } from "@/shared/lib/webtoon-production-support";
-import { useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import type { StudioProjectSection } from "../studio-project-views";
-import {
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 type Locale = string;
 type ProgressMap = Readonly<Record<string, readonly number[]>>;

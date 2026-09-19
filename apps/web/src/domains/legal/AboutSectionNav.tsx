@@ -2,7 +2,7 @@ import {
   resolveUiLocale,
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
-  translateLocaleBranchForLocale,
+  translateLocaleBranchForLocale, translateBilingualValueForActiveLocale, useBilingualI18nRevision 
 } from "@/shared/lib/i18n-bilingual-copy";
 import { Layers, Scale, Sparkles, Wrench } from "lucide-react";
 
@@ -10,7 +10,6 @@ import Link from "@/compat/router-link";
 import { usePathname } from "@/compat/navigation";
 import { cx } from "@/shared/lib/cx";
 
-import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("AboutSectionNav", ko, en);

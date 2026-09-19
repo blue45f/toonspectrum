@@ -3,6 +3,9 @@ import {
   translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateLocaleBranchForLocale,
+  getActiveI18nLocale,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
@@ -45,11 +48,6 @@ import {
   type StudioIntentAction,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
-import {
-  getActiveI18nLocale,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("StudioFrontDoorPages", ko, en);

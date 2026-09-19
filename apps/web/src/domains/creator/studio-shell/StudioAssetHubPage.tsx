@@ -8,7 +8,10 @@ import { MarketLibraryPage } from "@/domains/market/pages/MarketCloudLibraryPage
 import { MarketManagePage } from "@/domains/market/pages/MarketOwnedResourcesPage";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useBilingual,
+  formatI18nTemplate,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 import { StudioAssetGovernancePanel } from "./StudioAssetGovernancePanel";
@@ -20,11 +23,6 @@ import {
   resolveStudioAssetHubView,
   type AssetHubView,
 } from "./studio-asset-hub-view";
-import {
-  formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  useBilingualI18nRevision,
-} from "@/shared/lib/i18n-bilingual-copy";
 
 const CreatorEssentialsPage = lazy(() => import("./creator-essentials/CreatorEssentialsPage"));
 
