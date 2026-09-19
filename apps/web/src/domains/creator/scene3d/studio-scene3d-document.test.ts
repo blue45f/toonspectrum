@@ -38,7 +38,9 @@ describe("Studio Scene3D clean authority", () => {
       forwardAxis: "-Z",
     });
     expect(document.render.profile).toBe("webtoon");
-    expect(document.render.shadows.mode).toBe("csm");
+    expect(document.render.antialiasing).toBe("msaa");
+    expect(document.render.shadows).toMatchObject({ mode: "standard", cascades: 1 });
+    expect(document.render.effects).toMatchObject({ ssgi: false, sss: false });
     expect(document.output.smartLayer).toBe(true);
     expect(document.output.semanticPasses).toEqual([
       "beauty",
