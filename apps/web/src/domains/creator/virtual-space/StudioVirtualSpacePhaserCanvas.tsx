@@ -63,6 +63,7 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly selfIdentity?: string;
   /** AUTO in product; Canvas is useful for lifecycle-only browser harnesses. */
   readonly renderer?: "auto" | "webgl" | "canvas";
+  readonly debugWorld?: boolean;
   readonly onLocalState: (state: StudioVirtualSpaceEngineLocalState) => void;
   readonly onInteract: (interaction: StudioWorldInteractionDefinition | null) => void;
   readonly onNearbyInteractionChange?: (interaction: StudioWorldInteractionDefinition | null) => void;
@@ -174,6 +175,7 @@ export function StudioVirtualSpacePhaserCanvas({
   bridge,
   selfIdentity = "local",
   renderer = "auto",
+  debugWorld = false,
   onLocalState,
   onInteract,
   onNearbyInteractionChange,
@@ -487,6 +489,38 @@ export function StudioVirtualSpacePhaserCanvas({
           .setOrigin(0)
           .setDisplaySize(manifest.width, manifest.height)
           .setDepth(-1_000);
+
+        if (debugWorld) {
+          const graphics = this.add.graphics().setDepth(170_000);
+          graphics.lineStyle(2, 0x66aaff, 0.86);
+          for (const room of manifest.rooms) {
+            graphics.strokeRect(room.x, room.y, room.width, room.height);
+            this.add.text(room.x + 5, room.y + 5, room.id, {
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              fontSize: "10px",
+              color: "#dcecff",
+              backgroundColor: "#10233ddd",
+              padding: { x: 4, y: 2 },
+            }).setDepth(170_001);
+          }
+          graphics.lineStyle(2, 0xff5f6d, 0.88);
+          for (const collider of studioWorldCollisionRects(manifest)) {
+            graphics.strokeRect(collider.x, collider.y, collider.width, collider.height);
+          }
+          graphics.lineStyle(2, 0x4ade80, 0.75);
+          for (const interaction of interactions) {
+            graphics.strokeCircle(interaction.point.x, interaction.point.y, interaction.radius);
+          }
+          graphics.lineStyle(2, 0xfacc15, 0.9);
+          for (const spawn of manifest.spawns) {
+            graphics.strokeCircle(spawn.point.x, spawn.point.y, 10);
+            graphics.lineBetween(spawn.point.x - 7, spawn.point.y, spawn.point.x + 7, spawn.point.y);
+            graphics.lineBetween(spawn.point.x, spawn.point.y - 7, spawn.point.x, spawn.point.y + 7);
+          }
+          parent.dataset.authoringOverlay = "true";
+        } else {
+          delete parent.dataset.authoringOverlay;
+        }
 
         for (const skin of STUDIO_CHARACTER_SKINS) {
           for (const direction of ["down", "left", "right", "up"] as const) {
@@ -1018,7 +1052,7 @@ export function StudioVirtualSpacePhaserCanvas({
       game?.destroy(true);
       mount.remove();
     };
-  }, [attempt, bridge, manifest, renderer]);
+  }, [attempt, bridge, debugWorld, manifest, renderer]);
 
   return (
     <div

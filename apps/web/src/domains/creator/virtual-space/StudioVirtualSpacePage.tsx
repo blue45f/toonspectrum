@@ -87,9 +87,15 @@ import {
 } from "./StudioVirtualSpacePhaserCanvas";
 import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 import {
+  clearStudioWorldAuthoringDraft,
+  readStudioWorldAuthoringDraft,
+} from "./studio-virtual-space-world-authoring";
+import { StudioVirtualSpaceWorldAuthoringPanel } from "./StudioVirtualSpaceWorldAuthoringPanel";
+import {
   DEFAULT_STUDIO_WORLD_MANIFEST,
   studioWorldPresenceState,
   studioWorldSpawn,
+  validateStudioWorldManifest,
   type StudioVirtualSpaceWorldManifest,
   type StudioWorldInteractionDefinition,
   type StudioWorldPortalDefinition,
@@ -729,9 +735,17 @@ function VirtualSpaceExperience({
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
+  const [authoringMode] = useState(() =>
+    typeof globalThis.location !== "undefined"
+    && new URLSearchParams(globalThis.location.search).get("worldEdit") === "1"
+  );
   const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(
     DEFAULT_STUDIO_WORLD_MANIFEST,
   );
+  const [authoringDraft, setAuthoringDraft] = useState<StudioVirtualSpaceWorldManifest>(
+    DEFAULT_STUDIO_WORLD_MANIFEST,
+  );
+  const baselineWorldManifestRef = useRef<StudioVirtualSpaceWorldManifest>(DEFAULT_STUDIO_WORLD_MANIFEST);
   const [worldLoaded, setWorldLoaded] = useState(false);
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
@@ -754,22 +768,79 @@ function VirtualSpaceExperience({
       abortController.signal,
     ).then((manifest) => {
       if (abortController.signal.aborted) return;
-      const fallback = studioWorldCanOccupy(manifest, selfRef.current) ? selfRef.current : studioWorldSpawn(manifest).point;
-      const point = readVirtualSpaceSessionPoint(projectId, fallback, manifest);
-      const self = studioWorldPresenceState(manifest, { ...selfRef.current, ...point, moving: false });
+      baselineWorldManifestRef.current = manifest;
+      const activeManifest = authoringMode
+        ? readStudioWorldAuthoringDraft(projectId) ?? manifest
+        : manifest;
+      const fallback = studioWorldCanOccupy(activeManifest, selfRef.current)
+        ? selfRef.current
+        : studioWorldSpawn(activeManifest).point;
+      const point = readVirtualSpaceSessionPoint(projectId, fallback, activeManifest);
+      const self = studioWorldPresenceState(activeManifest, { ...selfRef.current, ...point, moving: false });
       selfRef.current = self;
       setSnapshot((current) => ({ ...current, self }));
-      setWorldManifest(manifest);
+      setWorldManifest(activeManifest);
+      setAuthoringDraft(activeManifest);
       setCurrentInteraction(null);
       setWorldLoaded(true);
     });
     return () => abortController.abort();
-  }, [projectId]);
+  }, [authoringMode, projectId]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
     setFollowingPeerId(sessionId);
   }, [engineBridge]);
+
+  const applyAuthoringManifest = useCallback((nextManifest: StudioVirtualSpaceWorldManifest) => {
+    if (validateStudioWorldManifest(nextManifest).length > 0) return;
+    engineBridge.clearMovement();
+    setFollowingPeer(null);
+    setCurrentInteraction(null);
+    movingRef.current = false;
+    setMoving(false);
+
+    const current = selfRef.current;
+    const point = studioWorldCanOccupy(nextManifest, current)
+      ? { x: current.x, y: current.y }
+      : studioWorldSpawn(nextManifest).point;
+    const self = studioWorldPresenceState(nextManifest, {
+      ...current,
+      ...point,
+      moving: false,
+    });
+    selfRef.current = self;
+    setWorldManifest(nextManifest);
+
+    const controller = controllerRef.current;
+    if (controller) {
+      controller.update(
+        point,
+        self.facing,
+        self.activity,
+        false,
+        self.avatarIndex,
+        self.zoneId,
+      );
+      setSnapshot(controller.snapshot());
+    } else {
+      setSnapshot((snapshot) => ({ ...snapshot, self }));
+    }
+  }, [engineBridge, setFollowingPeer]);
+
+  useEffect(() => {
+    if (!authoringMode || !worldLoaded) return;
+    if (validateStudioWorldManifest(authoringDraft).length > 0) return;
+    const timeout = globalThis.setTimeout(() => {
+      applyAuthoringManifest(authoringDraft);
+    }, 180);
+    return () => globalThis.clearTimeout(timeout);
+  }, [applyAuthoringManifest, authoringDraft, authoringMode, worldLoaded]);
+
+  const resetAuthoringManifest = useCallback(() => {
+    clearStudioWorldAuthoringDraft(projectId);
+    setAuthoringDraft(baselineWorldManifestRef.current);
+  }, [projectId]);
 
   useEffect(() => {
     if (!worldLoaded) return;
@@ -1085,6 +1156,7 @@ function VirtualSpaceExperience({
                   snapshot={snapshot}
                   bridge={engineBridge}
                   selfIdentity={fallbackIdentity}
+                  debugWorld={authoringMode}
                   onLocalState={handleEngineLocalState}
                   onInteract={handleEngineInteract}
                   onNearbyInteractionChange={setCurrentInteraction}
@@ -1198,6 +1270,15 @@ function VirtualSpaceExperience({
                 </div>
               </div>
             </div>
+
+            {authoringMode && worldLoaded ? (
+              <StudioVirtualSpaceWorldAuthoringPanel
+                projectId={projectId}
+                manifest={authoringDraft}
+                onChange={setAuthoringDraft}
+                onReset={resetAuthoringManifest}
+              />
+            ) : null}
 
             <div className="vs2-mobile-zone-cards grid gap-3 sm:grid-cols-2 lg:hidden">
               {worldManifest.rooms.map((room) => (
