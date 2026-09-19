@@ -385,26 +385,20 @@ describe("libmypaint incremental stroke session", () => {
     const { document } = readCorpusDocument("wash-soft");
     const samples = standardZigzagStrokeSamples(WIDTH, HEIGHT, SAMPLE_COUNT);
     const whole = createLibMypaintIncrementalStrokeSession(lmp, document, {
-      width: WIDTH,
-      height: HEIGHT,
-      seed: SEED,
+      width: WIDTH, height: HEIGHT, seed: SEED,
     });
+    let expected: Uint8Array;
+    try { whole.append(samples); expected = whole.finish(); } finally { whole.dispose(); }
     const chunked = createLibMypaintIncrementalStrokeSession(lmp, document, {
-      width: WIDTH,
-      height: HEIGHT,
-      seed: SEED,
+      width: WIDTH, height: HEIGHT, seed: SEED,
     });
     try {
-      whole.append(samples);
       for (let offset = 0; offset < samples.length; offset += 7) {
         chunked.append(samples.slice(offset, offset + 7));
       }
-      expect(chunked.finish()).toEqual(whole.finish());
-      expect(chunked.finish()).toEqual(whole.finish());
-    } finally {
-      chunked.dispose();
-      whole.dispose();
-    }
+      expect(chunked.finish()).toEqual(expected);
+      expect(chunked.finish()).toEqual(expected);
+    } finally { chunked.dispose(); }
   });
 
   it("matches the legacy whole-stroke helper exactly", () => {
