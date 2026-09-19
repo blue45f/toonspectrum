@@ -1,3 +1,6 @@
+import { StudioBrushV6DraftGuard } from "./StudioBrushV6DraftGuard";
+import { downloadBrushStudioSource } from "./brush-studio-source-download";
+import { serializeBrushStudioV6Authoring } from "./brush-studio-v6-authoring-document";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
@@ -38,9 +41,8 @@ import {
   analyzeBrushStudioV6Program,
   brushStudioV6Node,
   brushStudioV6NodesForSlot,
-  createBrushStudioV6Program,
   detectBrushStudioV6Capabilities,
-  normalizeBrushStudioV6Program,
+  nextBrushStudioV6Seed,
   optimizeBrushStudioV6Program,
   patchBrushStudioV6Input,
   patchBrushStudioV6Metadata,
@@ -114,8 +116,8 @@ const SINGLE_SLOTS: readonly { slot: SingleSlot; label: string; description: str
 
 const MATERIAL: readonly SliderSpec[] = [
   { key: "size", label: "크기", min: 1, max: 240, step: 1 },
-  { key: "opacity", label: "불투명도", min: 0.01, max: 1, step: 0.01 },
-  { key: "flow", label: "도포 유량", min: 0.01, max: 1, step: 0.01 },
+  { key: "opacity", label: "불투명도", min: 0, max: 1, step: 0.01 },
+  { key: "flow", label: "도포 유량", min: 0, max: 1, step: 0.01 },
   { key: "spacing", label: "다브 간격", min: 0.01, max: 4, step: 0.01 },
   { key: "surfaceTooth", label: "표면 이빨", min: 0, max: 1, step: 0.01 },
   { key: "friction", label: "마찰", min: 0, max: 1, step: 0.01 },
@@ -154,25 +156,8 @@ function materialNodeStatus(id: string, activeTuning: ReadonlySet<keyof BrushStu
   return "설계 기록 · 현재 획에는 적용되지 않음";
 }
 
-function readProgram(key: string): BrushStudioV6Program {
-  try {
-    const value = globalThis.localStorage?.getItem(key);
-    return value ? normalizeBrushStudioV6Program(JSON.parse(value)) : createBrushStudioV6Program();
-  } catch {
-    return createBrushStudioV6Program();
-  }
-}
-
 function download(program: BrushStudioV6Program): void {
-  const blob = new Blob([JSON.stringify({ kind: "toonspectrum.brush-program-v6", program }, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${program.id || "brush"}.brush-v6.json`;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 5_000);
+  downloadBrushStudioSource(serializeBrushStudioV6Authoring(program), `${program.name || "brush"}.brush.json`);
 }
 
 function Panel({ title, description, children }: { readonly title: string; readonly description: string; readonly children: ReactNode }) {
@@ -276,10 +261,18 @@ function capabilityRows(capabilities: BrushStudioV6Capabilities): readonly { lab
   ].map(([label, enabled]) => ({ label: String(label), enabled: Boolean(enabled) }));
 }
 
-export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
+export function StudioBrushV6Workbench({ scope, initialProgram }: {
+  readonly scope: string; readonly initialProgram?: BrushStudioV6Program;
+}) {
+  return <StudioBrushV6DraftGuard key={scope} scope={scope} initialProgram={initialProgram}>{(program) =>
+    <StudioBrushV6Editor scope={scope} initialProgram={program} />}</StudioBrushV6DraftGuard>;
+}
+
+function StudioBrushV6Editor({ scope, initialProgram }: {
+  readonly scope: string; readonly initialProgram: BrushStudioV6Program;
+}) {
   const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(scope)}`;
-  const [history, dispatchHistory] = useReducer(reduceBrushStudioV6EditHistory, storageKey,
-    (key) => createBrushStudioV6EditHistory(readProgram(key)));
+  const [history, dispatchHistory] = useReducer(reduceBrushStudioV6EditHistory, initialProgram, createBrushStudioV6EditHistory);
   const program = history.present;
   const [reference, setReference] = useState<BrushStudioV6Program>(program);
   const [saving, setSaving] = useState(false);
@@ -304,12 +297,13 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   const activeTuning = brushStudioV6MaterialActiveTuningKeys(program);
   const topology = brushStudioV6Topology(program.slots.carrier);
 
+  useEffect(() => () => { editGenerationRef.current += 1; }, []);
   useEffect(() => setCapabilities(detectBrushStudioV6Capabilities()), []);
   useEffect(() => {
     try { globalThis.localStorage?.setItem(BRUSH_STUDIO_EXPERIENCE_KEY, experience); } catch { /* UI preference is optional */ }
   }, [experience]);
   useEffect(() => {
-    try { globalThis.localStorage?.setItem(storageKey, JSON.stringify(program)); } catch { /* persistence is optional */ }
+    try { globalThis.localStorage?.setItem(storageKey, serializeBrushStudioV6Authoring(program)); } catch { setStatus("설정 자동 저장에 실패했습니다. 현재 설정을 JSON으로 내보내 보관하세요."); }
     globalThis.dispatchEvent?.(new CustomEvent("toonspectrum:brush-v6-program", { detail: program }));
   }, [program, storageKey]);
   useEffect(() => {
@@ -374,7 +368,15 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
   const chooseRecipe = (id: string) => { const recipe = BRUSH_STUDIO_V6_RECIPES.find((entry) => entry.id === id); if (!recipe) return; replace(recipe.create(), `${recipe.label} 레시피를 불러왔습니다.`); setTab("material"); };
   const importProgram = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return;
-    try { replace(parseBrushStudioV6Import(await file.text()), `${file.name}에서 브러시 설정을 가져왔습니다.`); } catch { setStatus("지원하는 브러시 JSON을 읽을 수 없습니다. 현재 브러시 설정은 유지됩니다."); }
+    const generation = ++editGenerationRef.current;
+    try {
+      if (file.size > 1_048_576) throw new Error("브러시 파일이 허용 크기를 초과했습니다.");
+      const serialized = await file.text();
+      if (generation !== editGenerationRef.current) return;
+      replace(parseBrushStudioV6Import(serialized), `${file.name}에서 브러시 설정을 가져왔습니다.`);
+    } catch (error) {
+      if (generation === editGenerationRef.current) setStatus(`${error instanceof Error ? error.message : "브러시 파일을 읽지 못했습니다."} 현재 브러시 설정은 유지됩니다.`);
+    }
   };
 
   const moveHistory = (type: "undo" | "redo") => {
@@ -428,7 +430,7 @@ export function StudioBrushV6Workbench({ scope }: { readonly scope: string }) {
             <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "en", "{v0} disabled:opacity-45"), { v0: String(BUTTON) })} disabled={!history.past.length} onClick={() => moveHistory("undo")} title={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "실행 취소 (⌘/Ctrl+Z)")}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "실행 취소")}</button>
             <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "en", "{v0} disabled:opacity-45"), { v0: String(BUTTON) })} disabled={!history.future.length} onClick={() => moveHistory("redo")} title={translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "다시 실행 (⌘/Ctrl+Shift+Z)")}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "다시 실행")}</button>
             <button type="button" className={PRIMARY} onClick={() => replace(optimizeBrushStudioV6Program(program, capabilities), "장치 기능과 품질 목표에 맞게 입력·재료 설정을 조정했습니다.")}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "이 기기에 맞게 조정")}</button>
-            <button type="button" className={BUTTON} onClick={() => replace(patchBrushStudioV6Metadata(program, { seed: (program.seed * 1664525 + 1013904223) >>> 0 }), "결정적 개성 시드를 변경했습니다.")}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "질감 배치 바꾸기")}</button>
+            <button type="button" className={BUTTON} onClick={() => replace(patchBrushStudioV6Metadata(program, { seed: nextBrushStudioV6Seed(program.seed) }), "결정적 개성 시드를 변경했습니다.")}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "질감 배치 바꾸기")}</button>
             <button type="button" className={BUTTON} onClick={() => download(program)}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "내보내기")}</button>
             <button type="button" className={BUTTON} onClick={() => fileRef.current?.click()}>{translateCurrentStaticSourceText("domains.creator.brush.lab.StudioBrushV6Workbench", "ko", "가져오기")}</button>
             <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" onChange={importProgram} />
