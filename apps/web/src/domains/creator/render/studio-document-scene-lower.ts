@@ -18,6 +18,12 @@ import {
   type StrokeLineCap,
 } from "../brush/studio-stroke-shapes";
 import { containingPanel } from "../studio-element-geometry";
+import {
+  planStudioPerfectFreehandRender,
+  resolveStudioOutlineStrokeContract,
+  STUDIO_OUTLINE_STROKE_ENGINE,
+} from "../studio-outline-stroke-contract";
+import { peekStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
 
 import {
   placeStudioLineSegment,
@@ -237,6 +243,82 @@ function hasDrawableFinalSegment(points: readonly number[]): boolean {
     && (points[end] !== points[end - 2] || points[end + 1] !== points[end - 1]);
 }
 
+function perfectFreehandOutlinePath(
+  outline: readonly (readonly number[])[],
+): PathIR | null {
+  if (outline.length < 3) return null;
+  const first = outline[0];
+  if (!first || !Number.isFinite(first[0]) || !Number.isFinite(first[1])) return null;
+  const verbs: PathIR["verbs"] = [{ v: "M", x: first[0]!, y: first[1]! }];
+  for (let index = 0; index < outline.length; index += 1) {
+    const current = outline[index];
+    const next = outline[(index + 1) % outline.length];
+    if (
+      !current
+      || !next
+      || !Number.isFinite(current[0])
+      || !Number.isFinite(current[1])
+      || !Number.isFinite(next[0])
+      || !Number.isFinite(next[1])
+    ) return null;
+    verbs.push({
+      v: "Q",
+      cx: current[0]!,
+      cy: current[1]!,
+      x: (current[0]! + next[0]!) / 2,
+      y: (current[1]! + next[1]!) / 2,
+    });
+  }
+  verbs.push({ v: "Z" });
+  return { verbs };
+}
+
+/**
+ * Stage-2 Vello brush admission: only immutable perfect-freehand outline contracts with plain
+ * source-over solid paint are eligible. Material, pattern, mask and specialist media semantics
+ * remain on their existing raster/provider owners.
+ */
+export function isStudioVelloDocumentVectorFreehandElement(
+  element: El,
+): element is DrawEl & El {
+  if (element.type !== "draw" || (element.kind ?? "freehand") !== "freehand") return false;
+  if (element.mode === "eraser" || element.fill !== undefined && element.fill !== null) return false;
+  if (!hasFiniteShapePoints(element.points) || !hasDrawableSegment(element.points)) return false;
+  if (!Number.isFinite(element.strokeWidth) || element.strokeWidth <= 0) return false;
+  if (element.opacity !== undefined && !Number.isFinite(element.opacity)) return false;
+  if (!parseSupportedCssColorToIR(element.stroke)) return false;
+  if (element.gradient || element.pattern || element.sketch?.enabled === true) return false;
+  if (element.symmetry && element.symmetry.type !== "none") return false;
+  if (element.paintModel !== undefined || element.brushEnginePrograms?.material) return false;
+  if (element.maskEnabled || element.maskSrc || element.clipBelow || element.alphaLocked) return false;
+  if (element.blendMode && element.blendMode !== "source-over") return false;
+  const contract = resolveStudioOutlineStrokeContract(element.outlineStroke);
+  return contract.status === "ready" && contract.contract.engine === STUDIO_OUTLINE_STROKE_ENGINE;
+}
+
+function velloPerfectFreehandNodes(
+  element: DrawEl & El,
+  opacity: number,
+): RenderNodeIR[] {
+  if (!isStudioVelloDocumentVectorFreehandElement(element)) return [];
+  const plan = planStudioPerfectFreehandRender({
+    contract: element.outlineStroke,
+    stroker: peekStudioPerfectFreehandStroker(),
+    points: element.points,
+    pressures: element.pressures,
+    strokeWidth: element.strokeWidth,
+    sampleSpacing: element.sampleSpacing,
+  });
+  if (
+    plan.kind !== "outline"
+    || plan.contract.engine !== STUDIO_OUTLINE_STROKE_ENGINE
+  ) return [];
+  const path = perfectFreehandOutlinePath(plan.outline);
+  const color = parseSupportedCssColorToIR(element.stroke);
+  if (!path || !color || color.a <= 0) return [];
+  return [fillNode(`${element.id}:freehand-outline`, path, color, opacity)];
+}
+
 /**
  * Fail-closed admission for the first product DrawEl slice. The admitted
  * shapes use only geometry and solid src-over paint that PathIR can preserve.
@@ -406,7 +488,8 @@ export function isStudioVelloDocumentRadialLineElement(element: El): boolean {
 
 export function isStudioVelloDocumentVectorElement(element: El): boolean {
   return isStudioVelloDocumentRadialLineElement(element)
-    || isStudioVelloDocumentGeometricDrawElement(element);
+    || isStudioVelloDocumentGeometricDrawElement(element)
+    || isStudioVelloDocumentVectorFreehandElement(element);
 }
 
 /**
@@ -497,9 +580,10 @@ function lowerElement(element: El): RenderNodeIR[] {
       return nodes;
     }
     case "draw":
-      return isStudioVelloDocumentGeometricDrawElement(element)
-        ? geometricDrawNodes(element, opacity)
-        : [];
+      if (isStudioVelloDocumentGeometricDrawElement(element)) {
+        return geometricDrawNodes(element, opacity);
+      }
+      return velloPerfectFreehandNodes(element, opacity);
     // Focus/speed lines share ONE planner with the Konva nodes, the SVG
     // exporter, and page thumbnails. Do not reimplement the geometry here — a
     // GPU-vs-CPU pixel gate cannot see a geometry divergence, because both
