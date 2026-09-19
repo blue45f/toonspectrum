@@ -1,9 +1,9 @@
 # ToonSpectrum libmypaint wasm reproducible release manifest (ADR-0011 lane 11)
 # libmypaint v1.6.1 (2768251dacce3939136c839aeca413f4aa4241d0), json-c bypassed
 # emcc 6.0.6
-c9328dfdf5e793783ace902f446816bf4c5f579a61db0eddfc59043654cc7f2e  mypaint-wasm.mjs
-811e5d89fd740dcb18f75ed5b631a405e05d84b3efb9a2f577f25f99301f757b  mypaint-wasm.wasm
-d4d929f6fa5a9facd8e7a63708f6e6b2b8c611f6a583157b34b3da961da73457  bridge/build.sh
+a6fbdeca5ae15671c47f8c8d65fae598f7b9275e1f8387bbc9dd652a5a7a2a8a  mypaint-wasm.mjs
+1d6f2f4ab8a69856359efab8666e319099bc2e004eb6272df015384139daf6b3  mypaint-wasm.wasm
+29e525e202dcba98718cfcaa78bb02b10ea60e86ab6ea5187a409ecf96ff8b30  bridge/build.sh
 d652a3cda8bd3459594d97aaac47252363ae90cd92ce109283dbbb29787d10d6  bridge/config.h
 abe2756e34eaf9f61bb638bf36ae3ee6cc5d820fb38795ff3b323f241f4141b2  bridge/json.h
-c895db27b99cfa6b99bd45690c81e294c75a0bc66f97356be3012045c8c66c7d  bridge/mypaint-bridge.c
+d3ab0c88e6a587163da82951a7439bb35097f86567356b4625cc9c1f30071599  bridge/mypaint-bridge.c

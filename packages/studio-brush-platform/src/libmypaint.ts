@@ -1,6 +1,6 @@
 import { standardZigzagStrokeSamples } from "./raster-compile";
 
-import type { LibMypaintRaw } from "./libmypaint/index";
+import type { LibMypaintDirtyFrame, LibMypaintRaw } from "./libmypaint/index";
 import type { RasterStrokeSample } from "./raster-compile";
 
 /**
@@ -21,6 +21,8 @@ import type { RasterStrokeSample } from "./raster-compile";
  * - finish pumps up to 8 idle events of 16 ms at the last position/pressure
  *   so slow-tracking tails resolve (the Hokusai finishStroke behavior).
  */
+
+export type { LibMypaintDirtyFrame } from "./libmypaint/index";
 
 export type LibMypaintCurvePoint = [number, number];
 
@@ -128,6 +130,10 @@ export interface LibMypaintIncrementalStrokeSession {
   append(samples: readonly RasterStrokeSample[]): LibMypaintIncrementalAppendResult;
   /** Fresh straight-alpha RGBA8 snapshot of the current bounded surface. */
   frame(): Uint8Array;
+  /** Consume changed pixels since the last successful take; null when no native tiles changed. */
+  takeDirtyFrame(): LibMypaintDirtyFrame | null;
+  /** Finish the tail once, then consume only its pending dirty pixels (never a full-frame copy). */
+  finishDirty(): LibMypaintDirtyFrame | null;
   /**
    * Resolve the configured slow-tracking tail once and return the final frame.
    * Repeated calls are idempotent and never advance the brush a second time.
@@ -175,9 +181,9 @@ function clampSignedUnit(value: number): number {
  * surface for the complete stroke. This session preserves exactly the old timing/tail semantics
  * while making batching explicit; tests lock batch partitioning to byte-identical final pixels.
  *
- * frame() currently uses the pinned bridge's whole-surface RGBA8 copy. The bridge already receives
- * libmypaint's dirty ROI from mypaint_surface_end_atomic; a later release can expose that ROI and
- * region readback without changing this session's append semantics.
+ * takeDirtyFrame()/finishDirty() copy only the union of native end_atomic dirty bounds.
+ * frame()/finish() remain explicit whole-surface reference/export snapshots. Patch consumers
+ * replace RGBA bytes at x/y; source-over blending would double-apply translucent paint.
  */
 export function createLibMypaintIncrementalStrokeSession(
   lmp: LibMypaintRaw,
@@ -287,7 +293,7 @@ export function createLibMypaintIncrementalStrokeSession(
       return pixels;
     } catch (error) { return fail(error); }
   }
-  function finish(): Uint8Array {
+  function resolveTail(): void {
     assertUsable("finish");
     if (phase === "active") {
       try {
@@ -300,10 +306,15 @@ export function createLibMypaintIncrementalStrokeSession(
         releaseModule();
       } catch (error) { return fail(error); }
     }
-    return frame();
   }
+  function takeDirtyFrame(): LibMypaintDirtyFrame | null {
+    assertUsable("read dirty frame");
+    try { return lmp.surfaceTakeDirtyFrame(surface); } catch (error) { return fail(error); }
+  }
+  function finish(): Uint8Array { resolveTail(); return frame(); }
+  function finishDirty(): LibMypaintDirtyFrame | null { resolveTail(); return takeDirtyFrame(); }
   return {
-    width, height, settings, append, frame, finish,
+    width, height, settings, append, frame, finish, takeDirtyFrame, finishDirty,
     dispose() {
       if (phase === "disposed") return;
       phase = "disposed";
