@@ -439,3 +439,36 @@ it("drains an in-flight depth read when the normal copy fails before returning a
   expect(destroy).toHaveBeenCalledOnce();
   expect(renderer.mrt).toEqual({ test: "existing-mrt" });
 });
+
+
+it.each(["color", "geometry"] as const)("keeps GPU resources until copies finish when %s state restore fails", async (pass) => {
+  const renderer = createFakeWebGpuRenderer({ colorBytes: new Uint8Array(16) });
+  let finish!: (value: Uint8Array) => void;
+  const fence = new Promise<Uint8Array>((resolve) => { finish = resolve; });
+  if (pass === "geometry") renderer.readRenderTargetPixelsAsync.mockImplementationOnce(async () => new Uint8Array(16));
+  renderer.readRenderTargetPixelsAsync.mockImplementationOnce(() => fence);
+  const originalSetTarget = renderer.setRenderTarget;
+  renderer.setRenderTarget = (target) => {
+    if (target === null && renderer.renderCalls === (pass === "color" ? 1 : 2)) {
+      throw new Error("restore failed");
+    }
+    originalSetTarget(target);
+  };
+  const sceneValue = scene();
+  const contact = new THREE.Mesh();
+  registerStudioBg3dDepthExcludedObject(contact);
+  sceneValue.add(contact);
+  const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+    scene: sceneValue, camera });
+  const dispose = vi.spyOn(THREE.RenderTarget.prototype, "dispose");
+  const pending = adapter.capture({ width: 2, height: 2, includeDepth: pass === "geometry",
+    background: { color: "#000000", alpha: 0 } });
+  const rejected = expect(pending).rejects.toThrow("restore failed");
+  adapter.dispose?.();
+  await Promise.resolve(); await Promise.resolve();
+  expect(contact.visible).toBe(true);
+  expect(dispose).not.toHaveBeenCalled();
+  finish(new Uint8Array(16));
+  await rejected;
+  expect(dispose).toHaveBeenCalled();
+});

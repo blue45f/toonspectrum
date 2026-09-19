@@ -57,6 +57,7 @@ jobs:
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgl-capture.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-lt-three-depth.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-lt-normal-edges.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-capture-adapter.test.ts
           apps/web/src/domains/creator/bg3d/studio-bg3d-lt-render-worker-client.test.ts

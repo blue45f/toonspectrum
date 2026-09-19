@@ -333,7 +333,9 @@ function submitColorCapture(input: {
   const capturedBackground = scene.background;
   const capturedBackgroundRotation = scene.backgroundRotation.clone();
   const { sceneTarget, outputTarget, outputQuad } = input.resources;
-  let readback: Promise<unknown>;
+  let readback: Promise<unknown> | undefined;
+  let failed = false;
+  let failure: unknown;
   try {
     renderer.xr.enabled = false;
     renderer.autoClear = true;
@@ -361,24 +363,31 @@ function submitColorCapture(input: {
       request.height,
     );
   } catch (error) {
+    failed = true;
+    failure = error;
+  } finally {
     scene.background = capturedBackground;
     scene.backgroundRotation.copy(capturedBackgroundRotation);
-    restoreRendererState(renderer, state);
-    throw error;
+    try {
+      restoreRendererState(renderer, state);
+    } catch (error) {
+      if (!failed) { failed = true; failure = error; }
+    }
   }
-  scene.background = capturedBackground;
-  scene.backgroundRotation.copy(capturedBackgroundRotation);
-  restoreRendererState(renderer, state);
-  return readback.then(
-    (raw) => normalizeStudioBg3dRgbaReadback({
+  // Restoration may throw after a copy was submitted. Keep the pool lease until it settles.
+  if (failed && !readback) throw failure;
+  return Promise.allSettled(readback ? [readback] : []).then((results) => {
+    if (failed) throw failure;
+    const raw = results[0];
+    if (!raw) throw new Error("Missing color readback.");
+    if (raw.status === "rejected") throw raw.reason;
+    return normalizeStudioBg3dRgbaReadback({
       width: request.width,
       height: request.height,
-      // WebGPU readback is already top-down; the WebGL adapter flips because GL is bottom-up. The
-      // normalizer still resolves the 256-byte row alignment WebGPU buffer copies require.
       flipY: false,
-      rgba: toReadbackBytes(raw),
-    }),
-  );
+      rgba: toReadbackBytes(raw.value),
+    });
+  });
 }
 
 interface GeometryCapture {
@@ -426,8 +435,13 @@ function submitDepthCapture(input: {
   } finally {
     scene.overrideMaterial = capturedOverride;
     scene.background = capturedBackground;
-    restoreRendererState(renderer, state);
-    restoreDepthExcludedObjects();
+    try {
+      restoreRendererState(renderer, state);
+    } catch (error) {
+      if (!failed) { failed = true; failure = error; }
+    } finally {
+      restoreDepthExcludedObjects();
+    }
   }
   // A later copy can throw before returning a promise. Drain earlier fences before releasing MRT.
   if (failed && pending.length === 0) throw failure;

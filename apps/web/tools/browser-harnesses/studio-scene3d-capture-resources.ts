@@ -54,7 +54,24 @@ async function run() {
     const request = { width: 64, height: 64, includeDepth: true, includeNormals: true,
       background: { color: "#000000", alpha: 0 } } as const;
     const first = await gpuAdapter.capture(request);
-    const reference = await glAdapter.capture(request);
+    const previousGlTarget = new THREE.WebGLRenderTarget(128, 128);
+    let reference: StudioBg3dCapturedRaster;
+    try {
+      gl.setRenderTarget(previousGlTarget);
+      gl.setViewport(7, 9, 19, 21);
+      gl.setScissor(2, 3, 11, 13);
+      gl.setScissorTest(true);
+      reference = await glAdapter.capture(request);
+      assert(gl.getRenderTarget() === previousGlTarget, "WebGL capture changed the previous framebuffer.");
+      assert(gl.getViewport(new THREE.Vector4()).equals(new THREE.Vector4(7, 9, 19, 21)),
+        "WebGL capture changed the live viewport.");
+      assert(gl.getScissor(new THREE.Vector4()).equals(new THREE.Vector4(2, 3, 11, 13)) && gl.getScissorTest(),
+        "WebGL capture changed the live scissor.");
+    } finally {
+      gl.setRenderTarget(null); gl.setViewport(0, 0, 64, 64);
+      gl.setScissor(0, 0, 64, 64); gl.setScissorTest(false);
+      previousGlTarget.dispose();
+    }
     assert(first.normalRgba && reference.normalRgba, "Requested normals were not produced.");
     const normalCenter = Array.from(first.normalRgba.slice((32 * 64 + 32) * 4, (32 * 64 + 32) * 4 + 4));
     assert(normalCenter.every((value, index) => Math.abs(value - [128, 128, 255, 255][index]!) <= 1),
@@ -171,6 +188,7 @@ async function run() {
     return { status: "ok", implementationRevision: gpuAdapter.implementationRevision,
       actualDevice: { vendor: info?.vendor ?? null, architecture: info?.architecture ?? null,
         isFallbackAdapter: info?.isFallbackAdapter ?? null },
+      webglViewportRestored: true,
       normals: { center: normalCenter, maxBackendDelta: maxNormalDelta, perspective }, crease,
       hdr: { expected, webgpu: actual, webgl: glPixel, maxChannelDelta },
       reuse: { captures: 9, warmTargetCount, extraTargetsDuringEightWarmCaptures: 0,

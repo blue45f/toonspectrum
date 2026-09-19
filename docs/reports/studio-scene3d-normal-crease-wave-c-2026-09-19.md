@@ -2,7 +2,8 @@
 
 상태: 실제 편집기·컷 배치 출력 경로 구현, 로컬 검증 완료. main 머지·운영 배포 또는 장기 고도화 전체 완료를 뜻하지 않는다.
 
-기준 main: `bb0d1979d685d0353a499f3e3ddfdb0c63bea98f` (PR #1833).
+최초 기준 main: `bb0d1979d685d0353a499f3e3ddfdb0c63bea98f` (PR #1833).
+재개 시 `27d99f1e5fd9e0fd817e32bf8def5be7b66a6402` main을 병합한 뒤 아래 검증을 다시 실행했다.
 작업 브랜치: `feat/scene3d-output-quality-20260919`.
 
 ## 해결한 사용자 문제
@@ -35,6 +36,18 @@ LT 선화의 `creaseAngleDegrees`는 범위 검증은 있었지만 실제 표면
 WebGPU 구현 식별자는 `studio-three-webgpu-capture-adapter-v3-hdr-mrt-normals`다.
 기존 캡처 owner revision 검증이 이전 배치 결과와 새 출력을 섞지 않도록 유지된다.
 
+## 재개 작업: 캡처 복구 결함 수정
+
+분할 viewport와 비동기 GPU copy가 함께 있을 때의 경계를 추가 검증했다.
+수정 전 WebGL 회귀 3개, WebGPU 회귀 2개가 실제 실패하는 것을 먼저 확인했다.
+
+- WebGL depth pass가 active cube face/mip, viewport, scissor, scissor-test를 모두 복구하도록 수정했다.
+- WebGL depth/normal/color 및 WebGPU color/geometry에서 복구 함수가 예외를 던져도 이미 제출한 GPU copy가 끝날 때까지 기다린다.
+- pending copy가 있는 render target을 조기에 dispose하거나 pool에 돌려주지 않는다.
+- normal/geometry 복구 예외에서도 depth-excluded 접지 그림자 객체의 가시성을 되돌린다.
+- 테스트 7개를 추가했다. 정상 복구, 복구 예외, GPU readback 수명과 visibility를 각각 검사한다.
+- 실 브라우저에서도 non-default framebuffer/viewport/scissor를 설정한 상태에서 전체 캡처 후 정확히 복원되는 것을 확인한다.
+
 ## 실 브라우저 검증
 
 Chromium `151.0.7922.34`. 프로덕션 renderer factory와 capture adapter, 실제 Vite module Worker를 사용했다.
@@ -45,6 +58,7 @@ Chromium `151.0.7922.34`. 프로덕션 renderer factory와 capture adapter, 실�
 | 실제 device architecture | metal-3 | swiftshader |
 | isFallbackAdapter | false | true |
 | HDR WebGPU/WebGL 최대 채널 차이 | 0 | 0 |
+| WebGL framebuffer/viewport/scissor 복원 | 통과 | 통과 |
 | 직교 normal 최대 채널 차이 | 0 | 0 |
 | 65×63 원근 normal 비교 표면 픽셀 | 1585 | 1586 |
 | 원근 coverage 불일치 픽셀 | 0 | 0 |
@@ -62,15 +76,28 @@ Depth/normal/LT는 기존 8,388,608 pixels 예산을 유지한다. 4K 정사각�
 
 ## 자동 검증
 
-- 확장 Scene3D·캡처·LT·샷 회귀: **73개 파일 / 648개 테스트 통과**.
-- 전문 제작 회귀: **34개 파일 / 196개 테스트 통과**.
-- 웹 TypeScript 검사 통과.
-- 변경된 TS/TSX/MJS strict lint 통과.
+- 확장 Scene3D·캡처·LT·샷 회귀: **73개 파일 / 655개 테스트 통과**.
+- 전문 제작 회귀: **34개 파일 / 199개 테스트 통과**.
+- 웹 및 API TypeScript 검사 통과.
+- 변경된 TS/TSX/MJS 23개 파일 strict lint 통과 (경고 0개).
 - `pnpm run build:bundle` 통과. third-party notices 생성 및 static CSP 검증 포함.
-- 기존 `verify-studio-bg3d-webgpu-engine.mjs` 통과 (`failures: []`): 기존 opaque/transparent/depth, KTX2, VRM 허용 오차 및 backend 보호 정책 회귀.
+- 앞선 Wave C 실행의 `verify-studio-bg3d-webgpu-engine.mjs` 통과 기록 (`failures: []`; 이번 재개에서 별도 재실행하지 않음): 기존 opaque/transparent/depth, KTX2, VRM 허용 오차 및 backend 보호 정책 회귀.
 - GPU proof는 `verify-studio-scene3d-capture-resources.mjs`에서 두 lane 모두 통과.
 
-생성된 JSON/PNG/로그는 `.qa/scene3d-output-quality/`에 있고 Git에 넣지 않는다.
+재개 검증 JSON/PNG/로그는 `.qa/scene3d-output-quality/resume/`에 있고 Git에 넣지 않는다.
+위 회귀 집합에는 겹치는 테스트가 있어 통과 수를 더해 독립 테스트 수로 표시하지 않는다.
+CI 입력 회귀도 올바른 Vitest runner로 2개 테스트가 통과했다.
+
+재현 명령:
+
+```sh
+pnpm run typecheck
+pnpm run verify:studio-3d-professional-completion
+pnpm exec vitest run scripts/scene3d-output-ci-policy.test.mjs
+pnpm run build:bundle
+SCENE3D_CAPTURE_GPU_LANE=hardware node scripts/verify-studio-scene3d-capture-resources.mjs
+SCENE3D_CAPTURE_GPU_LANE=swiftshader node scripts/verify-studio-scene3d-capture-resources.mjs
+```
 빌드에는 기존 three-vrm의 조건부 구 API 참조 등 warning이 남아 있다. 무경고 빌드로 주장하지 않는다.
 
 ## CI 입력 수정
@@ -84,7 +111,7 @@ Depth/normal/LT는 기존 8,388,608 pixels 예산을 유지한다. 4K 정사각�
 - 전용 Scene3D CI에서 normal/Worker/insert/shot artifact 계약 테스트를 실행
 
 기존 API 배포용 패키지 해석 오류, 브러시·다른 UI 회귀와 전체 main CI 성공 여부는 이 구현의 로컬 통과와 별개다.
-동일 문제를 작업 중인 PR #1827 / #1829를 덮어쓰거나 CI를 우회하지 않는다.
+재개 시 PR #1829의 main 수정도 합쳤다. 다른 영역의 회귀를 작업하는 PR #1827을 덮어쓰거나 CI를 우회하지 않는다.
 
 ## 남아 있는 범위
 

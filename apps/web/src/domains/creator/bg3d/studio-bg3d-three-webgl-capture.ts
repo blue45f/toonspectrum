@@ -93,45 +93,54 @@ async function captureStudioBg3dThreeWebglColor(input: {
   const packed = new Uint8Array(request.width * request.height * 4);
 
   try {
-    let readback: Promise<THREE.TypedArray>;
+    let readback: Promise<THREE.TypedArray> | undefined;
+    let failed = false;
+    let failure: unknown;
     try {
-      renderer.xr.enabled = false;
-      renderer.autoClear = true;
-      renderer.setClearColor(request.background.color, request.background.alpha);
-      renderer.setRenderTarget(sceneTarget);
-      renderer.clear(true, true, true);
-      // Pin the background reference and yaw sampled at transaction entry. R3F effects or input
-      // drafts that commit around this call cannot make the raster disagree with its document.
-      scene.background = suppressSceneBackground ? null : capturedSceneBackground;
-      scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
-      renderer.render(scene, camera);
+      try {
+        renderer.xr.enabled = false;
+        renderer.autoClear = true;
+        renderer.setClearColor(request.background.color, request.background.alpha);
+        renderer.setRenderTarget(sceneTarget);
+        renderer.clear(true, true, true);
+        // Pin the background reference and yaw sampled at transaction entry. R3F effects or input
+        // drafts that commit around this call cannot make the raster disagree with its document.
+        scene.background = suppressSceneBackground ? null : capturedSceneBackground;
+        scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
+        renderer.render(scene, camera);
 
-      // Rendering to a normal WebGLRenderTarget deliberately bypasses Three's final canvas output
-      // transform. The output pass first restores straight linear RGB, then recreates tone mapping
-      // and output color space before RGBA8 readback so transparency and viewport color both agree.
-      outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
-      readback = renderer.readRenderTargetPixelsAsync(
-        outputTarget,
-        0,
-        0,
-        request.width,
-        request.height,
-        packed,
-      );
-    } finally {
-      // `readRenderTargetPixelsAsync` has already submitted its copy/fence work. Never leave a
-      // live R3F frame pointed at a temporary capture target while the Promise waits for the GPU.
-      renderer.setRenderTarget(previousTarget, previousActiveCubeFace, previousActiveMipmapLevel);
-      renderer.setClearColor(previousClearColor, previousClearAlpha);
-      renderer.autoClear = previousAutoClear;
-      renderer.xr.enabled = previousXrEnabled;
-      renderer.setViewport(previousViewport);
-      renderer.setScissor(previousScissor);
-      renderer.setScissorTest(previousScissorTest);
-      scene.background = capturedSceneBackground;
-      scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
+        // Rendering to a normal WebGLRenderTarget deliberately bypasses Three's final canvas output
+        // transform. The output pass first restores straight linear RGB, then recreates tone mapping
+        // and output color space before RGBA8 readback so transparency and viewport color both agree.
+        outputPass.render(renderer, outputTarget, sceneTarget, 0, false);
+        readback = renderer.readRenderTargetPixelsAsync(
+          outputTarget,
+          0,
+          0,
+          request.width,
+          request.height,
+          packed,
+        );
+      } finally {
+        // `readRenderTargetPixelsAsync` has already submitted its copy/fence work. Never leave a
+        // live R3F frame pointed at a temporary capture target while the Promise waits for the GPU.
+        renderer.setRenderTarget(previousTarget, previousActiveCubeFace, previousActiveMipmapLevel);
+        renderer.setClearColor(previousClearColor, previousClearAlpha);
+        renderer.autoClear = previousAutoClear;
+        renderer.xr.enabled = previousXrEnabled;
+        renderer.setViewport(previousViewport);
+        renderer.setScissor(previousScissor);
+        renderer.setScissorTest(previousScissorTest);
+        scene.background = capturedSceneBackground;
+        scene.backgroundRotation.copy(capturedSceneBackgroundRotation);
+      }
+    } catch (error) {
+      failed = true;
+      failure = error;
     }
-    await readback;
+    const settled = await Promise.allSettled(readback ? [readback] : []);
+    if (failed) throw failure;
+    if (settled[0]?.status === "rejected") throw settled[0].reason;
     return normalizeStudioBg3dRgbaReadback({
       width: request.width,
       height: request.height,

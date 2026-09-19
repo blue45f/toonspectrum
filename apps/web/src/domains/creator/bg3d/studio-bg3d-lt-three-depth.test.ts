@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { registerStudioBg3dDepthExcludedObject } from "./studio-bg3d-capture-exclusion";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
+import { captureStudioBg3dThreeNormals } from "./studio-bg3d-three-normal-capture";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -23,6 +24,14 @@ function rendererFixture(readback: Promise<THREE.TypedArray>) {
     autoClear: false,
     xr: { enabled: true },
     getRenderTarget: vi.fn(() => renderTarget),
+    getActiveCubeFace: vi.fn(() => 3),
+    getActiveMipmapLevel: vi.fn(() => 2),
+    getViewport: vi.fn((target: THREE.Vector4) => target.set(7, 9, 19, 21)),
+    getScissor: vi.fn((target: THREE.Vector4) => target.set(2, 3, 11, 13)),
+    getScissorTest: vi.fn(() => true),
+    setViewport: vi.fn(),
+    setScissor: vi.fn(),
+    setScissorTest: vi.fn(),
     getClearColor: vi.fn((target: THREE.Color) => target.copy(clearColor)),
     getClearAlpha: vi.fn(() => clearAlpha),
     setRenderTarget: vi.fn((next: THREE.WebGLRenderTarget | null) => {
@@ -239,5 +248,53 @@ describe("captureStudioBg3dThreeDepth", () => {
         height: 1,
       })
     ).rejects.toThrow(/requires/u);
+  });
+});
+
+
+describe.each([
+  ["depth", captureStudioBg3dThreeDepth],
+  ["normal", captureStudioBg3dThreeNormals],
+] as const)("WebGL %s capture viewport isolation", (_label, capture) => {
+  it("restores viewport, scissor and cube/mip target before the GPU fence completes", async () => {
+    const readback = deferred<THREE.TypedArray>();
+    const fixture = rendererFixture(readback.promise);
+    const scene = new THREE.Scene();
+    const target = new THREE.WebGLCubeRenderTarget(16);
+    fixture.renderer.setRenderTarget(target, 3, 2);
+    const dispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
+    const pending = capture({ renderer: fixture.renderer, scene,
+      camera: new THREE.PerspectiveCamera(), width: 2, height: 2 });
+    expect(fixture.renderer.setRenderTarget).toHaveBeenLastCalledWith(target, 3, 2);
+    expect(fixture.renderer.setViewport).toHaveBeenLastCalledWith(new THREE.Vector4(7, 9, 19, 21));
+    expect(fixture.renderer.setScissor).toHaveBeenLastCalledWith(new THREE.Vector4(2, 3, 11, 13));
+    expect(fixture.renderer.setScissorTest).toHaveBeenCalledWith(false);
+    expect(fixture.renderer.setScissorTest).toHaveBeenLastCalledWith(true);
+    expect(dispose).not.toHaveBeenCalled();
+    readback.resolve(new Uint8Array(16));
+    await pending;
+    expect(dispose).toHaveBeenCalledOnce();
+    target.dispose();
+  });
+
+  it("does not dispose submitted GPU resources when state restoration throws", async () => {
+    const readback = deferred<THREE.TypedArray>();
+    const fixture = rendererFixture(readback.promise);
+    const scene = new THREE.Scene();
+    const contact = new THREE.Mesh();
+    registerStudioBg3dDepthExcludedObject(contact);
+    scene.add(contact);
+    const failure = new Error("restore target failed");
+    vi.mocked(fixture.renderer.setRenderTarget).mockImplementationOnce(() => {})
+      .mockImplementationOnce(() => { throw failure; });
+    const dispose = vi.spyOn(THREE.WebGLRenderTarget.prototype, "dispose");
+    const pending = capture({ renderer: fixture.renderer, scene,
+      camera: new THREE.PerspectiveCamera(), width: 2, height: 2 });
+    const rejected = expect(pending).rejects.toBe(failure);
+    expect(contact.visible).toBe(true);
+    expect(dispose).not.toHaveBeenCalled();
+    readback.resolve(new Uint8Array(16));
+    await rejected;
+    expect(dispose).toHaveBeenCalledOnce();
   });
 });
