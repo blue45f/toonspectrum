@@ -235,3 +235,22 @@ it("rejects non-finite binary accessor data before producing derivatives", async
     }),
   ).rejects.toMatchObject({ code: "invalid-input" });
 });
+
+it.each(["start", "end"] as const)(
+  "rejects a navigation %s that snaps to the wrong floor",
+  async (key) => {
+    await expect(
+      run("floor", {
+        kind: "navigation",
+        start: key === "start" ? [-2, 1, -2] : [-2, 0, -2],
+        end: key === "end" ? [2, 1, 2] : [2, 0, 2],
+        cellSize: 0.2,
+        agentRadius: 0.3,
+        agentHeight: 1.8,
+      }),
+    ).rejects.toMatchObject({
+      code: "runtime",
+      message: expect.stringContaining("XYZ projection tolerance"),
+    });
+  },
+);

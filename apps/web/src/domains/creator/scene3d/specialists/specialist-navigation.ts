@@ -79,29 +79,48 @@ export async function processNavigation(
       );
     query = new NavMeshQuery(generated.navMesh);
     const vector = (p: readonly number[]) => ({ x: p[0]!, y: p[1]!, z: p[2]! });
-    const result = query.computePath(
+    const endpointTolerance = {
+      horizontal: Math.max(0.1, cs * 2),
+      vertical: Math.max(0.1, ch * 2),
+    };
+    const projection = {
+      halfExtents: { x: cs * 2, y: options.agentHeight, z: cs * 2 },
+    };
+    const projectedStart = query.findClosestPoint(
       vector(options.start),
-      vector(options.end),
-      {
-        halfExtents: { x: cs * 2, y: options.agentHeight, z: cs * 2 },
-        maxPathPolys: 2048,
-        maxStraightPathPoints: 2048,
-      },
+      projection,
     );
+    const projectedEnd = query.findClosestPoint(
+      vector(options.end),
+      projection,
+    );
+    if (!projectedStart.success || !projectedEnd.success)
+      throw new SpecialistError(
+        "runtime",
+        "Navigation endpoints are outside the walkable surface.",
+      );
+    validateNavigationEndpoints(
+      [projectedStart.point, projectedEnd.point],
+      options.start,
+      options.end,
+      endpointTolerance,
+    );
+    const result = query.computePath(projectedStart.point, projectedEnd.point, {
+      halfExtents: { x: cs * 2, y: options.agentHeight, z: cs * 2 },
+      maxPathPolys: 2048,
+      maxStraightPathPoints: 2048,
+    });
     if (!result.success || result.path.length < 2)
       throw new SpecialistError(
         "runtime",
         "No path connects the requested positions on this walkable surface.",
       );
-    const end = result.path[result.path.length - 1]!;
-    if (
-      Math.hypot(end.x - options.end[0], end.z - options.end[2]) >
-      Math.max(0.1, cs * 2)
-    )
-      throw new SpecialistError(
-        "runtime",
-        "Only a partial route was found; no successful full path is claimed.",
-      );
+    validateNavigationEndpoints(
+      result.path,
+      options.start,
+      options.end,
+      endpointTolerance,
+    );
     const [navPositions, navIndices] = getNavMeshPositionsAndIndices(
       generated.navMesh,
     );
@@ -130,6 +149,7 @@ export async function processNavigation(
           coordinates: "meter/right/Y/-Z",
           options,
           path: result.path,
+          endpointTolerance,
           sourceSha256: sha256(source),
         },
         null,
@@ -160,5 +180,31 @@ export async function processNavigation(
     query?.destroy();
     if (generated.success) generated.navMesh.destroy();
     Raw.destroy(generated.intermediates.buildContext.raw);
+  }
+}
+
+/** Detour may snap to a nearby polygon; never silently route on a different floor. */
+export function validateNavigationEndpoints(
+  route: readonly { x: number; y: number; z: number }[],
+  start: readonly [number, number, number],
+  end: readonly [number, number, number],
+  tolerance: { horizontal: number; vertical: number },
+): void {
+  for (const [actual, requested, label] of [
+    [route[0], start, "start"],
+    [route.at(-1), end, "end"],
+  ] as const) {
+    if (
+      !actual ||
+      ![actual.x, actual.y, actual.z].every(Number.isFinite) ||
+      Math.hypot(actual.x - requested[0], actual.z - requested[2]) >
+        tolerance.horizontal ||
+      Math.abs(actual.y - requested[1]) > tolerance.vertical
+    ) {
+      throw new SpecialistError(
+        "runtime",
+        `Navigation ${label} is outside the allowed XYZ projection tolerance; select the intended walkable surface.`,
+      );
+    }
   }
 }

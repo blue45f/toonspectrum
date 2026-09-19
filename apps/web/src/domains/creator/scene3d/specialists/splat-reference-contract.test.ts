@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { inspectNativeSplat } from "./splat-reference-contract";
+import { describe, expect, it, vi } from "vitest";
+import {
+  inspectNativeSplat,
+  inspectNativeSplatAsync,
+  SPLAT_INSPECTION_BATCH_ROWS,
+} from "./splat-reference-contract";
 
 function fixture() {
   const bytes = new Uint8Array(32);
@@ -32,4 +36,29 @@ describe("local splat reference input", () => {
     rotation.fill(128, 28);
     expect(() => inspectNativeSplat(rotation)).toThrow();
   });
+});
+
+it("incrementally validates the same data and yields without per-row typed-array allocation", async () => {
+  const bytes = new Uint8Array((SPLAT_INSPECTION_BATCH_ROWS * 2 + 1) * 32);
+  for (let offset = 0; offset < bytes.length; offset += 32)
+    bytes.set(fixture(), offset);
+  const yieldControl = vi.fn(async () => {});
+  const subarray = vi.spyOn(bytes, "subarray");
+  expect(await inspectNativeSplatAsync(bytes, { yieldControl })).toEqual(
+    inspectNativeSplat(bytes),
+  );
+  expect(yieldControl).toHaveBeenCalledTimes(2);
+  expect(subarray).not.toHaveBeenCalled();
+});
+it("cancels a large inspection at the next batch boundary", async () => {
+  const bytes = new Uint8Array((SPLAT_INSPECTION_BATCH_ROWS + 1) * 32);
+  for (let offset = 0; offset < bytes.length; offset += 32)
+    bytes.set(fixture(), offset);
+  const controller = new AbortController();
+  await expect(
+    inspectNativeSplatAsync(bytes, {
+      signal: controller.signal,
+      yieldControl: async () => controller.abort(),
+    }),
+  ).rejects.toMatchObject({ code: "cancelled" });
 });

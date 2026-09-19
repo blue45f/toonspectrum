@@ -323,8 +323,8 @@ export function StudioScene3dAssetToolsPanel({
         </summary>
         <p className="my-2 text-xs text-fg-3">
           {t(
-            "각 GLB는 텍스처 없는 정적 메시 1개여야 합니다. 두 파일의 월드 좌표로 연산하며 결과는 형상 전용입니다.",
-            "Each GLB must contain one untextured static mesh. Operations use world coordinates and export geometry only.",
+            "각 GLB는 텍스처 없는 정적 메시 1개여야 하며 두 파일 합계는 128MiB 이하입니다. 월드 좌표로 연산하며 결과는 형상 전용입니다.",
+            "Each GLB must contain one untextured static mesh; combined input must not exceed 128 MiB. Operations use world coordinates and export geometry only.",
           )}
         </p>
         <label className="block text-xs">

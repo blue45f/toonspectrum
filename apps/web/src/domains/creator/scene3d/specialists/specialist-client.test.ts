@@ -120,3 +120,49 @@ it.each([0, 99, 1])(
     expect(FakeWorker.latest.terminate).toHaveBeenCalledOnce();
   },
 );
+
+it.each([null, undefined, false, 0, "not-a-response"])(
+  "rejects an empty or primitive worker response immediately (%s)",
+  async (data) => {
+    vi.stubGlobal("Worker", FakeWorker);
+    const pending = runScene3dSpecialistInWorker(request());
+    const rejected = expect(pending).rejects.toMatchObject({ code: "runtime" });
+    expect(() =>
+      FakeWorker.latest.onmessage?.({ data } as MessageEvent),
+    ).not.toThrow();
+    await rejected;
+    expect(FakeWorker.latest.terminate).toHaveBeenCalledOnce();
+  },
+);
+it("rejects aggregate CSG memory before creating a Worker or copying either operand", async () => {
+  const ctor = vi.fn();
+  vi.stubGlobal("Worker", ctor);
+  const source = new ArrayBuffer(SPECIALIST_LIMITS.csgInputBytes);
+  const secondary = new ArrayBuffer(20);
+  const copy = vi.spyOn(source, "slice");
+  await expect(
+    runScene3dSpecialistInWorker({
+      ...request(),
+      source,
+      secondary,
+      options: { kind: "csg", operation: "union", backend: "preview" },
+    }),
+  ).rejects.toMatchObject({ code: "budget" });
+  expect(ctor).not.toHaveBeenCalled();
+  expect(copy).not.toHaveBeenCalled();
+});
+it("does not transfer a stale CSG operand during another operation", async () => {
+  vi.stubGlobal("Worker", FakeWorker);
+  const controller = new AbortController();
+  const pending = runScene3dSpecialistInWorker(
+    { ...request(), secondary: new ArrayBuffer(32) },
+    controller.signal,
+  );
+  expect(
+    FakeWorker.latest.postMessage.mock.calls[0]![0].secondary,
+  ).toBeUndefined();
+  expect(FakeWorker.latest.postMessage.mock.calls[0]![1]).toHaveLength(1);
+  const rejected = expect(pending).rejects.toMatchObject({ code: "cancelled" });
+  controller.abort();
+  await rejected;
+});

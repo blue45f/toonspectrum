@@ -87,6 +87,7 @@ export const SPECIALIST_LIMITS = Object.freeze({
   nodes: 4096,
   navCells: 2_000_000,
   csgTriangles: 100_000,
+  csgInputBytes: 128 * 1024 * 1024,
   timeoutMs: 120_000,
 });
 export class SpecialistError extends Error {
@@ -115,7 +116,10 @@ export function parseSpecialistRequest(value: unknown): SpecialistRequest {
     })
     .strict()
     .parse(value);
-  for (const bytes of [request.source, request.secondary]) {
+  for (const bytes of [
+    request.source,
+    request.options.kind === "csg" ? request.secondary : undefined,
+  ]) {
     if (
       bytes &&
       (bytes.byteLength < 20 || bytes.byteLength > SPECIALIST_LIMITS.inputBytes)
@@ -125,7 +129,21 @@ export function parseSpecialistRequest(value: unknown): SpecialistRequest {
   }
   if (request.options.kind === "csg" && !request.secondary)
     throw new SpecialistError("invalid-input", "CSG requires two source GLBs.");
-  return request;
+  if (
+    request.options.kind === "csg" &&
+    request.source.byteLength + (request.secondary?.byteLength ?? 0) >
+      SPECIALIST_LIMITS.csgInputBytes
+  ) {
+    throw new SpecialistError(
+      "budget",
+      "Combined CSG source files exceed the 128 MiB input budget.",
+    );
+  }
+  // Other operations must not copy or transfer an unrelated previously selected operand.
+  return {
+    ...request,
+    secondary: request.options.kind === "csg" ? request.secondary : undefined,
+  };
 }
 
 const statsSchema = z

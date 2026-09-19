@@ -182,6 +182,17 @@ try {
     const download = page.waitForEvent("download");
     await page.getByRole("link", { name: "lod-2.glb" }).click();
     await (await download).saveAs(join(scratch, "ui-lod-2.glb"));
+    await page.getByRole("button", { name: /화면에 맞춤|Fit view/ }).click();
+    await page.getByRole("button", { name: /^확대$|^Zoom in$/ }).click();
+    await page.getByRole("button", { name: /^축소$|^Zoom out$/ }).click();
+    // New LOD preview replaces and disposes the previous artifact's renderer/resources.
+    const previewButtons = page.getByRole("button", {
+      name: /^미리보기$|^Preview$/,
+    });
+    for (let index = 0; index < 3; index++) {
+      await previewButtons.nth(index).click();
+      await page.getByRole("button", { name: /화면에 맞춤|Fit view/ }).click();
+    }
     const canvas = page.locator("canvas").first();
     const pixels = await canvas.screenshot();
     writeFileSync(join(scratch, "artifact-preview.png"), pixels);
@@ -231,7 +242,13 @@ try {
     await page.getByRole("button", { name: /뷰어 닫기|Close viewer/ }).click();
     await splatCanvas.waitFor({ state: "detached" });
     proof.splat.closeDisposedCanvas = true;
-    proof.ui = { generation: "passed", preview: "mounted", download: "passed" };
+    proof.ui = {
+      generation: "passed",
+      preview: "mounted",
+      download: "passed",
+      keyboardNavigation: "passed",
+      artifactSwitches: 3,
+    };
   }
   const result = {
     ...proof,

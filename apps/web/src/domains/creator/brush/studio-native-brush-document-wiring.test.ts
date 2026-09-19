@@ -10,10 +10,16 @@ describe("native document product wiring", () => {
     const start = host.indexOf("prepareNativeBrushDocumentConversion: (target)");
     expect(start).toBeGreaterThan(0);
     const handler = host.slice(start, host.indexOf("replaceDrawWithHokusaiNaturalMedia:", start));
-    for (const token of ["captureStudioMutationTicket()", "canApplyStudioMutation(ticket)", "pagesHistoryRef.current",
-      "pagesHiRef.current", "currentPageIdRef.current", "documentSaveInFlightRef.current",
-      "collaborationAccessRef.current.locked", "activeSurfaceReviewLockedRef.current", "pendingStrokeCommitsRef.current", "commit,"]) {
+    for (const token of ["captureStudioMutationTicket()", "canApply: canApplyStudioMutation", "history: pagesHistoryRef",
+      "index: pagesHiRef", "pageId: currentPageIdRef", "saving: documentSaveInFlightRef",
+      "collaboration: collaborationAccessRef", "surfaceLocked: activeSurfaceReviewLockedRef", "pending: pendingStrokeCommitsRef", "commit,"]) {
       expect(handler).toContain(token);
+    }
+    const adapter = source("./studio-native-brush-editor-commit.ts");
+    for (const token of ["prepareStudioNativeBrushDocumentCommit", "ports.canApply(ticket)",
+      "ports.history.current", "ports.index.current", "ports.pageId.current", "ports.saving.current",
+      "ports.collaboration.current.locked", "ports.surfaceLocked.current", "ports.pending.current"]) {
+      expect(adapter).toContain(token);
     }
   });
   it("reaches the document conversion from both drawing and selected-freehand inspectors", () => {

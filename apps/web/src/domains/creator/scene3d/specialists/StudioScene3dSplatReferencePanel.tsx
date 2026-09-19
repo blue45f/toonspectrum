@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import {
-  inspectNativeSplat,
-  SPLAT_REFERENCE_MAX_COUNT,
-} from "./splat-reference-contract";
+import { SPLAT_REFERENCE_MAX_COUNT } from "./splat-reference-contract";
 import type { SparkReferenceSession } from "./splat-reference-runtime";
 
 export function StudioScene3dSplatReferencePanel({
@@ -59,7 +56,6 @@ export function StudioScene3dSplatReferencePanel({
           ),
         );
       const bytes = new Uint8Array(await file.arrayBuffer());
-      inspectNativeSplat(bytes);
       const { createSparkReferenceSession } = await import(
         "./splat-reference-runtime"
       );

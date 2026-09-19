@@ -17,7 +17,7 @@ export function runScene3dSpecialistInWorker(
   if (signal?.aborted)
     return Promise.reject(new SpecialistError("cancelled", "Cancelled."));
   try {
-    parseSpecialistRequest(request);
+    request = parseSpecialistRequest(request);
   } catch (error) {
     return Promise.reject(error);
   }
@@ -82,7 +82,9 @@ export function runScene3dSpecialistInWorker(
         fail(
           new SpecialistError(
             "runtime",
-            event.data.message ?? "Invalid worker response.",
+            typeof event.data?.message === "string"
+              ? event.data.message
+              : "Invalid worker response.",
           ),
         );
         return;
