@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+import "./types/pigment-libraries";
+
+declare global {
 interface ImportMetaEnv {
   // Studio live ink: auto(default) selects the low-latency Canvas2D overlay before an operation.
   // `webgpu` is an explicit measured rollout; device/pipeline failure ends as unavailable.
@@ -39,4 +42,5 @@ interface ImportMetaEnv {
   // The URL must be an HTTPS provider-hosted checkout and must never contain secret credentials.
   readonly VITE_SUPPORTER_HOSTED_CHECKOUT_ENABLED?: "true" | "false";
   readonly VITE_SUPPORTER_HOSTED_CHECKOUT_URL?: string;
+}
 }
