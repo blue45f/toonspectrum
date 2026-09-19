@@ -52,7 +52,15 @@ apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx
 apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts
+apps/web/src/domains/creator/brush-lab/brush-studio-v6-legacy-replay.test.ts
+apps/web/src/domains/creator/brush-lab/brush-studio-v6-material-palette-cache.test.ts
+apps/web/src/domains/creator/brush-lab/brush-studio-v6-pigment-provider.test.ts
 apps/web/src/domains/creator/brush-lab/brush-studio-version-integration.test.ts
+apps/web/src/domains/creator/brush-lab/pigment/StudioPigmentComparison.test.tsx
+apps/web/src/domains/creator/brush-lab/pigment/external-pigments.test.ts
+apps/web/src/domains/creator/brush-lab/pigment/km-layer-comparison.test.ts
+apps/web/src/domains/creator/brush-lab/pigment/kubelka-munk.test.ts
+apps/web/src/domains/creator/brush-lab/pigment/pigment-material-integration.test.ts
 apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx
 apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
 apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx
@@ -182,3 +190,4 @@ scripts/verify-studio-hybrid-dcc-integration.test.ts
 scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
 scripts/verify-studio-living-ink-integration.test.ts
 scripts/verify-studio-menus.test.ts
+scripts/pigment-dependency-install-policy.test.mjs

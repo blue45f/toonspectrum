@@ -42,6 +42,7 @@ export function isBrushStudioV6TopologyNodeCompatible(id: string): boolean {
     "input-pointer-v3", "motion-direct", "tip-round-sdf", "tip-chisel-sdf", "tip-grain-exemplar", "tip-krita-dual",
     "surface-smooth", "surface-kent", "surface-coldpress", "surface-printmaking", "surface-linen", "surface-porous",
     "deposit-ink", "deposit-dry", "deposit-wet", "deposit-oil", "deposit-marker",
+    "pigment-spectral-js", "pigment-open-km-spectral", "pigment-colormix-lab",
     "pickup-none", "pickup-krita-smudge", "pigment-rgb", "pigment-spectral", "pigment-mixbox", "pattern-none", "finish-neon", "output-contact-canvas-svg",
   ].includes(id);
 }
