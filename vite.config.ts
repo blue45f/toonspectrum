@@ -44,6 +44,45 @@ const ENTRY_PRELOAD_EXCLUSIONS = [
   "i18n",
 ];
 const INITIAL_ICON_MODULES = new Set([
+  // Exact named exports already consumed by the application shell (manifest audit).
+  "rows-3",
+  "book-open",
+  "cloud",
+  "download",
+  "palette",
+  "brush",
+  "shield-check",
+  "flower-2",
+  "layers",
+  "history",
+  "message-circle",
+  "images",
+  "layout-grid",
+  "flame",
+  "circle-check",
+  "package-check",
+  "monitor-up",
+  "scan-search",
+  "boxes",
+  "box",
+
+  // Already in the app static closure: group leaf icons without loading new features.
+  "calendar-days",
+  "chart-column",
+  "compass",
+  "gamepad-2",
+  "house",
+  "library",
+  "lightbulb",
+  "message-square-quote",
+  "moon",
+  "settings",
+  "store",
+  "trending-up",
+  "user-round-pen",
+  "user-round",
+  "workflow",
+
   "chevron-left",
   "chevron-right",
   "pause",
@@ -122,6 +161,15 @@ const STUDIO_WORKSPACE_ICON_MODULES = new Set([
   "zap",
 ]);
 const STUDIO_CORE_ICON_MODULES = new Set([
+  // These leaves already ship synchronously with the Studio editor.
+  "external-link",
+  "link-2",
+  "radio",
+  "file-archive",
+  "grip-vertical",
+  "triangle",
+  "settings-2",
+
   "a-large-small",
   "align-justify",
   "arrow-up-to-line",
