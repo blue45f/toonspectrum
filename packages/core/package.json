@@ -54,6 +54,8 @@
       "types": "./src/infrastructure-fabric.ts",
       "import": "./src/infrastructure-fabric.ts",
       "default": "./src/infrastructure-fabric.ts"
-    }
+    },
+    "./business": "./src/business.ts",
+    "./public-share-path": "./src/public-share-path.ts"
   }
 }

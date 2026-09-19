@@ -1,4 +1,4 @@
-import { SITE_URL } from "@toonspectrum/core";
+import { SITE_URL } from "@toonspectrum/core/business";
 import { useEffect } from "react";
 
 import {

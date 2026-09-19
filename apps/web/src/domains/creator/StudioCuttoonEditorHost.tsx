@@ -264,7 +264,7 @@ import {
 import { createStudioAutosaveBusyRetry } from "./studio-autosave-busy-retry";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
-import { StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialog";
+import { StudioFormalSaveDialogMount as StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialogMount";
 import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
 import {
   chooseStudioProjectPackageSaveTarget,
@@ -272,7 +272,6 @@ import {
   writeStudioProjectPackageToTarget,
   type StudioProjectPackageSaveTarget,
 } from "./save-first/studio-project-package";
-import { buildStudioProjectPackageWithWorkspace } from "./save-first/studio-project-package-with-workspace";
 import {
   ensureStudioSaveProfile,
   markStudioStorageBindingSynced,
@@ -549,7 +548,7 @@ import { initialGpuLiveSourceJournalMatchesPlan } from "./canvas/studio-hokusai-
 import { StudioHokusaiLiveOverlayRenderer } from "./render/studio-hokusai-live-brush-overlay";
 import { StudioHokusaiLiveBrushProvider } from "./render/studio-hokusai-live-brush-runtime";
 import { planStudioHokusaiNaturalMediaReplacement } from "./render/studio-hokusai-natural-media-replacement";
-import { prepareStudioNativeBrushDocumentCommit } from "./brush/studio-native-brush-document-commit";
+import { createNativeBrushDocumentEditorPreparer } from "./brush/studio-native-brush-editor-bridge";
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
@@ -24187,6 +24186,7 @@ No text, logo, watermark, or copyrighted character.`;
           window,
         );
       formalSaveTargetRef.current = target;
+      const { buildStudioProjectPackageWithWorkspace } = await import("./save-first/studio-project-package-with-workspace");
       if (pendingStrokeCommitsRef.current) {
         flushSync(() => flushPendingStrokeCommitsRef.current());
       }
@@ -27203,28 +27203,13 @@ function clearSelectionForEdit() {
       }
       return addRenderedImage(src, width, height, undefined, false, { name });
     },
-    prepareNativeBrushDocumentConversion: (target) => {
-      const ticket = captureStudioMutationTicket();
-      return prepareStudioNativeBrushDocumentCommit(target, {
-        canMutate: () => canApplyStudioMutation(ticket)
-          && editorMountedRef.current && !documentSaveInFlightRef.current
-          && !collaborationAccessRef.current.locked && !activeSurfaceReviewLockedRef.current
-          && !drawingRef.current && !pendingStrokeCommitsRef.current,
-        read: () => {
-          const history = pagesHistoryRef.current;
-          const index = pagesHiRef.current;
-          const page = history[index]?.find((candidate) => candidate.id === currentPageIdRef.current);
-          return page ? { pageId: page.id, masterEditMode: masterEditModeRef.current,
-            historyIdentity: history, historyIndex: index, elements: page.elements,
-            groups: page.groups ?? [], documentWidth: CANVAS_W, documentHeight: page.canvasH } : null;
-        },
-        commit,
-        onCommitted: (id) => {
-          setSelectedId(id);
-          announceDrawingShortcut("네이티브 브러시 변환 완료 · 원본 숨김 보존 · 실행 취소 가능");
-        },
-      });
-    },
+    prepareNativeBrushDocumentConversion: createNativeBrushDocumentEditorPreparer({
+      captureStudioMutationTicket, canApplyStudioMutation, editorMountedRef,
+      documentSaveInFlightRef, collaborationAccessRef, activeSurfaceReviewLockedRef,
+      drawingRef, pendingStrokeCommitsRef, pagesHistoryRef, pagesHiRef,
+      currentPageIdRef, masterEditModeRef, documentWidth: CANVAS_W,
+      commit, setSelectedId, announceDrawingShortcut,
+    }),
     replaceDrawWithHokusaiNaturalMedia: (
       result,
       targetPageId,
