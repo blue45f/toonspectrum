@@ -5,6 +5,7 @@ import {
   type StudioScene3dDeviceCapabilities,
   type StudioScene3dPrimaryRenderer,
   type StudioScene3dRuntimePlan,
+  type StudioScene3dSoftwareCapabilities,
 } from "./studio-scene3d-runtime-policy";
 
 export const STUDIO_SCENE3D_NPR_PASS_IDS = Object.freeze([
@@ -182,12 +183,17 @@ function executorFor(
 export function buildStudioScene3dNprRenderGraph(input: {
   readonly document: StudioScene3dDocumentV1;
   readonly capabilities: StudioScene3dDeviceCapabilities;
+  readonly software?: StudioScene3dSoftwareCapabilities;
   readonly requestedPasses?: readonly StudioScene3dNprPassId[];
   readonly fx?: StudioScene3dNprFxRequest;
   readonly babylonSpecialistAvailable?: boolean;
 }): StudioScene3dNprRenderGraph {
   const needs = inferStudioScene3dRuntimeNeeds(input.document);
-  const runtimePlan = resolveStudioScene3dRuntimePlan(input.capabilities, needs);
+  const runtimePlan = resolveStudioScene3dRuntimePlan(
+    input.capabilities,
+    needs,
+    input.software,
+  );
   const requested = Object.freeze([...(input.requestedPasses ?? DEFAULT_REQUESTED)]);
   const wantsFx = fxRequested(input.fx);
   const fxEnabled = wantsFx && input.babylonSpecialistAvailable === true;
@@ -204,6 +210,11 @@ export function buildStudioScene3dNprRenderGraph(input: {
   }
   if (runtimePlan.primaryRenderer === "three-webgl2") {
     warnings.push("WebGPU를 사용할 수 없어 Three WebGL2 호환 렌더러로 동일 패스 계약을 실행합니다.");
+  }
+  if (needs.gaussianSplats && runtimePlan.features.gaussianSplatBackend === "unavailable") {
+    warnings.push(
+      "Gaussian Splat 자산이 있지만 admission 된 runtime이 없어 해당 entity를 렌더할 수 없습니다.",
+    );
   }
   const passes = STUDIO_SCENE3D_NPR_PASS_IDS.map((id) => {
     const enabled = expanded.has(id);
