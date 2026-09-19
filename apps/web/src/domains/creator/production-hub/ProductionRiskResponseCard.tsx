@@ -75,7 +75,8 @@ export function ProductionRiskResponseCard({
   const [error, setError] = useState<string | null>(null);
 
   const transition = async (toStatus: ProductionRiskResponseStatus) => {
-    if (busy) return;
+    if (busy || (toStatus === "approved" ? !canManage : !canEdit)) return;
+    if ((toStatus === "completed" || toStatus === "cancelled") && !resultNote.trim()) return;
     setBusy(true);
     setError(null);
     try {
@@ -83,7 +84,9 @@ export function ProductionRiskResponseCard({
         type: "transition-risk-response",
         responseId: response.id,
         toStatus,
-        actualEffect: resultNote.trim() || null,
+        actualEffect: toStatus === "completed" ? resultNote.trim() : null,
+        reason: toStatus === "cancelled" ? resultNote.trim() : null,
+        expectedResponseRevision: response.revision ?? 0,
       }, `${response.title} 대응을 ${STATUS_LABELS[toStatus]} 상태로 변경했습니다.`);
       if (toStatus === "proposed") setResultNote("");
     } catch (transitionError) {
@@ -147,7 +150,7 @@ export function ProductionRiskResponseCard({
             <ShieldCheck className="size-4" aria-hidden="true" /> 승인
           </button>
         ) : null}
-        {(response.status === "proposed" || response.status === "approved") && canEdit ? (
+        {response.status === "approved" && canEdit ? (
           <button type="button" className={buttonClass({ size: "sm" })} disabled={busy} onClick={() => void transition("in-progress")}>
             <Play className="size-4" aria-hidden="true" /> 대응 시작
           </button>

@@ -142,7 +142,7 @@ export function CreatorDirectoryPage() {
   };
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-bg">
+    <div className="min-h-[calc(100vh-4rem)] bg-bg">
       <Container size="wide" className="py-8 sm:py-12">
         <header className="max-w-3xl">
           <div className="flex items-center gap-2 text-accent">
@@ -305,6 +305,6 @@ export function CreatorDirectoryPage() {
           </>
         )}
       </Container>
-    </main>
+    </div>
   );
 }

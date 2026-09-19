@@ -43,9 +43,6 @@ function projectRecord() {
       title: "1화 원고",
       scope: {
         projectId: "project-1",
-        kind: "project",
-        id: "project-1",
-        ancestors: [],
       },
       headRevisionId: "revision-head",
       approvedRevisionId: null,

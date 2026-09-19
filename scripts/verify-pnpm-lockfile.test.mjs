@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
 
 import {
   duplicateValues,
@@ -10,6 +9,8 @@ import {
   parseWorkspacePatterns,
   verifyLockfileImporters,
 } from "./verify-pnpm-lockfile.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 test("duplicateValues reports every duplicate only once", () => {
   assert.deepEqual(

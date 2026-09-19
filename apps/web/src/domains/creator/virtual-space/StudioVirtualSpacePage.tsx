@@ -1096,7 +1096,7 @@ function VirtualSpaceExperience({
   }, [worldManifest]);
 
   return (
-    <main className="vs2-shell vs2-shell--project" data-studio-live-shell="true">
+    <div className="vs2-shell vs2-shell--project" data-studio-live-shell="true">
       <Container size="wide" className="vs2-live-container">
         <LiveStudioTopbar
           projectId={projectId}
@@ -1533,7 +1533,7 @@ function VirtualSpaceExperience({
           <em>Creators for a Brighter Tomorrow ♥</em>
         </footer>
       </Container>
-    </main>
+    </div>
   );
 }
 

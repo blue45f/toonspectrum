@@ -42,7 +42,7 @@ export function CreatorEcosystemLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12">
+    <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12">
       <header className="overflow-hidden rounded-3xl border border-line bg-panel p-6 sm:p-8">
         <p className="eyebrow text-accent">TOONSPECTRUM CREATOR ECOSYSTEM</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">{title}</h1>
@@ -70,6 +70,6 @@ export function CreatorEcosystemLayout({
         ))}
       </nav>
       {children}
-    </main>
+    </div>
   );
 }

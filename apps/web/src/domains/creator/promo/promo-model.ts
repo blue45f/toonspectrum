@@ -104,7 +104,7 @@ export function promoMotionAt(motion: PromoMotion, progress: number): { scale: n
     case "pan-down": return { scale: 1.1, x: 0, y: -0.035 + eased * 0.07 };
     case "drift": return { scale: 1.12, x: -0.03 + eased * 0.06, y: 0.025 - eased * 0.05 };
     case "orbit": return { scale: 1.12, x: Math.cos(t * Math.PI * 2) * 0.025, y: Math.sin(t * Math.PI * 2) * 0.025 };
-    case "impact": return { scale: 1.15 - Math.exp(-t * 8) * 0.15, x: Math.sin(t * 28) * Math.exp(-t * 6) * 0.012, y: 0 };
+    case "impact": return { scale: 1 + (1 - Math.exp(-t * 8)) * 0.15, x: Math.sin(t * 28) * Math.exp(-t * 6) * 0.012, y: 0 };
     case "float": return { scale: 1.08, x: Math.sin(t * Math.PI * 2) * 0.015, y: Math.sin(t * Math.PI * 2) * 0.02 };
     case "diagonal-reveal": return { scale: 1.12, x: -0.045 + eased * 0.09, y: 0.04 - eased * 0.08 };
     case "arc-left": return { scale: 1.1, x: 0.04 - eased * 0.08, y: Math.sin(t * Math.PI) * -0.025 };

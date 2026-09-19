@@ -71,7 +71,7 @@ export function CreatorVirtualStudioExperience() {
   const korean = useI18n((state) => state.lang.startsWith("ko"));
   const t = (ko: string, en: string) => korean ? ko : en;
   return (
-    <main className="vs2-shell" data-creator-home="virtual-studio" lang={korean ? "ko" : "en"}>
+    <div className="vs2-shell" data-creator-home="virtual-studio" lang={korean ? "ko" : "en"}>
       <header className="vs2-topbar">
         <Link href="/" className="vs2-brand">
           <span className="vs2-brand-mark"><Sparkles size={17} /></span>
@@ -173,6 +173,6 @@ export function CreatorVirtualStudioExperience() {
 
       <footer className="vs2-footer"><strong>ToonSpectrum</strong><span>{t("혼자가 아닌, 함께 만드는 더 큰 이야기.","Bigger stories, made together.")}</span><em>Creators for a Brighter Tomorrow ♥</em></footer>
       <div className="vs2-mode-switch"><CreatorExperienceModeSwitch compact/></div>
-    </main>
+    </div>
   );
 }

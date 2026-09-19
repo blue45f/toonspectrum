@@ -404,10 +404,14 @@ function reduceDemoCommand(
       return { ...base, riskResponses: replaceById(aggregate.riskResponses, command.response) };
     case "transition-risk-response": {
       const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
-      if (!response) return aggregate;
+      if (!response) throw new Error("상태를 변경할 위험 대응을 찾을 수 없습니다.");
+      if (command.expectedResponseRevision !== undefined && command.expectedResponseRevision !== (response.revision ?? 0)) {
+        throw new Error("위험 대응 revision이 현재 값과 일치하지 않습니다.");
+      }
       const next = transitionProductionRiskResponse(response, command.toStatus, {
         at: new Date().toISOString(),
         actualEffect: command.actualEffect,
+        reason: command.reason,
       });
       return { ...base, riskResponses: replaceById(aggregate.riskResponses, next) };
     }

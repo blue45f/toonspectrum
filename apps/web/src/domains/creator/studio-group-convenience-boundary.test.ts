@@ -279,7 +279,7 @@ describe("Studio PPT-style group convenience boundary", () => {
       dragEndSource.indexOf("committed = changed && commit(next)"),
     );
     expect(dragEndSource).toContain(
-      "if (!committed && dnode && (dx !== 0 || dy !== 0))",
+      "if (!committed && !previewRestored && dnode && (dx !== 0 || dy !== 0))",
     );
     expect(dragEndSource).toContain("restoreGroupDragPreview(g, dx, dy)");
     expect(dragEndSource).not.toContain(

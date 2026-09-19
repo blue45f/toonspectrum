@@ -37,11 +37,12 @@ import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 function localizeText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
 ): string {
-  return t(key) === key ? fallback : t(key);
+  const translated = t(key, fallback);
+  return translated === key ? fallback : translated;
 }
 
 function interpolateText(message: string, values?: Record<string, string | number>): string {
@@ -50,7 +51,7 @@ function interpolateText(message: string, values?: Record<string, string | numbe
 }
 
 function tText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
   values?: Record<string, string | number>,

@@ -47,6 +47,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
     expect(imports.valueImports).toEqual([
       "lucide-react",
       "react",
+      "@/shared/lib/i18n-bilingual-copy",
       "./studio-bg3d-environment-catalog",
     ]);
     expect(imports.typeImports).toEqual(["./bg3d-model-library"]);
@@ -115,7 +116,7 @@ describe("Studio BG3D asset-library ownership boundary", () => {
       expect(panelSource).not.toContain(ownerToken);
     }
     expect(editorSource).not.toContain('aria-label="3D 모델 및 연결 파일 선택"');
-    expect(panelSource).toContain('aria-label="3D 모델 및 연결 파일 선택"');
+    expect(panelSource).toContain('aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dAssetLibraryPanel", "ko", "3D 모델 및 연결 파일 선택")}');
   });
 
   it("delays SQLite/OPFS model, template, and LT preset authorities until their product surfaces activate", () => {

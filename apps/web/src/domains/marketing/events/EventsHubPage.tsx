@@ -33,7 +33,7 @@ export function EventsHubPage() {
   usePageSocialMeta({ canonicalPath: "/events", title, description });
 
   return (
-    <main className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas px-4 py-10 sm:px-6 sm:py-16">
+    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas px-4 py-10 sm:px-6 sm:py-16">
       <div className="mx-auto max-w-6xl">
         <header className="max-w-3xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-black tracking-[0.14em] text-accent">
@@ -75,7 +75,7 @@ export function EventsHubPage() {
           })}
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

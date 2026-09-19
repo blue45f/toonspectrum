@@ -199,6 +199,9 @@ describe("Studio tournament persistence bootstrap", () => {
     expect(page).not.toContain("peekBootedStudioTournamentRuntime()");
     expect(page).not.toContain("getStudioTournamentRuntime()");
     expect(page).not.toContain("resolveStudioStrokeRoutePointerDownGate");
-    expect(page).toContain("const livingInkAdmitted = livingInkSelected");
+    expect(page).toContain("const selectedMedia = selectStudioLiveStrokeMedia(next,");
+    expect(page).toContain(
+      'const livingInkAdmitted = (selectedMedia.kind === "living-ink")',
+    );
   });
 });

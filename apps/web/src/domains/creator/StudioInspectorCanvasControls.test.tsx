@@ -261,7 +261,7 @@ describe("StudioInspectorCanvasControls", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "배경·종이 질감" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "배경·종이 질감, 세부 설정 펼치기" })).toBeTruthy();
 
     view.rerender(
       <StudioInspectorCanvasControls
@@ -272,7 +272,7 @@ describe("StudioInspectorCanvasControls", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "배경·종이 질감, 설정 1개 켜짐" }),
+      screen.getByRole("button", { name: "배경·종이 질감, 설정 1개 켜짐, 세부 설정 펼치기" }),
     ).toBeTruthy();
 
     view.rerender(
@@ -285,7 +285,7 @@ describe("StudioInspectorCanvasControls", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: "배경·종이 질감, 설정 1개 켜짐" }),
+      screen.getByRole("button", { name: "배경·종이 질감, 설정 1개 켜짐, 세부 설정 펼치기" }),
     ).toBeTruthy();
   });
 
@@ -554,11 +554,11 @@ describe("StudioInspectorCanvasControls — CSP식 접기", () => {
     // 가이드선: 정렬선 표시 + 사용자 가이드 있음 → 2. 숫자 배지는 시각 전용이고
     // 접근 가능한 이름에는 문장이 들어간다("가이드선2" 로 붙여 읽히지 않게).
     expect(
-      screen.getByRole("button", { name: "가이드선, 설정 2개 켜짐" }),
+      screen.getByRole("button", { name: "가이드선, 설정 2개 켜짐, 세부 설정 펼치기" }),
     ).toBeTruthy();
     // 연출 스타일: 기본값(출판만화)이 아니므로 1
     expect(
-      screen.getByRole("button", { name: "만화/웹툰 연출 스타일, 설정 1개 켜짐" }),
+      screen.getByRole("button", { name: "만화/웹툰 연출 스타일, 설정 1개 켜짐, 세부 설정 펼치기" }),
     ).toBeTruthy();
   });
 
@@ -573,8 +573,8 @@ describe("StudioInspectorCanvasControls — CSP식 접기", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "가이드선" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "만화/웹툰 연출 스타일" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "가이드선, 세부 설정 펼치기" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "만화/웹툰 연출 스타일, 세부 설정 펼치기" })).toBeTruthy();
   });
 
   it("펼쳐 둔 섹션은 패널이 통째로 언마운트됐다 돌아와도 펼쳐진 채다", () => {

@@ -35,7 +35,7 @@ describe("academy product surfaces", () => {
     expect(screen.queryByRole("link", { name: /선 굵기와 필압/u })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "주차 추가" }));
-    expect(screen.getByRole("option", { name: /7주차 · 새 학습 주차 7/u })).toBeTruthy();
+    expect(screen.getAllByRole("option", { name: /7주차 · 새 학습 주차 7/u })).toHaveLength(2);
 
     fireEvent.change(screen.getByLabelText("과제 이름"), { target: { value: "3컷 콘티 제출" } });
     fireEvent.click(screen.getByRole("button", { name: "과제 추가" }));

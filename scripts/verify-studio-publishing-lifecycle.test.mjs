@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import test from "node:test";
 
 import {
   createPublishingLifecycleReceipt,
@@ -8,6 +7,8 @@ import {
   validatePublishingLifecycleManifest,
   verifyPublishingLifecycleEvidence,
 } from "./verify-studio-publishing-lifecycle.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const ROOT = resolve(import.meta.dirname, "..");
 

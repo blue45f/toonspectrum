@@ -47,7 +47,7 @@ describe("compiled Studio Music package boundary", () => {
       for (const dependency of JSON.parse(process.argv[2])) {
         const fromConsumer = createRequire(dependency.consumer);
         assert.equal(fromConsumer.resolve(dependency.specifier), root + '/packages/core/src/studio-music.js');
-        assert.equal(fromConsumer(dependency.specifier).MUSIC_MAX_BYTES, 1500000);
+        assert.equal(fromConsumer(dependency.specifier).MUSIC_MAX_BYTES, 2500000);
       }
       const api = require(root + '/apps/api/src/server/studio-music-core.js');
       assert.equal(api.musicStatus({}).reason, 'disabled');

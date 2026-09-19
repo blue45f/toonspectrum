@@ -254,7 +254,7 @@ export function ShareDialog({ payload, trigger, defaultOpen = false }: ShareDial
         <Dialog.Overlay className="fixed inset-0 z-[180] bg-[oklch(0.12_0.012_70/0.72)] backdrop-blur-sm" />
         <Dialog.Content
           aria-modal="true"
-          className="fixed bottom-0 left-1/2 z-[181] max-h-[calc(100dvh-1rem)] w-full max-w-xl -translate-x-1/2 overflow-y-auto rounded-t-3xl border border-line-strong bg-panel p-5 shadow-2xl focus:outline-none sm:bottom-auto sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-y-1/2 sm:rounded-3xl sm:p-6"
+          className="fixed bottom-0 left-1/2 z-[181] max-h-[calc(100dvh-1rem)] w-full max-w-xl -translate-x-1/2 overflow-y-auto rounded-t-3xl border border-line-strong bg-panel p-5 shadow-2xl shadow-[oklch(0.1_0.02_70/0.52)] focus:outline-none sm:bottom-auto sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-y-1/2 sm:rounded-3xl sm:p-6"
         >
           <div className="flex items-start gap-3">
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent">

@@ -59,8 +59,9 @@ describe("studio file control center model", () => {
       size: 100,
       type: "application/octet-stream",
     });
-    expect(clip.capabilityId).toBeNull();
+    expect(clip.capabilityId).toBe("clip");
     expect(clip.tier).toBe("unsupported");
+    expect(clip.importSupport).toBe("unsupported");
     expect(clip.actionId).toBeNull();
     expect(clip.recommendations.join(" ")).toContain("PSD");
 

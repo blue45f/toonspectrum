@@ -191,7 +191,7 @@ describe("Studio priority i18n loader", () => {
 
   it("keeps translation fetches outside the lazy chunk recovery promise", () => {
     const routeSource = readFileSync(
-      path.resolve(process.cwd(), "apps/web/src/app/routes/groups/creator.routes.tsx"),
+      path.resolve(process.cwd(), "apps/web/src/app/routes/groups/creator-route-pages.ts"),
       "utf8",
     );
 

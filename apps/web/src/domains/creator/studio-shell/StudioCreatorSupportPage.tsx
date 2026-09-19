@@ -18,6 +18,7 @@ export function StudioCreatorSupportPage() {
   const [summary, setSummary] = useState("");
   const [contact, setContact] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -33,8 +34,13 @@ export function StudioCreatorSupportPage() {
 
   const saveRequest = () => {
     const payload = { version: 1, category, summary: summary.trim(), contact: contact.trim(), createdAt: new Date().toISOString() };
-    try { window.localStorage.setItem(REQUEST_KEY, JSON.stringify(payload)); } catch { /* still allow export */ }
-    setSaved(true);
+    let persisted = false;
+    try {
+      window.localStorage.setItem(REQUEST_KEY, JSON.stringify(payload));
+      persisted = true;
+    } catch { /* Keep the user-initiated export available when browser storage is blocked. */ }
+    setSaved(persisted);
+    setSaveFailed(!persisted);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -65,7 +71,7 @@ export function StudioCreatorSupportPage() {
   ] as const;
 
   return (
-    <main className="min-h-screen bg-canvas py-8 sm:py-12">
+    <div className="min-h-screen bg-canvas py-8 sm:py-12">
       <Container size="wide">
         <section className="overflow-hidden rounded-3xl border border-line bg-card shadow-sm">
           <div className="grid gap-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,.8fr)] lg:items-center">
@@ -120,9 +126,10 @@ export function StudioCreatorSupportPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <button type="button" disabled={!summary.trim()} onClick={saveRequest} className={buttonClass({ className: "gap-2" })}><Download size={16} /> {bt("요청 브리프 저장·내보내기", "Save & export request")}</button>
             {saved ? <span className="text-xs font-bold text-success">{bt("브라우저에 초안을 저장했습니다.", "Draft saved in this browser.")}</span> : null}
+            {saveFailed ? <span role="status" className="text-xs font-bold text-warning">{bt("브라우저에 초안을 저장하지 못했습니다. 내보낸 파일을 보관해 주세요.", "Could not save the browser draft. Keep the exported file.")}</span> : null}
           </div>
         </section>
       </Container>
-    </main>
+    </div>
   );
 }

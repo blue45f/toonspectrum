@@ -35,7 +35,7 @@ import {
 // 이 페이지는 무엇을 할 수 있고 무엇이 모델에 따라 달라지는지를 짧고 정직하게 안내한다.
 // 수치·후기·검증되지 않은 약속은 쓰지 않는다(PRODUCT.md "주장보다 증거").
 
-const SHAPER_PATH = "/shaper";
+const SHAPER_PATH = "/studio/assets/characters/new";
 const STUDIO_SHAPER_PATH = "/studio/character";
 const SHAPER_TITLE = "캐릭터 셰이퍼";
 const SHAPER_DESCRIPTION =

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { join, win32 } from "node:path";
-import test from "node:test";
 
 import {
   packageDesktopSyncRelease,
@@ -13,6 +15,8 @@ import {
   resolveArchiveListingInvocation,
   verifyDesktopSyncRelease,
 } from "./verify-desktop-sync-release.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 function packageOptions(outputDir, version, overrides = {}) {
   return {
@@ -50,6 +54,15 @@ test("wraps Windows command shims through cmd.exe", () => {
   );
 });
 
+test("rejects Windows shell expansion and command injection", () => {
+  for (const argument of ["x&whoami", "%PATH%", "!PATH!", "x|more", "x\nwhoami", 'x"']) {
+    assert.throws(() => resolveReleaseCommand("npm.cmd", [argument], "win32", {}), /unsafe Windows/);
+  }
+  assert.deepEqual(resolveReleaseCommand("node.exe", ["a&b"], "win32", {}), {
+    command: "node.exe", args: ["a&b"],
+  });
+});
+
 test("lists Windows archives from their directory without a drive-letter argument", () => {
   assert.deepEqual(
     resolveArchiveListingInvocation(
@@ -68,10 +81,16 @@ test("packages a reproducible, self-contained desktop sync release", {
   timeout: 180_000,
 }, async (context) => {
   const temporaryRoot = await mkdtemp(join(os.tmpdir(), "toonstudio-desktop-release-"));
-  context.after(async () => rm(temporaryRoot, { recursive: true, force: true }));
+  (context.onTestFinished ?? context.after.bind(context))(async () => rm(temporaryRoot, { recursive: true, force: true }));
   const firstRoot = join(temporaryRoot, "first");
   const secondRoot = join(temporaryRoot, "second");
   const version = "0.0.0-release-test";
+  // A clean clone has no ignored dist tree. Build the real agent before exercising packaging.
+  execFileSync(process.execPath, [
+    createRequire(import.meta.url).resolve("typescript/bin/tsc"),
+    "-p", fileURLToPath(new URL("../apps/desktop-sync/tsconfig.build.json", import.meta.url)),
+  ], { encoding: "utf8", timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+
 
   const first = await packageDesktopSyncRelease(packageOptions(firstRoot, version));
   const second = await packageDesktopSyncRelease(packageOptions(secondRoot, version));

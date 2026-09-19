@@ -160,7 +160,7 @@ function useInspectorCopy(): (key: CopyKey) => string {
   const t = useT();
   return (key) => {
     const [localeKey, fallback] = COPY[key];
-    const text = t(localeKey);
+    const text = t(localeKey, fallback);
     return text === localeKey ? fallback : text;
   };
 }

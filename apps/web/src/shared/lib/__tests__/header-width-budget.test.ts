@@ -11,7 +11,7 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 describe("header width budget", () => {
   it("keeps the purpose navigation text-only and gated to the measured desktop width", () => {
     const header = read("apps/web/src/shared/components/site-header.tsx");
-    const start = header.indexOf('aria-label={locale === "ko" ? "주요 메뉴"');
+    const start = header.indexOf('aria-label={bi("주요 메뉴", "Primary navigation")}');
     const end = header.indexOf("</nav>", start);
     const primaryNavigation = header.slice(start, end);
 
