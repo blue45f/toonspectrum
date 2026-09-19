@@ -170,6 +170,48 @@ describe("StudioProjectCreatePage", () => {
       .toBe("illustration-portrait");
   });
 
+  it("creates a Slides pitch deck from its deep link and launches selection-first", async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/studio/new?kind=slides&template=slides-pitch"]}>
+        <StudioProjectCreatePage />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    expect((screen.getByRole("combobox", { name: /시작 템플릿|Starting template/u }) as HTMLSelectElement).value)
+      .toBe("slides-pitch");
+    const preview = container.querySelector('[data-studio-mode-preview="slides"]');
+    expect(preview).not.toBeNull();
+    expect(preview?.textContent).toMatch(/슬라이드|SLIDES/u);
+    fireEvent.click(screen.getByRole("button", { name: /다른 작업 종류 보기|Show more project types/u }));
+    expect(screen.getByRole("button", { name: /발표 자료|Presentation/u, pressed: true })).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: /프로젝트 이름|Project name/u }), {
+      target: { value: "피치덱" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /발표 자료 시작|Start Presentation/u }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("location").textContent).toMatch(
+        /^\/studio\/p\/[^/]+\/d\/[^?]+\?workspace=slides&uiMode=basic&startTool=select$/u,
+      );
+    });
+    const projects = readStudioProjectLibrary(window.localStorage).projects;
+    expect(projects).toHaveLength(1);
+    const project = projects[0]!;
+    expect(project).toMatchObject({ title: "피치덱", kind: "slides", templateId: "slides-pitch" });
+    const documents = readStudioProjectDocuments(window.localStorage, project.id).documents;
+    expect(documents).toHaveLength(1);
+    expect(documents[0]).toMatchObject({
+      kind: "slides",
+      defaultWorkspace: "slides",
+      width: 1920,
+      height: 1080,
+    });
+    expect(screen.getByLabelText("location").textContent).toBe(
+      `/studio/p/${project.id}/d/${documents[0]!.id}?workspace=slides&uiMode=basic&startTool=select`,
+    );
+  });
+
   it("switches project type and prepares the matching template choices", () => {
     render(
       <MemoryRouter>

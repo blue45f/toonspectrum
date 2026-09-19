@@ -8,6 +8,14 @@ on:
       - "pnpm-workspace.yaml"
       - "patches/**"
       - "apps/web/src/domains/creator/scene3d/**"
+      - "apps/web/src/domains/creator/bg3d/*inplace*"
+      - "apps/web/src/domains/creator/bg3d/useStudioBg3dInplaceTools.ts"
+      - "apps/web/src/domains/creator/bg3d/useStudioBg3dEditor.ts"
+      - "apps/web/src/domains/creator/bg3d/StudioBg3dViewPanel*.tsx"
+      - "apps/web/src/domains/creator/bg3d/StudioBg3dEditorSidebarExtras.tsx"
+      - "apps/web/src/domains/creator/bg3d/studio-bg3d-pro-suite-runtime-context.tsx"
+      - "apps/web/tools/browser-harnesses/studio-scene3d-inplace.tsx"
+      - "scripts/verify-studio-scene3d-inplace.mjs"
       - "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanelContent.tsx"
       - "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx"
       - "scripts/verify-studio-scene3d-specialists.mjs"
@@ -75,6 +83,8 @@ jobs:
           scripts/verify-scene3d-specialist-bundle.test.mjs
       - name: Verify functional specialist runtimes and UI
         run: pnpm run verify:studio-3d-specialists
+      - name: Verify selected-object transactions, storage and history
+        run: pnpm run verify:studio-3d-inplace
       - name: Type-check web workspace
         run: pnpm exec tsc -p tsconfig.json --noEmit
 
@@ -102,6 +112,15 @@ jobs:
         run: node scripts/verify-scene3d-specialist-bundle.mjs
       - name: Verify real worker, artifact, IK and splat user paths
         run: pnpm run verify:studio-3d-specialists:browser
+      - name: Verify selection to apply, Undo and native storage reopen
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.qa/scene3d-output-quality/specialist-ci/inplace
+        run: pnpm run verify:studio-3d-inplace:browser
+      - name: Verify KTX2 release to selection, Undo and native storage reopen
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.qa/scene3d-output-quality/specialist-ci/inplace-release
+          SCENE3D_INPLACE_OPERATION: release
+        run: pnpm run verify:studio-3d-inplace:browser
       - name: Preserve specialist verification evidence
         if: always()
         uses: actions/upload-artifact@v6
@@ -111,5 +130,9 @@ jobs:
             .qa/scene3d-output-quality/specialist-ci/*.json
             .qa/scene3d-output-quality/specialist-ci/*.png
             .qa/scene3d-output-quality/specialist-ci/*.glb
+            .qa/scene3d-output-quality/specialist-ci/inplace/*.json
+            .qa/scene3d-output-quality/specialist-ci/inplace/*.png
+            .qa/scene3d-output-quality/specialist-ci/inplace-release/*.json
+            .qa/scene3d-output-quality/specialist-ci/inplace-release/*.png
           if-no-files-found: warn
           retention-days: 7

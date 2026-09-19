@@ -2,7 +2,6 @@ import { normalizeLocaleCode } from "@/shared/lib/i18n-intl-utils";
 
 import type { VrmLibraryEntry } from "./vrm-library";
 
-
 type DisplayLocale = "en" | "ko" | "ja" | "zhHans" | "zhHant";
 type LocalizedNames = Readonly<Record<DisplayLocale, string>>;
 

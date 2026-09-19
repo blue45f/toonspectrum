@@ -4,9 +4,6 @@ import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
 
-const bi = <TKo, TEn>(locale: string, ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForLocale(locale, "CreatorReferenceSearch", ko, en);
-
 const COPY = {
   ko: {
     tag: "RESEARCH IN YOUR OWN WORDS", title: "영감은 한글로.\n자료는 더 넓게.",
@@ -32,7 +29,12 @@ const COPY = {
 
 export function CreatorReferenceSearch({ locale }: { locale: "ko" | "en" }) {
   useBilingualI18nRevision();
-  const copy = bi(locale, (COPY).ko, (COPY).en);
+  const copy = translateBilingualValueForLocale(
+    locale,
+    "CreatorReferenceSearch",
+    COPY.ko,
+    COPY.en,
+  );
   const navigate = useNavigate();
   const id = useId();
   const composing = useRef(false);

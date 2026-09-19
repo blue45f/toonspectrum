@@ -4,8 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');

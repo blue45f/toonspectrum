@@ -910,8 +910,7 @@ async function ensureDesktopBrushCatalogTrigger(page: Page): Promise<Locator> {
   await toolbar.waitFor({ state: "visible", timeout: 8_000 });
   let pill = toolbar.locator('[data-studio-brush-active-pill="true"]');
   if (await pill.count() === 0) {
-    const pen = toolbar.getByRole("button", { name: "펜", exact: true });
-    await pen.click();
+    await page.keyboard.press("b");
     await page.waitForFunction(() =>
       document.querySelector('[data-studio-draw-options="true"]')
         ?.getAttribute("data-studio-active-draw-mode") === "pen"

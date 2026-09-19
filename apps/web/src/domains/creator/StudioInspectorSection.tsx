@@ -103,7 +103,7 @@ export function StudioInspectorSection({
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={`${heading}, 세부 설정 ${open ? "접기" : "펼치기"}`}
+        aria-label={`${heading}${activeCount > 0 && !open ? `, 설정 ${activeCount}개 켜짐` : ""}, 세부 설정 ${open ? "접기" : "펼치기"}`}
         title="세밀한 옵션입니다. 필요할 때만 펼쳐도 기본 작업에는 문제가 없습니다."
         onClick={toggleOpen}
         data-inspector-control-id={`section.${sectionId}`}

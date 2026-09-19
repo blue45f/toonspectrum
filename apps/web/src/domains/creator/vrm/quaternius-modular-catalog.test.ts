@@ -8,7 +8,7 @@ import { SAMPLE_VRMS } from "./vrm-library";
 
 const publicRoot = resolve(process.cwd(), "apps/web/public");
 const manifest = JSON.parse(readFileSync(resolve(publicRoot, "vrm/quaternius-modular-v1/manifest.json"), "utf8"));
-const runtime = JSON.parse(readFileSync(resolve(process.cwd(), "artifacts/studio-asset-expansion/modular-runtime-validation.json"), "utf8"));
+const runtime = JSON.parse(readFileSync(resolve(process.cwd(), "apps/web/src/domains/creator/vrm/__fixtures__/quaternius-modular-runtime-validation.json"), "utf8"));
 
 describe("Quaternius modular humanoid candidates", () => {
   it("registers 21 distinct authored outfit sources without counting material recolors", () => {

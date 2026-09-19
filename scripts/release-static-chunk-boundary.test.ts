@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { createStudioManualChunks } from "../apps/web/config/vite-manual-chunks";
 
 const leaves = ["studio-material-pressure-model", "studio-hand-feel-media-load-v1", "brush/studio-ink-pressure-model", "studio-color-utils", "studio-color-wheel"];
+const metadataLeaves = ["studio-project-version", "studio-revision-document-extensions", "studio-webtoon-canvas-presets", "studio-tool-search"];
 const manual = createStudioManualChunks({ isInitialIconModule: () => false, isStudioCoreIconModule: () => false });
 
 describe("release static chunk isolation", () => {
@@ -14,12 +15,15 @@ describe("release static chunk isolation", () => {
     for (const leaf of leaves) {
       expect(manual(resolve(`apps/web/src/domains/creator/${leaf}.ts`))).toBe("studio-brush-numeric-contracts");
     }
+    for (const leaf of metadataLeaves) {
+      expect(manual(resolve(`apps/web/src/domains/creator/${leaf}.ts`))).toBe("studio-document-metadata-contracts");
+    }
     for (const file of ["brush/studio-native-brush-probe.worker.ts", "brush/studio-native-brush-document-session.ts", "render/studio-vello-hub.ts", "brush/StudioNativeBrushDocumentInspector.tsx"]) {
       expect(manual(resolve(`apps/web/src/domains/creator/${file}`))).toBeUndefined();
     }
   });
   it("keeps grouped contracts free of runtime imports and dynamic dependencies", () => {
-    for (const leaf of [...leaves, "render/studio-engine-failure-policy", "contracts/studio-live-lock-resource"]) {
+    for (const leaf of [...leaves, ...metadataLeaves, "render/studio-engine-failure-policy", "contracts/studio-live-lock-resource"]) {
       const file = `apps/web/src/domains/creator/${leaf}.ts`;
       const output = ts.transpileModule(readFileSync(file, "utf8"), {
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
@@ -49,6 +53,16 @@ describe("release static chunk isolation", () => {
     expect(action).toContain("catch (cause)");
   });
 
+  it("keeps the host bridge renderer-free while the lazy inspector supplies the unchanged validator", () => {
+    const file = "apps/web/src/domains/creator/brush/studio-native-brush-editor-bridge.ts";
+    const output = ts.transpileModule(readFileSync(file, "utf8"), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    }).outputText;
+    const ast = ts.createSourceFile(file, output, ts.ScriptTarget.Latest, true);
+    expect(ast.statements.filter(ts.isImportDeclaration)).toHaveLength(0);
+    const inspector = readFileSync("apps/web/src/domains/creator/brush/StudioNativeBrushDocumentInspector.tsx", "utf8");
+    expect(inspector).toContain("}, prepareStudioNativeBrushDocumentCommit)");
+  });
   it("does not change the accepted bundle baseline or temporary allowance", () => {
     const baseline = JSON.parse(readFileSync("scripts/bundle-baseline.json", "utf8"));
     expect(baseline).toBeTruthy();

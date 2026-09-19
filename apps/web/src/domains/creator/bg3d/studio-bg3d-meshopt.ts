@@ -7,10 +7,14 @@
  */
 
 export const STUDIO_BG3D_MESHOPT_EXTENSION = "EXT_meshopt_compression" as const;
+export const STUDIO_BG3D_QUANTIZATION_EXTENSION = "KHR_mesh_quantization" as const;
 export const STUDIO_BG3D_KTX2_EXTENSION = "KHR_texture_basisu" as const;
 
 export const STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS = Object.freeze([
   STUDIO_BG3D_MESHOPT_EXTENSION,
+  // Quantized derivatives declare this required. The pinned GLTFLoader natively decodes it;
+  // byte ranges, accessor layouts, decoded budgets and post-parse metrics remain mandatory.
+  STUDIO_BG3D_QUANTIZATION_EXTENSION,
   STUDIO_BG3D_KTX2_EXTENSION,
 ] as const);
 

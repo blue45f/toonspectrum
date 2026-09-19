@@ -4,8 +4,9 @@ import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const repository = fileURLToPath(new URL("../", import.meta.url));
 const wrapperSource = readFileSync(new URL("./verify-studio-menus-ci.mjs", import.meta.url), "utf8");
@@ -14,7 +15,7 @@ const tsxLoader = createRequire(import.meta.url).resolve("tsx");
 for (const guarded of [false, true]) for (const exitCode of [0, 23]) {
   test(`CI wrapper actually invokes ${guarded ? "guarded" : "legacy"} verifier once and preserves exit ${exitCode}`, (t) => {
     const directory = realpathSync(mkdtempSync(join(tmpdir(), "studio-menu-ci-entry-")));
-    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    (t.onTestFinished ?? t.after.bind(t))(() => rmSync(directory, { recursive: true, force: true }));
     writeFileSync(join(directory, "verify-studio-menus-ci.mjs"), wrapperSource);
     mkdirSync(join(directory, "node_modules", "playwright"), { recursive: true });
     writeFileSync(join(directory, "node_modules", "playwright", "package.json"), JSON.stringify({ type: "module", exports: "./index.mjs" }));

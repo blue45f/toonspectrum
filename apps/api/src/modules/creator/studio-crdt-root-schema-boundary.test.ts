@@ -53,6 +53,7 @@ describe("Studio CRDT root schema ownership boundary", () => {
 
     expect(service.valueImports).toContain("./studio-crdt-root-schema");
     expect(schema.valueImports).toEqual([
+      "../../../../web/src/shared/lib/studio-brush-material-program-contract",
       "yjs",
       "../../../../web/src/shared/lib/studio-brush-r8-grain-asset-contract",
       "../../../../web/src/shared/lib/studio-crdt-raster-document-contract",

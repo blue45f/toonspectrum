@@ -41,11 +41,11 @@ import { cn } from "@/shared/lib/utils";
 function localizeText(
   _fallback: string,
   key: string,
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   preferFallback = false,
 ): string {
   if (preferFallback) return _fallback;
-  const translated = t(key);
+  const translated = t(key, _fallback);
   return translated === key ? _fallback : translated;
 }
 
@@ -98,7 +98,7 @@ function localizedTutorialBadge(
 
 function localizedTutorialSearchText(
   tutorial: StudioFeatureTutorial,
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   preferKoreanSource: boolean,
 ): string {
   const source = studioTutorialSourceCopy(tutorial, preferKoreanSource);
@@ -139,7 +139,7 @@ function localizedTutorialSearchText(
 function filterStudioFeatureTutorials(
   tutorials: readonly StudioFeatureTutorial[],
   query: string,
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   preferKoreanSource: boolean,
 ): StudioFeatureTutorial[] {
   if (tokenizeStudioSearchQuery(query).length === 0) return [...tutorials];

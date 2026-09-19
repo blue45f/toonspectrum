@@ -81,7 +81,7 @@ export function ProductTourPage() {
   });
 
   return (
-    <main className="creator-home product-tour-page" lang={locale}>
+    <div className="creator-home product-tour-page" lang={locale}>
       <header className="product-tour-page__hero">
         <div className="product-tour-page__hero-copy">
           <Link href="/" className="product-tour-page__back">
@@ -207,6 +207,6 @@ export function ProductTourPage() {
           <Link className="ch-button ch-button--quiet" href="/brand-film">{bi("24초 브랜드 필름", "24-second brand film")}</Link>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

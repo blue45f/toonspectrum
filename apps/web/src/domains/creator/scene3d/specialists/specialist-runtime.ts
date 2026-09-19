@@ -1,3 +1,4 @@
+import type { SpecialistWorkerPhase } from "./specialist-job-progress";
 import {
   parseSpecialistRequest,
   SPECIALIST_LIMITS,
@@ -13,9 +14,12 @@ import type { SpecialistResult } from "./specialist-contract";
 
 export async function runScene3dSpecialist(
   value: unknown,
+  onPhase?: (phase: SpecialistWorkerPhase) => void,
 ): Promise<SpecialistResult> {
+  onPhase?.("validating");
   const request = parseSpecialistRequest(value);
   const source = new Uint8Array(request.source);
+  onPhase?.("decoding");
   const io = await createSpecialistIo();
   const original = await readSpecialistDocument(io, source);
   const before = specialistStats(original);
@@ -23,8 +27,12 @@ export async function runScene3dSpecialist(
     .getRoot()
     .listNodes()
     .map((node) => node.getName().slice(0, 256));
+  onPhase?.("processing");
   let processed;
-  if (request.options.kind === "inspect") {
+  if (request.options.kind === "textures" || request.options.kind === "release") {
+    const { processTextureDerivatives } = await import("./specialist-textures");
+    processed = await processTextureDerivatives(io, source, request.options);
+  } else if (request.options.kind === "inspect") {
     const bytes = new TextEncoder().encode(
       JSON.stringify(
         {
@@ -73,6 +81,7 @@ export async function runScene3dSpecialist(
     const { processAssetDerivatives } = await import("./specialist-assets");
     processed = await processAssetDerivatives(io, source, request.options);
   }
+  onPhase?.("verifying");
   if (
     processed.artifacts.reduce(
       (sum, artifact) => sum + artifact.bytes.length,
@@ -95,7 +104,7 @@ export async function runScene3dSpecialist(
       meshoptimizer: "1.2.0",
       threeBvhCsg: "0.0.18",
       recastNavigation: "0.43.1",
-      manifold: "3.5.1",
+      manifold: "3.5.1", ktx2Encoder: "0.6.0",
       closedChainIk: "0.0.3",
       tangentAlgorithm: "meshoptimizer Compatible (MikkTSpace convention)",
     },

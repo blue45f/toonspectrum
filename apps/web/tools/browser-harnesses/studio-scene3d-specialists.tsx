@@ -1,18 +1,28 @@
+
+
+
 import "../../src/styles/globals.css";
 import { createRoot } from "react-dom/client";
 
 import { runScene3dSpecialistInWorker } from "../../src/domains/creator/scene3d/specialists/specialist-client";
 import { createSpecialistFixture } from "../../src/domains/creator/scene3d/specialists/specialist-fixtures";
+import { inspectSpecialistGlbImages } from "../../src/domains/creator/scene3d/specialists/specialist-image-budget";
+import { scene3dSpecialistJobQueue } from "../../src/domains/creator/scene3d/specialists/specialist-job-queue";
+import { createTexturedSpecialistFixture } from "../../src/domains/creator/scene3d/specialists/specialist-texture-fixtures";
 import { StudioScene3dAssetToolsPanel } from "../../src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel";
 import { StudioScene3dSplatReferencePanel } from "../../src/domains/creator/scene3d/specialists/StudioScene3dSplatReferencePanel";
 
+import { verifySpecialistTexturePixels } from "./studio-scene3d-texture-proof";
+
 import type { SpecialistOptions } from "../../src/domains/creator/scene3d/specialists/specialist-contract";
+import type { SpecialistJobProgress } from "../../src/domains/creator/scene3d/specialists/specialist-job-progress";
 
 declare global {
   interface Window {
     __scene3dSpecialistProof?: unknown;
     __scene3dSpecialistFixture?: number[];
     __scene3dSplatFixture?: number[];
+    __scene3dTexturedFixture?: number[];
   }
 }
 const assert = (condition: unknown, message: string) => {
@@ -21,15 +31,22 @@ const assert = (condition: unknown, message: string) => {
 async function verify() {
   const bundle = new URL(location.href).searchParams.get("worker");
   let bundleRequests = 0;
+  let activeProcessingWorkers = 0; let peakProcessingWorkers = 0;
   if (bundle) {
     if (!/^\/assets\/specialist\.worker-[a-zA-Z0-9_-]+\.js$/.test(bundle))
       throw new Error("Invalid built worker artifact.");
     const OriginalWorker = window.Worker;
     window.Worker = class extends OriginalWorker {
+      private counted = false;
       constructor(url: string | URL, options?: WorkerOptions) {
         const built = String(url).includes("/specialist.worker.ts");
         super(built ? bundle! : url, options);
-        if (built) bundleRequests++;
+        if (built) { bundleRequests++; this.counted = true; activeProcessingWorkers++;
+          peakProcessingWorkers = Math.max(peakProcessingWorkers, activeProcessingWorkers); }
+      }
+      override terminate() {
+        if (this.counted) { this.counted = false; activeProcessingWorkers--; }
+        super.terminate();
       }
     };
   }
@@ -39,11 +56,15 @@ async function verify() {
   const second = await createSpecialistFixture("offset-cube");
   const animated = await createSpecialistFixture("animated");
   const rig = await createSpecialistFixture("rig");
+  const textured = await createTexturedSpecialistFixture(true);
   const jobs: {
     source: Uint8Array<ArrayBuffer>;
     secondary?: Uint8Array<ArrayBuffer>;
     options: SpecialistOptions;
   }[] = [
+    { source: textured, options: { kind: "textures", textureMode: "uastc", maxTextureSize: 512 } },
+    { source: textured, options: { kind: "textures", textureMode: "etc1s", maxTextureSize: 512 } },
+    { source: textured, options: { kind: "release", textureMode: "uastc", maxTextureSize: 512, error: 0.03 } },
     { source: rig, options: { kind: "inspect" } },
     {
       source: rig,
@@ -84,13 +105,15 @@ async function verify() {
   ];
   const outcomes = [];
   for (const [index, job] of jobs.entries()) {
+    const phases: SpecialistJobProgress[] = [];
     const result = await runScene3dSpecialistInWorker({
       version: 1,
       id: index + 1,
       source: job.source.buffer,
       ...(job.secondary ? { secondary: job.secondary.buffer } : {}),
       options: job.options,
-    });
+    }, undefined, { onProgress: (phase) => phases.push(phase) });
+    assert(phases.map(({ phase }) => phase).join(",") === "starting,validating,decoding,processing,verifying,ready", "Worker did not report actual ordered stages.");
     assert(result.artifacts.length > 0, "No real artifacts returned.");
     assert(job.source.byteLength > 0, "Canonical input was detached.");
     if (job.options.kind === "lod")
@@ -120,7 +143,16 @@ async function verify() {
           .length >= 2,
         "No actual path.",
       );
+    let texturePixels: Record<string, unknown> | undefined;
+    if (job.options.kind === "textures" || job.options.kind === "release") {
+      for (const artifact of result.artifacts.filter(({mime}) => mime === "model/gltf-binary")) {
+        assert(inspectSpecialistGlbImages(artifact.bytes).every(({mime}) => mime === "image/ktx2"), "Texture release contains an unconverted image.");
+      }
+      texturePixels = await verifySpecialistTexturePixels(job.source, result.artifacts[0]!.bytes);
+    }
     outcomes.push({
+      phases, sourceSha256: result.sourceSha256,
+      ...(texturePixels ? { texturePixels } : {}),
       options: job.options,
       sourceByteLength: job.source.length,
       ...(job.options.kind === "ik"
@@ -138,6 +170,32 @@ async function verify() {
       warnings: result.warnings,
     });
   }
+  const queuedPhases: SpecialistJobProgress[] = [];
+  const queueAbort = new AbortController(); const queuedSource = sphere.slice();
+  const firstQueued = runScene3dSpecialistInWorker({ version: 1, id: 100, source: sphere.buffer, options: { kind: "inspect" } });
+  const cancelledQueued = runScene3dSpecialistInWorker({ version: 1, id: 101, source: sphere.buffer, options: { kind: "inspect" } }, queueAbort.signal).then(
+    () => { throw new Error("Cancelled queued work returned a result."); }, (error: unknown) => { assert((error as { code?: string })?.code === "cancelled", "Wrong queue cancellation code."); });
+  const thirdQueued = runScene3dSpecialistInWorker({ version: 1, id: 102, source: queuedSource.buffer, options: { kind: "inspect" } }, undefined,
+    { onProgress: (phase) => queuedPhases.push(phase) });
+  assert(scene3dSpecialistJobQueue.snapshot().active === 1 && scene3dSpecialistJobQueue.snapshot().queued === 2, "Queue did not bound actual Worker acquisition.");
+  queuedSource[0] = 0; queueAbort.abort();
+  await cancelledQueued;
+  const [one, three] = await Promise.all([firstQueued, thirdQueued]);
+  assert(one.sourceSha256 === three.sourceSha256, "Queued source mutation changed the processed snapshot.");
+  assert(queuedPhases.some((event) => event.queuePosition === 2) && queuedPhases.some((event) => event.queuePosition === 1), "Queue position did not update after cancellation.");
+  const activeAbort = new AbortController();
+  const running = runScene3dSpecialistInWorker({ version: 1, id: 103, source: textured.buffer,
+    options: { kind: "textures", textureMode: "uastc", maxTextureSize: 512 } }, activeAbort.signal,
+    { onProgress: ({ phase }) => { if (phase === "decoding") activeAbort.abort(); } }).then(
+      () => { throw new Error("Cancelled running work returned a result."); }, (error: unknown) => { assert((error as {code?: string})?.code === "cancelled", "Wrong running cancellation code."); });
+  const afterCancellation = runScene3dSpecialistInWorker({ version: 1, id: 104, source: sphere.buffer, options: { kind: "inspect" } });
+  await running; await afterCancellation;
+  const queueState = scene3dSpecialistJobQueue.snapshot();
+  assert(queueState.active === 0 && queueState.queued === 0 && queueState.snapshotBytes === 0, "Queue leaked a lease or source reservation.");
+  if (bundle) assert(peakProcessingWorkers === 1 && activeProcessingWorkers === 0, "Production processing Workers overlapped or leaked.");
+  const orchestration = { queuedSourceImmutable: true, queuedCancellationBeforeWorker: true, activeCancellationReleased: true,
+    queuePositions: queuedPhases, queueState, peakProcessingWorkers: bundle ? peakProcessingWorkers : null,
+    additionalWorkers: 4, additionalCompletedJobs: 3, activeCancelledJobs: 1 };
   const controller = new AbortController();
   controller.abort();
   let cancelled = false;
@@ -182,9 +240,10 @@ async function verify() {
   }
   window.__scene3dSplatFixture = Array.from(splats);
   window.__scene3dSpecialistFixture = Array.from(sphere);
+  window.__scene3dTexturedFixture = Array.from(textured);
   if (bundle)
     assert(
-      bundleRequests === jobs.length,
+      bundleRequests === jobs.length + 4,
       "Not all jobs used the production-built worker.",
     );
   return {
@@ -192,6 +251,7 @@ async function verify() {
     outcomes,
     cancellation: "passed",
     productionWorkerJobs: bundleRequests,
+    orchestration,
   };
 }
 void verify()

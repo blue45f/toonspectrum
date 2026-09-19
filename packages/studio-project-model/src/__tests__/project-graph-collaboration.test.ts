@@ -11,11 +11,34 @@ describe("review anchors", () => {
     const base = {
       artifactId: "artifact-1",
       revisionId: "revision-1",
-      scope: { projectId: "project-1", panelId: "panel-2" },
+      scope: { projectId: "project-1", episodeId: "episode-1", panelId: "panel-2" },
     };
     expect(reviewAnchorSchema.parse({ ...base, kind: "region", x: 1, y: 2, width: 3, height: 4 })).toMatchObject({ kind: "region" });
     expect(() => reviewAnchorSchema.parse({ ...base, kind: "region", x: 1, y: 2 })).toThrow(/region anchor/u);
   });
+
+  it.each(["sequenceId", "sceneId", "panelId"] as const)(
+    "requires an episode parent for a review anchor with %s",
+    (scopeField) => {
+      const anchor = {
+        artifactId: "artifact-1",
+        revisionId: "revision-1",
+        scope: { projectId: "project-1", [scopeField]: "child-1" },
+        kind: "region",
+        x: 1,
+        y: 2,
+        width: 3,
+        height: 4,
+      };
+      expect(reviewAnchorSchema.safeParse(anchor)).toMatchObject({
+        success: false,
+        error: { issues: [{ code: "custom", path: ["scope", "episodeId"] }] },
+      });
+      const validScope = { ...anchor.scope, episodeId: "episode-1" };
+      expect(reviewAnchorSchema.parse({ ...anchor, scope: validScope }))
+        .toMatchObject({ kind: "region", scope: validScope });
+    },
+  );
 
   it("does not allow an open comment to pretend it has a resolution revision", () => {
     expect(() => reviewCommentSchema.parse({

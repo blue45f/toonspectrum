@@ -426,6 +426,7 @@ describe("Studio pages history command journal lazy client", () => {
     expect(studioPage).toContain("setPagesHistoryDurabilityStatus");
     expect(studioPage).toContain("retryDurability()");
     expect(studioPage).toContain('data-studio-pages-history-durability="memory-only"');
-    expect(studioPage).toContain("복구 기록 저장소 다시 연결");
+    expect(studioPage).toContain("onClick={retryStudioHistoryDurability}");
+    expect(studioPage).toContain("다시 저장");
   });
 });

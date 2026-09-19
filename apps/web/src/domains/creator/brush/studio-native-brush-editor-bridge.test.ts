@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { prepareStudioNativeBrushDocumentCommit } from "./studio-native-brush-document-commit";
 import { createNativeBrushDocumentEditorPreparer } from "./studio-native-brush-editor-bridge";
 
 import type { El } from "../studio-element-model";
@@ -23,10 +24,18 @@ function wiring(ports: ReturnType<typeof fixture>) {
   delegate.mockClear();
   const prepare = createNativeBrushDocumentEditorPreparer(ports);
   expect(ports.captureStudioMutationTicket).not.toHaveBeenCalled();
-  prepare({ pageId: "page", masterEditMode: false, sourceElementId: "stroke", sourceRevision: "source" });
+  prepare({ pageId: "page", masterEditMode: false, sourceElementId: "stroke", sourceRevision: "source" }, prepareStudioNativeBrushDocumentCommit);
   return (delegate.mock.calls as unknown as Array<[unknown, { canMutate(): boolean; read(): StudioNativeBrushDocumentState | null; commit(elements: El[]): boolean; onCommitted(id: string): void }]>)[0]![1];
 }
 describe("native brush editor bridge extraction", () => {
+  it("does not capture a ticket or mutate when the optional module is not supplied", () => {
+    const ports = fixture();
+    const prepare = createNativeBrushDocumentEditorPreparer(ports);
+    expect(prepare({ pageId: "page", masterEditMode: false, sourceElementId: "stroke", sourceRevision: "source" },
+      undefined as unknown as typeof prepareStudioNativeBrushDocumentCommit)).toBeNull();
+    expect(ports.captureStudioMutationTicket).not.toHaveBeenCalled();
+    expect(ports.commit).not.toHaveBeenCalled();
+  });
   it("captures the ticket at the action and reads refs at each validation", () => {
     const ports = fixture(), bridge = wiring(ports);
     expect(ports.captureStudioMutationTicket).toHaveBeenCalledTimes(1);

@@ -13,7 +13,7 @@ import { cn } from "@/shared/lib/utils";
 type StudioCompanionNavigatorT = (key: string, fallback?: string) => string;
 
 function localizeText(t: StudioCompanionNavigatorT, fallback: string, key: string): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 

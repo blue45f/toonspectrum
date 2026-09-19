@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
   validateVirtualStudioArtManifestContract,
@@ -28,7 +28,7 @@ function syntheticPng(width, height) {
 
 async function createFixture(context, { dimensions = [10, 12], sha256 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-art-manifest-"));
-  context.after(() => rm(directory, { recursive: true, force: true }));
+  (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
   const image = syntheticPng(10, 12);
   const manifest = {
     outputs: {
@@ -183,7 +183,7 @@ test("also verifies the generated clean plate without upgrading its provenance t
 
 async function createLivingFixture(context) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-living-art-"));
-  context.after(() => rm(directory, { recursive: true, force: true }));
+  (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
   const manifest = JSON.parse(await readFile(path.join(VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY, "art-manifest.json"), "utf8"));
   const image = await readFile(path.join(VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY, "master-clean-plate.webp"));
   await writeFile(path.join(directory, "master-clean-plate.webp"), image);
@@ -234,7 +234,7 @@ test("checks the WebP bitstream instead of accepting a lossless metadata claim",
 
 test("rejects generated-world asset or authoring dimension drift", async (context) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-living-binding-"));
-  context.after(() => rm(directory, { recursive: true, force: true }));
+  (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
   const world = {
     layers: [{ name: "background", type: "imagelayer", image: "../production-v2/master-central-lossless.webp", imagewidth: 1296, imageheight: 1213 }],
     properties: [{ name: "backgroundUrl", value: "/assets/virtual-studio/living-world/master-clean-plate.webp" }],

@@ -9,7 +9,7 @@ import {
   Store,
   Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   evaluateStudioMarketplaceSubmission,
@@ -23,7 +23,11 @@ import {
   readStudioMarketplaceSubmissionDraft,
   writeStudioMarketplaceSubmissionDraft,
 } from "../studio-marketplace-submission-store";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  getCurrentUiLocale,
+  translateBilingualValueForLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
@@ -87,25 +91,44 @@ function statusLabel(status: string, bt: (ko: string, en: string) => string): st
 /** A real seller draft, file checksum, readiness and moderation-state workflow. */
 export function StudioMarketplaceSellerPanel({
   sellerId,
-  locale: _locale,
+  locale,
 }: {
   readonly sellerId: string;
   readonly locale?: string;
 }) {
-  const bt = useBilingual("StudioMarketplaceSellerPanel");
+  useBilingualI18nRevision();
+  const resolvedLocale = locale ?? getCurrentUiLocale();
+  const bt = (ko: string, en: string) =>
+    translateBilingualValueForLocale(resolvedLocale, "StudioMarketplaceSellerPanel", ko, en);
   const [submission, setSubmission] = useState<StudioMarketplaceSubmission>(() => (
     createStudioMarketplaceSubmissionDraft(sellerId)
   ));
-  const [busyRole, setBusyRole] = useState<StudioMarketplaceFileRole | null>(null);
+  const submissionRef = useRef(submission);
+  // A hash may finish after its seller, draft, or component has changed.
+  // Only the current epoch and latest request for its role may commit.
+  const verificationEpochRef = useRef(0);
+  const fileTasksRef = useRef(new Map<StudioMarketplaceFileRole, symbol>());
+  const [busyRoles, setBusyRoles] = useState<readonly StudioMarketplaceFileRole[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === "undefined") return;
-    setSubmission(
+    const fileTasks = fileTasksRef.current;
+    verificationEpochRef.current += 1;
+    fileTasks.clear();
+    setBusyRoles([]);
+    setMessage(null);
+    setError(null);
+    const next =
       readStudioMarketplaceSubmissionDraft(window.localStorage, sellerId)
-      ?? createStudioMarketplaceSubmissionDraft(sellerId),
-    );
+      ?? createStudioMarketplaceSubmissionDraft(sellerId);
+    submissionRef.current = next;
+    setSubmission(next);
+    return () => {
+      verificationEpochRef.current += 1;
+      fileTasks.clear();
+    };
   }, [sellerId]);
 
   const readiness = useMemo(
@@ -114,10 +137,16 @@ export function StudioMarketplaceSellerPanel({
   );
   const editable = submission.status === "draft" || submission.status === "changes-requested";
 
-  const commit = (next: StudioMarketplaceSubmission, nextMessage?: string) => {
+  const commit = (
+    update: StudioMarketplaceSubmission
+      | ((current: StudioMarketplaceSubmission) => StudioMarketplaceSubmission),
+    nextMessage?: string,
+  ) => {
+    const next = typeof update === "function" ? update(submissionRef.current) : update;
     const stored = typeof window === "undefined"
       ? next
       : writeStudioMarketplaceSubmissionDraft(window.localStorage, next, window);
+    submissionRef.current = stored;
     setSubmission(stored);
     setMessage(nextMessage ?? (bt("판매 초안을 저장했습니다.", "Saved seller draft.")));
     setError(null);
@@ -126,15 +155,21 @@ export function StudioMarketplaceSellerPanel({
   const patch = <K extends keyof StudioMarketplaceSubmission>(
     key: K,
     value: StudioMarketplaceSubmission[K],
-  ) => commit({
-    ...submission,
+  ) => commit((current) => ({
+    ...current,
     [key]: value,
     updatedAt: new Date().toISOString(),
-  });
+  }));
 
   const attachFile = async (role: StudioMarketplaceFileRole, file: File | null) => {
-    if (!file) return;
-    setBusyRole(role);
+    if (!file || !editable) return;
+    const epoch = verificationEpochRef.current;
+    const task = Symbol(role);
+    fileTasksRef.current.set(role, task);
+    setBusyRoles([...fileTasksRef.current.keys()]);
+    const ownsTask = () => verificationEpochRef.current === epoch
+      && fileTasksRef.current.get(role) === task
+      && submissionRef.current.sellerId === sellerId;
     setError(null);
     try {
       const nextFile = Object.freeze({
@@ -144,24 +179,30 @@ export function StudioMarketplaceSellerPanel({
         sizeBytes: file.size,
         checksum: await checksum(file),
       });
-      commit({
-        ...submission,
+      if (!ownsTask() || !["draft", "changes-requested"].includes(submissionRef.current.status)) return;
+      commit((current) => ({
+        ...current,
         files: Object.freeze([
-          ...submission.files.filter((item) => item.role !== role),
+          ...current.files.filter((item) => item.role !== role),
           nextFile,
         ]),
         updatedAt: new Date().toISOString(),
-      }, bt(`${file.name}의 무결성을 확인했습니다.`, `Verified ${file.name}.`));
+      }), bt(`${file.name}의 무결성을 확인했습니다.`, `Verified ${file.name}.`));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : (bt("파일을 확인하지 못했습니다.", "Could not verify the file.")));
+      if (ownsTask()) {
+        setError(cause instanceof Error ? cause.message : (bt("파일을 확인하지 못했습니다.", "Could not verify the file.")));
+      }
     } finally {
-      setBusyRole(null);
+      if (ownsTask()) {
+        fileTasksRef.current.delete(role);
+        setBusyRoles([...fileTasksRef.current.keys()]);
+      }
     }
   };
 
   const submit = () => {
     try {
-      commit(transitionStudioMarketplaceSubmission(submission, {
+      commit((current) => transitionStudioMarketplaceSubmission(current, {
         type: "submit",
         at: new Date().toISOString(),
       }), bt("심사 요청을 준비했습니다. 서버 연결 시 안전하게 제출됩니다.", "Review request is prepared and will submit through the configured server."));
@@ -172,7 +213,7 @@ export function StudioMarketplaceSellerPanel({
 
   const withdraw = () => {
     try {
-      commit(transitionStudioMarketplaceSubmission(submission, {
+      commit((current) => transitionStudioMarketplaceSubmission(current, {
         type: "withdraw",
         at: new Date().toISOString(),
       }), bt("심사 요청을 철회했습니다.", "Withdrew the review request."));
@@ -182,6 +223,9 @@ export function StudioMarketplaceSellerPanel({
   };
 
   const reset = () => {
+    verificationEpochRef.current += 1;
+    fileTasksRef.current.clear();
+    setBusyRoles([]);
     commit(createStudioMarketplaceSubmissionDraft(sellerId), bt("새 판매 초안을 시작했습니다.", "Started a new seller draft."));
   };
 
@@ -287,7 +331,7 @@ export function StudioMarketplaceSellerPanel({
                 )}>
                   <input
                     type="file"
-                    disabled={!editable || busyRole !== null}
+                    disabled={!editable || busyRoles.length > 0}
                     className="sr-only"
                     onChange={(event) => void attachFile(role, event.target.files?.[0] ?? null)}
                   />
@@ -299,7 +343,7 @@ export function StudioMarketplaceSellerPanel({
                       {file.path.split("/").at(-1)} · {Math.ceil(file.sizeBytes / 1024)}KB
                     </span>
                   ) : null}
-                  {busyRole === role ? <span className="mt-2 text-xs font-bold text-accent">{bt("무결성 확인 중…", "Verifying…")}</span> : null}
+                  {busyRoles.includes(role) ? <span className="mt-2 text-xs font-bold text-accent">{bt("무결성 확인 중…", "Verifying…")}</span> : null}
                 </label>
               );
             })}
@@ -355,7 +399,7 @@ export function StudioMarketplaceSellerPanel({
 
           <div className="mt-4 grid gap-2">
             {editable ? (
-              <button type="button" disabled={readiness.status === "blocked" || busyRole !== null} onClick={submit} className={buttonClass({ className: "gap-2" })}>
+              <button type="button" disabled={readiness.status === "blocked" || busyRoles.length > 0} onClick={submit} className={buttonClass({ className: "gap-2" })}>
                 <Send size={16} aria-hidden="true" />
                 {bt("심사 요청 준비", "Prepare review request")}
               </button>

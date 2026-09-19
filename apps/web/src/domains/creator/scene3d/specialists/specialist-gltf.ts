@@ -1,3 +1,4 @@
+import { inspectSpecialistGlbImages } from "./specialist-image-budget";
 import { z } from "zod";
 import { WebIO, Logger } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
@@ -233,6 +234,7 @@ export function preflightSpecialistGlb(bytes: Uint8Array): GLTF.IGLTF {
     seen.add(id);
   }
   for (let id = 0; id < (data.nodes?.length ?? 0); id++) visitNode(id, 0);
+  inspectSpecialistGlbImages(bytes, data);
   return data;
 }
 export async function createSpecialistIo(): Promise<WebIO> {
@@ -342,6 +344,7 @@ export async function glbArtifact(
   if (bytes.length > SPECIALIST_LIMITS.outputBytes)
     throw new SpecialistError("budget", "Output budget exceeded.");
   // Do not report success until a real encode/decode round trip works.
+  preflightSpecialistGlb(bytes);
   specialistStats(await io.readBinary(bytes));
   return {
     name,

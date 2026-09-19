@@ -113,7 +113,7 @@ export function MembershipPolicyPage() {
   const economy = catalog?.economy ?? MEMBERSHIP_ECONOMY_POLICY;
 
   return (
-    <main className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas px-4 py-10 sm:px-6 sm:py-16">
+    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas px-4 py-10 sm:px-6 sm:py-16">
       <div className="mx-auto max-w-7xl">
         <header className="relative overflow-hidden rounded-[2rem] border border-line-strong bg-panel p-6 sm:p-9">
           <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,oklch(0.75_0.16_70/0.12),transparent_32%),radial-gradient(circle_at_10%_95%,oklch(0.7_0.18_315/0.10),transparent_36%)]" />
@@ -426,7 +426,7 @@ export function MembershipPolicyPage() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

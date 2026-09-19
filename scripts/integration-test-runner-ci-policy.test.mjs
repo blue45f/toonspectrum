@@ -31,22 +31,25 @@ function usesActions(job) {
 }
 
 const PLAYWRIGHT_INSTALL = "pnpm exec playwright install --with-deps chromium";
-const ROOT_SHARD_ARGUMENT = "--shard=${{ matrix.shard }}/${{ strategy.job-total }}";
 const HEADED_PARITY_COMMAND =
   'xvfb-run -a --server-args="-screen 0 1920x1200x24" pnpm run verify:studio-3d-console';
 
 describe("database integration runner CI policy", () => {
-  it.each([
-    "ci.yml", "bg3d-runtime-regression.yml", "studio-ink-live-commit.yml",
-  ])(
-    "runs %s for both main and the active integration branch",
-    (filename) => {
+  it("runs the protected core on main PRs, pushes and merge groups", () => {
+    const workflow = readYaml(".github/workflows/ci.yml");
+    expect(workflow.on.pull_request.branches).toEqual(["main"]);
+    expect(workflow.on.push.branches).toEqual(["main"]);
+    expect(workflow.on).toHaveProperty("merge_group");
+    expect(workflow.on).toHaveProperty("workflow_dispatch");
+  });
+
+  it.each(["bg3d-runtime-regression.yml", "studio-ink-live-commit.yml"])(
+    "does not resurrect superseded PR 1280 workflow %s", (filename) => {
       const workflow = readYaml(`.github/workflows/${filename}`);
-      for (const event of ["pull_request", "push"]) {
-        expect(workflow.on[event].branches).toEqual([
-          "main", "release/salvage-integration-20260908",
-        ]);
-      }
+      expect(workflow.on).not.toHaveProperty("pull_request");
+      expect(workflow.on.push.branches).toEqual(["integration/final-main-consolidation-20260910"]);
+      expect(workflow.jobs.retired.if).toBe("${{ false }}");
+      expect(workflow.on.push.paths).toEqual([`.github/workflows/${filename}`]);
     },
   );
 
@@ -108,16 +111,11 @@ describe("database integration runner CI policy", () => {
     });
   });
 
-  it("reruns the ink gate when its tracked preview harness source changes", () => {
-    const workflow = readYaml(".github/workflows/studio-ink-live-commit.yml");
+  it("reruns exhaustive preview checks when their tracked harness changes", () => {
+    const workflow = readYaml(".github/workflows/main-full-qa-studio.yml");
     const harnessPath = "scripts/lib/studio-verify-preview-harness.mts";
-    // The .mjs import resolves to this tracked .mts source, so filtering only the import
-    // spelling silently misses modifications to the preview process/readiness/shutdown code.
     expect(readText(harnessPath)).toContain("export function spawnVitePreview");
-    for (const event of ["pull_request", "push"]) {
-      expect(workflow.on[event].paths.some((pattern) => matchesGlob(harnessPath, pattern)))
-        .toBe(true);
-    }
+    expect(workflow.on.push.paths.some((pattern) => matchesGlob(harnessPath, pattern))).toBe(true);
   });
 
   it("keeps the package entrypoints bound to the reviewed integration runners", () => {
@@ -153,7 +151,7 @@ describe("database integration runner CI policy", () => {
     // generation (apps/web/public/data/ is gitignored, so without it the bundle ships no catalog) and the
     // third-party notices plus CSP verification; the bundle-only build must get the same, or the
     // dist the browser gates drive is not the dist production serves.
-    expect(packageManifest.scripts?.prebuild).toBe("pnpm catalog:gen");
+    expect(packageManifest.scripts?.prebuild).toBe("pnpm catalog:gen && pnpm i18n:builtins:gen");
     expect(packageManifest.scripts?.["prebuild:bundle"]).toBe("pnpm run prebuild");
     expect(packageManifest.scripts?.["postbuild:bundle"]).toBe("pnpm run postbuild");
     expect(packageManifest.scripts?.postbuild).toContain(
@@ -180,53 +178,38 @@ describe("database integration runner CI policy", () => {
     }
   });
 
-  it.each([1, 2, 3, 4])("keeps matrix shard %i in the four-way root suite", (shard) => {
+  // CI v3 replaced historical numbered shards with protected semantic shards.
+  // Exhaustive Studio browser evidence remains in main-full-qa-studio.yml.
+  const shards = ["product", "studio-foundation", "studio-editing", "studio-3d", "studio-character"];
+  it.each(shards)("keeps semantic shard %s behind core", (shard) => {
     const workflow = readYaml(".github/workflows/ci.yml");
-    const matrix = workflow.jobs.test.strategy.matrix.shard;
-    expect(matrix).toEqual([1, 2, 3, 4]);
-    expect(matrix).toContain(shard);
-
-    const step = workflow.jobs.test.steps.find(
-      (candidate) => candidate.name === "Run this shard of the root Vitest suite with per-file progress",
-    );
-    expect(step?.run).toContain(`args=(${ROOT_SHARD_ARGUMENT})`);
-    expect(step?.run).toContain(
-      'if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ]]; then',
-    );
-    expect(step?.run).toContain(
-      'args+=(--coverage --coverage.reportsDirectory=coverage/shard-${{ matrix.shard }} --testTimeout=120000)',
-    );
-    expect(step?.run).toContain('pnpm run test:root "${args[@]}"');
+    const job = workflow.jobs.static;
+    expect(job.strategy.matrix.shard).toEqual(shards);
+    expect(job.strategy.matrix.shard).toContain(shard);
+    expect(job.strategy["fail-fast"]).toBe(false);
+    expect(runCommands(job)).toContain('node scripts/ci-core-regression-shards.mjs "${{ matrix.shard }}"');
+    expect(workflow.jobs.core.needs).toContain("static");
+    expect(job["continue-on-error"]).not.toBe(true);
   });
 
-  it("imports every shard's measured coverage before SonarQube analysis", () => {
-    const workflow = readYaml(".github/workflows/ci.yml");
+  it("retains the reusable Sonar workflow's coverage import before analysis", () => {
     const sonar = readYaml(".github/workflows/sonarqube.yml");
-    expect(workflow.jobs.sonarqube).toMatchObject({
-      needs: "test", uses: "./.github/workflows/sonarqube.yml", secrets: "inherit",
-    });
     expect(sonar.on).toHaveProperty("workflow_call");
     expect(sonar.on).not.toHaveProperty("pull_request");
-    const upload = workflow.jobs.test.steps.find((step) => step.uses?.startsWith("actions/upload-artifact@"));
-    expect(upload.with).toMatchObject({
-      name: "sonar-coverage-${{ matrix.shard }}",
-      path: "coverage/shard-${{ matrix.shard }}/lcov.info",
-      "if-no-files-found": "error",
-    });
     const steps = sonar.jobs.sonarqube.steps;
-    const downloadIndex = steps.findIndex((step) => step.uses?.startsWith("actions/download-artifact@"));
-    const scanIndex = steps.findIndex((step) => step.uses?.startsWith("SonarSource/sonarqube-scan-action@"));
-    expect(downloadIndex).toBeGreaterThan(0);
-    expect(scanIndex).toBeGreaterThan(downloadIndex);
-    expect(steps[downloadIndex].with).toMatchObject({ pattern: "sonar-coverage-*", path: "coverage" });
-    const properties = readText("sonar-project.properties");
-    for (const shard of workflow.jobs.test.strategy.matrix.shard) {
-      expect(properties).toContain(`coverage/sonar-coverage-${shard}/lcov.info`);
+    const download = steps.findIndex((step) => step.uses?.startsWith("actions/download-artifact@"));
+    const guard = steps.findIndex((step) => step.name === "Require all four nonempty coverage reports");
+    const scan = steps.findIndex((step) => step.uses?.startsWith("SonarSource/sonarqube-scan-action@"));
+    expect(download).toBeGreaterThan(0);
+    expect(guard).toBeGreaterThan(download);
+    expect(scan).toBeGreaterThan(guard);
+    expect(steps[download].with).toMatchObject({ pattern: "sonar-coverage-*", path: "coverage" });
+    for (const shard of [1, 2, 3, 4]) {
+      expect(readText("sonar-project.properties")).toContain(`coverage/sonar-coverage-${shard}/lcov.info`);
     }
   });
 
   it("fails the actual SonarQube report guard when any shard is missing or empty", () => {
-    const workflow = readYaml(".github/workflows/ci.yml");
     const sonar = readYaml(".github/workflows/sonarqube.yml");
     const steps = sonar.jobs.sonarqube.steps;
     const guardIndex = steps.findIndex((step) => step.name === "Require all four nonempty coverage reports");
@@ -236,7 +219,7 @@ describe("database integration runner CI policy", () => {
     expect(guardIndex).toBeLessThan(scanIndex);
 
     const directory = mkdtempSync(join(tmpdir(), "sonar-coverage-policy-"));
-    const reports = workflow.jobs.test.strategy.matrix.shard.map((shard) => {
+    const reports = [1, 2, 3, 4].map((shard) => {
       const artifactDirectory = join(directory, "coverage", `sonar-coverage-${shard}`);
       mkdirSync(artifactDirectory, { recursive: true });
       return join(artifactDirectory, "lcov.info");
@@ -263,297 +246,87 @@ describe("database integration runner CI policy", () => {
     }
   });
 
-  it("shards the root Vitest suite behind a Postgres service and runs the serial lane once", () => {
+  const required = ["lint", "typecheck", "static", "serial", "a11y", "build"];
+  const coreGate = () => readYaml(".github/workflows/ci.yml").jobs.core.steps.find(
+    (step) => step.name === "Require actual success from every mandatory check",
+  );
+  const runCore = (results) => spawnSync("bash", ["-e", "-o", "pipefail", "-c", coreGate().run], {
+    encoding: "utf8", env: { ...process.env, CORE_RESULTS: JSON.stringify(results) },
+  });
+  it("aggregates all mandatory jobs and executes a fail-closed core gate", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
-    const shardJob = workflow.jobs?.test;
-    const serialJob = workflow.jobs?.["test-serial"];
-    const shardCommands = runCommands(shardJob);
-    const serialCommands = runCommands(serialJob);
-
-    expect(shardJob?.strategy?.matrix?.shard).toEqual([1, 2, 3, 4]);
-    expect(shardJob?.strategy?.["fail-fast"]).toBe(false);
-    expect(shardJob?.name).toBe("test (${{ matrix.shard }}/${{ strategy.job-total }})");
-    expect(shardJob?.services?.postgres?.image).toBe("postgres:16-alpine");
-    expect(shardJob?.env).toMatchObject({
-      DATABASE_URL: "postgres://webdex:webdex@localhost:5432/webdex",
-      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: "postgres://webdex:webdex@localhost:5432/webdex",
-      STUDIO_LIVE_POSTGRES_RUNTIME_ROLE: "webdex_runtime",
-    });
-    expect(shardJob?.["timeout-minutes"]).toBe(30);
-
-    // The browser probes in packages/studio-engine-* launch a real Chromium from Vitest.
-    expect(shardCommands).toContain(PLAYWRIGHT_INSTALL);
-
-    // Every shard provisions and migration-proves its own database before its slice of the suite.
-    const stepNames = (shardJob?.steps ?? []).map((step) => step.name);
-    const shardStepIndex = (shardJob?.steps ?? []).findIndex(
-      (step) => step.name === "Run this shard of the root Vitest suite with per-file progress",
-    );
-    expect(shardStepIndex).toBeGreaterThanOrEqual(0);
-    for (const provisioningStep of [
-      "Provision and verify database schema",
-      "Reproduce reviewed historical baseline through 0019",
-      "Adopt verified history and apply genuine pending migrations",
-      "Prove pending-only migration rerun",
-      "Verify full runtime readiness and exact migration ledger",
-    ]) {
-      const index = stepNames.indexOf(provisioningStep);
-      expect(index, provisioningStep).toBeGreaterThanOrEqual(0);
-      expect(index, provisioningStep).toBeLessThan(shardStepIndex);
+    expect(workflow.permissions).toEqual({ contents: "read", "pull-requests": "read" });
+    expect(workflow.jobs.core.needs).toEqual(required);
+    expect(workflow.jobs.core.if).toBe("${{ always() && !cancelled() }}");
+    expect(usesActions(workflow.jobs.core)).toEqual([]);
+    expect(coreGate().env.CORE_RESULTS).toBe("${{ toJSON(needs) }}");
+    for (const dependency of required) {
+      expect(workflow.jobs[dependency]).toBeDefined();
+      expect(workflow.jobs[dependency]["continue-on-error"]).not.toBe(true);
     }
-    expect(shardJob?.steps?.[shardStepIndex]).toMatchObject({
-      name: "Run this shard of the root Vitest suite with per-file progress",
-      "timeout-minutes": 20,
-    });
-    expect(shardJob?.steps?.[shardStepIndex]?.run).toContain(ROOT_SHARD_ARGUMENT);
-
-    // The wall-clock budget pass needs a runner that is doing nothing else, then the disposable
-    // Redis and workerd integrations ride the same quiet runner because each is seconds long.
-    expect(serialJob?.name).toBe("test (serial lane)");
-    expect(serialJob?.services).toBeUndefined();
-    expect(serialJob?.strategy).toBeUndefined();
-    expect(serialCommands).toEqual([
-      "pnpm install --frozen-lockfile --prefer-offline",
-      "pnpm run test:perf",
-      "pnpm run test:redis:integration",
-      "pnpm run test:cloudflare-realtime",
-    ]);
-
-    // Nothing runs the full `pnpm run test` (root + perf) or repeats a serial-lane check elsewhere.
-    const everyCommand = Object.values(workflow.jobs ?? {}).flatMap(runCommands);
-    expect(everyCommand).not.toContain("pnpm run test");
-    for (const once of [
-      "pnpm run test:perf",
-      "pnpm run test:redis:integration",
-      "pnpm run test:cloudflare-realtime",
-    ]) {
-      expect(everyCommand.filter((command) => command === once), once).toHaveLength(1);
+    expect(runCore(Object.fromEntries(required.map((key) => [key, { result: "success" }]))).status).toBe(0);
+    for (const incomplete of [null, [], {}, { lint: { result: "success" } }]) {
+      expect(runCore(incomplete).status).not.toBe(0);
     }
   });
-
-  it("derives migration summary expectations from the canonical manifest", () => {
-    const workflow = readYaml(".github/workflows/ci.yml");
-    const steps = workflow.jobs?.test?.steps ?? [];
-    const adoptionStep = steps.find(
-      (step) => step.name === "Adopt verified history and apply genuine pending migrations",
-    );
-    const rerunStep = steps.find(
-      (step) => step.name === "Prove pending-only migration rerun",
-    );
-
-    expect(adoptionStep?.run).toContain(
-      "manifest_count=\"$(grep -cve '^[[:space:]]*$' \"$manifest_path\")\"",
-    );
-    expect(adoptionStep?.run).toContain(
-      "expected_applied=$((manifest_count - adoption_baseline - bootstrap_count))",
-    );
-    expect(adoptionStep?.run).toContain(
-      "expected_verified=$((adoption_baseline + bootstrap_count))",
-    );
-    expect(adoptionStep?.run).not.toMatch(
-      /19 adopted, \d+ applied, \d+ checksum-verified skips/u,
-    );
-    expect(rerunStep?.run).toContain(
-      "0 applied, ${manifest_count} checksum-verified skips",
-    );
-    expect(rerunStep?.run).not.toMatch(
-      /0 applied, \d+ checksum-verified skips/u,
-    );
-  });
-
-  it("cancels superseded pull request and branch push runs", () => {
-    const workflow = readYaml(".github/workflows/ci.yml");
-
-    // A PR is keyed by PR number; a push is keyed by branch ref. The newest main/release commit
-    // contains all prior branch changes, so superseded runs should free their runners immediately
-    // instead of keeping one 14-job generation per SHA in the queue.
-    expect(workflow.concurrency).toEqual({
-      group: "${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}-release-final-g3",
-      "cancel-in-progress": true,
-    });
-  });
-
-  it("aggregates the required `core` check from every parallel gate", () => {
-    const workflow = readYaml(".github/workflows/ci.yml");
-    const coreJob = workflow.jobs?.core;
-    const gateStep = coreJob?.steps?.find(
-      (step) => step.name === "Require every core gate to succeed",
-    );
-
-    expect(workflow.permissions).toEqual({ contents: "read" });
-    expect(coreJob?.name).toBe("core");
-    expect(coreJob?.needs).toEqual(["lint", "typecheck", "build", "test", "test-serial"]);
-    for (const dependency of coreJob?.needs ?? []) {
-      expect(workflow.jobs?.[dependency], dependency).toBeDefined();
+  it.each(required)("fails core when mandatory job %s does not succeed", (job) => {
+    for (const result of ["failure", "skipped", "cancelled", "timed_out", "neutral"]) {
+      const results = Object.fromEntries(required.map((key) => [key, { result: "success" }]));
+      results[job] = { result };
+      expect(runCore(results).status, `${job}: ${result}`).not.toBe(0);
     }
-    // A skipped required check reads as green to branch protection, so the gate must always run
-    // and read the upstream results itself.
-    expect(coreJob?.if).toBe("${{ always() }}");
-    expect(coreJob?.services).toBeUndefined();
-    expect(usesActions(coreJob)).toEqual([]);
-    expect(gateStep?.env?.GATE_RESULTS).toBe("${{ toJSON(needs) }}");
-    expect(gateStep?.run).toContain('select(.value.result != "success")');
-    expect(gateStep?.run).toContain("exit 1");
-    expect(gateStep?.["continue-on-error"]).not.toBe(true);
-
-    // The checks that used to live inside the single core job each keep their own runner.
-    expect(runCommands(workflow.jobs?.lint)).toEqual([
-      "pnpm install --frozen-lockfile --prefer-offline",
-      "pnpm run audit:security",
-      "pnpm run validate:architecture",
-      "pnpm run verify:csp",
-      "pnpm run verify:toolchain-coverage",
-      "python3 scripts/verify-pr-workflow-fanout.py",
-      "pnpm run lint",
-    ]);
-    expect(runCommands(workflow.jobs?.typecheck)).toEqual([
-      "pnpm install --frozen-lockfile --prefer-offline",
-      "pnpm run typecheck",
-      "pnpm run typecheck:cloudflare-realtime",
-    ]);
-    const buildCommands = runCommands(workflow.jobs?.build);
-    expect(buildCommands).toContain("pnpm run build");
-    expect(buildCommands).toContain("pnpm run check:studio-bundle");
-    expect(buildCommands).toContain("pnpm run build:all");
-    expect(buildCommands.some((command) => command.includes("wrangler deploy"))).toBe(true);
   });
-
-  it("keeps the Studio 3D parity proof on a fresh runner behind a hard release gate", () => {
-    const packageManifest = readJson("package.json");
+  it("runs the quiet performance lane once and preserves active main checks", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
-    const parityJob = workflow.jobs?.["studio-3d-runtime"];
-    const paritySteps = parityJob?.steps ?? [];
-    const parityCommands = runCommands(parityJob);
-    const releaseGate = workflow.jobs?.verify;
-
-    const playwrightVersion = packageManifest.devDependencies?.playwright;
-    expect(playwrightVersion).toMatch(/^\d+\.\d+\.\d+$/u);
-    expect(packageManifest.devDependencies?.["@playwright/test"]).toBe(playwrightVersion);
-
-    // The proof runs parallel to core on its own VM: no `needs`, no services, nothing shared.
-    // 9a8f9f67 pinned every ci.yml job to ubuntu-24.04 so the runner image cannot drift under
-    // the merge checks; a pinned image is still a fresh VM of its own.
-    expect(parityJob).toMatchObject({
-      "runs-on": "ubuntu-24.04",
-      "timeout-minutes": 20,
-      env: {
-        NODE_OPTIONS: "--max-old-space-size=8192",
-      },
-    });
-    expect(parityJob?.needs).toBeUndefined();
-    expect(parityJob?.if).toBeUndefined();
-    expect(parityJob?.services).toBeUndefined();
-    // The trailing upload-artifact is the failure evidence path, not a runner dependency: it runs
-    // only `if: failure()` and touches nothing before the proof. This job had failed seven times in
-    // a row leaving no page state behind, which is why the sibling studio-3d-visual job already
-    // carries the same step. Keeping it in this pinned list means a *new* action still trips the
-    // contract, which is what "fresh runner" is guarding.
-    expect(usesActions(parityJob)).toEqual([
-      "actions/checkout@v6",
-      "pnpm/action-setup@v6",
-      "actions/setup-node@v6",
-      "actions/upload-artifact@v4",
-    ]);
-
-    const checkout = paritySteps.find((step) => step.uses === "actions/checkout@v6");
-    expect(checkout?.with?.["persist-credentials"]).toBe(false);
-
-    const installIndex = parityCommands.indexOf("pnpm install --frozen-lockfile --prefer-offline");
-    const browserInstallIndex = parityCommands.indexOf(PLAYWRIGHT_INSTALL);
-    const buildIndex = parityCommands.indexOf("pnpm run build:bundle");
-    const parityIndex = parityCommands.indexOf(HEADED_PARITY_COMMAND);
-    expect(installIndex).toBeGreaterThanOrEqual(0);
-    expect(browserInstallIndex).toBeGreaterThan(installIndex);
-    expect(buildIndex).toBeGreaterThan(browserInstallIndex);
-    expect(parityIndex).toBeGreaterThan(buildIndex);
-    expect(
-      parityCommands.filter((command) => command === HEADED_PARITY_COMMAND),
-    ).toHaveLength(1);
-    expect(parityCommands).not.toContain("pnpm run verify:studio-3d-console");
-
-    const parityStep = paritySteps.find((step) => step.run === HEADED_PARITY_COMMAND);
-    expect(parityStep?.if).toBeUndefined();
-    expect(parityStep?.["continue-on-error"]).not.toBe(true);
-
-    // No other job may run the headed parity proof: it belongs on this isolated runner only.
-    for (const [jobId, job] of Object.entries(workflow.jobs ?? {})) {
-      if (jobId === "studio-3d-runtime") continue;
-      expect(runCommands(job).some((command) => command.includes("verify:studio-3d-console")), jobId)
-        .toBe(false);
-    }
-
-    // The release-facing "CI / verify" check is core AND the proof. It needs the five core gates
-    // directly rather than the `core` job: a gate job also waits for a runner, and on a saturated
-    // queue that wait alone cost 30 minutes per hop (run 2643). A failed or cancelled upstream job
-    // must still produce a failing verify, never a merge-neutral skipped one, so the gate always
-    // runs and reads every result itself.
-    expect(releaseGate?.name).toBe("verify");
-    expect(releaseGate?.needs).toEqual([
-      ...workflow.jobs.core.needs,
-      "studio-3d-runtime",
-    ]);
-    expect(releaseGate?.if).toBe("${{ always() }}");
-    expect(releaseGate?.services).toBeUndefined();
-    expect(usesActions(releaseGate)).toEqual([]);
-    const releaseGateStep = releaseGate?.steps?.find(
-      (step) =>
-        step.name === "Require every core gate and the Studio 3D runtime proof to succeed",
-    );
-    expect(releaseGateStep?.env?.GATE_RESULTS).toBe("${{ toJSON(needs) }}");
-    expect(releaseGateStep?.run).toContain('select(.value.result != "success")');
-    expect(releaseGateStep?.run).toContain("exit 1");
-    expect(releaseGateStep?.if).toBeUndefined();
-    expect(releaseGateStep?.["continue-on-error"]).not.toBe(true);
+    const job = workflow.jobs.serial;
+    expect(job.services).toBeUndefined();
+    expect(job.strategy).toBeUndefined();
+    expect(runCommands(job).join("\n")).toContain("pnpm run test:perf");
+    const all = Object.values(workflow.jobs).flatMap(runCommands).join("\n");
+    expect(all.match(/pnpm run test:perf/gu)).toHaveLength(1);
+    expect(workflow.concurrency["cancel-in-progress"]).toBe("${{ github.event_name == 'pull_request' }}");
+    expect(workflow.concurrency.group).toContain("github.event_name");
+    expect(workflow.concurrency.group).toContain("github.event.pull_request.number || github.ref");
   });
-
-  it("splits the browser gates into lanes that each build the bundle once", () => {
-    const workflow = readYaml(".github/workflows/ci.yml");
-    const spec = readText("e2e/studio-3d-visual-verification.spec.ts");
-
-    // The 3D visual suite: one `@slow` case (7.5 minutes on SwiftShader) alone in one lane, every
-    // other case in the second. Playwright's `--shard` splits by case count, which cannot balance
-    // a single seven-minute case, so the split is by tag.
-    const visualJob = workflow.jobs?.["studio-3d-visual"];
-    expect(visualJob?.name).toBe("studio-3d-visual (${{ matrix.lane }})");
-    expect(visualJob?.strategy?.["fail-fast"]).toBe(false);
-    expect(visualJob?.strategy?.matrix?.include?.map((entry) => entry.filter)).toEqual([
-      "--grep=@slow",
-      "--grep-invert=@slow",
-    ]);
-    // No `--` between the script and the filter: pnpm 11 forwards a standalone `--` verbatim and
-    // Playwright stops reading options at it, so both lanes ran the whole suite (run 2643).
-    expect(runCommands(visualJob)).toContain(
-      "pnpm run verify:studio-3d-visual ${{ matrix.filter }}",
-    );
-    expect(spec.match(/\{ tag: "@slow" \}/gu)).toHaveLength(1);
-    expect(spec).toContain(
-      'test("3D 배경이 기본 진입 경로에서 캔버스에 실제로 붙는다", { tag: "@slow" }',
-    );
-
-    // The in-app sweeps: two jobs, each with its own bundle build, covering the four verifiers
-    // exactly once between them.
-    const routeJob = workflow.jobs?.["studio-inapp-browser"];
-    const featureJob = workflow.jobs?.["studio-inapp-feature-sweep"];
-    const routeCommands = runCommands(routeJob);
-    const featureCommands = runCommands(featureJob);
-    expect(routeCommands).toContain("pnpm run build:bundle");
-    expect(featureCommands).toContain("pnpm run build:bundle");
-    expect(routeCommands).toContain("pnpm run verify:studio-inapp-browser");
-    expect(routeCommands).toContain("pnpm run verify:studio-mobile-top");
-    expect(featureCommands).toContain("pnpm run verify:studio-inapp-feature-sweep");
-    expect(
-      featureCommands.some((command) => command.includes("verify:studio-bg3d-inapp-editor")),
-    ).toBe(true);
-    for (const job of [routeJob, featureJob]) {
-      const checkout = (job?.steps ?? []).find((step) => step.uses === "actions/checkout@v6");
-      expect(checkout?.with?.["persist-credentials"]).toBe(false);
-      expect(job?.needs).toBe("core");
+  it("retains strict lint, application typechecks, real accessibility and bundle checks", () => {
+    const { jobs } = readYaml(".github/workflows/ci.yml");
+    expect(runCommands(jobs.lint).join("\n")).toContain("node scripts/lint-changed.mjs --files-from=");
+    expect(runCommands(jobs.lint)).toContain("pnpm run quality:imports");
+    expect(runCommands(jobs.lint)).toContain("pnpm run quality:secrets");
+    expect(runCommands(jobs.typecheck).join("\n")).toContain("pnpm run typecheck\n");
+    expect(runCommands(jobs.typecheck).join("\n")).toContain("pnpm run typecheck:cloudflare-realtime");
+    expect(runCommands(jobs.typecheck)).toContain("python3 scripts/verify-pr-workflow-fanout.py");
+    expect(runCommands(jobs.a11y)).toContain(PLAYWRIGHT_INSTALL);
+    expect(runCommands(jobs.a11y)).toContain("pnpm run test:a11y");
+    const build = runCommands(jobs.build).join("\n");
+    expect(build).toContain("pnpm --filter @webtoon-nest/api build");
+    expect(build).toContain("pnpm run build:bundle");
+    expect(build).toContain("pnpm run check:studio-bundle");
+    expect(build).toContain("test -s dist/.vite/manifest.json");
+  });
+  it("keeps exhaustive browser proof on main with a shared exact production build", () => {
+    const workflow = readYaml(".github/workflows/main-full-qa-studio.yml");
+    expect(workflow.on.push.branches).toEqual(["main"]);
+    expect(workflow.on).toHaveProperty("workflow_dispatch");
+    expect(workflow.on).not.toHaveProperty("pull_request");
+    const build = workflow.jobs["production-build"];
+    const audit = workflow.jobs["studio-audit"];
+    expect(runCommands(build)).toContain("pnpm run build:bundle");
+    expect(audit.needs).toBe("production-build");
+    expect(audit.strategy["fail-fast"]).toBe(false);
+    const commands = audit.strategy.matrix.include.flatMap((lane) => lane.commands.trim().split("\n"));
+    const names = commands.map((command) => command.split("|", 1)[0]);
+    expect(new Set(names).size).toBe(names.length);
+    expect(commands).toContain(`studio-3d-console|${HEADED_PARITY_COMMAND}`);
+    for (const command of ["verify:studio-inapp-browser", "verify:studio-mobile-top", "verify:studio-inapp-feature-sweep", "verify:studio-bg3d-inapp-editor", "verify:studio-filter-dialog"]) {
+      expect(commands.filter((line) => line.includes(`pnpm run ${command}`))).toHaveLength(1);
     }
-
-    // Every browser gate serves the same dist the tsc-inclusive `build` job produces; only the
-    // `build` job pays for tsc, and it pays exactly once.
-    const everyCommand = Object.values(workflow.jobs ?? {}).flatMap(runCommands);
-    expect(everyCommand.filter((command) => command === "pnpm run build")).toHaveLength(1);
-    expect(runCommands(workflow.jobs?.["studio-filter-dialog"])).toContain("pnpm run build:bundle");
+    const download = audit.steps.find((step) => step.uses?.startsWith("actions/download-artifact@"));
+    expect(download.with).toEqual({ name: "main-full-qa-dist-${{ github.sha }}", path: "dist" });
+    const proof = runCommands(audit).join("\n");
+    expect(proof).toContain("status=${PIPESTATUS[0]}");
+    expect(proof).toContain('[[ -s "$output_dir/failures.txt" ]]');
+    expect(proof).toContain("exit 1");
+    expect(audit.steps.some((step) => step["continue-on-error"] === true)).toBe(false);
   });
 });

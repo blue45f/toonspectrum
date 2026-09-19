@@ -103,7 +103,7 @@ export function StudioBg3dProSuitePanel({
         {t("3D 자산 고급 가공 · LOD / 불리언 / 이동 경로", "Advanced 3D assets · LOD / Boolean / Navigation")}
       </button>
       {assetToolsOpen && <div id={`${id}-asset-tools`}><Suspense fallback={<p role="status">{t("3D 자산 도구를 불러오는 중입니다.", "Loading 3D asset tools.")}</p>}>
-        <AssetTools disabled={locked || runtime?.proSuiteActive === false} />
+        <AssetTools disabled={locked || runtime?.proSuiteActive === false} inplaceTools={runtime?.inplaceTools} />
         <SplatReference disabled={locked || runtime?.proSuiteActive === false} />
       </Suspense></div>}
       <div role="tablist" aria-label="웹툰 컷 제작 단계" className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">

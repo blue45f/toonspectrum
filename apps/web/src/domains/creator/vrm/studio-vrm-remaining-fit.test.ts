@@ -26,12 +26,19 @@ describe("remaining procedural garment fit defects", () => {
   it.each(["tshirt", "shirt", "sweater", "hoodie", "blazer"])("uses two tapered shoulder bridges instead of one cross-body tube for %s", (itemId) => {
     const shoulder = lateralSpineParts(buildGarmentParts(itemId, measuredMetrics(), 1));
     expect(shoulder).toHaveLength(2);
+    expect(new Set(shoulder.map((part) => part.shoulderBone))).toEqual(
+      new Set(["leftUpperArm", "rightUpperArm"]),
+    );
     expect(shoulder.every((part) => part.shape.kind === "lathe")).toBe(true);
     for (const part of shoulder) {
       if (part.shape.kind !== "lathe") throw new Error("expected tapered shoulder bridge");
       expect(part.shape.profile.length).toBeGreaterThanOrEqual(4);
       expect(part.shape.profile[0].radius).toBeGreaterThan(part.shape.profile.at(-1)!.radius);
-      expect(Math.abs(dot(part.offset, FALLBACK_WARDROBE_METRICS.up) - FALLBACK_WARDROBE_METRICS.spineToNeck * 0.86)).toBeLessThan(1e-6);
+      expect(part.skinMode).toBe("shoulder-yoke");
+      const verticalScale = part.squash?.[0] ?? 1;
+      const capTop = dot(part.offset, FALLBACK_WARDROBE_METRICS.up)
+        + part.shape.profile[0].radius * verticalScale;
+      expect(Math.abs(capTop - FALLBACK_WARDROBE_METRICS.spineToNeck * 0.86)).toBeLessThan(1e-6);
     }
   });
 

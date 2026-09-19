@@ -92,6 +92,7 @@ describe("Studio canvas image I/O module boundary", () => {
 
     expect(imageIo.imports).toEqual([
       "../studio-gif-element",
+      "../studio-frame-animation",
       "../studio-upload-image-safety",
       "../render/studio-raster-interchange",
     ]);

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { validateReleaseWorkflows } from "./release-workflow-policy.mjs";
 
 export const FREE_INFRASTRUCTURE_POLICY_VERSION =
   "toonspectrum.free-infrastructure.v2";
@@ -289,6 +290,8 @@ export function validateFreeInfrastructureRepository(root = process.cwd()) { // 
     }
   };
   for (const relativePath of activeSurfacePaths) visit(at(relativePath));
+
+  issues.push(...validateReleaseWorkflows(root));
 
   return issues;
 }

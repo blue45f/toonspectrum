@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import test from "node:test";
 
 import {
   createProfessionalValidationReceipt,
@@ -11,6 +10,8 @@ import {
   validateProfessionalValidationProtocol,
   validateProfessionalValidationTemplate,
 } from "./verify-studio-professional-validation.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const ROOT = resolve(import.meta.dirname, "..");
 const PROTOCOL_PATH = resolve(

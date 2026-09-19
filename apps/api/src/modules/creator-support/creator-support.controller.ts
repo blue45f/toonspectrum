@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   Header,
   Headers,
@@ -13,7 +14,7 @@ import { CreatorSupportService } from "./creator-support.service";
 
 @Controller()
 export class CreatorSupportController {
-  constructor(private readonly service: CreatorSupportService) {}
+  constructor(@Inject(CreatorSupportService) private readonly service: CreatorSupportService) {}
 
   @Get("creator-support/projects")
   @Header("Cache-Control", "no-store, max-age=0")

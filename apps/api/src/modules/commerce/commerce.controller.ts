@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Inject,
   Get,
   Header,
   Headers,
@@ -16,7 +17,7 @@ import { CommerceService } from "./commerce.service";
 
 @Controller()
 export class CommerceController {
-  constructor(private readonly commerceService: CommerceService) {}
+  constructor(@Inject(CommerceService) private readonly commerceService: CommerceService) {}
 
   @Get("commerce/config")
   @Header("Cache-Control", "no-store, max-age=0")

@@ -34,6 +34,10 @@ import {
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";
 import { ProductionRiskResponseCard } from "./ProductionRiskResponseCard";
+import { ProductionRiskResponseComposer, type ProductionRiskResponseDraftAction } from "./ProductionRiskResponseComposer";
+import { ProductionRiskMultiFilter } from "./ProductionRiskMultiFilter";
+import { ProductionRiskEpisodeView, ProductionRiskMatrixView, ProductionRiskViewSwitcher } from "./ProductionRiskViews";
+import { parseProductionRiskUrlState } from "./production-risk-url-state";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useApp } from "@/shared/lib/store";
@@ -186,9 +190,6 @@ function Section({
   );
 }
 
-function splitFilter(value: string | null): readonly string[] {
-  return value?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
-}
 
 function riskOwnerName(aggregate: ProductionProjectAggregate, risk: ProductionRisk): string {
   const assignment = aggregate.assignments.find((entry) => entry.id === risk.ownerAssignmentId);
@@ -294,6 +295,7 @@ function RiskDetail({
   readonly onBack: () => void;
 }) {
   const [reason, setReason] = useState("");
+  const [responseDraft, setResponseDraft] = useState<ProductionRiskResponseDraftAction | null>(null);
   const [busy, setBusy] = useState(false);
   const responses = aggregate.riskResponses.filter((response) => response.riskId === risk.id);
   const projectBase = `/production/projects/${encodeURIComponent(aggregate.projectId)}`;
@@ -320,42 +322,9 @@ function RiskDetail({
     }
   };
 
-  const createResponse = async (
-    actionType: "split-task" | "reschedule" | "outsource" | "resolve-dependency" | "manual",
-    title: string,
-  ) => {
+  const createResponse = (actionType: ProductionRiskResponseDraftAction["actionType"], title: string) => {
     if (!canEdit || busy) return;
-    setBusy(true);
-    try {
-      const now = new Date();
-      await execute({
-        type: "upsert-risk-response",
-        response: {
-          id: `risk-response:${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
-          projectId: aggregate.projectId,
-          riskId: risk.id,
-          strategy: actionType === "outsource" ? "transfer" : "mitigate",
-          actionType,
-          title,
-          description: reason.trim() || `${risk.title}의 영향을 줄이기 위한 운영 대응입니다.`,
-          ownerAssignmentId: actorAssignmentId ?? risk.ownerAssignmentId,
-          dueAt: risk.responseDueAt,
-          linkedTaskId: risk.affectedTaskIds[0] ?? null,
-          linkedChangeRequestId: null,
-          linkedChangeOrderId: null,
-          expectedEffect: risk.varianceHours
-            ? `예상 초과 ${Math.round(risk.varianceHours)}시간 축소`
-            : "차단 원인 또는 일정 위험 축소",
-          actualEffect: null,
-          status: "proposed",
-          createdAt: now.toISOString(),
-          completedAt: null,
-        },
-      }, `${title} 대응안을 등록했습니다.`);
-      setReason("");
-    } finally {
-      setBusy(false);
-    }
+    setResponseDraft({ actionType, title });
   };
 
   const suppressSignal = async () => {
@@ -503,7 +472,7 @@ function RiskDetail({
       {tab === "response" ? (
         <div className="mt-4 space-y-4">
           <label className="block">
-            <span className="text-xs font-bold text-fg">판단·대응 사유</span>
+            <span className="text-xs font-bold text-fg">위험 상태 판단 사유</span>
             <textarea
               value={reason}
               onChange={(event) => setReason(event.target.value)}
@@ -522,6 +491,11 @@ function RiskDetail({
             <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("resolve-dependency", "차단 해소")}>차단 해소</button>
             <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canEdit || busy} onClick={() => void createResponse("outsource", "외주 전환 검토")}>외주 전환</button>
           </div>
+          {responseDraft ? <ProductionRiskResponseComposer
+            key={`${risk.id}:${responseDraft.actionType}`} aggregate={aggregate} risk={risk}
+            action={responseDraft} actorAssignmentId={actorAssignmentId} description={reason}
+            execute={execute} canEdit={canEdit} onClose={() => setResponseDraft(null)}
+          /> : null}
           <div className="flex flex-wrap gap-2 border-t border-line pt-4">
             {risk.status === "open" || risk.status === "monitoring" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy} onClick={() => void transition("mitigating", "대응을 시작합니다.")}>대응 시작</button> : null}
             {risk.status === "mitigating" || risk.status === "occurred" ? <button type="button" className={buttonClass({ size: "sm" })} disabled={!canEdit || busy || !trimmedReason} onClick={() => void transition("resolved", "")}>해결 확인</button> : null}
@@ -721,14 +695,22 @@ export function ProductionRiskWorkspace({
       ? aggregate.assignments.find((assignment) => assignment.roleType === "producer" && assignment.status === "active")
       : null);
 
-  const severityFilters = splitFilter(searchParams.get("severity")) as readonly ProductionRiskSeverity[];
-  const statusFilters = splitFilter(searchParams.get("status")) as readonly ProductionRiskStatus[];
-  const categoryFilters = splitFilter(searchParams.get("category")) as readonly ProductionRiskCategory[];
-  const sourceFilter = searchParams.get("source");
-  const search = searchParams.get("q")?.trim().toLocaleLowerCase("ko-KR") ?? "";
-  const selectedRiskId = searchParams.get("risk");
+  const urlState = parseProductionRiskUrlState(searchParams, {
+    episodeIds: aggregate.episodes.map((episode) => episode.episodeId),
+    ownerAssignmentIds: aggregate.assignments.map((assignment) => assignment.id),
+    ruleKeys: [], riskIds: evaluation.risks.map((risk) => risk.id),
+  });
+  const { severities: severityFilters, statuses: statusFilters, categories: categoryFilters,
+    source: sourceFilter, selectedRiskId, view, matrixCell, episodeIds, ownerAssignmentIds } = urlState;
+  const search = urlState.search.toLocaleLowerCase("ko-KR");
+  const episodeOptions = [{ value: "project", label: "프로젝트 공통" }, ...aggregate.episodes.map((episode) => ({
+    value: episode.episodeId, label: aggregate.episodePlans.find((plan) => plan.episodeId === episode.episodeId)?.title ?? episode.episodeId,
+  }))];
+  const ownerOptions = [{ value: "unassigned", label: "담당자 미정" }, ...aggregate.assignments.map((assignment) => ({
+    value: assignment.id, label: aggregate.parties.find((party) => party.id === assignment.partyId)?.publicDisplayName ?? assignment.id,
+  }))];
 
-  const filteredRisks = evaluation.risks.filter((risk) => {
+  const baseFilteredRisks = evaluation.risks.filter((risk) => {
     const signal = sourceSignal(evaluation.signals, risk);
     const statusMatch = statusFilters.length > 0
       ? statusFilters.includes(risk.status)
@@ -736,9 +718,14 @@ export function ProductionRiskWorkspace({
     return statusMatch
       && (severityFilters.length === 0 || severityFilters.includes(risk.severity))
       && (categoryFilters.length === 0 || categoryFilters.includes(risk.category))
-      && (!sourceFilter || sourceFilter === "all" || sourceFilter === risk.source)
+      && (!sourceFilter || sourceFilter === risk.source)
+      && (episodeIds.length === 0 || (risk.affectedEpisodeIds.length === 0
+        ? episodeIds.includes("project") : risk.affectedEpisodeIds.some((id) => episodeIds.includes(id))))
+      && (ownerAssignmentIds.length === 0 || ownerAssignmentIds.includes(risk.ownerAssignmentId ?? "unassigned"))
       && (!search || `${risk.title} ${risk.description} ${risk.causeCodes.join(" ")}`.toLocaleLowerCase("ko-KR").includes(search));
   });
+  const filteredRisks = matrixCell ? baseFilteredRisks.filter((risk) =>
+    risk.probability === matrixCell.probability && risk.impact === matrixCell.impact) : baseFilteredRisks;
   const selectedRisk = evaluation.risks.find((risk) => risk.id === selectedRiskId)
     ?? filteredRisks[0]
     ?? null;
@@ -749,6 +736,7 @@ export function ProductionRiskWorkspace({
     if (!value || value === "all") next.delete(key);
     else next.set(key, value);
     if (key !== "risk") next.delete("risk");
+    if (key === "view" && value !== "matrix") next.delete("matrix");
     setSearchParams(next, { replace: true });
   };
 
@@ -832,16 +820,27 @@ export function ProductionRiskWorkspace({
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">유형</span><select value={searchParams.get("category") ?? "all"} onChange={(event) => updateParam("category", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option>{Object.entries(CATEGORY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="block"><span className="text-[0.6875rem] font-bold text-fg-3">등록 방식</span><select value={searchParams.get("source") ?? "all"} onChange={(event) => updateParam("source", event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-panel px-3 py-2 text-xs text-fg"><option value="all">전체</option><option value="automatic">자동 감지</option><option value="manual">직접 등록</option></select></label>
         </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <ProductionRiskMultiFilter label="회차" options={episodeOptions} selected={episodeIds} onChange={(values) => updateParam("episode", values.join(","))} />
+          <ProductionRiskMultiFilter label="담당자" options={ownerOptions} selected={ownerAssignmentIds} onChange={(values) => updateParam("owner", values.join(","))} />
+        </div>
       </Section>
+      <ProductionRiskViewSwitcher value={view} onChange={(value) => updateParam("view", value)} />
+      {view === "matrix" ? <ProductionRiskMatrixView
+        aggregate={aggregate} risks={baseFilteredRisks} selectedRiskId={selectedRisk?.id ?? null}
+        onSelect={selectRisk} selectedCell={matrixCell}
+        onSelectCell={(cell) => updateParam("matrix", cell ? `${cell.probability}-${cell.impact}` : null)}
+      /> : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(20rem,0.8fr)_minmax(0,1.4fr)]">
         <section className={cn("rounded-2xl border border-line bg-card p-4", mobileDetailOpen && "hidden xl:block")}>
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div><h2 className="text-sm font-black text-fg">위험 목록</h2><p className="mt-1 text-xs text-fg-3">{filteredRisks.length}건 · 운영 우선순위순</p></div>
+            <div><h2 className="text-sm font-black text-fg">{view === "episode" ? "회차별 위험" : "위험 목록"}</h2><p className="mt-1 text-xs text-fg-3">{filteredRisks.length}건 · 운영 우선순위순</p></div>
             <Pill>{evaluation.risks.filter((risk) => ACTIVE_STATUSES.has(risk.status)).length} 활성</Pill>
           </div>
           <div className="space-y-2">
-            {filteredRisks.map((risk) => (
+            {view === "episode" ? <ProductionRiskEpisodeView aggregate={aggregate} risks={filteredRisks}
+              selectedRiskId={selectedRisk?.id ?? null} onSelect={selectRisk} /> : filteredRisks.map((risk) => (
               <RiskListRow
                 key={risk.id}
                 aggregate={aggregate}
@@ -864,6 +863,7 @@ export function ProductionRiskWorkspace({
         <div className={cn(!mobileDetailOpen && "hidden xl:block")}>
           {selectedRisk ? (
             <RiskDetail
+              key={selectedRisk.id}
               aggregate={aggregate}
               risk={selectedRisk}
               signal={selectedSignal}

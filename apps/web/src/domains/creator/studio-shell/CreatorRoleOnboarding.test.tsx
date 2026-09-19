@@ -6,7 +6,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CreatorRoleOnboarding } from "./CreatorRoleOnboarding";
 
 import type { MeProfile } from "@/infrastructure/me-client";
-import { normalizeCreatorRoleProfile } from "@/shared/lib/creator-role-contract";
+import {
+  CREATOR_ROLE_PROFILE_VERSION,
+  normalizeCreatorRoleProfile,
+} from "@/shared/lib/creator-role-contract";
 
 const { updateMyProfile } = vi.hoisted(() => ({
   updateMyProfile: vi.fn(),
@@ -87,7 +90,7 @@ describe("CreatorRoleOnboarding", () => {
 
     await waitFor(() => expect(onDismiss).toHaveBeenCalledTimes(1));
     expect(readRoleProfile()).toMatchObject({
-      version: 2,
+      version: CREATOR_ROLE_PROFILE_VERSION,
       primaryRole: "story",
       specialties: ["dialogue"],
       usagePurposes: ["team-production"],

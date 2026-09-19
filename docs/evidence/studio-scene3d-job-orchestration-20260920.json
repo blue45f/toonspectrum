@@ -1,0 +1,564 @@
+{
+  "schema": "toonspectrum.scene3d-specialist-orchestration-evidence",
+  "version": 1,
+  "recordedAt": "2026-09-19T21:25:43.648040+00:00",
+  "scope": "specialist-JS-realm-queue-and-review-fix; not whole-platform completion, cross-tab scheduling, physical GPU-memory measurement, or all-CI certification",
+  "parentCommit": "ae9cd289cd3024583b86a0ff3c64291d60a9c660",
+  "mainBaseline": "2981170a292fbe83a57b2a2913d6ddcfa3cbde74",
+  "sourceSha256": {
+    ".github/workflows/toonstudio-session-goals.yml": "d0feeff7507fc4433e4bc142067dc487e2b2e36859d757c05e31ea283479b7ac",
+    "apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx": "927883cb308f5049d5aa54eb109348eccad2f410ff243a011fe51e0dd2090fd7",
+    "apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.tsx": "45941e62cabb7ab41e881f408647fb222e5cc61d9ad730c5b5dccf0b39a08c6d",
+    "apps/web/src/domains/creator/scene3d/specialists/StudioScene3dJobStatus.tsx": "061510f99a337c9d945cc3f05866bb0d6f9894dd0c8b02b354e9a8ac11b85d47",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-client.ts": "e5b058ab189aa1aa784f3d026f73e3f3b6711c63d03d453c1e668e8840f1f7c4",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-job-progress.ts": "3d766202bf5b9499f70954630a55577fabab73e21168ff82ed869b353cc28e0d",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-job-queue.ts": "220914aea6936f562a3e0f03f8d4ec70a3130138f1b379fc9aa70bffed884e49",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-orchestration.test.ts": "37d37faf0faf7292791542f08c5d4e23caf1d608a49ff80eedb68c2eb2a81fc3",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-runtime.ts": "c476d4c8ed1401bfb239c70e40b0642f884c5a737be199103b5112ee6535f503",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-textures.test.ts": "599af5a878ffeb1e135f6f41b8f4f4b00eda5ae6383d8dc07ee34711eaf35eee",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-textures.ts": "ad1f7920205b2b2bcf0fdb283e403221f9bdf5090f57eaa427bbd830ea30f37e",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist.worker.ts": "32c4a639ae54d5770855799bc9515c76e9557d3c78f204d5f84d024c868f7ec8",
+    "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx": "19607da2796935a3c202203f75d5e6d5d2221ad4f58678c78d3bb349aacbe848",
+    "scripts/scene3d-output-ci-policy.test.mjs": "948653efe3bf123cf5a80204652bd9773d5fd9782c45a705e5521df10d2de1b3"
+  },
+  "limits": {
+    "maxRetainedJobs": 5,
+    "maxActiveProcessingWorkers": 1,
+    "maxOwnedInputSnapshotBytes": 268435456,
+    "maxQueueWaitMilliseconds": 120000,
+    "maxExecutionMilliseconds": 120000
+  },
+  "localChecks": {
+    "specialists-final": "passed",
+    "typecheck": "passed",
+    "lint-final": "passed",
+    "inplace": "passed",
+    "completion": "passed",
+    "build": "passed",
+    "browser": "passed",
+    "isolation": "passed",
+    "bundle-ratchet": "passed",
+    "inplace-browser": "passed",
+    "inplace-release-browser": "passed",
+    "sparse-after": "passed",
+    "ci-lint": "passed",
+    "related": "passed"
+  },
+  "testSuites": {
+    "specialists": {
+      "files": 10,
+      "tests": 100
+    },
+    "inplace": {
+      "files": 9,
+      "tests": 76
+    },
+    "professional": {
+      "files": 34,
+      "tests": 205
+    },
+    "related": {
+      "files": 135,
+      "tests": 1558
+    },
+    "sparseAndAsset": {
+      "files": 3,
+      "tests": 21
+    }
+  },
+  "testOverlap": "Suites overlap; counts must not be summed as independent coverage.",
+  "specialistBrowser": {
+    "status": "ok",
+    "cancellation": "passed",
+    "productionWorkerJobs": 16,
+    "orchestration": {
+      "queuedSourceImmutable": true,
+      "queuedCancellationBeforeWorker": true,
+      "activeCancellationReleased": true,
+      "queuePositions": [
+        {
+          "phase": "queued",
+          "queuePosition": 2
+        },
+        {
+          "phase": "queued",
+          "queuePosition": 1
+        },
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "queueState": {
+        "active": 0,
+        "queued": 0,
+        "snapshotBytes": 0
+      },
+      "peakProcessingWorkers": 1,
+      "additionalWorkers": 4,
+      "additionalCompletedJobs": 3,
+      "activeCancelledJobs": 1
+    },
+    "textureReleaseUi": {
+      "generation": "passed",
+      "realGpuTranscode": "passed",
+      "download": "passed"
+    },
+    "splat": {
+      "driver": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+      "count": 256,
+      "renderer": "Spark 2.2.0 / Three WebGL2",
+      "frames": 4,
+      "closeDisposedCanvas": true
+    },
+    "ui": {
+      "generation": "passed",
+      "preview": "mounted",
+      "download": "passed",
+      "keyboardNavigation": "passed",
+      "artifactSwitches": 3
+    },
+    "browserVersion": "151.0.7922.34",
+    "productionWorkerArtifact": "specialist.worker-BUxtdt3m.js",
+    "productionWorkerCspApplied": true,
+    "requestedGpuLane": "swiftshader",
+    "errors": [],
+    "warnings": [
+      "BVH: \"maxLeafSize\" option has been deprecated. Use \"targetLeafSize\", instead.",
+      "BVH: \"maxLeafSize\" option has been deprecated. Use \"targetLeafSize\", instead."
+    ]
+  },
+  "completedOperationProgress": [
+    {
+      "operation": {
+        "kind": "textures",
+        "textureMode": "uastc",
+        "maxTextureSize": 512
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b"
+    },
+    {
+      "operation": {
+        "kind": "textures",
+        "textureMode": "etc1s",
+        "maxTextureSize": 512
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b"
+    },
+    {
+      "operation": {
+        "kind": "release",
+        "textureMode": "uastc",
+        "maxTextureSize": 512,
+        "error": 0.03
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b"
+    },
+    {
+      "operation": {
+        "kind": "inspect"
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:7cdedd39264ff7bfc25d100e5d81cb25620e80e388db0d265829ae40ba29b746"
+    },
+    {
+      "operation": {
+        "kind": "ik",
+        "rootName": "upper-arm",
+        "tipName": "hand",
+        "target": [
+          1,
+          1.2,
+          0.3
+        ],
+        "angleLimitDegrees": 150,
+        "tolerance": 0.005
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:7cdedd39264ff7bfc25d100e5d81cb25620e80e388db0d265829ae40ba29b746"
+    },
+    {
+      "operation": {
+        "kind": "compress"
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:7253fae989b9d080c4c14ceb3e8f8958cdbf114dd0539e0da2f31bd3cde9f8f6"
+    },
+    {
+      "operation": {
+        "kind": "lod",
+        "error": 0.03
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:7253fae989b9d080c4c14ceb3e8f8958cdbf114dd0539e0da2f31bd3cde9f8f6"
+    },
+    {
+      "operation": {
+        "kind": "tangents"
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:fb06b745dd37e2130038f16862572a00527e22bc3af854e3fe9621f95f89e079"
+    },
+    {
+      "operation": {
+        "kind": "animation"
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:a2485932be3d4a943b067322bccefa73d7981e17f2c223fca9d3f044c65e1ce2"
+    },
+    {
+      "operation": {
+        "kind": "csg",
+        "operation": "subtract",
+        "backend": "preview"
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:c83ada4d269c9c4de91edd886e0644162279f727ebee97665f1fe54717214532"
+    },
+    {
+      "operation": {
+        "kind": "csg",
+        "operation": "subtract",
+        "backend": "solid"
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:c83ada4d269c9c4de91edd886e0644162279f727ebee97665f1fe54717214532"
+    },
+    {
+      "operation": {
+        "kind": "navigation",
+        "start": [
+          -2,
+          0,
+          -2
+        ],
+        "end": [
+          2,
+          0,
+          2
+        ],
+        "cellSize": 0.2,
+        "agentRadius": 0.3,
+        "agentHeight": 1.8
+      },
+      "phases": [
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "sourceSha256": "sha256:fb06b745dd37e2130038f16862572a00527e22bc3af854e3fe9621f95f89e079"
+    }
+  ],
+  "workerCounting": "16 workers created before artist-UI checks: 12 original completed operations + 3 additional completed jobs + 1 active cancelled job. A separately cancelled queued job created no Worker.",
+  "inplaceLodBrowser": {
+    "status": "ok",
+    "browserVersion": "151.0.7922.34",
+    "builtProcessingWorker": "specialist.worker-BUxtdt3m.js",
+    "productionWorkerCspApplied": true,
+    "applied": {
+      "status": "ok",
+      "sourceHash": "sha256:7253fae989b9d080c4c14ceb3e8f8958cdbf114dd0539e0da2f31bd3cde9f8f6",
+      "derivativeHash": "sha256:e5e1dbeea29d8f423b5a5731f48859d19af4acf0bb8bf153451184fba1d19fc0",
+      "compressedTextureCount": 0,
+      "operation": "lod",
+      "sourceTriangles": 1472,
+      "derivativeTriangles": 614,
+      "undo": true,
+      "redo": true,
+      "sharedInstancePreserved": true,
+      "normalizationPreserved": true,
+      "storage": "actual SQLite Worker + native OPFS CAS",
+      "historyCommands": 1
+    },
+    "reopened": {
+      "status": "ok",
+      "reopenedModels": 2,
+      "sourceStillPresent": true,
+      "storage": "native OPFS"
+    },
+    "errors": [],
+    "warnings": [
+      "[.WebGL-0x124004cae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[.WebGL-0x124004cae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[.WebGL-0x124004cae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[.WebGL-0x124004cae00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    ]
+  },
+  "inplaceKtxReleaseBrowser": {
+    "status": "ok",
+    "browserVersion": "151.0.7922.34",
+    "builtProcessingWorker": "specialist.worker-BUxtdt3m.js",
+    "productionWorkerCspApplied": true,
+    "applied": {
+      "status": "ok",
+      "sourceHash": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b",
+      "derivativeHash": "sha256:aa70f354c5190556322905893b891bbd6c12713a6170f424f9a74f7641a9bbac",
+      "compressedTextureCount": 2,
+      "operation": "release",
+      "sourceTriangles": 1472,
+      "derivativeTriangles": 614,
+      "undo": true,
+      "redo": true,
+      "sharedInstancePreserved": true,
+      "normalizationPreserved": true,
+      "storage": "actual SQLite Worker + native OPFS CAS",
+      "historyCommands": 1
+    },
+    "reopened": {
+      "status": "ok",
+      "reopenedModels": 2,
+      "sourceStillPresent": true,
+      "storage": "native OPFS"
+    },
+    "errors": [],
+    "warnings": [
+      "[.WebGL-0x13c0050a800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[.WebGL-0x13c0050a800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[.WebGL-0x13c0050a800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[.WebGL-0x13c0050a800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+      "THREE.KTX2Loader: Multiple active KTX2 loaders may cause performance issues. Use a single KTX2Loader instance, or call .dispose() on old instances."
+    ]
+  },
+  "mergeDeployment": "No forced merge, protection/check bypass, new dependency, or production deployment."
+}

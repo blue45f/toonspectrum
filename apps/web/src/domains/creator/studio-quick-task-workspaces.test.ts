@@ -63,9 +63,9 @@ describe("quick and task-specific studio workspaces", () => {
   it("selects distinct layouts without changing document state", () => {
     const initial = createStudioWorkspaceDefaultState(null);
     const before = JSON.stringify(initial);
-    const layouts = ["draw", "comic", "design", "3d"] as const;
+    const layouts = ["draw", "comic", "design", "slides", "3d"] as const;
     expect(layouts.map((task) => applyStudioTaskWorkspace(initial, studioTaskWorkspaceId(task, "simple", "")).activeWorkspaceId))
-      .toEqual(["lineart", "pro-comic", "vector-design", "pose-3d"]);
+      .toEqual(["lineart", "pro-comic", "vector-design", "slides-deck", "pose-3d"]);
     expect(JSON.stringify(initial)).toBe(before);
     expect(studioTaskWorkspaceId(null, "simple", "")).toBeNull();
     expect(studioTaskWorkspaceId("3d", "simple", "")).toBe("pose-3d");
@@ -73,6 +73,8 @@ describe("quick and task-specific studio workspaces", () => {
   it("uses a validated project role layout without interpreting duplicates or unknown ids", () => {
     expect(studioRoleWorkspaceId("?roleWorkspace=coloring")).toBe("coloring");
     expect(studioTaskWorkspaceId("draw", "focus", "?roleWorkspace=review")).toBe("review");
+    expect(studioTaskWorkspaceId("slides", "simple", "?roleWorkspace=review")).toBe("review");
+    expect(studioRoleWorkspaceId("?roleWorkspace=slides-deck")).toBe("slides-deck");
     expect(studioRoleWorkspaceId("?roleWorkspace=unknown")).toBeNull();
     expect(studioRoleWorkspaceId("?roleWorkspace=lineart&roleWorkspace=review")).toBeNull();
   });
@@ -82,8 +84,22 @@ describe("quick and task-specific studio workspaces", () => {
       { id: "artist-layout", name: "My layout", layout: initial.liveLayout },
     ] };
     expect(applyStudioTaskWorkspace(custom, "pro-comic")).toBe(custom);
+    expect(applyStudioTaskWorkspace(custom, "slides-deck")).toBe(custom);
     const drawing = applyStudioTaskWorkspace(initial, "lineart");
     expect(applyStudioTaskWorkspace(drawing, "lineart")).toBe(drawing);
+  });
+  it.each(["focus", "simple", "full"] as const)("keeps Slides on its task layout at %s density and preserves live edits", (density) => {
+    const workspaceId = studioTaskWorkspaceId("slides", density, "");
+    expect(workspaceId).toBe("slides-deck");
+    const slides = applyStudioTaskWorkspace(createStudioWorkspaceDefaultState(null), workspaceId);
+    const edited = {
+      ...slides,
+      liveLayout: {
+        ...slides.liveLayout,
+        desktop: { ...slides.liveLayout.desktop, leftPanelWidth: 240 },
+      },
+    };
+    expect(applyStudioTaskWorkspace(edited, workspaceId)).toBe(edited);
   });
   it("projects task tools without mutating saved preferences", () => {
     const settings = defaultStudioAppSettings();

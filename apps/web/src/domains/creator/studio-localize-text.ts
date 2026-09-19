@@ -1,16 +1,15 @@
 /**
  * Studio's translate-or-keep-the-authored-copy helper.
  *
- * `useT()` returns the key itself when a locale pack has no entry for it (and Studio packs load
- * lazily, so that is also the state during the first paint). Callers therefore pass the authored
- * Korean string as the fallback: the UI never shows a raw `studio.*` key, and unit tests that
- * render a component without the i18n bundle keep asserting the authored copy.
+ * The UI translator humanizes unknown keys. Supply the authored fallback explicitly so
+ * a missing lazy dictionary cannot silently replace useful copy with a key-derived label.
+ * The raw-key check remains compatible with injected legacy resolvers and test doubles.
  */
 export function localizeStudioText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
 ): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }

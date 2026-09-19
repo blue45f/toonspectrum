@@ -17,6 +17,7 @@ import {
   creatorRoleDefinition,
   creatorSpecialtyDefinition,
   creatorText,
+  normalizePublicCreatorRoleProfile,
   type CreatorRoleLocale,
 } from "@/shared/lib/creator-role-contract";
 import { useT } from "@/shared/lib/i18n";
@@ -211,7 +212,7 @@ export function UserProfilePage() {
   const feed = data?.feed ?? [];
   const author = profile?.name ?? feed[0]?.author ?? t("userProfile.authorFallback");
   const avatar = profile?.avatar ?? feed[0]?.avatar ?? "#7c5cfc";
-  const roleProfile = profile?.creatorRoleProfile ?? null;
+  const roleProfile = normalizePublicCreatorRoleProfile(profile?.creatorRoleProfile);
   const primaryRole = creatorRoleDefinition(roleProfile?.primaryRole);
   const secondaryRoles = (roleProfile?.secondaryRoles ?? [])
     .map((role) => creatorRoleDefinition(role))
@@ -293,13 +294,15 @@ export function UserProfilePage() {
               <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-fg-2">
                 {profile?.bio || t("userProfile.bioFallback")}
               </p>
-              {primaryRole && roleProfile ? (
+              {roleProfile ? (
                 <div className="mt-3 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
-                      <BriefcaseBusiness size={12} aria-hidden="true" />
-                      {creatorText(primaryRole.label, locale)}
-                    </span>
+                    {primaryRole ? (
+                      <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-accent/35 bg-accent-soft px-2.5 text-xs font-black text-accent">
+                        <BriefcaseBusiness size={12} aria-hidden="true" />
+                        {creatorText(primaryRole.label, locale)}
+                      </span>
+                    ) : null}
                     {secondaryRoles.map((role) => (
                       <span key={role.id} className="inline-flex min-h-7 items-center rounded-full border border-line bg-card px-2.5 text-xs font-semibold text-fg-2">
                         {creatorText(role.shortLabel, locale)}
