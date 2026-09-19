@@ -10,10 +10,18 @@ const AUTHORITY = "apps/web/src/domains/creator/scene3d/studio-scene3d-authority
 const LINKED_LAYER = "apps/web/src/domains/creator/scene3d/studio-scene3d-linked-layer-bridge.ts";
 const NPR_GRAPH = "apps/web/src/domains/creator/scene3d/studio-scene3d-npr-render-graph.ts";
 const RUNTIME_RECOVERY = "apps/web/src/domains/creator/scene3d/studio-scene3d-runtime-recovery.ts";
+const PLATFORM_EVOLUTION =
+  "apps/web/src/domains/creator/scene3d/studio-scene3d-platform-evolution.ts";
 
 describe("Studio Scene3D professional integration boundary", () => {
   it("keeps canonical authority, Linked Layer, and NPR planning renderer-neutral", () => {
-    for (const path of [AUTHORITY, LINKED_LAYER, NPR_GRAPH, RUNTIME_RECOVERY]) {
+    for (const path of [
+      AUTHORITY,
+      LINKED_LAYER,
+      NPR_GRAPH,
+      RUNTIME_RECOVERY,
+      PLATFORM_EVOLUTION,
+    ]) {
       const contents = source(path);
       expect(contents).not.toMatch(/from\s+["']three(?:\/|["'])/u);
       expect(contents).not.toMatch(/from\s+["']@babylonjs\//u);

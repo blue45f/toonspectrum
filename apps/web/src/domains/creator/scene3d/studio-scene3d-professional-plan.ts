@@ -14,7 +14,15 @@ import {
   type StudioScene3dNprPassId,
   type StudioScene3dNprRenderGraph,
 } from "./studio-scene3d-npr-render-graph";
-import type { StudioScene3dDeviceCapabilities } from "./studio-scene3d-runtime-policy";
+import {
+  buildStudioScene3dEvolutionPlan,
+  type StudioScene3dEvolutionPlan,
+} from "./studio-scene3d-platform-evolution";
+import {
+  STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
+  type StudioScene3dDeviceCapabilities,
+  type StudioScene3dSoftwareCapabilities,
+} from "./studio-scene3d-runtime-policy";
 
 import type { StudioBg3dSharedCharacterGroundingReceipt } from "../bg3d/studio-bg3d-shared-character-grounding";
 
@@ -35,11 +43,13 @@ export interface StudioScene3dProfessionalPlan {
   readonly assets: readonly StudioScene3dProfessionalAssetReadiness[];
   readonly renderGraph: StudioScene3dNprRenderGraph;
   readonly characters: StudioScene3dCharacterPerformancePlan;
+  readonly evolution: StudioScene3dEvolutionPlan;
   readonly productionReady: boolean;
   readonly editorReady: boolean;
   readonly blockers: readonly string[];
   readonly warnings: readonly string[];
 }
+
 function assetReadiness(
   authority: StudioScene3dAuthoritySnapshot,
   evidenceByAssetId: ReadonlyMap<string, StudioScene3dAssetAdmissionEvidence>,
@@ -73,6 +83,7 @@ function assetReadiness(
 export function buildStudioScene3dProfessionalPlan(input: {
   readonly authority: StudioScene3dAuthoritySnapshot;
   readonly capabilities: StudioScene3dDeviceCapabilities;
+  readonly software?: StudioScene3dSoftwareCapabilities;
   readonly evidenceByAssetId?: ReadonlyMap<string, StudioScene3dAssetAdmissionEvidence>;
   readonly requestedPasses?: readonly StudioScene3dNprPassId[];
   readonly fx?: StudioScene3dNprFxRequest;
@@ -81,6 +92,7 @@ export function buildStudioScene3dProfessionalPlan(input: {
   readonly propContactElementIds?: ReadonlySet<string>;
   readonly linkedLayerRoundTripReady?: boolean;
 }): StudioScene3dProfessionalPlan {
+  const software = input.software ?? STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES;
   const assets = assetReadiness(
     input.authority,
     input.evidenceByAssetId ?? new Map(),
@@ -88,6 +100,7 @@ export function buildStudioScene3dProfessionalPlan(input: {
   const renderGraph = buildStudioScene3dNprRenderGraph({
     document: input.authority.document,
     capabilities: input.capabilities,
+    software,
     requestedPasses: input.requestedPasses,
     fx: input.fx,
     babylonSpecialistAvailable: input.babylonSpecialistAvailable,
@@ -99,7 +112,18 @@ export function buildStudioScene3dProfessionalPlan(input: {
     requireGrounding: input.authority.characters.length > 0,
     requireContact: input.authority.characters.length > 0,
   });
+  const evolution = buildStudioScene3dEvolutionPlan({
+    document: input.authority.document,
+    runtimePlan: renderGraph.runtimePlan,
+    software,
+  });
+
   const blockers = assets.flatMap(({ blockers }) => blockers);
+  for (const asset of assets) {
+    if (asset.status === "review") {
+      blockers.push(`자산 ${asset.label}은 production 승격 전 품질·성능 검토가 필요합니다.`);
+    }
+  }
   if (characters.blockedCount > 0) {
     blockers.push(...characters.entries.flatMap(({ warnings }) => warnings));
   }
@@ -117,6 +141,50 @@ export function buildStudioScene3dProfessionalPlan(input: {
   ) {
     blockers.push("현재 Shot의 Linked 3D Layer round-trip receipt가 준비되지 않았습니다.");
   }
+  if (
+    input.authority.document.assets.some(({ kind }) => kind === "gaussian-splat")
+    && renderGraph.runtimePlan.features.gaussianSplatBackend === "unavailable"
+  ) {
+    blockers.push(
+      "Gaussian Splat 자산이 있지만 검증·승격된 runtime provider가 없어 전문 출력을 만들 수 없습니다.",
+    );
+  }
+
+  const requestedRender = input.authority.document.render;
+  const admittedRender = renderGraph.runtimePlan.features;
+  if (requestedRender.antialiasing === "taa" && !admittedRender.taa) {
+    blockers.push("이 장면은 TAA를 요청하지만 제품에 승격된 TAA runtime이 없습니다.");
+  }
+  if (requestedRender.antialiasing === "taau" && !admittedRender.taau) {
+    blockers.push("이 장면은 TAAU를 요청하지만 제품에 승격된 TAAU runtime이 없습니다.");
+  }
+  if (
+    requestedRender.shadows.enabled
+    && requestedRender.shadows.mode === "vsm"
+    && !admittedRender.vsm
+  ) {
+    blockers.push("이 장면은 VSM 그림자를 요청하지만 제품에 승격된 VSM runtime이 없습니다.");
+  }
+  if (
+    requestedRender.shadows.enabled
+    && requestedRender.shadows.mode === "csm"
+    && !admittedRender.csm
+  ) {
+    blockers.push("이 장면은 CSM 그림자를 요청하지만 제품에 승격된 CSM runtime이 없습니다.");
+  }
+  if (requestedRender.effects.ssgi && !admittedRender.ssgi) {
+    blockers.push("이 장면은 SSGI를 요청하지만 제품에 승격된 SSGI runtime이 없습니다.");
+  }
+  if (requestedRender.effects.sss && !admittedRender.sss) {
+    blockers.push("이 장면은 SSS를 요청하지만 제품에 승격된 SSS runtime이 없습니다.");
+  }
+  if (requestedRender.effects.bloom && !admittedRender.bloom) {
+    blockers.push("이 장면은 Bloom을 요청하지만 제품에 승격된 Bloom runtime이 없습니다.");
+  }
+  if (requestedRender.effects.depthOfField && !admittedRender.depthOfField) {
+    blockers.push("이 장면은 DoF를 요청하지만 제품에 승격된 DoF runtime이 없습니다.");
+  }
+
   const warnings = [
     ...assets.flatMap(({ warnings: assetWarnings }) => assetWarnings),
     ...renderGraph.warnings,
@@ -132,6 +200,7 @@ export function buildStudioScene3dProfessionalPlan(input: {
     assets,
     renderGraph,
     characters,
+    evolution,
     productionReady: editorReady && blockers.length === 0,
     editorReady,
     blockers: Object.freeze([...new Set(blockers)]),

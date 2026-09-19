@@ -46,11 +46,18 @@ vi.mock("three/webgpu", () => ({
   },
 }));
 
-const { createStudioBg3dThreeWebGpuCaptureAdapter } = await import(
+const { createStudioBg3dThreeWebGpuCaptureAdapter: createAdapter } = await import(
   "./studio-bg3d-three-webgpu-capture"
 );
 const { registerStudioBg3dCaptureExcludedObject, registerStudioBg3dDepthExcludedObject } =
   await import("./studio-bg3d-capture-exclusion");
+
+const adapters = new Set<ReturnType<typeof createAdapter>>();
+function createStudioBg3dThreeWebGpuCaptureAdapter(...args: Parameters<typeof createAdapter>) {
+  const adapter = createAdapter(...args);
+  adapters.add(adapter);
+  return adapter;
+}
 
 interface FakeRendererOptions {
   readonly colorBytes?: Uint8Array;
@@ -70,22 +77,43 @@ function createFakeWebGpuRenderer(options: FakeRendererOptions = {}) {
     domElement: { width: 640, height: 480 },
     renderTarget: null as THREE.RenderTarget | null,
     clearHex: 0x123456,
+    clearColor: new THREE.Color(0x123456),
     clearAlpha: 0.25,
+    mrt: { test: "existing-mrt" } as unknown,
+    viewport: new THREE.Vector4(1, 2, 3, 4),
+    scissor: new THREE.Vector4(5, 6, 7, 8),
+    scissorTest: true,
+    targetsAtDraw: [] as Array<THREE.RenderTarget | null>,
+    getMRT() { return state.mrt; },
+    setMRT(value: unknown) { state.mrt = value; },
+    getViewport(target: THREE.Vector4) { return target.copy(state.viewport); },
+    setViewport(value: THREE.Vector4) { state.viewport.copy(value); },
+    getScissor(target: THREE.Vector4) { return target.copy(state.scissor); },
+    setScissor(value: THREE.Vector4) { state.scissor.copy(value); },
+    getScissorTest() { return state.scissorTest; },
+    setScissorTest(value: boolean) { state.scissorTest = value; },
+    getActiveCubeFace() { return 0; },
+    getActiveMipmapLevel() { return 0; },
     renderCalls: 0,
     watched: [] as THREE.Object3D[],
     visibilityAtDraw: [] as Array<Array<{ name: string; visible: boolean }>>,
     getRenderTarget() { return state.renderTarget; },
     setRenderTarget(target: THREE.RenderTarget | null) { state.renderTarget = target; },
-    getClearColor(target: THREE.Color) { target.setHex(state.clearHex); return target; },
+    getClearColor(target: THREE.Color) { return target.copy(state.clearColor); },
     getClearAlpha() { return state.clearAlpha; },
-    setClearColor(hex: number, alpha: number) { state.clearHex = hex; state.clearAlpha = alpha; },
+    setClearColor(value: number | THREE.Color, alpha: number) {
+      state.clearColor = value instanceof THREE.Color ? value.clone() : new THREE.Color(value);
+      state.clearHex = state.clearColor.getHex(); state.clearAlpha = alpha;
+    },
     render() {
       state.renderCalls += 1;
+      state.targetsAtDraw.push(state.renderTarget);
       state.visibilityAtDraw.push(
         state.watched.map((object) => ({ name: object.name, visible: object.visible })),
       );
     },
-    readRenderTargetPixelsAsync: vi.fn(async () => {
+    readRenderTargetPixelsAsync: vi.fn(async (_target?: THREE.RenderTarget, _x?: number,
+      _y?: number, _width?: number, _height?: number) => {
       const next = reads[Math.min(readIndex, reads.length - 1)];
       readIndex += 1;
       return next ?? new Uint8Array(0);
@@ -103,6 +131,9 @@ function scene(): THREE.Scene {
 const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
 
 afterEach(() => {
+  for (const adapter of adapters) adapter.dispose?.();
+  adapters.clear();
+  vi.restoreAllMocks();
   quadRender.mockClear();
   quadDispose.mockClear();
 });
@@ -160,6 +191,8 @@ describe("Studio BG3D Three WebGPU capture adapter", () => {
     // Scene render plus the straight-alpha output quad.
     expect(renderer.renderCalls).toBe(1);
     expect(quadRender).toHaveBeenCalledOnce();
+    expect(quadDispose).not.toHaveBeenCalled(); // Warm resources are retained, not leaked.
+    adapter.dispose?.();
     expect(quadDispose).toHaveBeenCalledOnce();
     // Live renderer state is handed back exactly as it was found.
     expect(renderer.renderTarget).toBeNull();
@@ -255,4 +288,103 @@ describe("Studio BG3D Three WebGPU capture adapter", () => {
     expect(gizmo.visible).toBe(true);
     expect(contactShadow.visible).toBe(true);
   });
+});
+
+
+describe("WebGPU capture resource and HDR execution", () => {
+  const request = { width: 2, height: 2, includeDepth: false,
+    background: { color: "#ffffff", alpha: 0 } } as const;
+
+  it("uses an HDR linear scene target and reuses it only after a completed readback", async () => {
+    const renderer = createFakeWebGpuRenderer({ colorBytes: new Uint8Array(16) });
+    const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+      scene: scene(), camera });
+    await adapter.capture(request);
+    await adapter.capture(request);
+    expect(renderer.targetsAtDraw[0]).toBe(renderer.targetsAtDraw[1]);
+    expect(renderer.targetsAtDraw[0]?.texture.type).toBe(THREE.HalfFloatType);
+    const output = renderer.readRenderTargetPixelsAsync.mock.calls[0]?.[0] as THREE.RenderTarget;
+    expect(output.texture.type).toBe(THREE.UnsignedByteType);
+  });
+
+  it("restores the exact linear clear color, viewport, scissor and pre-existing MRT", async () => {
+    const renderer = createFakeWebGpuRenderer({ colorBytes: new Uint8Array(16) });
+    renderer.clearColor.setRGB(0.123456789, 1.25, 0.234567891);
+    const original = renderer.clearColor.clone(); const mrt = renderer.mrt;
+    const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+      scene: scene(), camera });
+    await adapter.capture(request);
+    expect(renderer.clearColor).toEqual(original);
+    expect(renderer.mrt).toBe(mrt);
+    expect(renderer.viewport.toArray()).toEqual([1, 2, 3, 4]);
+    expect(renderer.scissor.toArray()).toEqual([5, 6, 7, 8]);
+    expect(renderer.scissorTest).toBe(true);
+  });
+
+  it("does not destroy pending GPU resources when the adapter is unmounted", async () => {
+    const renderer = createFakeWebGpuRenderer();
+    let resolve!: (value: Uint8Array) => void;
+    renderer.readRenderTargetPixelsAsync.mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+      scene: scene(), camera });
+    const pending = adapter.capture(request);
+    const target = renderer.targetsAtDraw[0]!;
+    const dispose = vi.spyOn(target, "dispose");
+    adapter.dispose?.();
+    expect(dispose).not.toHaveBeenCalled();
+    const rejected = expect(pending).rejects.toThrow(/disposed/);
+    resolve(new Uint8Array(16)); await rejected;
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it("drains an earlier readback if the later depth submission throws", async () => {
+    const renderer = createFakeWebGpuRenderer();
+    let reject!: (reason: Error) => void;
+    renderer.readRenderTargetPixelsAsync.mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+    const originalRender = renderer.render;
+    renderer.render = () => {
+      if (renderer.renderCalls === 1) throw new Error("depth submission failed");
+      originalRender();
+    };
+    const adapter = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+      scene: scene(), camera });
+    const pending = adapter.capture({ ...request, includeDepth: true });
+    const target = renderer.targetsAtDraw[0]!;
+    const dispose = vi.spyOn(target, "dispose");
+    expect(dispose).not.toHaveBeenCalled();
+    const rejected = expect(pending).rejects.toThrow("depth submission failed");
+    reject(new Error("color copy also failed")); await rejected;
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(renderer.renderTarget).toBeNull();
+  });
+
+  it("does not release a shared renderer pool while another View still owns an adapter", async () => {
+    const renderer = createFakeWebGpuRenderer({ colorBytes: new Uint8Array(16) });
+    const first = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+      scene: scene(), camera });
+    const second = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never,
+      scene: scene(), camera });
+    await first.capture(request); first.dispose?.();
+    await second.capture(request);
+    expect(renderer.targetsAtDraw[0]).toBe(renderer.targetsAtDraw[1]);
+    await expect(first.capture(request)).rejects.toThrow(/disposed/);
+  });
+});
+
+
+it("replacement Views cannot bypass the GPU budget of an unmounted pending capture", async () => {
+  const renderer = createFakeWebGpuRenderer();
+  let reject!: (reason: Error) => void;
+  renderer.readRenderTargetPixelsAsync.mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+  const first = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never, scene: scene(), camera });
+  const request = { width: 4096, height: 4096, includeDepth: false,
+    background: { color: "#ffffff", alpha: 0 } } as const;
+  const pending = first.capture(request);
+  const rejected = expect(pending).rejects.toThrow("copy cancelled");
+  first.dispose?.();
+  const second = createStudioBg3dThreeWebGpuCaptureAdapter({ renderer: renderer as never, scene: scene(), camera });
+  await expect(second.capture(request)).rejects.toThrow(/memory budget/);
+  expect(renderer.renderCalls).toBe(1);
+  reject(new Error("copy cancelled")); await rejected;
+  second.dispose?.();
 });

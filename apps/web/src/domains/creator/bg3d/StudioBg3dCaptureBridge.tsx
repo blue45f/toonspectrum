@@ -58,7 +58,7 @@ export function CaptureBridge({
       : loadStudioBg3dThreeWebglCaptureRuntime().then((runtime) =>
         runtime.createStudioBg3dThreeWebglCaptureAdapter({ camera, renderer: gl, scene }));
     void loadAdapter.then((created) => {
-      if (disposed) return;
+      if (disposed) { created.dispose?.(); return; }
       adapter = created;
       updateCapture({ adapter, camera });
     }).catch(() => {
@@ -66,7 +66,10 @@ export function CaptureBridge({
     });
     return () => {
       disposed = true;
-      if (adapter) updateCapture({ adapter: null, camera: null }, adapter);
+      if (adapter) {
+        try { updateCapture({ adapter: null, camera: null }, adapter); }
+        finally { adapter.dispose?.(); }
+      }
     };
   }, [camera, gl, scene]);
 

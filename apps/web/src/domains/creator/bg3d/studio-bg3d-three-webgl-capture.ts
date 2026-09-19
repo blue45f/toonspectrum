@@ -6,6 +6,7 @@ import {
   STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
   STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
 } from "./studio-bg3d-capture-adapter";
+import { assertStudioBg3dCaptureBudget } from "./studio-bg3d-capture-budget";
 import { hideStudioBg3dCaptureExcludedObjects } from "./studio-bg3d-capture-exclusion";
 import { captureStudioBg3dThreeDepth } from "./studio-bg3d-lt-three-depth";
 import { normalizeStudioBg3dRgbaReadback } from "./studio-bg3d-readback-normalize";
@@ -68,7 +69,8 @@ async function captureStudioBg3dThreeWebglColor(input: {
     depthBuffer: true,
     stencilBuffer: false,
     format: THREE.RGBAFormat,
-    type: THREE.UnsignedByteType,
+    type: renderer.extensions?.has("EXT_color_buffer_float")
+      ? THREE.HalfFloatType : THREE.UnsignedByteType,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     generateMipmaps: false,
@@ -157,6 +159,7 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
   }
 
   async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
+    assertStudioBg3dCaptureBudget(request);
     const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
     let colorReadback: Promise<Uint8ClampedArray>;
     let depthReadback: Promise<Float32Array> | undefined;
@@ -193,7 +196,9 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
     backend: "three-webgl" as const,
     engineId: "three" as const,
     engineVersion: String(THREE.REVISION).toLowerCase(),
-    implementationRevision: STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
+    implementationRevision: renderer.extensions?.has("EXT_color_buffer_float")
+      ? "studio-three-webgl-capture-adapter-v2-hdr"
+      : STUDIO_BG3D_THREE_WEBGL_CAPTURE_IMPLEMENTATION_V1,
     graphicsApi: "webgl2" as const,
     profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
     getSourceSize: () => ({

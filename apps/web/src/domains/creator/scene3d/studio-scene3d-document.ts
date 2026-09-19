@@ -621,9 +621,9 @@ export function createStudioScene3dDocument(documentId: string, now = new Date()
       colorSpace: "srgb",
       toneMapping: "neutral",
       exposure: 1,
-      antialiasing: "taa",
-      shadows: Object.freeze({ enabled: true, mode: "csm", cascades: 3, mapSize: 2048 }),
-      effects: Object.freeze({ ssgi: true, sss: true, contactShadows: true, bloom: false, depthOfField: false }),
+      antialiasing: "msaa",
+      shadows: Object.freeze({ enabled: true, mode: "standard", cascades: 1, mapSize: 2048 }),
+      effects: Object.freeze({ ssgi: false, sss: false, contactShadows: true, bloom: false, depthOfField: false }),
       toon: Object.freeze({ enabled: true, rampSteps: 4, outline: true, outlineWidthPx: 1.25, semanticLines: true }),
     }),
     output: Object.freeze({

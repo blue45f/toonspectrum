@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { registerStudioScene3dResourceOwner } from "../scene3d/studio-scene3d-resource-owner";
+
 import {
   createStudioBg3dThreeWebGpuRenderer,
   StudioBg3dWebGpuRendererError,
@@ -159,6 +161,25 @@ describe("Studio BG3D Three WebGPU renderer", () => {
 
     await runtime.dispose();
     expect(onDeviceLost).toHaveBeenCalledOnce();
+  });
+
+  it("cleans capture resources on device loss even without a UI loss callback", async () => {
+    let resolveLost!: (value: { reason: string }) => void;
+    rendererMock.deviceLost = new Promise<{ reason: string }>((resolve) => { resolveLost = resolve; });
+    const runtime = await createStudioBg3dThreeWebGpuRenderer(stubCanvas());
+    const dispose = vi.fn();
+    registerStudioScene3dResourceOwner(runtime.renderer, dispose);
+    resolveLost({ reason: "unknown" }); await Promise.resolve(); await Promise.resolve();
+    expect(dispose).toHaveBeenCalledOnce();
+    await runtime.dispose(); expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it("cleans capture resources when R3F directly disposes the renderer", async () => {
+    const runtime = await createStudioBg3dThreeWebGpuRenderer(stubCanvas());
+    const dispose = vi.fn();
+    registerStudioScene3dResourceOwner(runtime.renderer, dispose);
+    runtime.renderer.dispose(); await runtime.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
   it("does not report a device loss that only settles after disposal", async () => {
