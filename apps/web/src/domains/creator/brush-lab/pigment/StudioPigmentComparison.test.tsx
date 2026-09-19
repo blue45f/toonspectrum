@@ -12,7 +12,7 @@ describe("pigment comparison UI", () => {
       secondaryActive onSelect={onSelect} />);
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByText("#3d933e")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Spectral.js 3 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spectral.js 선택" }));
     expect(onSelect).toHaveBeenCalledExactlyOnceWith("pigment-spectral-js");
     expect(screen.getByRole("button", { name: "기존 WGM 선택" }).getAttribute("aria-pressed")).toBe("true");
   });

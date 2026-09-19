@@ -139,7 +139,7 @@ export function parseBrushStudioV6Import(serialized: string): BrushStudioV6Progr
   if (!source || typeof source !== "object" || !("schemaVersion" in source) || source.schemaVersion !== 6
     || !("slots" in source) || !source.slots || typeof source.slots !== "object"
     || !("tuning" in source) || !source.tuning || typeof source.tuning !== "object") {
-    throw new Error("V6 브러시 파일이 아닙니다. 현재 브러시 설정은 유지됩니다.");
+    throw new Error("지원하는 브러시 파일이 아닙니다. 현재 브러시 설정은 유지됩니다.");
   }
   return normalizeBrushStudioV6Program(source);
 }

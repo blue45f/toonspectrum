@@ -271,7 +271,7 @@ describe("V6 brush experiments in the workbench", () => {
     const plan = screen.getByRole("region", { name: "무폴백 브러시 엔진 바인딩" });
     expect(within(plan).getByText(/fallback none/u)).toBeTruthy();
     expect(within(plan).getByText("Mixbox")).toBeTruthy();
-    expect(within(plan).getByText("mixbox-js-v2@2.0.0")).toBeTruthy();
+    expect(within(plan).queryByText("mixbox-js-v2@2.0.0")).toBeNull();
     expect(within(plan).getAllByText("명시적 호환 어댑터").length).toBeGreaterThan(0);
   });
 
