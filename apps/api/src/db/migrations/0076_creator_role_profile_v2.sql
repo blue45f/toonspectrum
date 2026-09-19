@@ -4,6 +4,10 @@
 
 BEGIN;
 
+-- The existing v1 CHECK rejects v2 rows, so remove it before rewriting data.
+ALTER TABLE public."user"
+  DROP CONSTRAINT IF EXISTS "user_creator_role_profile_object_check";
+
 UPDATE public."user"
 SET "creatorRoleProfile" = jsonb_build_object(
   'version', 2,
@@ -85,9 +89,6 @@ WHERE COALESCE("creatorRoleProfile" ->> 'version', '1') <> '2'
 ALTER TABLE public."user"
   ALTER COLUMN "creatorRoleProfile" SET DEFAULT
     '{"version":2,"primaryRole":null,"secondaryRoles":[],"specialties":[],"experienceLevel":null,"collaborationStatus":null,"visibility":{"roles":false,"specialties":false,"experienceLevel":false,"collaborationStatus":false},"activeRole":null,"usagePurposes":[],"roleAliases":[],"workCapacity":{"weeklyHours":null,"maxConcurrentTasks":null,"availabilityNote":""},"defaultNotificationLevel":"standard","onboarding":{"status":"not-started","step":1,"completedAt":null,"updatedAt":null},"projectRolePreferences":[]}'::jsonb;
-
-ALTER TABLE public."user"
-  DROP CONSTRAINT IF EXISTS "user_creator_role_profile_object_check";
 
 ALTER TABLE public."user"
   ADD CONSTRAINT "user_creator_role_profile_object_check"
