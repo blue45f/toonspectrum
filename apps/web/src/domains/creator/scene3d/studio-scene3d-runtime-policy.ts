@@ -1,12 +1,58 @@
 import type { StudioScene3dDocumentV1 } from "./studio-scene3d-document";
 
 export type StudioScene3dPrimaryRenderer = "three-webgpu" | "three-webgl2";
-export type StudioScene3dSpecialistRenderer = "babylon" | "playcanvas-gsplat";
+export type StudioScene3dSpecialistRenderer =
+  | "babylon"
+  | "spark-gsplat"
+  | "playcanvas-gsplat";
 export type StudioScene3dWorkload =
   | "character-detail"
   | "environment-compose"
   | "mixed-scene"
   | "webtoon-output";
+
+export type StudioScene3dGaussianSplatBackend =
+  | "three-native"
+  | "spark-specialist"
+  | "playcanvas-specialist"
+  | "unavailable";
+
+export interface StudioScene3dSoftwareCapabilities {
+  readonly threeNativeGaussianSplat: boolean;
+  readonly sparkGaussianSplat: boolean;
+  readonly playcanvasGaussianSplat: boolean;
+  readonly bvhWebGpuCompute: boolean;
+  readonly gpuXpbd: boolean;
+  readonly closedChainIk: boolean;
+  readonly interactiveBvhCsg: boolean;
+  readonly tiles3dStreaming: boolean;
+  readonly recastNavigation: boolean;
+  readonly libiglDeformation: boolean;
+  readonly openSubdiv: boolean;
+  readonly pathTracer: boolean;
+}
+
+/**
+ * What the checked-in product can actually execute today.
+ *
+ * Candidate libraries never become product capability by merely appearing in architecture docs.
+ * Flip a bit only in the same change that lands a gated runtime/provider and its verification.
+ */
+export const STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES:
+  StudioScene3dSoftwareCapabilities = Object.freeze({
+    threeNativeGaussianSplat: false,
+    sparkGaussianSplat: false,
+    playcanvasGaussianSplat: false,
+    bvhWebGpuCompute: false,
+    gpuXpbd: false,
+    closedChainIk: false,
+    interactiveBvhCsg: false,
+    tiles3dStreaming: false,
+    recastNavigation: false,
+    libiglDeformation: false,
+    openSubdiv: false,
+    pathTracer: false,
+  });
 
 export interface StudioScene3dDeviceCapabilities {
   readonly webgpu: boolean;
@@ -54,7 +100,15 @@ export interface StudioScene3dRuntimePlan {
     readonly xpbd: "gpu" | "cpu" | "disabled";
     readonly ktx2: boolean;
     readonly meshopt: boolean;
+    readonly gaussianSplatBackend: StudioScene3dGaussianSplatBackend;
     readonly gaussianSplatGpuSort: boolean;
+    readonly bvhQueries: "cpu" | "webgpu-compute";
+    readonly advancedIk: "builtin" | "closed-chain";
+    readonly interactiveCsg: "manifold-commit" | "bvh-preview-manifold-commit";
+    readonly environmentStreaming: "none" | "3d-tiles";
+    readonly navigation: "none" | "recast";
+    readonly deformation: "builtin" | "libigl";
+    readonly subdivision: "builtin" | "opensubdiv";
     readonly progressiveStill: "raster-ssaa" | "pathtracer-experimental";
   };
   readonly qualityTier: "ultra" | "high" | "balanced" | "compatibility";
@@ -152,9 +206,47 @@ function resolveWorkloadBudget(
   });
 }
 
+function resolveGaussianSplatBackend(input: {
+  readonly needsSplat: boolean;
+  readonly capabilities: StudioScene3dDeviceCapabilities;
+  readonly software: StudioScene3dSoftwareCapabilities;
+  readonly specialists: StudioScene3dSpecialistRenderer[];
+  readonly reasons: string[];
+}): StudioScene3dGaussianSplatBackend {
+  if (!input.needsSplat) return "unavailable";
+
+  if (input.capabilities.webgpu && input.software.threeNativeGaussianSplat) {
+    input.reasons.push(
+      "Gaussian Splat은 Three primary 안의 승인된 native path를 사용해 장면 authority를 분리하지 않습니다.",
+    );
+    return "three-native";
+  }
+  if (input.software.sparkGaussianSplat) {
+    input.specialists.push("spark-gsplat");
+    input.reasons.push(
+      "Gaussian Splat은 승인된 Spark specialist를 명시적으로 사용하며 Scene3D authority는 Three에 유지합니다.",
+    );
+    return "spark-specialist";
+  }
+  if (input.software.playcanvasGaussianSplat) {
+    input.specialists.push("playcanvas-gsplat");
+    input.reasons.push(
+      "Gaussian Splat은 승인된 PlayCanvas specialist를 명시적으로 사용하며 Scene3D authority는 Three에 유지합니다.",
+    );
+    return "playcanvas-specialist";
+  }
+
+  input.reasons.push(
+    "Gaussian Splat 자산이 있지만 현재 제품에 admission을 통과한 실행 backend가 없어 출력 준비를 차단합니다.",
+  );
+  return "unavailable";
+}
+
 export function resolveStudioScene3dRuntimePlan(
   capabilities: StudioScene3dDeviceCapabilities,
   needs: StudioScene3dRuntimeNeeds,
+  software: StudioScene3dSoftwareCapabilities =
+    STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
 ): StudioScene3dRuntimePlan {
   if (!capabilities.webgpu && !capabilities.webgl2) {
     throw new Error("Studio 3D requires WebGPU or WebGL2.");
@@ -169,10 +261,14 @@ export function resolveStudioScene3dRuntimePlan(
   const specialists: StudioScene3dSpecialistRenderer[] = [];
   const reasons: string[] = [];
 
-  if (needs.gaussianSplats) {
-    specialists.push("playcanvas-gsplat");
-    reasons.push("Gaussian Splat 장면은 PlayCanvas specialist renderer를 lazy-load합니다.");
-  }
+  const gaussianSplatBackend = resolveGaussianSplatBackend({
+    needsSplat: needs.gaussianSplats,
+    capabilities,
+    software,
+    specialists,
+    reasons,
+  });
+
   if (needs.specialistCadOrBim) {
     specialists.push("babylon");
     reasons.push("CAD/BIM 전문 경로는 기존 Babylon specialist boundary를 사용합니다.");
@@ -215,7 +311,7 @@ export function resolveStudioScene3dRuntimePlan(
       ssgi: capabilities.webgpu && memory !== "low",
       sss: capabilities.webgpu && memory !== "low",
       xpbd: needs.liveClothOrHair
-        ? webgpuCompute
+        ? webgpuCompute && software.gpuXpbd
           ? "gpu"
           : memory === "low"
             ? "disabled"
@@ -223,11 +319,24 @@ export function resolveStudioScene3dRuntimePlan(
         : "disabled",
       ktx2: capabilities.compressedTextureAstc || capabilities.compressedTextureBc || capabilities.compressedTextureEtc2,
       meshopt: true,
-      gaussianSplatGpuSort: needs.gaussianSplats && webgpuCompute,
-      // Upstream Three path-tracing is transitioning to WebGPU in 2026. Do not make an unstable
-      // renderer the product authority; high-quality stills use deterministic raster SSAA until
-      // the WebGPU path tracer has a stable release and our visual corpus passes it.
-      progressiveStill: "raster-ssaa",
+      gaussianSplatBackend,
+      gaussianSplatGpuSort: needs.gaussianSplats
+        && webgpuCompute
+        && gaussianSplatBackend !== "unavailable",
+      bvhQueries: webgpuCompute && software.bvhWebGpuCompute
+        ? "webgpu-compute"
+        : "cpu",
+      advancedIk: software.closedChainIk ? "closed-chain" : "builtin",
+      interactiveCsg: software.interactiveBvhCsg
+        ? "bvh-preview-manifold-commit"
+        : "manifold-commit",
+      environmentStreaming: software.tiles3dStreaming ? "3d-tiles" : "none",
+      navigation: software.recastNavigation ? "recast" : "none",
+      deformation: software.libiglDeformation ? "libigl" : "builtin",
+      subdivision: software.openSubdiv ? "opensubdiv" : "builtin",
+      progressiveStill: software.pathTracer && needs.highQualityStill && capabilities.webgpu
+        ? "pathtracer-experimental"
+        : "raster-ssaa",
     }),
     qualityTier,
     reasons: Object.freeze(reasons),
