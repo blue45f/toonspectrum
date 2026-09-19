@@ -1,0 +1,7 @@
+@media print {
+  body * { visibility: hidden; }
+  .hiring-print-area, .hiring-print-area * { visibility: visible; }
+  .hiring-print-area { position: absolute; inset: 0; width: 100%; background: white; color: black; border: 0; }
+  .hiring-print-area a { color: black; }
+  .hiring-print-area a::after { content: " (" attr(href) ")"; }
+}
