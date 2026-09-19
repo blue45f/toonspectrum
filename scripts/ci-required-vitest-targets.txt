@@ -194,6 +194,7 @@ apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts
 apps/web/src/domains/creator/writer-room/buildStudioWriterRoomCanvasPages.test.ts
 apps/web/src/domains/fortune/fortune-observatory-storage.test.ts
+apps/web/src/domains/marketing/CreatorHomeExperience.locale.test.tsx
 apps/web/src/infrastructure/creator-role-workspace-client.test.ts
 apps/web/src/infrastructure/creator-work-read-options.test.ts
 apps/web/src/infrastructure/search-client.test.ts

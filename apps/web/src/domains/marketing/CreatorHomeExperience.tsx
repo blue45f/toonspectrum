@@ -1,9 +1,9 @@
-import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+import { translateCurrentStaticSourceText, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, FolderKanban, Handshake, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Users, Workflow, type LucideIcon } from "lucide-react";
 
 import Link from "@/compat/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
-import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
+import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
@@ -194,17 +194,13 @@ const COPY = {
   },
 } as const;
 
-function localeText(copy: LocalizedText, locale: ProductLocale) {
-  return copy[locale];
-}
-
 export function CreatorHomeExperience() {
   useCreatorHomeSectionNavigation();
   const language = useI18n((state) => state.lang);
   const resolvedTheme = useTheme((state) => state.resolvedTheme);
   const locale = resolveProductLocale(language);
-  const bi = (ko: string, en: string): string => locale === "ko" ? ko : en;
-  const identity = PRODUCT_IDENTITY[locale];
+  const bi = useBilingualLocalizer("domains.marketing.CreatorHomeExperience");
+  const identity = bi(PRODUCT_IDENTITY.ko, PRODUCT_IDENTITY.en);
   const copy = COPY[locale];
 
   return (
@@ -214,7 +210,7 @@ export function CreatorHomeExperience() {
       data-creator-experience="all-in-one-studio-v3"
       data-theme-art={resolvedTheme}
       data-product-direction="planning-to-publishing"
-      lang={locale}
+      lang={language}
     >
       <section className="cf-hero cf-shell" aria-labelledby="creator-hero-title">
         <div className="cf-hero-copy">
@@ -262,9 +258,9 @@ export function CreatorHomeExperience() {
             return (
               <Link key={destination.id} href={destination.href} className="cf-start-card">
                 <span className="cf-start-icon"><Icon size={24} aria-hidden="true" /></span>
-                <span className="cf-start-tag">{localeText(meta.tag, locale)}</span>
+                <span className="cf-start-tag">{bi(meta.tag.ko, meta.tag.en)}</span>
                 <strong>{bi((destination.label).ko, (destination.label).en)}</strong><p>{bi((destination.description).ko, (destination.description).en)}</p>
-                <span className="cf-start-action">{localeText(meta.action, locale)}<ArrowRight size={15} aria-hidden="true" /></span>
+                <span className="cf-start-action">{bi(meta.action.ko, meta.action.en)}<ArrowRight size={15} aria-hidden="true" /></span>
               </Link>
             );
           })}
