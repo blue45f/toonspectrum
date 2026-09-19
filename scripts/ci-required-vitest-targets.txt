@@ -8,6 +8,7 @@ apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.tes
 apps/api/src/modules/fortune/fortune.controller.test.ts
 apps/api/src/modules/og/og-page.test.ts
 apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
+apps/api/src/modules/studio-project-graph
 apps/api/src/runtime/runtime-boundary.test.ts
 apps/api/src/session-middleware.test.ts
 apps/web/src/app/app-floating-controls-startup.test.ts
