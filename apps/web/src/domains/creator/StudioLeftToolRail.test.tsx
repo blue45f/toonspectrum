@@ -294,7 +294,7 @@ it("delegates the 3D background rail entry to the selection-aware editor toggle"
   const props = createProps();
   render(<StudioLeftToolRail {...props} />);
 
-  fireEvent.click(screen.getByRole("button", { name: "3D 배경" }));
+  fireEvent.click(screen.getByRole("button", { name: "3D 장면" }));
 
   expect(props.stableHandlers.toggleBg3dEditor).toHaveBeenCalledOnce();
 });
@@ -871,7 +871,7 @@ describe("StudioLeftToolRail", () => {
     );
   });
 
-  it("groups additional tools and appends them beyond the nine-tool default", () => {
+  it("groups additional tools and appends them beyond the configured default", () => {
     stubAnimationFrame();
     const appSettings = defaultStudioAppSettings();
     const visible = new Set(appSettings.toolbar.visibleIds);
@@ -884,7 +884,7 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     expect(screen.getByText("선택·이동")).toBeTruthy();
-    expect(screen.getByText(/도구막대 9개 표시/u)).toBeTruthy();
+    expect(screen.getByText(new RegExp(`도구막대 ${appSettings.toolbar.visibleIds.length}개 표시`, "u"))).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
 
     expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({

@@ -79,7 +79,7 @@ describe("StudioProjectDocumentsPanel", () => {
     expect(window.localStorage.getItem(resumeKey)).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "문서를 휴지통으로" }));
-    fireEvent.click(screen.getByRole("button", { name: /휴지통 1/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /^휴지통\s*1$/u }));
     fireEvent.click(await screen.findByRole("button", { name: "완전히 삭제" }));
     fireEvent.click(screen.getByRole("button", { name: /^삭제$/u }));
 

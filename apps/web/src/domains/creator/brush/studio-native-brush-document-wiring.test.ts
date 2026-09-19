@@ -15,6 +15,12 @@ describe("native document product wiring", () => {
       "collaborationAccessRef.current.locked", "activeSurfaceReviewLockedRef.current", "pendingStrokeCommitsRef.current", "ports.commit(elements)"]) {
       expect(bridge).toContain(token);
     }
+    const adapter = source("./studio-native-brush-editor-commit.ts");
+    for (const token of ["prepareStudioNativeBrushDocumentCommit", "ports.canApply(ticket)",
+      "ports.history.current", "ports.index.current", "ports.pageId.current", "ports.saving.current",
+      "ports.collaboration.current.locked", "ports.surfaceLocked.current", "ports.pending.current"]) {
+      expect(adapter).toContain(token);
+    }
   });
   it("reaches the document conversion from both drawing and selected-freehand inspectors", () => {
     expect(source("../StudioInspectorDrawingSection.tsx")).toContain("onPrepare={prepareNativeBrushDocumentConversion}");

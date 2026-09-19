@@ -1,3 +1,4 @@
+import { prepareStudioNativeBrushDocumentFromEditor } from "./studio-native-brush-editor-commit";
 import { createHash } from "node:crypto";
 
 import { describe, expect, it, vi } from "vitest";
@@ -175,5 +176,34 @@ describe("native document PNG transport", () => {
     const controller = new AbortController(); controller.abort(); const create = vi.fn();
     await expect(renderStudioNativeBrushDocument(planStudioNativeBrushDocument(stroke(), options), controller.signal, create)).rejects.toMatchObject({ name: "AbortError" });
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("native brush editor reference adapter", () => {
+  function ports() {
+    const current = state();
+    return { canApply: vi.fn(() => true), commit: vi.fn(() => true),
+      history: { current: [[{ id: "p", elements: [...current.elements], groups: current.groups, canvasH: 1000, bg: "#fff", bgGrad: null }]] },
+      index: { current: 0 }, pageId: { current: "p" }, masterEditMode: { current: false },
+      mounted: { current: true }, saving: { current: false }, collaboration: { current: { locked: false } },
+      surfaceLocked: { current: false }, drawing: { current: null as unknown }, pending: { current: null as unknown },
+      documentWidth: 720, select: vi.fn(), announce: vi.fn() };
+  }
+  const target = () => ({ pageId: "p", masterEditMode: false, sourceElementId: "ink", sourceRevision: studioNativeBrushSourceRevision(stroke()) });
+  it("preserves the ticket and commits once through the ordinary history owner", () => {
+    const runtime = ports(); const ticket = {}; const prepared = prepareStudioNativeBrushDocumentFromEditor(target(), ticket, runtime)!;
+    expect(prepared(result())).toBe(true); expect(prepared(result())).toBe(false);
+    expect(runtime.canApply).toHaveBeenCalledWith(ticket); expect(runtime.commit).toHaveBeenCalledOnce();
+    expect(runtime.select).toHaveBeenCalledOnce();
+  });
+  it.each(["saving", "surfaceLocked", "drawing", "pending"] as const)("rejects late %s changes", (key) => {
+    const runtime = ports(); const prepared = prepareStudioNativeBrushDocumentFromEditor(target(), {}, runtime)!;
+    runtime[key].current = true; expect(prepared(result())).toBe(false); expect(runtime.commit).not.toHaveBeenCalled();
+  });
+  it("rejects a page/history frontier changed during processing", () => {
+    const runtime = ports(); const prepared = prepareStudioNativeBrushDocumentFromEditor(target(), {}, runtime)!;
+    runtime.history.current = [...runtime.history.current];
+    expect(prepared(result())).toBe(false); expect(runtime.commit).not.toHaveBeenCalled();
   });
 });

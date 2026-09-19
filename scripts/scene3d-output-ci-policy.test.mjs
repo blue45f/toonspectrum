@@ -60,3 +60,12 @@ describe("Scene3D output CI inputs", () => {
     expect(commands).toContain("scripts/scene3d-output-ci-policy.test.mjs");
   });
 });
+
+
+it("runs the real specialist CSP lane when pinned dependencies or compatibility patches change", () => {
+  const scene = workflow("studio-scene3d-next.yml"); const paths = scene.on.pull_request.paths;
+  for (const file of ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/manifold-3d@3.5.1.patch", "patches/@gltf-transform__functions@4.4.2.patch"]) {
+    expect(paths.some((pattern) => matchesGlob(file, pattern)), file).toBe(true);
+  }
+  expect(scene.jobs["scene3d-specialists-browser"].env.SCENE3D_SPECIALISTS_PRODUCTION_WORKER).toBe("1");
+});

@@ -1,0 +1,60 @@
+diff --git a/dist/index.js b/dist/index.js
+index 9cc58029925f119613483b23760270ab7dbfd234..1f3005bc90cd9c20064e25905c4f70273ba91a13 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,9 +1,14 @@
++// ToonSpectrum compatibility: geometry-only transforms must not eagerly initialize
++// optional ndarray image kernels (which use Function()). Texture APIs load their
++// original dependencies when invoked; no CSP weakening or mock implementation.
++async function getPixels(...args) { return (await import("ndarray-pixels")).getPixels(...args); }
++async function savePixels(...args) { return (await import("ndarray-pixels")).savePixels(...args); }
++async function loadNdarray() { return (await import("ndarray")).default; }
++async function lanczos2(...args) { return (await import("ndarray-lanczos")).lanczos2(...args); }
++async function lanczos3(...args) { return (await import("ndarray-lanczos")).lanczos3(...args); }
+ import { Accessor, AnimationChannel, AnimationSampler, BufferUtils, ColorUtils, ComponentTypeToTypedArray, Document, ExtensionProperty, FileUtils, ImageUtils, Material, MathUtils, Mesh, Node, Primitive, PrimitiveTarget, PropertyType, Root, Scene, Texture, TextureChannel, TextureInfo, getBounds as getBounds$1, uuid } from "@gltf-transform/core";
+-import { getPixels, savePixels } from "ndarray-pixels";
+ import { EXTMeshGPUInstancing, EXTMeshoptCompression, EXTTextureAVIF, EXTTextureWebP, KHRDracoMeshCompression, KHRMaterialsIOR, KHRMaterialsPBRSpecularGlossiness, KHRMaterialsSpecular, KHRMaterialsUnlit, KHRMeshPrimitiveRestart, KHRMeshQuantization } from "@gltf-transform/extensions";
+ import { KHR_DF_MODEL_ETC1S, KHR_DF_MODEL_UASTC, read } from "ktx-parse";
+-import ndarray from "ndarray";
+-import { lanczos2, lanczos3 } from "ndarray-lanczos";
+ //#region src/utils.ts
+ const { POINTS: POINTS$1, LINES: LINES$2, LINE_STRIP: LINE_STRIP$2, LINE_LOOP: LINE_LOOP$2, TRIANGLES: TRIANGLES$2, TRIANGLE_STRIP: TRIANGLE_STRIP$2, TRIANGLE_FAN: TRIANGLE_FAN$2 } = Primitive.Mode;
+ /**
+@@ -4724,7 +4729,7 @@ function palette(_options = PALETTE_DEFAULTS) {
+ 		if (materialProps.baseColor.size >= min) {
+ 			const name = "PaletteBaseColor";
+ 			baseColorTexture = document.createTexture(name).setURI(`${name}.png`);
+-			paletteTexturePixels.baseColor = ndarray(new Uint8Array(w * h * 4), [
++			paletteTexturePixels.baseColor = (await loadNdarray())(new Uint8Array(w * h * 4), [
+ 				w,
+ 				h,
+ 				4
+@@ -4734,7 +4739,7 @@ function palette(_options = PALETTE_DEFAULTS) {
+ 		if (materialProps.emissive.size >= min) {
+ 			const name = "PaletteEmissive";
+ 			emissiveTexture = document.createTexture(name).setURI(`${name}.png`);
+-			paletteTexturePixels.emissive = ndarray(new Uint8Array(w * h * 4), [
++			paletteTexturePixels.emissive = (await loadNdarray())(new Uint8Array(w * h * 4), [
+ 				w,
+ 				h,
+ 				4
+@@ -4744,7 +4749,7 @@ function palette(_options = PALETTE_DEFAULTS) {
+ 		if (materialProps.metallicRoughness.size >= min) {
+ 			const name = "PaletteMetallicRoughness";
+ 			metallicRoughnessTexture = document.createTexture(name).setURI(`${name}.png`);
+-			paletteTexturePixels.metallicRoughness = ndarray(new Uint8Array(w * h * 4), [
++			paletteTexturePixels.metallicRoughness = (await loadNdarray())(new Uint8Array(w * h * 4), [
+ 				w,
+ 				h,
+ 				4
+@@ -5726,8 +5731,8 @@ async function _encodeWithNdarrayPixels(srcImage, srcMimeType, dstMimeType, opti
+ 	if (options.resize) {
+ 		const [w, h] = srcPixels.shape;
+ 		const dstSize = Array.isArray(options.resize) ? fitWithin([w, h], options.resize) : fitPowerOfTwo([w, h], options.resize);
+-		const dstPixels = ndarray(new Uint8Array(dstSize[0] * dstSize[1] * 4), [...dstSize, 4]);
+-		options.resizeFilter === "lanczos3" ? lanczos3(srcPixels, dstPixels) : lanczos2(srcPixels, dstPixels);
++		const dstPixels = (await loadNdarray())(new Uint8Array(dstSize[0] * dstSize[1] * 4), [...dstSize, 4]);
++		options.resizeFilter === "lanczos3" ? await lanczos3(srcPixels, dstPixels) : await lanczos2(srcPixels, dstPixels);
+ 		return savePixels(dstPixels, dstMimeType);
+ 	}
+ 	return savePixels(srcPixels, dstMimeType);
