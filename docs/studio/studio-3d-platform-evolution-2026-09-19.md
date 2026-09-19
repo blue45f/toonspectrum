@@ -1,5 +1,9 @@
 # ToonStudio Scene3D 장기 플랫폼 고도화 — 2026-09-19
 
+> **Wave B 후속 구현:** 실제 HDR/4K 컬러 캡처, renderer별 자원 풀, R3F/device 수명 연결 및 검증 결과는
+> [캡처 구현 보고서](../reports/studio-scene3d-capture-wave-b-2026-09-19.md)를 따른다.
+> 이는 전체 MRT/NPR·자산 eviction·새 엔진 승격 완료를 의미하지 않는다.
+
 ## 1. 목표
 
 ToonStudio의 3D 기능을 새 엔진 하나로 교체하는 프로젝트로 보지 않는다.

@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - "apps/web/src/domains/creator/scene3d/**"
+      - "apps/web/src/domains/creator/bg3d/*capture*"
+      - "apps/web/src/domains/creator/bg3d/*readback*"
+      - "apps/web/src/domains/creator/bg3d/StudioBg3dCaptureBridge.tsx"
+      - "apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer*"
+      - "apps/web/tools/browser-harnesses/studio-scene3d-capture-resources.ts"
+      - "scripts/verify-studio-scene3d-capture-resources.mjs"
       - "apps/web/src/domains/creator/StudioSceneToolPopoverBody.tsx"
       - "docs/studio/studio-3d-next-platform-architecture-2026-09-10.md"
       - "docs/studio/studio-3d-platform-evolution-2026-09-19.md"
@@ -41,5 +47,11 @@ jobs:
           apps/web/src/domains/creator/scene3d/studio-scene3d-professional-plan.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-professional-integration-boundary.test.ts
           apps/web/src/domains/creator/scene3d/studio-scene3d-template-transaction.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-resource-pool.test.ts
+          apps/web/src/domains/creator/scene3d/studio-scene3d-resource-owner.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-capture-budget.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-capture.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgl-capture.test.ts
+          apps/web/src/domains/creator/bg3d/studio-bg3d-three-webgpu-renderer.test.ts
       - name: Type-check web workspace
         run: pnpm exec tsc -p tsconfig.json --noEmit

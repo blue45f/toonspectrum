@@ -1,6 +1,6 @@
 /** Pure row-stride/Y-axis normalization shared by future WebGPU and current GPU readback tests. */
 
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
+import { assertStudioBg3dCaptureBudget } from "./studio-bg3d-capture-budget";
 
 export interface NormalizeStudioBg3dRgbaReadbackInput {
   readonly width: number;
@@ -22,9 +22,7 @@ function assertShape(input: NormalizeStudioBg3dRgbaReadbackInput): number {
     throw new RangeError("3D RGBA readback height must be a positive safe integer.");
   }
   const pixels = width * height;
-  if (!Number.isSafeInteger(pixels) || pixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS) {
-    throw new RangeError("3D RGBA readback exceeds the raster pixel budget.");
-  }
+  assertStudioBg3dCaptureBudget({ width, height, includeDepth: false });
   if (!(input.rgba instanceof Uint8Array || input.rgba instanceof Uint8ClampedArray)) {
     throw new TypeError("3D RGBA readback must use an 8-bit typed array.");
   }

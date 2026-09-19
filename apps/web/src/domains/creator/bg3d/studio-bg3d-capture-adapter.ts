@@ -5,7 +5,7 @@
  * contract so WebGL and a future WebGPU adapter must produce the same top-down RGBA/depth raster.
  */
 
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
+import { assertStudioBg3dCaptureBudget } from "./studio-bg3d-capture-budget";
 
 export type StudioBg3dCaptureEngineId =
   | "three"
@@ -65,6 +65,8 @@ export interface StudioBg3dCaptureAdapter {
   readonly profileId: typeof STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1;
   getSourceSize(): StudioBg3dCaptureSize;
   capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster>;
+  /** Release cached capture resources; active GPU work retains its lease until settlement. */
+  dispose?(): void;
 }
 
 export interface StudioBg3dCaptureOperationOptions {
@@ -177,9 +179,7 @@ function assertSize(size: unknown, label: string, enforcePixelBudget: boolean): 
   }
   const pixels = width! * height!;
   if (!Number.isSafeInteger(pixels)) throw new RangeError(`${label} pixel count is unsafe.`);
-  if (enforcePixelBudget && pixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS) {
-    throw new RangeError(`${label} exceeds the raster pixel budget.`);
-  }
+  if (enforcePixelBudget) assertStudioBg3dCaptureBudget({ width: width!, height: height!, includeDepth: false });
 }
 
 function assertAdapter(adapter: unknown): asserts adapter is StudioBg3dCaptureAdapter {
@@ -269,6 +269,8 @@ function assertRequest(request: unknown): asserts request is StudioBg3dCaptureRe
   if (typeof candidate.includeDepth !== "boolean") {
     throw new TypeError("3D capture includeDepth must be a boolean.");
   }
+  assertStudioBg3dCaptureBudget({ width: request.width, height: request.height,
+    includeDepth: candidate.includeDepth });
   if (!candidate.background || typeof candidate.background !== "object") {
     throw new TypeError("3D capture background must be an object.");
   }

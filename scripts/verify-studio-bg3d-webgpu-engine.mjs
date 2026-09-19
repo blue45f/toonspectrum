@@ -458,7 +458,13 @@ async function main() { // NOSONAR javascript:S3776
     // makes Vite re-optimize and invalidate the module graph the page is already executing, which
     // surfaces as "Failed to fetch dynamically imported module" rather than as a real defect.
     optimizeDeps: {
+      // A cold cache must not discover another Three/TSL graph halfway through a capture.
+      noDiscovery: true,
       include: [
+        "three",
+        "three/webgpu",
+        "three/tsl",
+        "three/examples/jsm/postprocessing/OutputPass.js",
         "@pixiv/three-vrm",
         "@pixiv/three-vrm/nodes",
         "three/examples/jsm/loaders/GLTFLoader.js",

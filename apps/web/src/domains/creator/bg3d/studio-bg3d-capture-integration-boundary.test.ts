@@ -128,8 +128,17 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
       "[customModels, isBatchRenderingShots, isRestoringScene, primitives, sceneBaseDocument]"
     );
     expect(history).toContain("if (isRestoringScene || isBatchRenderingShots) return;");
-    expect(history.match(/setSceneBaseDocument\(snap\.document\)/gu)).toHaveLength(2);
-    expect(history).toContain("studioBg3dHistoryDocumentAtView(previousLast.document, liveView)");
+    // Undo and redo now share one atomic canonical-state owner, not independent setters.
+    expect(history).toContain('const doUndo = () => applyCommandHistoryStep("undo")');
+    expect(history).toContain('const doRedo = () => applyCommandHistoryStep("redo")');
+    expect(history).toContain("stepStudioBg3dCommandHistory(commandHistoryRefs, direction)");
+    expect(history).toMatch(
+      /replaceCanonicalDocumentState\(\{\s*primitives: nextPrimitives,\s*customModels: nextCustomModels,\s*document: snap\.document,\s*\}\)/u,
+    );
+    expect(history).not.toContain("setSceneBaseDocument(snap.document)");
+    expect(history).toContain("studioBg3dHistoryDocumentAtView(rawBefore.document, liveView)");
+    expect(history).toContain("studioBg3dHistoryDocumentAtView(nextDocument, liveView)");
+    expect(history).toContain("applyOrDeferStudioBg3dHistoryCamera(");
     expect(history).toContain("const commandChangesCamera");
     expect(history).not.toContain("setLineArtPreview(snap.document.output.line.enabled)");
     expect(background3dSource).not.toContain("setSkyPresetId");
