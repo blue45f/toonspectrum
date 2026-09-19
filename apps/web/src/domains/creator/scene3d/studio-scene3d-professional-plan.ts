@@ -145,6 +145,41 @@ export function buildStudioScene3dProfessionalPlan(input: {
     );
   }
 
+  const requestedRender = input.authority.document.render;
+  const admittedRender = renderGraph.runtimePlan.features;
+  if (requestedRender.antialiasing === "taa" && !admittedRender.taa) {
+    blockers.push("이 장면은 TAA를 요청하지만 제품에 승격된 TAA runtime이 없습니다.");
+  }
+  if (requestedRender.antialiasing === "taau" && !admittedRender.taau) {
+    blockers.push("이 장면은 TAAU를 요청하지만 제품에 승격된 TAAU runtime이 없습니다.");
+  }
+  if (
+    requestedRender.shadows.enabled
+    && requestedRender.shadows.mode === "vsm"
+    && !admittedRender.vsm
+  ) {
+    blockers.push("이 장면은 VSM 그림자를 요청하지만 제품에 승격된 VSM runtime이 없습니다.");
+  }
+  if (
+    requestedRender.shadows.enabled
+    && requestedRender.shadows.mode === "csm"
+    && !admittedRender.csm
+  ) {
+    blockers.push("이 장면은 CSM 그림자를 요청하지만 제품에 승격된 CSM runtime이 없습니다.");
+  }
+  if (requestedRender.effects.ssgi && !admittedRender.ssgi) {
+    blockers.push("이 장면은 SSGI를 요청하지만 제품에 승격된 SSGI runtime이 없습니다.");
+  }
+  if (requestedRender.effects.sss && !admittedRender.sss) {
+    blockers.push("이 장면은 SSS를 요청하지만 제품에 승격된 SSS runtime이 없습니다.");
+  }
+  if (requestedRender.effects.bloom && !admittedRender.bloom) {
+    blockers.push("이 장면은 Bloom을 요청하지만 제품에 승격된 Bloom runtime이 없습니다.");
+  }
+  if (requestedRender.effects.depthOfField && !admittedRender.depthOfField) {
+    blockers.push("이 장면은 DoF를 요청하지만 제품에 승격된 DoF runtime이 없습니다.");
+  }
+
   const warnings = [
     ...assets.flatMap(({ warnings: assetWarnings }) => assetWarnings),
     ...renderGraph.warnings,
