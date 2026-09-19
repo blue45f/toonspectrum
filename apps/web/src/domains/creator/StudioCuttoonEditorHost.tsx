@@ -41,7 +41,7 @@ import {
   type SetStateAction,
 } from "react";
 import { flushSync } from "react-dom";
-import { useLocation, useNavigate, useSearchParams, type NavigateOptions, type To } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   loadStudioAiRecentPrompts,
   pushStudioAiRecentPrompt,
@@ -266,8 +266,8 @@ import { createStudioAutosaveBusyRetry } from "./studio-autosave-busy-retry";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import { StudioFormalSaveDialogMount as StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialogMount";
-import { StudioReviewCaptureDialogMount } from "./review-capture/StudioReviewCaptureDialogMount";
-import { useStudioReviewCapture } from "./review-capture/useStudioReviewCapture";
+import { studioReviewCaptureSaveNavigation } from "./review-capture/studio-review-capture-navigation";
+import { useStudioReviewCaptureHost } from "./review-capture/useStudioReviewCaptureHost";
 import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
 import {
   chooseStudioProjectPackageSaveTarget,
@@ -24281,13 +24281,7 @@ const puppetWarpArmed =
     await runStudioPageSavePipeline(status, {
       studioAuthUserId, workId, remixId, loggedIn, autosaveKey,
       linkedTitleId, linkedSeriesId, linkedChallengeId, location,
-      navigate: (to: To | number, navigationOptions?: NavigateOptions) => {
-        if (typeof to === "number") return navigate(to);
-        // Review capture must read back the acknowledged source before this editor unmounts.
-        // All other save navigation, including new-work and recovery flows, stays unchanged.
-        if (options?.preserveEditor && workId && to === `/create/${workId}`) return;
-        return navigate(to, navigationOptions);
-      },
+      navigate: studioReviewCaptureSaveNavigation(navigate, workId, options?.preserveEditor),
       currentStudioDocumentScopeRef, editorMountedRef,
       captureStudioMutationTicket, canApplyStudioMutation,
       markStudioDocumentChanged, lockStudioMutationsNow, documentSaveInFlightRef,
@@ -26399,20 +26393,13 @@ function clearSelectionForEdit() {
     const pendingBatch = options.pendingStrokeCommits === undefined
       ? pendingStrokeCommitsRef.current
       : options.pendingStrokeCommits;
-    const snapshotEligiblePendingStrokes = pendingBatch?.strokes.filter((stroke) => (
-      !selectedGpuStrokeRequiresFinalReceipt(stroke.id)
-      || hasExactSelectedGpuFinalReceipt(stroke.id)
-    )) ?? [];
-    const receiptedPendingBatch = pendingBatch && snapshotEligiblePendingStrokes.length > 0
-      ? { pageId: pendingBatch.pageId, strokes: snapshotEligiblePendingStrokes }
-      : null;
     const durablePages = resolveStudioDurableProjectPages({
       pagesHistory: pagesHistoryRef.current,
       historyIndex: pagesHiRef.current,
       fallbackPages: pages,
-      pendingStrokeCommits: receiptedPendingBatch
-        ? { pageId: receiptedPendingBatch.pageId, strokes: receiptedPendingBatch.strokes }
-        : null,
+      pendingStrokeCommits: pendingBatch,
+      isPendingStrokeDurable: (stroke) => !selectedGpuStrokeRequiresFinalReceipt(stroke.id)
+        || hasExactSelectedGpuFinalReceipt(stroke.id),
     }).pagesList as PageState[];
     return buildCurrentStudioProjectFileSnapshot(
       durablePages,
@@ -26421,26 +26408,13 @@ function clearSelectionForEdit() {
     );
   }
 
-  const reviewCapture = useStudioReviewCapture(JSON.stringify([studioAuthUserId, workId]), {
-    getContext: () => {
-      const ticket = captureStudioMutationTicket();
-      return {
-        workId: ticket.workId,
-        scopeKey: JSON.stringify([ticket.authScopeKey, ticket.workId]),
-        generation: JSON.stringify([ticket.accessGeneration, ticket.documentGeneration,
-          studioRevisionProjectGenerationRef.current]),
-        available: loggedIn && editorMountedRef.current && canApplyStudioMutation(ticket)
-          && workHydrated && !sourceHydrationPending && !documentReloadRequired && !collaborationReadOnly
-          && !workHydrationFailed && !workHydrationUnsupportedFormat
-          && !drawingRef.current && !pendingStrokeCommitsRef.current,
-      };
-    },
-    projectRuntime: async (saved) => {
-      const snapshot = currentStudioProjectSnapshot();
-      const { projectStudioReviewCaptureSource } = await import("./review-capture/studio-review-capture-projection");
-      return projectStudioReviewCaptureSource(snapshot, saved, CANVAS_W, (surfaceId) =>
-        (studioCrdtDocumentRef.current?.getRasterOperationLog(surfaceId) ?? null) !== null);
-    },
+  const reviewCapture = useStudioReviewCaptureHost({
+    studioAuthUserId, workId, captureStudioMutationTicket, canApplyStudioMutation,
+    editorMountedRef, studioRevisionProjectGenerationRef, drawingRef, pendingStrokeCommitsRef,
+    available: loggedIn && workHydrated && !sourceHydrationPending && !documentReloadRequired
+      && !collaborationReadOnly && !workHydrationFailed && !workHydrationUnsupportedFormat,
+    getSnapshot: currentStudioProjectSnapshot, canvasWidth: CANVAS_W,
+    isDurableMask: (surfaceId) => (studioCrdtDocumentRef.current?.getRasterOperationLog(surfaceId) ?? null) !== null,
     save: (status) => handleSave(status, { preserveEditor: true }),
     captureAll: () => handleCapturePagesForPreset("all"),
   });
@@ -29669,13 +29643,7 @@ function clearSelectionForEdit() {
       >
         {editorSurface}
         {smartShapeDialog}
-        <StudioReviewCaptureDialogMount
-          open={reviewCapture.visible}
-          snapshot={reviewCapture.snapshot}
-          onSave={() => { void reviewCapture.save(); }}
-          onRetry={reviewCapture.retry}
-          onClose={() => { void reviewCapture.close(); }}
-        />
+        {reviewCapture.dialog}
         <StudioFormalSaveDialog
           open={formalSaveOpen}
           locale={studioSaveLocale}
