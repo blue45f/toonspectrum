@@ -7,6 +7,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { importMybBrush } from "../../../studio-format-gateway/src/myb";
 import {
   applyMybSettings,
+  createLibMypaintIncrementalStrokeSession,
   columnInkProfile,
   frameInkStats,
   pearsonCorrelation,
@@ -16,6 +17,7 @@ import { loadLibMypaint } from "../libmypaint/index";
 import {
   compileRasterBrush,
   renderCompiledBrushStroke,
+  standardZigzagStrokeSamples,
 } from "../raster-compile";
 
 import type { LibMypaintRaw } from "../libmypaint/index";
@@ -375,6 +377,78 @@ describe("libmypaint wasm loader", () => {
     } finally {
       lmp.brushFree(brush);
     }
+  });
+});
+
+describe("libmypaint incremental stroke session", () => {
+  it("is byte-identical across pointer-batch partitions", () => {
+    const { document } = readCorpusDocument("wash-soft");
+    const samples = standardZigzagStrokeSamples(WIDTH, HEIGHT, SAMPLE_COUNT);
+    const whole = createLibMypaintIncrementalStrokeSession(lmp, document, {
+      width: WIDTH,
+      height: HEIGHT,
+      seed: SEED,
+    });
+    const chunked = createLibMypaintIncrementalStrokeSession(lmp, document, {
+      width: WIDTH,
+      height: HEIGHT,
+      seed: SEED,
+    });
+    try {
+      whole.append(samples);
+      for (let offset = 0; offset < samples.length; offset += 7) {
+        chunked.append(samples.slice(offset, offset + 7));
+      }
+      expect(chunked.finish()).toEqual(whole.finish());
+      expect(chunked.finish()).toEqual(whole.finish());
+    } finally {
+      chunked.dispose();
+      whole.dispose();
+    }
+  });
+
+  it("matches the legacy whole-stroke helper exactly", () => {
+    const { document } = readCorpusDocument("ink-crisp");
+    const samples = standardZigzagStrokeSamples(WIDTH, HEIGHT, 41);
+    const expected = renderLibMypaintStroke(lmp, document, {
+      width: WIDTH,
+      height: HEIGHT,
+      seed: SEED,
+      samples,
+    });
+    const session = createLibMypaintIncrementalStrokeSession(lmp, document, {
+      width: WIDTH,
+      height: HEIGHT,
+      seed: SEED,
+    });
+    try {
+      session.append(samples.slice(0, 1));
+      session.append(samples.slice(1, 13));
+      session.append(samples.slice(13));
+      expect(session.finish()).toEqual(expected.frame);
+      expect(session.settings).toEqual(expected.settings);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it("fails closed after finish/dispose and on non-finite samples", () => {
+    const { document } = readCorpusDocument("ink-crisp");
+    const session = createLibMypaintIncrementalStrokeSession(lmp, document, {
+      width: 64,
+      height: 64,
+      seed: SEED,
+      finishTailSteps: 0,
+    });
+    expect(() => session.append([{
+      x: Number.NaN, y: 0, pressure: 0.5, tiltX: 0, tiltY: 0, tMs: 0,
+    }])).toThrow(/non-finite/u);
+    session.append([{ x: 8, y: 8, pressure: 0.5, tiltX: 0, tiltY: 0, tMs: 0 }]);
+    session.finish();
+    expect(() => session.append([])).toThrow(/finished/u);
+    session.dispose();
+    expect(() => session.frame()).toThrow(/disposed/u);
+    session.dispose();
   });
 });
 
