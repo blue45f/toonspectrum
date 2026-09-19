@@ -6,6 +6,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { REQUIRED_CORE_GATES } from "./ci-core-gate.mjs";
+import { CORE_DATABASE_VITEST_TARGETS } from "./ci-core-regression-shards.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
@@ -100,7 +101,7 @@ test("review database invariants execute with real PostgreSQL and the accepted g
   assert.match(database, /STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
   assert.match(database, /node scripts\/prepare-studio-review-test-db\.mjs/u);
   assert.match(database, /pnpm exec vitest run --no-file-parallelism/u);
-  for (const suite of ["studio-review-preview-producer.integration.test.ts", "studio-project-graph-review-race.integration.test.ts"]) {
+  for (const suite of CORE_DATABASE_VITEST_TARGETS) {
     assert.ok(database.includes(suite), `Missing real database suite: ${suite}`);
   }
   assert.ok(REQUIRED_CORE_GATES.includes("database"), "database failures must block protected core");
@@ -230,6 +231,28 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+});
+
+test("static regression checkout retains both imported 3D manifests but excludes their model payloads", () => {
+  const patterns = job("static").match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
+  assert.ok(patterns);
+  const manifests = ["refined-v6", "expansion-v1"].map((pack) => `apps/web/public/assets/3d/environments/${pack}/manifest.json`);
+  const models = ["refined-v6/hospital_reception.glb", "expansion-v1/library_reading_room.glb", "unrelated/large.glb"].map((file) => `apps/web/public/assets/3d/environments/${file}`);
+  const scratch = mkdtempSync(join(tmpdir(), "core-3d-manifests-"));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    git("init", "--quiet");
+    for (const file of [...manifests, ...models, "package.json"]) { mkdirSync(dirname(join(scratch, file)), { recursive: true }); writeFileSync(join(scratch, file), "{}\n"); }
+    git("add", ".");
+    git("-c", "user.name=CI Test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture");
+    git("config", "core.sparseCheckout", "true"); git("config", "core.sparseCheckoutCone", "false");
+    writeFileSync(join(scratch, ".git/info/sparse-checkout"), patterns.replace(/^ {12}/gmu, "")); git("read-tree", "-mu", "HEAD");
+    for (const file of manifests) assert.ok(existsSync(join(scratch, file)), `missing 3D import: ${file}`);
+    for (const file of models) assert.equal(existsSync(join(scratch, file)), false, `unrelated binary admitted: ${file}`);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
 });
 
 test("production build verifies Virtual Studio art after the single existing build", () => {

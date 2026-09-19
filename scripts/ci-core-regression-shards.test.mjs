@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   REQUIRED_VITEST_TARGETS,
+  CORE_DATABASE_VITEST_TARGETS,
+  buildShardVitestArgs,
   SHARD_COMMANDS,
   SHARD_NAMES,
   assertShardManifest,
@@ -14,6 +16,8 @@ import {
   targetIsCovered,
   targetsByShard,
 } from "./ci-core-regression-shards.mjs";
+
+import { resolveRequiredTargets } from "./run-core-vitest.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
@@ -66,6 +70,23 @@ test("required foundation execution includes virtual-world consent, media and co
     "apps/web/src/domains/creator/live/huddle/studio-p2p-huddle-controller.test.ts",
     "apps/web/src/domains/creator/live/huddle/studio-p2p-huddle-events.test.ts",
   ]) assert.ok(targetIsCovered(test, foundation), `required execution omitted ${test}`);
+});
+
+test("real product selectors partition into static and mandatory PostgreSQL execution without losing or duplicating a suite", () => {
+  const selectors = expandGlobTargets(executionTargetsByShard().product);
+  const all = resolveRequiredTargets(selectors);
+  const args = buildShardVitestArgs(selectors);
+  const routed = args.flatMap((arg, i) => arg === "--exclude" ? [args[i + 1]] : []);
+  assert.deepEqual(routed, [...CORE_DATABASE_VITEST_TARGETS]);
+  const staticOnly = all.filter((file) => !routed.includes(file));
+  assert.ok(staticOnly.includes("apps/api/src/modules/studio-project-graph/studio-project-graph.module.test.ts"));
+  assert.ok(staticOnly.includes("apps/api/src/modules/studio-project-graph/studio-review-preview-producer.service.test.ts"));
+  assert.deepEqual([...staticOnly, ...routed].sort(), [...all].sort());
+  assert.equal(new Set([...staticOnly, ...routed]).size, all.length);
+  assert.ok(routed.every((file) => file.endsWith(".integration.test.ts")));
+  for (const name of SHARD_NAMES.filter((name) => name !== "product")) {
+    assert.ok(!buildShardVitestArgs(expandGlobTargets(executionTargetsByShard()[name])).includes("--exclude"));
+  }
 });
 
 test("directory targets remove redundant child execution without reducing coverage", () => {
