@@ -134,6 +134,86 @@ describe("Studio Scene3D professional plan", () => {
     expect(admitted.blockers.join(" ")).not.toContain("SSGI");
   });
 
+  it("keeps review assets editable but out of production-ready output", () => {
+    const base = authority();
+    const reviewAsset = {
+      id: "asset:review-room",
+      kind: "mesh" as const,
+      version: "1",
+      contentSha256: "c".repeat(64),
+      uri: "/assets/review-room.glb",
+      mime: "model/gltf-binary",
+      byteSize: 1_000_000,
+      rights: {
+        commercialUse: true,
+        redistribution: true,
+        derivativeUse: true,
+        licenseName: "CC0-1.0",
+      },
+      quality: {
+        accepted: true,
+        score: 98,
+        reportUri: "/assets/review-room-quality.json",
+      },
+    };
+    const reviewedAuthority = {
+      ...base,
+      document: {
+        ...base.document,
+        assets: [reviewAsset],
+        entities: [{
+          id: "model:review-room",
+          kind: "model" as const,
+          name: "Review room",
+          assetId: reviewAsset.id,
+          materialVariantId: null,
+          transform: {
+            position: [0, 0, 0] as const,
+            rotation: [0, 0, 0, 1] as const,
+            scale: [1, 1, 1] as const,
+          },
+          visible: true,
+          locked: false,
+          castShadow: true,
+          receiveShadow: true,
+          parentId: null,
+        }],
+      },
+    };
+    const plan = buildStudioScene3dProfessionalPlan({
+      authority: reviewedAuthority,
+      capabilities: CAPABILITIES,
+      evidenceByAssetId: new Map([[reviewAsset.id, {
+        visual: {
+          goldenViewIds: ["front", "back", "left", "right", "wide", "detail"],
+          silhouetteScore: 98,
+          materialScore: 97,
+          deformationScore: 96,
+          compositionScore: 98,
+          severeIntersectionCount: 0,
+          thumbnailWidth: 1024,
+          thumbnailHeight: 1024,
+        },
+        technical: {
+          lodCount: 3,
+          trianglesByLod: [120_000, 96_000, 72_000],
+          drawCalls: 42,
+          materialCount: 14,
+          textureCount: 18,
+          maxTextureDimension: 4096,
+          geometryCompression: "meshopt",
+          textureCompression: "ktx2",
+          gpuBytesEstimate: 64 * 1024 * 1024,
+        },
+      }]]),
+    });
+
+    expect(plan.editorReady).toBe(true);
+    expect(plan.assets[0]?.status).toBe("review");
+    expect(plan.productionReady).toBe(false);
+    expect(plan.blockers.join(" ")).toContain("production 승격 전 품질·성능 검토");
+  });
+
   it("keeps the Three WebGL editor usable when specialist FX is unavailable", () => {
     const plan = buildStudioScene3dProfessionalPlan({
       authority: authority(),
