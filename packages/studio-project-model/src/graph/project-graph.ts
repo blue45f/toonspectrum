@@ -304,7 +304,7 @@ export function appendStudioRevisionToGraph(
  * append-only revision authority consumed by the engine and legacy-shadow migration. Keeping both
  * contracts here avoids making either caller reinterpret the other's persistence shape.
  */
-export type ProjectAuthorityVersion = "legacy-v2" | "project-graph-v3";
+type ProjectAuthorityVersion = "legacy-v2" | "project-graph-v3";
 
 export interface ProjectGraphLegacyProjection {
   readonly snapshotVersion: 2;
@@ -340,8 +340,8 @@ export function createProjectGraphV3(
     version: 3,
     projectId,
     authorityVersion,
-    artifacts: frozenRecord([]),
-    revisions: frozenRecord([]),
+    artifacts: frozenRecord<Artifact>([]),
+    revisions: frozenRecord<RevisionManifest>([]),
   });
 }
 
