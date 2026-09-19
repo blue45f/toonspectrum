@@ -339,11 +339,13 @@ test("focused integration checks cannot collide with the protected core status",
 });
 
 
-test("focused ToonStudio checkout includes static metadata without unrelated artwork", () => {
+test("focused ToonStudio checkout includes imported metadata and fault evidence without unrelated artwork/results", () => {
   const workflow = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
   const patterns = workflow.match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
   assert.ok(patterns, "focused workflow must declare its checkout");
   const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
+  const faultEvidence = "tests/benchmarks/results/v12-runtime-fault-matrix.json";
+  const unrelatedResult = "tests/benchmarks/results/unrelated-benchmark.json";
   const artwork = "apps/web/public/assets/3d/environments/unrelated-pack/large-model.glb";
   const scratch = mkdtempSync(join(tmpdir(), "toonstudio-focused-inputs-"));
   const git = (...args) => {
@@ -352,7 +354,7 @@ test("focused ToonStudio checkout includes static metadata without unrelated art
   };
   try {
     git("init", "--quiet");
-    for (const file of [...manifests, artwork, "package.json"]) {
+    for (const file of [...manifests, faultEvidence, unrelatedResult, artwork, "package.json"]) {
       mkdirSync(dirname(join(scratch, file)), { recursive: true });
       writeFileSync(join(scratch, file), "{}\n");
     }
@@ -362,7 +364,8 @@ test("focused ToonStudio checkout includes static metadata without unrelated art
     git("config", "core.sparseCheckoutCone", "false");
     writeFileSync(join(scratch, ".git/info/sparse-checkout"), patterns.replace(/^ {12}/gmu, ""));
     git("read-tree", "-mu", "HEAD");
-    for (const file of manifests) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
+    for (const file of [...manifests, faultEvidence]) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
+    assert.equal(existsSync(join(scratch, unrelatedResult)), false);
     assert.equal(existsSync(join(scratch, artwork)), false);
   } finally { rmSync(scratch, { recursive: true, force: true }); }
 });
