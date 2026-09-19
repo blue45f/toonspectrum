@@ -64,11 +64,11 @@ export type {
 } from "./studio-main-menu-model";
 
 function localizeText(
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
   fallback: string,
   key: string,
 ): string {
-  const translated = t(key);
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 
@@ -177,7 +177,7 @@ const MAIN_MENU_ITEM_HINTS: Readonly<Record<StudioMainMenuHintKey, StudioToolHin
 
 function resolveMainMenuHint(
   group: StudioMainMenuGroup,
-  t: (key: string) => string,
+  t: (key: string, fallback?: string) => string,
 ): StudioToolHintSpec {
   const hint = MAIN_MENU_HINTS[group.id];
   if (!hint) {
@@ -309,7 +309,7 @@ function MenuDropdown({
   /** True for the single group that carries the menubar's roving tab stop. */
   isTabStop: boolean;
   onFocusTrigger: () => void;
-  t: (key: string) => string;
+  t: (key: string, fallback?: string) => string;
 }): ReactElement {
   const preloadStudioFilterDialog = useStudioFilterDialogIntent();
   const unavailableReasonLabel = localizeText(t, "Unavailable condition", "studio.mainMenu.unavailableReason");

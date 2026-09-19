@@ -80,7 +80,7 @@ const STUDIO_COMPANION_VIEW_QUERY = "view";
 const STUDIO_COMPANION_SESSION_PATTERN = /^[A-Za-z0-9_-]{12,96}$/u;
 const STUDIO_COMPANION_SCOPE_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
-type StudioCompanionI18n = (key: string) => string;
+type StudioCompanionI18n = (key: string, fallback?: string) => string;
 
 function localizeCompanionText(
   t: StudioCompanionI18n | undefined,
@@ -88,7 +88,7 @@ function localizeCompanionText(
   key: string,
 ): string {
   if (!t) return fallback;
-  const value = t(key);
+  const value = t(key, fallback);
   return value === key ? fallback : value;
 }
 

@@ -76,13 +76,18 @@ function downloadBrief(brief: StudioStaffingBrief) {
 export function StudioStaffingSourcingPanel({ projectId }: { readonly projectId: string }) {
   const bt = useBilingual("StudioStaffingSourcingPanel");
   const [brief, setBrief] = useState(() => loadBrief(projectId));
+  const [loadedProjectId, setLoadedProjectId] = useState(projectId);
   const matches = useMemo(() => rankStudioStaffingPools(brief), [brief]);
 
-  useEffect(() => setBrief(loadBrief(projectId)), [projectId]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    setBrief(loadBrief(projectId));
+    setLoadedProjectId(projectId);
+  }, [projectId]);
+  useEffect(() => {
+    // Never write the previous project state during the scope-change render.
+    if (loadedProjectId !== projectId || typeof window === "undefined") return;
     try { window.localStorage.setItem(staffingBriefStorageKey(projectId), JSON.stringify(brief)); } catch { /* persistence is optional */ }
-  }, [brief, projectId]);
+  }, [brief, projectId, loadedProjectId]);
 
   const patch = (next: Partial<StudioStaffingBrief>) => setBrief((current) => ({ ...current, ...next }));
 

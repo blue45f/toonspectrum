@@ -3,9 +3,12 @@ import { createHash } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { assertMarketplaceAcquisitionAllowed } from "../commerce/commerce-market-policy";
 
 import {
   creatorMarketplacePackageIdentityPreimage,
@@ -21,6 +24,14 @@ import type {
   CreatorMarketplaceCloudLibraryRepository,
   CreatorMarketplaceLibraryStoredRow,
 } from "./creator-marketplace-library.repository-contract";
+
+vi.mock("../commerce/commerce-market-policy", () => ({
+  assertMarketplaceAcquisitionAllowed: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.mocked(assertMarketplaceAcquisitionAllowed).mockReset().mockResolvedValue(undefined);
+});
 
 const publisherId = "123e4567-e89b-42d3-a456-426614174000";
 const releaseId = "223e4567-e89b-42d3-a456-426614174000";
@@ -72,6 +83,22 @@ function repositoryMock(): CreatorMarketplaceCloudLibraryRepository {
 }
 
 describe("CreatorMarketplaceLibraryService", () => {
+  it.each(["acquire", "confirmStudioInstall"] as const)("does not mutate a library when commerce authorization rejects %s", async (operation) => {
+    const repository = repositoryMock();
+    const service = new CreatorMarketplaceLibraryService(repository);
+    const denial = new ForbiddenException("An entitlement is required");
+    vi.mocked(assertMarketplaceAcquisitionAllowed).mockRejectedValueOnce(denial);
+    const result = operation === "acquire"
+      ? service.acquire("member", releaseId)
+      : service.confirmStudioInstall("member", releaseId, {
+          schemaVersion: 1, logicalPackId: `community:${"c".repeat(64)}`, packageFingerprint: "a".repeat(64),
+        });
+    await expect(result).rejects.toBe(denial);
+    expect(assertMarketplaceAcquisitionAllowed).toHaveBeenCalledWith("member", releaseId);
+    expect(repository.acquire).not.toHaveBeenCalled();
+    expect(repository.confirmStudioInstall).not.toHaveBeenCalled();
+  });
+
   it("historical UUID에서 absolute current head acquisition target을 package identity로 투영한다", async () => {
     const repository = repositoryMock();
     vi.mocked(repository.resolveAcquisitionTarget).mockResolvedValue({

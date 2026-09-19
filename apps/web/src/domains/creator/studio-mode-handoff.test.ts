@@ -47,4 +47,26 @@ describe("studio mode handoff", () => {
       expect.arrayContaining(["webtoon", "illustration"]),
     );
   });
+  it("rejects invalid scope before creating any derived document", () => {
+    const writes: string[] = [];
+    const storage = { getItem: () => null, setItem: (key: string) => { writes.push(key); } };
+    const handoff = studioModeHandoffsFor("storyboard")[0]!;
+    for (const projectId of ["", " project-1", "project-1 ", "x".repeat(161)]) {
+      expect(() => executeStudioModeHandoff(storage, projectId, handoff, "ko", {
+        sourceDocumentId: "source-1",
+      })).toThrow("valid project");
+    }
+    expect(writes).toEqual([]);
+  });
+  it("never exposes another project's provenance records", () => {
+    const storage = new MemoryStorage();
+    executeStudioModeHandoff(storage, "project-a", studioModeHandoffsFor("storyboard")[0]!, "ko", {
+      sourceDocumentId: "source-a",
+    });
+    expect(readStudioModeHandoffRecords(storage, "project-a")).toHaveLength(1);
+    expect(readStudioModeHandoffRecords(storage, "project-b")).toEqual([]);
+    storage.setItem("toonspectrum:studio-mode-handoffs:v1:project-b", "{");
+    expect(readStudioModeHandoffRecords(storage, "project-b")).toEqual([]);
+  });
+
 });

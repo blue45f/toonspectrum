@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
 import {
   aggregateFailureData,
@@ -10,6 +9,8 @@ import {
   selectRunsForLogSampling,
   stripAnsi,
 } from './ci-failure-analytics.mjs';
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 test('stripAnsi and normalizeDiagnostic remove terminal and runner-specific noise', () => {
   assert.equal(stripAnsi('\u001b[31mboom\u001b[0m'), 'boom');

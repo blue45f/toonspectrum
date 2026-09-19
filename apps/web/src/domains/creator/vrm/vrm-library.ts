@@ -262,7 +262,7 @@ export const SAMPLE_VRMS: SampleVrm[] = [
   { id: "skull", name: "스컬 (해골)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/skull.png", url: "/vrm/Skull.vrm" },
   { id: "cool-alien", name: "쿨에일리언 (외계인)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/cool-alien.png", url: "/vrm/CoolAlien.vrm" },
   { id: "jimmy", name: "지미", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/jimmy.png", url: "/vrm/Jimmy.vrm" },
-  { id: "froggy", name: "프로기 (개구리)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/froggy.png", url: "/vrm/Froggy.vrm" },
+  { id: "froggy", name: "프로기 (개구리)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v1/froggy.png", url: "/vrm/Froggy.vrm" },
   { id: "teddy", name: "테디 (곰인형)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/teddy.png", url: "/vrm/Teddy.vrm" },
   { id: "nightmare", name: "나이트메어 (악몽)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/nightmare.png", url: "/vrm/Nightmare.vrm" },
   { id: "pumpkin", name: "펌킨 (호박)", thumbnailUrl: "/assets/3d/characters/thumbnails/refined-v2/pumpkin.png", url: "/vrm/Pumpkin.vrm" },
