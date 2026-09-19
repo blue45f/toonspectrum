@@ -143,3 +143,6 @@ crates/**/target/
 
 # Generated visual UX audit artifacts
 .qa/visual-ux/
+
+# Local engine continuation logs, pixel reports, and screenshots.
+.qa/engine-resume/

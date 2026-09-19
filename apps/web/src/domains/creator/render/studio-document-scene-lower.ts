@@ -18,6 +18,15 @@ import {
   type StrokeLineCap,
 } from "../brush/studio-stroke-shapes";
 import { containingPanel } from "../studio-element-geometry";
+import {
+  planStudioPerfectFreehandRender,
+  resolveStudioOutlineStrokeContract,
+  STUDIO_OUTLINE_STROKE_ENGINE,
+} from "../studio-outline-stroke-contract";
+import {
+  peekStudioPerfectFreehandStroker,
+  studioPerfectFreehandOutlineToPathIR,
+} from "../studio-perfect-freehand";
 
 import {
   placeStudioLineSegment,
@@ -34,7 +43,7 @@ import type { DrawEl, El } from "../studio-element-model";
  * Lower the product element model into a V13 RenderSceneIR.
  *
  * Vello owns path-heavy vector chrome plus a deliberately narrow set of clean
- * geometric DrawEl shapes. Freehand/media brushes and styled shape variants
+ * geometric DrawEl shapes and supported persisted ink outlines. Media brushes and styled variants
  * stay on the explicit legacy renderer boundary — flattening them would erase
  * pressure, wash, pattern, sketch, dash, mask, or blend semantics.
  */
@@ -238,6 +247,59 @@ function hasDrawableFinalSegment(points: readonly number[]): boolean {
 }
 
 /**
+ * Stage-2 Vello brush admission: only immutable perfect-freehand outline contracts with plain
+ * source-over solid paint are eligible. Material, pattern, mask and specialist media semantics
+ * remain on their existing raster/provider owners.
+ */
+export function isStudioVelloDocumentVectorFreehandElement(
+  element: El,
+): element is DrawEl & El {
+  if (element.type !== "draw" || (element.kind ?? "freehand") !== "freehand") return false;
+  if (element.mode === "eraser" || (element.fill !== undefined && element.fill !== null)) return false;
+  if (!hasFiniteShapePoints(element.points) || !hasDrawableSegment(element.points)) return false;
+  if (!Number.isFinite(element.strokeWidth) || element.strokeWidth <= 0) return false;
+  if (element.opacity !== undefined && !Number.isFinite(element.opacity)) return false;
+  if (!parseSupportedCssColorToIR(element.stroke)) return false;
+  if (element.gradient || element.pattern || element.sketch?.enabled === true) return false;
+  if (element.symmetry && element.symmetry.type !== "none") return false;
+  if (element.paintModel !== undefined || element.brushEnginePrograms?.material) return false;
+  if (element.maskEnabled || element.maskSrc || element.clipBelow || element.alphaLocked) return false;
+  if (element.blendMode && element.blendMode !== "source-over") return false;
+  const contract = resolveStudioOutlineStrokeContract(element.outlineStroke);
+  if (contract.status !== "ready" || contract.contract.engine !== STUDIO_OUTLINE_STROKE_ENGINE) return false;
+  // Sparse/compact strokes can deliberately resolve to the legacy round-Line plan. Do not
+  // claim their pixels unless this adapter actually has the outline it knows how to paint.
+  return velloPerfectFreehandPlan(element).kind === "outline";
+}
+
+function velloPerfectFreehandPlan(element: DrawEl) {
+  return planStudioPerfectFreehandRender({
+    contract: element.outlineStroke,
+    stroker: peekStudioPerfectFreehandStroker(),
+    points: element.points,
+    pressures: element.pressures,
+    strokeWidth: Math.max(1, element.strokeWidth), // Match StudioDrawNode's retained width floor.
+    sampleSpacing: element.sampleSpacing,
+  });
+}
+
+function velloPerfectFreehandNodes(
+  element: DrawEl & El,
+  opacity: number,
+): RenderNodeIR[] {
+  if (!isStudioVelloDocumentVectorFreehandElement(element)) return [];
+  const plan = velloPerfectFreehandPlan(element);
+  if (
+    plan.kind !== "outline"
+    || plan.contract.engine !== STUDIO_OUTLINE_STROKE_ENGINE
+  ) return [];
+  const path = studioPerfectFreehandOutlineToPathIR(plan.outline);
+  const color = parseSupportedCssColorToIR(element.stroke);
+  if (!path || !color || color.a <= 0) return [];
+  return [fillNode(`${element.id}:freehand-outline`, path, color, opacity)];
+}
+
+/**
  * Fail-closed admission for the first product DrawEl slice. The admitted
  * shapes use only geometry and solid src-over paint that PathIR can preserve.
  */
@@ -406,7 +468,8 @@ export function isStudioVelloDocumentRadialLineElement(element: El): boolean {
 
 export function isStudioVelloDocumentVectorElement(element: El): boolean {
   return isStudioVelloDocumentRadialLineElement(element)
-    || isStudioVelloDocumentGeometricDrawElement(element);
+    || isStudioVelloDocumentGeometricDrawElement(element)
+    || isStudioVelloDocumentVectorFreehandElement(element);
 }
 
 /**
@@ -497,9 +560,10 @@ function lowerElement(element: El): RenderNodeIR[] {
       return nodes;
     }
     case "draw":
-      return isStudioVelloDocumentGeometricDrawElement(element)
-        ? geometricDrawNodes(element, opacity)
-        : [];
+      if (isStudioVelloDocumentGeometricDrawElement(element)) {
+        return geometricDrawNodes(element, opacity);
+      }
+      return velloPerfectFreehandNodes(element, opacity);
     // Focus/speed lines share ONE planner with the Konva nodes, the SVG
     // exporter, and page thumbnails. Do not reimplement the geometry here — a
     // GPU-vs-CPU pixel gate cannot see a geometry divergence, because both
