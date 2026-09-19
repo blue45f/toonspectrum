@@ -6,6 +6,7 @@ on:
       - "apps/web/src/domains/creator/scene3d/**"
       - "apps/web/src/domains/creator/StudioSceneToolPopoverBody.tsx"
       - "docs/studio/studio-3d-next-platform-architecture-2026-09-10.md"
+      - "docs/studio/studio-3d-platform-evolution-2026-09-19.md"
       - ".github/workflows/studio-scene3d-next.yml"
   workflow_dispatch:
 
