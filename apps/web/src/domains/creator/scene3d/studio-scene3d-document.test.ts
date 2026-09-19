@@ -9,6 +9,7 @@ import {
 import {
   inferStudioScene3dRuntimeNeeds,
   resolveStudioScene3dRuntimePlan,
+  STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
 } from "./studio-scene3d-runtime-policy";
 
 const webGpuDevice = Object.freeze({
@@ -115,14 +116,16 @@ describe("Studio Scene3D clean authority", () => {
     expect(plan.specialists).toEqual([]);
     expect(plan.features).toMatchObject({
       tsl: true,
-      mrt: true,
+      mrt: false,
       gpuCompute: true,
-      csm: true,
-      taau: true,
-      ssgi: true,
-      sss: true,
+      csm: false,
+      taau: false,
+      ssgi: false,
+      sss: false,
       ktx2: true,
       meshopt: true,
+      renderBundles: false,
+      bvhQueries: "cpu",
       progressiveStill: "raster-ssaa",
     });
     expect(plan.qualityTier).toBe("ultra");
@@ -182,16 +185,33 @@ describe("Studio Scene3D clean authority", () => {
     expect(plan.qualityTier).toBe("compatibility");
   });
 
-  it("isolates Gaussian Splat rendering instead of replacing the main scene engine", () => {
-    const plan = resolveStudioScene3dRuntimePlan(webGpuDevice, {
+  it("fails closed for Gaussian Splat until a runtime provider is explicitly admitted", () => {
+    const needs = {
       gaussianSplats: true,
       specialistCadOrBim: false,
       liveClothOrHair: false,
       highQualityStill: true,
-    });
+    } as const;
+    const current = resolveStudioScene3dRuntimePlan(webGpuDevice, needs);
 
-    expect(plan.primaryRenderer).toBe("three-webgpu");
-    expect(plan.specialists).toEqual(["playcanvas-gsplat"]);
-    expect(plan.features.gaussianSplatGpuSort).toBe(true);
+    expect(current.primaryRenderer).toBe("three-webgpu");
+    expect(current.specialists).toEqual([]);
+    expect(current.features.gaussianSplatBackend).toBe("unavailable");
+    expect(current.features.gaussianSplatGpuSort).toBe(false);
+
+    const native = resolveStudioScene3dRuntimePlan(webGpuDevice, needs, {
+      ...STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
+      threeNativeGaussianSplat: true,
+    });
+    expect(native.specialists).toEqual([]);
+    expect(native.features.gaussianSplatBackend).toBe("three-native");
+    expect(native.features.gaussianSplatGpuSort).toBe(true);
+
+    const playcanvas = resolveStudioScene3dRuntimePlan(webGpuDevice, needs, {
+      ...STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES,
+      playcanvasGaussianSplat: true,
+    });
+    expect(playcanvas.specialists).toEqual(["playcanvas-gsplat"]);
+    expect(playcanvas.features.gaussianSplatBackend).toBe("playcanvas-specialist");
   });
 });
