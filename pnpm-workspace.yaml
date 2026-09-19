@@ -106,6 +106,8 @@ peerDependencyRules:
 # moves v9's public clock shape onto THREE.Timer, and suppresses only the deliberate
 # unmount event. Remove it when a stable R3F release ships the Timer migration.
 patchedDependencies:
+  '@gltf-transform/functions@4.4.2': patches/@gltf-transform__functions@4.4.2.patch
   '@react-three/fiber@9.6.1': patches/@react-three__fiber@9.6.1.patch
+  manifold-3d@3.5.1: patches/manifold-3d@3.5.1.patch
   'minimatch@3.1.5': patches/minimatch@3.1.5.patch
   p5.brush@2.2.1: patches/p5.brush@2.2.1.patch

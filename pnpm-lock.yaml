@@ -50,7 +50,9 @@ overrides:
   '@esbuild-kit/core-utils>esbuild': 0.25.12
 
 patchedDependencies:
+  '@gltf-transform/functions@4.4.2': bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d
   '@react-three/fiber@9.6.1': 68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222
+  manifold-3d@3.5.1: 53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad
   minimatch@3.1.5: fe761a9f2ee67f36ecef95437aff71cccde54f98d08053c41eb3f815a907be71
   p5.brush@2.2.1: 6b307bc36f52c10edfb448c81f93799eeba30e77015abf4031960ce9907a78cb
 
@@ -99,7 +101,7 @@ importers:
         version: 4.4.2
       '@gltf-transform/functions':
         specifier: 4.4.2
-        version: 4.4.2(@types/node@24.13.2)
+        version: 4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2)
       '@heejun/deskcloud':
         specifier: ^0.1.0
         version: 0.1.0(socket.io-client@4.8.3)
@@ -130,6 +132,9 @@ importers:
       '@resvg/resvg-wasm':
         specifier: 2.6.2
         version: 2.6.2
+      '@sparkjsdev/spark':
+        specifier: 2.2.0
+        version: 2.2.0(three@0.184.0)
       '@sqlite.org/sqlite-wasm':
         specifier: 3.53.0-build1
         version: 3.53.0-build1
@@ -175,6 +180,9 @@ importers:
       canvaskit-wasm:
         specifier: 0.41.1
         version: 0.41.1
+      closed-chain-ik:
+        specifier: 0.0.3
+        version: 0.0.3(three@0.184.0)(urdf-loader@0.13.1(three@0.184.0))
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -228,7 +236,10 @@ importers:
         version: 1.17.0(react@19.2.7)
       manifold-3d:
         specifier: 3.5.1
-        version: 3.5.1(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(@types/node@24.13.2))(esbuild-wasm@0.27.7)
+        version: 3.5.1(patch_hash=53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad)(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2))(esbuild-wasm@0.27.7)
+      meshoptimizer:
+        specifier: 1.2.0
+        version: 1.2.0
       mixbox:
         specifier: 2.0.0
         version: 2.0.0
@@ -283,6 +294,9 @@ importers:
       react-router-dom:
         specifier: 7.18.2
         version: 7.18.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      recast-navigation:
+        specifier: 0.43.1
+        version: 0.43.1
       rhino3dm:
         specifier: 8.32.1
         version: 8.32.1
@@ -301,6 +315,9 @@ importers:
       three:
         specifier: 0.184.0
         version: 0.184.0
+      three-bvh-csg:
+        specifier: 0.0.18
+        version: 0.0.18(three-mesh-bvh@0.9.13(three@0.184.0))(three@0.184.0)
       three-mesh-bvh:
         specifier: 0.9.13
         version: 0.9.13(three@0.184.0)
@@ -440,6 +457,9 @@ importers:
       lint-staged:
         specifier: ^17.0.7
         version: 17.0.7
+      mikktspace:
+        specifier: 1.1.1
+        version: 1.1.1
       parse5:
         specifier: 8.0.1
         version: 8.0.1
@@ -2937,6 +2957,15 @@ packages:
       react-native:
         optional: true
 
+  '@recast-navigation/core@0.43.1':
+    resolution: {integrity: sha512-4igfPgnoV90O92sDSIA0xHa6tanh3z/udlgGmD0SqGQ6PKV4JS2l9jWO8YnxfZuXP/NV52H4c5FU6pSdZc9WDA==}
+
+  '@recast-navigation/generators@0.43.1':
+    resolution: {integrity: sha512-w7r6k/A93wWxuSN+Lg+PmlsUVXq06r5bqXmBglolxqDt2O/Y776BIhYtb6P2P6pbYqDWORu9NCZZJzfY4FNpaA==}
+
+  '@recast-navigation/wasm@0.43.1':
+    resolution: {integrity: sha512-XFL6PhO8JodwXUHBSAkfaLUdUEweIkJsdP3HTmtJvMs5fkqEWxWJmBskZlACHJepv55NAriqWxOtuLlG3t7+Hg==}
+
   '@redis/bloom@5.12.1':
     resolution: {integrity: sha512-PUUfv+ms7jgPSBVoo/DN4AkPHj4D5TZSd6SbJX7egzBplkYUcKmHRE8RKia7UtZ8bSQbLguLvxVO+asKtQfZWA==}
     engines: {node: '>= 18.19.0'}
@@ -3154,6 +3183,11 @@ packages:
     engines: {node: '>=12.0.0'}
     peerDependencies:
       socket.io-adapter: ^2.5.4
+
+  '@sparkjsdev/spark@2.2.0':
+    resolution: {integrity: sha512-wf5F2YAmPXnjm20/MgXYer9FQTXz2JOCo05HwxFkaD7Guk9rHVPIwdJ6fq0oF9ME0heMvYj+TxS6DTrucvy6KA==}
+    peerDependencies:
+      three: '>=0.180.0'
 
   '@speed-highlight/core@1.2.17':
     resolution: {integrity: sha512-Z92FwKpCtfaW1V0jTU/fh3QzYEZN8wDwrzRIBoADCJfn4mJCNcJN/XegifX7BDrQ8/h9Xh/JnbyMchL0FqXrkg==}
@@ -4087,6 +4121,12 @@ packages:
   cliui@9.0.1:
     resolution: {integrity: sha512-k7ndgKhwoQveBL+/1tqGJYNz097I7WOvwbmmU2AR5+magtbjPWQTS1C5vzGkBC8Ym8UWRzfKUzUUqFLypY4Q+w==}
     engines: {node: '>=20'}
+
+  closed-chain-ik@0.0.3:
+    resolution: {integrity: sha512-ww4CPGbe/OCD2rAUKEOYKmeZlzFZ3o14KrbFULUCGZj6NRYej3T/PPGtJ0qkGyq1FzE6qLMCF45D+Q8eQb4Bsg==}
+    peerDependencies:
+      three: '>=0.120.1'
+      urdf-loader: '>=0.9.2'
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -5084,6 +5124,9 @@ packages:
     deprecated: Deprecated and no longer maintained. Use @conventional-changelog/git-client instead.
     hasBin: true
 
+  gl-matrix@3.4.4:
+    resolution: {integrity: sha512-latSnyDNt/8zYUB6VIJ6PCh2jBjJX6gnDsoCZ7LyW7GkqrD51EWwa9qCoGixj8YqBtETQK/xY7OmpTF8xz1DdQ==}
+
   glob-parent@6.0.2:
     resolution: {integrity: sha512-XxwI8EOhVQgWp6iDL+3b0r86f4d6AX6zSU55HfB4ydCEuXLXc5FcYeOu+nnGftS4TEju/11rt4KJPTMgbfmv4A==}
     engines: {node: '>=10.13.0'}
@@ -5733,6 +5776,9 @@ packages:
     resolution: {integrity: sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ==}
     engines: {node: '>= 12.0.0'}
 
+  linear-solve@1.2.1:
+    resolution: {integrity: sha512-YysEUwkRRtxvjJto9kArBJdH/NCnakI8YOrSDD8yK1EV3+t8UjNzqdCQSU+FaNtYLTCBdlI7fwV6Fbn1EEyLew==}
+
   lines-and-columns@1.2.4:
     resolution: {integrity: sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg==}
 
@@ -5857,6 +5903,9 @@ packages:
   meshoptimizer@1.1.1:
     resolution: {integrity: sha512-oRFNWJRDA/WTrVj7NWvqa5HqE1t9MYDj2VaWirQCzCCrAd2GHrqR/sQezCxiWATPNlKTcRaPRHPJwIRoPBAp5g==}
 
+  meshoptimizer@1.2.0:
+    resolution: {integrity: sha512-davRZeIJbxJrE24cwQle7ZDsxjdk/OphNOV83oX+efQinyoHY9Jcyz3MHbaoG0qySZajldGztNZ1RN/T19PZsg==}
+
   methods@1.1.2:
     resolution: {integrity: sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==}
     engines: {node: '>= 0.6'}
@@ -5864,6 +5913,9 @@ packages:
   micromatch@4.0.8:
     resolution: {integrity: sha512-PXwfBhYu0hBCPw8Dn0E+WDYb7af3dSLVWKi3HGv84IdF4TyFoC0ysxFd0Goxw7nSv4T/PzEJQxsYsEiFCKo2BA==}
     engines: {node: '>=8.6'}
+
+  mikktspace@1.1.1:
+    resolution: {integrity: sha512-w+n5O2YLFsv/aRi3QUF0jxR+mEsl2J08ZkRItJHE08MWqiDIy8amyZN9vetBfbLhlWGMb8G3mzSPwtKHvBF7hQ==}
 
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
@@ -6626,6 +6678,9 @@ packages:
   real-require@1.0.0:
     resolution: {integrity: sha512-P4nbQYQfePJxRSmY+v/KINxVucm4NF3p3s7pJveMTtom52FR4YGltUQLB8idDXwDDWW+eYrWDFbuzUnjoWHF7g==}
 
+  recast-navigation@0.43.1:
+    resolution: {integrity: sha512-BVBQEHE6uqD36opJomVkI5TxMVZ8bBLdDn90mYtBUYJnNlqEuNFOL8DH8lLOksfVVaC+kjykYuS57P6MrxVB7A==}
+
   redis@5.12.1:
     resolution: {integrity: sha512-LDsoVvb/CpoV9EN3FXvgvSHNJWuCIzl9MiO3ppOevuGLpSGJhwfQjpEwfFJcQvNSddHADDdZaWx0HnmMxRXG7g==}
     engines: {node: '>= 18.19.0'}
@@ -7064,6 +7119,9 @@ packages:
     peerDependencies:
       react: '>=17.0'
 
+  svd-js@1.1.1:
+    resolution: {integrity: sha512-3Mpd08lu7HPD/aDMnHvhLBKHLdoUv+w9411ZLGjZYIR51e05CFNAY+MYMXLs7leo6jljZ8PGkoCSI1I4lF1Z4Q==}
+
   symbol-tree@3.2.4:
     resolution: {integrity: sha512-9QNk5KwDF+Bvz+PyObkmSYjI5ksVUYtjW7AU22r2NKcfLJcXp96hkDWU3+XndOsUb+AQ9QhfzfCT2O+CNWT5Tw==}
 
@@ -7103,6 +7161,17 @@ packages:
   thread-stream@4.2.0:
     resolution: {integrity: sha512-e2zZ96wSChazBsbENf/Pcm/4swHt2cEKQ92rhUjkL9GCKiTDJIaTBenjE/m9DXi0QBmTMDkFDdOomUy20A1tDQ==}
     engines: {node: '>=20'}
+
+  three-bvh-csg@0.0.18:
+    resolution: {integrity: sha512-M3GCZMmGFgASGuDf+YMamM83nVlD/vdwzVHcYbFxgW+g1S7/nKPiuY00YVHOMbjmJPh8mLevGZL65ItHUuGt2w==}
+    peerDependencies:
+      three: '>=0.179.0'
+      three-mesh-bvh: '>=0.9.7'
+
+  three-mesh-bvh@0.5.24:
+    resolution: {integrity: sha512-VTIgfjz8aFoPKTQoMIQQv9jJD4ybFRZuKKE1/kqy78FQcuHQ0+iIWv7C5cSb2inlvs7bNMVY3yRx3RXGZfrvzQ==}
+    peerDependencies:
+      three: '>= 0.123.0'
 
   three-mesh-bvh@0.8.3:
     resolution: {integrity: sha512-4G5lBaF+g2auKX3P0yqx+MJC6oVt6sB5k+CchS6Ob0qvH0YIhuUk1eYr7ktsIpY+albCqE80/FVQGV190PmiAg==}
@@ -7356,6 +7425,11 @@ packages:
     hasBin: true
     peerDependencies:
       browserslist: 4.28.7
+
+  urdf-loader@0.13.1:
+    resolution: {integrity: sha512-bHHoh0Yxrgrw91dPAmVnzKleA8HiVMeHy6xYqOVRw3LuZ2hDOwUiQVCbrzPZckO5S30F1Yym8zLCINN0HfcM3w==}
+    peerDependencies:
+      three: '>=0.152.0'
 
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
@@ -8575,7 +8649,7 @@ snapshots:
       '@gltf-transform/core': 4.4.2
       ktx-parse: 1.1.0
 
-  '@gltf-transform/functions@4.4.2(@types/node@24.13.2)':
+  '@gltf-transform/functions@4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2)':
     dependencies:
       '@gltf-transform/core': 4.4.2
       '@gltf-transform/extensions': 4.4.2
@@ -9854,6 +9928,17 @@ snapshots:
       - '@types/react'
       - immer
 
+  '@recast-navigation/core@0.43.1':
+    dependencies:
+      '@recast-navigation/wasm': 0.43.1
+
+  '@recast-navigation/generators@0.43.1':
+    dependencies:
+      '@recast-navigation/core': 0.43.1
+      '@recast-navigation/wasm': 0.43.1
+
+  '@recast-navigation/wasm@0.43.1': {}
+
   '@redis/bloom@5.12.1(@redis/client@5.12.1)':
     dependencies:
       '@redis/client': 5.12.1
@@ -10027,6 +10112,11 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
       - supports-color
+
+  '@sparkjsdev/spark@2.2.0(three@0.184.0)':
+    dependencies:
+      fflate: 0.8.3
+      three: 0.184.0
 
   '@speed-highlight/core@1.2.17': {}
 
@@ -10974,6 +11064,15 @@ snapshots:
       string-width: 7.2.0
       strip-ansi: 7.2.0
       wrap-ansi: 9.0.2
+
+  closed-chain-ik@0.0.3(three@0.184.0)(urdf-loader@0.13.1(three@0.184.0)):
+    dependencies:
+      gl-matrix: 3.4.4
+      linear-solve: 1.2.1
+      svd-js: 1.1.1
+      three: 0.184.0
+      three-mesh-bvh: 0.5.24(three@0.184.0)
+      urdf-loader: 0.13.1(three@0.184.0)
 
   clsx@2.1.1: {}
 
@@ -12074,6 +12173,8 @@ snapshots:
       - conventional-commits-filter
       - conventional-commits-parser
 
+  gl-matrix@3.4.4: {}
+
   glob-parent@6.0.2:
     dependencies:
       is-glob: 4.0.3
@@ -12705,6 +12806,8 @@ snapshots:
       lightningcss-win32-arm64-msvc: 1.32.0
       lightningcss-win32-x64-msvc: 1.32.0
 
+  linear-solve@1.2.1: {}
+
   lines-and-columns@1.2.4: {}
 
   lint-staged@17.0.7:
@@ -12785,11 +12888,11 @@ snapshots:
     dependencies:
       semver: 7.8.5
 
-  manifold-3d@3.5.1(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(@types/node@24.13.2))(esbuild-wasm@0.27.7):
+  manifold-3d@3.5.1(patch_hash=53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad)(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2))(esbuild-wasm@0.27.7):
     dependencies:
       '@gltf-transform/core': 4.4.2
       '@gltf-transform/extensions': 4.4.2
-      '@gltf-transform/functions': 4.4.2(@types/node@24.13.2)
+      '@gltf-transform/functions': 4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2)
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/trace-mapping': 0.3.31
       '@jscadui/3mf-export': 0.5.0
@@ -12822,12 +12925,16 @@ snapshots:
 
   meshoptimizer@1.1.1: {}
 
+  meshoptimizer@1.2.0: {}
+
   methods@1.1.2: {}
 
   micromatch@4.0.8:
     dependencies:
       braces: 3.0.3
       picomatch: 2.3.2
+
+  mikktspace@1.1.1: {}
 
   mime-db@1.52.0: {}
 
@@ -13687,6 +13794,11 @@ snapshots:
 
   real-require@1.0.0: {}
 
+  recast-navigation@0.43.1:
+    dependencies:
+      '@recast-navigation/core': 0.43.1
+      '@recast-navigation/generators': 0.43.1
+
   redis@5.12.1:
     dependencies:
       '@redis/bloom': 5.12.1(@redis/client@5.12.1)
@@ -14272,6 +14384,8 @@ snapshots:
     dependencies:
       react: 19.2.7
 
+  svd-js@1.1.1: {}
+
   symbol-tree@3.2.4: {}
 
   table@6.9.0:
@@ -14312,6 +14426,15 @@ snapshots:
   thread-stream@4.2.0:
     dependencies:
       real-require: 1.0.0
+
+  three-bvh-csg@0.0.18(three-mesh-bvh@0.9.13(three@0.184.0))(three@0.184.0):
+    dependencies:
+      three: 0.184.0
+      three-mesh-bvh: 0.9.13(three@0.184.0)
+
+  three-mesh-bvh@0.5.24(three@0.184.0):
+    dependencies:
+      three: 0.184.0
 
   three-mesh-bvh@0.8.3(three@0.184.0):
     dependencies:
@@ -14585,6 +14708,10 @@ snapshots:
       browserslist: 4.28.7
       escalade: 3.2.0
       picocolors: 1.1.1
+
+  urdf-loader@0.13.1(three@0.184.0):
+    dependencies:
+      three: 0.184.0
 
   uri-js@4.4.1:
     dependencies:
