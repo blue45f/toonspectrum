@@ -19,10 +19,14 @@ export type StudioScene3dGaussianSplatBackend =
 
 export interface StudioScene3dSoftwareCapabilities {
   readonly tslNprRenderGraph: boolean;
-  readonly csmShadows: boolean;
+  readonly taa: boolean;
   readonly taau: boolean;
+  readonly vsmShadows: boolean;
+  readonly csmShadows: boolean;
   readonly ssgi: boolean;
   readonly sss: boolean;
+  readonly bloom: boolean;
+  readonly depthOfField: boolean;
   readonly assetReleasePipeline: boolean;
   readonly renderBundles: boolean;
   readonly threeNativeGaussianSplat: boolean;
@@ -48,10 +52,14 @@ export interface StudioScene3dSoftwareCapabilities {
 export const STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES:
   StudioScene3dSoftwareCapabilities = Object.freeze({
     tslNprRenderGraph: false,
-    csmShadows: false,
+    taa: false,
     taau: false,
+    vsmShadows: false,
+    csmShadows: false,
     ssgi: false,
     sss: false,
+    bloom: false,
+    depthOfField: false,
     assetReleasePipeline: false,
     renderBundles: false,
     threeNativeGaussianSplat: false,
@@ -107,10 +115,14 @@ export interface StudioScene3dRuntimePlan {
     readonly tsl: boolean;
     readonly mrt: boolean;
     readonly gpuCompute: boolean;
-    readonly csm: boolean;
+    readonly taa: boolean;
     readonly taau: boolean;
+    readonly vsm: boolean;
+    readonly csm: boolean;
     readonly ssgi: boolean;
     readonly sss: boolean;
+    readonly bloom: boolean;
+    readonly depthOfField: boolean;
     readonly xpbd: "gpu" | "cpu" | "disabled";
     readonly ktx2: boolean;
     readonly meshopt: boolean;
@@ -321,10 +333,14 @@ export function resolveStudioScene3dRuntimePlan(
       tsl: capabilities.webgpu,
       mrt: capabilities.webgpu && software.tslNprRenderGraph,
       gpuCompute: webgpuCompute,
-      csm: software.csmShadows,
+      taa: software.taa,
       taau: capabilities.webgpu && software.taau,
+      vsm: software.vsmShadows,
+      csm: software.csmShadows,
       ssgi: capabilities.webgpu && memory !== "low" && software.ssgi,
       sss: capabilities.webgpu && memory !== "low" && software.sss,
+      bloom: software.bloom,
+      depthOfField: software.depthOfField,
       xpbd: needs.liveClothOrHair
         ? webgpuCompute && software.gpuXpbd
           ? "gpu"
