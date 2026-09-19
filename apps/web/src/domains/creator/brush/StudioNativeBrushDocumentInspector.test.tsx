@@ -10,6 +10,12 @@ import type { StudioNativeBrushDocumentResult } from "./studio-native-brush-docu
 import type { StudioNativeBrushDocumentInspectorProps } from "./StudioNativeBrushDocumentInspector";
 
 const renderProduct = vi.hoisted(() => vi.fn());
+const sessionInstances = vi.hoisted(() => [] as Array<{ dispose: ReturnType<typeof vi.fn> }>);
+vi.mock("./studio-native-brush-document-session", () => ({ StudioNativeBrushDocumentSession: class {
+  readonly dispose = vi.fn();
+  constructor() { sessionInstances.push(this); }
+  render = renderProduct;
+} }));
 vi.mock("./studio-native-brush-document-product", () => ({ renderStudioNativeBrushDocument: renderProduct }));
 const source: DrawEl = { id: "s", type: "draw", kind: "freehand", points: [100, 100, 120, 110],
   pressures: [0.5, 0.8], sampleTimeOffsets: [0, 8], strokeWidth: 12, stroke: "#123456" };
@@ -24,7 +30,7 @@ function open() {
   const details = screen.getByText("선택 획 · 네이티브 엔진 변환").closest("details")!;
   details.open = true; fireEvent(details, new Event("toggle"));
 }
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); sessionInstances.length = 0; });
 
 describe("native document inspector", () => {
   it("does not create an engine before explicit conversion", () => {
@@ -87,5 +93,55 @@ describe("native document inspector", () => {
     render(<Inspector {...props({ selected: { ...source, pressures: undefined, sampleTimeOffsets: undefined } })} />); open();
     expect(screen.getByText(/일정한 필압 0.5/)).toBeTruthy();
     expect(screen.getByText(/입력점마다 8ms/)).toBeTruthy();
+  });
+});
+
+describe("native preview and scoped engine lifecycle", () => {
+  it("previews without mutation and applies the exact checked output once", async () => {
+    renderProduct.mockResolvedValue(result);
+    const commit = vi.fn(() => true);
+    render(<Inspector {...props({ onPrepare: () => commit })} />); open();
+    fireEvent.click(screen.getByRole("button", { name: "결과 미리보기" }));
+    await waitFor(() => expect(screen.getByRole("img").getAttribute("src")).toBe(result.src));
+    expect(commit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "미리보기 적용" }));
+    expect(commit).toHaveBeenCalledTimes(1); expect(commit).toHaveBeenCalledWith(result);
+    expect(screen.queryByRole("button", { name: "미리보기 적용" })).toBeNull();
+  });
+  it("rejects a stale preview without re-rendering it or changing the source", async () => {
+    renderProduct.mockResolvedValue(result); const commit = vi.fn(() => false);
+    render(<Inspector {...props({ onPrepare: () => commit })} />); open();
+    fireEvent.click(screen.getByRole("button", { name: "결과 미리보기" }));
+    await waitFor(() => expect(screen.getByRole("img")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "미리보기 적용" }));
+    expect(renderProduct).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("status").textContent).toContain("미리보기를 적용하지 않았습니다");
+  });
+  it("reuses an idle session across style changes but discards stale preview pixels", async () => {
+    renderProduct.mockResolvedValue(result); render(<Inspector {...props()} />); open();
+    fireEvent.click(screen.getByRole("button", { name: "결과 미리보기" }));
+    await waitFor(() => expect(screen.getByRole("img")).toBeTruthy());
+    fireEvent.change(screen.getByRole("combobox", { name: "문서 변환 재질" }), { target: { value: "chalk" } });
+    expect(screen.queryByRole("img")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "결과 미리보기" }));
+    await waitFor(() => expect(renderProduct).toHaveBeenCalledTimes(2));
+    expect(sessionInstances).toHaveLength(1); expect(sessionInstances[0]!.dispose).not.toHaveBeenCalled();
+  });
+  it.each(["close", "page", "engine", "hidden", "pagehide", "disable-reuse", "unmount"])("releases the idle session on %s", async (change) => {
+    renderProduct.mockResolvedValue(result); const initial = props(), view = render(<Inspector {...initial} />); open();
+    fireEvent.click(screen.getByRole("button", { name: "결과 미리보기" }));
+    await waitFor(() => expect(screen.getByRole("img")).toBeTruthy());
+    const lease = sessionInstances[0]!;
+    if (change === "close") { const details = screen.getByText("선택 획 · 네이티브 엔진 변환").closest("details")!; details.open = false; fireEvent(details, new Event("toggle")); }
+    if (change === "page") view.rerender(<Inspector {...initial} pageId="other" />);
+    if (change === "engine") fireEvent.change(screen.getByRole("combobox", { name: "문서 변환 엔진" }), { target: { value: "vello" } });
+    if (change === "hidden") {
+      const hidden = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      fireEvent(document, new Event("visibilitychange")); hidden.mockRestore();
+    }
+    if (change === "pagehide") fireEvent(window, new Event("pagehide"));
+    if (change === "disable-reuse") fireEvent.click(screen.getByRole("checkbox", { name: "연속 미리보기 가속" }));
+    if (change === "unmount") view.unmount();
+    expect(lease.dispose).toHaveBeenCalled();
   });
 });

@@ -56,10 +56,11 @@ export class StudioNativeBrushProbeClient {
   request(operation: NativeBrushProbeOperation): Promise<NativeBrushProbeReply> {
     if (this.disposed) return Promise.reject(new Error("Native brush test client is disposed"));
     if (this.pending) return Promise.reject(new Error("Native brush test request already in flight"));
-    if (operation.type === "init") {
+    if (operation.type === "init" || (operation.type === "render-document" && operation.surface)) {
       const surface = operation.surface ?? NATIVE_BRUSH_PROBE_SURFACE;
       try { validateNativeBrushSurface(surface); } catch (error) { return Promise.reject(error); }
-      this.engine = operation.engine; this.surface = { ...surface };
+      if (operation.type === "init") this.engine = operation.engine;
+      this.surface = { ...surface };
     }
     if (!Number.isSafeInteger(this.nextId)) return Promise.reject(new Error("Native brush request sequence exhausted"));
     const id = this.nextId++;
