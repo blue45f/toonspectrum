@@ -19,8 +19,18 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   try {
     await compiledPackage(
       root,
+      "packages/contracts/src/security/csrf.js",
+      '"use strict"; module.exports = { csrf: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/core/src/index.js",
       '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/core/src/creator-role.js",
+      '"use strict"; module.exports = { creatorRole: "artist" };\n',
     );
     await compiledPackage(
       root,
@@ -45,12 +55,16 @@ test("stages workspace packages inside the emitted API boundary", async () => {
 
     const staged = await stageApiWorkspaceRuntime(root);
     assert.deepEqual(staged.map((entry) => entry.name), [
+      "@toonspectrum/contracts",
       "@toonspectrum/core",
       "@toonspectrum/studio-project-model",
       "@toonspectrum/studio-format-gateway",
     ]);
 
     const requireFromApi = createRequire(caller);
+    assert.deepEqual(requireFromApi("@toonspectrum/contracts/security/csrf"), {
+      csrf: "ready",
+    });
     assert.deepEqual(requireFromApi("@toonspectrum/core"), {
       core: "ready",
     });
@@ -83,7 +97,14 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       resolve(root, "node_modules", "@toonspectrum", "core", "package.json"),
       "utf8",
     ));
+    assert.equal(corePackageJson.exports["./creator-role"], "./creator-role.js");
     assert.equal(corePackageJson.exports["./production"], "./production/index.js");
+    const contractsPackageJson = JSON.parse(await readFile(
+      resolve(root, "node_modules", "@toonspectrum", "contracts", "package.json"),
+      "utf8",
+    ));
+    assert.equal(contractsPackageJson.exports["./security/csrf"], "./security/csrf.js");
+    assert.equal("main" in contractsPackageJson, false);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -94,8 +115,18 @@ test("fails when an exported workspace subpath was not compiled", async () => {
   try {
     await compiledPackage(
       root,
+      "packages/contracts/src/security/csrf.js",
+      '"use strict"; module.exports = { csrf: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/core/src/index.js",
       '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/core/src/creator-role.js",
+      '"use strict"; module.exports = { creatorRole: "artist" };\n',
     );
     await compiledPackage(
       root,
