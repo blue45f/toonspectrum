@@ -39,6 +39,8 @@ export function StudioScene3dAssetToolsPanel({
   const [start, setStart] = useState([-2, 0, -2]);
   const [end, setEnd] = useState([2, 0, 2]);
   const [cellSize, setCellSize] = useState(0.2);
+  const [textureMode, setTextureMode] = useState<"uastc" | "etc1s">("uastc");
+  const [maxTextureSize, setMaxTextureSize] = useState<512 | 1024 | 2048>(2048);
   const nodeListId = useId();
   const [nodeNames, setNodeNames] = useState<readonly string[]>([]);
   const [rootName, setRootName] = useState("");
@@ -223,6 +225,14 @@ export function StudioScene3dAssetToolsPanel({
           {t("애니메이션 키 최적화", "Optimize animation keys")}
         </button>
       </div>
+      <details className="rounded-lg border border-line p-2">
+        <summary className="cursor-pointer py-2 text-xs font-semibold">{t("KTX2 텍스처·LOD 릴리스 생성", "KTX2 texture and LOD release")}</summary>
+        <p className="my-2 text-xs text-fg-3">{t("색상·노멀 맵의 색 공간을 구분해 KTX2를 생성합니다. 릴리스는 정적 모델의 LOD 3종과 검증 보고서를 만듭니다. 원본·카탈로그 승인은 변경하지 않습니다.", "Encode transfer-aware KTX2 textures. Release mode generates three static-model LODs and a receipt. Originals and catalog approval remain unchanged.")}</p>
+        <label className="my-2 block text-xs">{t("색상 텍스처 품질", "Color texture quality")}<select value={textureMode} disabled={locked} onChange={(event) => setTextureMode(event.currentTarget.value as typeof textureMode)} className="ml-2 bg-panel p-2"><option value="uastc">UASTC · {t("고품질", "High quality")}</option><option value="etc1s">ETC1S · {t("작은 파일", "Smaller files")}</option></select></label>
+        <label className="my-2 block text-xs">{t("텍스처 최대 한 변", "Texture maximum edge")}<select value={maxTextureSize} disabled={locked} onChange={(event) => setMaxTextureSize(Number(event.currentTarget.value) as typeof maxTextureSize)} className="ml-2 bg-panel p-2">{[512,1024,2048].map((size)=><option key={size} value={size}>{size}px</option>)}</select></label>
+        <div className="flex flex-wrap gap-2"><button className={BUTTON} disabled={locked} onClick={() => void run({kind:"textures", textureMode, maxTextureSize})}>{t("KTX2 파생본 생성", "Generate KTX2 derivative")}</button>
+        <button className={BUTTON} disabled={locked} onClick={() => void run({kind:"release", textureMode, maxTextureSize, error:0.01})}>{t("LOD+KTX2 릴리스 생성", "Generate LOD+KTX2 release")}</button></div>
+      </details>
       <details className="rounded-lg border border-line p-2">
         <summary className="cursor-pointer py-2 text-xs font-semibold">
           {t("관절 체인 IK 포즈 가공", "Joint-chain IK pose processing")}
@@ -510,8 +520,8 @@ export function StudioScene3dAssetToolsPanel({
           )}
           <p className="text-xs text-fg-3">
             {t(
-              "자동 품질 승인이나 KTX2 변환은 수행하지 않습니다. 가공 결과를 검토한 뒤 사용하세요.",
-              "No automatic quality approval or KTX2 conversion is performed. Review the artifacts before use.",
+              "자동 품질 승인은 수행하지 않습니다. KTX2 변환은 해당 도구에서만 수행하며 결과를 검토한 뒤 사용하세요.",
+              "No automatic quality approval is performed. KTX2 conversion runs only through its explicit tool. Review the artifacts before use.",
             )}
           </p>
           <details>

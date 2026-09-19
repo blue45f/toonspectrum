@@ -14,3 +14,11 @@ describe("Scene3D color and depth capture budgets", () => {
     expect(() => assertStudioBg3dCaptureBudget({ width: 4096, height: 4097, includeDepth: false })).toThrow(RangeError);
   });
 });
+
+
+it("accounts for all optional normal targets/readbacks before allocating an export", () => {
+  expect(() => assertStudioBg3dCaptureBudget({ width: 2048, height: 2048, includeDepth: true, includeNormals: true })).not.toThrow();
+  expect(() => assertStudioBg3dCaptureBudget({ width: 4096, height: 2048, includeDepth: true, includeNormals: true })).toThrow(/budget/);
+  expect(() => assertStudioBg3dCaptureBudget({ width: 4096, height: 2048, includeDepth: true })).not.toThrow();
+  expect(() => assertStudioBg3dCaptureBudget({ width: 2, height: 2, includeDepth: false, includeNormals: true })).toThrow();
+});

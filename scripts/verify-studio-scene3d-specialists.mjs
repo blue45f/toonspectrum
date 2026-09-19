@@ -68,6 +68,7 @@ const vite = await createServer({
       "@gltf-transform/extensions",
       "@gltf-transform/functions",
       "meshoptimizer",
+      "ktx2-encoder",
       "three-bvh-csg",
       "recast-navigation",
       "recast-navigation/generators",
@@ -196,6 +197,16 @@ try {
     const canvas = page.locator("canvas").first();
     const pixels = await canvas.screenshot();
     writeFileSync(join(scratch, "artifact-preview.png"), pixels);
+    const textured = await page.evaluate(() => window.__scene3dTexturedFixture);
+    await page.locator('input[type="file"]').first().setInputFiles({ name: "textured.glb", mimeType: "model/gltf-binary", buffer: Buffer.from(textured) });
+    await page.getByText("KTX2 텍스처·LOD 릴리스 생성", { exact: true }).click();
+    await page.getByRole("button", { name: "LOD+KTX2 릴리스 생성", exact: true }).click();
+    await page.getByRole("link", { name: "release-lod-2.glb" }).waitFor({ timeout: 120000 });
+    await page.locator('canvas[data-texture-runtime="ktx2-basis"]').waitFor({ timeout: 60000 });
+    await page.locator('canvas[data-texture-runtime="ktx2-basis"]').screenshot({ path: join(scratch, "ktx2-release-preview.png") });
+    const releaseDownload = page.waitForEvent("download"); await page.getByRole("link", { name: "release-lod-2.glb" }).click();
+    await (await releaseDownload).saveAs(join(scratch, "ui-release-lod-2.glb"));
+    proof.textureReleaseUi = { generation: "passed", realGpuTranscode: "passed", download: "passed" };
     const splat = await page.evaluate(() => window.__scene3dSplatFixture);
     // The real viewer deliberately stops when offscreen; bring it into view like a user.
     await page.locator('input[accept=".splat"]').scrollIntoViewIfNeeded();
