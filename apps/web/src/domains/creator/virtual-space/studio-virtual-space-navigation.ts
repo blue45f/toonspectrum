@@ -1,13 +1,17 @@
 import {
   STUDIO_VIRTUAL_SPACE_HEIGHT,
   STUDIO_VIRTUAL_SPACE_WIDTH,
+  STUDIO_VIRTUAL_SPACE_ZONES,
   clampStudioVirtualSpacePoint,
+  studioVirtualSpaceScaleLegacyDistance,
+  studioVirtualSpaceScaleLegacyX,
+  studioVirtualSpaceScaleLegacyY,
   type StudioVirtualSpacePoint,
 } from "./studio-virtual-space-model";
 
-export const STUDIO_VIRTUAL_SPACE_PLAYER_RADIUS = 10;
-export const STUDIO_VIRTUAL_SPACE_WALK_SPEED = 205;
-export const STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE = 8;
+export const STUDIO_VIRTUAL_SPACE_PLAYER_RADIUS = Math.round(studioVirtualSpaceScaleLegacyDistance(10));
+export const STUDIO_VIRTUAL_SPACE_WALK_SPEED = Math.round(studioVirtualSpaceScaleLegacyDistance(205));
+export const STUDIO_VIRTUAL_SPACE_CLICK_STOP_DISTANCE = Math.round(studioVirtualSpaceScaleLegacyDistance(8));
 
 export interface StudioVirtualSpaceRect {
   readonly x: number;
@@ -17,8 +21,10 @@ export interface StudioVirtualSpaceRect {
   readonly kind: "wall" | "furniture";
 }
 
-const WALL = 9;
-const DOOR = 72;
+const WALL_X = studioVirtualSpaceScaleLegacyX(9);
+const WALL_Y = studioVirtualSpaceScaleLegacyY(9);
+const DOOR_X = studioVirtualSpaceScaleLegacyX(72);
+const DOOR_Y = studioVirtualSpaceScaleLegacyY(72);
 
 function horizontalWall(
   x: number,
@@ -26,13 +32,13 @@ function horizontalWall(
   width: number,
   openingCenter?: number,
 ): readonly StudioVirtualSpaceRect[] {
-  if (openingCenter == null) return [{ x, y, width, height: WALL, kind: "wall" }];
-  const leftWidth = Math.max(0, openingCenter - DOOR / 2 - x);
-  const rightX = openingCenter + DOOR / 2;
+  if (openingCenter == null) return [{ x, y, width, height: WALL_Y, kind: "wall" }];
+  const leftWidth = Math.max(0, openingCenter - DOOR_X / 2 - x);
+  const rightX = openingCenter + DOOR_X / 2;
   const rightWidth = Math.max(0, x + width - rightX);
   return [
-    ...(leftWidth > 0 ? [{ x, y, width: leftWidth, height: WALL, kind: "wall" as const }] : []),
-    ...(rightWidth > 0 ? [{ x: rightX, y, width: rightWidth, height: WALL, kind: "wall" as const }] : []),
+    ...(leftWidth > 0 ? [{ x, y, width: leftWidth, height: WALL_Y, kind: "wall" as const }] : []),
+    ...(rightWidth > 0 ? [{ x: rightX, y, width: rightWidth, height: WALL_Y, kind: "wall" as const }] : []),
   ];
 }
 
@@ -42,68 +48,77 @@ function verticalWall(
   height: number,
   openingCenter?: number,
 ): readonly StudioVirtualSpaceRect[] {
-  if (openingCenter == null) return [{ x, y, width: WALL, height, kind: "wall" }];
-  const topHeight = Math.max(0, openingCenter - DOOR / 2 - y);
-  const bottomY = openingCenter + DOOR / 2;
+  if (openingCenter == null) return [{ x, y, width: WALL_X, height, kind: "wall" }];
+  const topHeight = Math.max(0, openingCenter - DOOR_Y / 2 - y);
+  const bottomY = openingCenter + DOOR_Y / 2;
   const bottomHeight = Math.max(0, y + height - bottomY);
   return [
-    ...(topHeight > 0 ? [{ x, y, width: WALL, height: topHeight, kind: "wall" as const }] : []),
-    ...(bottomHeight > 0 ? [{ x, y: bottomY, width: WALL, height: bottomHeight, kind: "wall" as const }] : []),
+    ...(topHeight > 0 ? [{ x, y, width: WALL_X, height: topHeight, kind: "wall" as const }] : []),
+    ...(bottomHeight > 0 ? [{ x, y: bottomY, width: WALL_X, height: bottomHeight, kind: "wall" as const }] : []),
   ];
 }
 
-const TOP_ROOMS = [
-  { x: 32, y: 32, width: 340, height: 190 },
-  { x: 390, y: 32, width: 330, height: 190 },
-  { x: 738, y: 32, width: 410, height: 190 },
-] as const;
+function room(id: string) {
+  const found = STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === id);
+  if (!found) throw new Error("Missing Virtual Studio room: " + id);
+  return found;
+}
 
-const MIDDLE_ROOMS = [
-  { x: 32, y: 250, width: 310, height: 190 },
-  { x: 838, y: 250, width: 310, height: 190 },
-] as const;
-
-const BOTTOM_ROOMS = [
-  { x: 32, y: 462, width: 430, height: 226 },
-  { x: 718, y: 462, width: 430, height: 226 },
-] as const;
+const TOP_ROOMS = [room("lounge"), room("writers"), room("storyboard")] as const;
+const MIDDLE_ROOMS = [room("assets"), room("drawing")] as const;
+const BOTTOM_ROOMS = [room("review"), room("assistant")] as const;
 
 const roomWalls: StudioVirtualSpaceRect[] = [];
 for (const room of TOP_ROOMS) {
   roomWalls.push(
     ...horizontalWall(room.x, room.y, room.width),
-    ...horizontalWall(room.x, room.y + room.height - WALL, room.width, room.x + room.width / 2),
+    ...horizontalWall(room.x, room.y + room.height - WALL_Y, room.width, room.x + room.width / 2),
     ...verticalWall(room.x, room.y, room.height),
-    ...verticalWall(room.x + room.width - WALL, room.y, room.height),
+    ...verticalWall(room.x + room.width - WALL_X, room.y, room.height),
   );
 }
 for (const room of MIDDLE_ROOMS) {
   roomWalls.push(
     ...horizontalWall(room.x, room.y, room.width, room.x + room.width / 2),
-    ...horizontalWall(room.x, room.y + room.height - WALL, room.width, room.x + room.width / 2),
+    ...horizontalWall(room.x, room.y + room.height - WALL_Y, room.width, room.x + room.width / 2),
     ...verticalWall(room.x, room.y, room.height),
-    ...verticalWall(room.x + room.width - WALL, room.y, room.height),
+    ...verticalWall(room.x + room.width - WALL_X, room.y, room.height),
   );
 }
 for (const room of BOTTOM_ROOMS) {
   roomWalls.push(
     ...horizontalWall(room.x, room.y, room.width, room.x + room.width / 2),
-    ...horizontalWall(room.x, room.y + room.height - WALL, room.width),
+    ...horizontalWall(room.x, room.y + room.height - WALL_Y, room.width),
     ...verticalWall(room.x, room.y, room.height),
-    ...verticalWall(room.x + room.width - WALL, room.y, room.height),
+    ...verticalWall(room.x + room.width - WALL_X, room.y, room.height),
   );
 }
 
+function legacyRect(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  kind: StudioVirtualSpaceRect["kind"] = "furniture",
+): StudioVirtualSpaceRect {
+  return {
+    x: studioVirtualSpaceScaleLegacyX(x),
+    y: studioVirtualSpaceScaleLegacyY(y),
+    width: studioVirtualSpaceScaleLegacyX(width),
+    height: studioVirtualSpaceScaleLegacyY(height),
+    kind,
+  };
+}
+
 const furniture: readonly StudioVirtualSpaceRect[] = [
-  // Reference-layout footprints: warm room furniture stays solid while the central plaza remains walkable around its ring.
-  { x: 70, y: 132, width: 190, height: 48, kind: "furniture" },
-  { x: 452, y: 135, width: 190, height: 48, kind: "furniture" },
-  { x: 870, y: 118, width: 230, height: 62, kind: "furniture" },
-  { x: 68, y: 336, width: 185, height: 56, kind: "furniture" },
-  { x: 914, y: 334, width: 184, height: 58, kind: "furniture" },
-  { x: 95, y: 586, width: 260, height: 64, kind: "furniture" },
-  { x: 794, y: 582, width: 266, height: 68, kind: "furniture" },
-  { x: 520, y: 302, width: 140, height: 118, kind: "furniture" },
+  legacyRect(70, 132, 190, 48),
+  legacyRect(452, 135, 190, 48),
+  legacyRect(870, 118, 230, 62),
+  legacyRect(68, 336, 185, 56),
+  legacyRect(914, 334, 184, 58),
+  legacyRect(95, 586, 260, 64),
+  legacyRect(794, 582, 266, 68),
+  legacyRect(520, 302, 140, 118),
 ];
 
 export const STUDIO_VIRTUAL_SPACE_COLLIDERS: readonly StudioVirtualSpaceRect[] = Object.freeze([
@@ -142,19 +157,45 @@ export function resolveStudioVirtualSpaceMovement(
   current: StudioVirtualSpacePoint,
   delta: StudioVirtualSpacePoint,
 ): StudioVirtualSpacePoint {
-  const boundedTarget = clampStudioVirtualSpacePoint({
-    x: current.x + delta.x,
-    y: current.y + delta.y,
-  });
-  if (studioVirtualSpaceCanOccupy(boundedTarget)) return boundedTarget;
+  const distance = Math.hypot(delta.x, delta.y);
+  if (distance <= 0.0001) return clampStudioVirtualSpacePoint(current);
 
-  const xOnly = clampStudioVirtualSpacePoint({ x: current.x + delta.x, y: current.y });
-  if (studioVirtualSpaceCanOccupy(xOnly)) return xOnly;
+  // Sweep in sub-steps so a low-frame-rate spike or click-follow step cannot tunnel through
+  // thin room walls. Each sub-step still tries axis sliding to keep wall movement natural.
+  const maxStep = Math.max(2, STUDIO_VIRTUAL_SPACE_PLAYER_RADIUS * 0.6);
+  const steps = Math.max(1, Math.ceil(distance / maxStep));
+  const stepX = delta.x / steps;
+  const stepY = delta.y / steps;
+  let position = clampStudioVirtualSpacePoint(current);
 
-  const yOnly = clampStudioVirtualSpacePoint({ x: current.x, y: current.y + delta.y });
-  if (studioVirtualSpaceCanOccupy(yOnly)) return yOnly;
+  for (let index = 0; index < steps; index += 1) {
+    const combined = clampStudioVirtualSpacePoint({
+      x: position.x + stepX,
+      y: position.y + stepY,
+    });
+    if (studioVirtualSpaceCanOccupy(combined)) {
+      position = combined;
+      continue;
+    }
 
-  return clampStudioVirtualSpacePoint(current);
+    const xOnly = clampStudioVirtualSpacePoint({
+      x: position.x + stepX,
+      y: position.y,
+    });
+    const yOnly = clampStudioVirtualSpacePoint({
+      x: position.x,
+      y: position.y + stepY,
+    });
+    const canX = studioVirtualSpaceCanOccupy(xOnly);
+    const canY = studioVirtualSpaceCanOccupy(yOnly);
+
+    if (canX) position = xOnly;
+    if (canY) position = canX
+      ? clampStudioVirtualSpacePoint({ x: position.x, y: yOnly.y })
+      : yOnly;
+  }
+
+  return position;
 }
 
 export function normalizeStudioVirtualSpaceVector(
@@ -183,7 +224,7 @@ export function studioVirtualSpaceStepToward(
   });
 }
 
-const PATH_GRID = 20;
+const PATH_GRID = Math.max(12, Math.round(studioVirtualSpaceScaleLegacyDistance(20)));
 const PATH_MAX_EXPANSIONS = 4_000;
 const PATH_MIN_GX = Math.ceil(STUDIO_VIRTUAL_SPACE_PLAYER_RADIUS / PATH_GRID);
 const PATH_MIN_GY = Math.ceil(STUDIO_VIRTUAL_SPACE_PLAYER_RADIUS / PATH_GRID);
@@ -214,7 +255,7 @@ function pathNode(gx: number, gy: number): PathNode {
 function nearestWalkablePathNode(point: StudioVirtualSpacePoint): PathNode | null {
   const baseX = Math.round(point.x / PATH_GRID);
   const baseY = Math.round(point.y / PATH_GRID);
-  for (let radius = 0; radius <= 5; radius += 1) {
+  for (let radius = 0; radius <= 10; radius += 1) {
     for (let offsetY = -radius; offsetY <= radius; offsetY += 1) {
       for (let offsetX = -radius; offsetX <= radius; offsetX += 1) {
         if (radius > 0 && Math.max(Math.abs(offsetX), Math.abs(offsetY)) !== radius) continue;
