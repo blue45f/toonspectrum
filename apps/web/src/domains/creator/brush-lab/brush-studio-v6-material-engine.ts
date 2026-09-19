@@ -100,7 +100,7 @@ export function brushStudioV6MaterialActiveTuningKeys(program: BrushStudioV6Mate
   }
   if (program.slots.physics.includes("physics-thin-film")) for (const key of ["wetness", "gravity", "viscosity"] as const) result.add(key);
   if (program.slots.physics.includes("physics-backrun-capillary")) for (const key of ["wetness", "diffusion", "absorbency", "evaporation", "advection"] as const) result.add(key);
-  if (program.slots.physics.includes("physics-pigment-sedimentation")) for (const key of ["granulation", "absorbency", "surfaceTooth"] as const) result.add(key);
+  if (program.slots.physics.includes("physics-pigment-sedimentation")) for (const key of ["granulation", "absorbency"] as const) result.add(key);
   if (program.slots.physics.includes("physics-bristle-split-merge")) for (const key of ["bristleStrands", "friction", "viscosity"] as const) result.add(key);
   if (program.slots.finish.includes("finish-directional-relief")) for (const key of ["relief", "gloss"] as const) result.add(key);
   if (pattern && mode !== "particle") return result;
