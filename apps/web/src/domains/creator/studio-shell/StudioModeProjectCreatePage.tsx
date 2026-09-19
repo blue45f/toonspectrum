@@ -478,7 +478,7 @@ export function StudioModeProjectCreatePage() {
                 {!creating ? <ArrowRight size={16} aria-hidden="true" /> : null}
               </button>
               <p className="mt-2 text-center text-[0.68rem] leading-5 text-fg-3">
-                {bt("자동 복구 저장과 버전 기록이 즉시 시작됩니다. 저장 위치는 작업 중 언제든 연결할 수 있습니다.", "Recovery autosave and version history start immediately. You can connect another save destination later.")}
+                {bt("그리는 동안 이 기기에 자동 저장됩니다. 저장 위치는 작업 중 언제든 연결할 수 있습니다.", "Your work is autosaved on this device while you draw. You can connect another save destination later.")}
               </p>
               {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
             </div>
