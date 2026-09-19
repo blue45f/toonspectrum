@@ -1,7 +1,7 @@
-import { standardZigzagStrokeSamples } from "./raster-compile";
+import { standardZigzagStrokeSamples } from "./raster-stroke-samples";
 
 import type { LibMypaintDirtyFrame, LibMypaintRaw } from "./libmypaint/index";
-import type { RasterStrokeSample } from "./raster-compile";
+import type { RasterStrokeSample } from "./raster-stroke-samples";
 
 /**
  * High-level libmypaint lane (ADR-0011 lane 11): programs a pinned

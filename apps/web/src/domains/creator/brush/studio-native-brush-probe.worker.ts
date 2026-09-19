@@ -4,7 +4,7 @@ import {
 } from "./studio-native-brush-probe-contract";
 
 import type { NativeBrushProbeConfig, NativeBrushProbeEngine, NativeBrushProbeFrame, NativeBrushProbeReply, NativeBrushProbeRequest, NativeBrushProbeSample, NativeBrushSurface } from "./studio-native-brush-probe-contract";
-import type { LibMypaintIncrementalStrokeSession } from "@toonspectrum/studio-brush-platform";
+import type { LibMypaintIncrementalStrokeSession } from "@toonspectrum/studio-brush-platform/libmypaint";
 
 
 import { nativeBrushProbeMybDocument, nativeBrushProbeScene } from "./studio-native-brush-probe-program";
@@ -129,7 +129,7 @@ async function execute(request: NativeBrushProbeRequest): Promise<NativeBrushPro
     native?.dispose(); native = null;
     config = { ...request.config }; samples = []; begun = true;
     if (mypaint) {
-      const { createLibMypaintIncrementalStrokeSession } = await import("@toonspectrum/studio-brush-platform");
+      const { createLibMypaintIncrementalStrokeSession } = await import("@toonspectrum/studio-brush-platform/libmypaint");
       native = createLibMypaintIncrementalStrokeSession(mypaint, nativeBrushProbeMybDocument(config), { width: surface.width, height: surface.height, seed: config.seed });
       if (native.settings.unknownSettings.length || native.settings.unknownInputs.length) throw new Error("Unsupported native test settings");
     }

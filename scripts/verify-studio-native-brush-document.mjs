@@ -88,7 +88,7 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.addInitScript((compiledUrl) => {
     Reflect.set(globalThis, "__zod_globalConfig", { jitless: true });
-    const stats = { created: 0, active: 0, peak: 0 };
+    const stats = { created: 0, active: 0, peak: 0, heldDocumentReplies: 0 };
     globalThis.__nativeDocumentWorkers = stats; globalThis.__nativeDocumentCsp = [];
     document.addEventListener("securitypolicyviolation", (event) => globalThis.__nativeDocumentCsp.push(event.violatedDirective));
     const NativeWorker = globalThis.Worker;
@@ -97,6 +97,14 @@ try {
       constructor(url, options) {
         super(compiledUrl && String(url).includes("studio-native-brush-probe.worker") ? compiledUrl : url, options);
         stats.created++; stats.active++; stats.peak = Math.max(stats.peak, stats.active);
+        // Fault-injection seam for cancellation only. Rendering is real; hold the final reply
+        // before client delivery so faster engines cannot finish before Playwright clicks Cancel.
+        this.addEventListener("message", (event) => {
+          if (globalThis.__nativeDocumentHoldReply && event.data?.type === "document") {
+            stats.heldDocumentReplies++;
+            event.stopImmediatePropagation();
+          }
+        }, { capture: true });
       }
       terminate() { if (!this.stopped) { this.stopped = true; stats.active--; } return super.terminate(); }
     };
@@ -144,8 +152,11 @@ try {
   await page.waitForFunction(() => document.querySelector('[role="status"]')?.textContent.includes('이력이 변경'), undefined, { timeout: 45_000 });
   assert.equal(await page.evaluate(() => globalThis.__nativeDocumentHarness.state().length), 1);
   await page.evaluate(() => globalThis.__nativeDocumentHarness.reset());
+  await page.evaluate(() => { globalThis.__nativeDocumentHoldReply = true; });
   await page.getByRole("button", { name: "선택 획 변환", exact: true }).click();
+  await page.waitForFunction(() => globalThis.__nativeDocumentWorkers.heldDocumentReplies === 1, undefined, { timeout: 45_000 });
   await page.getByRole("button", { name: "변환 취소", exact: true }).click();
+  await page.evaluate(() => { globalThis.__nativeDocumentHoldReply = false; });
   assert.equal(await page.evaluate(() => globalThis.__nativeDocumentHarness.state().length), 1);
   assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.active), 0);
   await page.screenshot({ path: fileURLToPath(new URL("native-document-inspector.png", output)) });
@@ -154,7 +165,7 @@ try {
   assert.equal(workers.peak, 1); assert.equal(workers.active, 0); assert.deepEqual(csp, []); assert.deepEqual(errors, []);
   const report = { scope: "real inspector + Dedicated Workers + production transaction planner/codec/SVG; isolated history host, not complete Studio UI or physical stylus certification",
     browser: browser.version(), workerArtifact: workerUrl ?? "Vite development Worker", engines, cancelledPreservesOriginal: true,
-    staleHistoryRejected: true, workers, cspViolations: csp, pageErrors: errors };
+    staleHistoryRejected: true, cancellationFault: "real completed Worker reply deliberately held before client delivery", workers, cspViolations: csp, pageErrors: errors };
   await writeFile(new URL(built ? "native-brush-document-built.json" : "native-brush-document-browser.json", output), JSON.stringify(report, null, 2) + "\n");
   console.log(JSON.stringify(report, null, 2));
 } finally { await browser?.close(); await server.close(); }
