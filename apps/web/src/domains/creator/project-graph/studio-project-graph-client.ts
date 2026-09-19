@@ -93,8 +93,10 @@ export async function getStudioProject(
 
 export async function getStudioProjectByWork(
   workId: string,
+  signal?: AbortSignal,
 ): Promise<StudioProjectRecord> {
-  const body = await api.get<unknown>(`${BASE}/works/${resourceId(workId)}/project`);
+  const path = `${BASE}/works/${resourceId(workId)}/project`;
+  const body = signal ? await api.get<unknown>(path, { signal }) : await api.get<unknown>(path);
   return studioProjectRecordSchema.parse(body);
 }
 
@@ -134,10 +136,10 @@ export async function registerStudioBlob(
 
 export async function listStudioArtifactRevisions(
   artifactId: string,
+  signal?: AbortSignal,
 ): Promise<readonly StudioRevisionRecord[]> {
-  const body = await api.get<unknown>(
-    `${BASE}/artifacts/${resourceId(artifactId)}/revisions`,
-  );
+  const path = `${BASE}/artifacts/${resourceId(artifactId)}/revisions`;
+  const body = signal ? await api.get<unknown>(path, { signal }) : await api.get<unknown>(path);
   return Object.freeze(z.array(studioRevisionRecordSchema).parse(body));
 }
 
