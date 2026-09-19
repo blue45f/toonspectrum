@@ -220,3 +220,38 @@ describe("Virtual Studio social activity ownership", () => {
     expect(within(picker as HTMLElement).getAllByRole("button").map((button) => button.textContent)).toEqual(["Bob", "Cleo"]);
   });
 });
+
+
+describe("Virtual Studio atmosphere preference storage", () => {
+  const key = "toonspectrum:virtual-atmosphere:v1";
+
+  it.each([["focus", "집중"], ["balanced", "일상"], ["lively", "활기"]] as const)(
+    "persists and reloads only the %s presentation preference", async (mode, label) => {
+      const writes = vi.spyOn(Storage.prototype, "setItem");
+      const mounted = await mount();
+      fireEvent.click(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: label }));
+      expect(writes.mock.calls.filter(([writtenKey]) => writtenKey === key)).toEqual([[key, mode]]);
+      mounted.unmount();
+      await mount();
+      expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: label }).getAttribute("aria-pressed")).toBe("true");
+    },
+  );
+
+  it("falls back to balanced without interpreting stored JSON as document or consent state", async () => {
+    localStorage.setItem(key, JSON.stringify({ mode: "focus", document: { secret: "not-a-preference" } }));
+    const writes = vi.spyOn(Storage.prototype, "setItem");
+    await mount();
+    expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "일상" }).getAttribute("aria-pressed")).toBe("true");
+    expect(writes.mock.calls.filter(([writtenKey]) => writtenKey === key)).toEqual([]);
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("applies focus for the session when persistence is blocked", async () => {
+    await mount();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("quota", "QuotaExceededError"); });
+    fireEvent.click(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "집중" }));
+    expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "집중" }).getAttribute("aria-pressed")).toBe("true");
+    expect(f.socialOptions?.enabled).toBe(false);
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+});
