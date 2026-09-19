@@ -80,10 +80,16 @@ if (mode === "production") {
   if (approval !== "cloudflare-static-production") {
     fail("production deploy requires TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production");
   }
+  const approvedSha = process.env.TOONSPECTRUM_APPROVED_MAIN_SHA;
+  if (approvedSha?.length !== 40 || !/^[0-9a-f]{40}$/u.test(approvedSha)) {
+    fail("production deploy requires TOONSPECTRUM_APPROVED_MAIN_SHA as a lowercase 40-hex SHA");
+  }
   const branch = execFileSync("git", ["branch", "--show-current"], { encoding: "utf8" }).trim();
   if (branch !== "main") fail(`production deploy requires main (current: ${branch || "detached"})`);
   const status = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim();
   if (status !== "") fail("production deploy requires a clean worktree");
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  if (head !== approvedSha) fail("production deploy requires HEAD to equal TOONSPECTRUM_APPROVED_MAIN_SHA");
 }
 
 const staticCatalogSource = process.env.VITE_CATALOG_SOURCE?.trim() || "static";
