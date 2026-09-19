@@ -119,6 +119,11 @@ export function buildStudioScene3dProfessionalPlan(input: {
   });
 
   const blockers = assets.flatMap(({ blockers }) => blockers);
+  for (const asset of assets) {
+    if (asset.status === "review") {
+      blockers.push(`자산 ${asset.label}은 production 승격 전 품질·성능 검토가 필요합니다.`);
+    }
+  }
   if (characters.blockedCount > 0) {
     blockers.push(...characters.entries.flatMap(({ warnings }) => warnings));
   }
