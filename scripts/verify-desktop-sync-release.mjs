@@ -100,9 +100,21 @@ async function discoverBundleRoot(releaseDir) {
   return join(stage, directories[0].name);
 }
 
-function expectedNativePackage(platform, arch) {
+export function expectedNativePackage(platform, arch, libc = "gnu") {
+  if (!["darwin", "windows", "linux", "freebsd"].includes(platform)
+    || !["x64", "arm64", "ia32", "arm", "riscv64"].includes(arch)) {
+    throw new TypeError("unsupported release native platform or architecture");
+  }
   const platformPart = platform === "windows" ? "win32" : platform;
-  return `keyring-${platformPart}-${arch}`;
+  const suffix = platform === "windows" ? "-msvc"
+    : platform === "linux" ? `-${arch === "arm" && libc === "gnu" ? "gnueabihf" : libc}` : "";
+  const allowed = platform === "darwin" ? ["x64", "arm64"]
+    : platform === "windows" ? ["x64", "arm64", "ia32"]
+      : platform === "freebsd" ? ["x64"] : ["x64", "arm64", "arm", "riscv64"];
+  if (!allowed.includes(arch) || platform === "linux" && (
+    !["gnu", "musl"].includes(libc) || libc === "musl" && !["x64", "arm64"].includes(arch)
+  )) throw new TypeError("unsupported release native platform or libc");
+  return `keyring-${platformPart}-${arch}${suffix}`;
 }
 
 function runTar(args, options = {}) {
@@ -189,7 +201,7 @@ async function verifySbom(bundleRoot, manifest) {
   ) throw new Error("CycloneDX SBOM is incomplete");
   const names = new Set(sbom.components.map((component) => component?.name));
   if (!names.has("@napi-rs/keyring")) throw new Error("SBOM omits the credential vault library");
-  const nativeName = `@napi-rs/${expectedNativePackage(manifest.platform, manifest.arch)}`;
+  const nativeName = `@napi-rs/${expectedNativePackage(manifest.platform, manifest.arch, manifest.libc)}`;
   if (!names.has(nativeName)) throw new Error(`SBOM omits ${nativeName}`);
 }
 

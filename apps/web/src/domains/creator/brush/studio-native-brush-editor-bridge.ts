@@ -1,5 +1,3 @@
-import { prepareStudioNativeBrushDocumentCommit } from "./studio-native-brush-document-commit";
-
 import type { El } from "../studio-element-model";
 import type { LayerGroup } from "../studio-layers";
 import type { StudioNativeBrushDocumentPrepare } from "./studio-native-brush-document-commit";
@@ -32,9 +30,10 @@ interface EditorPorts<Ticket> {
 
 /** Extract host orchestration without caching mutable page state or capturing the ticket early. */
 export function createNativeBrushDocumentEditorPreparer<Ticket>(ports: EditorPorts<Ticket>): StudioNativeBrushDocumentPrepare {
-  return (target) => {
+  return (target, prepare) => {
+    if (typeof prepare !== "function") return null;
     const ticket = ports.captureStudioMutationTicket();
-    return prepareStudioNativeBrushDocumentCommit(target, {
+    return prepare(target, {
       canMutate: () => ports.canApplyStudioMutation(ticket)
         && ports.editorMountedRef.current && !ports.documentSaveInFlightRef.current
         && !ports.collaborationAccessRef.current.locked && !ports.activeSurfaceReviewLockedRef.current

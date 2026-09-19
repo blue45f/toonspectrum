@@ -1,3 +1,4 @@
+import type { Scene3dInplaceToolsBridge } from "../scene3d/integration/scene3d-inplace-contract";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
@@ -193,6 +194,7 @@ interface StudioBg3dViewPanelContext {
 }
 
 export interface StudioBg3dViewPanelProps {
+  readonly inplaceTools?: Scene3dInplaceToolsBridge;
   readonly hidden: boolean;
   readonly context: StudioBg3dViewPanelContext;
   readonly enginePlan: StudioBg3dEngineSelectionPlan;

@@ -6,6 +6,25 @@ const point = z.tuple([
   z.number().finite().min(-10000).max(10000),
 ]);
 export const specialistOptionsSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("textures"),
+      textureMode: z.enum(["uastc", "etc1s"]).default("uastc"),
+      maxTextureSize: z
+        .union([z.literal(512), z.literal(1024), z.literal(2048)])
+        .default(2048),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("release"),
+      textureMode: z.enum(["uastc", "etc1s"]).default("uastc"),
+      maxTextureSize: z
+        .union([z.literal(512), z.literal(1024), z.literal(2048)])
+        .default(2048),
+      error: z.number().min(0.00001).max(0.1).default(0.01),
+    })
+    .strict(),
   z.object({ kind: z.literal("inspect") }).strict(),
   z
     .object({

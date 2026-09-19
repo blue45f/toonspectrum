@@ -355,3 +355,11 @@ describe("optional normal capture contract", () => {
       .rejects.toThrow(/unrequested surface normals/);
   });
 });
+
+
+it("rejects oversized normal capture before invoking any renderer allocation", async () => {
+  const capture = vi.fn();
+  const source = { ...adapter(capture), normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1 } as const;
+  await expect(captureStudioBg3dRaster(source, { ...REQUEST, width: 4096, height: 2048, includeDepth: true, includeNormals: true })).rejects.toThrow(/budget/);
+  expect(capture).not.toHaveBeenCalled();
+});

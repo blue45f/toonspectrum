@@ -208,9 +208,10 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
     expect(html).toContain('aria-controls="_R_0_-custom-list"');
     expect(html).toContain('role="search"');
     expect(html).toContain("작업공간 이름 또는 용도 검색");
-    // Fifteen built-ins (the twelve V5 catalogue profiles plus three pipeline presets) and the
-    // two saved above.
-    expect(html).toContain("검색 결과 17개");
+    // Sixteen built-ins, including the dedicated Slides layout, plus the two saved above.
+    expect(html).toContain("검색 결과 18개");
+    expect(html).toContain('data-workspace-id="slides-deck"');
+    expect(html).toContain('aria-label="발표 자료, 작업공간으로 전환"');
   });
 
   it("separates quick switching from the workspace management and preferences views", () => {

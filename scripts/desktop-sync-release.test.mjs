@@ -7,11 +7,13 @@ import os from "node:os";
 import { join, win32 } from "node:path";
 
 import {
+  findNodeLicense,
   packageDesktopSyncRelease,
   resolveReleaseCommand,
 } from "./package-desktop-sync-release.mjs";
 import { signDesktopSyncReleaseStage } from "./sign-desktop-sync-release.mjs";
 import {
+  expectedNativePackage,
   resolveArchiveListingInvocation,
   verifyDesktopSyncRelease,
 } from "./verify-desktop-sync-release.mjs";
@@ -75,6 +77,43 @@ test("lists Windows archives from their directory without a drive-letter argumen
       cwd: "D:\\a\\toonspectrum\\release",
     },
   );
+});
+
+test("resolves exact published native package names for every supported release target", () => {
+  for (const [platform, arch, libc, expected] of [
+    ["darwin", "arm64", undefined, "keyring-darwin-arm64"],
+    ["darwin", "x64", undefined, "keyring-darwin-x64"],
+    ["windows", "x64", undefined, "keyring-win32-x64-msvc"],
+    ["windows", "arm64", undefined, "keyring-win32-arm64-msvc"],
+    ["windows", "ia32", undefined, "keyring-win32-ia32-msvc"],
+    ["linux", "x64", "gnu", "keyring-linux-x64-gnu"],
+    ["linux", "arm64", "gnu", "keyring-linux-arm64-gnu"],
+    ["linux", "x64", "musl", "keyring-linux-x64-musl"],
+    ["linux", "arm64", "musl", "keyring-linux-arm64-musl"],
+    ["linux", "arm", "gnu", "keyring-linux-arm-gnueabihf"],
+    ["linux", "riscv64", "gnu", "keyring-linux-riscv64-gnu"],
+    ["freebsd", "x64", undefined, "keyring-freebsd-x64"],
+  ]) assert.equal(expectedNativePackage(platform, arch, libc), expected);
+  for (const args of [["linux", "x64", "unknown"], ["linux", "arm", "musl"],
+    ["windows", "riscv64"], ["darwin", "ia32"], ["unknown", "x64"]]) {
+    assert.throws(() => expectedNativePackage(...args), /unsupported/u);
+  }
+});
+
+test("finds the real Node license next to a Windows executable without fetching substitutes", async () => {
+  const exe = String.raw`C:\hostedtoolcache\windows\node\24.16.0\x64\node.exe`;
+  const license = win32.join(win32.dirname(exe), "LICENSE");
+  const checked = [];
+  const actual = await findNodeLicense(exe, { pathApi: win32, statFile: async (path) => {
+    checked.push(path);
+    if (path === license) return { isFile: () => true };
+    throw new Error("ENOENT");
+  } });
+  assert.equal(actual, license);
+  assert.deepEqual(checked, [license]);
+  await assert.rejects(findNodeLicense(exe, {
+    pathApi: win32, statFile: async () => ({ isFile: () => false }),
+  }), /Node license was not found/u);
 });
 
 test("packages a reproducible, self-contained desktop sync release", {

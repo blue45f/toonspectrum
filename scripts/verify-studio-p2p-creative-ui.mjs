@@ -4,6 +4,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { chromium, webkit } from "playwright";
 import { createServer } from "vite";
+import { collectStudioP2pFailureDiagnostics } from "./lib/studio-p2p-failure-diagnostics.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const fixture = "/tools/browser-harnesses/studio-p2p-creative-fixture.tsx";
@@ -145,31 +146,13 @@ try {
       assert.equal(row.errors.length, 0, row.errors.join("\n")); row.result = "PASS";
     } catch (error) {
       row.result = "FAIL"; row.failure = String(error?.stack ?? error);
-      row.capture = await Promise.all(pages.map((page) => page.evaluate(() => ({
-        calls: window.qaCaptureCalls ?? 0,
-        tracks: (window.qaTracks ?? []).map((track) => ({
-          kind: track.kind,
-          readyState: track.readyState,
-        })),
-        getUserMedia: String(navigator.mediaDevices?.getUserMedia).slice(0, 80),
-      })).catch(() => ({ calls: -1, tracks: [], getUserMedia: "" }))));
-      row.rtc = await Promise.all(pages.map((page) => page.evaluate(() =>
-        (window.qaConnections ?? []).map((pc) => ({
-          connectionState: pc.connectionState,
-          iceConnectionState: pc.iceConnectionState,
-          signalingState: pc.signalingState,
-          senders: pc.getSenders().map((sender) => ({
-            kind: sender.track?.kind ?? null,
-            readyState: sender.track?.readyState ?? null,
-          })),
-          receivers: pc.getReceivers().map((receiver) => ({
-            kind: receiver.track?.kind ?? null,
-            readyState: receiver.track?.readyState ?? null,
-          })),
-        }))
-      ).catch(() => [])));
+      const diagnostics = await Promise.all(pages.map((page) => page.evaluate(collectStudioP2pFailureDiagnostics)
+        .catch(() => ({ capture: { calls: -1, tracks: [], getUserMedia: "" }, directPackets: [], rtc: [] }))));
+      row.capture = diagnostics.map((entry) => entry.capture);
+      row.directPackets = diagnostics.map((entry) => entry.directPackets);
+      row.rtc = diagnostics.map((entry) => entry.rtc);
       for (let i = 0; i < pages.length; i++) {
-        row[`body${i}`] = (await pages[i].locator("body").innerText().catch(() => "")).slice(-6000);
+        // Keep rendered QA evidence private; do not copy chat/activity body text into result JSON.
         await pages[i].screenshot({ path: `${out}/${profile.name}-failure-${i}.png` }).catch(() => undefined);
       }
     } finally {

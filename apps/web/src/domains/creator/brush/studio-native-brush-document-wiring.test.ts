@@ -9,7 +9,7 @@ describe("native document product wiring", () => {
     const host = source("../StudioCuttoonEditorHost.tsx");
     expect(host).toContain("prepareNativeBrushDocumentConversion: createNativeBrushDocumentEditorPreparer({");
     const bridge = source("./studio-native-brush-editor-bridge.ts");
-    expect(bridge.indexOf("ports.captureStudioMutationTicket()")).toBeGreaterThan(bridge.indexOf("return (target) =>"));
+    expect(bridge.indexOf("ports.captureStudioMutationTicket()")).toBeGreaterThan(bridge.indexOf("return (target, prepare) =>"));
     for (const token of ["captureStudioMutationTicket()", "canApplyStudioMutation(ticket)", "pagesHistoryRef.current",
       "pagesHiRef.current", "currentPageIdRef.current", "documentSaveInFlightRef.current",
       "collaborationAccessRef.current.locked", "activeSurfaceReviewLockedRef.current", "pendingStrokeCommitsRef.current", "ports.commit(elements)"]) {

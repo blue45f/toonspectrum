@@ -22,6 +22,7 @@ import { chromium, type Browser, type CDPSession, type Locator, type Page } from
 
 import { STUDIO_ERASER_BRUSH_CATALOG_ITEMS, STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS, type StudioBrushCatalogItem } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 
+import { createStudioSoakCheckpoint } from "./lib/studio-five-hour-soak-checkpoint.mjs";
 import { collectStudioInAppRuntimeErrors, installStudioInAppFirstRunState, installStudioInAppGuestBoundary, STUDIO_INAPP_PROFILES, type StudioInAppRuntimeError } from "./lib/studio-inapp-sweep-harness.mjs";
 import { evaluateStudioSoakHeapGrowth, STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR } from "./lib/studio-memory-growth-policy.mjs";
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
@@ -550,15 +551,13 @@ try {
           }
         }
       }
-      report.checkpoints.push({
+      report.checkpoints.push(createStudioSoakCheckpoint({
         atMs: nowMs(startedAt),
         cycle,
-        heapBytes: heap?.usedBytes ?? null,
-        heapSlopeBytesPerHour: null,
-        domNodes: null,
-        eventListeners: null,
+        heap,
+        heapSamples: report.heapSamples,
         failures: report.failures.length,
-      });
+      }));
       await page.screenshot({ path: join(OUT, `checkpoint-${Math.round(nowMs(startedAt) / 60000)}m.png`) }).catch(() => undefined);
       writeReport();
       nextCheckpoint += CHECKPOINT_MS;

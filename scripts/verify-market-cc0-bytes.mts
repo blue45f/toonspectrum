@@ -7,6 +7,8 @@ import path from "node:path";
 import { validateStudioBg3dGlb, DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES } from "../apps/web/src/domains/creator/bg3d/studio-bg3d-glb-validation";
 import { STUDIO_MARKETPLACE_CC0_ASSETS } from "../apps/web/src/domains/creator/studio-marketplace-cc0-catalog.generated";
 
+import { summarizeVerifiedGlbAdmission } from "./lib/verified-glb-admission-report";
+
 const { validateBytes } = createRequire(import.meta.url)("gltf-validator") as {
   validateBytes(bytes: Uint8Array, options: { uri: string; maxIssues: number }): Promise<{ issues: { numErrors: number; [key: string]: unknown } }>;
 };
@@ -32,7 +34,7 @@ for (const asset of STUDIO_MARKETPLACE_CC0_ASSETS) {
   assert(admission.ok, `${asset.id}: production mobile admission rejected`);
   const validation = await validateBytes(new Uint8Array(bytes), { uri: asset.path, maxIssues: 100 });
   assert.equal(validation.issues.numErrors, 0, `${asset.id}: invalid GLB`);
-  results.push({ id: asset.id, sha256: asset.sha256, admission, issues: validation.issues });
+  results.push({ id: asset.id, sha256: asset.sha256, admission: summarizeVerifiedGlbAdmission(admission), issues: validation.issues });
 }
 await mkdir("artifacts/market-cc0", { recursive: true });
 await writeFile("artifacts/market-cc0/verified-files.json", JSON.stringify({ checked: results.length, results }, null, 2));

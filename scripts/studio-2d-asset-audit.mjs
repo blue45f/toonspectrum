@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 export const STUDIO_2D_MANIFEST_PATH = "apps/web/src/domains/creator/studio-2d-asset-manifest.json";
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const SOURCE_PREFIX = "/assets/studio/backgrounds/";
-const WEB_PUBLIC = path.join(ROOT, "apps", "web", "public");
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
 export function readPngDimensions(bytes) {
@@ -72,6 +71,7 @@ export function studio2dAssetRecommendationError(asset, dimensions) {
 
 export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
   root ??= ROOT;
+  const webPublic = path.join(root, "apps", "web", "public");
   const manifest = input ?? JSON.parse(readFileSync(path.join(root, STUDIO_2D_MANIFEST_PATH), "utf8"));
   const errors = [];
   const ids = new Set();
@@ -93,8 +93,8 @@ export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
         || !/^[a-z0-9_]+\.(?:png|jpg)$/u.test(asset.src.slice(SOURCE_PREFIX.length))) throw new Error("Unsafe asset path");
       if (sources.has(asset.src)) throw new Error("Duplicate source file");
       sources.add(asset.src);
-      const filePath = path.join(WEB_PUBLIC, asset.src);
-      const allowedRoot = realpathSync(path.join(WEB_PUBLIC, "assets/studio/backgrounds")) + path.sep;
+      const filePath = path.join(webPublic, asset.src);
+      const allowedRoot = realpathSync(path.join(webPublic, "assets/studio/backgrounds")) + path.sep;
       if (lstatSync(filePath).isSymbolicLink() || !realpathSync(filePath).startsWith(allowedRoot)) throw new Error("Symlink source is not allowed");
       const bytes = readFileSync(filePath);
       if (bytes.length > 20 * 1024 * 1024) throw new Error("Source exceeds 20 MiB");
@@ -109,7 +109,7 @@ export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
       hashes.add(hash);
       if (asset.legacySrc !== null) {
         if (asset.legacySrc !== asset.src.replace(/\.jpg$/u, ".png")) throw new Error("Unsafe legacy alias");
-        const alias = path.join(WEB_PUBLIC, asset.legacySrc);
+        const alias = path.join(webPublic, asset.legacySrc);
         if (lstatSync(alias).isSymbolicLink() || !realpathSync(alias).startsWith(allowedRoot)) throw new Error("Unsafe legacy alias");
         if (createHash("sha256").update(readFileSync(alias)).digest("hex") !== hash) throw new Error("Legacy compatibility bytes changed");
         sources.add(asset.legacySrc);
@@ -135,7 +135,7 @@ export function auditStudio2dAssets(root, input) { // NOSONAR javascript:S3776
       errors.push(`${id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  const directory = path.join(WEB_PUBLIC, "assets/studio/backgrounds");
+  const directory = path.join(webPublic, "assets/studio/backgrounds");
   for (const name of readdirSync(directory)) {
     if (/\.(?:png|jpg)$/u.test(name) && !sources.has(SOURCE_PREFIX + name)) errors.push(`Unreviewed original: ${name}`);
   }

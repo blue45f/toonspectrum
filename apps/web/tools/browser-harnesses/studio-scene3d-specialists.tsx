@@ -1,10 +1,16 @@
+
+
 import "../../src/styles/globals.css";
 import { createRoot } from "react-dom/client";
 
 import { runScene3dSpecialistInWorker } from "../../src/domains/creator/scene3d/specialists/specialist-client";
 import { createSpecialistFixture } from "../../src/domains/creator/scene3d/specialists/specialist-fixtures";
+import { inspectSpecialistGlbImages } from "../../src/domains/creator/scene3d/specialists/specialist-image-budget";
+import { createTexturedSpecialistFixture } from "../../src/domains/creator/scene3d/specialists/specialist-texture-fixtures";
 import { StudioScene3dAssetToolsPanel } from "../../src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel";
 import { StudioScene3dSplatReferencePanel } from "../../src/domains/creator/scene3d/specialists/StudioScene3dSplatReferencePanel";
+
+import { verifySpecialistTexturePixels } from "./studio-scene3d-texture-proof";
 
 import type { SpecialistOptions } from "../../src/domains/creator/scene3d/specialists/specialist-contract";
 
@@ -13,6 +19,7 @@ declare global {
     __scene3dSpecialistProof?: unknown;
     __scene3dSpecialistFixture?: number[];
     __scene3dSplatFixture?: number[];
+    __scene3dTexturedFixture?: number[];
   }
 }
 const assert = (condition: unknown, message: string) => {
@@ -39,11 +46,15 @@ async function verify() {
   const second = await createSpecialistFixture("offset-cube");
   const animated = await createSpecialistFixture("animated");
   const rig = await createSpecialistFixture("rig");
+  const textured = await createTexturedSpecialistFixture(true);
   const jobs: {
     source: Uint8Array<ArrayBuffer>;
     secondary?: Uint8Array<ArrayBuffer>;
     options: SpecialistOptions;
   }[] = [
+    { source: textured, options: { kind: "textures", textureMode: "uastc", maxTextureSize: 512 } },
+    { source: textured, options: { kind: "textures", textureMode: "etc1s", maxTextureSize: 512 } },
+    { source: textured, options: { kind: "release", textureMode: "uastc", maxTextureSize: 512, error: 0.03 } },
     { source: rig, options: { kind: "inspect" } },
     {
       source: rig,
@@ -120,7 +131,15 @@ async function verify() {
           .length >= 2,
         "No actual path.",
       );
+    let texturePixels: Record<string, unknown> | undefined;
+    if (job.options.kind === "textures" || job.options.kind === "release") {
+      for (const artifact of result.artifacts.filter(({mime}) => mime === "model/gltf-binary")) {
+        assert(inspectSpecialistGlbImages(artifact.bytes).every(({mime}) => mime === "image/ktx2"), "Texture release contains an unconverted image.");
+      }
+      texturePixels = await verifySpecialistTexturePixels(job.source, result.artifacts[0]!.bytes);
+    }
     outcomes.push({
+      ...(texturePixels ? { texturePixels } : {}),
       options: job.options,
       sourceByteLength: job.source.length,
       ...(job.options.kind === "ik"
@@ -182,6 +201,7 @@ async function verify() {
   }
   window.__scene3dSplatFixture = Array.from(splats);
   window.__scene3dSpecialistFixture = Array.from(sphere);
+  window.__scene3dTexturedFixture = Array.from(textured);
   if (bundle)
     assert(
       bundleRequests === jobs.length,

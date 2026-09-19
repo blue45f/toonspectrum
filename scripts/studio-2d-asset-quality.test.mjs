@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,7 +26,7 @@ test("every declared original matches its bytes, dimensions, format and reviewed
   assert.equal(result.recommended, 5);
 });
 
-test("JPEG originals use .jpg while all 5 legacy .png aliases preserve identical bytes", () => {
+test("JPEG originals use .jpg while all retained legacy .png aliases preserve identical bytes", () => {
   const aliases = original.assets.filter((asset) => asset.legacySrc);
   assert.equal(aliases.length, 5);
   for (const asset of aliases) {
@@ -55,7 +57,24 @@ test("extension-based PNG claims cannot disguise JPEG payloads", () => {
   assert.match(modified((manifest) => { manifest.assets[0].mediaType = "image/png"; }).errors.join(), /signature/u);
 });
 
-test("small originals cannot be promoted into recommendations", () => {
+test("small originals cannot be promoted into recommendations even when the main catalog contains only large originals", () => {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), "studio-small-original-"));
+  try {
+    const directory = path.join(fixtureRoot, "apps/web/public/assets/studio/backgrounds"); mkdirSync(directory, { recursive: true });
+    const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+afoQAAAAASUVORK5CYII=", "base64");
+    writeFileSync(path.join(directory,"small.png"), bytes);
+    const item = { ...structuredClone(original.assets[0]), id: "small-fixture", src: "/assets/studio/backgrounds/small.png", legacySrc: null,
+      mediaType: "image/png", width: 1, height: 1, bytes: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"), recommended: true,
+      review: { status: "usable", method: "full-image", notes: [] } };
+    const result = auditStudio2dAssets(fixtureRoot, { version: 1, assets: [item] });
+    assert.match(result.errors.join(), /Recommendation/u);
+    assert.doesNotMatch(result.errors.join(), /ENOENT|SHA-256|dimensions/u);
+    item.recommended = false;
+    assert.equal(auditStudio2dAssets(fixtureRoot, { version: 1, assets: [item] }).ok, true);
+  } finally { rmSync(fixtureRoot, { recursive: true, force: true }); }
+});
+
+test("recommendation predicate rejects small originals and admits reviewed large ones", () => {
   assert.match(studio2dAssetRecommendationError({
     recommended: true,
     review: { status: "usable", method: "full-image" },

@@ -71,6 +71,7 @@ export function StudioBg3dViewPanel(props: StudioBg3dViewPanelProps) {
     productionShots: context.savedShots,
     sceneSummary,
     professionalReadiness: props.professionalReadiness,
+    inplaceTools: props.inplaceTools,
     onSetLineArtPreview: context.setLineArtPreview,
     onSetTransparentBackground: context.updateBackgroundTransparency,
     productionBatch: {
