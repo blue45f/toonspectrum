@@ -315,7 +315,8 @@ export function writeStudioMaterialBrushSvg(
   let serializedUtf16Bytes = 0;
   const statistics = visitStudioMaterialBrushBatches(element, (marks) => {
     for (const batch of materialSymmetryBatches(marks, element.symmetry)) {
-      const chunk = brushStudioV6MaterialMarksToSvg(batch);
+      const chunk = brushStudioV6MaterialMarksToSvg(batch,
+        element.brushEnginePrograms?.material?.version === 2 ? "canvas-paths" : "legacy-primitives");
       serializedUtf16Bytes += chunk.length * 2;
       if (serializedUtf16Bytes > byteBudget) throw new StudioMaterialBrushSvgBudgetError(byteBudget);
       write(chunk);

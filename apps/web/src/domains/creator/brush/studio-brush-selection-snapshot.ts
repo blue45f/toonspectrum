@@ -1,18 +1,16 @@
 import { BRUSH_PRESETS } from "../studio-brush";
 import { defaultStampTuningForBrushId } from "../studio-page-editor-runtime-contracts";
 import { normalizeStudioBrushDynamicsSettings, studioBrushDynamicsSettingsForBrushId } from "./studio-brush-dynamics";
-import { normalizeStudioBrushEngineProgramSet, type StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
+import { normalizeStudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 import type { StudioBrushSnapshot } from "./studio-brush-library";
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
 import type { StudioBrushSlot } from "./studio-brush-slots";
 
-/** A new catalogue identity releases the previous material while retaining legacy switches. */
-function withoutMaterial(programs: StudioBrushEngineProgramSet | null | undefined) {
-  if (!programs?.material) return programs ?? null;
-  if (!programs.oil && !programs.watercolor && !programs.composition) return null;
-  return normalizeStudioBrushEngineProgramSet({ ...programs, material: undefined });
-}
-
+/**
+ * A selected catalogue item owns its engine overrides. Missing overrides mean that item's
+ * id-derived baseline, never the preceding brush's oil/watercolor/composition state.
+ * Existing saved brushes and committed strokes retain their explicit receipts unchanged.
+ */
 export function studioBrushCatalogSelectionSnapshot(
   current: StudioBrushSnapshot,
   selection: StudioBrushCatalogSelection,
@@ -26,9 +24,7 @@ export function studioBrushCatalogSelectionSnapshot(
     sourcePresetName: extendedSource ? selection.catalogName : undefined,
     stampTuning: defaultStampTuningForBrushId(applied.brushId),
     brushDynamics: normalizeStudioBrushDynamicsSettings(selection.brushDynamics),
-    enginePrograms: selection.enginePrograms === undefined
-      ? withoutMaterial(current.enginePrograms)
-      : normalizeStudioBrushEngineProgramSet(selection.enginePrograms),
+    enginePrograms: normalizeStudioBrushEngineProgramSet(selection.enginePrograms),
   };
 }
 
@@ -48,8 +44,6 @@ export function studioBrushSlotSelectionSnapshot(
     brushDynamics: normalizeStudioBrushDynamicsSettings(
       slot.brushDynamics ?? (preset ? studioBrushDynamicsSettingsForBrushId(preset.id) : undefined),
     ),
-    enginePrograms: slot.enginePrograms === undefined
-      ? withoutMaterial(current.enginePrograms)
-      : slot.enginePrograms,
+    enginePrograms: slot.enginePrograms ?? null,
   };
 }

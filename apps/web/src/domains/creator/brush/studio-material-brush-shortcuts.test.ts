@@ -45,15 +45,15 @@ describe("material brush numeric shortcuts", () => {
     expect(active.setStrokeWidth).not.toHaveBeenCalled();
   });
 
-  it("keeps built-in bracket bounds at 80 and material Alt-bracket opacity at 1%", () => {
+  it("keeps built-in bracket bounds at 80 and material Alt-bracket opacity at zero", () => {
     const builtin = shortcuts(79, null);
     builtin.handle(new KeyboardEvent("keydown", { key: "}", code: "BracketRight", shiftKey: true }));
     expect(builtin.current.strokeWidth).toBe(80);
     const material = shortcuts(150, materialPrograms(), 0.02);
     material.handle(new KeyboardEvent("keydown", { key: "[", code: "BracketLeft", altKey: true }));
-    expect(material.setBrushOpacity).toHaveBeenLastCalledWith(0.01);
+    expect(material.setBrushOpacity).toHaveBeenLastCalledWith(0);
     material.handle(new KeyboardEvent("keydown", { key: "]", code: "BracketRight", altKey: true }));
-    expect(material.setBrushOpacity).toHaveBeenLastCalledWith(0.06);
+    expect(material.setBrushOpacity).toHaveBeenLastCalledWith(0.05);
     const builtinOpacity = shortcuts(24, null, 0.07);
     builtinOpacity.handle(new KeyboardEvent("keydown", { key: "[", code: "BracketLeft", altKey: true }));
     expect(builtinOpacity.setBrushOpacity).toHaveBeenLastCalledWith(0.05);

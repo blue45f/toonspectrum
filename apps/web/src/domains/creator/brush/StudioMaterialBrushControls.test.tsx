@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createBrushStudioV6MaterialReceipt } from "../brush-lab/brush-studio-v6-material-receipt";
 import { createBrushStudioV6Program } from "../brush-lab/brush-studio-v6-engine";
 import { createBrushStudioV6MaterialStroke, normalizeBrushStudioV6MaterialConfig } from "../brush-lab/brush-studio-v6-material-engine";
 import { StudioBrushEngineProgramControls } from "./StudioBrushEngineProgramControls";
@@ -13,6 +14,10 @@ vi.mock("react-router-dom", async (importOriginal) => ({
   ...await importOriginal<typeof import("react-router-dom")>(),
   useNavigate: () => navigate,
 }));
+
+const editorUuid = "00000000-0000-4000-8000-000000000001";
+const editorId = `material-${editorUuid}`;
+beforeEach(() => { vi.spyOn(crypto, "randomUUID").mockReturnValue(editorUuid); });
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); navigate.mockReset(); });
 
@@ -54,11 +59,11 @@ describe("material brush controls inside Studio", () => {
   });
 
   it.each([false, true])("hands the exact material to the editor before navigating, modifier=%s", (metaKey) => {
-    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("dendritic-copper"))!;
+    const material = createBrushStudioV6MaterialReceipt(createBrushStudioV6Program("dendritic-copper"));
     render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
     const action = screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" });
     expect(screen.queryByRole("link", { name: "브러시 편집기에서 비교·실험" })).toBeNull();
-    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:material-${material.seed}`)}`;
+    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
     navigate.mockImplementation(() => {
       expect(JSON.parse(localStorage.getItem(storageKey)!).tuning).toEqual(material.tuning);
     });
@@ -66,16 +71,16 @@ describe("material brush controls inside Studio", () => {
     expect(navigate).not.toHaveBeenCalled();
     expect(localStorage.getItem(storageKey)).toBeNull();
     fireEvent.click(action, { metaKey });
-    const program = JSON.parse(localStorage.getItem(`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:material-${material.seed}`)}`)!);
+    const program = JSON.parse(localStorage.getItem(`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`)!);
     expect(program.tuning).toEqual(material.tuning);
     expect(program.input).toEqual(material.input);
     expect(program.slots).toEqual(material.slots);
     expect(program.seed).toBe(material.seed);
-    expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/material-${material.seed}/edit`);
+    expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/${editorId}/edit`);
   });
 
   it("stays in Studio with an explicit error when the exact editor draft cannot be stored", () => {
-    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    const material = createBrushStudioV6MaterialReceipt(createBrushStudioV6Program("oil-hair-mixer"));
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
     render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" }));
@@ -84,7 +89,7 @@ describe("material brush controls inside Studio", () => {
   });
 
   it("transfers current main-tool size, opacity and color without mutating the material program", () => {
-    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    const material = createBrushStudioV6MaterialReceipt(createBrushStudioV6Program("oil-hair-mixer"));
     const original = structuredClone(material);
     const onChange = vi.fn();
     const programSet = { version: 1 as const, material };
@@ -93,14 +98,14 @@ describe("material brush controls inside Studio", () => {
     rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={programSet}
       currentSnapshot={{ strokeWidth: 150, brushOpacity: 0.01, color: "#34ab67" }} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" }));
-    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:material-${material.seed}`)}`;
+    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
     const draft = JSON.parse(localStorage.getItem(storageKey)!);
     expect(draft.tuning).toEqual({ ...material.tuning, size: 150, opacity: 0.01, primaryColor: "#34ab67" });
     expect(draft.slots).toEqual(material.slots);
     expect(draft.input).toEqual(material.input);
     expect(material).toEqual(original);
     expect(onChange).not.toHaveBeenCalled();
-    expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/material-${material.seed}/edit`);
+    expect(navigate).toHaveBeenCalledWith(`/studio/assets/brushes/${editorId}/edit`);
   });
   it("switches topology, edits meaningful physics and combines material/neon without losing the receipt", () => {
     const original = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
@@ -121,6 +126,30 @@ describe("material brush controls inside Studio", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "발광 마감 결합" }));
     expect(onChange.mock.lastCall![0].material.slots.finish).toEqual(["finish-neon"]);
     expect(original).toEqual(snapshot);
+  });
+
+  it("refuses an unversioned legacy material rather than enabling newer contact adapters", () => {
+    const material = normalizeBrushStudioV6MaterialConfig(createBrushStudioV6Program("oil-hair-mixer"))!;
+    render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" }));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toContain("자동 변환하지 않습니다");
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("does not overwrite another brush draft that has the same random seed", () => {
+    const material = createBrushStudioV6MaterialReceipt(createBrushStudioV6Program("oil-hair-mixer"));
+    vi.mocked(crypto.randomUUID).mockReturnValueOnce(editorUuid)
+      .mockReturnValueOnce("00000000-0000-4000-8000-000000000002");
+    render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" });
+    fireEvent.click(button);
+    const key = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
+    const first = localStorage.getItem(key);
+    fireEvent.click(button);
+    expect(navigate.mock.calls[0]![0]).not.toBe(navigate.mock.calls[1]![0]);
+    expect(localStorage.getItem(key)).toBe(first);
+    expect(localStorage.length).toBe(2);
   });
 
 });

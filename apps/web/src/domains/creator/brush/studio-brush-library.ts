@@ -62,7 +62,7 @@ export interface StudioBrushSnapshot extends StudioBrushSourcePresetMetadata {
   brushId: string;
   /** Studio stroke width. Legacy presets use 1–80px; material programs retain 1–240px. */
   strokeWidth: number;
-  /** Studio opacity. Legacy presets use 0.05–1; material programs retain 0.01–1. */
+  /** Studio opacity. Legacy presets use 0.05–1; material programs retain 0–1. */
   brushOpacity: number;
   /** 정규화된 소문자 #rrggbb. StudioPage의 `color` state에 대응. */
   color: string;
@@ -204,7 +204,7 @@ export interface BrushUpdateResult {
 export const BRUSH_STROKE_WIDTH_RANGE = [1, 80] as const;
 export const BRUSH_OPACITY_RANGE = [0.05, 1] as const;
 export const MATERIAL_BRUSH_STROKE_WIDTH_RANGE = [1, 240] as const;
-export const MATERIAL_BRUSH_OPACITY_RANGE = [0.01, 1] as const;
+export const MATERIAL_BRUSH_OPACITY_RANGE = [0, 1] as const;
 
 export function studioBrushSnapshotRanges(programs?: StudioBrushEngineProgramSet | null) {
   return {

@@ -3,6 +3,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { parseBrushStudioV6Import } from "./brush-studio-v6-experiments";
+import { serializeBrushStudioV6Authoring } from "./brush-studio-v6-authoring-document";
 import { StudioBrushV6Workbench } from "./StudioBrushV6Workbench";
 import { createBrushStudioV6Program, type BrushStudioV6Program } from "./brush-studio-v6-engine";
 
@@ -35,7 +37,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const stored = (): BrushStudioV6Program => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
+const stored = (): BrushStudioV6Program => parseBrushStudioV6Import(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
 
 describe("V6 brush experiments in the workbench", () => {
   it("starts with result-focused controls and reveals engine internals only on request", () => {
@@ -289,6 +291,56 @@ describe("V6 brush experiments in the workbench", () => {
     fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
     fireEvent.click(screen.getByRole("button", { name: "호환성·성능" }));
     expect(screen.getByRole("alert").textContent).toContain("Pigment Painter LUT");
+  });
+
+  it("preserves an unsupported execution-bound draft instead of autosaving defaults", () => {
+    const document = JSON.parse(serializeBrushStudioV6Authoring(createBrushStudioV6Program()));
+    document.materialReceipt.runtime.bindings[0].version = "unsupported-future";
+    const raw = JSON.stringify(document);
+    localStorage.setItem("toonspectrum.brush-program-v6:test", raw);
+    render(<StudioBrushV6Workbench scope="test" />);
+    expect(screen.getByRole("alert").textContent).toContain("원본을 변경하지 않고 보존");
+    expect(screen.queryByRole("button", { name: "브러시로 저장" })).toBeNull();
+    expect(localStorage.getItem("toonspectrum.brush-program-v6:test")).toBe(raw);
+    expect(preview).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("restores zero flow and its receipt after closing and reopening the editor", () => {
+    const view = render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.click(screen.getByRole("button", { name: "재료·질감" }));
+    fireEvent.change(screen.getByRole("slider", { name: /도포 유량/u }), { target: { value: "0" } });
+    const before = stored();
+    expect(before.tuning.flow).toBe(0);
+    expect(JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!).materialReceipt.tuning.flow).toBe(0);
+    view.unmount();
+    render(<StudioBrushV6Workbench scope="test" />);
+    expect(stored()).toEqual(before);
+  });
+
+  it("ignores an imported file that resolves after a newer user edit", async () => {
+    let resolveText!: (text: string) => void;
+    const view = render(<StudioBrushV6Workbench scope="test" />);
+    const file = { name: "old.brush.json", size: 123,
+      text: () => new Promise<string>((resolve) => { resolveText = resolve; }) };
+    const input = view.container.querySelector('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.change(screen.getByRole("textbox", { name: "브러시 이름" }), { target: { value: "새 작업 유지" } });
+    await act(async () => { resolveText(serializeBrushStudioV6Authoring(createBrushStudioV6Program("mineral-bloom"))); });
+    expect(stored().name).toBe("새 작업 유지");
+    expect(stored().id).toBe("clean-ink");
+  });
+
+  it("does not overwrite the new scope when an old file load completes", async () => {
+    let resolveText!: (text: string) => void;
+    const view = render(<StudioBrushV6Workbench scope="test" />);
+    fireEvent.change(view.container.querySelector('input[type="file"]')!, { target: { files: [{
+      name: "old.brush.json", size: 123, text: () => new Promise<string>((resolve) => { resolveText = resolve; }),
+    }] } });
+    view.rerender(<StudioBrushV6Workbench scope="another" />);
+    const before = localStorage.getItem("toonspectrum.brush-program-v6:another");
+    await act(async () => { resolveText(serializeBrushStudioV6Authoring(createBrushStudioV6Program("mineral-bloom"))); });
+    expect(localStorage.getItem("toonspectrum.brush-program-v6:another")).toBe(before);
   });
 
 });

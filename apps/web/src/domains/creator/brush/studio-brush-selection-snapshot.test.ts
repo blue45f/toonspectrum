@@ -24,7 +24,7 @@ describe("material brush selection transitions", () => {
     });
     expect(next.brushId).toBe(id);
     expect(next.enginePrograms?.material).toBeUndefined();
-    expect(next.enginePrograms?.oil).toEqual(oil);
+    expect(next.enginePrograms).toBeNull();
     expect(studioMaterialBrushConfig({
       points: [0, 0, 20, 20], stroke: next.color, strokeWidth: next.strokeWidth,
       brushEnginePrograms: next.enginePrograms ?? undefined,
