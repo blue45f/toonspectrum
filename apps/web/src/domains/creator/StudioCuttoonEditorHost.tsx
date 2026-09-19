@@ -27206,25 +27206,12 @@ function clearSelectionForEdit() {
     prepareNativeBrushDocumentConversion: (target) => {
       const ticket = captureStudioMutationTicket();
       return prepareStudioNativeBrushDocumentCommit(target, {
-        canMutate: () => canApplyStudioMutation(ticket)
-          && editorMountedRef.current && !documentSaveInFlightRef.current
-          && !collaborationAccessRef.current.locked && !activeSurfaceReviewLockedRef.current
-          && !drawingRef.current && !pendingStrokeCommitsRef.current,
+        canMutate: () => canApplyStudioMutation(ticket) && editorMountedRef.current && !documentSaveInFlightRef.current && !collaborationAccessRef.current.locked && !activeSurfaceReviewLockedRef.current && !drawingRef.current && !pendingStrokeCommitsRef.current,
         read: () => {
-          const history = pagesHistoryRef.current;
-          const index = pagesHiRef.current;
-          const page = history[index]?.find((candidate) => candidate.id === currentPageIdRef.current);
-          return page ? { pageId: page.id, masterEditMode: masterEditModeRef.current,
-            historyIdentity: history, historyIndex: index, elements: page.elements,
-            groups: page.groups ?? [], documentWidth: CANVAS_W, documentHeight: page.canvasH } : null;
-        },
-        commit,
-        onCommitted: (id) => {
-          setSelectedId(id);
-          announceDrawingShortcut("네이티브 브러시 변환 완료 · 원본 숨김 보존 · 실행 취소 가능");
-        },
-      });
-    },
+          const history = pagesHistoryRef.current, index = pagesHiRef.current, page = history[index]?.find((candidate) => candidate.id === currentPageIdRef.current);
+          return page ? { pageId: page.id, masterEditMode: masterEditModeRef.current, historyIdentity: history, historyIndex: index, elements: page.elements, groups: page.groups ?? [], documentWidth: CANVAS_W, documentHeight: page.canvasH } : null;
+        }, commit, onCommitted: (id) => { setSelectedId(id); announceDrawingShortcut("네이티브 브러시 변환 완료 · 원본 숨김 보존 · 실행 취소 가능"); },
+      }); },
     replaceDrawWithHokusaiNaturalMedia: (
       result,
       targetPageId,
