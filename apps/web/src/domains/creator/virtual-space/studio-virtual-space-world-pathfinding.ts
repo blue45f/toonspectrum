@@ -4,23 +4,15 @@ import {
   type StudioVirtualSpaceWorldManifest,
   type StudioWorldRect,
 } from "./studio-virtual-space-world-manifest";
+import {
+  studioWorldCircleCanOccupy,
+  studioWorldLineCanOccupy,
+} from "./studio-virtual-space-world-connectivity";
 
 const GRID = 6;
 const MAX_EXPANSIONS = 30_000;
 export const STUDIO_WORLD_PLAYER_RADIUS = 9;
 const DEFAULT_RADIUS = STUDIO_WORLD_PLAYER_RADIUS;
-
-function circleIntersectsRect(
-  point: StudioVirtualSpacePoint,
-  radius: number,
-  rect: StudioWorldRect,
-): boolean {
-  const nearestX = Math.max(rect.x, Math.min(point.x, rect.x + rect.width));
-  const nearestY = Math.max(rect.y, Math.min(point.y, rect.y + rect.height));
-  const dx = point.x - nearestX;
-  const dy = point.y - nearestY;
-  return dx * dx + dy * dy < radius * radius;
-}
 
 function canOccupyWithColliders(
   manifest: StudioVirtualSpaceWorldManifest,
@@ -28,16 +20,7 @@ function canOccupyWithColliders(
   point: StudioVirtualSpacePoint,
   radius: number,
 ): boolean {
-  if (
-    !Number.isFinite(point.x) || !Number.isFinite(point.y)
-    || point.x < radius
-    || point.y < radius
-    || point.x > manifest.width - radius
-    || point.y > manifest.height - radius
-  ) {
-    return false;
-  }
-  return !colliders.some((rect) => circleIntersectsRect(point, radius, rect));
+  return studioWorldCircleCanOccupy(manifest, colliders, point, radius);
 }
 
 export function clampStudioWorldPoint(
@@ -71,18 +54,7 @@ function lineWalkable(
   to: StudioVirtualSpacePoint,
   radius: number,
 ): boolean {
-  const distance = Math.hypot(to.x - from.x, to.y - from.y);
-  const steps = Math.max(1, Math.ceil(distance / 6));
-  for (let index = 1; index <= steps; index += 1) {
-    const t = index / steps;
-    if (!canOccupyWithColliders(manifest, colliders, {
-      x: from.x + (to.x - from.x) * t,
-      y: from.y + (to.y - from.y) * t,
-    }, radius)) {
-      return false;
-    }
-  }
-  return true;
+  return studioWorldLineCanOccupy(manifest, colliders, from, to, radius);
 }
 
 function smoothPath(
@@ -190,10 +162,12 @@ function nearestWalkableNode(
   point: StudioVirtualSpacePoint,
   radius: number,
   requireConnection = false,
+  preferNear: StudioVirtualSpacePoint = point,
 ): Node | null {
   const gx = Math.round(point.x / GRID);
   const gy = Math.round(point.y / GRID);
   for (let ring = 0; ring <= 16; ring += 1) {
+    const candidates: Node[] = [];
     for (let dy = -ring; dy <= ring; dy += 1) {
       for (let dx = -ring; dx <= ring; dx += 1) {
         if (ring > 0 && Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
@@ -201,8 +175,17 @@ function nearestWalkableNode(
           || (gx + dx) * GRID > manifest.width || (gy + dy) * GRID > manifest.height) continue;
         const node = createNode(manifest, gx + dx, gy + dy, radius);
         if (canOccupyWithColliders(manifest, colliders, node.point, radius)
-          && (!requireConnection || lineWalkable(manifest, colliders, point, node.point, radius))) return node;
+          && (!requireConnection || lineWalkable(manifest, colliders, point, node.point, radius))) {
+          candidates.push(node);
+        }
       }
+    }
+    if (candidates.length > 0) {
+      candidates.sort((left, right) => (
+        Math.hypot(left.point.x - preferNear.x, left.point.y - preferNear.y)
+        - Math.hypot(right.point.x - preferNear.x, right.point.y - preferNear.y)
+      ) || left.gy - right.gy || left.gx - right.gx);
+      return candidates[0]!;
     }
   }
   return null;
@@ -225,7 +208,14 @@ export function findStudioWorldPath(
   }
 
   const startNode = nearestWalkableNode(manifest, colliders, boundedStart, radius, true);
-  const targetNode = nearestWalkableNode(manifest, colliders, boundedTarget, radius, canOccupyWithColliders(manifest, colliders, boundedTarget, radius));
+  const targetNode = nearestWalkableNode(
+    manifest,
+    colliders,
+    boundedTarget,
+    radius,
+    canOccupyWithColliders(manifest, colliders, boundedTarget, radius),
+    boundedStart,
+  );
   if (!startNode || !targetNode) return [];
 
   const startKey = nodeKey(startNode.gx, startNode.gy);

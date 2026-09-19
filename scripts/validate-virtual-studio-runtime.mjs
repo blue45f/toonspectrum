@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { chromium } from "playwright";
 
 import {
@@ -9,8 +11,44 @@ import {
   VIRTUAL_STUDIO_PRODUCTION_ART_DIRECTORY,
 } from "./verify-virtual-studio-art-manifest.mjs";
 
-const origin = process.env.STUDIO_QA_BASE_URL ?? "http://127.0.0.1:5226";
-assert(["127.0.0.1", "localhost"].includes(new URL(origin).hostname), "Run the QA harness against a local development server only");
+const runFile = promisify(execFile);
+const configuredOrigin = process.env.STUDIO_QA_BASE_URL?.trim();
+assert(configuredOrigin, "STUDIO_QA_BASE_URL is required; never default this QA harness to a possibly unrelated server");
+const originUrl = new URL(configuredOrigin);
+assert(["127.0.0.1", "localhost"].includes(originUrl.hostname), "Run the QA harness against a local development server only");
+assert(["http:", "https:"].includes(originUrl.protocol), "STUDIO_QA_BASE_URL must use HTTP or HTTPS");
+assert(!originUrl.username && !originUrl.password, "STUDIO_QA_BASE_URL must not include credentials");
+assert(originUrl.pathname === "/" && !originUrl.search && !originUrl.hash, "STUDIO_QA_BASE_URL must be an origin without a path, query, or hash");
+const origin = originUrl.origin;
+
+async function attestServerWorktree(url) {
+  const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+  assert(Number.isInteger(port) && port > 0 && port <= 65_535, "STUDIO_QA_BASE_URL must use a valid port");
+  const { stdout: pidOutput } = await runFile("lsof", [
+    "-nP",
+    `-iTCP:${port}`,
+    "-sTCP:LISTEN",
+    "-t",
+  ]);
+  const pids = [...new Set(pidOutput.split(/\s+/u).filter(Boolean))];
+  assert(pids.length > 0, `No listening process owns ${url.origin}`);
+  const expectedCwd = await fs.realpath(process.cwd());
+  const owners = [];
+  for (const pid of pids) {
+    const { stdout: cwdOutput } = await runFile("lsof", ["-a", "-p", pid, "-d", "cwd", "-Fn"]);
+    const cwd = cwdOutput.split("\n").find((line) => line.startsWith("n"))?.slice(1);
+    if (!cwd) continue;
+    owners.push({ pid: Number(pid), cwd: await fs.realpath(cwd) });
+  }
+  const owner = owners.find((candidate) => candidate.cwd === expectedCwd);
+  assert(
+    owner,
+    `QA server ${url.origin} is not owned by this worktree (${expectedCwd}); observed ${JSON.stringify(owners)}`,
+  );
+  return { ...owner, origin: url.origin, expectedCwd };
+}
+
+const serverOrigin = await attestServerWorktree(originUrl);
 const output = path.resolve(".qa/virtual-studio-runtime-acceptance");
 await fs.mkdir(output, { recursive: true });
 const results = [];
@@ -125,7 +163,13 @@ try {
       { type: "objectgroup", name: "spawns", objects: [{ name: "main", x: 1200, y: 950 }] },
     ];
     await page.route("**/assets/virtual-studio/world/default-world.json", (route) => route.fulfill({ json: { width: 1600, height: 1200, tilewidth: 1, tileheight: 1, layers } }));
-    await page.addInitScript(() => sessionStorage.setItem("toonspectrum:virtual-space-position:v2:virtual-demo", JSON.stringify({ x: 1240, y: 950 })));
+    const positionStorageKey = await page.evaluate(async () => {
+      const { studioVirtualSpacePositionStorageKey, studioVirtualSpacePositionScope } = await import(
+        "/src/domains/creator/virtual-space/studio-virtual-space-session-position.ts"
+      );
+      return studioVirtualSpacePositionStorageKey(studioVirtualSpacePositionScope("virtual-demo", false));
+    });
+    await page.addInitScript((key) => sessionStorage.setItem(key, JSON.stringify({ x: 1240, y: 950 })), positionStorageKey);
     await page.reload({ waitUntil: "domcontentloaded" }); await ready(page);
     const before = await position(page); assert(Math.abs(before.x - 1240) < 2); assert(Math.abs(before.y - 950) < 2);
     const picker = page.getByRole("button", { name: /시나 캐릭터 선택/ }); await picker.click(); await page.waitForTimeout(200);
@@ -146,7 +190,8 @@ try {
     await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - box.height * .4 }] });
     await mobile.waitForTimeout(450);
     await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await mobile.waitForTimeout(300);
-    const after = await position(mobile); assert(after.y < before.y - 15);
+    const after = await position(mobile);
+    assert(after.y < before.y - 15, `Native touch joystick did not move upward: ${JSON.stringify({ before, after, box })}`);
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     assert.deepEqual(mobileErrors, []);
     await mobile.screenshot({ path: path.join(output, "project-mobile.png"), fullPage: true });
@@ -202,16 +247,66 @@ try {
     const afterPackets = await call(fixture, "state");
     const remoteCount = afterPackets.remotePackets - beforePackets.remotePackets;
     const localCount = afterPackets.localPackets - beforePackets.localPackets;
-    assert(remoteCount >= 8 && remoteCount <= 16, `Unexpected remote presence packet rate: ${remoteCount}`);
-    assert(localCount <= 2, `Idle local peer sent too many packets: ${localCount}`);
+    const packetWindowMs = afterPackets.sampledAt - beforePackets.sampledAt;
+    const remoteBudget = Math.ceil(packetWindowMs / afterPackets.presenceIntervalMs) + 2;
+    const idleBudget = Math.ceil(packetWindowMs / afterPackets.presenceHeartbeatMs) + 1;
+    assert(remoteCount >= 8 && remoteCount <= remoteBudget,
+      `Unexpected remote presence packet rate: ${remoteCount} packets in ${packetWindowMs}ms (budget ${remoteBudget})`);
+    assert(localCount <= idleBudget, `Idle local peer sent too many packets: ${localCount} in ${packetWindowMs}ms`);
     await call(fixture, "follow"); await fixture.waitForTimeout(1000); assert((await position(fixture)).x > 260);
     return {
       nativeRtc: true,
       peer,
-      remotePacketsInApproximately1Second: remoteCount,
+      remotePackets: remoteCount,
+      packetWindowMs,
+      remotePacketsPerSecond: remoteCount / (packetWindowMs / 1000),
       idleLocalPackets: localCount,
       signaling: "in-page fixture (not production authorization/media)",
     };
+  });
+  await check("social: native reliable RTC consent, cancellation and disconnect", async () => {
+    const waitForSocial = async (predicate, detail) => {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const current = await call(fixture, "state");
+        if (predicate(current)) return current;
+        await fixture.waitForTimeout(50);
+      }
+      assert.fail(`Social RTC timeout: ${detail}`);
+    };
+    const connected = await waitForSocial((current) => current.social?.readyPeerIds.length === 1
+      && current.remoteSocial?.readyPeerIds.length === 1, "epoch handshake");
+    assert.deepEqual(connected.reliableSocialChannel, { ordered: true, maxRetransmits: null, maxPacketLifeTime: null });
+    const id = await call(fixture, "requestSocial", "talk");
+    assert(id, "RTC talk offer must enqueue successfully");
+    const offered = await waitForSocial((current) => current.remoteSocial?.requests.some((request) => request.id === id && request.status === "offered"), "incoming offer");
+    assert.deepEqual(offered.acceptedSocial, [], "Offer alone must not start an interaction");
+    assert.equal(await call(fixture, "respondPeerSocial", id, "accept"), true);
+    const accepted = await waitForSocial((current) => current.acceptedSocial.length === 2, "mutual consent completion");
+    assert.deepEqual(new Set(accepted.acceptedSocial.map((event) => event.side)), new Set(["local", "remote"]));
+    assert(accepted.acceptedSocial.every((event) => event.id === id && event.action === "talk"));
+    assert.equal(await call(fixture, "cancelSocial", id), true);
+    await waitForSocial((current) => current.remoteSocial?.requests.some((request) => request.id === id && request.status === "cancelled"), "cancel delivery");
+    await fixture.waitForTimeout(1_050);
+    const followId = await call(fixture, "requestSocial", "follow");
+    assert(followId);
+    await waitForSocial((current) => current.remoteSocial?.requests.some((request) => request.id === followId), "follow offer");
+    await call(fixture, "disconnectSocialPeer");
+    const disconnected = await waitForSocial((current) => current.social?.requests.some((request) => request.id === followId && request.status === "disconnected"), "channel disconnect");
+    assert.equal(disconnected.acceptedSocial.length, 2, "Unaccepted follow must not execute");
+    return { nativeRtc: true, ordered: true, unlimitedRetransmission: true, consentEvents: accepted.acceptedSocial,
+      socialPackets: disconnected.socialPackets, mediaStarted: false, signaling: "in-page fixture; production room authorization is outside this harness" };
+  });
+  await check("social: native RTC refuses mismatched world content", async () => {
+    await call(fixture, "mount", world, { x: 200, y: 250 }); await ready(fixture);
+    await call(fixture, "connectRtcPeer", "qa-different-content"); await ready(fixture);
+    await fixture.waitForTimeout(400);
+    const incompatible = await call(fixture, "state");
+    assert.equal(incompatible.snapshot.peers.length, 1, "Spatial RTC is connected while social identity differs");
+    assert.deepEqual(incompatible.social.readyPeerIds, []);
+    assert.deepEqual(incompatible.remoteSocial.readyPeerIds, []);
+    assert.equal(await call(fixture, "requestSocial", "review"), null);
+    assert.deepEqual(incompatible.acceptedSocial, []);
+    return { nativeRtc: true, worldContentMismatchRejected: true };
   });
   await check("engine: React StrictMode remount never leaves duplicate canvases", async () => {
     for (let i = 0; i < 5; i++) { await call(fixture, "mount", { ...world, version: i + 1 }, { x: 200, y: 250 }); await fixture.waitForTimeout(40); }
@@ -238,6 +333,6 @@ try {
   await (fixture ?? page).screenshot({ path: path.join(output, "failure.png"), fullPage: true }).catch(() => undefined);
   process.exitCode = 1;
 } finally {
-  await fs.writeFile(path.join(output, "report.json"), JSON.stringify({ results, browserErrors: errors, passed: results.filter((r) => r.passed).length, failed: results.filter((r) => !r.passed).length }, null, 2));
+  await fs.writeFile(path.join(output, "report.json"), JSON.stringify({ serverOrigin, results, browserErrors: errors, passed: results.filter((r) => r.passed).length, failed: results.filter((r) => !r.passed).length }, null, 2));
   await browser.close();
 }

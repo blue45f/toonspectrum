@@ -8,6 +8,10 @@ import {
   StudioFixedStepClock, StudioFixedStepPose, StudioPeerTimeline, STUDIO_CHARACTER_FOOT_ORIGIN,
   studioGaitFrame, studioStableFacing, studioRenderViewport, studioCameraLerp, studioCoverRect,
 } from "./studio-virtual-space-presentation";
+import {
+  StudioNpcDirector, studioNpcActivityLabel, studioNpcInteraction, studioNpcLabel,
+  type StudioNpcAtmosphere, type StudioNpcPhase,
+} from "./studio-virtual-space-npc-director";
 import { advanceStudioWorldPath } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -76,6 +80,8 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   /** AUTO in product; Canvas is useful for lifecycle-only browser harnesses. */
   readonly renderer?: "auto" | "webgl" | "canvas";
   readonly debugWorld?: boolean;
+  readonly atmosphere?: StudioNpcAtmosphere;
+  readonly onNpcInteract?: (interaction: StudioWorldInteractionDefinition) => void;
   readonly onLocalState: (state: StudioVirtualSpaceEngineLocalState) => void;
   readonly onInteract: (interaction: StudioWorldInteractionDefinition | null) => void;
   readonly onNearbyInteractionChange?: (interaction: StudioWorldInteractionDefinition | null) => void;
@@ -106,11 +112,10 @@ interface NpcVisual {
   readonly definition: StudioWorldNpcDefinition;
   readonly skin: StudioCharacterSkin;
   readonly sprite: import("phaser").GameObjects.Sprite;
-  readonly baseScale: number;
-  facing: StudioVirtualSpaceFacing;
-  path: readonly StudioVirtualSpacePoint[];
-  patrolIndex: number;
-  pauseUntil: number;
+  readonly label: import("phaser").GameObjects.Text;
+  readonly reaction: import("phaser").GameObjects.Text;
+  readonly shadow: import("phaser").GameObjects.Ellipse;
+  phase: StudioNpcPhase;
 }
 
 function staticTextureKey(
@@ -184,6 +189,8 @@ export function StudioVirtualSpacePhaserCanvas({
   selfIdentity = "local",
   renderer = "auto",
   debugWorld = false,
+  atmosphere = "balanced",
+  onNpcInteract,
   onLocalState,
   onInteract,
   onNearbyInteractionChange,
@@ -192,9 +199,13 @@ export function StudioVirtualSpacePhaserCanvas({
   onPortal,
 }: StudioVirtualSpacePhaserCanvasProps) {
   const bt = useBilingual("StudioVirtualSpacePhaserCanvas");
+  const btRef = useRef(bt);
+  btRef.current = bt;
   const [failure, setFailure] = useState(false);
   const [ready, setReady] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const atmosphereRef = useRef(atmosphere);
+  atmosphereRef.current = atmosphere;
   const identityRef = useRef(selfIdentity);
   identityRef.current = selfIdentity;
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -203,6 +214,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onLocalState,
     onInteract,
     onNearbyInteractionChange,
+    onNpcInteract,
     onPeerSelect,
     onCancelFollow,
     onPortal,
@@ -221,6 +233,7 @@ export function StudioVirtualSpacePhaserCanvas({
       onLocalState,
       onInteract,
       onNearbyInteractionChange,
+      onNpcInteract,
       onPeerSelect,
       onCancelFollow,
       onPortal,
@@ -230,6 +243,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onInteract,
     onLocalState,
     onNearbyInteractionChange,
+    onNpcInteract,
     onPeerSelect,
     onPortal,
   ]);
@@ -273,6 +287,7 @@ export function StudioVirtualSpacePhaserCanvas({
       };
       const peers = new Map<string, PeerVisual>();
       const npcs = new Map<string, NpcVisual>();
+      const npcDirector = new StudioNpcDirector(manifest);
       const interactionMarkers = new Map<string, import("phaser").GameObjects.Text>();
       const interactions = studioWorldInteractions(manifest);
       const portals = studioWorldPortals(manifest);
@@ -741,33 +756,38 @@ export function StudioVirtualSpacePhaserCanvas({
             .setDepth(600);
         }
 
-        for (const npcDefinition of manifest.npcs) {
+        for (const view of npcDirector.views) {
+          const npcDefinition = manifest.npcs.find((definition) => definition.id === view.id)!;
           const skin = studioCharacterSkinByKey(npcDefinition.skinKey);
-          const npcFacing = npcDefinition.facing ?? "down";
-          const npcState = npcDefinition.behavior === "talk"
-            || npcDefinition.behavior === "draw"
-            || npcDefinition.behavior === "review"
-            ? npcDefinition.behavior
-            : "idle";
-          const sprite = this.add.sprite(
-            npcDefinition.point.x,
-            npcDefinition.point.y,
-            staticTextureKey(skin, npcFacing, npcState),
-          ).setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
-            .setData({ visualWidth: 92 * (npcDefinition.scale ?? 1), visualHeight: 123 * (npcDefinition.scale ?? 1) })
-            .setDisplaySize(92 * (npcDefinition.scale ?? 1), 123 * (npcDefinition.scale ?? 1))
-            .setDepth(Math.round(npcDefinition.point.y) + 1_000);
-          applySpriteVisual(sprite, skin, npcFacing, npcState);
-          npcs.set(npcDefinition.id, {
-            definition: npcDefinition,
-            skin,
-            sprite,
-            baseScale: npcDefinition.scale ?? 1,
-            facing: npcFacing,
-            path: [],
-            patrolIndex: 0,
-            pauseUntil: 0,
-          });
+          const visualScale = npcDefinition.scale ?? 0.72;
+          const identity = studioNpcLabel(npcDefinition);
+          const shadow = this.add.ellipse(view.point.x, view.point.y + 1, 30 * visualScale, 10 * visualScale, 0x15151c, 0.2)
+            .setDepth(Math.round(view.point.y) + 990);
+          const sprite = this.add.sprite(view.point.x, view.point.y, staticTextureKey(skin, view.facing, view.animation))
+            .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
+            .setData({ visualWidth: 92 * visualScale, visualHeight: 123 * visualScale })
+            .setDisplaySize(92 * visualScale, 123 * visualScale)
+            .setDepth(Math.round(view.point.y) + 1_000);
+          const selectNpc = (_pointer: import("phaser").Input.Pointer, _x: number, _y: number, event: InputEventLike) => {
+            event.stopPropagation();
+            if (studioWorldInputBlocked(document, modalInputBlocked)) return;
+            const interaction = studioNpcInteraction(manifest, npcDefinition);
+            if (interaction) (callbacksRef.current.onNpcInteract ?? callbacksRef.current.onInteract)(interaction);
+          };
+          if (studioNpcInteraction(manifest, npcDefinition)) {
+            sprite.setInteractive({ useHandCursor: true }).on("pointerdown", selectNpc);
+          }
+          const label = this.add.text(view.point.x, view.point.y + 9, btRef.current(identity.ko, identity.en), {
+            fontFamily: "Inter, Pretendard, sans-serif", fontSize: "9px", color: "#f5e9cb",
+            backgroundColor: "#292532e8", padding: { x: 5, y: 3 },
+          }).setOrigin(0.5, 0).setDepth(Math.round(view.point.y) + 1_002);
+          if (studioNpcInteraction(manifest, npcDefinition)) label.setInteractive({ useHandCursor: true }).on("pointerdown", selectNpc);
+          const reaction = this.add.text(view.point.x, view.point.y - 123 * visualScale - 8, "", {
+            fontFamily: "Inter, Pretendard, sans-serif", fontSize: "10px", color: "#fff8e8",
+            backgroundColor: "#292532ed", padding: { x: 6, y: 4 },
+          }).setOrigin(0.5, 1).setDepth(140_000).setVisible(false);
+          applySpriteVisual(sprite, skin, view.facing, view.animation);
+          npcs.set(view.id, { definition: npcDefinition, skin, sprite, label, reaction, shadow, phase: view.phase });
         }
 
         keys = this.input.keyboard?.addKeys({
@@ -919,7 +939,11 @@ export function StudioVirtualSpacePhaserCanvas({
         };
 
         const currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
-        const nearbyInteraction = nearestInteraction(interactions, currentPoint);
+        const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.sprite.x - currentPoint.x, npc.sprite.y - currentPoint.y) < 55)
+          .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
+          .find((npc) => studioNpcInteraction(manifest, npc.definition));
+        const npcInteraction = nearbyNpc ? studioNpcInteraction(manifest, nearbyNpc.definition) : null;
+        const nearbyInteraction = npcInteraction ?? nearestInteraction(interactions, currentPoint);
         const nextNearbyId = nearbyInteraction?.id ?? null;
         if (nextNearbyId !== nearbyInteractionId) {
           nearbyInteractionId = nextNearbyId;
@@ -937,7 +961,10 @@ export function StudioVirtualSpacePhaserCanvas({
         );
         keyboardInteractQueued = false;
         gamepadInteractHeld = gamepad.interact;
-        if (interactPressed) callbacksRef.current.onInteract(nearbyInteraction);
+        if (interactPressed) {
+          if (npcInteraction) (callbacksRef.current.onNpcInteract ?? callbacksRef.current.onInteract)(npcInteraction);
+          else callbacksRef.current.onInteract(nearbyInteraction);
+        }
 
         const moveRequest = bridge.consumeMoveTarget();
         if (moveRequest && !blocked) setPathTo(moveRequest);
@@ -1051,52 +1078,34 @@ export function StudioVirtualSpacePhaserCanvas({
           visual.reaction.setPosition(visual.sprite.x, visual.sprite.y - 125);
         }
 
-        for (const npc of npcs.values()) {
-          const behavior = npc.definition.behavior ?? "idle";
-          if (behavior !== "patrol" || !npc.definition.patrol?.length) {
-            const state = behavior === "talk" || behavior === "draw" || behavior === "review"
-              ? behavior
-              : "idle";
-            applySpriteVisual(npc.sprite, npc.skin, npc.facing, state);
-            npc.sprite.setDepth(Math.round(npc.sprite.y) + 1_000);
-            continue;
-          }
-          if (time < npc.pauseUntil) { applySpriteVisual(npc.sprite, npc.skin, npc.facing, "idle"); continue; }
-          const patrol = npc.definition.patrol;
-          const patrolTarget = patrol[npc.patrolIndex % patrol.length]!;
-          if (npc.path.length === 0) {
-            npc.path = findStudioWorldPath(manifest, { x: npc.sprite.x, y: npc.sprite.y }, patrolTarget);
-          }
-          const target = npc.path[0];
-          if (!target) {
-            npc.patrolIndex = (npc.patrolIndex + 1) % patrol.length;
-            npc.pauseUntil = time + 1_000;
-            applySpriteVisual(npc.sprite, npc.skin, npc.facing, "idle");
-            continue;
-          }
-          const dx = target.x - npc.sprite.x;
-          const dy = target.y - npc.sprite.y;
-          const distance = Math.hypot(dx, dy);
-          let appliedStep = 0;
-          if (distance <= 5) {
-            npc.path = npc.path.slice(1);
-            if (npc.path.length === 0 && Math.hypot(patrolTarget.x - npc.sprite.x, patrolTarget.y - npc.sprite.y) <= 12) {
-              npc.patrolIndex = (npc.patrolIndex + 1) % patrol.length;
-              npc.pauseUntil = time + 500;
-            }
-          } else {
-            appliedStep = Math.min(distance, (npc.definition.speed ?? 72) * dt);
-            npc.sprite.x += dx / distance * appliedStep;
-            npc.sprite.y += dy / distance * appliedStep;
-            npc.facing = studioStableFacing({ x: dx, y: dy }, npc.facing);
-          }
-          if (appliedStep > 0) {
-            npc.sprite.setData("walkDistance", Number(npc.sprite.getData("walkDistance") ?? 0) + appliedStep);
-            applySpriteVisual(npc.sprite, npc.skin, npc.facing, "walk");
-          } else {
-            applySpriteVisual(npc.sprite, npc.skin, npc.facing, "idle");
-          }
-          npc.sprite.setDepth(Math.round(npc.sprite.y) + 1_000);
+        const npcViews = npcDirector.advance(dt, {
+          atmosphere: atmosphereRef.current,
+          reducedMotion: reducedMotion.matches,
+          focused: activity === "focused" || blocked,
+          people: [
+            { id: identityRef.current, point: currentPoint, velocity: motion.velocity, focused: activity === "focused" || blocked },
+            ...[...peers].map(([id, peer]) => ({
+              id, point: { x: peer.sprite.x, y: peer.sprite.y }, focused: peer.activity === "focused",
+              velocity: peer.moving ? {
+                x: peer.facing === "left" ? -STUDIO_VIRTUAL_SPACE_WALK_SPEED : peer.facing === "right" ? STUDIO_VIRTUAL_SPACE_WALK_SPEED : 0,
+                y: peer.facing === "up" ? -STUDIO_VIRTUAL_SPACE_WALK_SPEED : peer.facing === "down" ? STUDIO_VIRTUAL_SPACE_WALK_SPEED : 0,
+              } : { x: 0, y: 0 },
+            })),
+          ],
+        });
+        for (const view of npcViews) {
+          const npc = npcs.get(view.id);
+          if (!npc) continue;
+          npc.phase = view.phase;
+          npc.sprite.setPosition(view.point.x, view.point.y).setDepth(Math.round(view.point.y) + 1_000);
+          npc.sprite.setData("walkDistance", view.distance);
+          applySpriteVisual(npc.sprite, npc.skin, view.facing, view.animation);
+          npc.shadow.setPosition(view.point.x, view.point.y + 1).setDepth(Math.round(view.point.y) + 990);
+          npc.label.setPosition(view.point.x, view.point.y + 9).setDepth(Math.round(view.point.y) + 1_002);
+          const greeting = studioNpcActivityLabel(npc.definition, view.phase);
+          npc.reaction.setPosition(view.point.x, view.point.y - Number(npc.sprite.getData("visualHeight")) - 8)
+            .setVisible(view.greeting && !reducedMotion.matches && atmosphereRef.current !== "focus");
+          if (view.greeting) npc.reaction.setText(btRef.current(greeting.ko, greeting.en));
         }
 
         const portal = blocked ? null : portalTracker.enter(portals, currentPoint);
@@ -1147,7 +1156,7 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.texture = localSprite.texture.key;
           parent.dataset.reaction = localReaction?.visible ? localReaction.text : "";
           parent.dataset.peers = JSON.stringify([...peers].map(([id, peer]) => ({ id, x: peer.sprite.x, y: peer.sprite.y, targetX: peer.targetX, targetY: peer.targetY, texture: peer.sprite.texture.key, reaction: peer.reaction.visible ? peer.reaction.text : "" })));
-          parent.dataset.npcs = JSON.stringify([...npcs].map(([id, npc]) => ({ id, x: npc.sprite.x, y: npc.sprite.y })));
+          parent.dataset.npcs = JSON.stringify([...npcs].map(([id, npc]) => ({ id, x: npc.sprite.x, y: npc.sprite.y, phase: npc.phase, texture: npc.sprite.texture.key })));
           parent.dataset.props = JSON.stringify(manifest.props.filter((prop) => prop.assetUrl).map((prop) => ({ id: prop.id, depth: studioWorldPropDepth(prop) })));
         }
         moving = nextMoving;

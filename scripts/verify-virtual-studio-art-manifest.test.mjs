@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
   validateVirtualStudioArtManifestContract,
+  validateVirtualStudioLivingWorldArtManifestContract,
+  verifyVirtualStudioLivingWorldArtManifest,
+  verifyVirtualStudioLivingWorldBindings,
+  verifyLosslessWebpEncoding,
+  VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY,
   verifyArtManifestDirectory,
   verifyVirtualStudioArtManifest,
 } from "./verify-virtual-studio-art-manifest.mjs";
@@ -160,4 +165,85 @@ test("rejects misleading background provenance and weakened decoded gait gates",
     () => validateVirtualStudioArtManifestContract(hiddenRgbArtifact),
     /transparentRgbPixels\[0\] must be zero/u,
   );
+});
+
+
+test("also verifies the generated clean plate without upgrading its provenance to pixel-identical original art", async () => {
+  const { livingWorld } = await verifyVirtualStudioArtManifest();
+  assert.equal(livingWorld.assetCount, 1);
+  assert.equal(livingWorld.outputIntegrityVerified, true);
+  assert.equal(livingWorld.losslessWebpVerified, true);
+  assert.equal(livingWorld.referenceOutputIntegrityVerified, true);
+  assert.equal(livingWorld.runtimeBindingsVerified, true);
+  assert.equal(livingWorld.generatedPngPixelsReverifiedThisRun, false);
+  assert.equal(livingWorld.privateApprovedMasterSourceReverified, false);
+  assert.equal(livingWorld.manifest.background.referencePixelIdentity, false);
+  assert.deepEqual(livingWorld.assets[0].dimensions, [1296, 1213]);
+});
+
+async function createLivingFixture(context) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-living-art-"));
+  (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
+  const manifest = JSON.parse(await readFile(path.join(VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const image = await readFile(path.join(VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY, "master-clean-plate.webp"));
+  await writeFile(path.join(directory, "master-clean-plate.webp"), image);
+  await writeFile(path.join(directory, "art-manifest.json"), JSON.stringify(manifest));
+  return { directory, image, manifest };
+}
+
+test("rejects a clean-plate mutation, incorrect recorded dimensions and a changed authored reference", async (context) => {
+  const { directory, image, manifest } = await createLivingFixture(context);
+  const changed = Buffer.from(image);
+  changed[changed.length - 1] ^= 0xff;
+  await writeFile(path.join(directory, "master-clean-plate.webp"), changed);
+  await assert.rejects(verifyVirtualStudioLivingWorldArtManifest({ artDirectory: directory }), /SHA-256 mismatch/u);
+  await writeFile(path.join(directory, "master-clean-plate.webp"), image);
+  manifest.outputs["master-clean-plate.webp"].dimensions = [1296, 1216];
+  await writeFile(path.join(directory, "art-manifest.json"), JSON.stringify(manifest));
+  await assert.rejects(verifyVirtualStudioLivingWorldArtManifest({ artDirectory: directory }), /actual 1296x1213/u);
+  manifest.outputs["master-clean-plate.webp"].dimensions = [1296, 1213];
+  manifest.provenance.reference.sha256 = "0".repeat(64);
+  await writeFile(path.join(directory, "art-manifest.json"), JSON.stringify(manifest));
+  await assert.rejects(verifyVirtualStudioLivingWorldArtManifest({ artDirectory: directory }), /reference SHA-256/u);
+});
+
+test("requires honest generated-pixel, private-source and existing gait disclosures", async () => {
+  const original = JSON.parse(await readFile(path.join(VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const pixelIdentityClaim = structuredClone(original);
+  pixelIdentityClaim.background.referencePixelIdentity = true;
+  assert.throws(() => validateVirtualStudioLivingWorldArtManifestContract(pixelIdentityClaim), /changed reference pixels/u);
+  const privateSourceClaim = structuredClone(original);
+  privateSourceClaim.provenance.originalAuthoredMaster.sourcePixelsReverified = true;
+  assert.throws(() => validateVirtualStudioLivingWorldArtManifestContract(privateSourceClaim), /private authored master/u);
+  const gaitClaim = structuredClone(original);
+  gaitClaim.limitations = gaitClaim.limitations.filter((item) => !item.includes("cutout-rig"));
+  assert.throws(() => validateVirtualStudioLivingWorldArtManifestContract(gaitClaim), /cutout-rig/u);
+});
+
+test("checks the WebP bitstream instead of accepting a lossless metadata claim", async () => {
+  const image = await readFile(path.join(VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY, "master-clean-plate.webp"));
+  assert.equal(verifyLosslessWebpEncoding(image), true);
+  // A structurally valid lossy VP8 image header with the same declared dimensions.
+  const lossy = Buffer.alloc(30);
+  lossy.write("RIFF", 0, "ascii"); lossy.writeUInt32LE(22, 4); lossy.write("WEBP", 8, "ascii");
+  lossy.write("VP8 ", 12, "ascii"); lossy.writeUInt32LE(10, 16);
+  lossy[23] = 0x9d; lossy[24] = 0x01; lossy[25] = 0x2a;
+  lossy.writeUInt16LE(1296, 26); lossy.writeUInt16LE(1213, 28);
+  assert.throws(() => verifyLosslessWebpEncoding(lossy), /static lossless VP8L/u);
+});
+
+test("rejects generated-world asset or authoring dimension drift", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-living-binding-"));
+  (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
+  const world = {
+    layers: [{ name: "background", type: "imagelayer", image: "../production-v2/master-central-lossless.webp", imagewidth: 1296, imageheight: 1213 }],
+    properties: [{ name: "backgroundUrl", value: "/assets/virtual-studio/living-world/master-clean-plate.webp" }],
+  };
+  const worldPath = path.join(directory, "world.json");
+  await writeFile(worldPath, JSON.stringify(world));
+  await assert.rejects(verifyVirtualStudioLivingWorldBindings({ worldPath }), /generated default world/u);
+  world.layers[0].image = "../living-world/master-clean-plate.webp";
+  world.layers[0].imageheight = 1216;
+  await writeFile(worldPath, JSON.stringify(world));
+  await assert.rejects(verifyVirtualStudioLivingWorldBindings({ worldPath }), /actual dimensions/u);
 });

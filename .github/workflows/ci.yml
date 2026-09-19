@@ -38,6 +38,7 @@ jobs:
           sparse-checkout: |
             /*
             !/apps/web/public/assets/
+            /apps/web/public/assets/virtual-studio/world/
             /apps/web/public/assets/reference-rebuild/
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
@@ -121,6 +122,7 @@ jobs:
           sparse-checkout: |
             /*
             !/apps/web/public/assets/
+            /apps/web/public/assets/virtual-studio/world/
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
             !/apps/web/public/vrm/
@@ -181,6 +183,7 @@ jobs:
           sparse-checkout: |
             /*
             !/apps/web/public/assets/
+            /apps/web/public/assets/virtual-studio/world/
             /apps/web/public/assets/reference-rebuild/
             !/apps/web/public/vrm/
             /apps/web/public/vrm/AvatarSample_B.vrm
@@ -273,6 +276,11 @@ jobs:
           mkdir -p artifacts/core
           git rev-parse HEAD > artifacts/core/commit.txt
           (pnpm --filter @webtoon-nest/api build && test -s apps/api/dist/apps/api/src/main.js && node --check apps/api/dist/apps/api/src/main.js && pnpm run build:bundle && pnpm run check:studio-bundle && test -s dist/.vite/manifest.json) 2>&1 | tee artifacts/core/build.log
+      - name: Verify Virtual Studio art integrity
+        run: |
+          set -euo pipefail
+          pnpm run test:studio-virtual-art
+          pnpm run verify:studio-virtual-art
       - uses: actions/upload-artifact@v6
         if: always()
         with:

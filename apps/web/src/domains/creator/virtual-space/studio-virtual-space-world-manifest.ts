@@ -18,6 +18,10 @@ import {
   type StudioVirtualSpaceInteractionAction,
 } from "./studio-virtual-space-interactions";
 import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
+import {
+  StudioWorldConnectivityIndex,
+  studioWorldCircleCanOccupy,
+} from "./studio-virtual-space-world-connectivity";
 
 export type StudioWorldPropKind = "decor" | "solid" | "interactive" | "portal";
 export type StudioWorldDepthPolicy = "fixed" | "y-sort" | "foreground";
@@ -152,13 +156,13 @@ const DEFAULT_PROPS: readonly StudioWorldPropDefinition[] = [
   legacyProp({ id: "creator-plaza", kind: "solid", x: 590, y: 365, depth: "fixed", collider: { x: 520, y: 302, width: 140, height: 118 } }),
 ] as const;
 
-export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze({
+export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
-  version: 2,
+  version: 3,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,
   backgroundAssetKey: "studio-master-background",
-  backgroundUrl: "/assets/virtual-studio/production-v2/master-central-lossless.webp",
+  backgroundUrl: "/assets/virtual-studio/living-world/master-clean-plate.webp",
   rooms: STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => ({
     id: zone.id,
     labelKo: zone.labelKo,
@@ -188,7 +192,26 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     { id: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 180, y: 210 }), facing: "up" as const },
     { id: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 995, y: 430 }), facing: "up" as const },
   ],
-  npcs: [],
+  // A small ambient cast. These actors are local decoration and never count as online peers.
+  // The first point is a work approach; patrol points alternate reference checks and breaks.
+  npcs: [
+    { id: "studio-guide", skinKey: "dark", roomId: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 505, y: 485 }), facing: "down", scale: 0.68, speed: 58, behavior: "patrol", patrol: [
+      studioVirtualSpaceScaleLegacyPoint({ x: 455, y: 445 }),
+      studioVirtualSpaceScaleLegacyPoint({ x: 500, y: 550 }),
+    ] },
+    { id: "studio-writer", skinKey: "silver", roomId: "writers", point: studioVirtualSpaceScaleLegacyPoint({ x: 435, y: 198 }), facing: "up", scale: 0.68, speed: 54, behavior: "patrol", patrol: [
+      studioVirtualSpaceScaleLegacyPoint({ x: 660, y: 198 }),
+      studioVirtualSpaceScaleLegacyPoint({ x: 475, y: 235 }),
+    ] },
+    { id: "studio-artist", skinKey: "pink", roomId: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 885, y: 410 }), facing: "right", scale: 0.68, speed: 60, behavior: "patrol", patrol: [
+      studioVirtualSpaceScaleLegacyPoint({ x: 890, y: 310 }),
+      studioVirtualSpaceScaleLegacyPoint({ x: 870, y: 450 }),
+    ] },
+    { id: "studio-librarian", skinKey: "purple", roomId: "assets", point: studioVirtualSpaceScaleLegacyPoint({ x: 290, y: 410 }), facing: "left", scale: 0.68, speed: 52, behavior: "patrol", patrol: [
+      studioVirtualSpaceScaleLegacyPoint({ x: 285, y: 300 }),
+      studioVirtualSpaceScaleLegacyPoint({ x: 305, y: 450 }),
+    ] },
+  ],
 });
 
 function rectKey(rect: StudioWorldRect): string {
@@ -249,9 +272,8 @@ export function studioWorldPortalTarget(
 ): StudioVirtualSpacePoint | undefined {
   if (portal.targetPoint) return portal.targetPoint;
   if (!portal.targetRoomId) return undefined;
-  return (
-    manifest.spawns.find((spawn) => spawn.id === portal.targetRoomId)
-    ?? manifest.spawns.find((spawn) => studioWorldRoomAt(manifest, spawn.point) === portal.targetRoomId)
+  return manifest.spawns.find(
+    (spawn) => studioWorldRoomAt(manifest, spawn.point) === portal.targetRoomId,
   )?.point;
 }
 
@@ -341,37 +363,49 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
     && finite(rect.width) && finite(rect.height) && rect.width > 0 && rect.height > 0
     && rect.x + rect.width <= manifest.width && rect.y + rect.height <= manifest.height,
   );
-  const positive = (value: unknown) => finite(value) && value > 0;
+  const positive = (value: unknown): value is number => finite(value) && value > 0;
   const optionalPositive = (value: unknown) => value == null || positive(value);
   const actionValid = (value: unknown) => typeof value === "string" && WORLD_ACTIONS.has(value);
   const optionalActionValid = (value: unknown) => value == null || actionValid(value);
   const facingValid = (value: string | undefined) => value == null || ["down", "left", "right", "up"].includes(value);
-  const actorCanOccupy = (point: StudioVirtualSpacePoint) => {
-    if (!finite(point.x) || !finite(point.y)
-      || point.x < actorRadius || point.y < actorRadius
-      || point.x > manifest.width - actorRadius || point.y > manifest.height - actorRadius) return false;
-    return !studioWorldCollisionRects(manifest).some((rect) => {
-      const nearestX = Math.max(rect.x, Math.min(point.x, rect.x + rect.width));
-      const nearestY = Math.max(rect.y, Math.min(point.y, rect.y + rect.height));
-      const dx = point.x - nearestX;
-      const dy = point.y - nearestY;
-      return dx * dx + dy * dy < actorRadius * actorRadius;
-    });
+  const actorColliders = studioWorldCollisionRects(manifest);
+  const connectivity = new StudioWorldConnectivityIndex(manifest, actorColliders, actorRadius);
+  const actorCanOccupy = (point: StudioVirtualSpacePoint) =>
+    studioWorldCircleCanOccupy(manifest, actorColliders, point, actorRadius);
+  const activationReachable = (
+    point: StudioVirtualSpacePoint | null | undefined,
+    radius: unknown,
+  ) => {
+    if (!point || !positive(radius)) return false;
+    if (actorCanOccupy(point)) return true;
+    for (const fraction of [0.25, 0.5, 0.75, 1]) {
+      for (let index = 0; index < 16; index += 1) {
+        const angle = index / 16 * Math.PI * 2;
+        if (actorCanOccupy({
+          x: point.x + Math.cos(angle) * radius * fraction,
+          y: point.y + Math.sin(angle) * radius * fraction,
+        })) return true;
+      }
+    }
+    return false;
   };
-  const identifiers = (items: readonly { readonly id: string }[], kind: string) => {
+  const identifiers = (items: readonly { readonly id?: unknown }[], kind: string) => {
     const ids = new Set<string>();
     for (const item of items) {
-      if (!SAFE_WORLD_ID.test(item.id)) errors.push(`invalid ${kind} id: ${item.id}`);
+      if (typeof item.id !== "string" || !SAFE_WORLD_ID.test(item.id)) {
+        errors.push(`invalid ${kind} id: ${String(item.id)}`);
+        continue;
+      }
       if (ids.has(item.id)) errors.push(`duplicate ${kind} id: ${item.id}`);
       ids.add(item.id);
     }
     return ids;
   };
 
-  if (!finite(manifest.width) || !finite(manifest.height)
+  if (!Number.isSafeInteger(manifest.width) || !Number.isSafeInteger(manifest.height)
     || manifest.width < 32 || manifest.height < 32
     || manifest.width > STUDIO_WORLD_MAX_DIMENSION || manifest.height > STUDIO_WORLD_MAX_DIMENSION) {
-    errors.push("world dimensions must be finite, between 32 and 10000");
+    errors.push("world dimensions must be integer pixels between 32 and 10000");
   }
   if (!SAFE_WORLD_ID.test(manifest.id) || !Number.isSafeInteger(manifest.version) || manifest.version < 1) {
     errors.push("world id/version is invalid");
@@ -422,11 +456,13 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
   for (const interaction of studioWorldInteractions(manifest)) {
     if (!roomIds.has(interaction.zoneId)) errors.push(`interaction references missing room: ${interaction.id}`);
     if (!inBounds(interaction.point) || !positive(interaction.radius)) errors.push(`interaction geometry is invalid: ${interaction.id}`);
+    else if (!activationReachable(interaction.point, interaction.radius)) errors.push(`interaction is unreachable: ${interaction.id}`);
     if (!actionValid(interaction.action)) errors.push(`interaction action is invalid: ${interaction.id}`);
   }
   for (const portal of studioWorldPortals(manifest)) {
     const target = studioWorldPortalTarget(manifest, portal);
     if (!inBounds(portal.point) || !positive(portal.radius)) errors.push(`portal geometry is invalid: ${portal.id}`);
+    else if (!activationReachable(portal.point, portal.radius)) errors.push(`portal activation is blocked: ${portal.id}`);
     if (portal.targetPoint && !inBounds(portal.targetPoint)) errors.push(`portal target outside world: ${portal.id}`);
     if (target && !actorCanOccupy(target)) errors.push(`portal target is blocked: ${portal.id}`);
     if (portal.targetRoomId && !roomIds.has(portal.targetRoomId)) errors.push(`portal references missing room: ${portal.id}`);
@@ -447,6 +483,18 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
     if (npc.behavior && !["idle", "talk", "draw", "review", "patrol"].includes(npc.behavior)) errors.push(`npc behavior is invalid: ${npc.id}`);
     if (npc.patrol?.some((point) => !inBounds(point))) errors.push(`npc patrol outside world: ${npc.id}`);
     if (npc.patrol?.some((point) => inBounds(point) && !actorCanOccupy(point))) errors.push(`npc patrol is blocked: ${npc.id}`);
+    if (actorCanOccupy(npc.point) && npc.patrol?.length
+      && npc.patrol.every((point) => inBounds(point) && actorCanOccupy(point))) {
+      const legs = [npc.point, ...npc.patrol, npc.patrol[0]!];
+      for (let index = 1; index < legs.length; index += 1) {
+        if (!connectivity.connected(legs[index - 1]!, legs[index]!)) {
+          errors.push(connectivity.budgetExceeded
+            ? `npc patrol connectivity exceeds validation budget: ${npc.id}`
+            : `npc patrol is unreachable: ${npc.id}`);
+          break;
+        }
+      }
+    }
   }
   return errors;
 }

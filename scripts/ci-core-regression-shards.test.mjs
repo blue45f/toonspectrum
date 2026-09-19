@@ -48,6 +48,26 @@ test("semantic sharding keeps expensive domains isolated", () => {
   }
 });
 
+test("required foundation execution includes virtual-world consent, media and compiler integration regressions", () => {
+  const foundation = executionTargetsByShard()["studio-foundation"];
+  for (const target of [
+    "apps/web/src/domains/creator/virtual-space",
+    "apps/web/src/domains/creator/live/huddle",
+    "apps/web/tests/vite-react-compiler-runtime-interop.test.ts",
+  ]) {
+    assert.ok(REQUIRED_VITEST_TARGETS.includes(target), `missing protected regression target: ${target}`);
+    assert.equal(shardForTarget(target), "studio-foundation", target);
+    assert.ok(targetIsCovered(target, foundation), `target must execute in foundation: ${target}`);
+  }
+  for (const test of [
+    "apps/web/src/domains/creator/virtual-space/studio-virtual-space-social.test.ts",
+    "apps/web/src/domains/creator/virtual-space/studio-virtual-space-world.test.ts",
+    "apps/web/src/domains/creator/virtual-space/studio-virtual-space-npc-director.test.ts",
+    "apps/web/src/domains/creator/live/huddle/studio-p2p-huddle-controller.test.ts",
+    "apps/web/src/domains/creator/live/huddle/studio-p2p-huddle-events.test.ts",
+  ]) assert.ok(targetIsCovered(test, foundation), `required execution omitted ${test}`);
+});
+
 test("directory targets remove redundant child execution without reducing coverage", () => {
   const input = [
     "apps/web/src/domains/creator/export",

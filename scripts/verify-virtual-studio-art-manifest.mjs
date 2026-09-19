@@ -31,6 +31,14 @@ export const VIRTUAL_STUDIO_ART_MANIFEST_PATH = path.join(
   "art-manifest.json",
 );
 
+export const VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY = path.resolve(
+  scriptDirectory,
+  "../apps/web/public/assets/virtual-studio/living-world",
+);
+const LIVING_WORLD_BACKGROUND_NAME = "master-clean-plate.webp";
+const LIVING_WORLD_BACKGROUND_URL = `/assets/virtual-studio/living-world/${LIVING_WORLD_BACKGROUND_NAME}`;
+const LIVING_WORLD_DIMENSIONS = [1296, 1213];
+
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -700,17 +708,17 @@ export async function verifyArtManifestDirectory({
   for (const entry of directoryEntries) {
     requireCondition(
       expectedNames.has(entry.name),
-      `production-v2 contains undeclared entry ${entry.name}`,
+      `${path.basename(resolvedArtDirectory)} contains undeclared entry ${entry.name}`,
     );
     requireCondition(
       entry.isFile() && !entry.isSymbolicLink(),
-      `production-v2 entry ${entry.name} must be a regular file, not a link or directory`,
+      `${path.basename(resolvedArtDirectory)} entry ${entry.name} must be a regular file, not a link or directory`,
     );
   }
   for (const expectedName of expectedNames) {
     requireCondition(
       directoryEntries.some((entry) => entry.name === expectedName),
-      `production-v2 is missing declared entry ${expectedName}`,
+      `${path.basename(resolvedArtDirectory)} is missing declared entry ${expectedName}`,
     );
   }
 
@@ -765,6 +773,126 @@ export async function verifyArtManifestDirectory({
   });
 }
 
+/** A lossless declaration must agree with the actual WebP bitstream, including VP8X wrappers. */
+export function verifyLosslessWebpEncoding(bytes, label = "clean plate") {
+  requireCondition(readImageDimensions(bytes, label).format === "webp", `${label} must be WebP`);
+  const chunks = [];
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const type = bytes.toString("ascii", offset, offset + 4);
+    const length = bytes.readUInt32LE(offset + 4);
+    const end = offset + 8 + length;
+    requireCondition(end <= bytes.length, `${label} has a truncated ${type} chunk`);
+    chunks.push(type);
+    offset = end + length % 2;
+  }
+  requireCondition(offset === bytes.length, `${label} has invalid WebP chunk padding`);
+  requireCondition(chunks.filter((type) => type === "VP8L").length === 1
+    && !chunks.some((type) => ["VP8 ", "ANIM", "ANMF"].includes(type)),
+  `${label} must contain one static lossless VP8L bitstream`);
+  return true;
+}
+
+export function validateVirtualStudioLivingWorldArtManifestContract(manifest) {
+  requireCondition(isRecord(manifest) && manifest.version === 1
+    && manifest.kind === "virtual-studio-living-world", "living-world manifest version/kind is invalid");
+  requireCondition(isRecord(manifest.outputs) && Object.keys(manifest.outputs).length === 1,
+    "living-world must declare exactly the clean-plate output");
+  const output = outputMetadata(manifest, LIVING_WORLD_BACKGROUND_NAME);
+  requireCondition(dimensionsEqual(requireDimensions(output.dimensions, "living-world output dimensions"), LIVING_WORLD_DIMENSIONS),
+    "living-world clean plate must retain its actual 1296x1213 dimensions");
+  requireCondition(isRecord(manifest.background)
+    && manifest.background.output === LIVING_WORLD_BACKGROUND_NAME
+    && manifest.background.runtimeUrl === LIVING_WORLD_BACKGROUND_URL,
+  "living-world background must identify the clean-plate asset and runtime URL");
+  requireCondition(manifest.background.technique === "imagegen edit of the existing authored background"
+    && manifest.background.referencePixelIdentity === false && manifest.background.singleFlattenedLayer === true,
+  "living-world must disclose imagegen editing, changed reference pixels and the flattened layer");
+  requireCondition(isRecord(manifest.provenance) && isRecord(manifest.provenance.reference)
+    && manifest.provenance.reference.path === "../production-v2/master-central-lossless.webp",
+  "living-world reference must be the preserved production-v2 background");
+  const reference = manifest.provenance.reference;
+  requireSha256(reference.sha256, "living-world reference sha256");
+  requirePositiveInteger(reference.bytes, "living-world reference bytes");
+  requireCondition(dimensionsEqual(requireDimensions(reference.dimensions, "living-world reference dimensions"), [869, 813]),
+    "living-world reference dimensions must remain 869x813");
+  const original = manifest.provenance.originalAuthoredMaster;
+  requireCondition(isRecord(original) && original.sourcePixelsReverified === false,
+    "living-world must not claim the private authored master was reverified");
+  requireSha256(original.sourceSha256, "living-world original authored master sha256");
+  const generation = manifest.provenance.generation;
+  requireCondition(isRecord(generation) && generation.tool === "image_gen" && generation.mode === "edit"
+    && generation.outputStoredInRepository === false && typeof generation.promptSummary === "string"
+    && generation.promptSummary.length > 0, "living-world imagegen provenance is required");
+  requireSha256(generation.outputSha256, "living-world generated PNG sha256");
+  requirePositiveInteger(generation.outputBytes, "living-world generated PNG bytes");
+  requireCondition(dimensionsEqual(requireDimensions(generation.outputDimensions, "living-world generated PNG dimensions"), LIVING_WORLD_DIMENSIONS),
+    "living-world generated PNG must match the clean-plate dimensions");
+  const encoding = manifest.provenance.encoding;
+  requireCondition(isRecord(encoding) && encoding.tool === "cwebp" && encoding.lossless === true
+    && encoding.generatedPngPixelsCompared === true,
+  "living-world must record lossless encoding and the preparation-time PNG pixel comparison");
+  requireSha256(encoding.decodedRgbaSha256, "living-world recorded decoded RGBA sha256");
+  for (const limitation of [
+    "generated clean plate, not pixel-identical to the authored reference",
+    "occluded floor and furniture pixels were reconstructed by image generation",
+    "single flattened background, not independently movable furniture layers",
+    "generated PNG pixel comparison is a recorded preparation check, not repeated by the repository verifier",
+    "existing character animation remains cutout-rig deformation, not redrawn poses",
+  ]) {
+    requireCondition(Array.isArray(manifest.limitations) && manifest.limitations.includes(limitation),
+      `living-world must disclose limitation: ${limitation}`);
+  }
+}
+
+/** Ensure the generated authoring world, its generator, and the runtime bind the verified asset. */
+export async function verifyVirtualStudioLivingWorldBindings({
+  worldPath = path.resolve(scriptDirectory, "../apps/web/public/assets/virtual-studio/world/default-world.json"),
+  generatorPath = path.resolve(scriptDirectory, "generate-virtual-studio-default-world.mts"),
+  runtimePath = path.resolve(scriptDirectory, "../apps/web/src/domains/creator/virtual-space/studio-virtual-space-world-manifest.ts"),
+} = {}) {
+  const world = JSON.parse(await readFile(worldPath, "utf8"));
+  const layer = world.layers?.find((entry) => entry.name === "background" && entry.type === "imagelayer");
+  const backgroundUrl = world.properties?.find((entry) => entry.name === "backgroundUrl")?.value;
+  requireCondition(backgroundUrl === LIVING_WORLD_BACKGROUND_URL
+    && layer?.image === `../living-world/${LIVING_WORLD_BACKGROUND_NAME}`
+    && layer.imagewidth === LIVING_WORLD_DIMENSIONS[0] && layer.imageheight === LIVING_WORLD_DIMENSIONS[1],
+  "generated default world must reference the verified clean plate and its actual dimensions");
+  const generator = await readFile(generatorPath, "utf8");
+  requireCondition(generator.includes(`image: "../living-world/${LIVING_WORLD_BACKGROUND_NAME}"`)
+    && /imagewidth:\s*1296\b/u.test(generator) && /imageheight:\s*1213\b/u.test(generator),
+  "default-world generator must retain the verified clean-plate path and dimensions");
+  const runtime = await readFile(runtimePath, "utf8");
+  requireCondition(runtime.includes(`backgroundUrl: "${LIVING_WORLD_BACKGROUND_URL}"`),
+    "runtime default manifest must use the verified clean-plate URL");
+  return true;
+}
+
+export async function verifyVirtualStudioLivingWorldArtManifest({
+  artDirectory = VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY,
+  productionArtDirectory = VIRTUAL_STUDIO_PRODUCTION_ART_DIRECTORY,
+} = {}) {
+  const result = await verifyArtManifestDirectory({ artDirectory, validateContract: validateVirtualStudioLivingWorldArtManifestContract });
+  const output = result.assets[0];
+  verifyLosslessWebpEncoding(await readFile(output.path), LIVING_WORLD_BACKGROUND_NAME);
+  const referencePath = path.join(productionArtDirectory, "master-central-lossless.webp");
+  const referenceStat = await lstat(referencePath);
+  requireCondition(referenceStat.isFile() && !referenceStat.isSymbolicLink(), "living-world reference must be a regular file");
+  const referenceBytes = await readFile(referencePath);
+  const reference = result.manifest.provenance.reference;
+  requireCondition(referenceBytes.length === reference.bytes
+    && createHash("sha256").update(referenceBytes).digest("hex") === reference.sha256
+    && dimensionsEqual(readImageDimensions(referenceBytes).dimensions, reference.dimensions),
+  "living-world reference SHA-256, bytes or dimensions do not match the preserved production background");
+  const productionManifest = JSON.parse(await readFile(path.join(productionArtDirectory, "art-manifest.json"), "utf8"));
+  requireCondition(productionManifest.background.sourceSha256 === result.manifest.provenance.originalAuthoredMaster.sourceSha256,
+    "living-world original authored master provenance must match production-v2");
+  await verifyVirtualStudioLivingWorldBindings();
+  return Object.freeze({ ...result, outputIntegrityVerified: true, losslessWebpVerified: true,
+    referenceOutputIntegrityVerified: true, runtimeBindingsVerified: true,
+    generatedPngPixelsReverifiedThisRun: false, privateApprovedMasterSourceReverified: false });
+}
+
 export async function verifyVirtualStudioArtManifest({
   artDirectory = VIRTUAL_STUDIO_PRODUCTION_ART_DIRECTORY,
   manifestPath = path.join(artDirectory, "art-manifest.json"),
@@ -791,6 +919,7 @@ export async function verifyVirtualStudioArtManifest({
     generatorSha256 === result.manifest.generator.sha256,
     "art generator SHA-256 does not match the manifest",
   );
+  const livingWorld = await verifyVirtualStudioLivingWorldArtManifest({ productionArtDirectory: artDirectory });
   const atlasQuality = REQUIRED_SKINS.flatMap((skin) => (
     REQUIRED_DIRECTIONS.map((direction) => (
       result.manifest.skins[skin].directions[direction]
@@ -803,6 +932,7 @@ export async function verifyVirtualStudioArtManifest({
     result.manifest.background.sourcePixelsComparedThisBuild;
   return Object.freeze({
     ...result,
+    livingWorld,
     outputIntegrityVerified: true,
     privateApprovedMasterSourceReverified,
     backgroundProvenanceMode: result.manifest.background.provenanceMode,
@@ -822,9 +952,11 @@ async function main() {
     ? "The private approved master source was reverified in this build."
     : "The private approved master source was not reverified in this build.";
   console.log(
-    `Virtual Studio art integrity OK: ${result.assetCount} assets, ${result.totalBytes} bytes; `
+    `Virtual Studio art integrity OK: ${result.assetCount} preserved production assets + ${result.livingWorld.assetCount} living-world clean plate, ${result.totalBytes + result.livingWorld.totalBytes} bytes; `
       + "output SHA-256, byte lengths, and dimensions match art-manifest.json; "
       + `minimum decoded pairwise difference is ${result.minimumPairwiseVisibleDifferencePixels} pixels. `
+      + "Living-world output/reference integrity, static lossless VP8L and runtime bindings verified. "
+      + "Generated PNG pixel identity is a recorded preparation check. "
       + sourceVerification,
   );
 }

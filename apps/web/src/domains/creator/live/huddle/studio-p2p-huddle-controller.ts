@@ -36,6 +36,8 @@ export interface HuddleDependencies {
   createStream?: (tracks: MediaStreamTrack[]) => MediaStream;
   /** Optional RTC-only cohort gate. Virtual Space uses this to keep a huddle proximity-scoped. */
   peerFilter?: (participant: StudioLiveParticipant) => boolean;
+  /** Immutable consent scope. Changing its identity or membership requires closing this session. */
+  conversation?: { readonly id: string; readonly peerIds: readonly string[] };
   id?: () => string; now?: () => number;
 }
 
@@ -46,6 +48,7 @@ export class StudioP2pHuddleController {
   private readonly links = new Map<string, Link>();
   private readonly deferredSignals = new Map<string, HuddleSignalPacket[]>();
   private mediaPeerScope: Set<string> | null = null;
+  private readonly conversation: { id: string; memberIds: readonly string[] } | null;
   private readonly blocked = new Set<string>();
   private readonly seen = new Set<string>();
   private readonly listeners = new Set<() => void>();
@@ -66,7 +69,13 @@ export class StudioP2pHuddleController {
     private readonly self: StudioLiveParticipant,
     private readonly port: StudioLiveDirectPort,
     private readonly deps: HuddleDependencies = {},
-  ) { this.epoch = this.id(); }
+  ) {
+    this.epoch = this.id();
+    this.conversation = deps.conversation ? {
+      id: deps.conversation.id,
+      memberIds: Object.freeze([...new Set([self.sessionId, ...deps.conversation.peerIds])].sort()),
+    } : null;
+  }
   private id(): string { return this.deps.id?.() ?? crypto.randomUUID(); }
   private now(): number { return this.deps.now?.() ?? Date.now(); }
   private stream(tracks: MediaStreamTrack[]): MediaStream {
@@ -94,6 +103,7 @@ export class StudioP2pHuddleController {
       peer.sessionId !== this.self.sessionId
       && peer.role !== "viewer"
       && !this.blocked.has(peer.sessionId)
+      && (!this.conversation || this.conversation.memberIds.includes(peer.sessionId))
       && (this.deps.peerFilter?.(peer) ?? true)
     );
   }
@@ -103,7 +113,10 @@ export class StudioP2pHuddleController {
   /** Re-evaluate a dynamic cohort without reopening camera or microphone capture. */
   refreshPeers(): void { this.sync(); }
   private send(id: string, packet: HuddlePacket): boolean {
-    return !this.closed && this.port.send(id, JSON.stringify(packet));
+    if (this.closed || !this.eligiblePeers().some((peer) => peer.sessionId === id)) return false;
+    return this.port.send(id, JSON.stringify(this.conversation ? {
+      ...packet, conversationId: this.conversation.id, memberIds: this.conversation.memberIds,
+    } : packet));
   }
   private announce(id?: string): void {
     const packet: HuddlePacket = { kind: "state", epoch: this.epoch, ...this.state };
@@ -130,6 +143,12 @@ export class StudioP2pHuddleController {
     if (this.closed || !this.isEligiblePeer(sender)) return;
     const packet = parseHuddlePacket(raw);
     if (!packet) return;
+    const scope = packet as HuddlePacket & { conversationId?: unknown; memberIds?: unknown };
+    if (this.conversation) {
+      if (scope.conversationId !== this.conversation.id || !Array.isArray(scope.memberIds)
+        || scope.memberIds.length !== this.conversation.memberIds.length
+        || !scope.memberIds.every((member, index) => member === this.conversation?.memberIds[index])) return;
+    } else if (scope.conversationId !== undefined || scope.memberIds !== undefined) return;
     if (packet.kind === "state") { this.receiveState(sender, packet); return; }
     const peer = this.peers.get(id);
     if (!peer || peer.epoch !== packet.epoch) return;
@@ -137,7 +156,7 @@ export class StudioP2pHuddleController {
     if (packet.kind === "description" || packet.kind === "ice") {
       if (packet.toEpoch === this.epoch) {
         if (this.isMediaPeerAllowed(id)) this.enqueueSignal(id, packet);
-        else this.deferSignal(id, packet);
+        else if (!this.conversation) this.deferSignal(id, packet);
       }
       return;
     }
@@ -218,7 +237,8 @@ export class StudioP2pHuddleController {
     this.emit();
   }
   private isMediaPeerAllowed(id: string): boolean {
-    return this.mediaPeerScope === null || this.mediaPeerScope.has(id);
+    return (!this.conversation || this.conversation.memberIds.includes(id))
+      && (this.mediaPeerScope === null || this.mediaPeerScope.has(id));
   }
   react(emoji: HuddleReaction): void {
     const packet: HuddlePacket = { kind: "reaction", epoch: this.epoch, id: this.id(), emoji };
@@ -230,7 +250,7 @@ export class StudioP2pHuddleController {
   }
   private ensureLink(id: string): Link | null {
     const peer = this.peers.get(id);
-    if (this.closed || !peer || !this.isMediaPeerAllowed(id)) return null;
+    if (this.closed || !peer || !this.isEligiblePeer(peer.participant) || !this.isMediaPeerAllowed(id)) return null;
     const existing = this.links.get(id);
     if (existing) return existing;
     try {
@@ -246,7 +266,10 @@ export class StudioP2pHuddleController {
           { kind: "ice", epoch: this.epoch, toEpoch: link.epoch, candidate: candidate.toJSON() });
       };
       pc.ontrack = ({ track }) => {
-        if (this.links.get(id) !== link) return;
+        if (this.links.get(id) !== link || !this.isEligiblePeer(peer.participant) || !this.isMediaPeerAllowed(id)) {
+          track.stop(); return;
+        }
+        peer.stream?.getTracks().filter((t) => t.kind === track.kind && t !== track).forEach((t) => t.stop());
         const tracks = (peer.stream?.getTracks() ?? []).filter((t) => t.kind !== track.kind);
         peer.stream = this.stream([...tracks, track]); this.emit();
       };
@@ -454,7 +477,10 @@ export class StudioP2pHuddleController {
       link.pc.close();
     }
     const peer = this.peers.get(id);
-    if (peer) { peer.stream = null; peer.connection = "idle"; }
+    if (peer) {
+      peer.stream?.getTracks().forEach((track) => track.stop());
+      peer.stream = null; peer.connection = "idle";
+    }
   }
   private removePeer(id: string): void {
     this.closeLink(id);

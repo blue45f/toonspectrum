@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { StudioWorldConnectivityIndex } from "./studio-virtual-space-world-connectivity";
+
 import tiledWorld from "../../../../public/assets/virtual-studio/world/default-world.json";
 
 import {
@@ -8,6 +10,7 @@ import {
   studioWorldPortalTarget,
   studioWorldRoomAt,
   type StudioVirtualSpaceWorldManifest,
+  type StudioWorldPortalDefinition,
   validateStudioWorldManifest,
 } from "./studio-virtual-space-world-manifest";
 import {
@@ -79,6 +82,46 @@ describe("Virtual Studio world manifest", () => {
     );
   });
 
+  it("rejects an NPC patrol leg that is separated by a sealed wall", () => {
+    const manifest: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      width: 200,
+      height: 160,
+      rooms: [{ id: "room", x: 0, y: 0, width: 200, height: 160, labelKo: "방", labelEn: "Room" }],
+      props: [],
+      interactions: [],
+      portals: [],
+      spawns: [{ id: "main", point: { x: 40, y: 40 } }],
+      colliders: [{ x: 95, y: 0, width: 10, height: 160 }],
+      npcs: [{
+        id: "blocked-patrol",
+        skinKey: "silver",
+        roomId: "room",
+        point: { x: 40, y: 80 },
+        behavior: "patrol",
+        patrol: [{ x: 160, y: 80 }],
+      }],
+    };
+
+    expect(validateStudioWorldManifest(manifest)).toContain(
+      "npc patrol is unreachable: blocked-patrol",
+    );
+  });
+
+  it("shares one connectivity component search across many NPC patrol legs", () => {
+    const bounds = { width: 1_000, height: 1_000 };
+    const colliders = [{ x: 495, y: 0, width: 10, height: 900 }];
+    const connectivity = new StudioWorldConnectivityIndex(bounds, colliders, 9);
+    for (let index = 0; index < 100; index += 1) {
+      expect(connectivity.connected(
+        { x: 100, y: 100 + index * 2 },
+        { x: 900, y: 100 + index * 2 },
+      )).toBe(true);
+    }
+    expect(connectivity.searchCount).toBe(1);
+    expect(connectivity.budgetExceeded).toBe(false);
+  });
+
   it("rejects blocked spawns, portal targets and NPC routes before runtime", () => {
     const collider = { x: 300, y: 300, width: 100, height: 100 };
     const manifest: StudioVirtualSpaceWorldManifest = {
@@ -125,6 +168,24 @@ describe("Virtual Studio world manifest", () => {
       .toEqual(expect.arrayContaining(["spawn is blocked: main"]));
   });
 
+  it("rejects a portal whose entire activation disk is sealed inside geometry", () => {
+    const manifest: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      props: [],
+      colliders: [{ x: 360, y: 330, width: 130, height: 140 }],
+      portals: [{
+        id: "buried-portal",
+        point: { x: 425, y: 399 },
+        radius: 40,
+        targetPoint: { x: 425, y: 700 },
+      }],
+    };
+
+    expect(validateStudioWorldManifest(manifest)).toContain(
+      "portal activation is blocked: buried-portal",
+    );
+  });
+
   it("resolves room portals to that room's spawn unless coordinates override it", () => {
     const drawingSpawn = DEFAULT_STUDIO_WORLD_MANIFEST.spawns.find((spawn) => spawn.id === "drawing")!;
     expect(studioWorldPortalTarget(DEFAULT_STUDIO_WORLD_MANIFEST, {
@@ -141,19 +202,48 @@ describe("Virtual Studio world manifest", () => {
       targetPoint: { x: 420, y: 520 },
     })).toEqual({ x: 420, y: 520 });
   });
+  it("uses actual room membership instead of a misleading spawn id", () => {
+    const manifest: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      width: 200,
+      height: 100,
+      props: [],
+      colliders: [],
+      interactions: [],
+      portals: [],
+      npcs: [],
+      rooms: [
+        { id: "left", x: 0, y: 0, width: 100, height: 100, labelKo: "왼쪽", labelEn: "Left" },
+        { id: "right", x: 100, y: 0, width: 100, height: 100, labelKo: "오른쪽", labelEn: "Right" },
+      ],
+      spawns: [
+        { id: "left", point: { x: 150, y: 50 } },
+        { id: "real-left", point: { x: 50, y: 50 } },
+      ],
+    };
+    const portal: StudioWorldPortalDefinition = {
+      id: "to-left",
+      point: { x: 150, y: 70 },
+      radius: 20,
+      targetRoomId: "left",
+    };
+
+    expect(studioWorldPortalTarget(manifest, portal)).toEqual({ x: 50, y: 50 });
+    expect(validateStudioWorldManifest({ ...manifest, portals: [portal] })).toEqual([]);
+  });
 });
 
 describe("Virtual Studio Tiled adapter", () => {
-  it("uses the production crop as the Tiled authoring reference", () => {
+  it("uses the clean plate as the Tiled authoring reference", () => {
     const background = tiledWorld.layers.find((layer) => layer.name === "background");
     expect(background).toMatchObject({
       type: "imagelayer",
-      image: "../production-v2/master-central-lossless.webp",
-      imagewidth: 869,
-      imageheight: 813,
+      image: "../living-world/master-clean-plate.webp",
+      imagewidth: 1296,
+      imageheight: 1213,
     });
     expect(tiledWorld.properties.find((item) => item.name === "backgroundUrl")?.value)
-      .toBe("/assets/virtual-studio/production-v2/master-central-lossless.webp");
+      .toBe("/assets/virtual-studio/living-world/master-clean-plate.webp");
   });
 
   it("supports new rooms, props, portals, spawns and NPCs from data", () => {
@@ -342,6 +432,25 @@ describe("Virtual Studio manifest pathfinding", () => {
     });
     expect(path.length).toBeGreaterThan(0);
     expect(path.every((point) => studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, point))).toBe(true);
+  });
+
+  it("approaches a blocked click from the reachable side of a sealed wall", () => {
+    const world: StudioVirtualSpaceWorldManifest = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      width: 200,
+      height: 160,
+      rooms: [{ id: "room", x: 0, y: 0, width: 200, height: 160, labelKo: "방", labelEn: "Room" }],
+      props: [],
+      interactions: [],
+      portals: [],
+      spawns: [{ id: "main", point: { x: 150, y: 80 } }],
+      npcs: [],
+      colliders: [{ x: 95, y: 0, width: 10, height: 160 }],
+    };
+    const path = findStudioWorldPath(world, { x: 150, y: 80 }, { x: 100, y: 80 });
+    expect(path.length).toBeGreaterThan(0);
+    expect(path.at(-1)?.x).toBeGreaterThan(105);
+    expect(path.every((point) => studioWorldCanOccupy(world, point))).toBe(true);
   });
 });
 

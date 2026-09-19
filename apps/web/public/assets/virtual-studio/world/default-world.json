@@ -11,12 +11,12 @@
   "version": "1.10",
   "tiledversion": "1.11.2",
   "nextlayerid": 9,
-  "nextobjectid": 73,
+  "nextobjectid": 77,
   "properties": [
     {
       "name": "backgroundUrl",
       "type": "string",
-      "value": "/assets/virtual-studio/production-v2/master-central-lossless.webp"
+      "value": "/assets/virtual-studio/living-world/master-clean-plate.webp"
     },
     {
       "name": "backgroundAssetKey",
@@ -26,7 +26,7 @@
     {
       "name": "manifestVersion",
       "type": "float",
-      "value": 2
+      "value": 3
     },
     {
       "name": "manifestId",
@@ -39,9 +39,9 @@
       "id": 1,
       "name": "background",
       "type": "imagelayer",
-      "image": "../production-v2/master-central-lossless.webp",
-      "imagewidth": 869,
-      "imageheight": 813,
+      "image": "../living-world/master-clean-plate.webp",
+      "imagewidth": 1296,
+      "imageheight": 1213,
       "x": 0,
       "y": 0,
       "opacity": 1,
@@ -1688,7 +1688,200 @@
       "draworder": "topdown",
       "x": 0,
       "y": 0,
-      "objects": []
+      "objects": [
+        {
+          "id": 73,
+          "name": "studio-guide",
+          "type": "",
+          "x": 363.7711864406779,
+          "y": 537.5416666666667,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "dark"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lounge"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "down"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.68
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 58
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "327.7542372881356,493.20833333333337;360.1694915254237,609.5833333333334"
+            }
+          ]
+        },
+        {
+          "id": 74,
+          "name": "studio-writer",
+          "type": "",
+          "x": 313.3474576271186,
+          "y": 219.45000000000002,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "silver"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "writers"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "up"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.68
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 54
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "475.4237288135593,219.45000000000002;342.16101694915255,260.45833333333337"
+            }
+          ]
+        },
+        {
+          "id": 75,
+          "name": "studio-artist",
+          "type": "",
+          "x": 637.5,
+          "y": 454.4166666666667,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "pink"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "right"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.68
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 60
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "641.1016949152543,343.58333333333337;626.6949152542372,498.75"
+            }
+          ]
+        },
+        {
+          "id": 76,
+          "name": "studio-librarian",
+          "type": "",
+          "x": 208.89830508474574,
+          "y": 454.4166666666667,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "purple"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "assets"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.68
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 52
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "205.29661016949152,332.5;219.70338983050846,498.75"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
