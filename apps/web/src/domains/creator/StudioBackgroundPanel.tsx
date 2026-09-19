@@ -173,13 +173,13 @@ export function StudioBackgroundPanel({
   const sectionLoading = t("studio.background.sectionLoading");
 
   function localizeChipLabel(chip: { id: string; label: string; labelKey: string }) {
-    const translated = t(chip.labelKey);
+    const translated = t(chip.labelKey, chip.label);
     return translated === chip.labelKey ? chip.label : translated;
   }
 
   function localizePresetLabel(preset: StudioBackgroundPreset) {
     const key = `studio.background.preset.${preset.id}`;
-    const translated = t(key);
+    const translated = t(key, preset.label);
     return translated === key ? preset.label : translated;
   }
 

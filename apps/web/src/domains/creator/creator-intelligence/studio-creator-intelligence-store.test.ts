@@ -80,4 +80,33 @@ describe("Studio Creator Intelligence project store", () => {
     expect(saved?.id).toBe("2026-09-18:37.57:126.98");
     expect(saved?.payload.location?.label).toBe("Jongno, Seoul");
   });
+  it("reports write failures without claiming saved research", () => {
+    const current = loadStudioCreatorIntelligenceStore(null, "alpha");
+    const blocked: StudioCreatorIntelligenceStorage = {
+      getItem: () => null, removeItem: () => undefined,
+      setItem: () => { throw new Error("quota"); },
+    };
+    expect(saveStudioCreatorIntelligenceStore(blocked, current)).toBe(false);
+    expect(saveStudioCreatorIntelligenceStore(null, current)).toBe(false);
+  });
+  it("rejects corrupt and foreign-project records", () => {
+    const storage = new MemoryStorage();
+    storage.setItem("toonspectrum:creator-intelligence:project:v1:alpha", "{");
+    expect(loadStudioCreatorIntelligenceStore(storage, "alpha").references).toEqual([]);
+    storage.setItem("toonspectrum:creator-intelligence:project:v1:alpha", JSON.stringify({
+      ...loadStudioCreatorIntelligenceStore(null, "beta"), references: [reference],
+    }));
+    expect(loadStudioCreatorIntelligenceStore(storage, "alpha").references).toEqual([]);
+  });
+  it("rejects an unreadably large write and preserves the previous draft", () => {
+    const storage = new MemoryStorage();
+    const current = patchStudioCreatorIntelligenceStore(loadStudioCreatorIntelligenceStore(storage, "alpha"), { references: [reference] });
+    expect(saveStudioCreatorIntelligenceStore(storage, current)).toBe(true);
+    const oversized = patchStudioCreatorIntelligenceStore(current, {
+      references: [{ ...reference, title: "x".repeat(750_000) }],
+    });
+    expect(saveStudioCreatorIntelligenceStore(storage, oversized)).toBe(false);
+    expect(loadStudioCreatorIntelligenceStore(storage, "alpha").references[0]?.title).toBe("Pose");
+  });
+
 });

@@ -1,12 +1,12 @@
-import { formatI18nTemplate, translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
+import { formatI18nTemplate, translateBilingualValueForLocale } from "@/shared/lib/i18n-bilingual-copy";
 import type {
   CreatorContinuityLocale,
   CreatorDestinationId,
   CreatorRecentDestination,
 } from "./creator-continuity-model";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("creator-continuity-destinations", ko, en);
+const bi = <TKo, TEn>(locale: string, ko: TKo, en: TEn): TKo =>
+  translateBilingualValueForLocale(locale, "creator-continuity-destinations", ko, en);
 
 export interface CreatorDestinationDefinition {
   readonly id: CreatorDestinationId;
@@ -183,18 +183,18 @@ export function safeCreatorDestinationHref(
 
 export function creatorDestinationLabel(
   id: CreatorDestinationId,
-  _locale: CreatorContinuityLocale,
+  locale: CreatorContinuityLocale,
 ): string {
   const destination = BY_ID.get(id);
-  return destination ? bi(destination.label.ko, destination.label.en) : id;
+  return destination ? bi(locale, destination.label.ko, destination.label.en) : id;
 }
 
 export function creatorDestinationDescription(
   id: CreatorDestinationId,
-  _locale: CreatorContinuityLocale,
+  locale: CreatorContinuityLocale,
 ): string {
   const destination = BY_ID.get(id);
-  return destination ? bi(destination.description.ko, destination.description.en) : "";
+  return destination ? bi(locale, destination.description.ko, destination.description.en) : "";
 }
 
 function studioWorkspaceFromHref(href: string): string | null {
@@ -238,17 +238,17 @@ export function creatorRecentDestinationDescription(
 
 export function formatCreatorRelativeTime(
   visitedAt: number,
-  _locale: CreatorContinuityLocale,
+  locale: CreatorContinuityLocale,
   now = Date.now(),
 ): string {
   const minutes = Math.floor(Math.max(0, now - visitedAt) / 60_000);
-  if (minutes < 1) return bi("방금 전", "Just now");
-  if (minutes < 60) return formatI18nTemplate(String(bi("{value0}분 전", "{value0} min ago")), { value0: minutes });
+  if (minutes < 1) return bi(locale, "방금 전", "Just now");
+  if (minutes < 60) return formatI18nTemplate(String(bi(locale, "{value0}분 전", "{value0} min ago")), { value0: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return formatI18nTemplate(String(bi("{value0}시간 전", "{value0} hr ago")), { value0: hours });
+  if (hours < 24) return formatI18nTemplate(String(bi(locale, "{value0}시간 전", "{value0} hr ago")), { value0: hours });
   const days = Math.floor(hours / 24);
-  if (days === 1) return bi("어제", "Yesterday");
-  if (days < 30) return formatI18nTemplate(String(bi("{value0}일 전", "{value0} days ago")), { value0: days });
+  if (days === 1) return bi(locale, "어제", "Yesterday");
+  if (days < 30) return formatI18nTemplate(String(bi(locale, "{value0}일 전", "{value0} days ago")), { value0: days });
   const months = Math.floor(days / 30);
-  return formatI18nTemplate(String(bi("{value0}개월 전", "{value0} mo ago")), { value0: months });
+  return formatI18nTemplate(String(bi(locale, "{value0}개월 전", "{value0} mo ago")), { value0: months });
 }

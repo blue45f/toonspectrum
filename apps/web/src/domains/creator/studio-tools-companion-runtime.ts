@@ -73,10 +73,10 @@ export function openStudioToolsCompanionForMenu(input: {
   windowRef: { current: Window | null };
   announce: (message: string) => void;
   workId: string | null;
-  t: (key: string) => string;
+  t: (key: string, fallback?: string) => string;
 }): void {
   const localize = (key: string, fallback: string) => {
-    const translated = input.t(key);
+    const translated = input.t(key, fallback);
     return translated === key ? fallback : translated;
   };
   const surface = input.surface ?? "workspace";

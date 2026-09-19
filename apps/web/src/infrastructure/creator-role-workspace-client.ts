@@ -6,7 +6,7 @@ import {
   type PublicCreatorRoleCandidate,
 } from "@/shared/lib/creator-role-workspace-contract";
 import {
-  publicCreatorRoleProfile,
+  normalizePublicCreatorRoleProfile,
   type CreatorCollaborationStatus,
   type CreatorRoleId,
   type CreatorSpecialtyId,
@@ -86,7 +86,7 @@ function normalizeCandidate(
   value: PublicRoleCandidateEnvelope,
 ): PublicCreatorRoleCandidate | null {
   if (typeof value.userId !== "string" || !value.userId) return null;
-  const roleProfile = publicCreatorRoleProfile(value.roleProfile);
+  const roleProfile = normalizePublicCreatorRoleProfile(value.roleProfile);
   if (!roleProfile) return null;
   return {
     userId: value.userId,

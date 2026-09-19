@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { prepareStudioNativeBrushDocumentCommit } from "./studio-native-brush-document-commit";
 import { planStudioNativeBrushDocument } from "./studio-native-brush-document-contract";
 import Inspector from "./StudioNativeBrushDocumentInspector";
 
@@ -56,7 +57,7 @@ describe("native document inspector", () => {
     fireEvent.click(screen.getByRole("button", { name: "선택 획 변환" }));
     await waitFor(() => expect(commit).toHaveBeenCalledWith(result));
     expect(calls).toEqual(["prepare", "worker", "commit"]);
-    expect(onPrepare).toHaveBeenCalledWith({ pageId: "p", masterEditMode: false, sourceElementId: "s", sourceRevision: plan.sourceRevision });
+    expect(onPrepare).toHaveBeenCalledWith({ pageId: "p", masterEditMode: false, sourceElementId: "s", sourceRevision: plan.sourceRevision }, prepareStudioNativeBrushDocumentCommit);
   });
   it("never calls the Worker when the document authority denies preparation", () => {
     render(<Inspector {...props({ onPrepare: () => null })} />); open();

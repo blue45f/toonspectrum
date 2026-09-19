@@ -206,6 +206,39 @@ test("kit escaping prevents reference titles from injecting Markdown links", () 
   assert.ok(kit.includes("\\[link\\]"));
 });
 
+test.each([
+  ["<scr<script>ipt>alert(1)</scr</script>ipt>", "alert(1)"],
+  ["<<b>iframe src=x>", ""],
+  ["<img src=x onerror=alert(1)", ""],
+  ["plain > text <", "plain text"],
+  [">plain >> text>", "plain text"],
+])("strips nested, unclosed and unmatched markup from metadata and kits: %s", (markup, plain) => {
+  const input = `Reference ${markup}`;
+  const saved = parseSavedOpenReference({
+    ...artwork, title: input, creator: input, date: input, credit: input,
+  });
+  assert.ok(saved);
+  for (const field of [saved.title, saved.creator, saved.date, saved.credit]) {
+    assert.equal(field, `Reference ${plain}`.trim());
+    assert.doesNotMatch(field, /[<>]/u);
+  }
+  for (const format of KIT_FORMATS) {
+    assert.doesNotMatch(buildCreationKit(format.id, markup, markup, [saved]), /[<>]/u);
+  }
+});
+
+test("preserves formatted text while rejecting titles stripped to empty text", () => {
+  assert.equal(parseSavedOpenReference({ ...artwork, title: "<b>Good</b> title" })?.title, "Good title");
+  assert.equal(parseSavedOpenReference({ ...artwork, title: "  <b>Good <i>nested</i></b>\n title  " })?.title, "Good nested title");
+  for (const title of ["<<b>iframe src=x>", "<img src=x onerror=alert(1)", ">>>"]) {
+    assert.equal(parseSavedOpenReference({ ...artwork, title }), null);
+  }
+  const kit = buildCreationKit("comic", "<b>Good</b> title", "<i>Useful</i> notes", [artwork]);
+  assert.ok(kit.includes("Good title"));
+  assert.ok(kit.includes("Useful notes"));
+  assert.doesNotMatch(kit, /[<>]/u);
+});
+
 test("requests include copyright fields and conflicting or malformed notices fail closed", () => {
   assert.ok(new URL(openSearchUrl("artic", "armor")).searchParams.get("fields")?.includes("copyright_notice"));
   assert.ok(new URL(openSearchUrl("cleveland", "armor")).searchParams.get("fields")?.includes("copyright"));

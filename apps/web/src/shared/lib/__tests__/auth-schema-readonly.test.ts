@@ -90,7 +90,7 @@ describe("authentication runtime schema assertions", () => {
       "utf8",
     );
     const start = source.indexOf("async function upsertOAuthUser(");
-    const end = source.indexOf("\nfunction normalizeRole", start);
+    const end = source.indexOf("\nasync function linkOAuthUser(", start);
     const upsertSource = source.slice(start, end);
 
     expect(start).toBeGreaterThanOrEqual(0);
@@ -101,10 +101,11 @@ describe("authentication runtime schema assertions", () => {
     expect(upsertSource).toContain(
       "target: [accounts.provider, accounts.providerAccountId]",
     );
-    expect(upsertSource).toContain("const [authoritativeUser]");
-    expect(upsertSource).toContain("const [authoritativeAccount]");
+    expect(upsertSource).toContain("const authoritativeUserId = await findLinkedUserId()");
     expect(upsertSource).toContain(
-      "userId = authoritativeAccount.userId",
+      "insertedUser && authoritativeUserId !== insertedUser.id",
     );
+    expect(upsertSource).toContain("transaction.delete(users)");
+    expect(upsertSource).toContain("return authoritativeUserId");
   });
 });

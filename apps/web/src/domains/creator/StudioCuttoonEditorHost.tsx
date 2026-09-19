@@ -333,7 +333,7 @@ import {
 } from "./studio-character-bible";
 import { svgToDataUrl } from "./studio-characters";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "./studio-chrome-ui";
-import { deleteSavedClipInMemory, prepareStudioSavedClipElements, upsertSavedClipInMemory } from "./studio-clips";
+import { deleteSavedClipInMemory, prepareStudioSavedClipElements, upsertSavedClipInMemory, type StudioClip } from "./studio-clips";
 import {
   COLOR_RANGE_FUZZINESS_DEFAULT,
   COLOR_RANGE_MAX_SAMPLES,
@@ -594,7 +594,7 @@ import {
   invertLayerMaskAlpha,
   type LayerMaskPaintMode,
 } from "./layer/studio-layer-mask";
-import { normalizeStudioLayerColor, normalizeStudioLayerRole } from "./layer/studio-layer-navigator";
+import { normalizeStudioLayerColor, normalizeStudioLayerRole, type StudioLayerNavigatorItem } from "./layer/studio-layer-navigator";
 import { createStudioLayerOperations } from "./layer/studio-layer-operations";
 import {
   EMPTY_STUDIO_LAYER_SOLO_STATE,
@@ -745,7 +745,7 @@ import { bindStudioMainMenuEditorActions } from "./studio-main-menu-editor-bindi
 import { buildStudioMainMenuGroups } from "./studio-main-menu-groups";
 import { studioBrushLabHref } from "./studio-main-menu-items-brush";
 import { StudioFilterDialogIntentContext } from "./studio-filter-dialog-intent";
-import { bindStudioMainMenuSurfaceActions } from "./studio-main-menu-surface-bindings";
+import { bindStudioMainMenuSurfaceActions, type StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
 import {
   composeThumbPage,
   normalizeDocumentMaster,
@@ -1248,6 +1248,7 @@ import {
   WET_MIX_WETNESS_DEFAULT,
 } from "./brush/studio-wet-mix";
 import { exportStudioPageToWillV1 } from "./export/studio-will-v1-export-bridge";
+import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import {
   studioWorkAssetDestructiveEditReason,
   studioWorkAssetDocumentSourceTransitionReason,
@@ -1344,7 +1345,6 @@ import type { StudioDrawingPaletteLayout } from "./brush/studio-drawing-palettes
 import type { PaperGrainKind } from "./brush/studio-paper-texture";
 import type { SvgExportEl, SvgExportResult } from "./export/studio-svg-export";
 import type { StudioFilterDraft, StudioFilterKind, StudioFilterPreview } from "./filter/studio-filter-menu";
-import type { StudioLayerNavigatorItem } from "./layer/studio-layer-navigator";
 import type { StudioLayerLiftReviewOptions } from "./layer/StudioLayerLiftDialog";
 import type {
   StudioDialogueImportApplyResult,
@@ -1375,7 +1375,6 @@ import type {
   StudioAutoActionScope,
   StudioAutoActionSet,
 } from "./studio-auto-actions";
-import type { StudioClip } from "./studio-clips";
 import type {
   StudioElementLike,
   StudioPageInsertState,
@@ -1405,7 +1404,6 @@ import type { StudioInkMlExportResult } from "./studio-inkml-interchange";
 import type { StudioIsometricPrimitiveSpec } from "./studio-isometric-primitive-contract";
 import type { StudioLivingInkExecutionConfig } from "./studio-living-ink-execution-protocol";
 import type { StudioLivingInkSelectionMask } from "./studio-living-ink-field";
-import type { StudioMainMenuSurfaceHandlerBundle } from "./studio-main-menu-surface-bindings";
 import type {
   StudioMainMenuSurfaceState,
   StudioPixelSelectionToolId,
@@ -1431,7 +1429,6 @@ import type { StudioTeamCommentMutationPlan } from "./studio-team-comment-mutati
 import type { StudioToolbarGroupId } from "./studio-toolbar-groups";
 import type { StudioVelocityPressureState } from "./studio-velocity-pressure-response";
 import type { StudioWatermarkPreferenceRuntime, StudioWatermarkPreferenceSnapshot } from "./studio-watermark-preferences-sqlite";
-import type { StudioWillV1PageExportResult } from "./export/studio-will-v1-export-bridge";
 import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type { StudioWorkspacePersistenceRuntime } from "./studio-workspace-sqlite-runtime";
 import type { StudioAssetShareOptions, StudioAssetSortOrder, StudioAssetTab } from "./StudioAssetMenuPanel";
@@ -15401,19 +15398,23 @@ const puppetWarpArmed =
       setError("생성한 에셋을 라이브러리에 저장하려면 로그인이 필요해요.");
       return;
     }
-    // BYOK가 설정되어 있으면 기존 직접 호출 경로를 유지하고, 그렇지 않으면 서버 관리형
-    // creator/assets/generate 경로를 사용한다. 서버 경로가 비활성화된 배포에서는 API가
-    // 명시적인 오류를 반환하므로 사용자가 설정 화면으로 이동할 수 있다.
+    if (!isStudioAiConfigured(aiSettings)) {
+      setError("설정에서 사용자 API 키를 등록한 뒤 다시 시도해 주세요.");
+      return;
+    }
+    // 이미지 생성은 사용자가 선택한 BYOK 제공자만 사용한다. 키가 없거나 호출이 실패해도
+    // 운영자 과금 경로로 자동 전환하지 않는다.
     runWithAiNotice(() => void executeGenerateAsset(prompt));
   }
   async function executeGenerateAsset(prompt: string) {
     if (collaborationAccessRef.current.locked) return;
+    if (!isStudioAiConfigured(aiSettings)) {
+      setError("설정에서 사용자 API 키를 등록한 뒤 다시 시도해 주세요.");
+      return;
+    }
     const mutationTicket = captureStudioMutationTicket();
     const insertionPlacement = nextAssetInsertionPlacement();
-    const useByok = isStudioAiConfigured(aiSettings);
-    const provider = useByok
-      ? studioImageAiProviderContext(aiSettings)
-      : { provider: "openai", model: "gpt-image-2", transport: "server" as const };
+    const provider = studioImageAiProviderContext(aiSettings);
     const requestProvenance = captureStudioAiGeneratedAssetProvenance(provider, "generated");
     const aiImageSize: StudioAiImageSize = assetPromptSize === "1536x1024"
       ? "1792x1024"
@@ -15442,7 +15443,7 @@ No text, logo, watermark, or copyrighted character.`;
         promptVersion: 1,
         prompt: providerPrompt,
         target: { pageId: activePage.id },
-        requestedSize: parseStudioAiRequestedSize(useByok ? aiImageSize : assetPromptSize),
+        requestedSize: parseStudioAiRequestedSize(aiImageSize),
         references: [],
       });
       const result = await generateBackgroundImage(aiSettings, providerPrompt, {

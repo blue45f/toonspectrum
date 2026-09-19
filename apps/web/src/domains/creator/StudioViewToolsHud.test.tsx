@@ -88,7 +88,8 @@ describe("StudioViewToolsHud", () => {
       name: "캔버스 확대율 정밀 조절",
     });
     fireEvent.change(slider, { target: { value: "1000" } });
-    expect(onSetMagnification).toHaveBeenLastCalledWith(5);
+    const sliderMagnification = onSetMagnification.mock.lastCall?.[0];
+    expect(sliderMagnification).toBeCloseTo(5, 12);
 
     fireEvent.click(
       screen.getByRole("button", { name: "캔버스 확대율 200퍼센트" })

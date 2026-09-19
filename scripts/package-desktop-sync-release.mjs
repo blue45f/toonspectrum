@@ -95,20 +95,30 @@ async function writeJson(filePath, value) {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-/** Node cannot spawn a Windows .cmd shim directly without invoking cmd.exe. */
-export function resolveReleaseCommand(command, args, platform = process.platform, env = process.env) {
-  if (platform === "win32" && /\.(?:cmd|bat)$/iu.test(command)) {
-    return { command: env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", command, ...args] };
-  }
-  return { command, args };
+/** .cmd shims need cmd.exe on Windows; never enable a shell for native executables. */
+export function resolveReleaseCommand(command, args, platform = process.platform, environment = process.env) {
+  if (platform !== "win32" || !/\.(?:cmd|bat)$/iu.test(command)) return { command, args };
+  // This boundary only runs trusted package-manager flags. Reject shell operators and
+  // expansion syntax instead of letting package metadata become an executable command.
+  const quote = (value) => {
+    if (typeof value !== "string" || !value || /[\r\n\0"%!?&|<>^()]/u.test(value)) {
+      throw new TypeError("unsafe Windows release command argument");
+    }
+    return /\s/u.test(value) ? `"${value}"` : value;
+  };
+  return {
+    command: environment.ComSpec || environment.COMSPEC || "cmd.exe",
+    args: ["/d", "/s", "/c", quote(command), ...args.map(quote)],
+  };
 }
 
 function run(command, args, options = {}) {
-  const invocation = resolveReleaseCommand(command, args);
+  const environment = { ...process.env, ...options.env };
+  const invocation = resolveReleaseCommand(command, args, process.platform, environment);
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: options.cwd ?? ROOT,
     encoding: "utf8",
-    env: { ...process.env, ...options.env },
+    env: environment,
     stdio: options.capture ? "pipe" : "inherit",
   });
   if (result.error) throw result.error;
@@ -134,21 +144,25 @@ async function copyJavaScriptTree(source, destination) {
   }
 }
 
-async function findNodeLicense() {
-  const runtimeRoot = resolve(dirname(process.execPath), "..");
-  const candidates = [
-    join(runtimeRoot, "LICENSE"),
-    join(runtimeRoot, "LICENSE.md"),
-    join(runtimeRoot, "share", "doc", "node", "copyright"),
-  ];
+export async function findNodeLicense(execPath = process.execPath, {
+  pathApi = { dirname, resolve, join }, statFile = stat,
+} = {}) {
+  const executableDirectory = pathApi.dirname(execPath);
+  const runtimeRoot = pathApi.resolve(executableDirectory, "..");
+  // Windows archives keep LICENSE beside node.exe; Unix distributions use the prefix.
+  const candidates = [...new Set([
+    ...[executableDirectory, runtimeRoot].flatMap((directory) =>
+      ["LICENSE", "LICENSE.md", "LICENSE.txt"].map((name) => pathApi.join(directory, name))),
+    pathApi.join(runtimeRoot, "share", "doc", "node", "copyright"),
+  ])];
   for (const candidate of candidates) {
     try {
-      if ((await stat(candidate)).isFile()) return candidate;
+      if ((await statFile(candidate)).isFile()) return candidate;
     } catch {
       // Continue through known Node distribution layouts.
     }
   }
-  throw new Error(`Node license was not found beside ${process.execPath}`);
+  throw new Error(`Node license was not found beside ${execPath}`);
 }
 
 async function stageRelease(options) {
@@ -213,6 +227,9 @@ async function stageRelease(options) {
     version,
     platform: platformLabel(),
     nodePlatform: process.platform,
+    ...(process.platform === "linux" ? {
+      libc: process.report.getReport().header.glibcVersionRuntime ? "gnu" : "musl",
+    } : {}),
     arch: process.arch,
     nodeVersion: process.version,
     sourceCommit: commit,

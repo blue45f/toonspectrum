@@ -3,13 +3,14 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-viewport-stack";
-
 const fileUrl = new URL("../StudioCuttoonEditorHost.tsx", import.meta.url);
 // The scenario image executors moved verbatim into the ctx-parameterized factory module.
 const scenarioModuleUrl = new URL("./studio-scenario-image-generation.ts", import.meta.url);
 const source = readFileSync(fileUrl, "utf8");
-const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
+const modalsSource = readFileSync(
+  new URL("../canvas/StudioCanvasModalsBody.tsx", import.meta.url),
+  "utf8",
+);
 const file = ts.createSourceFile(
   fileUrl.pathname,
   source,
@@ -71,22 +72,27 @@ describe("Studio AI generated asset fail-closed boundary", () => {
       "aiNoticePendingActionRef.current = null",
       "setAiNoticeOpen(false)",
     ]);
-    expect(viewportSource).toContain("<AiAssetNotice onCancel={cancelAiNotice}");
-    expect(viewportSource).toContain("cancelAiNotice: () => void;");
-    expect(viewportSource).not.toContain("setAiNoticeOpen={setAiNoticeOpen}");
+    expect(modalsSource).toContain("<AiAssetNotice onCancel={cancelAiNotice}");
+    expect(modalsSource).toContain("cancelAiNotice: () => void;");
+    expect(modalsSource).not.toContain("setAiNoticeOpen={setAiNoticeOpen}");
   });
 
-  it("keeps BYOK generation and wires the managed server fallback into the same product action", () => {
+  it("keeps asset generation BYOK-only and fails closed without an operator-paid fallback", () => {
     const value = functionSource("executeGenerateAsset");
     expectInOrder(value, [
-      "const useByok = isStudioAiConfigured(aiSettings)",
-      "if (useByok)",
+      "if (!isStudioAiConfigured(aiSettings))",
+      "setError(\"설정에서 사용자 API 키를 등록한 뒤 다시 시도해 주세요.\")",
+      "return;",
+      "const provider = studioImageAiProviderContext(aiSettings)",
+      "captureStudioAiGeneratedAssetProvenance(provider, \"generated\")",
+      "beginTrackedStudioAiOperation",
       "await generateBackgroundImage",
-      'await import("@/infrastructure/creator-client")',
-      "await generateAsset",
       "saveStudioAssetMutation",
       "addRenderedImage",
     ]);
+    expect(value).not.toContain('import("@/infrastructure/creator-client")');
+    expect(value).not.toContain("await generateAsset");
+    expect(value).not.toContain('transport: "server"');
   });
 
   it("captures request provenance before image awaits and never derives it after completion", () => {

@@ -197,7 +197,10 @@ export function saveStudioCreatorIntelligenceStore(
 ): boolean {
   if (!storage || !next.projectId) return false;
   try {
-    storage.setItem(storageKey(next.projectId), JSON.stringify(next));
+    const raw = JSON.stringify(next);
+    // Never report a successful save that the bounded loader cannot read back.
+    if (raw.length > 750_000) return false;
+    storage.setItem(storageKey(next.projectId), raw);
     return true;
   } catch {
     return false;

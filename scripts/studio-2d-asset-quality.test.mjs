@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { auditStudio2dAssets, readImageDimensions, readPngDimensions, STUDIO_2D_MANIFEST_PATH } from "./studio-2d-asset-audit.mjs";
+import { auditStudio2dAssets, readImageDimensions, readPngDimensions, studio2dAssetRecommendationError, STUDIO_2D_MANIFEST_PATH } from "./studio-2d-asset-audit.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -72,6 +72,17 @@ test("small originals cannot be promoted into recommendations even when the main
     item.recommended = false;
     assert.equal(auditStudio2dAssets(fixtureRoot, { version: 1, assets: [item] }).ok, true);
   } finally { rmSync(fixtureRoot, { recursive: true, force: true }); }
+});
+
+test("recommendation predicate rejects small originals and admits reviewed large ones", () => {
+  assert.match(studio2dAssetRecommendationError({
+    recommended: true,
+    review: { status: "usable", method: "full-image" },
+  }, { width: 899, height: 2048 }) ?? "", /Recommendation/u);
+  assert.equal(studio2dAssetRecommendationError({
+    recommended: true,
+    review: { status: "usable", method: "full-image" },
+  }, { width: 1024, height: 1024 }), null);
 });
 
 test("contact-sheet-only inspection cannot pass full-image recommendation", () => {

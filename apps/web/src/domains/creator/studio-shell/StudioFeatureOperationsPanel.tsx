@@ -5,7 +5,10 @@ import { studioFeatureModule } from "../studio-feature-registry";
 import { studioFeatureSurfacesForView, type StudioFeatureSurfaceTone } from "../studio-feature-surface-registry";
 import type { StudioProjectSection } from "../studio-project-views";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  translateBilingualValueForLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
 
@@ -40,14 +43,16 @@ export function StudioFeatureOperationsPanel({
   projectId,
   section,
   view,
-  locale: _locale,
+  locale,
 }: {
   readonly projectId: string;
   readonly section: StudioProjectSection;
   readonly view: string;
   readonly locale: string;
 }) {
-  const bt = useBilingual("StudioFeatureOperationsPanel");
+  useBilingualI18nRevision();
+  const bt = (ko: string, en: string) =>
+    translateBilingualValueForLocale(locale, "StudioFeatureOperationsPanel", ko, en);
   const registrations = studioFeatureSurfacesForView(section, view);
   if (registrations.length === 0) return null;
 

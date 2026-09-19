@@ -1,7 +1,6 @@
 import {
   formatI18nTemplate,
-  translateBilingualValueForActiveLocale,
-  translateCurrentStaticSourceText,
+  translateBilingualValueForLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import { ArrowUpRight, Heart, Search, SlidersHorizontal, X } from "lucide-react";
@@ -30,8 +29,6 @@ import type {
   SiteRoutePurpose,
 } from "@/shared/lib/site-route-metadata";
 
-const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
-  translateBilingualValueForActiveLocale("SiteDirectorySearch", ko, en);
 
 const PRODUCT_VALUES = ["studio", "spectrum", "docs"] as const satisfies readonly SiteRouteProduct[];
 const PURPOSE_VALUES = ["create", "discover", "learn", "connect", "manage", "trust"] as const satisfies readonly SiteRoutePurpose[];
@@ -86,6 +83,8 @@ function allowedParam<T extends string>(value: string | null, allowed: readonly 
 
 export function SiteDirectorySearch({ entries, locale }: { entries: readonly SiteDirectoryEntry[]; locale: SiteNavigationLocale }) {
   useBilingualI18nRevision();
+  const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
+    translateBilingualValueForLocale(locale, "SiteDirectorySearch", ko, en);
   const [params, setParams] = useSearchParams();
   const [favorites, setFavorites] = useState<string[]>(() => readFavoriteSiteRoutes());
   const query = (params.get("menu") ?? "").slice(0, 160);
@@ -161,8 +160,8 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
   );
 
   return (
-    <section className="directory-search" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-label"), { v0: String(id) })}>
-      <form role="search" aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SiteDirectorySearch", "en", "{v0}-label"), { v0: String(id) })} onSubmit={(event) => {
+    <section className="directory-search" aria-labelledby={`${id}-label`}>
+      <form role="search" aria-labelledby={`${id}-label`} onSubmit={(event) => {
         event.preventDefault();
         resultRef.current?.querySelector<HTMLAnchorElement>("a")?.focus();
       }}>

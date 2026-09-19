@@ -134,7 +134,8 @@ describe("Studio tools companion multi-window integration", () => {
       expect(workspace.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
       expect(navigator.getByRole("button", { name: "발표 안전 끄기" })).toBeTruthy();
     });
-    expect(storageRead).not.toHaveBeenCalled();
+    // Labels may consult the locale cache; transient companion state must not read any document key.
+    expect(storageRead.mock.calls.filter(([key]) => key !== "toonspectrum-i18n-runtime:v3:ko")).toEqual([]);
     expect(storageWrite).not.toHaveBeenCalled();
   });
 

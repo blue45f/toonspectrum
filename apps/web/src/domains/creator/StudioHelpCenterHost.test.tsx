@@ -27,7 +27,7 @@ async function openHelp(section: Parameters<typeof openStudioHelpCenter>[0]) {
     openStudioHelpCenter(section);
   });
   // 첫 열기는 lazy 청크 로드 + 검색 색인 구성이 함께 일어나 기본 1초 타임아웃을 넘긴다.
-  return screen.findByTestId("studio-help-center", undefined, { timeout: 10_000 });
+  return screen.findByRole("dialog", undefined, { timeout: 10_000 });
 }
 
 describe("StudioHelpCenterHost", () => {
@@ -51,18 +51,19 @@ describe("StudioHelpCenterHost", () => {
     expect(screen.getByText(/채우기/u)).toBeTruthy();
   });
 
-  it("현재 도구 구역은 산문 도움말이 없다는 사실을 화면에 적는다", async () => {
+  it("현재 도구 구역은 작성형 30초 가이드와 복구 순서를 연다", async () => {
     await openHelp({ section: "current-tool", toolCommandId: "tool.pen" });
-    expect(screen.getByText(/산문 도움말 문서는 아직 없습니다/u)).toBeTruthy();
-    // 비어 있다고 말하는 그 도움말 노드 id 를 그대로 밝힌다.
-    expect(screen.getByText("help/tool/pen")).toBeTruthy();
-    // 타사 별칭 칩은 카탈로그 실측치에서 나온다.
-    expect(screen.getByText(/Freehand Brush Tool/u)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "펜으로 선 그리기" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "30초 시작" })).toBeTruthy();
+    expect(screen.getByText("선이 그려지지 않아요")).toBeTruthy();
+    expect(screen.getByText(/B 키/u)).toBeTruthy();
   });
 
   it("도구를 모르면 추측하지 않는다", async () => {
     await openHelp({ section: "current-tool" });
-    expect(screen.getByText(/확인하지 못했습니다/u)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "도움말 홈" })).toBeTruthy();
+    expect(screen.getByText("현재 도구 정보가 아직 연결되지 않았습니다.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "현재 도구 도움말" })).toBeNull();
   });
 
   it("버그 리포트 구역은 담기는 것과 빠지는 것을 먼저 보여 준다", async () => {
@@ -83,7 +84,7 @@ describe("StudioHelpCenterHost", () => {
     await act(async () => {
       fireEvent.keyDown(window, { key: "Escape" });
     });
-    expect(screen.queryByTestId("studio-help-center")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("닫은 뒤 포커스를 도움말을 연 트리거로 돌려준다", async () => {
@@ -108,7 +109,7 @@ describe("StudioHelpCenterHost", () => {
       });
     });
 
-    expect(screen.queryByTestId("studio-help-center")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
 
     trigger.remove();

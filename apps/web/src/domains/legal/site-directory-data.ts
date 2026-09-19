@@ -147,6 +147,36 @@ export const PERSONAL_DESTINATIONS = [
  */
 export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGroup[] = [
   {
+    id: "creator-network",
+    icon: UsersRound,
+    label: { ko: "창작자 연결", en: "Creator network" },
+    description: { ko: "협업·교육·팬 활동과 자료실", en: "Collaboration, education, fan activity and resources" },
+    items: [
+      destination("/creators", "창작자", "Creators", "창작자와 활동 살펴보기", "Explore creators and their activity"),
+      destination("/ecosystem", "창작 생태계", "Creator ecosystem", "창작 생태계 서비스 찾기", "Explore creator ecosystem services"),
+      destination("/ecosystem/collaboration", "협업 연결", "Collaboration", "협업 서비스를 살펴보기", "Explore collaboration services"),
+      destination("/ecosystem/education", "창작 교육", "Creator education", "창작 교육 서비스를 살펴보기", "Explore creator education services"),
+      destination("/ecosystem/fandom", "팬 커뮤니티", "Fandom", "팬 활동과 커뮤니티 찾기", "Explore fan activity and communities"),
+      destination("/ecosystem/library", "생태계 자료실", "Ecosystem library", "생태계 자료 모아보기", "Explore ecosystem resources"),
+      destination("/learn/education", "교육 안내", "Education", "교육 과정과 기능 안내", "Explore education courses and tools"),
+    ],
+  },
+  {
+    id: "events-membership",
+    icon: UsersRound,
+    label: { ko: "이벤트·멤버십·후원", en: "Events, membership & support" },
+    description: { ko: "이벤트에 참여하고 멤버십과 후원 확인", en: "Explore events, membership and support" },
+    items: [
+      destination("/community/events", "커뮤니티 이벤트", "Community events", "커뮤니티 이벤트 찾기", "Explore community events"),
+      destination("/events", "이벤트 안내", "Events", "이벤트 목록과 안내 확인", "Explore events and announcements"),
+      destination("/events/beta-open", "베타 오픈 안내", "Beta opening", "베타 오픈 소식 확인", "Read the beta opening announcement"),
+      destination("/membership", "멤버십", "Membership", "멤버십 안내 확인", "Explore membership"),
+      destination("/membership/usage", "멤버십 사용 내역", "Membership usage", "멤버십 사용 내역 확인", "Review membership usage"),
+      destination("/support-creators", "창작자 후원", "Support creators", "창작자 후원 안내 확인", "Explore creator support"),
+      destination("/support-us", "서비스 후원", "Support the service", "서비스 후원 안내 확인", "Explore service support"),
+    ],
+  },
+  {
     id: "studio-foundation",
     icon: Wrench,
     label: { ko: "Studio 시작·프로젝트", en: "Studio & projects" },
@@ -442,6 +472,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/guide", "랭킹 산정 방식", "Ranking guide", "데이터와 산식 설명", "Understand ranking data and formulas"),
       destination("/accessibility", "접근성 안내", "Accessibility", "키보드·스크린리더·표시 지원", "Keyboard, screen reader and display support"),
       destination("/support", "이용 문의", "Support", "서비스 이용 도움받기", "Get help using the service"),
+      destination("/business", "비즈니스 안내", "Business", "사업자용 서비스와 협업 안내", "Services and collaboration for businesses"),
       destination("/contact", "광고·제휴", "Business contact", "광고와 파트너십 문의", "Advertising and partnership inquiries"),
       destination("/copyright", "저작권 안내", "Copyright", "콘텐츠·권리 정책", "Content and rights policy"),
       destination("/terms", "이용약관", "Terms", "서비스 이용 조건", "Terms of service"),

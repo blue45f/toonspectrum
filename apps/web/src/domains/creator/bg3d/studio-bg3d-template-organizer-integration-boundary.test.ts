@@ -36,7 +36,7 @@ describe("Studio BG3D template organizer integration boundary", () => {
       "allocateStudioBg3dTemplateInstanceNodeIds({",
       'sourceKind: "catalog"',
       "const parts = rawParts.map",
-      "physicsRuntimeSourceRef.current =",
+      "replaceCanonicalDocumentState(",
       "setSelectedIds(new Set(allocation.nodeIds))",
     ]);
   });
@@ -69,7 +69,7 @@ describe("Studio BG3D template organizer integration boundary", () => {
     expect(organizerRuntimeSource).toContain("planStudioBg3dTemplateInstanceReset({");
     expect(organizerRuntimeSource).toContain("planStudioBg3dSceneEntityRemoval({");
     expect(organizerRuntimeSource.match(/commitImmediateHistoryTransition\(/gu)).toHaveLength(3);
-    expect(organizerRuntimeSource.match(/physicsRuntimeSourceRef\.current =/gu)).toHaveLength(2);
+    expect(organizerRuntimeSource.match(/replaceCanonicalDocumentState\(/gu)).toHaveLength(2);
     expect(organizerRuntimeSource).toContain("commitSceneEntityRemoval(plan)");
     expect(organizerHost).toContain("membershipInstanceIds: Object.freeze(");
     expect(organizerHost).toContain("sceneEpoch: ltInsertSceneEpochRef.current");

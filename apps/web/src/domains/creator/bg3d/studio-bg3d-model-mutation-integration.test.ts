@@ -51,9 +51,9 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     expect(additive).toContain("if (parts.length === 0 || !canAdmitSceneNodes(parts.length)) return");
     expectInOrder(additive, [
       "if (!canAdmitSceneNodes(primitivePairs.length + modelPairs.length)) return",
-      "physicsRuntimeSourceRef.current = {",
-      "setPrimitives(nextPrimitives)",
-      "setCustomModels(nextCustomModels)",
+      "replaceCanonicalDocumentState({",
+      "primitives: nextPrimitives",
+      "customModels: nextCustomModels",
     ]);
   });
 
@@ -156,7 +156,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "assertStudioBg3dModelAttachmentAdmission({",
       "maximumCumulativeBytes: runtime.document.budgets.complexity.maxModelBytes",
       "commitImmediateHistoryTransition(",
-      "physicsRuntimeSourceRef.current =",
+      "replaceCanonicalDocumentState(",
     ]);
     const templateCommit = template.lastIndexOf("assertStudioBg3dModelAttachmentAdmission({");
     expect(templateCommit).toBeGreaterThan(-1);
@@ -165,7 +165,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "candidateAttachments: preparedAttachments",
       "maximumCumulativeBytes: current.document.budgets.complexity.maxModelBytes",
       "attachmentByStorageModelIdRef.current.clear()",
-      "physicsRuntimeSourceRef.current =",
+      "replaceCanonicalDocumentState(",
     ]);
     expectInOrder(upload, [
       "assertStudioBg3dModelAttachmentAdmission({",
@@ -179,7 +179,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       "candidateAttachments",
       "maximumCumulativeBytes: current.document.budgets.complexity.maxModelBytes",
       "attachmentByStorageModelIdRef.current.clear()",
-      "physicsRuntimeSourceRef.current =",
+      "replaceCanonicalDocumentState(",
     ]);
   });
 
@@ -205,10 +205,10 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     ]);
     expect(handler).not.toContain("removeSceneEntities(removedInstanceIds)");
     expectInOrder(commit, [
-      "physicsRuntimeSourceRef.current = {",
-      "setPrimitives(next.primitives)",
-      "setCustomModels(next.customModels)",
-      "setSceneBaseDocument(next.document)",
+      "replaceCanonicalDocumentState({",
+      "primitives: next.primitives",
+      "customModels: next.customModels",
+      "document: next.document",
     ]);
     expect(commit).toContain("resetStudioBg3dCommandHistory(");
     expect(commit).toContain("createStudioBg3dHistorySnapshot(next)");
@@ -241,6 +241,16 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
     expect(undoRedo.match(/applyOrDeferStudioBg3dHistoryCamera\(/gu)).toHaveLength(1);
     expect(undoRedo.match(/pendingInitialCameraRef/gu)).toHaveLength(1);
     expect(undoRedo.match(/snap\.document\.camera/gu)).toHaveLength(1);
-    expect(undoRedo.match(/physicsRuntimeSourceRef\.current =/gu)).toHaveLength(1);
+    expect(undoRedo.match(/replaceCanonicalDocumentState\(/gu)).toHaveLength(1);
   });
+  it("publishes the complete canonical revision before any React setter", () => {
+    const canonical = readFileSync(new URL("./useStudioBg3dCanonicalDocumentState.ts", import.meta.url), "utf8");
+    expectInOrder(canonical, [
+      "revision: current.revision + 1", "liveSceneRef.current = next",
+      "setPrimitivesState(nextPrimitives)", "setCustomModelsState(nextModels)",
+      "setSceneBaseDocumentState(nextDocument)", "setCanonicalRevision(next.revision)",
+    ]);
+    expect(canonical.match(/liveSceneRef\.current = next/gu)).toHaveLength(1);
+  });
+
 });

@@ -163,36 +163,34 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     expect(generator).toContain('"p5.brush": "2.2.1"');
   });
 
-  it("is a mandatory isolated GitHub CI job with a bounded runtime", () => {
-    const workflow = parseYaml(
-      source(".github/workflows/ci.yml"),
-    ) as Readonly<{
-      jobs?: Readonly<Record<string, Readonly<{
-        "runs-on"?: string;
-        "timeout-minutes"?: number;
-        services?: unknown;
-        steps?: readonly Readonly<{
-          uses?: string;
-          run?: string;
-        }>[];
-      }>>>;
-    }>;
-    const job = workflow.jobs?.["studio-p5-brush-real-runtime"];
-    const steps = job?.steps ?? [];
-
-    expect(job).toBeDefined();
-    expect(job?.["runs-on"]).toBe("ubuntu-24.04");
-    expect(job?.["timeout-minutes"]).toBe(12);
-    expect(job?.services).toBeUndefined();
-    expect(steps.map((step) => step.uses).filter(Boolean)).toEqual([
-      "actions/checkout@v6",
-      "pnpm/action-setup@v6",
-      "actions/setup-node@v6",
-    ]);
-    expect(steps.map((step) => step.run).filter(Boolean)).toEqual([
-      "pnpm install --frozen-lockfile",
-      "pnpm exec playwright install --with-deps chromium",
-      "pnpm run verify:studio-p5-brush-real-runtime",
-    ]);
+  it("retains a bounded, non-skippable graphics gate in the main exhaustive lane", () => {
+    const workflow = parseYaml(source(".github/workflows/main-full-qa-studio.yml")) as {
+      on: { push: { branches: string[] }; workflow_dispatch: unknown };
+      permissions: { contents: string };
+      env: { QA_COMMAND_TIMEOUT_MINUTES: string };
+      jobs: Record<string, {
+        needs?: string; "runs-on": string; "timeout-minutes": number; services?: unknown;
+        strategy?: { matrix: { include: { lane: string; commands: string }[] } };
+        steps: { run?: string; uses?: string; "continue-on-error"?: boolean }[];
+      }>;
+    };
+    const job = workflow.jobs["studio-audit"]!;
+    const lane = job.strategy!.matrix.include.find((entry) => entry.lane === "brush-rendering-b");
+    expect(workflow.on.push.branches).toEqual(["main"]);
+    expect(workflow.on).toHaveProperty("workflow_dispatch");
+    expect(workflow.permissions).toEqual({ contents: "read" });
+    expect(job.needs).toBe("production-build");
+    expect(job["runs-on"]).toBe("ubuntu-24.04");
+    expect(job.services).toBeUndefined();
+    expect(workflow.env.QA_COMMAND_TIMEOUT_MINUTES).toBe("35");
+    expect(lane?.commands.trim().split("\n").filter((line) => line.includes("p5-brush-real-runtime")))
+      .toEqual(["p5-brush-runtime|pnpm run verify:studio-p5-brush-real-runtime"]);
+    const commands = job.steps.flatMap((step) => step.run ? [step.run] : []).join("\n");
+    expect(commands).toContain("pnpm exec playwright install --with-deps chromium");
+    expect(commands).toContain("timeout --signal=TERM --kill-after=30s");
+    expect(commands).toContain("local status=${PIPESTATUS[0]}");
+    expect(commands).toContain('if [[ -s "$output_dir/failures.txt" ]]');
+    expect(commands).toContain("exit 1");
+    expect(job.steps.some((step) => step["continue-on-error"])).toBe(false);
   });
 });

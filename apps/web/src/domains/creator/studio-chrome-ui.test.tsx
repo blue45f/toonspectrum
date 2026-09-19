@@ -177,7 +177,8 @@ describe("studio chrome UI", () => {
     const icon = container.querySelector("svg");
 
     expect(button.className).toContain("min-h-11");
-    expect(button.className).toContain("min-w-11");
+    expect(button.style.minWidth).toBe("44px");
+    expect(button.className).toContain("min-w-[44px]");
     expect(button.className).toContain("bg-accent");
     expect(button.className).toContain("text-on-accent");
     expect(icon?.getAttribute("class")).toContain("text-on-accent");
@@ -207,7 +208,7 @@ describe("studio chrome UI", () => {
       />
     );
     expect(html).toContain('data-studio-tool-hint-target="true"');
-    expect(html).toContain("min-w-11 flex-1");
+    expect(html).toContain("min-w-11 flex-none");
     expect(html).toContain("min-h-11");
   });
 
@@ -238,7 +239,8 @@ describe("studio chrome UI", () => {
       <StudioDockNavButton icon={Folder} label="페이지" />
     );
     expect(html).toContain("min-h-11");
-    expect(html).toContain("min-w-11");
+    expect(html).toContain("min-w-[44px]");
+    expect(html).toContain("min-width:44px");
   });
 
   it("keeps context-button activation keys out of global canvas shortcuts", () => {
@@ -282,7 +284,7 @@ describe("studio chrome UI", () => {
     expect(html.match(/data-studio-tool-hint-unavailable="true"/g)).toHaveLength(2);
     expect(html.match(/aria-disabled="true"/g)).toHaveLength(2);
     expect(html.match(/tabindex="0"/g)).toHaveLength(2);
-    expect(html).toContain("min-w-11 flex-1");
+    expect(html).toContain("min-w-11 flex-none");
     expect(html).not.toContain('title="편집 잠금을 먼저 해제하세요"');
   });
 

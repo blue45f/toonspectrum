@@ -140,9 +140,7 @@ describe("site directory experience contracts", () => {
       ...NESTED_USER_FACING_DESTINATIONS,
     ]);
 
-    for (const href of expectedDestinations) {
-      expect(directoryPaths, `missing public directory destination: ${href}`).toContain(href);
-    }
+    expect([...expectedDestinations].filter((href) => !directoryPaths.has(href)), `missing public directory destinations: ${[...expectedDestinations].filter((href) => !directoryPaths.has(href)).join(", ")}`).toEqual([]);
   });
 
   it("keeps the first directory layer creator-first without losing discovery paths", () => {
@@ -168,11 +166,11 @@ describe("site directory experience contracts", () => {
     ]);
   });
 
-  it("keeps creator entry points and the brand film visible before the long directory", () => {
+  it("keeps creator entry points and the product tour visible before the long directory", () => {
     expect(sitemapSource).toContain('href="/studio/new"');
     expect(sitemapSource).toContain('href="/studio/projects"');
-    expect(sitemapSource).toContain('href="/brand-film"');
-    expect(sitemapSource.indexOf('href="/brand-film"')).toBeLessThan(
+    expect(sitemapSource).toContain('href="/product-tour"');
+    expect(sitemapSource.indexOf('href="/product-tour"')).toBeLessThan(
       sitemapSource.indexOf("SITEMAP_EXTENDED_DESTINATION_GROUPS.map"),
     );
     expect(directoryPaths).toContain("/brand-film");

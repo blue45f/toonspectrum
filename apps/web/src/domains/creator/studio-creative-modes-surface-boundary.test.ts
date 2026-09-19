@@ -28,6 +28,10 @@ const collabMenu = readFileSync(
   resolve(process.cwd(), "apps/web/src/domains/creator/studio-main-menu-items-collaboration.ts"),
   "utf8",
 );
+const commandCatalog = readFileSync(
+  resolve(process.cwd(), "apps/web/src/domains/creator/studio-command-catalog-base.ts"),
+  "utf8",
+);
 
 describe("Studio creative modes surface", () => {
   it("does not mount a dock-covering floating launcher", () => {
@@ -39,7 +43,8 @@ describe("Studio creative modes surface", () => {
     expect(brushMenu).toContain('commandId: "brush.pixel-art"');
     expect(brushMenu).toContain("픽셀 아트");
     expect(brushMenu).toContain('commandId: "brush.silk-flow"');
-    expect(brushMenu).toContain("실크 대칭");
+    expect(brushMenu).toContain('label: "대칭 그리기"');
+    expect(commandCatalog).toContain('labels: [ko("실크 대칭"), en("Silk symmetry")]');
     expect(canvasMenu).toContain('commandId: "canvas.sticky-note"');
     expect(canvasMenu).toContain("스티키 노트");
     expect(storyMenu).toContain('commandId: "insert.sculpt-3d"');

@@ -150,9 +150,10 @@ export function resolveTranslationForDisplay(
   lang: string,
   key: string,
   fallbackChain: readonly string[] = FALLBACK_CHAIN,
+  fallbackText?: string,
 ): string {
   const resolved = resolveTranslation(lang, key, fallbackChain);
-  return resolved === key ? formatMissingTranslationKey(key) : resolved;
+  return resolved === key ? fallbackText ?? formatMissingTranslationKey(key) : resolved;
 }
 
 /**
@@ -178,7 +179,11 @@ export function registerI18nLocaleEntries(
   if (!changed) return;
 }
 
-type TranslationResolver = (key: string) => string;
+type TranslationResolver = (
+  key: string,
+  fallbackOrValues?: string | Readonly<Record<string, string | number>>,
+  fallbackText?: string,
+) => string;
 
 // A translator is part of effect dependencies in data-fetching and OAuth surfaces. Returning a
 // fresh closure from useT() on every render would restart those effects (and can create a render /
@@ -192,8 +197,15 @@ function getTranslationResolver(lang: string): TranslationResolver {
   const cached = translationResolvers.get(normalized);
   if (cached) return cached;
 
-  const resolver: TranslationResolver = (key) =>
-    resolveTranslationForDisplay(normalized, key);
+  const resolver: TranslationResolver = (key, fallbackOrValues, fallbackText) => {
+    const fallback = typeof fallbackOrValues === "string" ? fallbackOrValues : fallbackText;
+    const text = resolveTranslationForDisplay(normalized, key, FALLBACK_CHAIN, fallback);
+    if (!fallbackOrValues || typeof fallbackOrValues === "string") return text;
+    // Replace once so literal braces inside user-supplied values are never reinterpreted.
+    return text.replace(/\{([A-Za-z0-9_]+)\}/gu, (placeholder, token: string) =>
+      Object.hasOwn(fallbackOrValues, token) ? String(fallbackOrValues[token]) : placeholder,
+    );
+  };
   translationResolvers.set(normalized, resolver);
   return resolver;
 }
@@ -249,7 +261,9 @@ export const useI18n = create<I18nState>()(
           const normalized = resolveSelectableLocale(state.lang || FALLBACK_LANG);
           state.lang = normalized;
           applyDocumentLocale(normalized);
-          void loadRuntimeTranslationBundle(normalized);
+          // Hydration runs during store construction, before circular locale-loader
+          // imports have finished. Restore state here; useT's effect loads the saved
+          // locale when a translated surface mounts, after module initialization.
         }
       },
     },
@@ -260,7 +274,7 @@ export function getLang(): string {
   return useI18n.getState().lang;
 }
 
-export function useT(): (key: string) => string {
+export function useT(): TranslationResolver {
   const lang = useI18n((s) => s.lang);
   const translationBundleRevision = useI18n((s) => s.translationBundleRevision);
   useEffect(() => {

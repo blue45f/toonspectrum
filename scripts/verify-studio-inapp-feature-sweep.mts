@@ -29,9 +29,11 @@ import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosa
 
 import {
   collectStudioInAppRuntimeErrors,
+  dismissStudioInAppFirstRunSurfaces,
   installStudioInAppFirstRunState,
   installStudioInAppGuestBoundary,
   launchStudioInAppBrowser,
+  selectStudioInAppInactiveBrush,
   STUDIO_INAPP_PROFILES,
   type StudioInAppProfile,
   type StudioInAppRuntimeError,
@@ -423,11 +425,11 @@ const STEPS: readonly StudioInAppStep[] = Object.freeze([
       await search.fill("펜");
       if (await search.inputValue() !== "펜") throw new Error("brush library search did not retain the query");
       await settle(page);
-      return clickLocator(
-        page,
-        library.getByRole("button", { name: /선택$/u }),
-        "selectable brush",
-      );
+      await selectStudioInAppInactiveBrush(library, {
+        click: (locator) => clickInView(locator, 5_000),
+        settle: () => settle(page),
+      });
+      return "ok";
     },
   },
 
@@ -949,6 +951,7 @@ async function sweepProfile(
 
   const outcomes: StudioInAppStepOutcome[] = [];
   await page.goto(`${baseUrl}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await dismissStudioInAppFirstRunSurfaces(page);
 
   for (const step of steps) {
     currentStep = step.id;

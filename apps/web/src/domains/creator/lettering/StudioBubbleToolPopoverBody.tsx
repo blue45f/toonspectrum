@@ -38,8 +38,8 @@ export interface StudioBubbleToolPopoverBodyProps {
 
 const BUBBLE_RECOMMENDER = new StudioAiEmotionBubbleMatcher();
 
-function localizeText(t: (key: string) => string, fallback: string, key: string): string {
-  const translated = t(key);
+function localizeText(t: (key: string, fallback?: string) => string, fallback: string, key: string): string {
+  const translated = t(key, fallback);
   return translated === key ? fallback : translated;
 }
 

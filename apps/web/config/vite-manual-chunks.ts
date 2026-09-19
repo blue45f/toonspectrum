@@ -163,6 +163,12 @@ export function createStudioManualChunks(predicates: {
       // Pure placement/guide geometry already used by the static editor graph.
       return "studio-placement-guide-contracts";
     }
+    if (["studio-project-version", "studio-revision-document-extensions", "studio-webtoon-canvas-presets", "studio-tool-search"]
+      .some((name) => id.endsWith(`/src/domains/creator/${name}.ts`))) {
+      // Already-synchronous dependency-free document metadata and discovery functions.
+      // Keep these separate from renderer/Worker/stateful authority chunks.
+      return "studio-document-metadata-contracts";
+    }
     if (
       id.endsWith("/src/domains/creator/studio-material-pressure-model.ts")
       || id.endsWith("/src/domains/creator/studio-hand-feel-media-load-v1.ts")

@@ -12,7 +12,7 @@ const TASK_LAYOUTS: Partial<Record<StudioDocumentWorkspaceId, StudioDefaultWorks
   comic: "pro-comic",
   image: "photo-edit",
   design: "vector-design",
-  slides: "vector-design",
+  slides: "slides-deck",
   storyboard: "storyboard",
   whiteboard: "vector-design",
   "3d": "pose-3d",

@@ -31,11 +31,7 @@ vi.mock("@toonspectrum/core/fx", () => ({
     artist: "",
     creditUrl: "",
     volume: 0.48,
-    presets: [
-      { id: "pop", name: "청춘 오프닝", emoji: "🌅" },
-      { id: "citypop", name: "감성 시티팝", emoji: "🌌" },
-      { id: "mystery_noir", name: "비밀의 복선", emoji: "🔍" },
-    ],
+    presets: [],
     toggle: vi.fn(),
     setEnabled: mocks.setEnabled,
     next: mocks.next,
@@ -59,6 +55,41 @@ vi.mock("@/shared/lib/i18n", () => ({
   useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "ko" }),
 }));
 
+// Metadata only: this fixture does not claim that an audio master exists or is approved for release.
+const APPROVED_TRACK_FIXTURE = {
+  id: "fixture-original-opening",
+  src: "/audio/original/fixture-original-opening.mp3",
+  title: "Fixture original opening",
+  artist: "ToonSpectrum test fixture",
+  role: "opening",
+  origin: "original",
+  vocalMode: "vocal",
+  language: "ko",
+  summary: "Deterministic metadata fixture for the approved-catalog UI path.",
+  license: "Test fixture only; no media is published by this test.",
+  creditUrl: "https://example.invalid/toonspectrum-ost-fixture",
+  profiles: ["animation", "citypop"],
+  intensity: "normal",
+  durationMs: 210_000,
+  bpm: 128,
+  provider: "elevenlabs",
+  model: "music_v2_5",
+  sha256: "a".repeat(64),
+  generatedAt: "2026-09-18T00:00:00.000Z",
+  provenance: "c2pa-requested",
+  c2paRequested: true,
+  status: "published",
+} as const;
+
+function mockManifest(tracks: readonly unknown[] = [APPROVED_TRACK_FIXTURE]) {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ tracks }),
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 function renderAt(pathname: string, suspended = false) {
   return render(
     <MemoryRouter initialEntries={[pathname]}>
@@ -67,19 +98,17 @@ function renderAt(pathname: string, suspended = false) {
   );
 }
 
-function expandPlayer() {
-  const theme = screen.getByText(/청춘 드라이브|툰스튜디오 오프닝|소재 탐험 테마/u);
-  const button = theme.closest("button");
-  if (!button) throw new Error("player toggle not found");
+async function expandPlayer() {
+  const button = await screen.findByRole("button", { name: /오리지널 애니·웹툰 OST/u });
   fireEvent.click(button);
 }
 
 describe("SiteBackgroundMusicPlayer", () => {
   beforeEach(() => {
     localStorage.clear();
-    localStorage.setItem("ts_site_bgm_source", "focus-instrumental");
     vi.clearAllMocks();
     mocks.resumeAudio.mockResolvedValue(undefined);
+    mockManifest();
   });
 
   afterEach(() => {
@@ -90,60 +119,86 @@ describe("SiteBackgroundMusicPlayer", () => {
   it("selects the route theme and starts only after an explicit play gesture", async () => {
     renderAt("/ranking");
     expect(screen.getByTestId("site-background-music-player")).toBeTruthy();
-    expect(screen.getByText("청춘 드라이브")).toBeTruthy();
-    await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("citypop"));
+    expect(mocks.resumeAudio).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "OST 재생" }));
+    expect(await screen.findByText("네온 스크롤")).toBeTruthy();
+    await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("playlist:0"));
+
+    const play = screen.getByRole("button", { name: "OST 재생" }) as HTMLButtonElement;
+    await waitFor(() => expect(play.disabled).toBe(false));
+    fireEvent.click(play);
     await waitFor(() => {
       expect(mocks.resumeAudio).toHaveBeenCalledTimes(1);
       expect(mocks.setEnabled).toHaveBeenCalledWith(true);
     });
   });
 
-  it("keeps both compact controls at the 44px touch-target minimum", () => {
+  it("keeps both compact controls at the 44px touch-target minimum", async () => {
     renderAt("/");
+    expect(await screen.findByText("툰스펙트럼 오프닝")).toBeTruthy();
     expect(screen.getByRole("button", { name: "OST 재생" }).className).toContain("size-11");
-    expect(screen.getByRole("button", { name: /집중용 인스트/u }).className).toContain("min-h-11");
+    expect(screen.getByRole("button", { name: /오리지널 애니·웹툰 OST/u }).className).toContain("min-h-11");
   });
 
-  it("lets the listener override page following, theme and dedicated BGM volume", () => {
+  it("lets the listener override page following, style and dedicated BGM volume", async () => {
     renderAt("/ranking");
-    expandPlayer();
+    await screen.findByText("네온 스크롤");
+    await expandPlayer();
 
-    fireEvent.change(screen.getByLabelText("테마 직접 선택"), { target: { value: "mystery_noir" } });
-    expect(mocks.setMood).toHaveBeenLastCalledWith("mystery_noir");
+    fireEvent.click(screen.getByRole("checkbox", { name: /페이지 역할에 맞춰/u }));
     expect(localStorage.getItem("ts_site_bgm_follow_route")).toBe("0");
+
+    fireEvent.change(screen.getByLabelText("OST 스타일"), { target: { value: "cinematic" } });
+    expect(localStorage.getItem("ts_site_bgm_style")).toBe("cinematic");
 
     fireEvent.change(screen.getByLabelText("OST 음량"), { target: { value: "0.7" } });
     expect(mocks.setVolume).toHaveBeenCalledWith(0.7);
   });
 
-  it("loads role-aware OST metadata only when original OST mode is selected", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        tracks: [{
-          id: "opening-original", src: "/audio/theme.mp3", title: "Original opening", artist: "ToonSpectrum",
-          role: "opening", origin: "original", vocalMode: "vocal", language: "ko",
-          summary: "Original anime opening", license: "ToonSpectrum original", creditUrl: "https://example.com/credit",
-        }],
-      }),
-    }));
-
+  it("registers only parser-approved same-origin metadata and follows the route role", async () => {
+    const fetchMock = mockManifest([APPROVED_TRACK_FIXTURE]);
     renderAt("/market");
-    expandPlayer();
-    fireEvent.click(screen.getByRole("button", { name: /오리지널 애니 OST/u }));
 
     await waitFor(() => expect(mocks.register).toHaveBeenCalledWith([
       {
-        url: "/audio/theme.mp3",
-        label: "Original opening",
-        artist: "ToonSpectrum",
-        creditUrl: "https://example.com/credit",
+        url: "/audio/original/fixture-original-opening.mp3",
+        label: "Fixture original opening",
+        artist: "ToonSpectrum test fixture",
+        creditUrl: "https://example.invalid/toonspectrum-ost-fixture",
       },
     ]));
     await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("playlist:0"));
-    expect(localStorage.getItem("ts_site_bgm_source")).toBe("original-ost");
+    expect(fetchMock).toHaveBeenCalledWith("/audio/playlist.json", expect.objectContaining({
+      cache: "force-cache",
+      headers: { Accept: "application/json" },
+    }));
+  });
+
+  it("keeps playback unavailable when the reviewed release catalogue is empty", async () => {
+    mockManifest([]);
+    renderAt("/");
+
+    expect(await screen.findByText("오리지널 OST 준비 중")).toBeTruthy();
+    const play = screen.getByRole("button", { name: "OST 재생" }) as HTMLButtonElement;
+    expect(play.disabled).toBe(true);
+    fireEvent.click(play);
+    expect(mocks.resumeAudio).not.toHaveBeenCalled();
+    await waitFor(() => expect(mocks.register).toHaveBeenCalledWith([]));
+    await waitFor(() => expect(mocks.setEnabled).toHaveBeenCalledWith(false));
+
+    await expandPlayer();
+    expect(await screen.findByText("검수 완료된 오리지널 OST가 아직 게시되지 않았습니다.")).toBeTruthy();
+  });
+
+  it("fails closed when the same-origin catalogue is unavailable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    renderAt("/");
+    await expandPlayer();
+
+    expect(await screen.findByText("사이트 OST 목록을 불러오지 못했습니다.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "OST 재생" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(mocks.register).toHaveBeenCalledWith([]);
+    expect(mocks.setEnabled).toHaveBeenCalledWith(false);
   });
 
   it("stays out of audio-producing pages and preserves the user's opt-in", () => {

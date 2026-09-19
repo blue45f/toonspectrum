@@ -11,7 +11,7 @@
  * things tells you an error happened; it does not tell you which affordance is broken. Each error
  * carries the step id that was in flight when it arrived.
  */
-import { chromium, type Browser, type ConsoleMessage, type Page } from "playwright";
+import { chromium, type Browser, type ConsoleMessage, type Locator, type Page } from "playwright";
 
 /** A phone-sized embedded WebView. Heights exclude the native bars that eat the viewport. */
 export interface StudioInAppProfile {
@@ -254,6 +254,57 @@ export async function installStudioInAppGuestBoundary(page: Page): Promise<void>
       status: 200,
     });
   });
+}
+
+/** Fall back to the visible UI when a WebView rejects the preloaded storage state. */
+export async function dismissStudioInAppFirstRunSurfaces(page: Page): Promise<void> {
+  const dock = page.locator('[data-studio-mobile-editing-dock="true"]');
+  await dock.waitFor({ state: "visible", timeout: 25_000 });
+
+  // An absent first-run surface must not add a timeout to every successful profile.
+  const quickStart = page.locator('[data-studio-creative-starter="true"]');
+  if (await quickStart.isVisible()) {
+    await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click({ timeout: 1_000 });
+    await quickStart.waitFor({ state: "hidden", timeout: 1_000 });
+  }
+
+  // The coach is a sibling of the dock, not a dock descendant.
+  const mobileHintDismiss = page.locator('[data-studio-canvas-transient="coach"]')
+    .getByRole("button", { name: "안내 닫기", exact: true });
+  if (await mobileHintDismiss.isVisible()) {
+    await mobileHintDismiss.click({ timeout: 1_000 });
+    await mobileHintDismiss.waitFor({ state: "hidden", timeout: 1_000 });
+  }
+}
+
+/** Select a different brush and verify its identity survives the reactive list update. */
+export async function selectStudioInAppInactiveBrush(
+  library: Locator,
+  interaction: {
+    click: (locator: Locator) => Promise<void>;
+    settle: () => Promise<void>;
+  },
+): Promise<void> {
+  const candidates = library.locator('button[data-studio-brush-select]:not([aria-pressed="true"])');
+  const count = await candidates.count();
+  for (let index = 0; index < Math.min(count, 6); index += 1) {
+    const candidate = candidates.nth(index);
+    if (!(await candidate.isVisible())) continue;
+    const brushId = await candidate.getAttribute("data-studio-brush-select");
+    if (!brushId) throw new Error("selectable brush has no identity");
+    // A live :not([aria-pressed]) locator resolves to a different button after the click.
+    const selected = library.locator(`button[data-studio-brush-select=${JSON.stringify(brushId)}]`);
+    if (await selected.getAttribute("aria-pressed") === "true") {
+      throw new Error("selectable brush was already active before the click");
+    }
+    await interaction.click(selected);
+    await interaction.settle();
+    if (await selected.getAttribute("aria-pressed") !== "true") {
+      throw new Error("selected brush did not become active");
+    }
+    return;
+  }
+  throw new Error("a visible non-active brush is required for the selection transition");
 }
 
 /** Storage keys the Studio reads on boot to decide whether to show first-run surfaces. */

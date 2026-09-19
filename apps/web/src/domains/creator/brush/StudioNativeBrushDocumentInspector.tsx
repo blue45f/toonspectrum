@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { prepareStudioNativeBrushDocumentCommit } from "./studio-native-brush-document-commit";
 import { planStudioNativeBrushDocument } from "./studio-native-brush-document-contract";
 import { renderStudioNativeBrushDocument } from "./studio-native-brush-document-product";
 import { StudioNativeBrushDocumentSession } from "./studio-native-brush-document-session";
@@ -68,7 +69,7 @@ export default function StudioNativeBrushDocumentInspector(props: StudioNativeBr
   async function convert(previewOnly = false) {
     const plan = prepared.plan;
     if (!plan || disabled || masterEditMode || busy || !onPrepare || active.current) return;
-    const commit = onPrepare({ pageId, masterEditMode, sourceElementId: plan.sourceElementId, sourceRevision: plan.sourceRevision });
+    const commit = onPrepare({ pageId, masterEditMode, sourceElementId: plan.sourceElementId, sourceRevision: plan.sourceRevision }, prepareStudioNativeBrushDocumentCommit);
     if (!commit) { setStatus("현재 문서 상태에서는 변환을 시작할 수 없습니다."); return; }
     clearPreview();
     const controller = new AbortController(); active.current = controller;

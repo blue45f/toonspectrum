@@ -267,6 +267,7 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
 
 function commandCapability(command: ProductionCommand): "comment" | "edit" | "manage" {
   if (command.type === "record-review-decision") return "comment";
+  if (command.type === "transition-risk-response" && command.toStatus === "approved") return "manage";
   if (command.type === "apply-automation-execution") return "manage";
   if (command.type === "upsert-operations-record") {
     return [
@@ -1487,10 +1488,14 @@ function applyCommand(
     case "transition-risk-response": {
       const response = aggregate.riskResponses.find((entry) => entry.id === command.responseId);
       if (!response) throw new BadRequestException("상태를 변경할 위험 대응을 찾을 수 없습니다.");
+      if (command.expectedResponseRevision !== undefined && command.expectedResponseRevision !== (response.revision ?? 0)) {
+        throw new ConflictException("위험 대응 revision이 현재 값과 일치하지 않습니다.");
+      }
       try {
         const next = transitionProductionRiskResponse(response, command.toStatus, {
           at,
           actualEffect: command.actualEffect,
+          reason: command.reason,
         });
         return {
           aggregate: {

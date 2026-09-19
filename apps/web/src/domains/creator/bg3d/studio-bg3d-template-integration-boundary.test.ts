@@ -63,7 +63,7 @@ describe("Studio BG3D user-template integration boundary", () => {
     const admission = apply.indexOf("await admitAndCacheModel({");
     const stagedBinding = apply.indexOf("attachmentByStorageModelId: nextAttachmentByStorageId");
     const hydration = apply.indexOf("hydrateStudioBg3dDocumentToRuntime({");
-    const sceneCommit = apply.indexOf("setPrimitives(nextPrimitives)");
+    const canonicalCommit = apply.indexOf("replaceCanonicalDocumentState({");
 
     expect(mutationStart).toBeGreaterThanOrEqual(0);
     expect(instantiate).toBeGreaterThan(mutationStart);
@@ -72,7 +72,12 @@ describe("Studio BG3D user-template integration boundary", () => {
     expect(admission).toBeGreaterThan(exactMatch);
     expect(stagedBinding).toBeGreaterThan(admission);
     expect(hydration).toBeGreaterThan(stagedBinding);
-    expect(sceneCommit).toBeGreaterThan(hydration);
+    expect(canonicalCommit).toBeGreaterThan(hydration);
+    expect(apply).toContain("primitives: nextPrimitives");
+    expect(apply).toContain("customModels: nextCustomModels");
+    expect(apply).not.toContain("physicsRuntimeSourceRef.current =");
+    expect(apply).not.toContain("setPrimitives(nextPrimitives)");
+    expect(apply).not.toContain("setCustomModels(nextCustomModels)");
     expect(apply).toContain("throw new Error(\"template-attachment-missing\")");
     expect(apply).toContain('templateFailure.message === "template-attachment-missing"');
     expect(apply).toContain("현재 기기에서 찾을 수 없습니다");

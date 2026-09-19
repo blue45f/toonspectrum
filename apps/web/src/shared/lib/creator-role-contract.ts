@@ -1,10 +1,27 @@
+import {
+  CREATOR_ROLE_ALIAS_MAX_LENGTH,
+  CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH,
+  CREATOR_ROLE_LEGACY_PROFILE_VERSION as CREATOR_ROLE_PROFILE_VERSION,
+  CREATOR_ROLE_MAX_ALIASES,
+  CREATOR_ROLE_MAX_PROJECT_PREFERENCES,
+  CREATOR_ROLE_MAX_SECONDARY,
+  CREATOR_ROLE_MAX_SPECIALTIES,
+  CREATOR_ROLE_PROFILE_VERSION as CREATOR_PUBLIC_ROLE_PROFILE_VERSION,
+  CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH,
+} from "@toonspectrum/core/creator-role";
 
-export const CREATOR_ROLE_PROFILE_VERSION = 1 as const;
-export const CREATOR_ROLE_MAX_SECONDARY = 5;
-export const CREATOR_ROLE_MAX_SPECIALTIES = 12;
-export const CREATOR_ROLE_MAX_PROJECT_PREFERENCES = 64;
-export const CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH = 170;
-export const CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH = 160;
+// Keep the web's v1 write contract while adopting the core's public v2 projection.
+export {
+  CREATOR_PUBLIC_ROLE_PROFILE_VERSION,
+  CREATOR_ROLE_ALIAS_MAX_LENGTH,
+  CREATOR_ROLE_AVAILABILITY_NOTE_MAX_LENGTH,
+  CREATOR_ROLE_MAX_ALIASES,
+  CREATOR_ROLE_MAX_PROJECT_PREFERENCES,
+  CREATOR_ROLE_MAX_SECONDARY,
+  CREATOR_ROLE_MAX_SPECIALTIES,
+  CREATOR_ROLE_PROFILE_VERSION,
+  CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH,
+};
 
 export const CREATOR_ROLE_NOTIFICATION_LEVELS = ["essential", "standard", "all"] as const;
 export type CreatorRoleNotificationLevel = (typeof CREATOR_ROLE_NOTIFICATION_LEVELS)[number];
@@ -201,12 +218,13 @@ export interface CreatorRoleProfile {
 
 /** Public projection intentionally excludes private workspace preferences. */
 export interface PublicCreatorRoleProfile {
-  readonly version: typeof CREATOR_ROLE_PROFILE_VERSION;
-  readonly primaryRole: CreatorRoleId;
+  readonly version: typeof CREATOR_PUBLIC_ROLE_PROFILE_VERSION;
+  readonly primaryRole: CreatorRoleId | null;
   readonly secondaryRoles: readonly CreatorRoleId[];
   readonly specialties: readonly CreatorSpecialtyId[];
   readonly experienceLevel: CreatorExperienceLevel | null;
   readonly collaborationStatus: CreatorCollaborationStatus | null;
+  readonly roleAliases: readonly CreatorRoleAlias[];
 }
 
 const text = (ko: string, en: string): LocalizedCreatorText => ({ ko, en });
@@ -678,6 +696,27 @@ function normalizeDistinctValues<T>(
   return normalized;
 }
 
+function normalizeCreatorRoleAliases(
+  value: unknown,
+  selectedRoles: ReadonlySet<CreatorRoleId>,
+): CreatorRoleAlias[] {
+  if (!Array.isArray(value)) return [];
+  const result: CreatorRoleAlias[] = [];
+  const seen = new Set<CreatorRoleId>();
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    const record = candidate as Record<string, unknown>;
+    const role = normalizeCreatorRoleId(record.role);
+    const label = typeof record.label === "string" ? record.label.trim().replace(/\s+/gu, " ") : "";
+    if (!role || !label || label.length > CREATOR_ROLE_ALIAS_MAX_LENGTH
+      || !selectedRoles.has(role) || seen.has(role)) continue;
+    seen.add(role);
+    result.push({ role, label });
+    if (result.length >= CREATOR_ROLE_MAX_ALIASES) break;
+  }
+  return result;
+}
+
 function normalizeCreatorRoleVisibility(value: unknown, legacy: unknown): CreatorRoleVisibility {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
@@ -831,7 +870,7 @@ export function normalizeCreatorRoleProfile(value: unknown): CreatorRoleProfile 
       normalizeCreatorUsagePurposeId,
       CREATOR_USAGE_PURPOSE_IDS.length,
     ),
-    roleAliases: [],
+    roleAliases: normalizeCreatorRoleAliases(record.roleAliases, selectedRoles),
     workCapacity: normalizeCreatorWorkCapacity(record.workCapacity),
     defaultNotificationLevel:
       normalizeCreatorRoleNotificationLevel(record.defaultNotificationLevel) ?? "standard",
@@ -904,37 +943,47 @@ export function normalizePublicCreatorRoleProfile(
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const primaryRole = normalizeCreatorRoleId(record.primaryRole);
-  if (!primaryRole) return null;
-
+  const secondaryRoles = normalizeDistinctValues(
+    record.secondaryRoles,
+    normalizeCreatorRoleId,
+    CREATOR_ROLE_MAX_SECONDARY,
+  ).filter((role) => role !== primaryRole);
+  const specialties = normalizeDistinctValues(
+    record.specialties,
+    normalizeCreatorSpecialtyId,
+    CREATOR_ROLE_MAX_SPECIALTIES,
+  );
+  const experienceLevel = normalizeCreatorExperienceLevel(record.experienceLevel);
+  const collaborationStatus = normalizeCreatorCollaborationStatus(record.collaborationStatus);
+  const selectedRoles = new Set<CreatorRoleId>([
+    ...(primaryRole ? [primaryRole] : []),
+    ...secondaryRoles,
+  ]);
+  const roleAliases = normalizeCreatorRoleAliases(record.roleAliases, selectedRoles);
+  if (!primaryRole && secondaryRoles.length === 0 && specialties.length === 0
+    && !experienceLevel && !collaborationStatus && roleAliases.length === 0) return null;
   return {
-    version: CREATOR_ROLE_PROFILE_VERSION,
+    version: CREATOR_PUBLIC_ROLE_PROFILE_VERSION,
     primaryRole,
-    secondaryRoles: normalizeDistinctValues(
-      record.secondaryRoles,
-      normalizeCreatorRoleId,
-      CREATOR_ROLE_MAX_SECONDARY,
-    ).filter((role) => role !== primaryRole),
-    specialties: normalizeDistinctValues(
-      record.specialties,
-      normalizeCreatorSpecialtyId,
-      CREATOR_ROLE_MAX_SPECIALTIES,
-    ),
-    experienceLevel: normalizeCreatorExperienceLevel(record.experienceLevel),
-    collaborationStatus: normalizeCreatorCollaborationStatus(record.collaborationStatus),
+    secondaryRoles,
+    specialties,
+    experienceLevel,
+    collaborationStatus,
+    roleAliases,
   };
 }
 
 export function publicCreatorRoleProfile(value: unknown): PublicCreatorRoleProfile | null {
   const profile = normalizeCreatorRoleProfile(value);
-  if (!profile.roleVisibility || !profile.primaryRole) return null;
-  return {
-    version: profile.version,
-    primaryRole: profile.primaryRole,
-    secondaryRoles: profile.secondaryRoles,
-    specialties: profile.specialties,
-    experienceLevel: profile.experienceLevel,
-    collaborationStatus: profile.collaborationStatus,
-  };
+  return normalizePublicCreatorRoleProfile({
+    version: CREATOR_PUBLIC_ROLE_PROFILE_VERSION,
+    primaryRole: profile.visibility.roles ? profile.primaryRole : null,
+    secondaryRoles: profile.visibility.roles ? profile.secondaryRoles : [],
+    specialties: profile.visibility.specialties ? profile.specialties : [],
+    experienceLevel: profile.visibility.experienceLevel ? profile.experienceLevel : null,
+    collaborationStatus: profile.visibility.collaborationStatus ? profile.collaborationStatus : null,
+    roleAliases: profile.visibility.roles ? profile.roleAliases : [],
+  });
 }
 
 export function creatorRoleDefinition(role: CreatorRoleId | null | undefined): CreatorRoleDefinition | null {
@@ -947,6 +996,14 @@ export function creatorSpecialtyDefinition(
 ): CreatorSpecialtyDefinition | null {
   if (!specialty) return null;
   return CREATOR_SPECIALTY_DEFINITIONS.find((entry) => entry.id === specialty) ?? null;
+}
+
+export function creatorRoleAlias(
+  profile: Pick<PublicCreatorRoleProfile, "roleAliases">,
+  role: CreatorRoleId | null | undefined,
+): string | null {
+  if (!role) return null;
+  return profile.roleAliases.find((entry) => entry.role === role)?.label ?? null;
 }
 
 export function creatorRoleSelection(profile: CreatorRoleProfile): readonly CreatorRoleId[] {

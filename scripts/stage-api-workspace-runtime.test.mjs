@@ -3,9 +3,10 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import test from "node:test";
 
 import { stageApiWorkspaceRuntime } from "./stage-api-workspace-runtime.mjs";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 async function compiledPackage(root, path, source) {
   const filename = resolve(root, path);

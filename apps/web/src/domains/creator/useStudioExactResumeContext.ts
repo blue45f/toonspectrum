@@ -75,7 +75,7 @@ export function useStudioExactResumeContext(input: UseStudioExactResumeContextIn
   const restoreFrameRef = useRef<number | null>(null);
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     restoredRef.current = false;
     if (restoreFrameRef.current !== null) cancelAnimationFrame(restoreFrameRef.current);
     restoreFrameRef.current = null;
