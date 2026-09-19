@@ -1,5 +1,10 @@
 # Scene3D follow-up delivery — 2026-09-20
 
+> This previously uncommitted follow-up was preserved and integrated by the
+> [selected-object design execution wave](./studio-scene3d-inplace-design-wave-2026-09-20.md).
+> Its final commit-bound revalidation is recorded there; counts below describe the original
+> follow-up verification and must not be added to or substituted for the final current counts.
+
 ## Scope actually completed
 
 Extends integrated PR #1844 (which already contains the normal/crease output work from #1838)

@@ -116,3 +116,40 @@ SCENE3D_SPECIALISTS_PRODUCTION_WORKER=1 SCENE3D_SPECIALISTS_GPU_LANE=swiftshader
 
 Generated logs and screenshots remain in `.qa/scene3d-output-quality/inplace/`. Source/tests, runtime
 admission and full CI are the evidence; prior plans and old green runs are not substituted for them.
+
+
+## Final executed validation
+
+Validated code: `f7546332e1af278d437b62034ef55e0673eb06a3`, including main
+`2981170a292fbe83a57b2a2913d6ddcfa3cbde74`. The following evidence commit changes documentation only.
+
+| Verification | Result |
+| --- | --- |
+| Full web and API TypeScript | Passed |
+| Selected-object/controller/storage/UI/history suite | 9 files / 75 tests passed |
+| Specialist/texture/image/lifecycle suite | 9 files / 81 tests passed |
+| Professional 3D completion | 34 files / 205 tests passed |
+| Source lint and normal pre-commit checks | Passed, zero source-lint warnings |
+| Workflow actionlint | Passed |
+| Production bundle, third-party notices and static CSP | Passed; existing vendor warnings remain |
+| Optional-engine startup isolation | Passed |
+| Existing static bundle ratchet | 0 regressions, 0 unbaselined; no baseline/tolerance changes |
+| Plain LOD → selected instance → Undo/Redo → actual page reload | Passed with real SQLite/OPFS |
+| LOD+KTX2 → selected instance → Undo/Redo → actual page reload | Passed; two compressed textures present |
+| Actual production Worker under deployment CSP | 12 specialist operations passed |
+| Actual file UI/texture preview/download and Spark reference | Passed |
+| Browser page/console/request errors | 0 |
+| Preserved raster quality/hash audit | 14 tests passed |
+| Self-contained desktop package/reproducibility/tamper audit | 3 tests passed; no signing/release |
+| Bounded marketplace byte audit | 334 pinned files and six GLBs passed |
+
+The synthetic textured sphere changed from 1,472 to 614 triangles and from 45,664 to 12,368 GLB bytes.
+These numbers are fixture-specific, not universal quality/size/FPS guarantees. Both direct-apply lanes
+recorded one history command and preserved the other shared instance and normalization. The original
+33-file worktree snapshot was rehashed unchanged. No source backup was deleted.
+
+Full machine-readable [synthetic validation receipt](../evidence/studio-scene3d-inplace-design-wave-20260920.json).
+The receipt omits full serialized fixture bytes and records their hash/size instead. Raw logs/screenshots
+stay under `.qa/scene3d-output-quality/inplace/release/`. Old runtime-startup telemetry was not remeasured.
+Warnings for upstream BVH deprecation, ReadPixels and separate KTX2-loader lifetimes remain visible.
+Remote CI and merge status must be checked on the actual PR; local success is not remote CI success.
