@@ -158,8 +158,25 @@ export function createStudioManualChunks(predicates: {
       // without changing any static or lazy closure.
       return "studio-editing-micro-models";
     }
+    if (["studio-isometric-grid", "studio-perspective-guide", "studio-object-insert-drag", "studio-image-placement"]
+      .some((name) => id.endsWith(`/src/domains/creator/${name}.ts`))) {
+      // Pure placement/guide geometry already used by the static editor graph.
+      return "studio-placement-guide-contracts";
+    }
+    if (
+      id.endsWith("/src/domains/creator/studio-material-pressure-model.ts")
+      || id.endsWith("/src/domains/creator/studio-hand-feel-media-load-v1.ts")
+      || id.endsWith("/src/domains/creator/brush/studio-ink-pressure-model.ts")
+      || id.endsWith("/src/domains/creator/studio-color-utils.ts")
+    ) {
+      // Audited dependency-free numeric brush contracts, already needed at Studio entry.
+      // Do not include renderers, catalogues, Workers, or their mutable runtime state here.
+      return "studio-brush-numeric-contracts";
+    }
     if (
       id.endsWith("/src/domains/creator/studio-id.ts")
+      || id.endsWith("/src/domains/creator/render/studio-engine-failure-policy.ts")
+      || id.endsWith("/src/domains/creator/contracts/studio-live-lock-resource.ts")
       || id.endsWith("/src/domains/creator/live/studio-live-local-transport-support.ts")
       || id.endsWith("/src/domains/creator/studio-content-aware-fill-contract.ts")
       || id.endsWith("/src/domains/creator/studio-z-index.ts")

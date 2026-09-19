@@ -2,7 +2,7 @@ import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { SITE_URL } from "@toonspectrum/core";
+import { SITE_URL } from "@toonspectrum/core/business";
 import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
