@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { WebIO } from "@gltf-transform/core";
 import { describe, expect, it, vi } from "vitest";
 import { admitArtifactReviewPair } from "./artifact-review-admission";
@@ -180,4 +181,17 @@ describe("source/result preview input boundary", () => {
     after.abort();
     await expect(pending).rejects.toMatchObject({ code: "cancelled" });
   });
+});
+
+
+it("copies Uint8Array subclasses instead of retaining a Buffer.slice view across attestation", async () => {
+  const { artifact, source } = await fixture();
+  const expected = artifact.bytes.slice();
+  const borrowed = Buffer.from(artifact.bytes);
+  const pending = admitArtifactReviewPair({ ...artifact, bytes: borrowed }, { ...source, bytes: borrowed });
+  borrowed.fill(0);
+  const admitted = await pending;
+  expect(admitted.result.bytes).toEqual(expected);
+  expect(admitted.source!.bytes).toEqual(expected);
+  expect(admitted.result.bytes.constructor).toBe(Uint8Array);
 });

@@ -146,7 +146,7 @@ export async function admitArtifactReviewPair(
     );
   }
   const inspected = inputs.map((input) =>
-    inspect(input.bytes.slice(), input.sha256),
+    inspect(new Uint8Array(input.bytes), input.sha256),
   );
   if (
     inspected.reduce((sum, item) => sum + item.decodedEstimateBytes, 0) >
