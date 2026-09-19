@@ -294,6 +294,13 @@ export function StudioModeProjectCreatePage() {
             className="mt-5"
           />
 
+          <p className="mt-3 text-xs leading-5 text-fg-3">
+            {bt(
+              "그리는 동안 이 기기에 자동 저장됩니다",
+              "Your work is autosaved on this device while you draw",
+            )}
+          </p>
+
           <section className="mt-7" aria-labelledby="studio-mode-kind-title">
             <p className="text-xs font-black text-accent">01</p>
             <h2 id="studio-mode-kind-title" className="mt-1 text-lg font-black text-fg">
