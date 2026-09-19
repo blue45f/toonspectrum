@@ -46,7 +46,6 @@ export interface StudioScene3dNprRenderPass {
   readonly dependencies: readonly StudioScene3dNprPassId[];
   readonly executor: StudioScene3dNprExecutor;
   readonly runtime: StudioScene3dPrimaryRenderer | "babylon" | "compositor";
-  readonly fallbackRuntime: "three-webgl2" | null;
   readonly format: "rgba8" | "r32f" | "rgba16f" | "uint32" | "mask8";
   readonly enabled: boolean;
   readonly required: boolean;
@@ -157,27 +156,26 @@ function executionOrder(
 function executorFor(
   pass: StudioScene3dNprPassId,
   primary: StudioScene3dPrimaryRenderer,
-): Pick<StudioScene3dNprRenderPass, "executor" | "runtime" | "fallbackRuntime" | "format"> {
-  const fallbackRuntime = primary === "three-webgpu" ? "three-webgl2" : null;
+): Pick<StudioScene3dNprRenderPass, "executor" | "runtime" | "format"> {
   if (pass === "fx-overlay") {
-    return { executor: "babylon-specialist", runtime: "babylon", fallbackRuntime: null, format: "rgba16f" };
+    return { executor: "babylon-specialist", runtime: "babylon", format: "rgba16f" };
   }
   if (pass === "beauty" || pass === "line" || pass === "tone" || pass === "ao") {
-    return { executor: "compositor", runtime: "compositor", fallbackRuntime: null, format: "rgba8" };
+    return { executor: "compositor", runtime: "compositor", format: "rgba8" };
   }
   if (pass === "depth") {
-    return { executor: "three-primary", runtime: primary, fallbackRuntime, format: "r32f" };
+    return { executor: "three-primary", runtime: primary, format: "r32f" };
   }
   if (pass === "normal" || pass === "emission" || pass === "velocity") {
-    return { executor: "three-primary", runtime: primary, fallbackRuntime, format: "rgba16f" };
+    return { executor: "three-primary", runtime: primary, format: "rgba16f" };
   }
   if (pass === "object-id" || pass === "material-id") {
-    return { executor: "three-primary", runtime: primary, fallbackRuntime, format: "uint32" };
+    return { executor: "three-primary", runtime: primary, format: "uint32" };
   }
   if (pass === "shadow") {
-    return { executor: "three-primary", runtime: primary, fallbackRuntime, format: "mask8" };
+    return { executor: "three-primary", runtime: primary, format: "mask8" };
   }
-  return { executor: "three-primary", runtime: primary, fallbackRuntime, format: "rgba8" };
+  return { executor: "three-primary", runtime: primary, format: "rgba8" };
 }
 
 export function buildStudioScene3dNprRenderGraph(input: {
