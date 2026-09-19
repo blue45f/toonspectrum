@@ -293,12 +293,12 @@ test("focused integration checks cannot collide with the protected core status",
 });
 
 
-test("focused ToonStudio checkout includes static metadata without expansion artwork", () => {
+test("focused ToonStudio checkout includes static metadata without unrelated artwork", () => {
   const workflow = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
   const patterns = workflow.match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
   assert.ok(patterns, "focused workflow must declare its checkout");
   const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
-  const artwork = "apps/web/public/assets/3d/environments/expansion-v1/large-model.glb";
+  const artwork = "apps/web/public/assets/3d/environments/unrelated-pack/large-model.glb";
   const scratch = mkdtempSync(join(tmpdir(), "toonstudio-focused-inputs-"));
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
