@@ -41,6 +41,11 @@ export async function captureStudioBg3dThreeDepth(
   }
 
   const previousTarget = renderer.getRenderTarget();
+  const previousCubeFace = renderer.getActiveCubeFace();
+  const previousMipmapLevel = renderer.getActiveMipmapLevel();
+  const previousViewport = renderer.getViewport(new THREE.Vector4());
+  const previousScissor = renderer.getScissor(new THREE.Vector4());
+  const previousScissorTest = renderer.getScissorTest();
   const previousOverrideMaterial = scene.overrideMaterial;
   const previousSceneBackground = scene.background;
   const previousSceneBackgroundRotation = scene.backgroundRotation.clone();
@@ -67,38 +72,52 @@ export async function captureStudioBg3dThreeDepth(
   const restoreDepthExcludedObjects = hideStudioBg3dDepthExcludedObjects(scene);
 
   try {
-    let readback: Promise<THREE.TypedArray>;
+    let readback: Promise<THREE.TypedArray> | undefined;
+    let failed = false;
+    let failure: unknown;
     try {
-      renderer.xr.enabled = false;
-      renderer.autoClear = true;
-      scene.overrideMaterial = depthMaterial;
-      renderer.setRenderTarget(target);
-      renderer.setClearColor(0xffffff, 1);
-      renderer.clear(true, true, true);
-      // Equirectangular scene backgrounds are color-only environment decoration. Pin a null
-      // background immediately before submission so no full-frame fake depth surface is packed.
-      scene.background = null;
-      renderer.render(scene, camera);
-      // Three submits readPixels/fence work synchronously before returning this Promise. Restore
-      // the live R3F renderer immediately so subsequent frames cannot render into the depth target
-      // or through MeshDepthMaterial while the GPU fence is pending.
-      readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, packed);
-    } finally {
       try {
-        scene.overrideMaterial = previousOverrideMaterial;
-        scene.background = previousSceneBackground;
-        scene.backgroundRotation.copy(previousSceneBackgroundRotation);
-        renderer.setRenderTarget(previousTarget);
-        renderer.setClearColor(previousClearColor, previousClearAlpha);
-        renderer.autoClear = previousAutoClear;
-        renderer.xr.enabled = previousXrEnabled;
+        renderer.xr.enabled = false;
+        renderer.autoClear = true;
+        scene.overrideMaterial = depthMaterial;
+        renderer.setRenderTarget(target);
+        renderer.setScissorTest(false);
+        renderer.setClearColor(0xffffff, 1);
+        renderer.clear(true, true, true);
+        // Equirectangular scene backgrounds are color-only environment decoration. Pin a null
+        // background immediately before submission so no full-frame fake depth surface is packed.
+        scene.background = null;
+        renderer.render(scene, camera);
+        // Three submits readPixels/fence work synchronously before returning this Promise. Restore
+        // the live R3F renderer immediately so subsequent frames cannot render into the depth target
+        // or through MeshDepthMaterial while the GPU fence is pending.
+        readback = renderer.readRenderTargetPixelsAsync(target, 0, 0, width, height, packed);
       } finally {
-        // The GPU submission already owns the draw. Restore beauty-only objects immediately so a
-        // live R3F frame cannot visibly lose its contact shadows while the readback fence settles.
-        restoreDepthExcludedObjects();
+        try {
+          scene.overrideMaterial = previousOverrideMaterial;
+          scene.background = previousSceneBackground;
+          scene.backgroundRotation.copy(previousSceneBackgroundRotation);
+          renderer.setRenderTarget(previousTarget, previousCubeFace, previousMipmapLevel);
+          renderer.setClearColor(previousClearColor, previousClearAlpha);
+          renderer.autoClear = previousAutoClear;
+          renderer.xr.enabled = previousXrEnabled;
+          renderer.setViewport(previousViewport);
+          renderer.setScissor(previousScissor);
+          renderer.setScissorTest(previousScissorTest);
+        } finally {
+          // The GPU submission already owns the draw. Restore beauty-only objects immediately so a
+          // live R3F frame cannot visibly lose its contact shadows while the readback fence settles.
+          restoreDepthExcludedObjects();
+        }
       }
+    } catch (error) {
+      failed = true;
+      failure = error;
     }
-    await readback;
+    // Even a synchronous restore failure must drain any already-submitted GPU copy.
+    const settled = await Promise.allSettled(readback ? [readback] : []);
+    if (failed) throw failure;
+    if (settled[0]?.status === "rejected") throw settled[0].reason;
     return decodeStudioBg3dThreeRgbaDepth({ width, height, rgba: packed, flipY: true });
   } finally {
     depthMaterial.dispose();

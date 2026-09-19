@@ -681,6 +681,9 @@ export function createStudioBg3dShotBatchExportRunner(
                 height: shot.capture.height,
                 background: shot.capture.background,
                 includeDepth: shot.capture.includeDepth,
+                ...(captureAdapter.normalProfile && shot.capture.includeDepth
+                  && applied.output.line.depthEnabled && !applied.output.line.depthOutlineOnly
+                  ? { includeNormals: true } : {}),
               },
               { signal: controller.signal, timeoutMs: 30_000 },
             );

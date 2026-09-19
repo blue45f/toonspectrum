@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -105,6 +106,15 @@ const NEW_BUNDLE_FILES = [
 ] as const;
 
 const MIN_BUNDLE_FILE_BYTES = 100 * 1024;
+// Refined-v2 already ships 768px material-preserving PNGs with a checked-in render receipt.
+// Preserve their pixels: exact size, digest and dimensions are stronger than an obsolete 200KB guess.
+const refinedV2Manifest = JSON.parse(readFileSync(join(process.cwd(),
+  "apps/web/public/assets/3d/characters/thumbnails/refined-v2/manifest.json"), "utf8")) as {
+  sourceMaterialsPreserved: boolean;
+  entries: { id: string; sourceUrl: string; width: number; height: number; thumbnailSha256: string; thumbnailBytes: number }[];
+};
+const refinedV2Receipts = new Map(refinedV2Manifest.entries.map((entry) => [entry.id, entry]));
+
 const HIGH_DETAIL_THUMBNAIL_MAX_BYTES = new Map<string, number>([
   // Froggy is a retained 768px production render whose audited PNG is ~287KB.
   ["froggy", 320 * 1024],
@@ -235,7 +245,20 @@ describe("VRM library helpers", () => {
 
       const { size } = statSync(filePath);
       expect(size, `${sample.id} thumbnail size should be > 1KB`).toBeGreaterThan(1024);
-      const maxThumbnailBytes = HIGH_DETAIL_THUMBNAIL_MAX_BYTES.get(sample.id)
+      const refinedV2 = sample.thumbnailUrl!.includes("/refined-v2/");
+      if (refinedV2) {
+        expect(refinedV2Manifest.sourceMaterialsPreserved).toBe(true);
+        const receipt = refinedV2Receipts.get(sample.id);
+        expect(receipt, `missing reviewed render receipt for ${sample.id}`).toBeDefined();
+        const png = readFileSync(filePath);
+        expect(receipt!.sourceUrl).toBe(sample.url);
+        expect(size).toBe(receipt!.thumbnailBytes);
+        expect(createHash("sha256").update(png).digest("hex")).toBe(receipt!.thumbnailSha256);
+        expect(png.readUInt32BE(16)).toBe(receipt!.width);
+        expect(png.readUInt32BE(20)).toBe(receipt!.height);
+        expect(receipt!.width).toBe(768); expect(receipt!.height).toBe(768);
+      }
+      const maxThumbnailBytes = refinedV2 ? 384 * 1024 : HIGH_DETAIL_THUMBNAIL_MAX_BYTES.get(sample.id)
         ?? (sample.thumbnailUrl!.includes("/refined-v1/") ? 320 * 1024 : 200 * 1024);
       expect(
         size,

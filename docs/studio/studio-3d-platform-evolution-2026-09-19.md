@@ -157,6 +157,10 @@ UI component는 renderer object를 직접 소유하지 않고 typed controller/c
 
 ## 6. P0 — Three WebGPU / TSL 실제 RenderGraph
 
+> 후속 Wave C는 실제 geometry depth/normal MRT와 각도 기반 LT 선화를 연결했다.
+> [구현·검증 결과](../reports/studio-scene3d-normal-crease-wave-c-2026-09-19.md)를 참고한다.
+> 아래 전체 RenderGraph의 완료나 모든 effect의 승격을 의미하지 않는다.
+
 현재 `studio-scene3d-npr-render-graph.ts`는 pass planner다. 이를 실제 GPU graph와 연결한다.
 
 목표:

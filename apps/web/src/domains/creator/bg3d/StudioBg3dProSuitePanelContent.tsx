@@ -1,11 +1,14 @@
 import { ArrowUpRight, Boxes, Camera, Clapperboard, Download } from "lucide-react";
 import { lazy, Suspense, useId, useState } from "react";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import { STUDIO_BG3D_CONTROL_BUTTON, studioBg3dClassNames as cx } from "./studio-bg3d-editor-ui";
 import { useStudioBg3dProSuiteRuntime } from "./studio-bg3d-pro-suite-runtime-context";
 import { StudioBg3dCompositionLensPanel } from "./StudioBg3dCompositionLensPanel";
 import { StudioBg3dProfessionalReadinessPanel } from "./StudioBg3dProfessionalReadinessPanel";
 
+const SplatReference = lazy(() => import("../scene3d/specialists/StudioScene3dSplatReferencePanel").then((module) => ({ default: module.StudioScene3dSplatReferencePanel })));
+const AssetTools = lazy(() => import("../scene3d/specialists/StudioScene3dAssetToolsPanel").then((module) => ({ default: module.StudioScene3dAssetToolsPanel })));
 const Director = lazy(() => import("./StudioBg3dCinematicDirectorPanel").then((module) => ({ default: module.StudioBg3dCinematicDirectorPanel })));
 const MultiPass = lazy(() => import("./StudioBg3dMultiPassExporterPanel").then((module) => ({ default: module.StudioBg3dMultiPassExporterPanel })));
 
@@ -27,8 +30,10 @@ export function StudioBg3dProSuitePanel({
   disabled = false,
   onOpenPrecisionModeler,
 }: StudioBg3dProSuitePanelProps) {
+  const t = useBilingual("scene3d-specialists");
   const runtime = useStudioBg3dProSuiteRuntime();
   const id = useId();
+  const [assetToolsOpen, setAssetToolsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ProSuiteActiveTab>("lens");
   const [visited, setVisited] = useState<ReadonlySet<ProSuiteActiveTab>>(() => new Set(["lens"]));
   const locked = disabled || (runtime?.disabled ?? true);
@@ -93,6 +98,14 @@ export function StudioBg3dProSuitePanel({
           </p>
         )}
       </section>
+      <button type="button" aria-expanded={assetToolsOpen} aria-controls={`${id}-asset-tools`} disabled={locked}
+        className={cx(STUDIO_BG3D_CONTROL_BUTTON, "w-full")} onClick={() => setAssetToolsOpen((open) => !open)}>
+        {t("3D 자산 고급 가공 · LOD / 불리언 / 이동 경로", "Advanced 3D assets · LOD / Boolean / Navigation")}
+      </button>
+      {assetToolsOpen && <div id={`${id}-asset-tools`}><Suspense fallback={<p role="status">{t("3D 자산 도구를 불러오는 중입니다.", "Loading 3D asset tools.")}</p>}>
+        <AssetTools disabled={locked || runtime?.proSuiteActive === false} />
+        <SplatReference disabled={locked || runtime?.proSuiteActive === false} />
+      </Suspense></div>}
       <div role="tablist" aria-label="웹툰 컷 제작 단계" className="grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
         {TOOLS.map((tool, index) => {
           const Icon = tool.icon;
