@@ -25,7 +25,7 @@ export type NativeBrushProbeOperation =
   | { type: "begin"; config: NativeBrushProbeConfig }
   | { type: "append"; samples: readonly NativeBrushProbeSample[] }
   | { type: "finish" }
-  | { type: "render-document"; config: NativeBrushProbeConfig; samples: readonly NativeBrushProbeSample[]; clipEdges: NativeBrushDocumentClipEdges };
+  | { type: "render-document"; surface?: NativeBrushSurface; config: NativeBrushProbeConfig; samples: readonly NativeBrushProbeSample[]; clipEdges: NativeBrushDocumentClipEdges };
 export type NativeBrushProbeRequest = NativeBrushProbeOperation & { version: 1; id: number };
 export type NativeBrushProbeFrame =
   | { kind: "pixels"; x: number; y: number; width: number; height: number; pixels: Uint8Array }

@@ -112,6 +112,7 @@ try {
   await page.goto("http://127.0.0.1:5279/__native_document");
   await page.locator("summary").click();
   assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.created), 0);
+  await page.getByRole("checkbox", { name: "연속 미리보기 가속" }).uncheck();
   const engines = [];
   for (const engine of ["libmypaint", "canvaskit", "vello"]) {
     await page.evaluate(() => globalThis.__nativeDocumentHarness.reset());
@@ -142,6 +143,40 @@ try {
     assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.active), 0);
     engines.push({ engine, ...pixels, serializedBytes: reopened.bytes, preservedOriginal: true, undoRedoExact: true, canonicalReload: true, svgEmbeddedPng: true });
   }
+  const previews = [];
+  await page.getByRole("checkbox", { name: "연속 미리보기 가속" }).check();
+  for (const engine of ["libmypaint", "canvaskit", "vello"]) {
+    await page.evaluate(() => globalThis.__nativeDocumentHarness.reset());
+    await page.getByRole("combobox", { name: "문서 변환 엔진", exact: true }).selectOption(engine);
+    const before = await page.evaluate(() => ({ source: globalThis.__nativeDocumentHarness.state(), created: globalThis.__nativeDocumentWorkers.created }));
+    let previousSrc;
+    for (let run = 0; run < 3; run++) {
+      await page.getByRole("button", { name: "결과 미리보기", exact: true }).click();
+      await page.getByRole("button", { name: "미리보기 적용", exact: true }).waitFor();
+      const src = await page.getByRole("img", { name: engine + " 선택 획 미리보기", exact: true }).getAttribute("src");
+      if (previousSrc) assert.equal(src, previousSrc, "Reused engine changed its PNG");
+      previousSrc = src;
+      assert.deepEqual(await page.evaluate(() => globalThis.__nativeDocumentHarness.state()), before.source);
+    }
+    assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.created), before.created + 1);
+    await page.getByRole("button", { name: "미리보기 적용", exact: true }).click();
+    const applied = await page.evaluate(() => globalThis.__nativeDocumentHarness.state());
+    assert.equal(applied.length, 2); assert.equal(applied[1].src, previousSrc);
+    await page.locator("summary").click(); // Actual close UI releases the idle lease.
+    await page.waitForFunction(() => globalThis.__nativeDocumentWorkers.active === 0, undefined, { timeout: 2000 });
+    assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.active), 0);
+    await page.locator("summary").click();
+    previews.push({ engine, previewCount: 3, workerInitializations: 1, originalUntouchedUntilApply: true, appliedExactPreview: true, closeReleasesWorker: true });
+  }
+  // A preview can outlive a document-history edit: applying it must fail, not regenerate.
+  await page.evaluate(() => globalThis.__nativeDocumentHarness.reset());
+  await page.getByRole("combobox", { name: "문서 변환 엔진", exact: true }).selectOption("libmypaint");
+  await page.getByRole("button", { name: "결과 미리보기", exact: true }).click();
+  await page.getByRole("button", { name: "미리보기 적용", exact: true }).waitFor();
+  await page.evaluate(() => globalThis.__nativeDocumentHarness.mutateFrontier());
+  await page.getByRole("button", { name: "미리보기 적용", exact: true }).click();
+  assert.equal(await page.evaluate(() => globalThis.__nativeDocumentHarness.state().length), 1);
+  assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.active), 0);
   await page.evaluate(() => globalThis.__nativeDocumentHarness.reset());
   await page.getByRole("combobox", { name: "문서 변환 엔진", exact: true }).selectOption("libmypaint");
   // Trigger synchronously so the history changes before the asynchronous Worker can finish.
@@ -160,11 +195,15 @@ try {
   assert.equal(await page.evaluate(() => globalThis.__nativeDocumentHarness.state().length), 1);
   assert.equal(await page.evaluate(() => globalThis.__nativeDocumentWorkers.active), 0);
   await page.screenshot({ path: fileURLToPath(new URL("native-document-inspector.png", output)) });
+  const sessionLifecycle = await page.evaluate(async () => {
+    const { verifyNativeBrushSessions } = await import("/scripts/studio-native-brush-session-browser.mjs");
+    return verifyNativeBrushSessions();
+  });
   const workers = await page.evaluate(() => globalThis.__nativeDocumentWorkers);
   const csp = await page.evaluate(() => globalThis.__nativeDocumentCsp);
   assert.equal(workers.peak, 1); assert.equal(workers.active, 0); assert.deepEqual(csp, []); assert.deepEqual(errors, []);
   const report = { scope: "real inspector + Dedicated Workers + production transaction planner/codec/SVG; isolated history host, not complete Studio UI or physical stylus certification",
-    browser: browser.version(), workerArtifact: workerUrl ?? "Vite development Worker", engines, cancelledPreservesOriginal: true,
+    browser: browser.version(), previews, sessionLifecycle, workerArtifact: workerUrl ?? "Vite development Worker", engines, cancelledPreservesOriginal: true,
     staleHistoryRejected: true, cancellationFault: "real completed Worker reply deliberately held before client delivery", workers, cspViolations: csp, pageErrors: errors };
   await writeFile(new URL(built ? "native-brush-document-built.json" : "native-brush-document-browser.json", output), JSON.stringify(report, null, 2) + "\n");
   console.log(JSON.stringify(report, null, 2));

@@ -27,7 +27,9 @@ const rows = candidate.rows.map((row) => {
 });
 const report = { baseline: before, candidate: after,
   trialsBefore: baseline.trials, trialsAfter: candidate.trials,
-  method: "Sequential build comparisons with provider order rotated within each run; not randomized build A/B or a significance claim",
+  method: "Sequential runs; recorded provider ordering below; not randomized build A/B or a significance claim",
+  beforeOrdering: baseline.ordering, afterOrdering: candidate.ordering,
+  beforeReusesEngine: baseline.reuseSession ?? false, afterReusesEngine: candidate.reuseSession ?? false,
   rows };
 await writeFile(new URL(`native-brush-comparison-${before}-${after}.json`, root), JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify(report, null, 2));

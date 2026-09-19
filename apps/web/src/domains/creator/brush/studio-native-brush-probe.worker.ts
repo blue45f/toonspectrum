@@ -107,23 +107,41 @@ async function execute(request: NativeBrushProbeRequest): Promise<NativeBrushPro
     if (!Array.isArray(request.samples) || request.samples.length < 1 || request.samples.length > NATIVE_BRUSH_PROBE_MAX_SAMPLES) {
       throw new RangeError("Native document input budget exceeded");
     }
+    const nextSurface = request.surface ?? surface;
+    validateNativeBrushSurface(nextSurface);
     validateNativeBrushProbeConfig(request.config);
     // Validate the entire source before allocating or changing native brush state.
     for (let offset = 0; offset < request.samples.length; offset += NATIVE_BRUSH_PROBE_BATCH) {
       validateNativeBrushProbeSamples(request.samples.slice(offset, offset + NATIVE_BRUSH_PROBE_BATCH),
-        offset ? request.samples[offset - 1]!.tMs : 0, offset, surface);
+        offset ? request.samples[offset - 1]!.tMs : 0, offset, nextSurface);
     }
-    await execute({ ...base, type: "begin", config: request.config });
-    for (let offset = 0; offset < request.samples.length; offset += NATIVE_BRUSH_PROBE_BATCH) {
-      const batch = request.samples.slice(offset, offset + NATIVE_BRUSH_PROBE_BATCH);
-      native?.append(batch); samples.push(...batch);
+    if (nextSurface.width !== surface.width || nextSurface.height !== surface.height) {
+      // Resize only between settled operations; retain the selected engine/module, not old ink.
+      if (gpuCanvas && gpuContext && device) {
+        gpuContext.unconfigure();
+        gpuCanvas.width = nextSurface.width; gpuCanvas.height = nextSurface.height;
+        gpuContext.configure({ device, format: "rgba8unorm", alphaMode: "premultiplied",
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST });
+      }
+      surface = { ...nextSurface };
     }
-    const { encodeNativeBrushDocumentFrame } = await import("./studio-native-brush-document-output");
-    const frame = await render(true);
-    begun = false;
-    const output = await encodeNativeBrushDocumentFrame(frame, surface, request.clipEdges);
-    return { ...base, type: "document", engine, ...surface, ...output, samples: samples.length };
+    try {
+      await execute({ ...base, type: "begin", config: request.config });
+      for (let offset = 0; offset < request.samples.length; offset += NATIVE_BRUSH_PROBE_BATCH) {
+        const batch = request.samples.slice(offset, offset + NATIVE_BRUSH_PROBE_BATCH);
+        native?.append(batch); samples.push(...batch);
+      }
+      const { encodeNativeBrushDocumentFrame } = await import("./studio-native-brush-document-output");
+      const frame = await render(true);
+      begun = false;
+      const output = await encodeNativeBrushDocumentFrame(frame, surface, request.clipEdges);
+      return { ...base, type: "document", engine, ...surface, ...output, samples: samples.length };
+    } finally {
+      // Engine reuse must never reuse brush dynamics, previous seed, or native stroke pixels.
+      try { native?.dispose(); } finally { native = null; samples = []; config = null; begun = false; }
+    }
   }
+
   if (request.type === "begin") {
     validateNativeBrushProbeConfig(request.config);
     native?.dispose(); native = null;

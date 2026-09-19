@@ -13,6 +13,8 @@ const output = new URL("../.qa/engine-resume/", import.meta.url);
 const label = process.argv.find((value) => value.startsWith("--label="))?.slice(8) ?? "current";
 assert.match(label, /^[a-z0-9-]{1,48}$/u);
 const built = process.argv.includes("--built-worker");
+const reuseSession = process.argv.includes("--session");
+const groupEngines = reuseSession || process.argv.includes("--engine-blocks");
 const trials = Number(process.argv.find((value) => value.startsWith("--trials="))?.slice(9) ?? 20);
 assert.ok(Number.isInteger(trials) && trials >= 3 && trials <= 40);
 const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws:; img-src 'self' data: blob:";
@@ -74,10 +76,11 @@ try {
     };
   }, workerUrl);
   await page.goto("http://127.0.0.1:5281/__native_bench");
-  const result = await page.evaluate(async ({ trials }) => {
+  const result = await page.evaluate(async ({ trials, reuseSession, groupEngines }) => {
     const base = "/apps/web/src/domains/creator/brush/";
     const { planStudioNativeBrushDocument } = await import(base + "studio-native-brush-document-contract.ts");
     const { renderStudioNativeBrushDocument } = await import(base + "studio-native-brush-document-product.ts");
+    const { StudioNativeBrushDocumentSession } = await import(base + "studio-native-brush-document-session.ts");
     const { createStudioNativeBrushProbeClient } = await import(base + "studio-native-brush-probe-client.ts");
     const { nativeBrushProbeScene } = await import(base + "studio-native-brush-probe-program.ts");
     const cases = [
@@ -120,25 +123,40 @@ try {
       ctx.fillStyle = source.stroke; ctx.fill(path);
       const referencePixels = ctx.getImageData(0, 0, scene.width, scene.height).data;
       const sourceHash = await hash(new TextEncoder().encode(JSON.stringify(source)));
-      // Rotate provider order per round. Each run creates/disposes a fresh product Worker.
-      for (let round = -3; round < trials; round++) {
-        const offset = (round + 3) % engines.length;
-        const order = [...engines.slice(offset), ...engines.slice(0, offset)];
-        for (const engine of order) {
-          const stages = {};
+      // Scoped mode uses one selected engine at a time; no global pool or parallel Workers.
+      const rounds = Array.from({ length: trials + 3 }, (_, i) => i - 3);
+      const sequence = groupEngines
+        ? engines.flatMap((engine) => rounds.map((round) => ({ engine, round })))
+        : rounds.flatMap((round) => {
+          const offset = (round + 3) % engines.length;
+          return [...engines.slice(offset), ...engines.slice(0, offset)].map((engine) => ({ engine, round }));
+        });
+      let selectedSession = null, selectedEngine = null, activeStages = null;
+      const createMeasuredClient = () => {
+        const client = createStudioNativeBrushProbeClient();
+        const original = client.request.bind(client);
+        client.request = async (request) => {
+          const stages = activeStages;
+          const started = performance.now(); const reply = await original(request);
+          stages[request.type] = performance.now() - started;
+          if (reply.type === "document") stages.pngBytes = reply.png.byteLength;
+          return reply;
+        };
+        return client;
+      };
+      try {
+        for (const { engine, round } of sequence) {
+          if (reuseSession && engine !== selectedEngine) {
+            selectedSession?.dispose();
+            selectedSession = new StudioNativeBrushDocumentSession({ createClient: createMeasuredClient });
+            selectedEngine = engine;
+          }
+          const stages = {}; activeStages = stages;
           const plan = planStudioNativeBrushDocument(source, { ...task, engine, style: "ink" });
           const start = performance.now();
-          const output = await renderStudioNativeBrushDocument(plan, new AbortController().signal, () => {
-            const client = createStudioNativeBrushProbeClient();
-            const original = client.request.bind(client);
-            client.request = async (request) => {
-              const started = performance.now(); const reply = await original(request);
-              stages[request.type] = performance.now() - started;
-              if (reply.type === "document") stages.pngBytes = reply.png.byteLength;
-              return reply;
-            };
-            return client;
-          });
+          const output = reuseSession
+            ? await selectedSession.render(plan, new AbortController().signal)
+            : await renderStudioNativeBrushDocument(plan, new AbortController().signal, createMeasuredClient);
           const totalMs = performance.now() - start;
           const image = new Image(); const decodeStart = performance.now(); image.src = output.src; await image.decode();
           const decodeMs = performance.now() - decodeStart;
@@ -150,15 +168,16 @@ try {
           if (image.width !== plan.surface.width || image.height !== plan.surface.height) throw new Error("Output scale changed");
           let visible = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
           if (!visible) throw new Error(`${task.id}/${engine}: empty output`);
-          if (globalThis.__benchmarkWorkers.active !== 0) throw new Error("Worker leak");
-          const row = { initMs: stages.init, renderToPngMs: stages["render-document"], totalMs, decodeMs,
+          if (globalThis.__benchmarkWorkers.active > (reuseSession ? 1 : 0)) throw new Error("Worker leak");
+          const row = { initMs: stages.init ?? 0, reusedSession: reuseSession && stages.init === undefined, renderToPngMs: stages["render-document"], totalMs, decodeMs,
             pngBytes: stages.pngBytes, pixelHash, visiblePixels: visible };
           if (!first[engine]) first[engine] = row;
           if (round >= 0) observations[engine].push(row);
           final[engine] = { output, pixels, canvas };
           await new Promise((resolve) => setTimeout(resolve, 0));
         }
-      }
+      } finally { selectedSession?.dispose(); }
+      if (globalThis.__benchmarkWorkers.active !== 0) throw new Error("Session disposal leaked its Worker");
       for (const engine of engines) {
         const values = observations[engine], last = final[engine];
         const hashes = new Set(values.map((value) => value.pixelHash));
@@ -176,14 +195,16 @@ try {
     }
     return { rows, workers: globalThis.__benchmarkWorkers, cspViolations: globalThis.__benchmarkCsp,
       timingResolution: "performance.now; browser-coarsened, crossOriginIsolated=" + crossOriginIsolated };
-  }, { trials });
+  }, { trials, reuseSession, groupEngines });
   assert.deepEqual(errors, []); assert.deepEqual(result.cspViolations, []);
   assert.equal(result.workers.active, 0); assert.equal(result.workers.peak, 1);
   const report = { schemaVersion: 1, label, generatedAt: new Date().toISOString(),
     gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
     dirtySource: execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" }).trim().length > 0,
     browser: browser.version(), host: { ...host, loadAverageAfter: loadavg() }, workerArtifact: workerUrl ?? "development Worker",
-    trials, warmupRounds: 3, ordering: "rotated per round; fresh Worker per conversion; shared browser HTTP/WASM caches",
+    trials, warmupRounds: 3, reuseSession, groupEngines, ordering: groupEngines
+      ? "one selected engine per block, three warmups then measured repetitions; shared browser caches; at most one Worker"
+      : "rotated per round; fresh Worker per conversion; shared browser HTTP/WASM caches",
     scope: "selected-stroke reinterpretation/PNG; no physical-pen, live-frame, cross-device or competitor performance claim",
     unavailableMetrics: ["GPU resident bytes", "WASM peak heap per provider", "physical pen latency"], ...result, pageErrors: errors };
   await writeFile(new URL(`native-brush-benchmark-${label}.json`, output), JSON.stringify(report, null, 2) + "\n");

@@ -7,22 +7,23 @@ import type { StudioNativeBrushProbeClient } from "./studio-native-brush-probe-c
 function abort(signal: AbortSignal): void {
   if (signal.aborted) throw new DOMException("네이티브 브러시 변환을 취소했습니다.", "AbortError");
 }
-/** One selected Worker per explicit settled conversion. Returns durable PNG, never a blob URL. */
-export async function renderStudioNativeBrushDocument(
-  plan: StudioNativeBrushDocumentPlan,
+/** Narrow transport for one-shot and explicitly scoped reusable execution. */
+export type StudioNativeBrushDocumentClientPort = Pick<StudioNativeBrushProbeClient, "request" | "dispose">;
+
+/** Shared validated execution; caller decides whether a successful engine may remain scoped. */
+export async function renderStudioNativeBrushDocumentOnClient(
+  captured: StudioNativeBrushDocumentPlan,
   signal: AbortSignal,
-  createClient: () => StudioNativeBrushProbeClient = createStudioNativeBrushProbeClient,
+  client: StudioNativeBrushDocumentClientPort,
+  initialize: boolean,
 ): Promise<StudioNativeBrushDocumentResult> {
-  abort(signal);
-  const captured = structuredClone(plan);
-  const client = createClient();
   const onAbort = () => client.dispose(new DOMException("네이티브 브러시 변환을 취소했습니다.", "AbortError"));
   signal.addEventListener("abort", onAbort, { once: true });
   try {
     abort(signal);
-    await client.request({ type: "init", engine: captured.engine, surface: captured.surface });
+    if (initialize) await client.request({ type: "init", engine: captured.engine, surface: captured.surface });
     abort(signal);
-    const reply = await client.request({ type: "render-document", config: captured.config, samples: captured.samples, clipEdges: captured.clipEdges });
+    const reply = await client.request({ type: "render-document", surface: captured.surface, config: captured.config, samples: captured.samples, clipEdges: captured.clipEdges });
     abort(signal);
     if (reply.type !== "document" || reply.engine !== captured.engine || reply.samples !== captured.samples.length
       || !validateNativeBrushDocumentOutput(reply, captured.surface)) {
@@ -43,6 +44,18 @@ export async function renderStudioNativeBrushDocument(
       src: `data:image/png;base64,${btoa(binary)}`, pngHash: hash };
   } finally {
     signal.removeEventListener("abort", onAbort);
-    client.dispose();
   }
+}
+
+/** Standalone callers keep the original one-Worker-per-conversion contract. */
+export async function renderStudioNativeBrushDocument(
+  plan: StudioNativeBrushDocumentPlan,
+  signal: AbortSignal,
+  createClient: () => StudioNativeBrushDocumentClientPort = createStudioNativeBrushProbeClient,
+): Promise<StudioNativeBrushDocumentResult> {
+  abort(signal);
+  const captured = structuredClone(plan);
+  const client = createClient();
+  try { return await renderStudioNativeBrushDocumentOnClient(captured, signal, client, true); }
+  finally { client.dispose(); }
 }
