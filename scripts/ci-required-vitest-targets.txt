@@ -111,7 +111,10 @@ apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts
 apps/web/src/domains/creator/layer
 apps/web/src/domains/creator/live/huddle
 apps/web/src/domains/creator/offline
+apps/web/src/domains/creator/production-hub/ProductionStudioRevisionBridgePanel.test.tsx
+apps/web/src/domains/creator/project-graph/studio-project-graph-client.test.ts
 apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts
+apps/web/src/domains/creator/scene3d/specialists/specialist-orchestration.test.ts
 apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts
 apps/web/src/domains/creator/studio-autosave-opfs-product-boundary.test.ts
 apps/web/src/domains/creator/studio-autosave-opfs-session.test.ts

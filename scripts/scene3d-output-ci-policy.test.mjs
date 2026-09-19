@@ -69,3 +69,36 @@ it("runs the real specialist CSP lane when pinned dependencies or compatibility 
   }
   expect(scene.jobs["scene3d-specialists-browser"].env.SCENE3D_SPECIALISTS_PRODUCTION_WORKER).toBe("1");
 });
+
+
+it("keeps both current environment packs for related tests, without admitting unrelated asset trees", () => {
+  const lane = workflow("toonstudio-session-goals.yml").jobs["focused-validation"];
+  const checkout = lane.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
+  const wanted = [
+    ...manifests,
+    "apps/web/public/assets/3d/environments/refined-v6/hospital_reception.glb",
+    "apps/web/public/assets/3d/environments/expansion-v1/library_reading_room.glb",
+    "apps/web/public/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png",
+    "apps/web/public/assets/3d/characters/thumbnails/refined-v2/manifest.json",
+    "apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts",
+  ];
+  const excluded = ["apps/web/public/assets/unrelated/large.glb", "apps/web/public/vrm/large.vrm", "artifacts/huge.bin"];
+  const scratch = mkdtempSync(join(tmpdir(), "scene3d-related-checkout-"));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+  };
+  try {
+    git("init", "--quiet");
+    for (const file of [...wanted, ...excluded]) { const path = join(scratch, file); mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, "fixture"); }
+    git("add", ".");
+    git("-c", "user.name=Scene3D Test", "-c", "user.email=scene3d@example.invalid", "commit", "--quiet", "-m", "fixture");
+    git("config", "core.sparseCheckout", "true"); git("config", "core.sparseCheckoutCone", "false");
+    writeFileSync(join(scratch, ".git/info/sparse-checkout"), checkout.with["sparse-checkout"]);
+    git("read-tree", "-mu", "HEAD");
+    for (const file of wanted) expect(existsSync(join(scratch, file)), file).toBe(true);
+    for (const file of excluded) expect(existsSync(join(scratch, file)), file).toBe(false);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
+  const commands = lane.steps.map((step) => step.run ?? "").join("\n");
+  expect(commands).toContain('vitest related "${files[@]}" --run');
+});
