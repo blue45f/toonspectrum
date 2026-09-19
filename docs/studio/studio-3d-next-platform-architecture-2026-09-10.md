@@ -259,8 +259,12 @@ Hard blockers include:
 - deformation score below 92
 - thumbnail below 512px
 - fewer than three LODs for character/mesh assets
+- textured production assets without a KTX2/Basis derivative
+- non-splat mesh assets without meshoptimizer/Draco geometry compression evidence
 
-Warnings requiring review include missing KTX2, missing geometry compression, oversized textures and excessive draw calls.
+Warnings requiring review include insufficient far-LOD reduction, oversized textures and excessive draw calls.
+A `review` result is not automatic production readiness; professional output stays in review until the
+asset is explicitly brought back to a production result.
 
 Low-quality assets are hidden from the production catalog. They may remain in quarantine/source storage for re-authoring but are not shown to users.
 
