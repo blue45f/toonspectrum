@@ -409,11 +409,25 @@ renderer state를 공유하지 않는다.
 
 path tracing은 interactive authority 후보가 아니다.
 
+저장소에는 이미 renderer-neutral `studio-pathtrace-scene`, CPU progressive renderer,
+BVH/BSDF/integrator와 WebGPU runtime/WGSL이 있다. 이를 버리고 외부 엔진부터 넣지 않는다.
+
 ```text
 preview          -> raster
 webtoon output   -> high-res deterministic raster + accumulation
-reference still  -> optional path tracer after promotion gates
+reference still  -> internal Studio Path Tracer reference
+                         ↓ same Scene3D corpus
+                    external path tracer A/B
 ```
+
+승격 순서:
+
+1. 기존 Studio Path Tracer를 Scene3D immutable snapshot/output job에 연결
+2. texture/UV, TLAS/instancing, emissive triangle, transmission/SSS 등 결손을 corpus로 명시
+3. CPU reference와 WebGPU 결과 parity
+4. cancellation/device-loss/resource lifecycle
+5. 외부 `three-gpu-pathtracer`와 같은 scene/material/output 계약으로 A/B
+6. visual·성능·bundle 우위가 있을 때만 external specialist를 선택적으로 채택
 
 material/VRM/toon/alpha/semantic pass parity가 준비되지 않으면 research 상태를 유지한다.
 
