@@ -24,6 +24,7 @@ export interface StudioScene3dSoftwareCapabilities {
   readonly ssgi: boolean;
   readonly sss: boolean;
   readonly assetReleasePipeline: boolean;
+  readonly renderBundles: boolean;
   readonly threeNativeGaussianSplat: boolean;
   readonly sparkGaussianSplat: boolean;
   readonly playcanvasGaussianSplat: boolean;
@@ -52,6 +53,7 @@ export const STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES:
     ssgi: false,
     sss: false,
     assetReleasePipeline: false,
+    renderBundles: false,
     threeNativeGaussianSplat: false,
     sparkGaussianSplat: false,
     playcanvasGaussianSplat: false,
@@ -114,6 +116,7 @@ export interface StudioScene3dRuntimePlan {
     readonly meshopt: boolean;
     readonly gaussianSplatBackend: StudioScene3dGaussianSplatBackend;
     readonly gaussianSplatGpuSort: boolean;
+    readonly renderBundles: boolean;
     readonly bvhQueries: "cpu" | "webgpu-compute";
     readonly advancedIk: "builtin" | "closed-chain";
     readonly interactiveCsg: "manifold-commit" | "bvh-preview-manifold-commit";
@@ -335,6 +338,7 @@ export function resolveStudioScene3dRuntimePlan(
       gaussianSplatGpuSort: needs.gaussianSplats
         && webgpuCompute
         && gaussianSplatBackend !== "unavailable",
+      renderBundles: capabilities.webgpu && software.renderBundles,
       bvhQueries: webgpuCompute && software.bvhWebGpuCompute
         ? "webgpu-compute"
         : "cpu",
