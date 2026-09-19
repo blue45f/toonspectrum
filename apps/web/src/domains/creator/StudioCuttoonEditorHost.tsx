@@ -549,6 +549,7 @@ import { initialGpuLiveSourceJournalMatchesPlan } from "./canvas/studio-hokusai-
 import { StudioHokusaiLiveOverlayRenderer } from "./render/studio-hokusai-live-brush-overlay";
 import { StudioHokusaiLiveBrushProvider } from "./render/studio-hokusai-live-brush-runtime";
 import { planStudioHokusaiNaturalMediaReplacement } from "./render/studio-hokusai-natural-media-replacement";
+import { prepareStudioNativeBrushDocumentCommit } from "./brush/studio-native-brush-document-commit";
 import { useStudioHybridDccPersistence } from "./hybrid-dcc/studio-hybrid-dcc-persistence";
 import { uid } from "./studio-id";
 import {
@@ -27201,6 +27202,28 @@ function clearSelectionForEdit() {
         return false;
       }
       return addRenderedImage(src, width, height, undefined, false, { name });
+    },
+    prepareNativeBrushDocumentConversion: (target) => {
+      const ticket = captureStudioMutationTicket();
+      return prepareStudioNativeBrushDocumentCommit(target, {
+        canMutate: () => canApplyStudioMutation(ticket)
+          && editorMountedRef.current && !documentSaveInFlightRef.current
+          && !collaborationAccessRef.current.locked && !activeSurfaceReviewLockedRef.current
+          && !drawingRef.current && !pendingStrokeCommitsRef.current,
+        read: () => {
+          const history = pagesHistoryRef.current;
+          const index = pagesHiRef.current;
+          const page = history[index]?.find((candidate) => candidate.id === currentPageIdRef.current);
+          return page ? { pageId: page.id, masterEditMode: masterEditModeRef.current,
+            historyIdentity: history, historyIndex: index, elements: page.elements,
+            groups: page.groups ?? [], documentWidth: CANVAS_W, documentHeight: page.canvasH } : null;
+        },
+        commit,
+        onCommitted: (id) => {
+          setSelectedId(id);
+          announceDrawingShortcut("네이티브 브러시 변환 완료 · 원본 숨김 보존 · 실행 취소 가능");
+        },
+      });
     },
     replaceDrawWithHokusaiNaturalMedia: (
       result,

@@ -1,3 +1,4 @@
+import { StudioNativeBrushDocumentInspectorMount } from "./brush/StudioNativeBrushDocumentInspectorMount";
 import { PaintBucket } from "lucide-react";
 import { Suspense } from "react";
 
@@ -132,6 +133,7 @@ export function StudioInspectorDrawingSection({
     removeAdvancedRuler,
     removeVanishingPointHandler,
     replaceDrawWithHokusaiNaturalMedia,
+    prepareNativeBrushDocumentConversion,
     resetIsometricOrigin,
     savedBrushes,
     selectAdvancedRuler,
@@ -532,6 +534,12 @@ export function StudioInspectorDrawingSection({
                     announceDrawingShortcut("캔버스에서 변환할 자유곡선 선화를 선택하세요");
                   }}
                   onReplace={replaceDrawWithHokusaiNaturalMedia}
+                />
+                <StudioNativeBrushDocumentInspectorMount
+                  selected={selected} documentWidth={CANVAS_W} documentHeight={canvasH}
+                  pageId={currentPageId} masterEditMode={masterEditMode}
+                  disabled={collaborationDocumentLocked || activeSurfaceReviewLocked || selectedContentMutationLocked}
+                  onPrepare={prepareNativeBrushDocumentConversion}
                 />
                 {drawMode !== "shape" && drawMode !== "pixel" ? (
                   <StudioProceduralArtisticBrushInspectorSection key={`${currentPageId}:${masterEditMode ? "master" : "page"}`} currentColor={color} canvasHeight={canvasH} pageId={currentPageId} masterEditMode={masterEditMode} disabled={collaborationDocumentLocked || activeSurfaceReviewLocked} disabledReason={collaborationDocumentLocked ? "협업 문서 잠금을 해제한 뒤 절차적 질감을 만들 수 있어요." : activeSurfaceReviewLocked ? "표면 리뷰를 마친 뒤 절차적 질감을 만들 수 있어요." : null} onInsert={addProceduralArtisticBrushRaster} />
