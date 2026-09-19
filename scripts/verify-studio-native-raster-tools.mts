@@ -1627,8 +1627,11 @@ async function drawNativeFixture(
   await page.keyboard.press("b");
   const drawOptions = page.locator('[data-studio-draw-options="true"]');
   await drawOptions.waitFor({ state: "visible" });
-  const pen = drawOptions.getByRole("button", { name: "펜", exact: true });
-  if (await pen.getAttribute("aria-pressed") !== "true") await pen.click();
+  await page.waitForFunction(() =>
+    document.querySelector('[data-studio-draw-options="true"]')
+      ?.getAttribute("data-studio-active-draw-mode") === "pen"
+  );
+  await drawOptions.locator('[data-studio-brush-active-pill="true"]').waitFor({ state: "visible" });
   await setPrimaryColor(page, "#6b7280");
   await ensureNativeRasterInteractionRegion(page);
   const blankBaseline = await captureClip(page, 80);
