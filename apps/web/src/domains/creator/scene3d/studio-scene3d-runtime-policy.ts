@@ -18,6 +18,12 @@ export type StudioScene3dGaussianSplatBackend =
   | "unavailable";
 
 export interface StudioScene3dSoftwareCapabilities {
+  readonly tslNprRenderGraph: boolean;
+  readonly csmShadows: boolean;
+  readonly taau: boolean;
+  readonly ssgi: boolean;
+  readonly sss: boolean;
+  readonly assetReleasePipeline: boolean;
   readonly threeNativeGaussianSplat: boolean;
   readonly sparkGaussianSplat: boolean;
   readonly playcanvasGaussianSplat: boolean;
@@ -40,6 +46,12 @@ export interface StudioScene3dSoftwareCapabilities {
  */
 export const STUDIO_SCENE3D_CURRENT_SOFTWARE_CAPABILITIES:
   StudioScene3dSoftwareCapabilities = Object.freeze({
+    tslNprRenderGraph: false,
+    csmShadows: false,
+    taau: false,
+    ssgi: false,
+    sss: false,
+    assetReleasePipeline: false,
     threeNativeGaussianSplat: false,
     sparkGaussianSplat: false,
     playcanvasGaussianSplat: false,
@@ -304,12 +316,12 @@ export function resolveStudioScene3dRuntimePlan(
     budget,
     features: Object.freeze({
       tsl: capabilities.webgpu,
-      mrt: capabilities.webgpu,
+      mrt: capabilities.webgpu && software.tslNprRenderGraph,
       gpuCompute: webgpuCompute,
-      csm: true,
-      taau: capabilities.webgpu,
-      ssgi: capabilities.webgpu && memory !== "low",
-      sss: capabilities.webgpu && memory !== "low",
+      csm: software.csmShadows,
+      taau: capabilities.webgpu && software.taau,
+      ssgi: capabilities.webgpu && memory !== "low" && software.ssgi,
+      sss: capabilities.webgpu && memory !== "low" && software.sss,
       xpbd: needs.liveClothOrHair
         ? webgpuCompute && software.gpuXpbd
           ? "gpu"
