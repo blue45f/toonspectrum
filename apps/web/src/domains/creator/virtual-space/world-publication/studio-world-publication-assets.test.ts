@@ -1,6 +1,6 @@
 import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudioWorldPublication } from "@toonspectrum/studio-project-model";
+import type { StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "../studio-virtual-space-world-manifest";
 import { prepareStudioWorldAssets, type StudioWorldAssetDependencies } from "./studio-world-publication-assets";
 import { parseStudioWorldPublication, studioWorldDigest, studioWorldPublishManifest } from "./studio-world-publication-client";

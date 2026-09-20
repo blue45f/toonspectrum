@@ -44,3 +44,10 @@
 .workspace-runtime-recovery{min-height:100dvh;background:var(--color-canvas);color:var(--color-fg)}
 .workspace-runtime-recovery>section{display:grid;place-content:center;gap:16px;min-height:60dvh;padding:24px}
 .workspace-runtime-recovery>section button{min-height:44px;padding:12px 20px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-panel);color:var(--color-fg)}
+/* Keep the existing compact OST player away from local status and touch actions. */
+@media(min-width:761px){
+ body:has([data-site-ost="mounted"]) .vs2-shell--project .workspace-live-state{padding-left:246px}
+}
+@media(max-width:760px){
+ body:has([data-site-ost="mounted"]) .vs2-shell--project .studio-vspace-touch-action{bottom:88px}
+}

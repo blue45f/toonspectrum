@@ -1,5 +1,5 @@
-import { studioAcousticCoreBindingSchema, studioConversationInvalidationSchema,
-  type StudioAcousticCoreBinding, type StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
+import { studioAcousticCoreBindingSchema, type StudioAcousticCoreBinding } from "@toonspectrum/studio-project-model/world-acoustic";
+import { studioConversationInvalidationSchema, type StudioConversationInvalidation } from "@toonspectrum/studio-project-model/world-conversation";
 
 /** A join-confirmed Core identity, never a door, consent or media grant. */
 export type StudioLiveAcousticCoreBinding = Readonly<Pick<StudioAcousticCoreBinding, "connectionId" | "clientInstanceId">>;

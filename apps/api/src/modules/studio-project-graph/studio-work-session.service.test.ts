@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StudioWorkSessionCommandError } from "@toonspectrum/studio-project-model";
+import { StudioWorkSessionCommandError } from "@toonspectrum/studio-project-model/work-session";
 import { StudioWorkSessionService } from "./studio-work-session.controller";
 import { StudioWorkSessionRepository, StudioWorkSessionRepositoryError } from "./studio-work-session.repository";
 import { loadArtifactAccess, StudioProjectGraphRepository } from "./studio-project-graph.repository";

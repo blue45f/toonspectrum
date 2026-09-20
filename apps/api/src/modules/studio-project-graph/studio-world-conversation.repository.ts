@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
-import { canonicalJson, STUDIO_ACOUSTIC_INVITATION_MS, STUDIO_ACOUSTIC_MAX_CONVERSATIONS, STUDIO_ACOUSTIC_RESOURCE_PREFIX,
-  STUDIO_WORLD_ARTIFACT_PREFIX, studioConversationSnapshotSchema, studioConversationProposeSchema, type StudioConversationSnapshot, type StudioConversationReason,
-  type StudioConversationPropose, type StudioConversationRead, type StudioConversationChange, type StudioConversationRenew } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_INVITATION_MS, STUDIO_ACOUSTIC_MAX_CONVERSATIONS, studioConversationSnapshotSchema, studioConversationProposeSchema, type StudioConversationSnapshot, type StudioConversationReason, type StudioConversationPropose, type StudioConversationRead, type StudioConversationChange, type StudioConversationRenew } from "@toonspectrum/studio-project-model/world-conversation";
+import { STUDIO_ACOUSTIC_RESOURCE_PREFIX } from "@toonspectrum/studio-project-model/world-acoustic";
+import { STUDIO_WORLD_ARTIFACT_PREFIX } from "@toonspectrum/studio-project-model/world-publication";
 import type { PoolClient } from "pg";
 import type { VerifiedSessionToken } from "../../server/session";
 import { StudioProjectForbiddenError, StudioProjectNotFoundError, StudioIdempotencyConflictError, studioRequestHash as hash } from "./studio-project-graph.repository";

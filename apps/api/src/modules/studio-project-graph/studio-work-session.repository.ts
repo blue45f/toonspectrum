@@ -2,10 +2,8 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import type { PoolClient } from "pg";
-import { canonicalJson, STUDIO_WORK_SESSION_ARTIFACT_PREFIX, createStudioWorkSession, reduceStudioWorkSession,
-  studioWorkSessionCreateSchema, studioWorkSessionCommandSchema, studioWorkSessionReceiptSchema,
-  type StudioWorkSession, type StudioWorkSessionActor, type StudioWorkSessionCreate, type StudioWorkSessionCommand,
-  type StudioWorkSessionView, type StudioWorkSessionReceipt, type StudioWorkSessionResult } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { STUDIO_WORK_SESSION_ARTIFACT_PREFIX, createStudioWorkSession, reduceStudioWorkSession, studioWorkSessionCreateSchema, studioWorkSessionCommandSchema, studioWorkSessionReceiptSchema, type StudioWorkSession, type StudioWorkSessionActor, type StudioWorkSessionCreate, type StudioWorkSessionCommand, type StudioWorkSessionView, type StudioWorkSessionReceipt, type StudioWorkSessionResult } from "@toonspectrum/studio-project-model/work-session";
 import { dbPool } from "../../db";
 import { resolveCreatorCollaborationAccess } from "../creator/creator-collaboration.policy";
 import { studioRequestHash as hash } from "./studio-project-graph.repository";

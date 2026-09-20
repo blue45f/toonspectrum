@@ -1,5 +1,5 @@
 /** Implementation helpers for `StudioLiveSocketTransport`; not a public entry. */
-import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model/world-conversation";
 import { studioLiveAcousticJoinBinding } from "./studio-live-acoustic-control";
 import { formatStudioLiveAdmissionDeniedMessage } from "./studio-live-admission-support";
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { canonicalJson, studioWorkSessionId, studioWorkSessionViewSchema, studioWorkSessionListSchema, studioWorkSessionMutationSchema, studioWorkSessionReceiptSchema,
-  type StudioWorkSessionCreate, type StudioWorkSessionCommand, type StudioWorkSessionView } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { studioWorkSessionId, studioWorkSessionViewSchema, studioWorkSessionListSchema, studioWorkSessionMutationSchema, studioWorkSessionReceiptSchema, type StudioWorkSessionCreate, type StudioWorkSessionCommand, type StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
 import { api } from "@/infrastructure/api";
 
 export type StudioSessionList = z.infer<typeof studioWorkSessionListSchema>;

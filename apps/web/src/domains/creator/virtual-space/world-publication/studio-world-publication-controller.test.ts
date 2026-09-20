@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { StudioWorldPublication } from "@toonspectrum/studio-project-model";
+import type { StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "../studio-virtual-space-world-manifest";
 import { StudioWorldPublicationController, type StudioWorldPublicationDependencies } from "./studio-world-publication-controller";
 import { StudioWorldPublicationError, studioWorldPublishManifest, type StudioWorldPublicationAuthority } from "./studio-world-publication-client";
