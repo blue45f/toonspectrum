@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  actions: read
   pull-requests: read
 
 concurrency:
@@ -31,133 +30,51 @@ jobs:
           persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
+      
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Preserve exact original failure evidence
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Load immutable reviewed validation steps
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/throughput"
-          gh api --method GET repos/blue45f/toonspectrum/actions/jobs/106087375245/logs > "$RUNNER_TEMP/throughput/original-full-test.log"
-          python3 - <<'PY'
-          import os, re
-          from pathlib import Path
-          source=Path(os.environ['RUNNER_TEMP'])/'throughput/original-full-test.log'
-          lines=re.sub(r'\x1b\[[0-9;]*m','',source.read_text(errors='replace')).splitlines()
-          selected=set()
-          for i,line in enumerate(lines):
-              if re.search(r'\bFAIL\b|Failed Tests|Test Files|Tests\s+[0-9]|\bDuration\b|ENOENT',line):
-                  selected.update(range(max(0,i-1),min(len(lines),i+15)))
-          report='\n'.join(lines[i] for i in sorted(selected))
-          (source.parent/'original-failure-summary.txt').write_text(report)
-          print(report)
-          PY
-      - name: Apply immutable reviewed patch and remove obsolete comparator imports
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api --method GET "repos/blue45f/toonspectrum/contents/.github/workflows/ci-throughput-validation.yml?ref=$PATCH_SHA" --jq .content | base64 --decode > "$RUNNER_TEMP/throughput/source-patch-workflow.yml"
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/blue45f/toonspectrum/341c6b0c15429816f44d2638b0f9cb3087a47db3/.github/workflows/ci-throughput-validation.yml --output "$RUNNER_TEMP/throughput/reviewed-workflow.yml"
           node --input-type=module <<'JS'
           import fs from 'node:fs';
           import { parse } from 'yaml';
           const root=process.env.RUNNER_TEMP;
-          const workflow=parse(fs.readFileSync(`${root}/throughput/source-patch-workflow.yml`,'utf8'));
-          const steps=workflow.jobs.validate.steps.filter(s=>s.name==='Apply narrowly asserted behavior-preserving validation deduplication');
-          if(steps.length!==1 || typeof steps[0].run!=='string')throw new Error('Unexpected immutable patch');
-          fs.writeFileSync(`${root}/repair.sh`,steps[0].run);
+          const w=parse(fs.readFileSync(`${root}/throughput/reviewed-workflow.yml`,'utf8'));
+          const names={
+            patch:'Apply immutable reviewed patch and remove obsolete comparator imports',
+            test:'Validate source, contracts and type safety',
+            build:'Require real production build and unchanged bundle gate',
+            publish:'Publish only tested Git object and receipt, never move a branch',
+            report:'Summarize validation evidence',
+          };
+          for(const [file,name] of Object.entries(names)){
+            const steps=w.jobs.validate.steps.filter(s=>s.name===name);
+            if(steps.length!==1 || typeof steps[0].run!=='string')throw new Error(`Unexpected step: ${name}`);
+            fs.writeFileSync(`${root}/${file}.sh`,steps[0].run);
+          }
           JS
-          bash "$RUNNER_TEMP/repair.sh"
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          for name in ['studio-bg3d-shot-batch.ts','studio-bg3d-shot-batch-plan.ts']:
-              p=Path('apps/web/src/domains/creator/bg3d')/name
-              text=p.read_text()
-              assert text.count('compareStudioValidationStrings')==1,name
-              text,count=re.subn(r'^import \{ compareStudioValidationStrings \} from "[^"]+";\n','',text,flags=re.MULTILINE)
-              assert count==1,name
-              p.write_text(text)
-          PY
-      - name: Validate source, contracts and type safety
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm exec eslint --fix apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-plan.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.test.ts > "$RUNNER_TEMP/throughput/lint.log" 2>&1
-          pnpm exec vitest run apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-client.test.ts scripts/cleanup-superseded-actions-runs.test.mjs scripts/integration-test-runner-ci-policy.test.mjs scripts/ci-throughput-policy.test.mjs scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-p5-brush-real-runtime.test.ts scripts/studio-bg3d-runtime-release-wiring.test.ts scripts/run-full-test-ci.test.mjs > "$RUNNER_TEMP/throughput/tests.log" 2>&1
-          tail -10 "$RUNNER_TEMP/throughput/tests.log"
-          pnpm run typecheck > "$RUNNER_TEMP/throughput/typecheck.log" 2>&1
-          node --test scripts/ci-core-gate.test.mjs scripts/ci-core-regression-shards.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs scripts/ci-throughput-policy.test.mjs > "$RUNNER_TEMP/throughput/preflight.log" 2>&1
-          tail -10 "$RUNNER_TEMP/throughput/preflight.log"
-          python3 scripts/verify-pr-workflow-fanout.py
-          pnpm run validate:architecture > "$RUNNER_TEMP/throughput/architecture.log" 2>&1
-          git diff --check
-          git diff --exit-code HEAD -- scripts/bundle-baseline.json scripts/check-studio-bundle.mjs scripts/lib/studio-bundle-temporary-allowance.mjs vite.config.ts apps/web/config/vite-manual-chunks.ts
-      - name: Require real production build and unchanged bundle gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          pnpm run build:bundle > "$RUNNER_TEMP/throughput/build.log" 2>&1
-          node scripts/check-studio-bundle.mjs > "$RUNNER_TEMP/throughput/bundle-gate.log" 2>&1
-          tail -30 "$RUNNER_TEMP/throughput/bundle-gate.log"
-          pnpm run test:studio-virtual-art > "$RUNNER_TEMP/throughput/art-tests.log" 2>&1
-          pnpm run verify:studio-virtual-art > "$RUNNER_TEMP/throughput/art-integrity.log" 2>&1
-      - name: Publish only tested Git object and receipt, never move a branch
+      - name: Apply reviewed behavior-preserving repair
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json, os, subprocess
-          from pathlib import Path
-          def git(*args):
-              return subprocess.check_output(['git', *args], text=True).strip()
-          def api(path, payload=None):
-              cmd=['gh','api','--method','GET' if payload is None else 'POST',path]
-              if payload is not None: cmd += ['--input','-']
-              result=subprocess.run(cmd,input=None if payload is None else json.dumps(payload),text=True,capture_output=True,check=True)
-              return json.loads(result.stdout)
-          repo='blue45f/toonspectrum'
-          source=os.environ['SOURCE_SHA']
-          assert git('rev-parse','HEAD')==source
-          pr=api(f'repos/{repo}/pulls/1883')
-          assert pr['state']=='open' and pr['head']['sha']==source and pr['head']['ref']=='fix/ci-throughput-20260920'
-          paths=[f'apps/web/src/domains/creator/bg3d/{name}' for name in [
-              'studio-bg3d-shot-batch.ts','studio-bg3d-shot-batch-plan.ts',
-              'studio-bg3d-shot-batch-limits.ts','studio-bg3d-shot-batch-limits.test.ts']]
-          paths+=['docs/operations/ci-throughput-policy.md']
-          changed=set(git('diff','--name-only','HEAD').splitlines())
-          untracked=set(git('ls-files','--others','--exclude-standard').splitlines())
-          assert changed | untracked == set(paths),(changed,untracked)
-          subprocess.run(['git','add','--',*paths],check=True)
-          local_tree=git('write-tree')
-          tree=api(f'repos/{repo}/git/trees',{'base_tree':git('rev-parse','HEAD^{tree}'),'tree':[{'path':p,'mode':'100644','type':'blob','content':Path(p).read_text()} for p in paths]})
-          assert tree['sha']==local_tree,'GitHub tree differs from tested tree'
-          commit=api(f'repos/{repo}/git/commits',{'message':'perf(scene3d): deduplicate bounded batch validators without relaxing gates','tree':tree['sha'],'parents':[source]})
-          receipt={'parent':source,'candidate_commit':commit['sha'],'tree':local_tree,'validation_run':os.environ['GITHUB_RUN_ID'],'changed_files':paths,'branch_updated':False}
-          text=json.dumps(receipt,indent=2)
-          (Path(os.environ['RUNNER_TEMP'])/'throughput/candidate.json').write_text(text)
-          print('VERIFIED_CANDIDATE\n'+text)
-          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f: f.write('## Tested candidate; no branch changed\n\n```json\n'+text+'\n```\n')
-          PY
-      - name: Summarize validation evidence
+        run: bash "$RUNNER_TEMP/patch.sh"
+      - name: Require affected tests, full typecheck, preflight, lint and architecture
+        run: bash "$RUNNER_TEMP/test.sh"
+      - name: Require unchanged bundle gate and real production build
+        run: bash "$RUNNER_TEMP/build.sh"
+      - name: Publish tested candidate object only, without updating any branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash "$RUNNER_TEMP/publish.sh"
+      - name: Preserve exact failure or success evidence
         if: always()
-        shell: bash
         run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-          root=Path(os.environ['RUNNER_TEMP'])/'throughput'
-          for name in ['lint.log','tests.log','typecheck.log','preflight.log','architecture.log','build.log','bundle-gate.log','candidate.json']:
-              p=root/name
-              if p.exists(): print('\n### '+name+'\n'+'\n'.join(p.read_text(errors='replace').splitlines()[-20:]))
-          PY
+          if test -f "$RUNNER_TEMP/report.sh"; then bash "$RUNNER_TEMP/report.sh"; fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:
