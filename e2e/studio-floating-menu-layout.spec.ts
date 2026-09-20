@@ -83,3 +83,30 @@ test("major tool menus use roomy movable desktop windows", async ({ page }, test
   expect(verified).toContain("bubble-menu");
   expect(verified.length).toBeGreaterThanOrEqual(4);
 });
+
+
+test("desktop view launcher leaves the rail more button clickable", async ({ page }) => {
+  await openStudio(page);
+  for (const width of [1024, 1440, 1600]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const more = page.locator('[data-studio-tool-rail-settings="true"]').getByRole("button");
+    const view = page.locator('[data-studio-shell-view-options="true"]').getByRole("button");
+    await expect(more).toBeVisible();
+    await expect(view).toBeVisible();
+    const railBox = await more.boundingBox();
+    const viewBox = await view.boundingBox();
+    expect(railBox).not.toBeNull();
+    expect(viewBox).not.toBeNull();
+    const overlaps = railBox!.x < viewBox!.x + viewBox!.width
+      && viewBox!.x < railBox!.x + railBox!.width
+      && railBox!.y < viewBox!.y + viewBox!.height
+      && viewBox!.y < railBox!.y + railBox!.height;
+    expect(overlaps, `rail and view launcher overlap at ${width}px`).toBe(false);
+    await more.click();
+    await expect(page.getByRole("dialog", { name: "추가 도구", exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await view.click();
+    await expect(page.locator('[data-studio-shell-view-options-panel="true"]')).toBeVisible();
+    await view.click();
+  }
+});
