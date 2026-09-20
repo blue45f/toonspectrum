@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const AUDIO_DIR = join(ROOT, "apps/web/public/audio");
 const PLAYLIST = join(AUDIO_DIR, "playlist.json");
-const EXPECTED_TRACKS = 9;
+const EXPECTED_TRACKS = 12;
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -49,6 +49,10 @@ for (const track of manifest.tracks) {
   assert(sidecar.quality?.integratedLufs >= -15.5 && sidecar.quality?.integratedLufs <= -12.5, `Loudness out of range for ${track.id}.`);
   assert(sidecar.quality?.truePeakDbfs <= -0.5, `True peak too high for ${track.id}.`);
   assert(sidecar.review?.approvedForSite === true, `Release approval missing for ${track.id}.`);
+}
+
+for (const id of ["spectrum-breaker-vocal", "wings-of-the-unwritten-vocal", "oath-of-a-thousand-lights-vocal", "where-the-stars-return-vocal", "atlas-of-starlight-instrumental", "dawnfall-protocol-instrumental"]) {
+  assert(ids.has(id), `Missing Prism Awakening master: ${id}`);
 }
 
 console.log(`Verified ${manifest.tracks.length} ToonSpectrum original OST masters and provenance sidecars.`);
