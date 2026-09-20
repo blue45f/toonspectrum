@@ -26,7 +26,7 @@ export async function verifyScene3dTiledSavedShotFlow(
   adapter: StudioBg3dCaptureAdapter,
   camera: THREE.PerspectiveCamera,
 ) {
-  const draft = parseStudioBg3dSceneDocument({
+  const draft = parseStudioBg3dSceneDocument(JSON.stringify({
     ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT,
     camera: {
       ...DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT.camera,
@@ -58,7 +58,7 @@ export async function verifyScene3dTiledSavedShotFlow(
         pattern: "crosshatch",
       },
     },
-  });
+  }));
   assert(draft, "Could not construct canonical fixture.");
   let doc = captureStudioBg3dShot(draft, {
     id: "tiled-4k",

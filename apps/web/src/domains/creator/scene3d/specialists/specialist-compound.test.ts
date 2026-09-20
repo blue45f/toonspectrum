@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import Module from "manifold-3d";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -12,8 +11,8 @@ import type { ManifoldToplevel } from "manifold-3d";
 
 let module: ManifoldToplevel;
 beforeAll(async () => {
-  const wasmBinary = await readFile(fileURLToPath(import.meta.resolve("manifold-3d/manifold.wasm")));
-  module = await Module({ wasmBinary });
+  const wasmPath = fileURLToPath(import.meta.resolve("manifold-3d/manifold.wasm"));
+  module = await Module({ locateFile: () => wasmPath });
   module.setup();
 });
 const providerFactory = () => createStudioManifoldMeshProvider({ runtimeLoader: () => createStudioManifoldRuntime(module) });
