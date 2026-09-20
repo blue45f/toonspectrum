@@ -4,6 +4,7 @@ import {
   clearStudioWorldAuthoringDraft,
   parseStudioWorldAuthoringImport,
   readStudioWorldAuthoringDraft,
+  readStudioWorldAuthoringDraftRecord,
   studioWorldDraftStorageKey,
   studioWorldManifestToTiledMap,
   writeStudioWorldAuthoringDraft,
@@ -133,6 +134,24 @@ describe("Virtual Studio world authoring", () => {
 
     expect(writeStudioWorldAuthoringDraft("bad-world", invalid)).toBe(false);
     expect(localStorage.length).toBe(0);
+  });
+
+  it("preserves the exact publication origin across remounts and never guesses a legacy draft base", () => {
+    expect(writeStudioWorldAuthoringDraft("pinned-draft", DEFAULT_STUDIO_WORLD_MANIFEST, "published-A")).toBe(true);
+    expect(readStudioWorldAuthoringDraftRecord("pinned-draft")).toEqual({ manifest: DEFAULT_STUDIO_WORLD_MANIFEST, basePublishedRevisionId: "published-A" });
+    expect(writeStudioWorldAuthoringDraft("unpublished-draft", DEFAULT_STUDIO_WORLD_MANIFEST, null)).toBe(true);
+    expect(readStudioWorldAuthoringDraftRecord("unpublished-draft")?.basePublishedRevisionId).toBeNull();
+    localStorage.setItem(studioWorldDraftStorageKey("legacy-draft"), JSON.stringify(DEFAULT_STUDIO_WORLD_MANIFEST));
+    expect(readStudioWorldAuthoringDraftRecord("legacy-draft")).toEqual({ manifest: DEFAULT_STUDIO_WORLD_MANIFEST });
+    expect(writeStudioWorldAuthoringDraft("legacy-draft", DEFAULT_STUDIO_WORLD_MANIFEST)).toBe(true);
+    expect(readStudioWorldAuthoringDraftRecord("legacy-draft")?.basePublishedRevisionId).toBeUndefined();
+  });
+
+  it("rejects malformed persisted origin data without discarding another project's draft", () => {
+    writeStudioWorldAuthoringDraft("valid-base", DEFAULT_STUDIO_WORLD_MANIFEST, "published-A");
+    localStorage.setItem(studioWorldDraftStorageKey("bad-base"), JSON.stringify({ contract: "studio-world-browser-draft-v2", manifest: DEFAULT_STUDIO_WORLD_MANIFEST, basePublishedRevisionId: 123 }));
+    expect(readStudioWorldAuthoringDraftRecord("bad-base")).toBeNull();
+    expect(readStudioWorldAuthoringDraftRecord("valid-base")?.basePublishedRevisionId).toBe("published-A");
   });
 
   it("does not persist a draft that would hide the editor behind an unsafe world", () => {

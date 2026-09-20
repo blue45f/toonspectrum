@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   reload: vi.fn(),
   setMode: vi.fn(),
 }));
+vi.mock("./StudioWorkspaceLiveHome", () => ({ StudioWorkspaceLiveHome: ({ projectId, header }: { projectId: string | null; header: ReactNode }) => <div data-testid="actual-live-home" data-project={projectId ?? "personal"}>{header}</div> }));
 vi.mock("../studio-shell/useStudioProjectLibrary", () => ({ useStudioProjectLibrary: () => ({
   projects: state.projects, state: state.loaded ? { schemaVersion: 1, projects: state.projects } : null,
   error: state.error, reload: state.reload,
@@ -179,4 +180,16 @@ describe("workspace live resume integration", () => {
     expect(screen.getByTestId("location").textContent).toBe("/home?project=older");
     expect(document.querySelector('[data-workspace-resume-notice="unavailable"]')).toBeTruthy();
   });
+});
+
+it("keeps the space home free of permanent cards and opens work details only on request", async () => {
+  state.mode = "virtual-studio";
+  render(<App entries={["/home?project=older"]} />);
+  await waitFor(() => expect(screen.getByTestId("actual-live-home").getAttribute("data-project")).toBe("older"));
+  expect(document.querySelector(".workspace-main .workspace-activity")).toBeNull();
+  expect(document.querySelector(".workspace-main .workspace-recent")).toBeNull();
+  expect(document.querySelector(".workspace-world")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "작업 바로가기 열기" }));
+  expect(document.querySelector(".workspace-activity")).toBeTruthy();
+  expect(screen.getByTestId("location").textContent).toBe("/home?project=older&panel=work");
 });

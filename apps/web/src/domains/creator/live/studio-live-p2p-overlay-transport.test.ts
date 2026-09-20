@@ -332,6 +332,7 @@ class SignalingBus {
 
 class FakePrimaryTransport implements StudioLiveTransport {
   authoritativeLockCapability: "fenced-v2" | null = null;
+  acousticCoreBinding: StudioLiveTransport["acousticCoreBinding"] = null;
   readonly mode = "server" as const;
   readonly sent: StudioLiveEnvelope[] = [];
   readonly sentInk: StudioLiveInkWireMessage[] = [];
@@ -524,13 +525,18 @@ describe("Studio live P2P overlay", () => {
   it("never derives lock authority from a connected peer mesh", async () => {
     const { local, remote, localPrimary } = await connectedMesh();
     expect(local.authoritativeLockCapability).toBeNull();
+    expect(local.acousticCoreBinding).toBeNull();
+    localPrimary.acousticCoreBinding = { connectionId: "core-socket", clientInstanceId: LOCAL.sessionId };
+    expect(local.acousticCoreBinding).toEqual(localPrimary.acousticCoreBinding);
     localPrimary.authoritativeLockCapability = "fenced-v2";
     expect(local.authoritativeLockCapability).toBe("fenced-v2");
     localPrimary.ready = false;
+    expect(local.acousticCoreBinding).toBeNull();
     expect(local.authoritativeLockCapability).toBeNull();
     localPrimary.ready = true; localPrimary.authoritativeLockCapability = null;
     expect(local.authoritativeLockCapability).toBeNull();
     local.close(); remote.close();
+    expect(local.acousticCoreBinding).toBeNull();
   });
 
   it("leaves local BroadcastChannel transports unwrapped", () => {

@@ -5,8 +5,8 @@ import { readBrowserPreference, writeBrowserPreference } from "./browser-prefere
 export const CREATOR_EXPERIENCE_STORAGE_KEY = "toonspectrum-creator-experience-mode-v1";
 export type CreatorExperienceMode = "classic" | "virtual-studio";
 
-export function defaultCreatorExperienceMode(narrow: boolean): CreatorExperienceMode {
-  return narrow ? "classic" : "virtual-studio";
+export function defaultCreatorExperienceMode(_narrow: boolean): CreatorExperienceMode {
+  return "virtual-studio";
 }
 
 function defaultMode(): CreatorExperienceMode {

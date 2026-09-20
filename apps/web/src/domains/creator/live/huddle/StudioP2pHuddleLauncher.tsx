@@ -10,6 +10,7 @@ import { StudioP2pActivitiesPanel } from "./StudioP2pActivitiesPanel";
 import { StudioP2pVirtualStudio } from "./StudioP2pVirtualStudio";
 import { studioStrokeFocusActivitySnapshot, subscribeStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 import { acquireStudioHuddleAudioFocus } from "./studio-p2p-huddle-audio-focus";
+import { resolveStudioHuddleAuthority, type StudioHuddleAuthority } from "./studio-p2p-huddle-authority";
 
 export default function StudioP2pHuddleLauncher() {
   const live = useStudioLiveCollaboration();
@@ -21,6 +22,8 @@ export default function StudioP2pHuddleLauncher() {
   );
   const controller = useRef<StudioP2pHuddleController | null>(null);
   const cleanup = useRef<(() => void) | null>(null);
+  const authority = useRef<StudioHuddleAuthority | null>(null);
+  const offAuthority = useRef<(() => void) | null>(null);
   const proximityPeerIds = useRef<Set<string> | null>(null);
   const conversation = useRef<{ id: string; peerIds: readonly string[] } | null>(null);
   const [open, setOpen] = useState(false);
@@ -50,6 +53,8 @@ export default function StudioP2pHuddleLauncher() {
   const disposeSession = useCallback(() => {
     const conversationId = conversation.current?.id;
     conversation.current = null;
+    authority.current = null;
+    offAuthority.current?.(); offAuthority.current = null;
     const previous = controller.current;
     controller.current = null;
     cleanup.current?.(); cleanup.current = null;
@@ -81,12 +86,21 @@ export default function StudioP2pHuddleLauncher() {
       const requestedIds = detail.peerIds ? [...detail.peerIds].sort() : null;
       const nextConversation = detail.conversationId && requestedIds
         ? { id: detail.conversationId, peerIds: requestedIds } : null;
+      const nextAuthority = detail.authorityToken && nextConversation
+        ? resolveStudioHuddleAuthority(detail.authorityToken,nextConversation.id,nextConversation.peerIds) : null;
+      if (detail.authorityToken && !nextAuthority) return;
       const current = conversation.current;
       const changed = current?.id !== nextConversation?.id
-        || JSON.stringify(current?.peerIds ?? null) !== JSON.stringify(nextConversation?.peerIds ?? null);
+        || JSON.stringify(current?.peerIds ?? null) !== JSON.stringify(nextConversation?.peerIds ?? null)
+        || authority.current !== nextAuthority;
       // Capture consent belongs to this exact audience. Never carry enabled devices into another conversation.
       if (changed) leave();
       conversation.current = nextConversation;
+      authority.current = nextAuthority;
+      if (changed && nextAuthority) offAuthority.current = nextAuthority.subscribe(() => {
+        if (authority.current !== nextAuthority || nextAuthority.valid()) return;
+        leave(); setOpen(false);
+      });
       proximityPeerIds.current = requestedIds ? new Set(requestedIds) : null;
       nearbyPeerIdsRef.current = requestedIds ?? [];
       proximityMediaRef.current = requestedIds !== null;
@@ -129,10 +143,12 @@ export default function StudioP2pHuddleLauncher() {
       element.scrollTop = element.scrollHeight;
   }, [snapshot?.messages.length]);
   function join() {
-    if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current) return;
+    if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current || (authority.current && !authority.current.valid())) return;
+    const scopeAuthority = authority.current;
     const next = new StudioP2pHuddleController(room.participant, room.direct, {
       peerFilter: (peer) => proximityPeerIds.current?.has(peer.sessionId) ?? true,
       conversation: conversation.current ?? undefined,
+      ...(scopeAuthority ? {authorityValid:()=>authority.current===scopeAuthority&&scopeAuthority.valid(),captureRevision:scopeAuthority.captureRevision} : {}),
     });
     next.setMediaPeerScope(conversation.current?.peerIds ?? (proximityMediaRef.current ? nearbyPeerIdsRef.current : null));
     controller.current = next;
@@ -149,6 +165,7 @@ export default function StudioP2pHuddleLauncher() {
     setNotice(null); next.start(); setSnapshot(next.snapshot());
   }
   async function capture(action: () => Promise<void>) {
+    if (authority.current && !authority.current.valid()) { leave(); setOpen(false); return; }
     const owner = controller.current; setBusy(true);
     try { await action(); } finally { if (controller.current === owner) setBusy(false); }
   }

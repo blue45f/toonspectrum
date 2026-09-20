@@ -1,6 +1,8 @@
 import {
   resolveStudioCloudflareRealtimeOrigin,
 } from "../studio-realtime-provider-cloudflare-adapter";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model";
+import { parseStudioLiveAcousticInvalidation, type StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
 
 import {
   STUDIO_CRDT_BINARY_WIRE_FORMAT,
@@ -156,6 +158,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   pendingLockDeltaOverflowed = false;
   sessionToken: string | null;
   selfConnectionId: string | null = null;
+  acousticJoinBinding: StudioLiveAcousticCoreBinding | null = null;
   pendingInitialSnapshot: ServerJoinSnapshot | null = null;
   joined = false;
   closed = false;
@@ -231,6 +234,7 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
     this.socket.on("studio:voice:signal", this.onVoiceSignal);
     this.socket.on("studio:chat:message", this.onChatMessage);
     this.socket.on("studio:comment:changed", this.onTeamCommentChanged);
+    this.socket.on(STUDIO_ACOUSTIC_CONVERSATION_EVENT, this.onAcousticInvalidation);
     this.socket.on("studio:crdt:sync", this.onCrdtSync);
     this.socket.on("studio:crdt:update", this.onCrdtUpdate);
     this.socket.on(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, this.onCrdtBinaryUpdate);
@@ -248,6 +252,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
 
   get authoritativeLockCapability(): "fenced-v2" | null {
     return this.ready && this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION ? "fenced-v2" : null;
+  }
+
+  get acousticCoreBinding(): StudioLiveAcousticCoreBinding | null {
+    return this.ready && !this.accessRevoked ? this.acousticJoinBinding : null;
   }
 
   /**
@@ -337,6 +345,11 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
   };
   readonly onTeamCommentChanged = (value: unknown): void => {
     presence.onTeamCommentChanged.call(this, value);
+  };
+  readonly onAcousticInvalidation = (value: unknown): void => {
+    if (!this.acousticCoreBinding) return;
+    const invalidation = parseStudioLiveAcousticInvalidation(value, this.context.workId);
+    if (invalidation) this.emitControl({ type: "acoustic-invalidation", invalidation });
   };
   readonly onVoiceSnapshot = (value: unknown): void => {
     voice.onVoiceSnapshot.call(this, value);

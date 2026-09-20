@@ -28,6 +28,8 @@ import type {
   StudioLiveLockRequest,
 } from "./studio-live-collaboration-protocol";
 import type { StudioTeamCommentLiveEvent } from "../studio-team-comment-live-event";
+import type { StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
+import type { StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
 
 import type { StudioLiveDirectPort } from "./studio-live-direct-port";
 import type { StudioPeerBulkExchangePort } from "./studio-peer-bulk-exchange";
@@ -67,6 +69,7 @@ export type StudioLiveTransportControlEvent =
   | { type: "status"; status: StudioLiveTransportStatus }
   | { type: "lock"; lock: StudioLiveAuthoritativeLockEvent }
   | { type: "comment-changed"; change: StudioTeamCommentLiveEvent }
+  | { type: "acoustic-invalidation"; invalidation: StudioConversationInvalidation }
   | {
       type: "voice-removed";
       callId: string;
@@ -79,6 +82,8 @@ export type StudioLiveTransportControlEvent =
  * authenticated socket has received a successful work-room ACL acknowledgement.
  */
 export interface StudioLiveTransport {
+  /** Present only after a Core work-room join; no private-room or media permission is implied. */
+  readonly acousticCoreBinding?: StudioLiveAcousticCoreBinding | null;
   /** Negotiated single-server lease authority; wrappers only forward their primary's capability. */
   readonly authoritativeLockCapability?: "fenced-v2" | null;
   /** Strict RTC-only messages. Absence never grants permission to relay. */

@@ -256,7 +256,11 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   manifest,
   onChange,
   onReset,
+  disabled = false,
+  basePublishedRevisionId,
 }: {
+  readonly disabled?: boolean;
+  readonly basePublishedRevisionId?: string | null;
   readonly projectId: string;
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly onChange: (manifest: StudioVirtualSpaceWorldManifest) => void;
@@ -643,6 +647,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
 
   return (
     <section className="studio-vspace-authoring" data-studio-world-authoring="true">
+      <fieldset disabled={disabled} aria-label={bt("공간 초안", "World draft")} className="min-w-0 border-0 p-0">
       <div className="studio-vspace-authoring-head">
         <div>
           <p>WORLD AUTHORING</p>
@@ -653,7 +658,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           <button
             type="button"
             onClick={() => {
-              const ok = writeStudioWorldAuthoringDraft(projectId, manifest);
+              const ok = writeStudioWorldAuthoringDraft(projectId, manifest, basePublishedRevisionId);
               setMessage(ok ? bt("브라우저 초안을 저장했습니다.", "Browser draft saved.") : bt("초안을 저장하지 못했습니다.", "Could not save draft."));
             }}
           >
@@ -725,6 +730,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           {renderEditor()}
         </div>
       </div>
+      </fieldset>
     </section>
   );
 }

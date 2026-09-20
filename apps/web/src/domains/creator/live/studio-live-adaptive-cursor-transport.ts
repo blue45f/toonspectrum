@@ -185,6 +185,14 @@ class StudioAdaptiveCursorTransport implements StudioLiveTransport {
     return !this.closed && this.inner.ready;
   }
 
+  get acousticCoreBinding() {
+    return this.ready ? this.inner.acousticCoreBinding ?? null : null;
+  }
+
+  get authoritativeLockCapability() {
+    return this.ready ? this.inner.authoritativeLockCapability ?? null : null;
+  }
+
   get binaryLaneCapabilities(): readonly string[] | undefined {
     return this.inner.binaryLaneCapabilities;
   }

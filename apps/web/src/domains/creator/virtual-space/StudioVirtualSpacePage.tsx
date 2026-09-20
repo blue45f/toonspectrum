@@ -9,11 +9,9 @@ import {
   ExternalLink,
   Footprints,
   Gamepad2,
-  Headphones,
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
-  Mic2,
   MousePointer2,
   Radio,
   Settings,
@@ -21,6 +19,8 @@ import {
   UsersRound,
 } from "lucide-react";
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -28,12 +28,15 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { WorkspaceNavigation } from "@/shared/components/workspace/WorkspaceNavigation";
+import { StudioSpaceWorkContext } from "../workspace/StudioSpaceWorkContext";
+import { StudioWorkspaceInbox } from "../workspace/StudioWorkspaceInbox";
 import { WorkspaceContextPanel } from "@/shared/components/workspace/WorkspaceContextPanel";
 import "@/shared/components/workspace/workspace.css";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -52,6 +55,9 @@ import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaboration
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import { openStudioP2pHuddle, closeStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpaceAmbientAudio } from "./StudioVirtualSpaceAmbientAudio";
+import { useStudioPrivateRoom } from "./private-room/use-studio-private-room";
+import { StudioPrivateRoomPanel } from "./private-room/StudioPrivateRoomPanel";
+import { studioPrivateRoomWalkTarget } from "./private-room/studio-private-room-walk";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
@@ -88,9 +94,12 @@ import {
 import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 import {
   clearStudioWorldAuthoringDraft,
-  readStudioWorldAuthoringDraft,
+  readStudioWorldAuthoringDraftRecord,
+  writeStudioWorldAuthoringDraft,
 } from "./studio-virtual-space-world-authoring";
 import { StudioVirtualSpaceWorldAuthoringPanel } from "./StudioVirtualSpaceWorldAuthoringPanel";
+import { useStudioWorldPublication } from "./world-publication/use-studio-world-publication";
+import { StudioWorldPublicationPanel } from "./world-publication/StudioWorldPublicationPanel";
 import {
   DEFAULT_STUDIO_WORLD_MANIFEST,
   studioWorldPresenceState,
@@ -200,6 +209,8 @@ function decodeProjectId(projectId: string): string {
     return projectId;
   }
 }
+
+const WorkSessionWorkspace = lazy(() => import("../work-session/StudioWorkSessionWorkspace").then((module) => ({ default: module.StudioWorkSessionWorkspace })));
 
 function validProjectId(projectId: string): boolean {
   return Boolean(
@@ -456,10 +467,12 @@ function ConnectionBadge({
 function MobileZoneCard({
   room,
   projectId,
+  personal = false,
   onAssistant,
 }: {
   readonly room: StudioWorldRoomDefinition;
   readonly projectId: string;
+  readonly personal?: boolean;
   readonly onAssistant: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceMobileZone");
@@ -468,7 +481,7 @@ function MobileZoneCard({
   const destination = action === "community"
     ? "/community"
     : action && action !== "assistant"
-      ? studioVirtualSpaceDestination(projectId, action)
+      ? personal ? (action === "assets" ? "/studio/assets" : "/studio/new") : studioVirtualSpaceDestination(projectId, action)
       : null;
   const className = cn(
     "relative flex min-h-28 flex-col overflow-hidden rounded-2xl border border-line bg-gradient-to-br p-4 text-left shadow-sm",
@@ -517,9 +530,9 @@ function LiveStudioTopbar({
   const peers = snapshot.peers.slice(0, 4);
   return (
     <header className="vs2-topbar vs2-live-topbar">
-      <Link href="/" className="vs2-brand" aria-label="ToonSpectrum">
+      <Link href="/" className="vs2-brand" aria-label="ToonStudio">
         <span className="vs2-brand-mark"><Sparkles size={17} aria-hidden /></span>
-        <span><strong>ToonSpectrum</strong></span>
+        <span><strong>ToonStudio</strong></span>
       </Link>
       <div className="vs2-project">
         <span className="vs2-project-icon"><Sparkles size={15} aria-hidden /></span>
@@ -561,11 +574,17 @@ function LiveStudioTopbar({
   );
 }
 
-function VirtualSpaceExperience({
+export function VirtualSpaceExperience({
   projectId,
   preparing,
   signedIn,
+  publication,
+  homeHeader,
+  personal = false,
 }: {
+  readonly homeHeader?: ReactNode;
+  readonly personal?: boolean;
+  readonly publication: ReturnType<typeof useStudioWorldPublication>;
   readonly projectId: string;
   readonly preparing: boolean;
   readonly signedIn: boolean;
@@ -573,6 +592,10 @@ function VirtualSpaceExperience({
   const bt = useBilingual("StudioVirtualSpaceExperience");
   const location = useLocation();
   const authoringMode = new URLSearchParams(location.search).get("worldEdit") === "1";
+  const publishedWorld = publication.snapshot.active;
+  const publishedScope = publishedWorld?.scope;
+  const [draftBaseRevision, setDraftBaseRevision] = useState<string | null | undefined>(undefined);
+  const sharedWorldAllowed = !publication.enabled || (publication.snapshot.viewVerified && (Boolean(publishedWorld) || !publication.snapshot.hasPublishedWorld));
   const positionScope = useMemo(
     () => studioVirtualSpacePositionScope(projectId, authoringMode),
     [authoringMode, projectId],
@@ -580,6 +603,8 @@ function VirtualSpaceExperience({
   const positionScopeKey = studioVirtualSpacePositionStorageKey(positionScope);
   const navigate = useNavigate();
   const live = useStudioLiveCollaboration();
+  const privateActorId = useSession().data?.user?.id ?? null;
+  const [privateZoneSelection,setPrivateZoneSelection] = useState<string | null>(null);
   const connectivity = useSyncExternalStore(
     subscribeStudioConnectivity,
     getStudioConnectivitySnapshot,
@@ -610,7 +635,8 @@ function VirtualSpaceExperience({
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
-  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | null>(null);
+  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | "search" | "work" | "sessions" | null>(() => { const q = new URLSearchParams(location.search); return q.has("session") || q.get("activity") === "sessions" ? "sessions" : null; });
+  const spaceSearchRef = useRef<HTMLInputElement>(null);
   const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
   const [openingReview, setOpeningReview] = useState(false);
   const cancelSlotsRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -642,6 +668,17 @@ function VirtualSpaceExperience({
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   useEffect(() => { if (workspacePanel) engineBridge.clearMovement(); }, [workspacePanel, engineBridge]);
+  useEffect(() => {
+    const search = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      if (document.querySelector('dialog[open][aria-modal="true"]') && workspacePanel !== "search") return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      engineBridge.clearMovement(); setWorkspacePanel("search");
+      spaceSearchRef.current?.focus();
+    };
+    window.addEventListener("keydown", search, true);
+    return () => window.removeEventListener("keydown", search, true);
+  }, [engineBridge, workspacePanel]);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -684,17 +721,15 @@ function VirtualSpaceExperience({
     setWorldLoaded(false);
     setLoadedPositionScope(null);
     setWorldLoadError(false);
-    void loadStudioVirtualSpaceWorldManifest(
-      undefined,
-      undefined,
-      abortController.signal,
-    ).then((manifest) => {
+    void (publishedWorld ? Promise.resolve(publishedWorld.publication.manifest) : loadStudioVirtualSpaceWorldManifest(
+      undefined, undefined, abortController.signal,
+    )).then((manifest) => {
       if (abortController.signal.aborted) return;
       baselineWorldManifestRef.current = manifest;
-      const activeManifest = authoringMode
-        ? readStudioWorldAuthoringDraft(projectId) ?? manifest
-        : manifest;
-      const point = resolveStudioVirtualSpaceSessionPoint(
+      const storedDraft = authoringMode ? readStudioWorldAuthoringDraftRecord(projectId) : null;
+      const activeManifest = storedDraft?.manifest ?? manifest;
+      setDraftBaseRevision(storedDraft ? storedDraft.basePublishedRevisionId : publishedWorld?.publication.revisionId ?? null);
+      const point = publishedWorld ? resolveStudioWorldSpawn(activeManifest, studioWorldSpawn(activeManifest).point) : resolveStudioVirtualSpaceSessionPoint(
         positionScope,
         activeManifest,
         studioWorldSpawn(activeManifest).point,
@@ -715,7 +750,7 @@ function VirtualSpaceExperience({
       setWorldLoaded(true);
     });
     return () => abortController.abort();
-  }, [authoringMode, engineBridge, positionScope, positionScopeKey, projectId]);
+  }, [authoringMode, engineBridge, positionScope, positionScopeKey, projectId, publishedWorld]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
@@ -769,7 +804,8 @@ function VirtualSpaceExperience({
   const resetAuthoringManifest = useCallback(() => {
     clearStudioWorldAuthoringDraft(projectId);
     setAuthoringDraft(baselineWorldManifestRef.current);
-  }, [projectId]);
+    setDraftBaseRevision(publishedWorld?.publication.revisionId ?? null);
+  }, [projectId, publishedWorld]);
 
   useEffect(() => {
     if (!worldReady) return;
@@ -821,7 +857,7 @@ function VirtualSpaceExperience({
   useEffect(() => {
     const room = live.room;
     if (!worldReady) return;
-    if (authoringMode || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
+    if (authoringMode || !sharedWorldAllowed || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
       setSnapshot((current) => ({
@@ -838,7 +874,7 @@ function VirtualSpaceExperience({
       room.participant,
       room.direct,
       selfRef.current,
-      { appearanceForAvatarIndex: studioCharacterAppearanceForAvatarIndex },
+      { appearanceForAvatarIndex: studioCharacterAppearanceForAvatarIndex, worldScope: publishedScope },
     );
     clearLocalReactionTimer();
     controllerRef.current = controller;
@@ -852,7 +888,7 @@ function VirtualSpaceExperience({
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [authoringMode, clearLocalReactionTimer, connectivity.serverAvailable, live.availability, live.room, worldReady]);
+  }, [authoringMode, clearLocalReactionTimer, connectivity.serverAvailable, live.availability, live.room, worldReady, publishedScope, sharedWorldAllowed]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -895,9 +931,9 @@ function VirtualSpaceExperience({
       navigate("/community");
       return;
     }
-    const destination = studioVirtualSpaceDestination(projectId, action);
+    const destination = personal ? (action === "assets" ? "/studio/assets" : "/studio/new") : studioVirtualSpaceDestination(projectId, action);
     if (destination) navigate(destination);
-  }, [navigate, openAssistant, positionScope, projectId]);
+  }, [navigate, openAssistant, personal, positionScope, projectId]);
 
   const activateInteraction = useCallback((interaction: StudioWorldInteractionDefinition) => {
     activateAction(interaction.action);
@@ -919,8 +955,8 @@ function VirtualSpaceExperience({
   }, [engineBridge, setFollowingPeer, worldReady]);
 
   const slots = useStudioVirtualSpaceSlots({
-    room: live.room, manifest: worldManifest,
-    enabled: signedIn && worldReady && !authoringMode && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
+    room: live.room, manifest: worldManifest, publishedScope,
+    enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     point: snapshot.self, moving,
     onApproach: (point) => { setFollowingPeer(null); engineBridge.requestMove(point); },
   });
@@ -982,16 +1018,6 @@ function VirtualSpaceExperience({
   }, [navigate]);
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
 
-  const startNearbyHuddle = useCallback(() => {
-    const peer = snapshot.nearbyPeers[0];
-    if (peer) setSelectedPeerId(peer.participant.sessionId);
-  }, [snapshot.nearbyPeers]);
-
-  const openStudioChat = useCallback(() => {
-    const peer = snapshot.nearbyPeers[0] ?? snapshot.peers[0];
-    if (peer) setSelectedPeerId(peer.participant.sessionId);
-  }, [snapshot.nearbyPeers, snapshot.peers]);
-
   const sendReaction = useCallback((reaction: StudioVirtualSpaceReaction) => {
     const controller = controllerRef.current;
     if (controller) {
@@ -1018,10 +1044,10 @@ function VirtualSpaceExperience({
     workId: projectId,
     participant: live.room?.participant,
     port: live.room?.direct,
-    manifest: worldManifest,
+    manifest: worldManifest, publishedScope,
     presence: snapshot,
     acousticBindingAvailable: worldReady && !authoringMode && snapshot.direct,
-    enabled: signedIn && worldReady && !authoringMode && snapshot.direct
+    enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && snapshot.direct
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     onAccepted: (request) => acceptedActivityHandler.current(request),
   });
@@ -1054,10 +1080,10 @@ function VirtualSpaceExperience({
     return () => { globalThis.removeEventListener("blur", suspend); document.removeEventListener("visibilitychange", visibility); };
   }, [finishSharedActivity]);
   const conversation = useStudioVirtualSpaceConversation({
-    participant: live.room?.participant, port: live.room?.direct, manifest: worldManifest,
+    participant: live.room?.participant, port: live.room?.direct, manifest: worldManifest, publishedScope,
     presence: snapshot,
     acousticBindingAvailable: worldReady && !authoringMode && snapshot.direct,
-    enabled: signedIn && worldReady && !authoringMode && snapshot.direct
+    enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && snapshot.direct
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     blockedPeerIds: socialSnapshot.blockedPeerIds,
     onReady: (scope) => {
@@ -1067,6 +1093,14 @@ function VirtualSpaceExperience({
       openStudioP2pHuddle({ conversationId: scope.id,
         peerIds: scope.memberIds.filter((id) => id !== live.room?.participant.sessionId), source: "virtual-space" });
     },
+  });
+  const privateZones = worldManifest.acousticZones?.filter(zone => Boolean(zone.doorId)) ?? [];
+  const privateZoneId = privateZones.find(zone=>zone.id===privateZoneSelection)?.id ?? privateZones[0]?.id ?? null;
+  const privateRoom = useStudioPrivateRoom({workId:projectId,actorId:privateActorId,
+    world:publishedWorld ? {worldId:publishedWorld.publication.manifest.id,revisionId:publishedWorld.publication.revisionId,contentHash:publishedWorld.publication.contentHash} : null,
+    zones:worldManifest.acousticZones??[],zoneId:privateZoneId,room:live.room,presence:snapshot,
+    enabled:signedIn&&worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus",
+    onConversation:()=>{finishSharedActivity();if(conversation.snapshot.active)conversation.leave(conversation.snapshot.active.id);},
   });
   const pairConversation = useMemo(() => sharedActivity?.action === "talk" && live.room?.participant
     ? { id: sharedActivity.id, memberIds: [live.room.participant.sessionId, sharedActivity.peer.sessionId].sort() }
@@ -1202,18 +1236,28 @@ function VirtualSpaceExperience({
   }, [worldManifest]);
 
   return (
-    <div className="vs2-shell vs2-shell--project" data-studio-live-shell="true">
+    <div className="vs2-shell vs2-shell--project" data-studio-live-shell="true" data-studio-personal-space={personal || undefined} data-route-ready="studio-live-space">
       <Container size="wide" className="vs2-live-container">
-        <LiveStudioTopbar
+        {homeHeader ?? <LiveStudioTopbar
           projectId={projectId}
           preparing={preparing}
           snapshot={snapshot}
           fallbackIdentity={fallbackIdentity}
           localName={localName}
-        />
+        />}
         <WorkspaceNavigation activeId="workspace-home"
-          studioHref={`/home?project=${encodeURIComponent(projectId)}`}
-          teamHref={`/team?project=${encodeURIComponent(projectId)}`} />
+          studioHref={personal ? "/home?scope=personal" : `/home?project=${encodeURIComponent(projectId)}`}
+          teamHref={personal ? "/team?scope=personal" : `/team?project=${encodeURIComponent(projectId)}`} />
+        <div className="studio-space-commandbar" data-space-interactive="true">
+          <StudioSpaceWorkContext workId={projectId} personal={personal} />
+          <div className="studio-space-command-actions">
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "search"}
+              onClick={() => setWorkspacePanel("search")}>{bt("방·팀원 찾기", "Find rooms & people")} <kbd>⌘ / Ctrl K</kbd></button>
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "work"}
+              onClick={() => setWorkspacePanel("work")}>{bt("검수·작업함", "Reviews & inbox")}</button>
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "sessions"} onClick={() => setWorkspacePanel("sessions")}>{bt("공동 작업 세션", "Work sessions")}</button>
+          </div>
+        </div>
 
 
         <section className="vs2-live-layout">
@@ -1227,6 +1271,7 @@ function VirtualSpaceExperience({
               >
                 {worldReady ? <StudioVirtualSpacePhaserCanvas
                   manifest={worldManifest}
+                  worldAssetUrls={publishedWorld?.assetUrls}
                   snapshot={snapshot}
                   bridge={engineBridge}
                   selfIdentity={fallbackIdentity}
@@ -1358,6 +1403,8 @@ function VirtualSpaceExperience({
             {authoringMode && worldReady ? (
               <StudioVirtualSpaceWorldAuthoringPanel
                 projectId={projectId}
+                basePublishedRevisionId={draftBaseRevision}
+                disabled={publication.enabled && (["reading", "publishing", "preparing"].includes(publication.snapshot.phase) || !publication.snapshot.viewVerified)}
                 manifest={authoringDraft}
                 onChange={setAuthoringDraft}
                 onReset={resetAuthoringManifest}
@@ -1368,9 +1415,20 @@ function VirtualSpaceExperience({
           </div>
 
           <WorkspaceContextPanel open={workspacePanel !== null}
-            title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization") : bt("사람과 대화", "People and conversations")}
+            presentation={workspacePanel === "search" ? "modal" : "adaptive"}
+            initialFocusRef={workspacePanel === "search" ? spaceSearchRef : undefined}
+            title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization")
+              : workspacePanel === "search" ? bt("방·팀원 찾기", "Find rooms & people")
+                : workspacePanel === "work" ? bt("검수·작업함", "Reviews & inbox") : workspacePanel === "sessions" ? bt("공동 작업 세션", "Work sessions") : bt("사람과 대화", "People and conversations")}
             onClose={() => setWorkspacePanel(null)}>
           <div className="vs2-live-inspector-content">
+          {workspacePanel === "work" ? personal ? <p>{bt("작품을 만든 뒤 검수와 담당 작업을 연결할 수 있습니다.", "Create a work to connect reviews and assignments.")} <Link href="/studio/new">{bt("새 작품 만들기", "Create a work")}</Link></p> : <StudioWorkspaceInbox workId={projectId} /> : null}
+          {workspacePanel === "sessions" ? personal ? <p>{bt("작품을 만들면 대본 리딩·콘티·검수·소재 검토를 고정 입력본과 함께 기록할 수 있습니다.", "Create a work to organize reading, storyboard, review and material sessions around a pinned input.")} <Link href="/studio/new">{bt("새 작품 만들기", "Create a work")}</Link></p> : <Suspense fallback={<p role="status">{bt("작업 세션 불러오는 중…", "Loading work sessions…")}</p>}><WorkSessionWorkspace workId={projectId} initialSessionId={new URLSearchParams(location.search).get("session")} /></Suspense> : null}
+          <div hidden={workspacePanel !== "search"}>
+            {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
+              inputRef={spaceSearchRef} expanded onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} />
+              : <p role="status">{bt("공간 목록을 확인 중입니다.", "Checking the space directory.")}</p>}
+          </div>
           <div hidden={workspacePanel !== "space"}>
             <details><summary>{bt("방별 작업 바로가기", "Room work shortcuts")}</summary>
             {worldReady ? <div className="workspace-live-room-links">
@@ -1379,18 +1437,24 @@ function VirtualSpaceExperience({
                   key={room.id}
                   room={room}
                   projectId={projectId}
-                  onAssistant={openAssistant}
+                  personal={personal}
+                  onAssistant={personal ? () => navigate("/studio/new") : openAssistant}
                 />
               ))}
             </div> : null}
             </details>
+            <StudioWorldPublicationPanel publication={publication} draft={authoringMode ? authoringDraft : undefined} draftBaseRevision={draftBaseRevision}
+              onRebaseDraft={(revisionId) => { if (!writeStudioWorldAuthoringDraft(projectId, authoringDraft, revisionId)) return false;
+                setDraftBaseRevision(revisionId); return true; }}
+              onEdit={() => { const search = new URLSearchParams(location.search); search.set("worldEdit", "1"); navigate({ pathname: location.pathname, search: search.toString() }); }}
+              onApplied={() => { if (authoringMode) { const search = new URLSearchParams(location.search); search.delete("worldEdit");
+                navigate({ pathname: location.pathname, search: search.toString() }); } }} />
             {worldReady ? <StudioVirtualSpaceGuide manifest={worldManifest} onMove={queuePathTo} onOpen={activateAction}
               onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")}
               guideTour={guideTour} tourRequested={guideTourRequest !== null}
               onStartTour={atmosphere === "focus" || activity === "focused" || activity === "away" || authoringMode ? undefined : startGuideTour}
               onCancelTour={cancelGuideTour} /> : null}
-            {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
-              onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} /> : null}
+
             <section className="vs2-panel studio-vspace-atmosphere" data-space-interactive="true">
               <h2>{bt("작업실 분위기", "Studio atmosphere")}</h2>
               <div role="group" aria-label={bt("작업실 분위기", "Studio atmosphere")}>
@@ -1406,11 +1470,23 @@ function VirtualSpaceExperience({
             {worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
               onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
+
+            <StudioPrivateRoomPanel key={`${privateActorId}:${projectId}:${publishedScope}:${privateZoneId}`} room={privateRoom}
+              zones={privateZones} zoneId={privateZoneId} onZone={setPrivateZoneSelection} peers={snapshot.peers}
+              onWalk={worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus"?()=>{
+                const target=privateZoneId?studioPrivateRoomWalkTarget(worldManifest,privateZoneId,snapshot.self):null;
+                if(!target)return false;queuePathTo(target);return true;
+              }:undefined}
+              labels={Object.fromEntries(privateZones.map(zone=>{const room=worldManifest.rooms.find(item=>item.id===zone.roomId);return [zone.id,room?bt(room.labelKo,room.labelEn):bt("비공개 방","Private room")];}))} />
           </div>
           <div hidden={workspacePanel !== "people"}>
+
             <StudioVirtualSpaceSocialPanel
+              renderPeerAvatar={(peer) => <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName} activity={peer.state.activity} avatarIndex={peer.state.avatarIndex} appearance={peer.state.appearance} compact />}
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
+              nearbyPeerIds={snapshot.nearbyPeers.map((peer) => peer.participant.sessionId)}
+              conversationPeerIds={activeConversation?.memberIds ?? pairConversation?.memberIds ?? []}
               disabled={!signedIn || !snapshot.direct || authoringMode || !socialInteractive}
               focused={activity === "focused" || activity === "away" || atmosphere === "focus"}
               onSelect={setSelectedPeerId} onWave={() => {
@@ -1424,6 +1500,11 @@ function VirtualSpaceExperience({
               }}
               onCancel={cancelSocialRequest}
               onBlock={(id, blocked) => {
+                if(blocked){const privateConversation=privateRoom.snapshot.conversations.filter(record=>record.status!=="revoked")
+                  .sort((a,b)=>Number(b.status==="active")-Number(a.status==="active"))
+                  .find(record=>record.members.some(member=>member.binding.clientInstanceId===id));
+                  const member=privateConversation?.members.find(item=>item.binding.clientInstanceId===id);
+                  if(privateConversation&&member)void privateRoom.controller?.change(privateConversation.conversationId,"block",member.sessionEpoch);}
                 if (blocked) for (const record of conversation.snapshot.records) {
                   if (record.memberIds.includes(id)) conversation.leave(record.id);
                 }
@@ -1449,103 +1530,6 @@ function VirtualSpaceExperience({
               <button type="button" onClick={() => { const review = worldManifest.interactions.find((item) => item.action === "review"); if (review) queuePathTo(review.point); }}>{bt("리뷰 데스크로 이동", "Walk to review desk")}</button>
               <button type="button" disabled={openingReview || !sharedActivity.reviewSubject} onClick={() => { void openSharedReview(); }}>{openingReview ? bt("권한 확인 중…", "Verifying access…") : bt("초대한 검수본 열기", "Open invited snapshot")}</button>
             </section> : null}
-            <section className="vs2-panel vs2-live-huddle">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="mt-1 text-base font-black">{bt("근처 팀원", "Nearby teammates")}</h2>
-                </div>
-                <Headphones size={18} className="text-accent" aria-hidden />
-              </div>
-              <p className="mt-2 text-xs leading-5 text-fg-3">
-                {bt(
-                  "가까운 팀원에게 대화를 요청할 수 있어요. 서로 수락한 참여자끼리만 연결되며 마이크와 카메라는 직접 켭니다.",
-                  "Invite a nearby teammate. Only mutually accepted participants connect; you turn on your own mic and camera.",
-                )}
-              </p>
-              <div className="mt-3 space-y-2">
-                {snapshot.nearbyPeers.length ? snapshot.nearbyPeers.map((peer) => (
-                  <div key={peer.participant.sessionId} className="flex items-center gap-2 rounded-xl border border-line bg-card/70 p-2.5">
-                    <ChibiAvatar
-                      identity={peer.participant.sessionId}
-                      name={peer.participant.displayName}
-                      compact
-                      activity={peer.state.activity}
-                      avatarIndex={peer.state.avatarIndex}
-                      appearance={peer.state.appearance}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
-                      <p className="truncate text-[0.68rem] text-fg-3">
-                        {roomById.get(peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
-                      </p>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs leading-5 text-fg-3">
-                    {bt("조금 더 가까이 가면 근처 대화를 시작할 수 있어요.", "Move closer to someone to start a nearby huddle.")}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                disabled={!signedIn || !connectivity.serverAvailable || !snapshot.direct || snapshot.nearbyPeers.length === 0}
-                onClick={startNearbyHuddle}
-                className={buttonClass({ className: "mt-3 w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" })}
-              >
-                <Mic2 size={15} aria-hidden />
-                {bt("근처 팀원 선택", "Choose nearby teammate")}
-              </button>
-              {!signedIn ? (
-                <p className="mt-2 text-[0.68rem] leading-5 text-fg-3">
-                  {bt("게스트는 공간을 둘러볼 수 있지만 프로젝트 대화에는 로그인 권한이 필요합니다.", "Guests can explore the space, but project huddles require an authenticated account.")}
-                </p>
-              ) : null}
-            </section>
-
-            <section className="vs2-panel vs2-live-chat">
-              <header>
-                <strong># {bt("스튜디오 채팅", "Studio chat")}</strong>
-                <MessageCircle size={15} aria-hidden />
-              </header>
-              <div className="vs2-live-chat-body">
-                {snapshot.peers.length ? (
-                  snapshot.peers.slice(0, 3).map((peer) => (
-                    <div key={peer.participant.sessionId}>
-                      <ChibiAvatar
-                        identity={peer.participant.sessionId}
-                        name={peer.participant.displayName}
-                        compact
-                        activity={peer.state.activity}
-                        avatarIndex={peer.state.avatarIndex}
-                        appearance={peer.state.appearance}
-                      />
-                      <span>
-                        <strong>{peer.participant.displayName}</strong>
-                        <small>
-                          {bt(
-                            roomById.get(peer.state.zoneId)?.labelKo ?? "스튜디오",
-                            roomById.get(peer.state.zoneId)?.labelEn ?? "Studio",
-                          )}
-                        </small>
-                      </span>
-                      <i aria-hidden>●</i>
-                    </div>
-                  ))
-                ) : (
-                  <p>{bt("같은 프로젝트에 다른 팀원이 들어오면 P2P 채팅을 시작할 수 있어요.", "When teammates join this project, you can start P2P chat here.")}</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={openStudioChat}
-                disabled={!signedIn || !connectivity.serverAvailable || !snapshot.direct}
-                className="vs2-live-chat-button"
-              >
-                <MessageCircle size={14} aria-hidden />
-                {bt("대화할 팀원 선택", "Choose someone to talk to")}
-              </button>
-            </section>
-
             <section className="vs2-panel vs2-live-members">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-black">
@@ -1568,43 +1552,6 @@ function VirtualSpaceExperience({
                     <p className="truncate text-[0.68rem] text-accent">{bt(currentRoom.labelKo, currentRoom.labelEn)}</p>
                   </div>
                 </div>
-                {snapshot.peers.slice(0, 7).map((peer) => {
-                  const following = followingPeerId === peer.participant.sessionId;
-                  return (
-                    <div key={peer.participant.sessionId} className="flex items-center gap-2 rounded-xl px-1 py-1">
-                      <ChibiAvatar
-                        identity={peer.participant.sessionId}
-                        name={peer.participant.displayName}
-                        compact
-                        activity={peer.state.activity}
-                        avatarIndex={peer.state.avatarIndex}
-                        appearance={peer.state.appearance}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
-                        <p className="truncate text-[0.68rem] text-fg-3">
-                          {roomById.get(peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        aria-pressed={following}
-                        className={cn(
-                          "grid size-8 shrink-0 place-items-center rounded-lg border transition",
-                          following
-                            ? "border-good/40 bg-good/10 text-good"
-                            : "border-line bg-card text-fg-3 hover:border-accent/40 hover:text-accent",
-                        )}
-                        aria-label={following ? bt("따라가기 중지", "Stop following") : bt(`${peer.participant.displayName} 님과 상호작용`, `Interact with ${peer.participant.displayName}`)}
-                        onClick={() => following
-                          ? cancelFollowing()
-                          : handleEnginePeerSelect(peer.participant.sessionId)}
-                      >
-                        <Footprints size={13} aria-hidden />
-                      </button>
-                    </div>
-                  );
-                })}
               </div>
 
               <fieldset className="mt-4 border-t border-line/70 pt-4">
@@ -1700,7 +1647,7 @@ function VirtualSpaceExperience({
             <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
               <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
             </button>
-            <Link href={`/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{bt("원고 열기", "Open artwork")}<ExternalLink size={16} aria-hidden /></Link>
+            <Link href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
           </div>
         </footer>
       </Container>
@@ -1708,25 +1655,27 @@ function VirtualSpaceExperience({
   );
 }
 
-export function StudioVirtualSpacePage() {
+export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal = false }: { readonly projectIdOverride?: string; readonly homeHeader?: ReactNode; readonly personal?: boolean } = {}) {
   const bt = useBilingual("StudioVirtualSpacePage");
   const { projectId = "" } = useParams<{ projectId: string }>();
-  const decodedProjectId = decodeProjectId(projectId);
+  const decodedProjectId = projectIdOverride ?? decodeProjectId(projectId);
   const session = useSession();
   const userId = session.data?.user.id ?? null;
+  const publication = useStudioWorldPublication(decodedProjectId, userId, !personal && session.ready && Boolean(userId)
+    && validProjectId(decodedProjectId) && !/^(?:virtual-demo|draft|local)(?:$|[:_-])/u.test(decodedProjectId));
   const transportFactory = useStudioLiveTransportAuth({
-    authReady: session.ready,
-    userId,
+    authReady: session.ready && !personal,
+    userId: personal ? null : userId,
   });
   const participant = useMemo(() => {
-    if (!session.ready || !transportFactory) return null;
+    if (personal || !session.ready || !transportFactory) return null;
     return {
       displayName: session.data?.user.name
         ?? session.data?.user.email
         ?? bt("게스트 크리에이터", "Guest creator"),
       role: session.data ? "editor" as const : "viewer" as const,
     };
-  }, [bt, session.data, session.ready, transportFactory]);
+  }, [bt, personal, session.data, session.ready, transportFactory]);
 
   useDocumentTitle(`${bt("협업 스튜디오", "Collaboration Studio")} · ToonStudio`);
 
@@ -1755,10 +1704,13 @@ export function StudioVirtualSpacePage() {
       ephemeralOnly
     >
       <VirtualSpaceExperience
-        key={projectId}
+        key={JSON.stringify([decodedProjectId, userId, publication.snapshot.active?.scope ?? "bundled"])}
+        publication={publication}
         projectId={decodedProjectId}
-        preparing={!session.ready || !transportFactory}
-        signedIn={Boolean(session.data)}
+        homeHeader={homeHeader}
+        personal={personal}
+        preparing={!personal && (!session.ready || !transportFactory)}
+        signedIn={!personal && Boolean(session.data)}
       />
     </StudioLiveCollaborationProvider>
   );

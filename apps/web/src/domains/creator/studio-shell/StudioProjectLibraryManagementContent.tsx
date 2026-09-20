@@ -6,7 +6,7 @@ import {
   StudioProjectLibraryCard,
   StudioProjectLibraryRecoveryRow,
 } from "./StudioProjectLibraryManagementUi";
-import { StudioProjectLibraryEmptyVisual } from "./StudioProjectLibraryEmptyVisual";
+import { StudioWorkspaceLibraryEmptyState } from "../workspace/StudioWorkspaceLibraryEmptyState";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
@@ -81,7 +81,7 @@ export function StudioProjectLibraryManagementContent({
     <>
       {visibleProjects.length === 0 ? (
         view === "active" && !query ? (
-          <StudioProjectLibraryEmptyVisual locale={locale} />
+          <StudioWorkspaceLibraryEmptyState />
         ) : (
           <section className="mt-5 rounded-3xl border border-dashed border-line bg-card/60 px-5 py-14 text-center">
             <FolderOpen size={24} className="mx-auto text-fg-3" aria-hidden="true" />

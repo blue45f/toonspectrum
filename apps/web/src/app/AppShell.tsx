@@ -5,6 +5,8 @@ import { RouteScrollRestoration } from "./RouteScrollRestoration";
 import { AppRouter } from "./routes/AppRouter";
 
 import { ErrorBoundary } from "@/components/error-boundary";
+import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
+import { WorkspaceAccountContext } from "@/shared/components/workspace/workspace-account-context";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
@@ -109,7 +111,7 @@ export function AppShell({
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   const { pathname } = useLocation();
-  const immersiveVirtualHome = ["/", "/home", "/team", "/hub"].includes(pathname.replace(/\/+$/u, "") || "/");
+  const immersiveVirtualHome = ["/", "/home", "/team", "/hub", "/studio"].includes(pathname.replace(/\/+$/u, "") || "/");
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
   const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject;
   const publicCreativeRoute = isPublicCreativeRoute(pathname);
@@ -139,7 +141,7 @@ export function AppShell({
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}
         <main id="main-content" tabIndex={-1} className={resolvedMainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
           {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
-          <AppRouter />
+          <WorkspaceAccountContext.Provider value={<AuthMenuShell />}><AppRouter /></WorkspaceAccountContext.Provider>
           {publicCreativeRoute && !immersiveVirtualExperience ? (
             <ErrorBoundary resetKey={pathname}>
               <Suspense fallback={<Suspense fallback={null}><PublicSiteWayfinder /></Suspense>}>

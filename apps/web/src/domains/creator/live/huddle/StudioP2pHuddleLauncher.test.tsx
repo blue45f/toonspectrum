@@ -7,6 +7,7 @@ import StudioP2pHuddleLauncher from "./StudioP2pHuddleLauncher";
 import { closeStudioP2pHuddle, openStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "./studio-p2p-huddle-events";
 import { resetStudioStrokeFocusActivityForTests, setStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 import { studioHuddleAudioFocusSnapshot } from "./studio-p2p-huddle-audio-focus";
+import { registerStudioHuddleAuthority } from "./studio-p2p-huddle-authority";
 
 const track = { kind: "audio", stop: vi.fn(), onended: null };
 const stream = { getTracks: () => [track] };
@@ -29,6 +30,19 @@ function view(room: StudioLiveRoom, canChat = true) {
 }
 afterEach(() => { resetStudioStrokeFocusActivityForTests(); cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUserMedia.mockClear(); track.stop.mockClear(); });
 describe("P2P launcher consent and lifetime", () => {
+  it("requires a matching private capability and cancels an outstanding device prompt when it is revoked",async()=>{
+    environment();render(view(fixture()));let valid=true,notify=()=>{};
+    const capability=registerStudioHuddleAuthority({conversationId:"private",peerIds:["b"],valid:()=>valid,subscribe:fn=>{notify=fn;return()=>{};}});
+    act(()=>openStudioP2pHuddle({conversationId:"private",peerIds:["b"],authorityToken:"invented"}));
+    expect(screen.queryByRole("button",{name:"동의하고 P2P 채팅 참여"})).toBeNull();
+    act(()=>openStudioP2pHuddle({conversationId:"private",peerIds:["b"],authorityToken:capability.token}));
+    expect(getUserMedia).not.toHaveBeenCalled();fireEvent.click(screen.getByRole("button",{name:"동의하고 P2P 채팅 참여"}));
+    let finish!:(value:typeof stream)=>void;getUserMedia.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+    fireEvent.click(screen.getByRole("button",{name:"마이크 켜기"}));
+    act(()=>{valid=false;notify();});await act(async()=>{finish(stream);await Promise.resolve();});
+    expect(track.stop).toHaveBeenCalledOnce();expect(studioHuddleAudioFocusSnapshot()).toBe(false);
+    expect(screen.queryByRole("button",{name:"마이크 끄기"})).toBeNull();capability.dispose();
+  });
   it("gives joined Huddles local playback priority without capturing devices or treating a panel open as a call", () => {
     environment(); const mounted = render(view(fixture()));
     expect(studioHuddleAudioFocusSnapshot()).toBe(false);

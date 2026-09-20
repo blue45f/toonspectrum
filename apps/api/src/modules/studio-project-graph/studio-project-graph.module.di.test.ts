@@ -31,6 +31,16 @@ it("compiles the actual graph and Creator modules and resolves preview producer,
   const { StudioReviewPreviewProducerRepository } = await import("./studio-review-preview-producer.repository");
   const { StudioReviewPreviewProducerController } = await import("./studio-review-preview-producer.controller");
   const { StudioReviewPreviewService } = await import("./studio-review-preview.service");
+  const { StudioWorldPublicationRepository } = await import("./studio-world-publication.repository");
+  const { StudioWorldPublicationService } = await import("./studio-world-publication.service");
+  const { StudioWorldPublicationController } = await import("./studio-world-publication.controller");
+  const { StudioWorldAcousticRepository } = await import("./studio-world-acoustic.repository");
+  const { StudioWorldAcousticService } = await import("./studio-world-acoustic.service");
+  const { StudioWorldAcousticController } = await import("./studio-world-acoustic.controller");
+  const { StudioLiveAcousticBinding } = await import("../creator/studio-live-acoustic-binding");
+  const { StudioWorldConversationService } = await import("./studio-world-conversation.service");
+  const { StudioWorldConversationRepository } = await import("./studio-world-conversation.repository");
+  const { StudioWorldConversationController } = await import("./studio-world-conversation.controller");
   // create() instantiates the actual Nest module graph; init()/listen() would also
   // start unrelated Creator lifecycle schedulers and is deliberately not called.
   application = await NestFactory.create(StudioProjectGraphModule, { logger: false, abortOnError: false });
@@ -44,4 +54,15 @@ it("compiles the actual graph and Creator modules and resolves preview producer,
   expect(application.get(StudioWorkAssetUploadGuard)).toBeInstanceOf(StudioWorkAssetUploadGuard);
   expect(application.get(StudioReviewPreviewProducerController)).toBeInstanceOf(StudioReviewPreviewProducerController);
   expect(application.get(StudioReviewPreviewService)).toBeInstanceOf(StudioReviewPreviewService);
+  const world = application.get(StudioWorldPublicationService) as unknown as Record<string, unknown>;
+  expect(world.repository).toBe(application.get(StudioWorldPublicationRepository));
+  expect(application.get(StudioWorldPublicationController)).toBeInstanceOf(StudioWorldPublicationController);
+  const acoustic = application.get(StudioWorldAcousticService) as unknown as Record<string, unknown>;
+  expect(acoustic.repository).toBe(application.get(StudioWorldAcousticRepository));
+  expect(acoustic.bindings).toBe(application.get(StudioLiveAcousticBinding));
+  expect(application.get(StudioWorldAcousticController)).toBeInstanceOf(StudioWorldAcousticController);
+  const conversation = application.get(StudioWorldConversationService) as unknown as Record<string,unknown>;
+  expect(conversation.repository).toBe(application.get(StudioWorldConversationRepository));
+  expect(conversation.bindings).toBe(application.get(StudioLiveAcousticBinding));
+  expect(application.get(StudioWorldConversationController)).toBeInstanceOf(StudioWorldConversationController);
 });

@@ -2,6 +2,8 @@ import {
   parseStudioTeamCommentLiveEvent,
   type StudioTeamCommentLiveEvent,
 } from "../studio-team-comment-live-event";
+import type { StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
+import { parseStudioLiveAcousticInvalidation, type StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
 
 import {
   STUDIO_LIVE_ATTENTION_FALLBACK_TEXT,
@@ -234,6 +236,7 @@ export type StudioLiveRoomEvent =
     }
   | { type: "signal"; envelope: StudioLiveSignalEnvelope }
   | { type: "comment-changed"; change: StudioTeamCommentLiveEvent }
+  | { type: "acoustic-invalidation"; invalidation: StudioConversationInvalidation }
   | { type: "transport-status"; status: StudioLiveTransportStatus }
   | { type: "transport-error"; message: string };
 
@@ -489,6 +492,10 @@ export class StudioLiveRoom {
   get authoritativeLockCapability(): "fenced-v2" | null {
     return this.ready && this.transport?.mode === "server"
       ? this.transport.authoritativeLockCapability ?? null : null;
+  }
+
+  get acousticCoreBinding(): StudioLiveAcousticCoreBinding | null {
+    return this.ready && this.transport?.mode === "server" ? this.transport.acousticCoreBinding ?? null : null;
   }
 
   /** Explicitly managed leases never fall back to local arbitration or automatic heartbeats. */
@@ -2309,6 +2316,12 @@ export class StudioLiveRoom {
       const change = parseStudioTeamCommentLiveEvent(event.change, this.workId);
       if (!change) return;
       this.emit({ type: "comment-changed", change });
+      return;
+    }
+    if (event.type === "acoustic-invalidation") {
+      if (!this.acousticCoreBinding) return;
+      const invalidation = parseStudioLiveAcousticInvalidation(event.invalidation, this.workId);
+      if (invalidation) this.emit({ type: "acoustic-invalidation", invalidation });
       return;
     }
     // Socket ACKs and broadcasts can already be queued when access is revoked or the connection

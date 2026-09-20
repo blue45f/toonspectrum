@@ -1,6 +1,7 @@
 import { StudioHandoffEnvelopeController, StudioHandoffEnvelopeService } from "./studio-handoff-envelope.controller";
 import { StudioHandoffEnvelopeRepository } from "./studio-handoff-envelope.repository";
 import { Module } from "@nestjs/common";
+import { StudioLiveAcousticBinding } from "./studio-live-acoustic-binding";
 
 import { StudioRealtimeRevocationModule } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.module";
 import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
@@ -140,7 +141,8 @@ const privateObjectStorageModule =
     StudioLiveRoomTransitionCoordinator,
     StudioLiveSocketAuthService,
     StudioLiveGateway,
+    StudioLiveAcousticBinding,
   ],
-  exports: [CreatorCollaborationRepository, StudioWorkAssetService, StudioWorkAssetUploadGuard],
+  exports: [CreatorCollaborationRepository, StudioWorkAssetService, StudioWorkAssetUploadGuard, StudioLiveAcousticBinding],
 })
 export class CreatorModule {}

@@ -1,4 +1,5 @@
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
+import { STUDIO_ACOUSTIC_RESOURCE_PREFIX } from "@toonspectrum/studio-project-model";
 
 import { studioLiveLockResourcesConflict } from "../../../../web/src/shared/lib/studio-live-lock-resource";
 import {
@@ -14,6 +15,10 @@ export const STUDIO_LIVE_LOCK_ADVISORY_NAMESPACE =
 const STUDIO_LIVE_LOCK_EXPIRY_WORK_BATCH_LIMIT = 128;
 const STUDIO_LIVE_LOCK_EXPIRY_CONCURRENCY = 4;
 const STUDIO_LIVE_LOCK_ACQUISITION_SEPARATOR = ".";
+const isGenericResource = (resourceId: string) => !resourceId.startsWith(STUDIO_ACOUSTIC_RESOURCE_PREFIX);
+function requireGenericResource(resourceId: string): void {
+  if (!isGenericResource(resourceId)) throw new Error("server-reserved acoustic resource");
+}
 
 type DrizzleStudioLiveLockTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -154,6 +159,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   }
 
   async acquire(input: AcquireStudioLiveLockInput): Promise<AcquireStudioLiveLockResult> {
+    requireGenericResource(input.resourceId);
     return this.database.transaction(
       (transaction) => withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const expired = await transaction
@@ -179,7 +185,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
         const activeRows = await transaction
           .select()
           .from(creatorWorkLiveLocks)
-          .where(eq(creatorWorkLiveLocks.workId, input.workId))
+          .where(and(eq(creatorWorkLiveLocks.workId, input.workId), sql`${creatorWorkLiveLocks.resourceId} NOT LIKE ${STUDIO_ACOUSTIC_RESOURCE_PREFIX + "%"}`))
           .orderBy(asc(creatorWorkLiveLocks.resourceId))
           .limit(STUDIO_LIVE_LOCK_LIMIT_PER_WORK + 1);
         const existing = activeRows.find((row) => row.resourceId === input.resourceId);
@@ -273,6 +279,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   }
 
   async release(input: ReleaseStudioLiveLockInput): Promise<StudioLiveLockRecord | null> {
+    requireGenericResource(input.resourceId);
     return this.database.transaction(
       (transaction) => withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const [released] = await transaction
@@ -297,6 +304,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
   async rollbackAcquire(
     input: ReleaseStudioLiveLockInput & { acquisitionId: string }
   ): Promise<StudioLiveLockRecord | null> {
+    requireGenericResource(input.resourceId);
     return this.database.transaction(
       (transaction) => withStudioLiveLockWorkMutation(transaction, input.workId, async () => {
         const [released] = await transaction
@@ -336,7 +344,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
           .returning();
         if (released.length === 0) return [];
         const revision = await nextStudioLiveLockRevision(transaction, workId);
-        return released.map((row) => ({ ...toRecord(row), revision }));
+        return released.filter((row) => isGenericResource(row.resourceId)).map((row) => ({ ...toRecord(row), revision }));
       }),
       { isolationLevel: "read committed" }
     );
@@ -363,7 +371,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
             )
           )
           .orderBy(asc(creatorWorkLiveLocks.resourceId));
-        return { revision: clock?.revision ?? 0n, locks: rows.map(toRecord) };
+        return { revision: clock?.revision ?? 0n, locks: rows.filter((row) => isGenericResource(row.resourceId)).map(toRecord) };
       }),
       { isolationLevel: "read committed" }
     );
@@ -397,7 +405,7 @@ export class DrizzleStudioLiveLockRepository implements StudioLiveLockRepository
                 .returning();
               if (rows.length === 0) return [];
               const revision = await nextStudioLiveLockRevision(transaction, workId);
-              return rows.map((row) => ({ ...toRecord(row), revision }));
+              return rows.filter((row) => isGenericResource(row.resourceId)).map((row) => ({ ...toRecord(row), revision }));
             }),
             { isolationLevel: "read committed" }
           )

@@ -33,3 +33,11 @@ describe("Virtual Studio directory", () => {
     expect(screen.getByRole("status").textContent).toContain("없어요");
   });
 });
+
+it("does not execute a composing Enter and prioritizes direct tool opening on explicit Enter", () => {
+  const onOpen = vi.fn(), onMove = vi.fn();
+  render(<StudioVirtualSpaceDirectory manifest={DEFAULT_STUDIO_WORLD_MANIFEST} peers={[]} onMove={onMove} onOpen={onOpen} onSelectPeer={vi.fn()} expanded />);
+  const input = screen.getByRole("searchbox"); fireEvent.change(input, { target: { value: "drawing" } });
+  fireEvent.keyDown(input, { key: "Enter", isComposing: true }); expect(onOpen).not.toHaveBeenCalled(); expect(onMove).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: "Enter" }); expect(onOpen).toHaveBeenCalledExactlyOnceWith("canvas"); expect(onMove).not.toHaveBeenCalled();
+});
