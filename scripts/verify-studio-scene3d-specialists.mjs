@@ -152,19 +152,56 @@ try {
     }
     if (message.type() === "warning") warnings.push(message.text());
   });
+  const pendingRequests = new Set();
+  page.on("request", (request) => pendingRequests.add(request.url()));
+  page.on("requestfinished", (request) => pendingRequests.delete(request.url()));
+  page.on("requestfailed", (request) => pendingRequests.delete(request.url()));
   page.on("requestfailed", (request) =>
     errors.push(`${request.url()}: ${request.failure()?.errorText}`),
   );
+  // The actual proof signal below, not unrelated resource load completion, is readiness.
+  // Keep its original bounded deadline and all operation/UI assertions unchanged.
   await page.goto(
     `http://127.0.0.1:${address.port}/__scene3d_specialists__${bundleName ? "?worker=" + encodeURIComponent("/assets/" + bundleName) : ""}`,
+    { waitUntil: "commit" },
   );
-  await page.waitForFunction(
-    () => window.__scene3dSpecialistProof !== undefined,
-    undefined,
-    { timeout: 90000 },
-  );
+  try {
+    await page.waitForFunction(
+      () => window.__scene3dSpecialistProof !== undefined,
+      undefined,
+      { timeout: 90000 },
+    );
+  } catch (error) {
+    console.error("Pending specialist verifier requests:", [...pendingRequests]);
+    console.error("Verifier page:", await page.locator("body").innerText({ timeout: 2000 }).catch(() => "unavailable"));
+    throw error;
+  }
   const proof = await page.evaluate(() => window.__scene3dSpecialistProof);
   if (proof.status === "ok") {
+    const compoundSource = await page.evaluate(() => window.__scene3dCompoundFixture);
+    const compoundCutter = await page.evaluate(() => window.__scene3dCompoundCutter);
+    await page.getByLabel("원본 GLB", { exact: true }).setInputFiles({ name: "compound.glb", mimeType: "model/gltf-binary", buffer: Buffer.from(compoundSource) });
+    await page.getByText("불리언 합치기·빼기·교집합", { exact: true }).click();
+    await page.getByLabel("두 번째 GLB", { exact: true }).setInputFiles({ name: "cutter.glb", mimeType: "model/gltf-binary", buffer: Buffer.from(compoundCutter) });
+    await page.getByLabel(/^처리기/).selectOption("solid");
+    await page.getByLabel(/^연산/).selectOption("subtract");
+    await page.getByRole("button", { name: "불리언 파생본 생성", exact: true }).click();
+    await page.getByRole("link", { name: "boolean-report.json", exact: true }).waitFor({ timeout: 120000 });
+    await page.getByRole("button", { name: /화면에 맞춤|Fit view/ }).waitFor({ timeout: 60000 });
+    await page.locator("canvas").first().screenshot({ path: join(scratch, "compound-boolean-preview.png") });
+    const reportDownload = page.waitForEvent("download");
+    await page.getByRole("link", { name: "boolean-report.json", exact: true }).click();
+    const reportPath = join(scratch, "ui-boolean-report.json");
+    await (await reportDownload).saveAs(reportPath);
+    const compoundReport = JSON.parse(readFileSync(reportPath, "utf8"));
+    if (Math.abs(compoundReport.output.topology.volume - 6) > 0.0001 || compoundReport.sourceParts.left.length !== 2) {
+      throw new Error("The real compound Boolean UI returned an incorrect solid or report.");
+    }
+    const compoundDownload = page.waitForEvent("download");
+    await page.getByRole("link", { name: "boolean-solid.glb", exact: true }).click();
+    await (await compoundDownload).saveAs(join(scratch, "ui-boolean-solid.glb"));
+    proof.compoundBooleanUi = { processor: "Manifold", sourceMeshNodes: 2, sourcePrimitives: 12,
+      finalVolume: compoundReport.output.topology.volume, preview: "passed", reportDownload: "passed", glbDownload: "passed" };
     const fixture = await page.evaluate(
       () => window.__scene3dSpecialistFixture,
     );
