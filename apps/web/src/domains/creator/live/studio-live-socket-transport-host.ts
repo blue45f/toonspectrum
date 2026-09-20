@@ -58,6 +58,8 @@ import type {
   ServerVoiceMember,
 } from "./studio-live-socket-wire";
 
+import type { StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
+
 export interface StudioLiveSocketTransportHost {
   readonly mode: "server";
   readonly crdtFanout: "authoritative";
@@ -104,6 +106,7 @@ export interface StudioLiveSocketTransportHost {
   pendingLockDeltaOverflowed: boolean;
   sessionToken: string | null;
   selfConnectionId: string | null;
+  acousticJoinBinding: StudioLiveAcousticCoreBinding | null;
   pendingInitialSnapshot: ServerJoinSnapshot | null;
   joined: boolean;
   closed: boolean;
@@ -177,6 +180,7 @@ export interface StudioLiveSocketTransportHost {
   onVoiceSignal(value: unknown): void;
   onChatMessage(value: unknown): void;
   onTeamCommentChanged(value: unknown): void;
+  onAcousticInvalidation(value: unknown): void;
   onCrdtSync(value: unknown): void;
   onCrdtUpdate(value: unknown): void;
   onCrdtBinaryUpdate(value: unknown): void;

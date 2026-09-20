@@ -1,4 +1,6 @@
 /** Implementation helpers for `StudioLiveSocketTransport`; not a public entry. */
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model";
+import { studioLiveAcousticJoinBinding } from "./studio-live-acoustic-control";
 import { formatStudioLiveAdmissionDeniedMessage } from "./studio-live-admission-support";
 
 import {
@@ -128,6 +130,7 @@ export function close(this: StudioLiveSocketTransportHost): void {
   this.socket.off("studio:voice:signal", this.onVoiceSignal);
   this.socket.off("studio:chat:message", this.onChatMessage);
   this.socket.off("studio:comment:changed", this.onTeamCommentChanged);
+  this.socket.off(STUDIO_ACOUSTIC_CONVERSATION_EVENT, this.onAcousticInvalidation);
   this.socket.off("studio:crdt:sync", this.onCrdtSync);
   this.socket.off("studio:crdt:update", this.onCrdtUpdate);
   this.socket.off(STUDIO_LIVE_CRDT_BINARY_REMOTE_EVENT, this.onCrdtBinaryUpdate);
@@ -162,6 +165,7 @@ export function close(this: StudioLiveSocketTransportHost): void {
   this.pendingLockDeltas.length = 0;
   this.pendingLockDeltaOverflowed = false;
   this.selfConnectionId = null;
+  this.acousticJoinBinding = null;
 }
 
 export function onConnect(this: StudioLiveSocketTransportHost) {
@@ -352,6 +356,7 @@ export function beginJoin(this: StudioLiveSocketTransportHost): void {
   this.clearJoinRetry(false);
   const generation = ++this.joinGeneration;
   this.joined = false;
+  this.acousticJoinBinding = null;
   this.selectedCrdtWireFormat = null;
   this.clearCrdtWireSelectionTimeout();
   this.pendingInitialSnapshot = null;
@@ -413,6 +418,10 @@ export function acceptJoin(this: StudioLiveSocketTransportHost, snapshot: Server
   this.lockProtocolVersion = reconciledSnapshot.lockProtocolVersion;
   this.lockRevisions.lockRevisionVersion = reconciledSnapshot.lockRevisionVersion;
   this.selfConnectionId = reconciledSnapshot.self.connectionId;
+  this.acousticJoinBinding = studioLiveAcousticJoinBinding({
+    connectionId: reconciledSnapshot.self.connectionId,
+    clientInstanceId: reconciledSnapshot.self.clientInstanceId,
+  }, this.context.participant.sessionId);
   this.rememberCanonicalSession(
     reconciledSnapshot.self.connectionId,
     this.context.participant.sessionId,
