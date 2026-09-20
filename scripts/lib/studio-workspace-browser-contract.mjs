@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 
 /** Public UI contract: no dev-only imports, fake document storage, or production writes. */
 export async function assertStudioWorkspaceHome(page) {
-  const home = page.locator('[data-route-ready="studio-workspace"][data-workspace-surface="home"]');
+  const home = page.locator('[data-workspace-surface="home"]');
   await expect(home).toBeVisible({ timeout: 30000 });
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(home.locator("#workspace-title")).toBeVisible();
@@ -13,7 +13,7 @@ export async function assertStudioWorkspaceHome(page) {
     ["/home", "/studio", "/team", "/hub"]);
   await expect(home.locator("dialog[open]")).toHaveCount(0);
   await expect(page.locator(".vs2-bottom, .public-site-journey, video")).toHaveCount(0);
-  const primary = home.locator(".workspace-statusbar .workspace-primary");
+  const primary = home.locator(".workspace-statusbar .workspace-primary, .workspace-live-status .workspace-live-actions > a");
   await expect(primary).toBeVisible();
   await expect.poll(async () => (await primary.boundingBox())?.height ?? 0,
     { message: "The settled primary action must retain a 44px target" }).toBeGreaterThanOrEqual(44);
@@ -28,12 +28,15 @@ export async function assertStudioWorkspaceHome(page) {
   await expect(home.locator(".workspace-list-view")).toBeVisible();
   await expect(selection).toHaveValue(selectedProject);
   await viewButtons.nth(1).click();
-  const art = home.locator(".workspace-world img");
-  await expect(art).toBeVisible();
-  await expect.poll(() => art.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true);
+  const canvas = home.locator('[data-studio-phaser-runtime] canvas');
+  await expect(home.locator('[data-studio-engine-status="ready"]')).toHaveCount(1, { timeout: 45000 });
+  await expect(canvas).toBeVisible();
+  await expect.poll(async () => (await canvas.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(320);
+  await expect.poll(async () => (await canvas.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(280);
+  await expect(home.locator(".workspace-world")).toHaveCount(0);
   await expect(selection).toHaveValue(selectedProject);
   const workTrigger = home.locator(".workspace-work-shortcut");
-  const trigger = await workTrigger.isVisible() ? workTrigger : home.locator(".workspace-footer-actions .workspace-icon-button");
+  const trigger = await workTrigger.isVisible() ? workTrigger : home.getByRole("button", { name: /^(검수·작업함|Reviews & inbox)$/u });
   await trigger.click();
   const panel = home.locator("dialog[open]");
   await expect(panel).toBeVisible();
@@ -42,5 +45,5 @@ export async function assertStudioWorkspaceHome(page) {
   await expect(panel).toHaveCount(0);
   await expect(trigger).toBeFocused();
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Workspace must not overflow horizontally");
-  await expect(home.locator(".workspace-statusbar")).toBeVisible();
+  await expect(home.locator(".workspace-statusbar, .workspace-live-status")).toBeVisible();
 }
