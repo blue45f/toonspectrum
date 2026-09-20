@@ -1,11 +1,12 @@
 name: Main full QA · isolated diagnostics
 
-# `core` and domain workflows own pull-request gating. This intentionally broad diagnostic
-# matrix runs after merge (and on demand) so it can find cross-domain drift without occupying
-# dozens of PR runners or duplicating type/build work before every merge.
+# `core` and domain workflows own immediate PR/main verification. This broad matrix
+# runs nightly and on demand, never on every main push. Preserve all diagnostic commands
+# without making each merge enqueue 22 additional jobs.
 on:
-  push:
-    branches: [main]
+  # 02:37 Asia/Seoul; PR/core owns immediate verification.
+  schedule:
+    - cron: "37 17 * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,7 +14,8 @@ permissions:
 
 concurrency:
   group: main-full-qa-fast-${{ github.ref_name }}
-  cancel-in-progress: true
+  # A new manual/nightly request must not discard in-flight diagnostic evidence.
+  cancel-in-progress: false
 
 env:
   CI: "1"
@@ -26,6 +28,7 @@ jobs:
     timeout-minutes: 50
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - gate: security
@@ -57,6 +60,7 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         test:
           - apps/web/src/domains/creator/ai/StudioStrokeProposalReviewPanel.test.tsx
@@ -84,6 +88,7 @@ jobs:
     timeout-minutes: 55
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - gate: creator-domain
@@ -109,6 +114,7 @@ jobs:
     timeout-minutes: 70
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - gate: engine

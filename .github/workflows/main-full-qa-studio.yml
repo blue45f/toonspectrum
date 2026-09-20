@@ -1,18 +1,12 @@
 name: Main full QA · Studio exhaustive
 
-# Exhaustive browser/engine coverage is intentionally post-merge. Pull requests already run
-# `core` plus focused domain browser contracts; keeping this six-lane suite off PRs avoids
-# runner starvation while preserving broad integration evidence on main and on demand.
+# Exhaustive browser/engine coverage runs nightly on the default branch and on demand.
+# PR/main CI and focused domain contracts retain immediate validation. The shared build
+# and every exhaustive command stay intact without creating seven jobs on every merge.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "apps/web/src/domains/creator/**"
-      - "scripts/verify-studio-**"
-      - "scripts/qa/**"
-      - "scripts/lib/studio-verify-preview-harness.mts"
-      - ".github/workflows/main-full-qa-studio.yml"
+  # 04:17 Asia/Seoul; all exhaustive lanes remain available on demand.
+  schedule:
+    - cron: "17 19 * * *"
   workflow_dispatch:
 
 permissions:
@@ -20,7 +14,8 @@ permissions:
 
 concurrency:
   group: main-full-qa-studio-${{ github.ref_name }}
-  cancel-in-progress: true
+  # A new manual/nightly request must not discard in-flight diagnostic evidence.
+  cancel-in-progress: false
 
 env:
   CI: "1"
@@ -59,6 +54,7 @@ jobs:
     timeout-minutes: 240
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - lane: ux-persistence-a

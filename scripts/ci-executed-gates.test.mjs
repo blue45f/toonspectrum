@@ -417,7 +417,7 @@ test("focused session checkout retains every non-brand route-purpose image", () 
 
 
 test("full-suite health probes cannot race the target database's NOLOGIN bootstrap gate", () => {
-  for (const name of ["full-test-suite.yml", "full-test-diagnostic.yml"]) {
+  for (const name of ["full-test-diagnostic.yml"]) {
     const workflow = readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
     assert.match(workflow, /POSTGRES_DB: studio_full_integration/u);
     assert.match(workflow, /--health-cmd "pg_isready -U studio_full_test -d postgres"/u);

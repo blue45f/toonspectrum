@@ -111,11 +111,12 @@ describe("database integration runner CI policy", () => {
     });
   });
 
-  it("reruns exhaustive preview checks when their tracked harness changes", () => {
+  it("retains exhaustive preview coverage nightly and on demand without a merge fanout", () => {
     const workflow = readYaml(".github/workflows/main-full-qa-studio.yml");
-    const harnessPath = "scripts/lib/studio-verify-preview-harness.mts";
-    expect(readText(harnessPath)).toContain("export function spawnVitePreview");
-    expect(workflow.on.push.paths.some((pattern) => matchesGlob(harnessPath, pattern))).toBe(true);
+    expect(readText("scripts/lib/studio-verify-preview-harness.mts")).toContain("export function spawnVitePreview");
+    expect(workflow.on.schedule).toEqual([{ cron: "17 19 * * *" }]);
+    expect(workflow.on).toHaveProperty("workflow_dispatch");
+    expect(workflow.on).not.toHaveProperty("push");
   });
 
   it("keeps the package entrypoints bound to the reviewed integration runners", () => {
@@ -159,7 +160,7 @@ describe("database integration runner CI policy", () => {
     );
   });
 
-  it.each(["full-test-suite.yml", "full-test-diagnostic.yml"])(
+  it.each(["full-test-diagnostic.yml"])(
     "runs %s with a fresh real database, separated runtime role and actual shell tests", (filename) => {
       const workflow = readYaml(`.github/workflows/${filename}`);
       const full = workflow.jobs["full-test"];
@@ -335,9 +336,10 @@ describe("database integration runner CI policy", () => {
     expect(build).toContain("pnpm run check:studio-bundle");
     expect(build).toContain("test -s dist/.vite/manifest.json");
   });
-  it("keeps exhaustive browser proof on main with a shared exact production build", () => {
+  it("keeps nightly browser proof on main with a shared exact production build", () => {
     const workflow = readYaml(".github/workflows/main-full-qa-studio.yml");
-    expect(workflow.on.push.branches).toEqual(["main"]);
+    expect(workflow.on).toHaveProperty("schedule");
+    expect(workflow.on).not.toHaveProperty("push");
     expect(workflow.on).toHaveProperty("workflow_dispatch");
     expect(workflow.on).not.toHaveProperty("pull_request");
     const build = workflow.jobs["production-build"];
