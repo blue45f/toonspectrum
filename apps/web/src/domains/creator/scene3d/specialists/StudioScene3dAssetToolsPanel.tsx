@@ -388,8 +388,8 @@ export function StudioScene3dAssetToolsPanel({
         </summary>
         <p className="my-2 text-xs text-fg-3">
           {t(
-            "각 GLB는 텍스처 없는 정적 메시 1개여야 하며 두 파일 합계는 128MiB 이하입니다. 월드 좌표로 연산하며 결과는 형상 전용입니다.",
-            "Each GLB must contain one untextured static mesh; combined input must not exceed 128 MiB. Operations use world coordinates and export geometry only.",
+            "BVH 미리보기는 단일 프리미티브, Manifold는 파일당 최대 32개 메시 부품을 지원합니다. 재질별 조각은 같은 메시 안에서 닫힌 형상이어야 합니다. 두 GLB 합계는 128MiB 이하이며 텍스처·재질은 보존하지 않는 형상 전용 결과입니다.",
+            "BVH preview supports one primitive; Manifold supports up to 32 mesh nodes per file. Material partitions within each node must form a closed solid. Combined GLBs must not exceed 128 MiB. Results are geometry-only: textures and materials are not preserved.",
           )}
         </p>
         <label className="block text-xs">
