@@ -205,6 +205,39 @@ describe("CreatorAdaptiveOnboardingGate", () => {
     expect(await screen.findByRole("dialog")).toBeTruthy();
   });
 
+  it("prevents duplicate saves and dismissal while persistence is pending", async () => {
+    let finish!: (value: typeof emptyProfile) => void;
+    mocks.updateMyProfile.mockReturnValueOnce(new Promise<typeof emptyProfile>((resolve) => { finish = resolve; }));
+    render(gateUi());
+    await fillWorkspace();
+    const submit = screen.getByRole("button", { name: "이 작업실로 시작" });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    for (const close of screen.getAllByRole("button", { name: "나중에 설정" })) {
+      expect((close as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.click(close);
+    }
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(mocks.updateMyProfile).toHaveBeenCalledTimes(1);
+    expect(mocks.saveWorkspace).not.toHaveBeenCalled();
+    await act(async () => { finish({ ...emptyProfile, id: mocks.userId }); });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(mocks.saveWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not continue a stale save after the route unmounts", async () => {
+    let finish!: (value: typeof emptyProfile) => void;
+    mocks.updateMyProfile.mockReturnValueOnce(new Promise<typeof emptyProfile>((resolve) => { finish = resolve; }));
+    const view = render(gateUi());
+    await fillWorkspace();
+    fireEvent.click(screen.getByRole("button", { name: "이 작업실로 시작" }));
+    view.unmount();
+    await act(async () => { finish({ ...emptyProfile, id: mocks.userId }); });
+    expect(mocks.saveWorkspace).not.toHaveBeenCalled();
+    expect(hasAcknowledgedCreatorOnboarding(mocks.userId)).toBe(false);
+  });
+
   it("ignores a profile response belonging to another account", async () => {
     mocks.getMyProfile.mockResolvedValue({ ...emptyProfile, id: "other-account" });
     await act(async () => { render(gateUi()); });

@@ -325,6 +325,12 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
     setWorkspaceMode(recommendedWorkspaceMode);
   }, [modeTouched, recommendedWorkspaceMode, visible]);
 
+  // The Next button can become disabled after changing steps. Move focus to
+  // the dialog before tabbing resumes instead of retaining a disabled target.
+  useEffect(() => {
+    if (visible) dialogRef.current?.focus({ preventScroll: true });
+  }, [step, visible]);
+
   const canContinue = step === 0
     ? experienceLevel !== null
     : step === 1
