@@ -17,6 +17,7 @@ export function useStudioReviewCapture(scopeKey: string, bindings: HostBindings)
   const handlers = useStudioStableHandlers(bindings);
   const open = useCallback(() => {
     let owner = current.current;
+    let created = false;
     if (!owner || owner.key !== scopeKey || ["completed", "cancelled"].includes(owner.bridge.getSnapshot().phase)) {
       owner?.unsubscribe(); owner?.bridge.dispose();
       // Concurrent document digests share one lazy module load. A failed chunk load can be
@@ -45,9 +46,11 @@ export function useStudioReviewCapture(scopeKey: string, bindings: HostBindings)
         }));
       }) };
       current.current = owner;
+      created = true;
     }
     setView({ key: scopeKey, open: true, snapshot: owner.bridge.getSnapshot() });
     if (["idle", "needs-save"].includes(owner.bridge.getSnapshot().phase)) void owner.bridge.start();
+    return created;
   }, [handlers, scopeKey]);
   const retry = useCallback(() => { void current.current?.bridge.retry(); }, []);
   const save = useCallback(async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { useSession } from "@/compat/auth-session-store";
 import { getAuthSessionRevision, listeners as sessionListeners, type Session } from "@/compat/auth-session-state";
@@ -8,6 +8,7 @@ import type { StudioReviewCommentCreateInput } from "../project-graph/studio-pro
 import { getStudioTeam } from "../studio-team-client";
 import { StudioReviewEditorLink } from "../review-handoff/StudioReviewEditorLink";
 import { StudioReviewProductionConnection } from "../review-production/StudioReviewProductionConnection";
+import { studioReviewResolutionMatchesComment, type StudioReviewResolutionRequest } from "../review-resolution/studio-review-resolution-route";
 import { StudioReviewCommentAssignment } from "./StudioReviewCommentAssignment";
 import { studioReviewRosterName, useStudioReviewRoster } from "./use-studio-review-roster";
 import { normalizeStudioReviewAssignees, studioReviewAssigneesAllowed, studioReviewDueAt } from "./studio-review-comment-assignment";
@@ -17,18 +18,21 @@ import { StudioPinnedReviewWorkflow } from "./StudioPinnedReviewWorkflow";
 import { StudioPinnedReviewComparison } from "./StudioPinnedReviewComparison";
 import { StudioReviewAnnotationLocation, type StudioReviewAnnotationSelection } from "./StudioReviewSpatialAnnotation";
 
+const StudioReviewResolution = lazy(async () => ({ default: (await import("../review-resolution/StudioReviewResolution")).StudioReviewResolution }));
+
 /** A pinned server review. This surface never substitutes the latest editable document. */
-export function StudioPinnedReviewPanel({ subject }: { readonly subject: StudioVirtualSpaceReviewSubject | null }) {
+export function StudioPinnedReviewPanel({ subject, resolutionRequest = null }: { readonly subject: StudioVirtualSpaceReviewSubject | null; readonly resolutionRequest?: StudioReviewResolutionRequest | null }) {
   const session = useSession();
   const actorId = session.data?.user.id ?? null;
   // Actor changes remove private pixels/notes during the same render and give
   // drafts, idempotency identities and pending writes a separate owner.
-  return <PinnedReviewForActor key={JSON.stringify([actorId, subject])} actorId={actorId} subject={subject} />;
+  return <PinnedReviewForActor key={JSON.stringify([actorId, subject])} actorId={actorId} subject={subject} resolutionRequest={resolutionRequest} />;
 }
 
-function PinnedReviewForActor({ actorId, subject }: {
+function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
   readonly actorId: string | null;
   readonly subject: StudioVirtualSpaceReviewSubject | null;
+  readonly resolutionRequest: StudioReviewResolutionRequest | null;
 }) {
   const bt = useBilingual("StudioPinnedReviewPanel");
   const inputId = useId();
@@ -182,6 +186,11 @@ function PinnedReviewForActor({ actorId, subject }: {
           {comment.dueAt ? <p className="mt-1 text-xs text-fg-3">{bt("완료 기한", "Due date")} · <time dateTime={comment.dueAt}>{new Date(comment.dueAt).toLocaleString()}</time></p> : null}
           {result.project.access.edit && comment.anchor?.source ? <div className="mt-2"><StudioReviewEditorLink request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
           {result.project.access.edit ? <div className="mt-2"><StudioReviewProductionConnection request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
+          {result.project.access.edit && resolutionRequest && studioReviewResolutionMatchesComment(resolutionRequest, result.subject, comment.id)
+            ? <Suspense fallback={<p role="status">{bt("수정 검토를 불러오는 중…", "Loading correction review…")}</p>}>
+              <StudioReviewResolution request={resolutionRequest} onRecorded={() => { void refresh(true); }}
+                onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
+            </Suspense> : null}
         </article>)}
         {!result.review.comments.length ? <p className="text-sm">{bt("아직 검토 의견이 없어요.", "No review notes yet.")}</p> : null}
       </div>

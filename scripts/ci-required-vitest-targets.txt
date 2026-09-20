@@ -128,6 +128,7 @@ apps/web/src/domains/creator/project-graph/studio-project-graph-client.test.ts
 apps/web/src/domains/creator/review-capture
 apps/web/src/domains/creator/review-handoff
 apps/web/src/domains/creator/review-production
+apps/web/src/domains/creator/review-resolution
 apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts
 apps/web/src/domains/creator/scene3d/specialists/specialist-orchestration.test.ts
 apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts
