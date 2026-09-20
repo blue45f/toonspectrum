@@ -217,6 +217,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   return (
     <aside
       data-testid="site-background-music-player"
+      data-site-ost="mounted"
       className="fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"
       aria-label={korean ? "툰스펙트럼 오리지널 OST" : "ToonSpectrum original OST"}
     >
