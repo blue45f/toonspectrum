@@ -21,7 +21,10 @@ describe("purpose-first product UX foundation", () => {
   it("puts the task launcher before detailed creator guidance", () => {
     const root = readFileSync(ROOT_HOME, "utf8");
     const experience = readFileSync(HOME_EXPERIENCE, "utf8");
-    expect(root).toContain("<CreatorHomeExperience />");
+    expect(root).toContain("<StudioWorkspacePage />");
+    expect(root).not.toContain("<CreatorHomeExperience");
+    const routes = readFileSync("apps/web/src/app/routes/groups/marketing.routes.tsx", "utf8");
+    expect(routes).toContain('path: "/about/studio"');
     expect(experience).toContain("<ProductIntentStart />");
     expect(experience.indexOf("<ProductIntentStart />")).toBeLessThan(
       experience.indexOf('id="creator-start"'),

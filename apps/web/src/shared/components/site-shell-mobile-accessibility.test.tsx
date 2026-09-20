@@ -74,14 +74,15 @@ describe("mobile site shell accessibility", () => {
 
     const primaryNavigation = container.querySelector<HTMLElement>('nav[aria-label="주요 메뉴"]');
     expect(primaryNavigation?.querySelector('a[href="/about/technology"]')).toBeNull();
-    expect(primaryNavigation?.querySelector('a[data-navigation-entry="research"]')?.getAttribute("href")).toBe("/research");
-    expect(primaryNavigation?.querySelector('a[data-navigation-entry="market"]')?.getAttribute("href")).toBe("/market");
+    expect(Array.from(primaryNavigation?.querySelectorAll("a[data-navigation-entry]") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/home", "/studio", "/team", "/hub", "/sitemap"]);
 
     const trigger = screen.getByRole("button", { name: "전체 메뉴" });
     trigger.focus();
     fireEvent.click(trigger);
 
     const dialog = await screen.findByRole("dialog", { name: "전체 메뉴" });
+    expect(within(dialog).getByRole("link", { name: "리서치 데스크" }).getAttribute("href")).toBe("/research");
+    expect(within(dialog).getByRole("link", { name: "소재 마켓" }).getAttribute("href")).toBe("/market");
     const technologyEntry = within(dialog).getByRole("link", { name: "제작 기술" });
     expect(technologyEntry.getAttribute("href")).toBe("/about/technology");
     const close = within(dialog).getByRole("button", { name: "전체 메뉴 닫기" });

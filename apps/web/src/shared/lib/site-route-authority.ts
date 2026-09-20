@@ -97,6 +97,15 @@ export function canonicalSitePath(input: string): string {
 
 export const SITE_ROUTE_AUTHORITIES = Object.freeze([
   route({
+    id: "studio-introduction",
+    path: "/about/studio",
+    titleKey: "route.about",
+    label: { ko: "서비스 소개", en: "Studio introduction" },
+    description: { ko: "제작 흐름과 기능을 살펴보는 공개 소개", en: "Explore the production workflow and tools" },
+    purpose: "learn",
+    directory: true,
+  }),
+  route({
     id: "workspace-home", path: "/home", titleKey: "route.studio",
     label: { ko: "스튜디오", en: "Studio" },
     description: { ko: "내 작업실에서 작품을 이어서 만들기", en: "Resume your work in your studio" },

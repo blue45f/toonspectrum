@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
+import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
 
 const origin = process.env.PUBLIC_WEBTOON_ORIGIN || "http://127.0.0.1:5281";
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname), 'Interactive fault-injection checks only run against a local candidate');
@@ -83,9 +84,9 @@ try {
     });
     await check(`home color treatment and footer availability ${width}`, async () => {
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('.cf-hero h1')).toBeVisible();
-      const background = await page.locator('.cf-hero .cf-primary').evaluate((element) => getComputedStyle(element).backgroundImage);
-      assert(background.includes('linear-gradient'), 'The scoped visual treatment must be present');
+      await assertStudioWorkspaceHome(page);
+      const background = await page.locator('.workspace-statusbar .workspace-primary').evaluate((element) => getComputedStyle(element).backgroundColor);
+      assert(background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent', 'The primary action must retain its theme surface');
       await expect(page.locator('footer')).toBeAttached({ timeout: 5000 });
       await page.screenshot({ path: `${output}/home-${width}.png`, animations: 'disabled' });
       // Theme fixture verifies contrast/layout without claiming the preference UI was tested.

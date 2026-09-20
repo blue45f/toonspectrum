@@ -28,7 +28,7 @@ try {
       await route.continue().catch(() => { /* A closed player can cancel its intercepted request. */ });
     });
     try {
-      await page.goto(origin, { waitUntil: "domcontentloaded" });
+      await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded" });
       await page.locator('[data-creator-home="production-first"]').waitFor();
       await page.evaluate(() => document.fonts.ready);
       await page.waitForFunction(() => document.title.includes("툰스튜디오") || document.title.includes("ToonStudio"));

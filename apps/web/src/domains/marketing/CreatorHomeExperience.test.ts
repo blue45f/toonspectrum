@@ -23,7 +23,11 @@ const FOOTER_KO_SOURCE = "apps/web/public/i18n/app/footer/ko.json";
 describe("creator home experience contracts", () => {
   it("renders one coherent root experience instead of appending a second homepage", () => {
     const source = readFileSync(ROOT_HOME_SOURCE, "utf8");
-    expect(source).toContain("<CreatorHomeExperience />");
+    expect(source).toContain("<StudioWorkspacePage />");
+    expect(source).not.toContain("<CreatorHomeExperience");
+    const routes = readFileSync("apps/web/src/app/routes/groups/marketing.routes.tsx", "utf8");
+    expect(routes).toContain('path: "/about/studio"');
+    expect(routes).toContain('default: module.CreatorHomeExperience');
     expect(source).not.toContain("CreatorHubEntry");
   });
 

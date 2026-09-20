@@ -42,7 +42,13 @@ const StudioWorkspacePage = lazyRetry(
   "StudioWorkspacePage",
 );
 
+const StudioIntroductionPage = lazyRetry(
+  () => import("@/domains/marketing/CreatorHomeExperience").then((module) => ({ default: module.CreatorHomeExperience })),
+  "StudioIntroductionPage",
+);
+
 export const marketingRoutes = defineAppRoutes([
+  { id: "marketing-studio-introduction", path: "/about/studio", element: <StudioIntroductionPage /> },
   { id: "workspace-home", path: "/home", element: <StudioWorkspacePage /> },
   { id: "workspace-team", path: "/team", element: <StudioWorkspacePage surface="team" /> },
   { id: "workspace-hub", path: "/hub", element: <StudioWorkspacePage surface="hub" /> },

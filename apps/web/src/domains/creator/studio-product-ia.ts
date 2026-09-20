@@ -13,10 +13,10 @@
  */
 
 export const STUDIO_GLOBAL_NAVIGATION = [
-  { id: "production", label: "제작 관리", href: "/production" },
-  { id: "studio", label: "프로젝트", href: "/studio" },
-  { id: "research", label: "리서치 데스크", href: "/research" },
-  { id: "market", label: "소재 마켓", href: "/market" },
+  { id: "workspace-home", label: "스튜디오", href: "/home" },
+  { id: "studio", label: "작품", href: "/studio" },
+  { id: "workspace-team", label: "팀", href: "/team" },
+  { id: "workspace-hub", label: "둘러보기", href: "/hub" },
 ] as const;
 
 export const STUDIO_PROJECT_NAVIGATION = [
