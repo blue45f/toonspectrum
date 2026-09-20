@@ -33,6 +33,7 @@ export interface StudioVirtualSpaceReactionSnapshot {
 
 interface StudioVirtualSpacePresencePacket {
   readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
+  readonly worldScope?: string;
   readonly kind: "presence";
   readonly sequence: number;
   readonly at: number;
@@ -41,6 +42,7 @@ interface StudioVirtualSpacePresencePacket {
 
 interface StudioVirtualSpaceLeavePacket {
   readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
+  readonly worldScope?: string;
   readonly kind: "leave";
   readonly sequence: number;
   readonly at: number;
@@ -48,6 +50,7 @@ interface StudioVirtualSpaceLeavePacket {
 
 interface StudioVirtualSpaceReactionPacket {
   readonly wire: typeof STUDIO_VIRTUAL_SPACE_WIRE;
+  readonly worldScope?: string;
   readonly kind: "reaction";
   readonly sequence: number;
   readonly at: number;
@@ -69,6 +72,8 @@ export interface StudioVirtualSpaceSnapshot {
 }
 
 export interface StudioVirtualSpacePresenceDependencies {
+  /** Only the current server publication reader supplies this scope. Absence keeps bundled-world wire compatibility. */
+  readonly worldScope?: string;
   readonly appearanceForAvatarIndex?: (avatarIndex: number, identity: string) => StudioVirtualSpaceAppearance;
   readonly now?: () => number;
   readonly setInterval?: (handler: () => void, delayMs: number) => unknown;
@@ -183,9 +188,12 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   ) {
     return null;
   }
+  if (packet.worldScope !== undefined && (typeof packet.worldScope !== "string" || !/^[a-f0-9]{64}$/u.test(packet.worldScope))) return null;
+  const scope = typeof packet.worldScope === "string" ? { worldScope: packet.worldScope } : {};
   if (packet.kind === "leave") {
     return {
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...scope,
       kind: "leave",
       sequence: Number(packet.sequence),
       at: Number(packet.at),
@@ -197,6 +205,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
     }
     return {
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...scope,
       kind: "reaction",
       sequence: Number(packet.sequence),
       at: Number(packet.at),
@@ -221,6 +230,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
   if (appearance === null) return null;
   return {
     wire: STUDIO_VIRTUAL_SPACE_WIRE,
+    ...scope,
     kind: "presence",
     sequence: Number(packet.sequence),
     at: Number(packet.at),
@@ -394,6 +404,7 @@ export class StudioVirtualSpacePresenceController {
     });
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...(this.dependencies.worldScope ? { worldScope: this.dependencies.worldScope } : {}),
       kind: "reaction",
       sequence: this.nextSequence(),
       at: now,
@@ -470,6 +481,7 @@ export class StudioVirtualSpacePresenceController {
     const now = this.now();
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...(this.dependencies.worldScope ? { worldScope: this.dependencies.worldScope } : {}),
       kind: "presence",
       sequence: this.nextSequence(),
       at: now,
@@ -489,7 +501,7 @@ export class StudioVirtualSpacePresenceController {
     if (this.closed || sender.sessionId === this.participant.sessionId) return;
     if (!this.availablePeerIds().has(sender.sessionId)) return;
     const packet = parseStudioVirtualSpacePacket(raw);
-    if (!packet) return;
+    if (!packet || packet.worldScope !== this.dependencies.worldScope) return;
 
     if (packet.kind === "reaction") {
       const previousReactionSequence = this.reactionSequences.get(sender.sessionId) ?? -1;
@@ -532,6 +544,7 @@ export class StudioVirtualSpacePresenceController {
     if (this.closed) return;
     const packet = encodePacket({
       wire: STUDIO_VIRTUAL_SPACE_WIRE,
+      ...(this.dependencies.worldScope ? { worldScope: this.dependencies.worldScope } : {}),
       kind: "leave",
       sequence: this.nextSequence(),
       at: this.now(),

@@ -22,6 +22,7 @@ type Engine = ComponentProps<typeof StudioVirtualSpacePhaserCanvas>;
 type ConversationOptions = Parameters<typeof import("./use-studio-virtual-space-conversation").useStudioVirtualSpaceConversation>[0];
 type SocialOptions = Parameters<typeof useStudioVirtualSpaceSocial>[0];
 const f = vi.hoisted(() => ({
+  worldPublication: null as ReturnType<typeof import("./world-publication/use-studio-world-publication").useStudioWorldPublication> | null,
   realPresence: false,
   presenceOverrides: {} as Record<string, Partial<StudioVirtualSpacePresenceState>>,
   worldLoad: null as Promise<StudioVirtualSpaceWorldManifest> | null,
@@ -44,6 +45,10 @@ const f = vi.hoisted(() => ({
   } },
   session: { ready: true, data: { user: { id: "alice", name: "Alice", email: "alice@example.test" } } },
 }));
+vi.mock("./world-publication/use-studio-world-publication", async () => {
+  const { EMPTY_WORLD_PUBLICATION } = await import("./world-publication/studio-world-publication-controller");
+  return { useStudioWorldPublication: () => f.worldPublication ?? ({ enabled: false, snapshot: EMPTY_WORLD_PUBLICATION, refresh: vi.fn(), publish: vi.fn() }) };
+});
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => f.session }));
 vi.mock("../live/use-studio-live-transport-auth", () => ({ useStudioLiveTransportAuth: () => f.transport }));
 vi.mock("../live/StudioLiveCollaborationProvider", () => ({ StudioLiveCollaborationProvider: ({ children }: { children: ReactNode }) => children }));
@@ -121,7 +126,7 @@ function showPanel(panel: "people" | "space") {
 
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
-  f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
+  f.worldPublication = null; f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
   f.live.room.ready = false;
   f.presenceOverrides = {};
   f.snapshot = { requests: [], readyPeerIds: ["bob", "cleo"], reviewReadyPeerIds: ["bob", "cleo"], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: true };
@@ -530,5 +535,36 @@ describe("Virtual Studio atmosphere preference storage", () => {
     expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "집중" }).getAttribute("aria-pressed")).toBe("true");
     expect(f.socialOptions?.enabled).toBe(false);
     expect(localStorage.getItem(key)).toBeNull();
+  });
+});
+
+
+describe("published world Page transition", () => {
+  it("retains accepted ownership on unchanged renewal, then closes it and safely spawns on a new exact revision", async () => {
+    const { EMPTY_WORLD_PUBLICATION } = await import("./world-publication/studio-world-publication-controller");
+    const { studioWorldPublishManifest } = await import("./world-publication/studio-world-publication-client");
+    const { studioWorldSpawn } = await import("./studio-virtual-space-world-manifest");
+    const first = { publication: { contract: "studio-world-publication-v1" as const, workId: "project-social", projectId: "graph-1", artifactId: "world-1",
+      revisionId: "published-1", previousPublishedRevisionId: null, contentHash: "a".repeat(64), sequence: 1, publishedBy: "alice", publishedAt: "2026-09-20T00:00:00.000Z",
+      manifest: studioWorldPublishManifest(DEFAULT_STUDIO_WORLD_MANIFEST) }, scope: "a".repeat(64), assetUrls: new Map([[DEFAULT_STUDIO_WORLD_MANIFEST.backgroundUrl, "blob:first-world"]]), dispose: vi.fn() };
+    f.worldPublication = { enabled: true, refresh: vi.fn(async () => true), publish: vi.fn(async () => true), reviewDraftBase: vi.fn(async () => null),
+      snapshot: { ...EMPTY_WORLD_PUBLICATION, phase: "ready", viewVerified: true, hasPublishedWorld: true, active: first,
+        authority: { publication: first.publication, canPublish: true, expiresAt: Date.now() + 15_000 } } };
+    const mounted = await mount(); await accept(accepted("world-follow", "follow")); const oldBridge = f.engine!.bridge;
+    expect(oldBridge.getFollowingPeer()).toBe("bob"); expect(f.engine?.worldAssetUrls).toBe(first.assetUrls);
+    const rerender = () => mounted.rerender(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
+      <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage />} /></Routes></MemoryRouter>);
+    f.worldPublication = { ...f.worldPublication, snapshot: { ...f.worldPublication.snapshot, authority: { ...f.worldPublication.snapshot.authority!, expiresAt: Date.now() + 30_000 } } };
+    rerender(); await act(async () => {}); expect(f.engine?.bridge).toBe(oldBridge); expect(oldBridge.getFollowingPeer()).toBe("bob");
+    const closes: string[] = [], closed = (event: Event) => closes.push((event as CustomEvent<{ conversationId: string }>).detail.conversationId);
+    window.addEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, closed);
+    try {
+      const second = { ...first, publication: { ...first.publication, revisionId: "published-undo", sequence: 2 }, scope: "b".repeat(64) };
+      f.worldPublication = { ...f.worldPublication, snapshot: { ...f.worldPublication.snapshot, active: second } };
+      rerender(); await waitFor(() => expect(f.engine?.bridge).not.toBe(oldBridge)); await screen.findByTestId("engine-ready");
+      expect(f.engine?.bridge.getFollowingPeer()).toBeNull(); expect(closes).toContain("world-follow");
+      expect(f.engine?.snapshot.self).toMatchObject(studioWorldSpawn(second.publication.manifest).point);
+      expect(f.socialOptions?.publishedScope).toBe(second.scope); expect(f.conversationOptions?.publishedScope).toBe(second.scope);
+    } finally { window.removeEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, closed); }
   });
 });
