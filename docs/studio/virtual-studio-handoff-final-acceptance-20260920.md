@@ -23,3 +23,9 @@ Browser journeys still use HTTP fixtures and the real shipped forms/controllers/
 Seven task-completion screenshots/reports were accidentally tracked in #1869 despite its description saying they were ignored. This change removes only those generated files from Git tracking, preserves their local bytes, and adds explicit ignore entries for all four exercised review QA directories. No unrelated source, worktree or branch is deleted.
 
 The original shared-chat body is still unavailable. This acceptance closes the review/task/handoff continuation and does not relabel every VS-01–VS-30 product requirement, WAN/NAT validation, or production deployment as complete.
+
+## Repeated-database-run repair
+
+A repeat on `25424b1c4` passed 74/75 cases and exposed `studio_project_graph_time_check` during capture completion. The initial 75/75 result above is historical, not a replacement for that failed repeat. Two deterministic tests now put the graph or artifact timestamps ahead of the current database clock; both reproduced their respective time-constraint failure before the fix.
+
+Capture completion now updates metadata with `GREATEST(createdAt, updatedAt, clock_timestamp())` while preserving all existing constraints, authorization, receipts and revision history. The full repaired PostgreSQL portfolio passed 77/77 cases. This models backward/lagging time without attributing the intermittent failure to an unobserved specific clock-sync service. No sleep, increased timeout, skipped assertion or migration is used as the fix.
