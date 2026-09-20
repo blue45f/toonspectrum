@@ -1,8 +1,7 @@
-import type { Scene3dInplaceToolsBridge } from "../scene3d/integration/scene3d-inplace-contract";
-import {
+import { useBilingual,
   formatI18nTemplate,
-  translateCurrentStaticSourceText,
-} from "@/shared/lib/i18n-bilingual-copy";
+  translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+import type { Scene3dInplaceToolsBridge } from "../scene3d/integration/scene3d-inplace-contract";
 import {
   CheckCircle2,
   Cpu,
@@ -426,6 +425,7 @@ export function StudioBg3dViewPanel({
   aiReferenceDisabled = false,
   onOpenPrecisionModeler,
 }: StudioBg3dViewPanelProps) {
+  const tiledCopy = useBilingual("scene3d-tiled-output");
   const {
     VIEW_EDITOR_SECTIONS,
     viewEditorSection,
@@ -752,6 +752,9 @@ export function StudioBg3dViewPanel({
                         ))}
                       </select>
                     </label>
+                    <p className="mt-2 text-[0.62rem] leading-relaxed text-fg-3">
+                      {tiledCopy("Three 캡처는 큰 PNG를 타일로 분할해 최대 4096px까지 출력합니다. 선·톤의 위치와 굵기를 유지하며, 큰 타일 출력의 PSD는 예산 사유로 제외됩니다. 최대 변 길이에 따라 높이는 줄어들 수 있습니다. 커스텀 셰이더·포인트·화면 기반 굴절은 지원하지 않습니다.", "Three capture renders large PNGs in bounded tiles up to 4096 px. Line and tone alignment is preserved; layered PSD is omitted for large tiled output. The maximum edge can still reduce the height. Custom shaders, points and screen-space refraction are unsupported.")}
+                    </p>
                     <fieldset className="mt-2">
                       <legend className="text-[0.62rem] font-semibold text-fg-3">
                         {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "PNG 렌더 패스 ")}{selectedShotBatchPasses.length}/{STUDIO_BG3D_SHOT_BATCH_PASSES.length}

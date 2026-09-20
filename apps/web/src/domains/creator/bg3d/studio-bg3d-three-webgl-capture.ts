@@ -1,3 +1,5 @@
+import { assertStudioBg3dTiledSceneAdmission } from "./studio-bg3d-tiled-scene-admission";
+import { createStudioBg3dTiledCameraSession } from "./studio-bg3d-tiled-session";
 /** Three/WebGL implementation of the renderer-neutral Studio 3D capture contract. */
 
 import * as THREE from "three";
@@ -168,25 +170,25 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
     throw new TypeError("Three WebGL capture requires a renderer, scene, and camera.");
   }
 
-  async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
+  async function capture(request: StudioBg3dCaptureRequest, captureCamera = camera): Promise<StudioBg3dCapturedRaster> {
     assertStudioBg3dCaptureRequest(request);
     const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
     let colorReadback: Promise<Uint8ClampedArray>;
     let depthReadback: Promise<Float32Array> | undefined;
     let normalReadback: Promise<Uint8ClampedArray> | undefined;
     try {
-      colorReadback = captureStudioBg3dThreeWebglColor({ camera, renderer, request, scene });
+      colorReadback = captureStudioBg3dThreeWebglColor({ camera: captureCamera, renderer, request, scene });
       if (request.includeDepth) {
         depthReadback = captureStudioBg3dThreeDepth({
           renderer,
           scene,
-          camera,
+          camera: captureCamera,
           width: request.width,
           height: request.height,
         });
       }
       if (request.includeNormals) {
-        normalReadback = captureStudioBg3dThreeNormals({ renderer, scene, camera,
+        normalReadback = captureStudioBg3dThreeNormals({ renderer, scene, camera: captureCamera,
           width: request.width, height: request.height });
       }
     } finally {
@@ -217,8 +219,8 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
     engineId: "three" as const,
     engineVersion: String(THREE.REVISION).toLowerCase(),
     implementationRevision: renderer.extensions?.has("EXT_color_buffer_float")
-      ? "studio-three-webgl-capture-adapter-v3-hdr-normals"
-      : "studio-three-webgl-capture-adapter-v3-ldr-normals",
+      ? "studio-three-webgl-capture-adapter-v4-hdr-normal-tiles"
+      : "studio-three-webgl-capture-adapter-v4-ldr-normal-tiles",
     normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
     graphicsApi: "webgl2" as const,
     profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
@@ -227,5 +229,10 @@ export function createStudioBg3dThreeWebglCaptureAdapter(
       height: renderer.domElement.height,
     }),
     capture,
+    createTiledCapture: () => {
+      if (renderer.capabilities?.reversedDepthBuffer) throw new Error("Reversed-depth tiled capture is not supported.");
+      assertStudioBg3dTiledSceneAdmission(scene);
+      return createStudioBg3dTiledCameraSession(camera, capture, THREE.WebGLCoordinateSystem);
+    },
   });
 }
