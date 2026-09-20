@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createBrushStudioV6Program } from "./brush-studio-v6-engine";
+import { createBrushStudioV6Program, type BrushStudioV6Program } from "./brush-studio-v6-engine";
 import { attachBrushStudioV6LivePreview } from "./brush-studio-v6-preview";
 import { mapBrushStudioV6Pressure } from "./brush-studio-v6-material-engine";
 
@@ -20,7 +20,9 @@ afterEach(() => { cleanups.splice(0).forEach((fn) => fn()); vi.restoreAllMocks()
 function fixture() {
   const context = { setTransform: vi.fn(), clearRect: vi.fn(), fillRect: vi.fn(), save: vi.fn(),
     restore: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(), drawImage: vi.fn() };
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  // Exercise the 2D overload explicitly; other suites also add the WebGPU overload.
+  const canvas2dPrototype: { getContext(contextId: "2d"): CanvasRenderingContext2D | null } = HTMLCanvasElement.prototype;
+  vi.spyOn(canvas2dPrototype, "getContext").mockReturnValue(context as unknown as CanvasRenderingContext2D);
   const canvas = document.createElement("canvas");
   Object.defineProperties(canvas, { clientWidth: { value: 400, configurable: true }, clientHeight: { value: 200 },
     offsetWidth: { value: 400 }, onpointerrawupdate: { value: null } });
@@ -33,7 +35,7 @@ function fixture() {
   vi.stubGlobal("PointerEvent", PointerMock);
   vi.stubGlobal("devicePixelRatio", 1);
   const initial = createBrushStudioV6Program("clean-ink");
-  let program = { ...initial, input: { ...initial.input, transport: "move-basic" as const } };
+  let program: BrushStudioV6Program = { ...initial, input: { ...initial.input, transport: "move-basic" } };
   const telemetry = vi.fn();
   const controller = attachBrushStudioV6LivePreview(canvas, () => program, telemetry);
   cleanups.push(() => controller.destroy());
@@ -45,7 +47,7 @@ function fixture() {
     canvas.dispatchEvent(event);
   }
   return { canvas, context, capture, telemetry, controller, send, initial,
-    useRaw() { program = { ...program, input: { ...program.input, transport: "raw-coalesced" } } as typeof program; } };
+    useRaw() { program = { ...program, input: { ...program.input, transport: "raw-coalesced" } }; } };
 }
 
 describe("workbench material pointer lifecycle", () => {
