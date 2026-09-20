@@ -75,8 +75,18 @@ export function createStudioBg3dTileCamera(
   frozen: THREE.Camera,
   window: StudioBg3dRasterWindow,
 ): THREE.Camera {
-  assertStudioBg3dRasterWindow(window);
   const camera = snapshotStudioBg3dCaptureCamera(frozen);
+  applyStudioBg3dTileProjection(camera, frozen.projectionMatrix, window);
+  return camera;
+}
+
+/** Reuse one renderer camera identity per session; never accumulate crops across tiles. */
+export function applyStudioBg3dTileProjection(
+  camera: THREE.Camera,
+  fullProjection: THREE.Matrix4,
+  window: StudioBg3dRasterWindow,
+): void {
+  assertStudioBg3dRasterWindow(window);
   const scaleX = window.fullWidth / window.width,
     scaleY = window.fullHeight / window.height;
   const shiftX =
@@ -101,7 +111,6 @@ export function createStudioBg3dTileCamera(
     0,
     1,
   );
-  camera.projectionMatrix.premultiply(crop);
+  camera.projectionMatrix.copy(fullProjection).premultiply(crop);
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-  return camera;
 }

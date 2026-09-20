@@ -167,3 +167,20 @@ it("converts clip depth for a fresh WebGPU camera without changing XY or the liv
   expect(mapped.z).toBeCloseTo(0.5 * old.z + 0.5, 12);
   expect(camera.coordinateSystem).toBe(THREE.WebGLCoordinateSystem);
 });
+
+
+it("reuses one session camera identity while applying each tile from the original projection", async () => {
+  const source = new THREE.PerspectiveCamera(41, 1.5, 0.1, 100); source.position.z = 5; source.updateMatrixWorld(true);
+  const children = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial()); source.add(children);
+  const cameras: THREE.Camera[] = []; const projections: number[][] = [];
+  const session = createStudioBg3dTiledCameraSession(source, async (request, camera) => {
+    cameras.push(camera); projections.push(camera.projectionMatrix.toArray());
+    return { width: request.width, height: request.height, rgba: new Uint8Array(request.width * request.height * 4) };
+  });
+  const tiles = createStudioBg3dTilePlan({ width: 63, height: 47, tileWidth: 31, bandHeight: 31 }).tiles;
+  for (const tile of tiles) await session.capture({ width: tile.capture.width, height: tile.capture.height,
+    background: { color: "#000000", alpha: 0 }, includeDepth: false }, tile.capture);
+  expect(new Set(cameras).size).toBe(1); expect(cameras[0]!.children).toHaveLength(0);
+  for (const tile of tiles) expect(projections[tile.index]).toEqual(createStudioBg3dTileCamera(source, tile.capture).projectionMatrix.toArray());
+  session.dispose(); children.geometry.dispose(); (children.material as THREE.Material).dispose();
+});

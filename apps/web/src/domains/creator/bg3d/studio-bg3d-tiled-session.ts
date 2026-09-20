@@ -3,7 +3,7 @@ import {
   STUDIO_BG3D_TILE_PROFILE,
 } from "./studio-bg3d-tile-plan";
 import {
-  createStudioBg3dTileCamera,
+  applyStudioBg3dTileProjection,
   snapshotStudioBg3dCaptureCamera,
 } from "./studio-bg3d-tile-camera";
 import type * as THREE from "three";
@@ -30,6 +30,7 @@ export function createStudioBg3dTiledCameraSession(
   coordinateSystem?: THREE.Camera["coordinateSystem"],
 ): StudioBg3dTiledCaptureSession {
   const frozen = snapshotStudioBg3dCaptureCamera(camera, coordinateSystem);
+  const tileCamera = snapshotStudioBg3dCaptureCamera(frozen);
   let closed = false;
   let busy = false;
   return Object.freeze({
@@ -47,10 +48,8 @@ export function createStudioBg3dTiledCameraSession(
         throw new RangeError("Tile raster does not match the declared window.");
       busy = true;
       try {
-        const result = await execute(
-          request,
-          createStudioBg3dTileCamera(frozen, window),
-        );
+        applyStudioBg3dTileProjection(tileCamera, frozen.projectionMatrix, window);
+        const result = await execute(request, tileCamera);
         if (closed)
           throw new Error(
             "Tiled capture session closed before readback completed.",
