@@ -74,7 +74,7 @@ await page.route("**/*", async (route) => {
       const body = request.postDataJSON();
       assert.equal(request.method(), "PATCH");
       assert.equal(typeof body.crdtServerSequence, "string");
-      assert(/^\d+$/u.test(body.crdtServerSequence) && BigInt(body.crdtServerSequence) > 0n,
+      assert(/^\d+$/u.test(body.crdtServerSequence) && BigInt(body.crdtServerSequence) > BigInt(0),
         "Authored shared saves require a real, nonzero gateway acknowledgement");
       savePins.push({ baseRevision: body.baseRevision, crdtServerSequence: body.crdtServerSequence });
       sourceWrites++;
