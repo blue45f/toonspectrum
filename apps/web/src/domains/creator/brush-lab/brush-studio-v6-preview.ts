@@ -1,3 +1,5 @@
+import { normalizeStudioMaterialPointerPressure, resolveStudioMaterialReleasePressure } from "../brush/studio-material-pointer-pressure";
+import { mapBrushStudioMaterialInput } from "./brush-studio-material-input";
 import type {
   BrushStudioV6InputTransport,
   BrushStudioV6Program,
@@ -216,23 +218,26 @@ interface LiveStroke {
   readonly point: LivePoint;
   readonly material: BrushStudioV6MaterialStroke;
   readonly program: BrushStudioV6Program;
+  readonly transport: BrushStudioV6ResolvedTransport;
+  readonly lastContactPressure: number;
+  readonly previousSurface: HTMLCanvasElement;
 }
 
 function eventPoint(
   canvas: HTMLCanvasElement,
   event: PointerEvent,
   program: BrushStudioV6Program,
+  pressure = normalizeStudioMaterialPointerPressure(event.pointerType, event.pressure),
 ): LivePoint {
   const rect = canvas.getBoundingClientRect();
-  const rawPressure = event.pointerType === "mouse" && event.buttons ? 0.5 : event.pressure;
-  const tiltDegrees = Math.hypot(event.tiltX || 0, event.tiltY || 0);
-  return {
+  return mapBrushStudioMaterialInput({
     x: event.clientX - rect.left - canvas.clientLeft,
     y: event.clientY - rect.top - canvas.clientTop,
-    pressure: mapBrushStudioV6Pressure(rawPressure, program.input),
-    tilt: mapBrushStudioV6Tilt(tiltDegrees, program.input),
-    twist: event.twist || 0,
-  };
+    pressure,
+    tiltX: event.tiltX,
+    tiltY: event.tiltY,
+    twist: event.twist,
+  }, program.input);
 }
 
 function liveCapabilities(canvas: HTMLCanvasElement): BrushStudioV6LiveInputCapabilities {
@@ -269,126 +274,169 @@ export function attachBrushStudioV6LivePreview(
   const active = new Map<number, LiveStroke>();
   const capabilities = liveCapabilities(canvas);
   const previousTouchAction = canvas.style.touchAction;
+  let disposed = false;
   let lastTelemetry = 0;
   let samples = 0;
   let started = performance.now();
   if (context) clearPaper(context, canvas, getProgram());
   canvas.style.touchAction = "none";
 
-  const draw = (stroke: LiveStroke, to: LivePoint): void => {
+  const releaseCapture = (pointerId: number): void => {
+    try {
+      if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+    } catch {
+      // The browser may already have released or transferred this pointer.
+    }
+  };
+  const retire = (pointerId: number, rollback: boolean): void => {
+    const stroke = active.get(pointerId);
+    if (!stroke) return;
+    // Remove ownership before releasing capture: lostpointercapture can be reentrant.
+    active.delete(pointerId);
+    try {
+      if (rollback) {
+        const drawContext = fit(canvas);
+        if (drawContext) {
+          drawContext.save();
+          try {
+            drawContext.setTransform(1, 0, 0, 1, 0, 0);
+            drawContext.clearRect(0, 0, canvas.width, canvas.height);
+            drawContext.drawImage(stroke.previousSurface, 0, 0, canvas.width, canvas.height);
+          } finally { drawContext.restore(); }
+        }
+      }
+    } finally {
+      releaseCapture(pointerId);
+      stroke.previousSurface.width = 0;
+      stroke.previousSurface.height = 0;
+    }
+  };
+  const draw = (stroke: LiveStroke, point: LivePoint): void => {
     const drawContext = fit(canvas);
-    if (!drawContext) return;
-    if (stroke.intent === "water") return;
-    renderBrushStudioV6MaterialMarks(drawContext, stroke.material.push(to));
+    if (!drawContext || stroke.intent === "water") return;
+    renderBrushStudioV6MaterialMarks(drawContext, stroke.material.push(point));
   };
 
   const down = (event: PointerEvent): void => {
+    if (disposed || active.size > 0 || event.button !== 0 || event.isPrimary === false) return;
     const program = getProgram();
     const transport = resolveBrushStudioV6LiveTransport(program.input.transport, capabilities);
-    const intent = resolveBrushStudioV6PointerIntent(
-      event,
-      program.input.touchPolicy,
-      program.input.palmRejection,
-    );
+    const intent = resolveBrushStudioV6PointerIntent(event, program.input.touchPolicy, program.input.palmRejection);
     if (intent !== "draw" && intent !== "water") {
       emitIgnoredTelemetry(event, intent, transport, onTelemetry);
       return;
     }
-    canvas.setPointerCapture(event.pointerId);
-    const point = eventPoint(canvas, event, program);
-    const stroke: LiveStroke = { intent, point, program, material: createBrushStudioV6MaterialStroke(program) };
-    active.set(event.pointerId, stroke);
-    draw(stroke, point);
+    if (!fit(canvas)) return;
+    // A single writer owns one pre-stroke bitmap, released on every exit path.
+    const previousSurface = canvas.ownerDocument.createElement("canvas");
+    previousSurface.width = canvas.width;
+    previousSurface.height = canvas.height;
+    const previousContext = previousSurface.getContext("2d");
+    if (!previousContext) return;
+    previousContext.drawImage(canvas, 0, 0);
+    try { canvas.setPointerCapture(event.pointerId); }
+    catch {
+      previousSurface.width = previousSurface.height = 0;
+      return;
+    }
+    const lastContactPressure = normalizeStudioMaterialPointerPressure(event.pointerType, event.pressure);
+    try {
+      const point = eventPoint(canvas, event, program, lastContactPressure);
+      const stroke: LiveStroke = { intent, point, program, transport, lastContactPressure,
+        previousSurface, material: createBrushStudioV6MaterialStroke(program) };
+      active.set(event.pointerId, stroke);
+      draw(stroke, point);
+    } catch (error) {
+      if (active.has(event.pointerId)) retire(event.pointerId, true);
+      else {
+        releaseCapture(event.pointerId);
+        previousSurface.width = previousSurface.height = 0;
+      }
+      throw error;
+    }
   };
 
   const move = (event: PointerEvent): void => {
-    const program = getProgram();
-    const transport = resolveBrushStudioV6LiveTransport(program.input.transport, capabilities);
+    if (disposed) return;
     const stroke = active.get(event.pointerId);
     if (!stroke) {
-      if (
-        event.type === "pointermove"
-        && program.input.hoverPreview
-        && event.pointerType === "pen"
-        && event.buttons === 0
-      ) {
-        onTelemetry?.({
-          pointerType: "pen-hover",
-          pressure: 0,
-          tilt: Math.hypot(event.tiltX || 0, event.tiltY || 0),
-          twist: event.twist || 0,
-          sampleRateHz: 0,
-          rejectedPalm: false,
-          transport,
-        });
+      const program = getProgram();
+      if (event.type === "pointermove" && program.input.hoverPreview
+        && event.pointerType === "pen" && event.buttons === 0) {
+        onTelemetry?.({ pointerType: "pen-hover", pressure: 0,
+          tilt: Math.hypot(event.tiltX || 0, event.tiltY || 0), twist: event.twist || 0,
+          sampleRateHz: 0, rejectedPalm: false,
+          transport: resolveBrushStudioV6LiveTransport(program.input.transport, capabilities) });
       }
       return;
     }
+    const transport = stroke.transport;
     if (!shouldBrushStudioV6HandleMoveEvent(event.type, transport)) return;
-    const sourceEvents = transport === "move-basic"
-      ? [event]
-      : typeof event.getCoalescedEvents === "function"
-        ? event.getCoalescedEvents()
-        : [event];
-    let from = stroke.point;
-    for (const source of sourceEvents.length > 0 ? sourceEvents : [event]) {
-      const point = eventPoint(canvas, source, stroke.program);
-      draw(stroke, point);
-      from = point;
-      samples += 1;
+    const sourceEvents = transport === "move-basic" ? [event]
+      : typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : [event];
+    let point = stroke.point;
+    let lastContactPressure = stroke.lastContactPressure;
+    try {
+      for (const source of sourceEvents.length > 0 ? sourceEvents : [event]) {
+        lastContactPressure = normalizeStudioMaterialPointerPressure(source.pointerType, source.pressure);
+        point = eventPoint(canvas, source, stroke.program, lastContactPressure);
+        draw(stroke, point);
+        samples += 1;
+      }
+    } catch (error) {
+      retire(event.pointerId, true);
+      throw error;
     }
-    active.set(event.pointerId, { ...stroke, point: from });
+    active.set(event.pointerId, { ...stroke, point, lastContactPressure });
     const now = performance.now();
     if (now - lastTelemetry <= 80) return;
     const elapsed = Math.max(1, now - started);
-    onTelemetry?.({
-      pointerType: event.pointerType,
-      pressure: from.pressure,
-      tilt: from.tilt * 90,
-      twist: event.twist || 0,
-      sampleRateHz: Math.round(samples * 1000 / elapsed),
-      rejectedPalm: false,
-      transport,
-    });
+    onTelemetry?.({ pointerType: event.pointerType, pressure: point.pressure,
+      tilt: point.tilt * 90, twist: event.twist || 0,
+      sampleRateHz: Math.round(samples * 1000 / elapsed), rejectedPalm: false, transport });
     lastTelemetry = now;
-    if (elapsed > 2_000) {
-      samples = 0;
-      started = now;
-    }
+    if (elapsed > 2_000) { samples = 0; started = now; }
   };
 
   const up = (event: PointerEvent): void => {
-    active.delete(event.pointerId);
-    if (canvas.hasPointerCapture(event.pointerId)) {
-      canvas.releasePointerCapture(event.pointerId);
-    }
+    const stroke = active.get(event.pointerId);
+    if (!stroke) return;
+    let completed = false;
+    try {
+      const pressure = resolveStudioMaterialReleasePressure(event.pointerType, event.pressure, stroke.lastContactPressure);
+      const point = eventPoint(canvas, event, stroke.program, pressure);
+      if (point.x !== stroke.point.x || point.y !== stroke.point.y) draw(stroke, point);
+      completed = true;
+    } finally { retire(event.pointerId, !completed); }
   };
+  const cancel = (event: PointerEvent): void => { retire(event.pointerId, true); };
 
   canvas.addEventListener("pointerdown", down);
   canvas.addEventListener("pointermove", move);
   canvas.addEventListener("pointerrawupdate", move as EventListener);
   canvas.addEventListener("pointerup", up);
-  canvas.addEventListener("pointercancel", up);
-  canvas.addEventListener("lostpointercapture", up);
+  canvas.addEventListener("pointercancel", cancel);
+  canvas.addEventListener("lostpointercapture", cancel);
 
   return {
     clear(): void {
+      if (disposed) return;
+      for (const pointerId of [...active.keys()]) retire(pointerId, false);
       const clearContext = fit(canvas);
       if (clearContext) clearPaper(clearContext, canvas, getProgram());
-      active.clear();
     },
     destroy(): void {
+      if (disposed) return;
+      disposed = true;
       canvas.removeEventListener("pointerdown", down);
       canvas.removeEventListener("pointermove", move);
       canvas.removeEventListener("pointerrawupdate", move as EventListener);
       canvas.removeEventListener("pointerup", up);
-      canvas.removeEventListener("pointercancel", up);
-      canvas.removeEventListener("lostpointercapture", up);
-      for (const pointerId of active.keys()) {
-        if (canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
-      }
-      active.clear();
-      canvas.style.touchAction = previousTouchAction;
+      canvas.removeEventListener("pointercancel", cancel);
+      canvas.removeEventListener("lostpointercapture", cancel);
+      try {
+        for (const pointerId of [...active.keys()]) retire(pointerId, true);
+      } finally { canvas.style.touchAction = previousTouchAction; }
     },
   };
 }

@@ -1,3 +1,4 @@
+import { normalizeStudioMaterialPointerPressure, resolveStudioMaterialReleasePressure } from "./studio-material-pointer-pressure";
 /**
  * Product adapter between brush-family pressure semantics and the causal velocity low-pass.
  *
@@ -165,12 +166,7 @@ function stabilizeHardwarePressure(
 }
 
 /** Matches the workbench contact convention without device, brush-family or speed curves. */
-export function normalizeStudioMaterialPointerPressure(
-  pointerType: unknown,
-  pressure: unknown,
-): number {
-  return pointerType === "mouse" ? 0.5 : clamp01(pressure, 0.5);
-}
+export { normalizeStudioMaterialPointerPressure } from "./studio-material-pointer-pressure";
 
 function pressureProfileForTransition(
   state: StudioVelocityPressureState | null | undefined,
@@ -339,6 +335,9 @@ export function resolveStudioBrushReleasePressure(
 ): number {
   const lastContactPressure = clamp01(input.lastContactPressure, 0.5);
   const rawPressure = finiteOr(input.rawPressure, Number.NaN);
+  if (input.rawMaterialPressure) {
+    return resolveStudioMaterialReleasePressure(input.pointerType, input.rawPressure, input.lastContactPressure);
+  }
   if (
     input.pointerType === "pen"
     && !(rawPressure > 0 && rawPressure <= 1)
@@ -347,10 +346,6 @@ export function resolveStudioBrushReleasePressure(
     // sample. Replacing the last real contact with the family nominal would make a fast tail pop
     // wider or darker on browsers/devices that omit release pressure.
     return lastContactPressure;
-  }
-
-  if (input.rawMaterialPressure) {
-    return normalizeStudioMaterialPointerPressure(input.pointerType, input.rawPressure);
   }
 
   const profiledRawPressure = resolveStudioStylusPressureInput(
