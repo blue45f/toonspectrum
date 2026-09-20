@@ -60,8 +60,17 @@ const CollaborationEditorPage = lazyRetry(() => import("@/domains/collaboration/
 const CollaborationPostPage = lazyRetry(() => import("@/domains/collaboration/CollaborationPostPage").then((module) => ({ default: module.CollaborationPostPage })), "CollaborationPostPage");
 const CollaborationModerationPage = lazyRetry(() => import("@/domains/collaboration/CollaborationModerationPage").then((module) => ({ default: module.CollaborationModerationPage })), "CollaborationModerationPage");
 
+const CreatorCareerGalleryPage = lazyRetry(() => import("@/domains/collaboration/hiring/CreatorCareerPanel").then((module) => ({ default: module.CreatorCareerGalleryPage })), "CreatorCareerGalleryPage");
+
+const HiringWorkspacePage = lazyRetry(() => import("@/domains/collaboration/hiring/HiringWorkspacePage").then((module) => ({ default: module.HiringWorkspacePage })), "HiringWorkspacePage");
+
+const HiringPositionsPage = lazyRetry(() => import("@/domains/collaboration/hiring/HiringPositionsPage").then((module) => ({ default: module.HiringPositionsPage })), "HiringPositionsPage");
+
 export const communityRoutes = defineAppRoutes([
   { id: "collaboration-board", path: "/collaborate", element: <CollaborationBoardPage /> },
+  { id: "collaboration-positions", path: "/collaborate/positions", element: <HiringPositionsPage /> },
+  { id: "collaboration-career-gallery", path: "/collaborate/gallery", element: <CreatorCareerGalleryPage /> },
+  { id: "collaboration-workspace", path: "/collaborate/workspace", element: <HiringWorkspacePage /> },
   { id: "collaboration-new", path: "/collaborate/new", element: <CollaborationEditorPage /> },
   { id: "collaboration-moderation", path: "/collaborate/moderation", element: <CollaborationModerationPage /> },
   { id: "collaboration-edit", path: "/collaborate/:id/edit", element: <CollaborationEditorPage /> },

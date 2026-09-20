@@ -26,6 +26,10 @@ import {
 } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 
+import { HiringPublicPositions } from "./hiring/HiringPositionsPage";
+
+import { HiringPostPanel } from "./hiring/HiringPostPanel";
+
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");
   return { default: module.SharePageButton };
@@ -99,6 +103,7 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
           <p className="mt-4 text-sm text-fg-3"><Link href={`/u/${encodeURIComponent(post.author.id)}`} className="font-semibold text-fg-2 underline-offset-4 hover:text-accent hover:underline">{post.author.name}</Link> · {new Date(post.createdAt).toLocaleDateString("ko-KR")} {translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "등록")}</p>
           {post.hidden && <div className="mt-4"><CollabNotice error>{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "운영자가 비공개 처리한 공고입니다. 공개 목록에는 나타나지 않으며 새 지원을 받지 않아요.")}</CollabNotice></div>}
         </header>
+        {userId ? <HiringPostPanel key={`${id}:${reload}`} postId={id} postVersion={post.version} canManage={data.canManage} /> : <HiringPublicPositions postId={id} />}
         {[["작품과 작업 소개", post.details.description], ["작업 분량·납품물·일정", post.details.deliverables], ["보수·지급 조건", post.details.compensation], ["저작권·크레딧·수정 범위", post.details.terms]].map(([label, text]) => <section key={label} className="rounded-2xl border border-line bg-panel p-6"><h2 className="text-lg font-bold text-fg">{label}</h2><p className="mt-4 whitespace-pre-wrap break-words text-sm leading-8 text-fg-2">{text}</p></section>)}
         {data.canManage ? <ApplicationsPanel key={reload} id={id} busy={busy} act={act} /> : <ApplicationPanel data={data} userId={userId} busy={busy} act={act} />}
         {userId && <ReportForm id={id} busy={busy} act={act} />}

@@ -75,3 +75,4 @@ apps/api/src/db/migrations/0074_creator_ecosystem.sql
 apps/api/src/db/migrations/0075_membership_wallet_policy.sql
 apps/api/src/db/migrations/0076_creator_role_profile_v2.sql
 apps/api/src/db/migrations/0077_membership_operations.sql
+apps/api/src/db/migrations/0078_creator_hiring_workspace.sql
