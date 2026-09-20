@@ -23,7 +23,7 @@ export function needsCreatorAdaptiveOnboarding(
 }
 
 /** This UI preference grants no access and contains no profile or artwork data. */
-export function hasAcknowledgedCreatorOnboarding(userId: string | null): boolean {
+export function hasAcknowledgedCreatorOnboarding(userId: string | null | undefined): boolean {
   if (!userId) return false;
   if (acknowledgedUsers.has(userId)) return true;
   try {
