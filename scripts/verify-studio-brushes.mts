@@ -3940,9 +3940,13 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   // Completion below also requires the exact snapshot and the live dialog's original-restore
   // command; an absent banner alone cannot make an empty or incorrectly restored document pass.
   const recoveredDraws = await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "cold reload lost correction metadata");
-  await waitForStudioRecoveredStrokeLayers(page, recoveredDraws.map((draw) => draw.id));
+  const recoveredStrokeIds = recoveredDraws.map((draw) => {
+    invariant(typeof draw.id === "string" && draw.id.length > 0, "cold reload restored a stroke without a valid ID");
+    return draw.id;
+  });
+  await waitForStudioRecoveredStrokeLayers(page, recoveredStrokeIds);
   writeFileSync(join(SCRATCH, "studio-smart-shape-cold-recovery.json"), JSON.stringify({
-    expectedStrokeIds: recoveredDraws.map((draw) => draw.id),
+    expectedStrokeIds: recoveredStrokeIds,
     correctedStrokeId: corrected.id,
     ...(await studioShapeLiveReadinessEvidence(page)),
   }, null, 2));
