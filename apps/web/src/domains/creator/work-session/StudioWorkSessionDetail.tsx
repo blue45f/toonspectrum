@@ -1,3 +1,4 @@
+import { useStudioSessionFormDraft } from "./use-studio-session-form-draft";
 import { useLayoutEffect, useState } from "react";
 import type { StudioWorkSession, StudioWorkSessionView } from "@toonspectrum/studio-project-model";
 import Link from "@/compat/router-link";
@@ -17,8 +18,9 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy }: {
 }) {
   const bt = useBilingual("StudioWorkSessionDetail"), session = view.session;
   const roster = useStudioReviewRoster({ workId: session.workId, actorId, enabled: true, autoStart: true });
-  const [body, setBody] = useState(""), [category, setCategory] = useState<StudioWorkSession["notes"][number]["category"]>("note");
-  const [closing, setClosing] = useState<"close" | "cancel" | null>(null), [summary, setSummary] = useState(""), [confirmed, setConfirmed] = useState(false);
+  const [body, setBody] = useStudioSessionFormDraft(JSON.stringify(["studio-session-note", actorId, session.workId, session.id]), 2000);
+  const [category, setCategory] = useState<StudioWorkSession["notes"][number]["category"]>("note");
+  const [closing, setClosing] = useState<"close" | "cancel" | null>(null), [summary, setSummary] = useStudioSessionFormDraft(JSON.stringify(["studio-session-outcome", actorId, session.workId, session.id]), 4000), [confirmed, setConfirmed] = useState(false);
   useLayoutEffect(() => { setConfirmed(false); }, [session.version]);
   const terminal = session.status === "closed" || session.status === "cancelled", joined = session.participantUserIds.includes(actorId);
   const host = view.capabilities.edit, canWrite = joined && view.capabilities.comment && !terminal;

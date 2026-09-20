@@ -79,9 +79,11 @@ export function reduceStudioWorkSession(current: StudioWorkSession, raw: StudioW
       if (host && current.status === "active") return fail("invalid-transition");
       next = { ...next, participantUserIds: current.participantUserIds.filter((id) => id !== actor.userId), readerUserId: current.readerUserId === actor.userId ? null : current.readerUserId }; break;
     case "note":
+      if (current.notes.length >= 100) return fail("capacity");
       if (!joined || !actor.canComment || (command.category === "decision" && !host)) return fail("forbidden");
       next = { ...next, notes: [...current.notes, { id: command.operationId, authorUserId: actor.userId, at, category: command.category, body: command.body }] }; break;
     case "attach-result":
+      if (current.results.length >= 64) return fail("capacity");
       if (!joined || !actor.canComment) return fail("forbidden");
       if (command.result.type === "review" && command.result.subject.workId !== current.workId) return fail("invalid-target");
       next = { ...next, results: [...current.results.filter((result) => JSON.stringify(result) !== JSON.stringify(command.result)), command.result] }; break;

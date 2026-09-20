@@ -295,6 +295,7 @@ describe("Virtual Studio social activity ownership", () => {
       const images = view.container.querySelectorAll(`${selector} img.studio-vspace-reference-compact-player`);
       expect([...images].map((image) => image.getAttribute("src")), selector).toEqual(skins.map(src));
     }
+    expect(view.container.querySelector(".vs2-live-huddle, .vs2-live-chat-body")).toBeNull();
     expect(f.engine?.snapshot.self.appearance?.skinKey).toBe("dark");
     expect(f.engine?.snapshot.peers[0]?.state.appearance?.skinKey).toBe("silver");
     expect(f.request).not.toHaveBeenCalled();

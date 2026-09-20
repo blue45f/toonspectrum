@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
-import { getAuthSessionRevision } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId, listeners } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioWorkSessionEntry } from "../work-session/StudioWorkSessionEntry";
 import { StudioHandoffEnvelopeInbox } from "../handoff-envelope/StudioHandoffEnvelope";
@@ -23,11 +23,15 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
   const [taskFailure, setTaskFailure] = useState(false);
   const [reviews, setReviews] = useState<StudioVirtualSpaceReviewChoices | null>(null);
   const [query, setQuery] = useState("");
+  const [expired, setExpired] = useState(false);
   useEffect(() => {
     let live = true;
     const abort = new AbortController(), authRevision = getAuthSessionRevision();
-    setSnapshot(null); setTaskFailure(false); setReviews(null);
-    const current = () => live && !abort.signal.aborted && getAuthSessionRevision() === authRevision;
+    setSnapshot(null); setTaskFailure(false); setReviews(null); setExpired(false);
+    const current = () => live && !abort.signal.aborted && getAuthSessionRevision() === authRevision && getAuthUserId() === actor && document.visibilityState !== "hidden";
+    const expire = () => { live = false; abort.abort(); setSnapshot(null); setTaskFailure(true); setReviews({ ok: false, reason: "unavailable" }); setExpired(true); };
+    const timeout = setTimeout(expire, 15_000);
+    listeners.add(expire);
     void loadStudioServerProductionWorkspace(workId, abort.signal).then((value) => {
       if (current()) { if (value.capabilities.view) setSnapshot(value); else setTaskFailure(true); }
     }, () => { if (current()) setTaskFailure(true); });
@@ -36,11 +40,11 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
     });
     const invalidate = () => {
       live = false; abort.abort(); setSnapshot(null); setReviews(null);
-      if (document.visibilityState !== "hidden") refresh((value) => value + 1);
+      if (document.visibilityState !== "hidden" && getAuthUserId() === actor) refresh((value) => value + 1);
     };
     window.addEventListener("focus", invalidate);
     document.addEventListener("visibilitychange", invalidate);
-    return () => { live = false; abort.abort(); window.removeEventListener("focus", invalidate); document.removeEventListener("visibilitychange", invalidate); };
+    return () => { live = false; abort.abort(); clearTimeout(timeout); listeners.delete(expire); window.removeEventListener("focus", invalidate); document.removeEventListener("visibilitychange", invalidate); };
   }, [workId, actor, revision]);
   const normalized = query.trim().normalize("NFKC").toLocaleLowerCase();
   const matches = (value: string) => value.normalize("NFKC").toLocaleLowerCase().includes(normalized);
@@ -48,6 +52,7 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
   const choices = reviews?.ok ? reviews.choices.filter((choice) => matches(`${choice.title} ${choice.artifactTitle}`)) : [];
   return <div className="space-y-5" data-workspace-inbox="true">
     <p className="text-sm text-fg-2">{bt("검수·담당 작업·인수인계를 같은 작품에서 확인합니다. 열람, 인수, 작업 완료와 승인은 별도입니다.", "Review requests, assigned work and handoffs for this work. Viewing, acceptance, completion and approval remain separate.")}</p>
+    {expired ? <p role="status" className="text-sm">{bt("권한 확인 유효 시간이 지났습니다. 최신 상태를 다시 읽어 주세요.", "The access-check lease has expired. Read the latest state again.")}</p> : null}
     <label className="block text-sm">{bt("검수·담당 작업 찾기", "Find reviews or assigned tasks")}<input type="search" className={`${control} mt-1 w-full`} maxLength={120} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
     <button type="button" className={control} onClick={() => refresh((value) => value + 1)}>{bt("최신 상태 다시 확인", "Refresh current status")}</button>
     <section aria-label={bt("담당 작업", "Assigned work")}><h3 className="font-semibold">{bt("내 담당 작업", "Assigned to me")}</h3>
@@ -69,7 +74,8 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
           </li>)}</ul> : <p>{bt("현재 조건에 맞는 열린 검수가 없습니다.", "No open reviews match this search.")}</p>}
       {reviews?.ok && reviews.truncated ? <p className="text-xs">{bt("일부 최신 검수만 표시합니다. 전체 검수함에서 나머지를 확인하세요.", "Only a bounded set of recent reviews is shown. Check the review workspace for more.")}</p> : null}
     </section>
-    <StudioWorkSessionEntry workId={workId} /><StudioHandoffEnvelopeInbox workId={workId} />
+    <StudioWorkSessionEntry workId={workId} />
+    <StudioHandoffEnvelopeInbox workId={workId} />
     <Link className="inline-flex min-h-11 items-center underline" href={`/studio/p/${encodeURIComponent(workId)}/review`}>{bt("검수 작업실 열기", "Open review workspace")}</Link>
   </div>;
 }
