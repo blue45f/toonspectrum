@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Headers, Optional, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Headers, Inject, Optional, Param, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 
 import { collaborationWriteGate } from "./collaboration.controller";
@@ -8,7 +8,7 @@ import { hiringId, parseHiring, resumeInputSchema, revision, submissionSchema } 
 
 @Controller("/collaborations/hiring")
 export class HiringController {
-  constructor(@Optional() private readonly resumes = new HiringResumeRepository()) {}
+  constructor(@Optional() @Inject(HiringResumeRepository) private readonly resumes = new HiringResumeRepository()) {}
   @Get("/resumes") @Header("Cache-Control", "private, no-store, max-age=0")
   list(@Headers("x-user-id") actor?: string) { return this.resumes.list(requireCollaborationUser(actor)); }
   @Get("/resumes/:id/versions") @Header("Cache-Control", "private, no-store, max-age=0")

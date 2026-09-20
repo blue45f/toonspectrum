@@ -40,3 +40,13 @@ Production deployment, production migration, external provider credentials/right
 - The existing fortune browser script passed full-deck identity, calendar fallback, period selection and 320/390/768/1440px overflow checks without page errors. No external provider was enabled or called successfully as evidence.
 - A public hiring browser journey passed error recovery, next/back pages, filtering/reset and the same responsive widths. This uses intercepted synthetic API responses; it is UI integration evidence, not a production hiring E2E claim.
 - Normal pre-push on the integrated tree passed whole Web/API typecheck, architecture, source lint, secret scanning and the existing security/license audit. Current PR CI remains the merge authority; no failures are converted into success or ignored.
+
+## Merge closure corrections
+
+The full diagnostic suites exposed three integration contracts not exercised by the earlier focused selection: explicit controller injection tokens, the AppShell-only main landmark, and public sitemap destinations. All were repaired in source, with those existing tests added to the focused hiring workflow. No test inventory or strictness was reduced.
+
+The creator-hub workflow exhausted its old 8GiB V8 heap while the same complete Web check passed in core at 12GiB. Its budget now matches core without changing runner class, timeout or validation commands. Its synthetic API fixture now returns the actual public-positions envelope. Malformed optional hiring responses are validated before rendering and remain local errors instead of crashing the original post. New component and desktop/mobile regressions protect this behavior.
+
+Reference browser clicks were blocked by the real first-visit dialog. The existing visible-dismissal helper is now installed in every reference page fixture; the product gate itself is unchanged. Desktop/mobile creator browser checks passed ten cases after the corrections.
+
+Local merge-closure verification: the current production web build passed; all 13 reference browser cases passed against that build. All 10 desktop/mobile creator-hub cases and 11 public-positions component cases passed, including the deliberately malformed response regressions. Browser APIs are synthetic fixtures, not production service evidence.

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Headers, Optional, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Headers, Inject, Optional, Param, Patch, Post } from "@nestjs/common";
 import { z } from "zod";
 
 import { collaborationWriteGate } from "../collaboration/collaboration.controller";
@@ -12,7 +12,7 @@ const accountId = z.string().min(1).max(128);
 const groupSchema = z.strictObject({ name: nameSchema.max(80), memberIds: unique(accountId, 200) });
 @Controller("/collaborations/teams")
 export class CreatorTeamController {
-  constructor(@Optional() private readonly teams = new CreatorTeamRepository()) {}
+  constructor(@Optional() @Inject(CreatorTeamRepository) private readonly teams = new CreatorTeamRepository()) {}
   @Get() @Header("Cache-Control", "private, no-store, max-age=0")
   list(@Headers("x-user-id") actor?: string) { return this.teams.list(requireCollaborationUser(actor)); }
   @Post() @Header("Cache-Control", "private, no-store, max-age=0")

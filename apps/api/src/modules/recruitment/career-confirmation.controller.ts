@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Headers, Optional, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Header, Headers, Inject, Optional, Param, Post, Query } from "@nestjs/common";
 
 import { collaborationWriteGate } from "../collaboration/collaboration.controller";
 import { requireCollaborationUser } from "../collaboration/collaboration.service";
@@ -11,7 +11,7 @@ import { confirmationActionSchema, confirmationCollaboratorsSchema, confirmation
 // POST continues through the application's existing CSRF middleware.
 @Controller("/collaborations/career-confirmations")
 export class CareerConfirmationController {
-  constructor(@Optional() private readonly repository = new CareerConfirmationRepository()) {}
+  constructor(@Optional() @Inject(CareerConfirmationRepository) private readonly repository = new CareerConfirmationRepository()) {}
   @Get("/capability") @Header("Cache-Control", "private, no-store, max-age=0")
   capability(@Headers("x-user-id") actor?: string) { return this.repository.capability(requireCollaborationUser(actor)); }
   @Get("/collaborators") @Header("Cache-Control", "private, no-store, max-age=0")

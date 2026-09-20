@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Headers, Optional, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Header, Headers, Inject, Optional, Param, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 
 import { collaborationWriteGate } from "../collaboration/collaboration.controller";
@@ -10,7 +10,7 @@ import { roomEpochSchema, roomHostSchema, roomInputSchema, roomMessageSchema } f
 
 @Controller("/collaborations/rooms")
 export class CreatorMeetingController {
-  constructor(@Optional() private readonly rooms = new CreatorMeetingRepository()) {}
+  constructor(@Optional() @Inject(CreatorMeetingRepository) private readonly rooms = new CreatorMeetingRepository()) {}
   @Get() @Header("Cache-Control", "private, no-store, max-age=0")
   list(@Headers("x-user-id") actor?: string) { return this.rooms.list(requireCollaborationUser(actor)); }
   @Post() @Header("Cache-Control", "private, no-store, max-age=0")

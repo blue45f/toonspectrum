@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Headers, Optional, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Header, Headers, Inject, Optional, Param, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 
 import { collaborationWriteGate } from "../collaboration/collaboration.controller";
@@ -14,7 +14,7 @@ export const careerSchema = z.strictObject({ title: z.string().trim().min(1).max
   && ((v.episodeFrom === null && v.episodeTo === null) || (v.episodeFrom !== null && v.episodeTo !== null && v.episodeFrom <= v.episodeTo)));
 @Controller("/collaborations/career")
 export class CreatorCareerController {
-  constructor(@Optional() private readonly career = new CreatorCareerRepository()) {}
+  constructor(@Optional() @Inject(CreatorCareerRepository) private readonly career = new CreatorCareerRepository()) {}
   @Get("/me") @Header("Cache-Control", "private, no-store, max-age=0")
   own(@Headers("x-user-id") actor?: string) { return this.career.list(requireCollaborationUser(actor)); }
   @Get("/gallery") @Header("Cache-Control", "no-store, max-age=0")

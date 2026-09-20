@@ -4,6 +4,7 @@ import { CREATOR_HIRING_MODELS, CREATOR_HIRING_ROLES, HIRING_FORMATS, HIRING_TOO
 import { CollabField, CollabNotice, collabButton, collabInput } from "../collaboration-ui";
 import { compensationLabels, optionsOf } from "./hiring-form-values";
 import { HiringTermsView } from "./HiringSlotEditor";
+import { parseHiringPositionPage } from "./hiring-position-response";
 
 import type { HiringPositionPage } from "../../../../../../packages/contracts/src/creator-hiring";
 
@@ -29,13 +30,13 @@ function PublicPositionsContent({ postId }: { postId?: string }) {
   const hasFilters = Object.keys(filters).length > 0;
   useEffect(() => {
     const controller = new AbortController();
-    void api.get<HiringPositionPage>("/collaborations/hiring/positions", {
+    void api.get<unknown>("/collaborations/hiring/positions", {
       signal: controller.signal,
       timeout: 10000,
       retry: 0,
       params: { ...filters, ...(postId ? { postId } : {}), ...(after ? { after } : {}) },
     }).then((data) => {
-      if (!controller.signal.aborted) setResult({ key: requestKey, page: data, error: "" });
+      if (!controller.signal.aborted) setResult({ key: requestKey, page: parseHiringPositionPage(data), error: "" });
     }).catch(async (cause: unknown) => {
       const message = await getApiErrorMessage(cause, "모집 조건을 불러오지 못했어요.");
       if (!controller.signal.aborted) setResult({ key: requestKey, page: null, error: message });
@@ -70,5 +71,5 @@ function PublicPositionsContent({ postId }: { postId?: string }) {
 }
 
 export function HiringPositionsPage() {
-  return <main className="mx-auto max-w-5xl space-y-6 px-4 py-8"><Link href="/collaborate" className="text-accent underline">협업 게시판</Link><h1 className="text-3xl font-bold">모집 조건으로 찾기</h1><p className="text-fg-3">공고의 각 모집 자리를 역할·도구·보수로 찾아보세요. 공개 중인 자리만 표시하며 기존 공고에서 지원합니다.</p><HiringPublicPositions /></main>;
+  return <div className="mx-auto max-w-5xl space-y-6 px-4 py-8"><Link href="/collaborate" className="text-accent underline">협업 게시판</Link><h1 className="text-3xl font-bold">모집 조건으로 찾기</h1><p className="text-fg-3">공고의 각 모집 자리를 역할·도구·보수로 찾아보세요. 공개 중인 자리만 표시하며 기존 공고에서 지원합니다.</p><HiringPublicPositions /></div>;
 }

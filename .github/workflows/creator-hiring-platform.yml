@@ -55,6 +55,9 @@ jobs:
       - name: Verify real runtime ACLs, races, privacy, lifecycle and UI
         run: >-
           pnpm exec vitest run --maxWorkers=1 --no-file-parallelism
+          apps/api/src/nest-explicit-injection-boundary.test.ts
+          apps/web/src/app/app-shell-main-ownership.test.ts
+          apps/web/src/domains/legal/SitemapPage.test.ts
           apps/api/src/modules/collaboration/hiring-
           apps/api/src/modules/collaboration/collaboration.repository.test.ts
           apps/api/src/modules/recruitment/

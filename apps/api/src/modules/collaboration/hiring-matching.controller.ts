@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Headers, Optional, Param, Patch, Post, Put } from "@nestjs/common";
+import { Body, Controller, Get, Header, Headers, Inject, Optional, Param, Patch, Post, Put } from "@nestjs/common";
 
 import { collaborationWriteGate } from "./collaboration.controller";
 import { requireCollaborationUser } from "./collaboration.service";
@@ -8,7 +8,7 @@ import { availabilitySchema, hiringId, mutationSchema, offerActionSchema, offerI
 
 @Controller("/collaborations/hiring")
 export class HiringMatchingController {
-  constructor(@Optional() private readonly availability = new HiringAvailabilityRepository(), @Optional() private readonly offers = new HiringOfferRepository()) {}
+  constructor(@Optional() @Inject(HiringAvailabilityRepository) private readonly availability = new HiringAvailabilityRepository(), @Optional() @Inject(HiringOfferRepository) private readonly offers = new HiringOfferRepository()) {}
   @Get("/availability/me") @Header("Cache-Control", "private, no-store, max-age=0")
   own(@Headers("x-user-id") actor?: string) { return this.availability.own(requireCollaborationUser(actor)); }
   @Put("/availability/me") @Header("Cache-Control", "private, no-store, max-age=0")

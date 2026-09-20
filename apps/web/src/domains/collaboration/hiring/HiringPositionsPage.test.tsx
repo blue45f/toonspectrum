@@ -27,6 +27,17 @@ beforeEach(() => { get.mockReset(); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("public hiring search recovery and request identity", () => {
+  it.each([{}, { items: null, next: null }, { items: [{ id: "broken" }], next: null }, { ...page("bad terms"), items: [{ ...page("bad terms").items[0], terms: { model: "invalid" } }] }])("contains malformed API data in the optional section instead of breaking its host", async (invalid) => {
+    get.mockResolvedValueOnce(invalid).mockResolvedValueOnce({ items: [], next: null });
+    render(<MemoryRouter><h1>원래 공고</h1><HiringPublicPositions postId="post-a" /></MemoryRouter>);
+    await screen.findByText("연결 실패");
+    expect(screen.getByRole("heading", { name: "원래 공고" })).toBeTruthy();
+    expect(screen.queryByText("이 조건에 맞는 공개 모집 자리가 없어요.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    await screen.findByText("이 조건에 맞는 공개 모집 자리가 없어요.");
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
   it("retries only after an explicit gesture, preserving the filters", async () => {
     get.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(page("복구된 공고"));
     mount();

@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Optional, Query } from "@nestjs/common";
+import { Controller, Get, Header, Inject, Optional, Query } from "@nestjs/common";
 import { z } from "zod";
 
 import { HIRING_FORMATS, HIRING_TOOLS } from "../../../../../packages/contracts/src/creator-hiring";
@@ -34,7 +34,7 @@ export class HiringPositionRepository {
 }
 @Controller("/collaborations/hiring/positions")
 export class HiringPositionController {
-  constructor(@Optional() private readonly positions = new HiringPositionRepository()) {}
+  constructor(@Optional() @Inject(HiringPositionRepository) private readonly positions = new HiringPositionRepository()) {}
   @Get() @Header("Cache-Control", "no-store, max-age=0")
   list(@Query() query: unknown) { return this.positions.list(parseHiring(positionQuery, query)); }
 }

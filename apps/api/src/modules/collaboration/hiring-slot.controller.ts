@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Headers, Optional, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Header, Headers, Inject, Optional, Param, Patch, Post } from "@nestjs/common";
 
 import { collaborationWriteGate } from "./collaboration.controller";
 import { requireCollaborationUser } from "./collaboration.service";
@@ -7,7 +7,7 @@ import { hiringId, parseHiring, slotInputSchema, slotStateSchema } from "./hirin
 
 @Controller("/collaborations/hiring/posts/:postId/slots")
 export class HiringSlotController {
-  constructor(@Optional() private readonly slots = new HiringSlotRepository()) {}
+  constructor(@Optional() @Inject(HiringSlotRepository) private readonly slots = new HiringSlotRepository()) {}
   @Get() @Header("Cache-Control", "private, no-store, max-age=0")
   list(@Param("postId") postId: string, @Headers("x-user-id") actor?: string) { return this.slots.list(requireCollaborationUser(actor), parseHiring(hiringId, postId)); }
   @Post() @Header("Cache-Control", "private, no-store, max-age=0")
