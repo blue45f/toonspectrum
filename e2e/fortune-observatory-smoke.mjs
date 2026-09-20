@@ -13,7 +13,8 @@ try {
   await page.goto(`${base}/fortune`,{waitUntil:'domcontentloaded',timeout:120000});
   await page.getByRole('heading',{name:/운세 관측소/}).waitFor({timeout:120000});
   await page.screenshot({path:`${output}/desktop.png`,fullPage:true});
-  await page.getByRole('button',{name:'내 사주 펼치기',exact:true}).click();
+  // The cinematic hero now launches daily fortune; use the stable experience route for saju.
+  await page.goto(`${base}/fortune?content=saju`);
   const birthday=page.getByPlaceholder('1990-06-15').first(); await birthday.fill('2023-02-29');
   await page.getByRole('button',{name:'사주팔자 열기',exact:true}).click(); await page.getByRole('alert').filter({hasText:'존재하지 않는'}).waitFor();
   await birthday.fill('1990-06-15'); await page.getByRole('button',{name:'사주팔자 열기',exact:true}).click();

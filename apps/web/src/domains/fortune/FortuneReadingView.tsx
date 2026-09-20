@@ -1,3 +1,4 @@
+import { FortuneEnrichment } from "./FortuneEnrichment";
 import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { tryCopyFortuneText } from "./fortune-sharing";
 import { useState } from "react";
@@ -41,8 +42,9 @@ export function FortuneReadingView({ reading, cast = "ara", onCastChange }: { re
     {reading.terms && <details className="fo-terms" open={reading.id === "terms"}><summary>24절기 시각 · 한국 표준시</summary><div className="fo-terms-grid">{reading.terms.map((term) => <div key={term.name}><strong>{term.name} <small>{term.chinese}</small></strong><time>{term.atKst}</time><span>{term.isMonthBoundary ? "월주가 바뀌는 절입" : "계절의 중기"}</span></div>)}</div></details>}
     {reading.trend && <section className="fo-trend"><h3>날짜별 키워드</h3><p className="fo-help">콘텐츠 지수 0~100 · 통계·확률·길일이 아닌 재미용 표현입니다.</p><div className="fo-trend-list">{reading.trend.map((point) => <div key={point.label}><strong>{point.label}</strong><span className="fo-trend-track" aria-hidden="true"><i style={{ width: `${point.value}%` }} /></span><b>{point.value}</b><span>{point.keyword}</span><p>{point.detail}</p></div>)}</div></section>}
     {mode === "report" && <div className="fo-reading-sections">{reading.sections.map((section, i) => <section key={`${section.title}-${i}`}><span className="fo-section-no">{String(i + 1).padStart(2, "0")}</span><h3>{section.title}</h3><p>{section.body}</p>{section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}</section>)}</div>}
+    <FortuneEnrichment key={`${reading.id}:${reading.generatedFor}:${reading.calendar?.[0]?.date ?? reading.zodiacSign ?? ""}`} reading={reading} />
     <FortuneCreativeMission reading={reading} cast={cast} />
     <FortuneReadingTools reading={reading} />
-    <details className="fo-method"><summary>해석 기준 · 계산 범위 · 출처</summary>{reading.notes.map((note, i) => <p key={i}>{note}</p>)}<p>한국 음력: korean-lunar-calendar · 절입 시각: lunar-typescript · MIT 라이선스의 로컬 계산 라이브러리. 공식 역서 인증·전문 감정을 대체하지 않습니다.</p><a href="https://github.com/usingsky/korean_lunar_calendar_js" target="_blank" rel="noreferrer">한국 음력 라이브러리</a><span> · </span><a href="https://6tail.cn/calendar/api.html" target="_blank" rel="noreferrer">절기 계산 문서</a></details>
+    <details className="fo-method"><summary>해석 기준 · 계산 범위 · 출처</summary>{reading.context && <p>계산 기준일 {reading.context.referenceDate} · {reading.context.timeZone} · {reading.context.tarotDeck === "full-78" ? "전체 78장" : reading.context.tarotDeck === "major-22" ? "기존 메이저 22장" : "로컬 계산"} · 콘텐츠 {reading.context.contentRevision}</p>}{reading.notes.map((note, i) => <p key={i}>{note}</p>)}<p>한국 음력: korean-lunar-calendar · 절입 시각: lunar-typescript · MIT 라이선스의 로컬 계산 라이브러리. 공식 역서 인증·전문 감정을 대체하지 않습니다.</p><a href="https://github.com/usingsky/korean_lunar_calendar_js" target="_blank" rel="noreferrer">한국 음력 라이브러리</a><span> · </span><a href="https://6tail.cn/calendar/api.html" target="_blank" rel="noreferrer">절기 계산 문서</a></details>
   </article>;
 }
