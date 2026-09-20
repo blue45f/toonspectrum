@@ -92,10 +92,14 @@ describe("original brush preservation across SQLite and portable archives", () =
     await expect(repository.putMany([good, bad])).rejects.toMatchObject({ code: "corrupt" });
     expect(await repository.getById(good.id)).toBeNull();
   });
-  it("round-trips archives above the old 2MiB settings limit without increasing that limit", () => {
+  it("round-trips archives above the old 2MiB settings limit without increasing that limit", async () => {
     const bytes = new Uint8Array(2 * 1024 * 1024).fill(17);
     const brush = { ...originalBrush(), originalSource: createStudioBrushOriginalSource(bytes, "large.kpp", "kpp") };
-    const text = writeBrushJson(brush);
+    const repository = createSqliteBrushLibraryRepository(database);
+    await repository.put(brush);
+    const fromSql = (await repository.getById(brush.id))!;
+    expect(fromSql.originalSource).toEqual(brush.originalSource);
+    const text = writeBrushJson(fromSql);
     expect(text.length).toBeGreaterThan(2 * 1024 * 1024);
     const restored = importBrushFromJson(text).brush;
     expect(createHash("sha256").update(decodeStudioBrushOriginalSource(restored.originalSource)).digest("hex")).toBe(brush.originalSource.sha256);
