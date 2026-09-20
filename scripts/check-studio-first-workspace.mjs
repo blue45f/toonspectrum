@@ -45,6 +45,14 @@ try {
   await page.locator('.workspace-project-select select').selectOption(seeded.id);
   await page.waitForFunction((href) => document.querySelector('.workspace-statusbar .workspace-primary')?.getAttribute('href') === href, seeded.href);
   await capture(page, 'desktop-list-with-work'); checks.push('real library/document resume adapter is connected');
+  await page.evaluate(async () => {
+    const library = await import('/src/domains/creator/studio-project-library-store.ts');
+    library.createStudioProject(localStorage, {
+      id: `workspace-newer-${Date.now()}`, title: 'A newer work must not replace my selection', kind: 'webtoon',
+      createdAt: new Date(Date.now() + 60000).toISOString(),
+    }, { target: window });
+  });
+  assert.equal(await page.locator('.workspace-project-select select').inputValue(), seeded.id);
   await page.locator('.workspace-nav').getByRole('link', { name: '팀', exact: true }).click(); await ready(page);
   await page.locator('[data-workspace-surface="team"]').waitFor();
   assert.equal(await page.locator('.workspace-link-list a').first().getAttribute('href'), `/studio/p/${seeded.id}/settings?view=team`);
@@ -55,10 +63,47 @@ try {
   await page.getByRole('button', { name: '소재', exact: true }).click();
   assert.equal(await page.getByRole('link', { name: /소재 마켓/ }).getAttribute('href'), '/market');
   await capture(page, 'desktop-explore');
+  assert.equal(new URL(page.url()).searchParams.get('project'), seeded.id);
+  await page.locator('.workspace-nav').getByRole('link', { name: '스튜디오', exact: true }).click(); await ready(page);
+  assert.equal(await page.locator('.workspace-project-select select').inputValue(), seeded.id);
+  assert.equal(await page.locator('.workspace-statusbar .workspace-primary').getAttribute('href'), seeded.href);
+  await page.goBack(); await ready(page);
+  assert.equal(new URL(page.url()).pathname, '/hub');
+  assert.equal(new URL(page.url()).searchParams.get('tab'), 'materials');
+  assert.equal(new URL(page.url()).searchParams.get('project'), seeded.id);
+  checks.push('older work survives home/team/explore and Back preserves category without changing artwork');
+  await page.goto(`${base}/home?scope=personal`); await ready(page);
+  for (const name of ['팀', '둘러보기', '스튜디오']) {
+    await page.locator('.workspace-nav').getByRole('link', { name, exact: true }).click(); await ready(page);
+    assert.equal(new URL(page.url()).searchParams.get('scope'), 'personal');
+    assert.equal(await page.locator('.workspace-project-select select').inputValue(), '');
+  }
+  checks.push('personal workspace survives navigation despite multiple existing works');
   await page.goto(`${base}/home?project=not-available`); await ready(page);
   await page.getByText('이 기기에서 선택한 작품을 찾을 수 없습니다.', { exact: false }).waitFor();
   assert.equal(await page.locator('.workspace-statusbar .workspace-primary').count(), 0);
   checks.push('missing explicit project does not resume another work');
+  for (const mode of ['목록 보기', '공간 보기']) {
+    await page.getByRole('button', { name: mode, exact: true }).click();
+    assert.equal(await page.locator('[data-workspace-state="missing"]').count(), 1);
+    assert.equal(await page.locator('.workspace-world').count(), 0);
+    assert.equal(await page.locator('a[href^="/studio/p/"]').count(), 0);
+    assert.equal(await page.locator('a[href="/studio/new"]').count(), 0);
+    await page.getByRole('button', { name: '작업 바로가기 열기' }).click();
+    await page.locator('dialog[open]').waitFor();
+    assert.equal(await page.locator('dialog[open] a[href^="/studio/p/"]').count(), 0);
+    await page.keyboard.press('Escape');
+  }
+  await capture(page, 'desktop-missing-recovery');
+  await page.getByRole('button', { name: '개인 작업실로 돌아가기', exact: true }).click();
+  assert.equal(new URL(page.url()).searchParams.get('scope'), 'personal');
+  assert.equal(new URL(page.url()).searchParams.has('project'), false);
+  checks.push('missing work blocks spatial, list and inspector actions and offers explicit personal recovery');
+  await page.goto(`${base}/home?project=${seeded.id}`); await ready(page);
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.locator('.workspace-world img').evaluate((image) => image.decode());
+  await capture(page, 'tablet-820-space');
+  await page.setViewportSize({ width: 1440, height: 900 });
   const mobile = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ko-KR', isMobile: true, hasTouch: true });
   const phone = await mobile.newPage(); phone.on('pageerror', (error) => errors.push(error.message));
   await phone.goto(`${base}/home`); await ready(phone); await phone.locator('.workspace-list-view').waitFor();
