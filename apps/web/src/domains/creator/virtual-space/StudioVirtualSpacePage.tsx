@@ -760,13 +760,6 @@ function VirtualSpaceExperience({
     guideRequestRef.current = null; setGuideTourRequest(null);
     setGuideTour((current) => current ? { ...current, status: "cancelled" } : null);
   }, []);
-  const startGuideTour = useCallback((guideId: string) => {
-    if (!worldReady || authoringMode || atmosphere === "focus" || activity === "focused" || activity === "away"
-      || !worldManifest.npcs.some((npc) => npc.id === guideId && studioNpcRole(npc) === "guide")) return;
-    const request = { id: `guide-tour:${++guideSequence.current}`, guideId };
-    engineBridge.clearMovement();
-    guideRequestRef.current = request; setGuideTour(null); setGuideTourRequest(request);
-  }, [worldReady, authoringMode, atmosphere, activity, worldManifest, engineBridge]);
   const updateGuideTour = useCallback((state: StudioVirtualNpcGuideTourState) => {
     if (state.requestId === guideRequestRef.current?.id && state.guideId === guideRequestRef.current.guideId) setGuideTour(state);
   }, []);
@@ -1264,11 +1257,22 @@ function VirtualSpaceExperience({
     try { localStorage.setItem("toonspectrum:virtual-atmosphere:v1", next); } catch { /* Session preference still applies. */ }
     if (next === "focus") { engineBridge.clearMovement(); finishSharedActivity(); }
   };
-  const cancelFollowing = () => {
-    void slots.cancel();
+  const cancelSlotApproach = slots.cancel;
+  const cancelFollowing = useCallback(() => {
+    void cancelSlotApproach();
     if (sharedActivity?.action === "follow") finishSharedActivity();
     else setFollowingPeer(null);
-  };
+  }, [cancelSlotApproach, sharedActivity?.action, finishSharedActivity, setFollowingPeer]);
+  const startGuideTour = useCallback((guideId: string) => {
+    if (!worldReady || authoringMode || atmosphere === "focus" || activity === "focused" || activity === "away"
+      || !worldManifest.npcs.some((npc) => npc.id === guideId && studioNpcRole(npc) === "guide")) return;
+    const request = { id: `guide-tour:${++guideSequence.current}`, guideId };
+    // Relinquish follow ownership and fence pending seat approaches before the
+    // guide starts. Clearing only the engine cannot cancel a delayed release.
+    cancelFollowing();
+    engineBridge.clearMovement();
+    guideRequestRef.current = request; setGuideTour(null); setGuideTourRequest(request);
+  }, [worldReady, authoringMode, atmosphere, activity, worldManifest, engineBridge, cancelFollowing]);
 
   const setPresenceActivity = (next: StudioVirtualSpaceActivity) => {
     if (next === "focused" || next === "away") { engineBridge.clearMovement(); finishSharedActivity(); }

@@ -14,7 +14,9 @@ the narrower scope of this implementation batch. No production release is author
   The guide waits for the user to catch up. Starting, waiting and arriving never moves the
   user's character or launches a tool automatically. Stop, Escape, focus/away mode,
   window blur, backgrounding and world replacement revoke the request. Late status from
-  an earlier tour cannot alter a restarted tour.
+  an earlier tour cannot alter a restarted tour. Starting a tour also relinquishes accepted
+  avatar-follow ownership and invalidates pending seat approaches, so a delayed release
+  cannot restart movement after the user's new choice.
 - Conversation admission uses exact authored acoustic geometry, current presence,
   direct connection and the same immutable world binding. Proposal, acceptance, commit
   and active membership each check these conditions. Leaving a zone or losing its binding
@@ -59,6 +61,11 @@ The later API scope hardening completed 20 focused tests, eight actual PostgreSQ
 tests, full API TypeScript checking and scoped lint. The browser flow completed 21 fixture
 requests, exactly one explicit comment mutation and zero page errors. These are local results;
 they do not substitute for the subsequent exact-commit GitHub checks.
+
+Independent review found and reproduced the guide ownership race before the fix. The corrected
+Page, Guide and slot-hook regressions passed 45 tests across three files, including both the
+visible follow state and a deferred real slot-controller release. Integration of the existing CI
+repairs with this batch passed 25 CI routing and sparse-checkout contracts.
 
 ## Remaining design work
 

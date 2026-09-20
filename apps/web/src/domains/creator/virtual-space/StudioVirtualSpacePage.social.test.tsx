@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { webcrypto } from "node:crypto";
 import type { ComponentProps, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -11,6 +12,7 @@ import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import type { StudioVirtualSpacePresenceDependencies } from "./studio-virtual-space-presence";
 import { parseStudioVirtualSpacePacket } from "./studio-virtual-space-presence";
 import { studioCharacterAppearanceForAvatarIndex } from "./studio-virtual-space-character-skins";
+import { StudioVirtualSlotLeaseController } from "./studio-virtual-space-slot-lease";
 import type { StudioSpaceSocialRequest, StudioSpaceSocialSnapshot } from "./StudioVirtualSpaceSocialPanel";
 import type { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import { STUDIO_P2P_HUDDLE_OPEN_EVENT, STUDIO_P2P_HUDDLE_CLOSE_EVENT, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "../live/huddle/studio-p2p-huddle-events";
@@ -35,6 +37,8 @@ const f = vi.hoisted(() => ({
   transport: () => null,
   connectivity: { serverAvailable: true, localOnly: false, mode: "online", browserOnline: true },
   live: { availability: "ready", room: {
+    workId: "project-social", ready: false, authoritativeLockCapability: "fenced-v2",
+    getLocks: () => [], subscribe: () => () => undefined,
     participant: { sessionId: "alice", displayName: "Alice", role: "editor" },
     direct: { getPeers: (): readonly StudioLiveParticipant[] => [], subscribe: () => () => undefined, send: (_target: string, _payload: string) => true },
   } },
@@ -98,12 +102,13 @@ vi.mock("./studio-virtual-space-presence", async (importOriginal) => {
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
   f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
+  f.live.room.ready = false;
   f.presenceOverrides = {};
   f.snapshot = { requests: [], readyPeerIds: ["bob", "cleo"], reviewReadyPeerIds: ["bob", "cleo"], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: true };
   f.cancel.mockClear(); f.request.mockClear(); f.respond.mockClear(); f.leaveConversation.mockClear();
   f.conversationSnapshot = { available: true, readyPeers: [], records: [], active: null }; f.conversationOptions = null;
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 async function mount() {
   const mounted = render(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
@@ -130,6 +135,45 @@ async function accept(request: StudioSpaceSocialRequest): Promise<void> {
 // The transport and renderer are boundaries; these tests execute the real Page's
 // activity ownership, UI events, engine bridge and Huddle event integration.
 describe("Virtual Studio social activity ownership", () => {
+  it("ends the accepted outgoing follow and its visible ownership before starting an NPC tour", async () => {
+    await mount();
+    await accept(accepted("follow-before-tour", "follow"));
+    expect(f.engine?.bridge.getFollowingPeer()).toBe("bob");
+    expect(screen.getByRole("button", { name: "Bob 따라가는 중" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
+    fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
+    expect(f.engine?.guideTourRequest).not.toBeNull();
+    expect(f.engine?.bridge.getFollowingPeer()).toBeNull();
+    expect(f.cancel).toHaveBeenCalledExactlyOnceWith("follow-before-tour");
+    expect(screen.queryByRole("button", { name: "Bob 따라가는 중" })).toBeNull();
+  });
+
+  it("fences a delayed slot release so an earlier seat choice cannot restart movement after tour start", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    f.live.room.ready = true;
+    await mount();
+    const slot = DEFAULT_STUDIO_WORLD_MANIFEST.interactionSlots![0]!;
+    const useSlot = screen.getByRole("button", { name: `${slot.labelKo} 사용하기` });
+    await waitFor(() => expect(useSlot.hasAttribute("disabled")).toBe(false));
+    // Keep the real slots hook and its request generation. Defer only the
+    // controller's release result at the asynchronous reservation boundary.
+    let released!: () => void;
+    const release = vi.spyOn(StudioVirtualSlotLeaseController.prototype, "release")
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { released = resolve; }));
+    const move = vi.spyOn(f.engine!.bridge, "requestMove");
+    fireEvent.click(useSlot);
+    expect(release).toHaveBeenCalledOnce();
+    expect(move).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
+    fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
+    expect(f.engine?.guideTourRequest).not.toBeNull();
+    await act(async () => { released(); });
+    expect(move).not.toHaveBeenCalled();
+    expect(f.engine?.bridge.consumeMoveTarget()).toBeNull();
+    expect(screen.queryByText("자리로 이동·확인 중")).toBeNull();
+  });
+
   it("starts an NPC tour only on request and fences stale guide status after cancellation or restart", async () => {
     await mount();
     expect(f.engine?.guideTourRequest).toBeNull();
