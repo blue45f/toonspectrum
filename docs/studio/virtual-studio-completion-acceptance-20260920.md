@@ -107,8 +107,13 @@ zsh interpreter used by shell regressions. The existing bootstrap applies the co
 ledger and separates the runtime role. The full-suite wrapper serializes all 14 database files,
 then executes the unchanged remainder and performance entrypoint. Actual Vitest collection
 verified the exact 4,612-file union (14 database + 4,598 remaining, no overlap). The first phase
-passed 188 database tests and the marketplace database verifier; full root/performance results
-remain pending. The runner, workflow and shell regression checks passed 88 tests.
+passed 188 database tests and the marketplace database verifier. The remaining run completed
+52,238 tests with no failed assertions, 38 existing skipped tests, and two module-collection
+failures. Both failures were reproduced with native Node: `createRequire` anchored at a pnpm
+symlink could not find the real consumer's transitive dependency. Anchoring at `realpathSync`
+resolved both dependencies, and their seven focused tests passed. The complete run was still a
+failure; these focused repairs are not relabeled as a new full-suite pass. Performance and the
+next exact-commit GitHub run remain pending. The runner, workflow and shell checks passed 88 tests.
 
 Useful commands, with an explicitly owned dev origin and disposable database variables:
 
