@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, expect } from "vitest";
 import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
@@ -46,6 +45,8 @@ function isStudioMenubarContentTest(testPath: unknown): testPath is string {
 }
 
 if (typeof document !== "undefined") {
+  // Pure Node suites do not need React DOM. Keep DOM cleanup and file isolation unchanged.
+  const { cleanup } = await import("@testing-library/react");
   afterEach(() => {
     // Vitest does not expose its hooks as globals in this repository. Testing Library's
     // implicit auto-cleanup therefore never registers, leaving prior React roots and DOM

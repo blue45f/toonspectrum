@@ -1,3 +1,4 @@
+import { isStudioBg3dShotBatchNumberInRange, isStudioBg3dShotBatchIntegerInRange, STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
 import { isStudioBg3dTilePipelineId, STUDIO_BG3D_TILED_PNG_PROFILE } from "./studio-bg3d-tiled-batch-policy";
 import { buildStudioPackageArchiveBlob } from "../studio-package-archive";
@@ -9,7 +10,6 @@ import {
   verifyStudioBg3dRgba8PngFile,
 } from "./studio-bg3d-file-integrity";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
-import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import {
   STUDIO_BG3D_SHOT_BATCH_MAX_FILES,
   STUDIO_BG3D_SHOT_BATCH_PASSES,
@@ -328,19 +328,14 @@ async function validatePng(
   if (
     !ID_PATTERN.test(image.shotId) ||
     !validShotName(image.shotName) ||
-    !Number.isSafeInteger(image.width) ||
-    !Number.isSafeInteger(image.height) ||
-    image.width < 1 ||
-    image.height < 1 ||
-    image.width > MAX_DIMENSION ||
-    image.height > MAX_DIMENSION ||
+    !isStudioBg3dShotBatchIntegerInRange(image.width, 1, MAX_DIMENSION) ||
+    !isStudioBg3dShotBatchIntegerInRange(image.height, 1, MAX_DIMENSION) ||
     (image.pass !== undefined && !PASS_SET.has(image.pass)) ||
     (image.output !== undefined && image.output !== "beauty" && image.output !== "lt-composite") ||
     (image.pass !== undefined && image.output !== undefined && image.pass !== image.output) ||
     ((image.requestedHeight === undefined) !== (image.wasReduced === undefined)) ||
     (image.requestedHeight !== undefined && (
-      !Number.isSafeInteger(image.requestedHeight) ||
-      image.requestedHeight < 256 || image.requestedHeight > MAX_DIMENSION ||
+      !isStudioBg3dShotBatchIntegerInRange(image.requestedHeight, 256, MAX_DIMENSION) ||
       image.height > image.requestedHeight ||
       typeof image.wasReduced !== "boolean" ||
       image.wasReduced !== (image.height < image.requestedHeight)
@@ -367,8 +362,8 @@ async function validateLayeredPsd(
   if (
     !ID_PATTERN.test(artifact.shotId) ||
     !validShotName(artifact.shotName) ||
-    !Number.isSafeInteger(artifact.width) || artifact.width < 1 || artifact.width > MAX_DIMENSION ||
-    !Number.isSafeInteger(artifact.height) || artifact.height < 1 || artifact.height > MAX_DIMENSION ||
+    !isStudioBg3dShotBatchIntegerInRange(artifact.width, 1, MAX_DIMENSION) ||
+    !isStudioBg3dShotBatchIntegerInRange(artifact.height, 1, MAX_DIMENSION) ||
     !(artifact.psd instanceof Blob) ||
     artifact.psd.type !== STUDIO_BG3D_SHOT_PSD_MIME ||
     artifact.psd.size < 26 ||
@@ -468,31 +463,17 @@ function snapshotPublicRenderPlan(
     !PROFILE_ID_PATTERN.test(plan.captureProfile.pngEncodingId) ||
     !PROFILE_ID_PATTERN.test(plan.captureProfile.depthEncodingId) ||
     plan.captureProfile.depthEncodingId !== STUDIO_BG3D_SHOT_BATCH_DEPTH_ENCODING_V1 ||
-    !Number.isSafeInteger(plan.captureProfile.sourceWidth) ||
-    plan.captureProfile.sourceWidth < 1 ||
-    plan.captureProfile.sourceWidth > PUBLIC_SOURCE_MAX_DIMENSION ||
-    !Number.isSafeInteger(plan.captureProfile.sourceHeight) ||
-    plan.captureProfile.sourceHeight < 1 ||
-    plan.captureProfile.sourceHeight > PUBLIC_SOURCE_MAX_DIMENSION ||
-    !Number.isSafeInteger(plan.captureProfile.maxPixels) ||
-    plan.captureProfile.maxPixels < 1 ||
-    plan.captureProfile.maxPixels > PUBLIC_MAX_PIXELS ||
+    !isStudioBg3dShotBatchIntegerInRange(plan.captureProfile.sourceWidth, 1, PUBLIC_SOURCE_MAX_DIMENSION) ||
+    !isStudioBg3dShotBatchIntegerInRange(plan.captureProfile.sourceHeight, 1, PUBLIC_SOURCE_MAX_DIMENSION) ||
+    !isStudioBg3dShotBatchIntegerInRange(plan.captureProfile.maxPixels, 1, PUBLIC_MAX_PIXELS) ||
     (plan.captureProfile.maxPixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS &&
       (plan.implementation.engineId !== "three" || !isStudioBg3dTilePipelineId(plan.captureProfile.ltPipelineId)
         || plan.captureProfile.pngEncodingId !== STUDIO_BG3D_TILED_PNG_PROFILE)) ||
-    !Number.isSafeInteger(plan.captureProfile.maxEdge) ||
-    plan.captureProfile.maxEdge < 1 ||
-    plan.captureProfile.maxEdge > MAX_DIMENSION ||
+    !isStudioBg3dShotBatchIntegerInRange(plan.captureProfile.maxEdge, 1, MAX_DIMENSION) ||
     (plan.captureProfile.deviceProfile !== "mobile" &&
       plan.captureProfile.deviceProfile !== "desktop") ||
-    typeof plan.captureProfile.textureScale !== "number" ||
-    !Number.isFinite(plan.captureProfile.textureScale) ||
-    plan.captureProfile.textureScale < 0.01 ||
-    plan.captureProfile.textureScale > 4 ||
-    typeof plan.captureProfile.lodBias !== "number" ||
-    !Number.isFinite(plan.captureProfile.lodBias) ||
-    plan.captureProfile.lodBias < 0 ||
-    plan.captureProfile.lodBias > 8 ||
+    !isStudioBg3dShotBatchNumberInRange(plan.captureProfile.textureScale, 0.01, 4) ||
+    !isStudioBg3dShotBatchNumberInRange(plan.captureProfile.lodBias, 0, 8) ||
     !hasExactKeys(plan.artifactProfiles, [
       "psdProfileId",
       "contactSheetProfileId",
@@ -510,9 +491,7 @@ function snapshotPublicRenderPlan(
     plan.passes.some((pass) => !PASS_SET.has(pass)) ||
     new Set(plan.passes).size !== plan.passes.length ||
     (plan.exportHeight !== "per-shot" && (
-      !Number.isSafeInteger(plan.exportHeight) ||
-      plan.exportHeight < 256 ||
-      plan.exportHeight > MAX_DIMENSION
+      !isStudioBg3dShotBatchIntegerInRange(plan.exportHeight, 256, MAX_DIMENSION)
     )) ||
     !hasExactKeys(plan.artifactRequests, ["layeredPsd", "contactSheet"]) ||
     typeof plan.artifactRequests.layeredPsd !== "boolean" ||
@@ -539,9 +518,7 @@ function snapshotPublicRenderPlan(
       !hasExactKeys(shot, ["shotId", "shotName", "shotIndex", "capture", "files"]) ||
       !ID_PATTERN.test(shot.shotId) ||
       !validShotName(shot.shotName) ||
-      !Number.isSafeInteger(shot.shotIndex) ||
-      shot.shotIndex < 1 ||
-      shot.shotIndex > plan.shots.length ||
+      !isStudioBg3dShotBatchIntegerInRange(shot.shotIndex, 1, plan.shots.length) ||
       shotIds.has(shot.shotId) ||
       shotIndexes.has(shot.shotIndex) ||
       !hasExactKeys(shot.capture, [
@@ -554,17 +531,11 @@ function snapshotPublicRenderPlan(
         "shadowMapSize",
         "background",
       ]) ||
-      !Number.isSafeInteger(shot.capture.width) ||
-      shot.capture.width < 1 ||
-      shot.capture.width > plan.captureProfile.maxEdge ||
-      !Number.isSafeInteger(shot.capture.height) ||
-      shot.capture.height < 1 ||
-      shot.capture.height > plan.captureProfile.maxEdge ||
+      !isStudioBg3dShotBatchIntegerInRange(shot.capture.width, 1, plan.captureProfile.maxEdge) ||
+      !isStudioBg3dShotBatchIntegerInRange(shot.capture.height, 1, plan.captureProfile.maxEdge) ||
       !Number.isSafeInteger(shot.capture.width * shot.capture.height) ||
       shot.capture.width * shot.capture.height > plan.captureProfile.maxPixels ||
-      !Number.isSafeInteger(shot.capture.requestedHeight) ||
-      shot.capture.requestedHeight < 256 ||
-      shot.capture.requestedHeight > MAX_DIMENSION ||
+      !isStudioBg3dShotBatchIntegerInRange(shot.capture.requestedHeight, 256, MAX_DIMENSION) ||
       shot.capture.height > shot.capture.requestedHeight ||
       typeof shot.capture.wasReduced !== "boolean" ||
       shot.capture.wasReduced !== (shot.capture.height < shot.capture.requestedHeight) ||
@@ -957,9 +928,7 @@ function validateManifestContext(
     } else if (
       candidate.resolution.mode !== "maximum-height" ||
       !hasExactKeys(candidate.resolution, ["mode", "height"]) ||
-      !Number.isSafeInteger(candidate.resolution.height) ||
-      (candidate.resolution.height as number) < 256 ||
-      (candidate.resolution.height as number) > MAX_DIMENSION
+      !isStudioBg3dShotBatchIntegerInRange(candidate.resolution.height, 256, MAX_DIMENSION)
     ) {
       throw new TypeError("컷 일괄 렌더 최대 해상도 문맥이 올바르지 않습니다.");
     } else {
@@ -1309,8 +1278,8 @@ export async function buildStudioBg3dShotBatchArchive(
     if (
       artifact.sheetNumber !== index + 1 ||
       artifact.fileName !== `contact-sheet-${String(index + 1).padStart(3, "0")}.png` ||
-      !Number.isSafeInteger(artifact.width) || artifact.width < 1 || artifact.width > 8_192 ||
-      !Number.isSafeInteger(artifact.height) || artifact.height < 1 || artifact.height > 8_192 ||
+      !isStudioBg3dShotBatchIntegerInRange(artifact.width, 1, 8_192) ||
+      !isStudioBg3dShotBatchIntegerInRange(artifact.height, 1, 8_192) ||
       !Array.isArray(artifact.shotIds) || artifact.shotIds.length < 1 ||
       artifact.shotIds.some((shotId: string) => (
         !ID_PATTERN.test(shotId) || !shots.has(shotId) || contactShotIds.has(shotId)

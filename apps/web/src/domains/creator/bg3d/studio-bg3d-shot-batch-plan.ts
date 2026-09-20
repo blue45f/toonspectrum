@@ -1,3 +1,4 @@
+import { isStudioBg3dShotBatchNumberInRange, isStudioBg3dShotBatchIntegerInRange } from "./studio-bg3d-shot-batch-limits";
 import { isStudioBg3dTilePipelineId, STUDIO_BG3D_TILED_PNG_PROFILE } from "./studio-bg3d-tiled-batch-policy";
 import { STUDIO_BG3D_TILED_OUTPUT_MAX_PIXELS } from "./studio-bg3d-tile-plan";
 /**
@@ -367,21 +368,15 @@ function validCaptureOwner(value: unknown): value is StudioBg3dShotBatchCaptureO
     typeof owner.implementationRevision === "string" &&
     PROFILE_ID_PATTERN.test(owner.implementationRevision) &&
     typeof owner.profileId === "string" && PROFILE_ID_PATTERN.test(owner.profileId) &&
-    Number.isSafeInteger(owner.sourceWidth) && owner.sourceWidth! >= 1 &&
-    owner.sourceWidth! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION &&
-    Number.isSafeInteger(owner.sourceHeight) && owner.sourceHeight! >= 1 &&
-    owner.sourceHeight! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION &&
-    Number.isSafeInteger(owner.maxPixels) && owner.maxPixels! >= 1 &&
-    owner.maxPixels! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS &&
+    isStudioBg3dShotBatchIntegerInRange(owner.sourceWidth, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION) &&
+    isStudioBg3dShotBatchIntegerInRange(owner.sourceHeight, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION) &&
+    isStudioBg3dShotBatchIntegerInRange(owner.maxPixels, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS) &&
     (owner.maxPixels! <= STUDIO_BG3D_LT_RENDER_MAX_PIXELS ||
       (owner.engineId === "three" && isStudioBg3dTilePipelineId(owner.ltPipelineId) && owner.pngEncodingId === STUDIO_BG3D_TILED_PNG_PROFILE)) &&
-    Number.isSafeInteger(owner.maxEdge) && owner.maxEdge! >= 1 &&
-    owner.maxEdge! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION &&
+    isStudioBg3dShotBatchIntegerInRange(owner.maxEdge, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION) &&
     (owner.deviceProfile === "mobile" || owner.deviceProfile === "desktop") &&
-    typeof owner.textureScale === "number" && Number.isFinite(owner.textureScale) &&
-    owner.textureScale >= 0.01 && owner.textureScale <= 4 &&
-    typeof owner.lodBias === "number" && Number.isFinite(owner.lodBias) &&
-    owner.lodBias >= 0 && owner.lodBias <= 8 &&
+    isStudioBg3dShotBatchNumberInRange(owner.textureScale, 0.01, 4) &&
+    isStudioBg3dShotBatchNumberInRange(owner.lodBias, 0, 8) &&
     typeof owner.ltPipelineId === "string" && PROFILE_ID_PATTERN.test(owner.ltPipelineId) &&
     typeof owner.pngEncodingId === "string" && PROFILE_ID_PATTERN.test(owner.pngEncodingId) &&
     typeof owner.psdEncodingId === "string" && PROFILE_ID_PATTERN.test(owner.psdEncodingId);
@@ -405,14 +400,10 @@ function validCaptureSpec(value: unknown): value is StudioBg3dShotBatchCaptureSp
     "background",
   ]) &&
     typeof spec.shotId === "string" && ID_PATTERN.test(spec.shotId) &&
-    Number.isSafeInteger(spec.width) && spec.width! >= 1 &&
-    spec.width! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION &&
-    Number.isSafeInteger(spec.height) && spec.height! >= 1 &&
-    spec.height! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION &&
-    Number.isSafeInteger(pixels) && pixels >= 1 &&
-    pixels <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS &&
-    Number.isSafeInteger(spec.requestedHeight) && spec.requestedHeight! >= 256 &&
-    spec.requestedHeight! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION &&
+    isStudioBg3dShotBatchIntegerInRange(spec.width, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION) &&
+    isStudioBg3dShotBatchIntegerInRange(spec.height, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION) &&
+    isStudioBg3dShotBatchIntegerInRange(pixels, 1, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS) &&
+    isStudioBg3dShotBatchIntegerInRange(spec.requestedHeight, 256, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION) &&
     spec.height! <= spec.requestedHeight! &&
     typeof spec.wasReduced === "boolean" &&
     spec.wasReduced === (spec.height! < spec.requestedHeight!) &&
@@ -654,8 +645,7 @@ export function isStudioBg3dShotBatchPlan(value: unknown): value is StudioBg3dSh
     STUDIO_BG3D_SHOT_BATCH_PASSES.filter((pass) => plan.passes!.includes(pass))
       .some((pass, index) => pass !== plan.passes![index]) ||
     (plan.exportHeight !== "per-shot" && (
-      !Number.isSafeInteger(plan.exportHeight) || plan.exportHeight! < 256 ||
-      plan.exportHeight! > STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION
+      !isStudioBg3dShotBatchIntegerInRange(plan.exportHeight, 256, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION)
     )) ||
     typeof plan.includeLayeredPsd !== "boolean" ||
     typeof plan.includeContactSheet !== "boolean" ||
@@ -817,8 +807,7 @@ export async function createStudioBg3dShotBatchPlan(
   const exportHeight = options.exportHeight ?? "per-shot";
   if (
     exportHeight !== "per-shot" &&
-    (!Number.isSafeInteger(exportHeight) || exportHeight < 256 ||
-      exportHeight > STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION)
+    (!isStudioBg3dShotBatchIntegerInRange(exportHeight, 256, STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION))
   ) {
     return failure("invalid-pass", "컷 배치 고정 출력 높이가 올바르지 않습니다.");
   }

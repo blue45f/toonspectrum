@@ -1,7 +1,9 @@
 # CI throughput and verification lifecycle
 
 Status: current implementation in this change. Decision: 2026-09-20.
-Scope: GitHub Actions only. No application deploy, paid runner, plan, security scanner,
+Scope: GitHub Actions plus a behavior-preserving bounded-integer validator deduplication
+needed to unblock the existing BG3D bundle gate, repaired test fixtures and the public worker inventory.
+No application deploy, paid runner, plan, security scanner,
 production secret, database or branch-protection change is part of this rollout.
 
 ## Verification ownership
@@ -51,7 +53,21 @@ unbounded matrices. Existing tests retain real database/bootstrap and graphics a
 Acceptance: local core preflight, cleanup/integration tests, changed-file lint, Actionlint,
 then actual PR core/verify success, normal merge and main configuration verification.
 For exhaustive same-SHA release evidence, explicitly dispatch diagnostics rather than
-waiting for a future schedule. Do not dispatch runtime deployments for an Actions-only change.
+waiting for a future schedule. This rollout changes CI operation; it does not dispatch a runtime release.
 Rollback is a reviewed revert of this change and needs no application redeploy. Record
 actual run IDs and merge SHA in the rollout report. CodeQL and full brush sweeps remain
 independent performance bottlenecks; this change does not claim their algorithms got faster.
+
+## Inherited bundle failure found during rollout
+
+Main CI 35513710443 and the initial PR run independently failed the same BG3D shot-batch
+raw/gzip ratchets (112.9/34.9 KiB). A clean local production build reproduced both failures.
+Do not accept a larger baseline or skip this check to roll out CI improvements.
+The follow-up deduplicates bounded-integer and finite-number predicates into lightweight helpers,
+retaining inclusive bounds, safe-integer rejection and non-coercion. No numeric limits,
+bundle thresholds, image integrity checks or dynamic-import boundaries are changed.
+The shot-batch/recovery/archive/worker/frame/content suite has 151 passing tests in 21 files,
+including the helpers' differential boundary checks. The optimized local production build passes
+all ratchets: 27 within baseline, 10 improved and zero regressed, with no baseline change.
+Actual PR/core receipts remain necessary before merge. See test-portfolio-review-20260920.md
+for the full static census, retained coverage, duplicate-case decision and audit limitations.

@@ -7,26 +7,12 @@ const test = process.env.VITEST ? vitestTest : nodeTest;
 
 import {
   STUDIO_COMPETITOR_REGISTRY_PATH,
-  shareStudioOfficialDomainFamily,
   summarizeStudioCompetitorRegistry,
   validateStudioCompetitorRegistry,
 } from "./validate-studio-competitor-registry.mjs";
 
-test("recognizes Adobe and Mixamo as one explicit official source family", () => {
-  assert.equal(
-    shareStudioOfficialDomainFamily("www.mixamo.com", "helpx.adobe.com"),
-    true,
-  );
-  assert.equal(
-    shareStudioOfficialDomainFamily("www.adobe.com", "helpx.adobe.com"),
-    true,
-  );
-  assert.equal(
-    shareStudioOfficialDomainFamily("www.mixamo.com", "unrelated.example"),
-    false,
-  );
-});
-
+// Exact vendor-family cases remain in validate-studio-competitor-registry.test.mjs.
+// This file owns the separate expanded-registry inventory contract.
 test("the expanded committed competitor registry is internally valid", () => {
   const registry = JSON.parse(fs.readFileSync(STUDIO_COMPETITOR_REGISTRY_PATH, "utf8"));
   assert.deepEqual(validateStudioCompetitorRegistry(registry), []);
