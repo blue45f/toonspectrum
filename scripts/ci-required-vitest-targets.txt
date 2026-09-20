@@ -127,6 +127,7 @@ apps/web/src/domains/creator/production-hub/ProductionStudioRevisionBridgePanel.
 apps/web/src/domains/creator/project-graph/studio-project-graph-client.test.ts
 apps/web/src/domains/creator/review-capture
 apps/web/src/domains/creator/review-handoff
+apps/web/src/domains/creator/review-production
 apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts
 apps/web/src/domains/creator/scene3d/specialists/specialist-orchestration.test.ts
 apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts
@@ -219,6 +220,7 @@ packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts
 packages/studio-project-model/src/__tests__/review-task-reference.test.ts
+packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs

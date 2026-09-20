@@ -7,6 +7,7 @@ import { createStudioReviewComment, newStudioProjectGraphId } from "../project-g
 import type { StudioReviewCommentCreateInput } from "../project-graph/studio-project-graph-contract";
 import { getStudioTeam } from "../studio-team-client";
 import { StudioReviewEditorLink } from "../review-handoff/StudioReviewEditorLink";
+import { StudioReviewProductionConnection } from "../review-production/StudioReviewProductionConnection";
 import { StudioReviewCommentAssignment } from "./StudioReviewCommentAssignment";
 import { studioReviewRosterName, useStudioReviewRoster } from "./use-studio-review-roster";
 import { normalizeStudioReviewAssignees, studioReviewAssigneesAllowed, studioReviewDueAt } from "./studio-review-comment-assignment";
@@ -180,6 +181,7 @@ function PinnedReviewForActor({ actorId, subject }: {
             studioReviewRosterName(roster, id) ?? bt("현재 확인할 수 없는 담당자", "Assignee currently unavailable")).join(", ")}</p> : null}
           {comment.dueAt ? <p className="mt-1 text-xs text-fg-3">{bt("완료 기한", "Due date")} · <time dateTime={comment.dueAt}>{new Date(comment.dueAt).toLocaleString()}</time></p> : null}
           {result.project.access.edit && comment.anchor?.source ? <div className="mt-2"><StudioReviewEditorLink request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
+          {result.project.access.edit ? <div className="mt-2"><StudioReviewProductionConnection request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
         </article>)}
         {!result.review.comments.length ? <p className="text-sm">{bt("아직 검토 의견이 없어요.", "No review notes yet.")}</p> : null}
       </div>
