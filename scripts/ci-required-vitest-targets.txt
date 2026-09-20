@@ -1,4 +1,3 @@
-
 apps/api/src/config/cors.test.ts
 apps/api/src/config/security-headers.test.ts
 apps/api/src/csrf-middleware.test.ts
@@ -189,6 +188,7 @@ apps/web/src/domains/creator/studio-shell/StudioProjectLibraryPage.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioQuickStart.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioRolePersonalizationCenter.test.tsx
 apps/web/src/domains/creator/studio-shell/StudioVisualGuidance.test.tsx
+apps/web/src/domains/creator/studio-shell/useStudioProjectLibrary.test.tsx
 apps/web/src/domains/creator/studio-smart-filter-opacity.test.ts
 apps/web/src/domains/creator/studio-source-hydration-recovery-boundary.test.ts
 apps/web/src/domains/creator/studio-team-client.test.ts
@@ -215,6 +215,7 @@ apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts
 apps/web/src/domains/creator/workspace/StudioWorkspacePage.continuity.test.tsx
 apps/web/src/domains/creator/workspace/StudioWorkspaceProjectPicker.test.tsx
+apps/web/src/domains/creator/workspace/StudioWorkspaceSpaceBoundary.test.tsx
 apps/web/src/domains/creator/workspace/studio-workspace-project-search.test.ts
 apps/web/src/domains/creator/writer-room/buildStudioWriterRoomCanvasPages.test.ts
 apps/web/src/domains/fortune/fortune-observatory-storage.test.ts

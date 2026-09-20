@@ -75,3 +75,53 @@ test("storage failure stays an error rather than a fake empty list", async ({ pa
   await expect(page.getByRole("button", { name: "다시 불러오기", exact: true })).toBeVisible();
   await expect(page.getByText("조건에 맞는 공고가 아직 없어요.")).toHaveCount(0);
 });
+
+test("owner candidate discovery pages and recovers without automatic offers", async ({ page }) => {
+  await fixtures(page);
+  const owner = { id: "artist", name: "테스트 작가", email: "artist@example.com", image: null, role: "creator" };
+  const onboarding = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "나에게 맞는 작업 환경 만들기", exact: true }) });
+  await page.addLocatorHandler(onboarding, async () => {
+    await onboarding.locator('button[aria-label="나중에 설정"]').click();
+    await expect(onboarding).toBeHidden();
+  });
+  // Explicit UI fixtures, not real authentication or production candidate data.
+  await page.addInitScript((user) => sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify({ user })), owner);
+  await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: true, user: owner } }));
+  await page.route(/\/api\/me(?:\?.*)?$/u, (route) => route.fulfill({ json: { profile: { ...owner, avatar: null, bio: null, regionSettings: null } } }));
+  await page.route(`**/api/collaborations/posts/${ID}`, (route) => route.fulfill({ json: { post, application: null, canManage: true, canModerate: false } }));
+  await page.route(`**/api/collaborations/posts/${ID}/applications*`, (route) => route.fulfill({ json: [] }));
+  const times = { startsAt: new Date().toISOString(), dueAt: new Date(Date.now()+3600000).toISOString() };
+  const terms = { model: "freelance-task", role: "lineart", publicScope: "선화 10컷", quantity: 10, quantityUnit: "cut", ...times, timeZone: "Asia/Seoul", compensation: "paid", currency: "KRW", minRate: 1000, maxRate: 2000, rateUnit: "cut", tools: ["ToonStudio"], formats: ["PNG"], revisionRounds: 1, acceptanceCriteria: "선화 검수", ndaRequired: false, creditPolicy: "필명 표시", portfolioPolicy: "approval-required", aiPolicy: "prohibited" };
+  const slotId = "22222222-2222-4222-8222-222222222222";
+  const requests: (string | null)[] = []; let offerCount = 0, failNext = true;
+  await page.route(`**/api/collaborations/hiring/posts/${ID}/**`, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/slots")) return route.fulfill({ json: [{ id: slotId, postId: ID, revision: 1, state: "open", terms, createdAt: times.startsAt }] });
+    if (url.pathname.endsWith("/automation")) return route.fulfill({ json: { enabled: false, supported: true, job: null } });
+    if (url.pathname.endsWith("/campaign")) return route.fulfill({ json: { slotId, round: 0, state: "active", nextDispatchAt: null, invitedCount: 0, automaticDispatchEnabled: false } });
+    if (url.pathname.endsWith("/offers")) { offerCount++; return route.fulfill({ json: { id: "synthetic-offer" } }); }
+    if (!url.pathname.endsWith("/candidates")) return route.fulfill({ status: 404, json: { message: "Unexpected test route" } });
+    requests.push(url.searchParams.get("after"));
+    expect(url.searchParams.get("expectedRevision")).toBe("1");
+    const second = url.searchParams.has("after");
+    if (second && failNext) { failNext = false; return route.fulfill({ status: 503, json: { message: "후보 조회 연결 실패" } }); }
+    const userId = second ? "candidate-b" : "candidate-a";
+    return route.fulfill({ json: { items: [{ userId, displayName: second ? "다음 후보" : "첫 후보", roles: ["lineart"], tools: ["ToonStudio"], formats: ["PNG"], startsAt: times.startsAt, endsAt: times.dueAt, confirmedAt: times.startsAt, expiresAt: times.dueAt, capacity: 1, minRate: 1000, rateUnit: "cut", reasons: ["선화 역할", "동시 작업 여력1건"] }], limit: 30, ordering: "account-id", next: second ? null : "next-cursor", termsRevision: 1, observedAt: new Date().toISOString() } });
+  });
+  await page.goto(`/collaborate/${ID}`);
+  const area = page.getByRole("region", { name: "지금 작업 가능한 후보", exact: true });
+  await expect(area.getByRole("button", { name: "조건에 맞는 후보 찾기" })).toBeVisible();
+  expect(requests).toEqual([]);
+  await area.getByRole("button", { name: "조건에 맞는 후보 찾기" }).click();
+  await expect(area.getByRole("heading", { name: "첫 후보", exact: true })).toBeVisible();
+  await area.getByRole("button", { name: "다음 후보", exact: true }).click();
+  await expect(area.getByRole("alert")).toBeVisible();
+  await area.getByRole("button", { name: "현재 페이지 다시 조회" }).click();
+  await expect(area.getByRole("heading", { name: "다음 후보", exact: true })).toBeVisible();
+  await expect(area.getByText("2페이지 · 이 페이지 1명 · 조건 버전 1")).toBeVisible();
+  await area.getByRole("button", { name: "이전 후보" }).click();
+  await expect(area.getByRole("heading", { name: "첫 후보", exact: true })).toBeVisible();
+  expect(requests).toEqual([null, "next-cursor", "next-cursor", null]);
+  expect(offerCount).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});

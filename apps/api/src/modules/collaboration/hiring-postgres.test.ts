@@ -97,6 +97,21 @@ describe.skipIf(!database)("real disposable PostgreSQL hiring invariants (requir
       expect(query).toHaveBeenCalledTimes(1); query.mockRestore();
       expect(found).toHaveLength(30); expect(found[0].userId).toBe("bulk_101"); expect(found.at(-1)?.userId).toBe("bulk_130");
       expect(found.every((candidate) => candidate.capacity === 1)).toBe(true);
+      // HTTP discovery reads one sentinel beyond30 without changing campaign bounds.
+      const first = await available.discover("recruiter", p, "busy_1", { expectedRevision: 1 });
+      expect(first.items.map((item) => item.userId)).toEqual(found.map((item) => item.userId));
+      expect(first.next).not.toBeNull(); expect(first.termsRevision).toBe(1);
+      const second = await available.discover("recruiter", p, "busy_1", { expectedRevision: 1, after: first.next! });
+      expect(second.items.map((item) => item.userId)).toEqual(["bulk_131", "bulk_132"]); expect(second.next).toBeNull();
+      await expect(available.discover("outsider", p, "busy_1", { after: first.next! })).rejects.toMatchObject({ status: 403 });
+      await expect(available.discover("recruiter", p, "busy_2", { after: first.next! })).rejects.toMatchObject({ status: 409 });
+      await expect(available.discover("recruiter", p, "busy_1", { expectedRevision: 2 })).rejects.toMatchObject({ status: 409 });
+      await c.query(`UPDATE creator_hiring_availability SET discoverable=false WHERE user_id='bulk_131'; INSERT INTO member_message_block VALUES ('bulk_132','recruiter')`);
+      expect((await available.discover("recruiter", p, "busy_1", { after: first.next! })).items).toEqual([]);
+      await c.query(`UPDATE creator_hiring_availability SET discoverable=true WHERE user_id='bulk_131'; DELETE FROM member_message_block`);
+      await c.query(`UPDATE creator_collab_post SET version=version+1 WHERE id=$1`, [p]);
+      await expect(available.discover("recruiter", p, "busy_1", { after: first.next! })).rejects.toMatchObject({ status: 409 });
+      expect((await available.discover("recruiter", p, "busy_1")).items).toHaveLength(30);
       // Adjacent intervals must remain eligible in the SQL sweep as in peakOverlap.
       await c.query(`UPDATE creator_hiring_commitment SET starts_at=$1::timestamptz-interval '1 hour',ends_at=$1`, [value.startsAt]);
       expect((await available.candidates(c, "recruiter", value))[0].userId).toBe("bulk_001");

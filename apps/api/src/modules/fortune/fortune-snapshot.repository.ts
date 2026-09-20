@@ -19,8 +19,11 @@ export class PostgresFortuneSnapshotRepository implements FortuneSnapshotPort {
       WHERE fortune_public_snapshot.checked_at < EXCLUDED.checked_at`, [key, JSON.stringify(safe), safe.checkedAt, safe.expiresAt]);
   }
   async prune(): Promise<void> {
-    await this.query(`DELETE FROM fortune_public_snapshot WHERE snapshot_key IN
-      (SELECT snapshot_key FROM fortune_public_snapshot WHERE expires_at <= CURRENT_TIMESTAMP
-       ORDER BY expires_at LIMIT 1000)`, []);
+    await this.query(`WITH expired AS (
+      SELECT snapshot_key FROM fortune_public_snapshot WHERE expires_at <= CURRENT_TIMESTAMP
+      ORDER BY expires_at, snapshot_key LIMIT 1000 FOR UPDATE SKIP LOCKED
+    ) DELETE FROM fortune_public_snapshot AS snapshot USING expired
+      WHERE snapshot.snapshot_key = expired.snapshot_key
+        AND snapshot.expires_at <= CURRENT_TIMESTAMP`, []);
   }
 }

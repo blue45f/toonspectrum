@@ -16,6 +16,7 @@ import { resolveStudioProjectResumeTarget } from "../studio-project-resume-targe
 import { selectWorkspaceProject, workspacePanel, workspaceProjectLinks, type WorkspaceSurface } from "./studio-workspace-model";
 import { WorkspaceTeamContent, WorkspaceExploreContent } from "./StudioWorkspaceSections";
 import { StudioWorkspaceProjectPicker } from "./StudioWorkspaceProjectPicker";
+import { StudioWorkspaceSpaceBoundary } from "./StudioWorkspaceSpaceBoundary";
 import "@/shared/components/workspace/workspace.css";
 
 const WorkspaceWorld = lazy(() => import("./StudioWorkspaceWorld").then((module) => ({ default: module.StudioWorkspaceWorld })));
@@ -107,9 +108,13 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
           <p role={loading ? "status" : undefined}>{loading ? bt("작품을 확인하는 동안 다른 원고를 열지 않습니다.", "No other artwork will open while your library is being checked.") : library.error ? bt("브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요. 원고는 변경하지 않았습니다.", "Check browser storage and try again. Your artwork has not been changed.") : bt("원고를 다른 작품으로 대체하지 않았습니다. 작품 목록에서 다시 선택하거나 개인 작업실로 돌아가세요.", "No other artwork has been substituted. Choose a work from the library or return to your personal studio.")}</p>
           {!loading ? <div><Link className="workspace-primary" href={library.error ? "/studio?view=storage" : "/studio"}>{library.error ? bt("저장 공간 확인", "Check storage") : bt("작품 목록 열기", "Open work library")}</Link>{!library.error ? <button type="button" className="workspace-icon-button" onClick={() => chooseProject("")}>{bt("개인 작업실로 돌아가기", "Return to personal studio")}</button> : null}</div> : null}
         </section> : surface === "home" ? <>
-          {mode === "virtual-studio" ? <Suspense fallback={<div className="workspace-world-loading" role="status"><p>{bt("공간 보기 불러오는 중…", "Loading space view…")}</p><button type="button" onClick={() => setMode("classic")}>{bt("목록 보기로 전환", "Switch to list view")}</button></div>}>
+          {mode === "virtual-studio" ? <StudioWorkspaceSpaceBoundary fallback={<section className="workspace-world-loading" data-workspace-space-error="true" role="alert">
+            <h2>{bt("공간 보기를 불러오지 못했습니다", "Space view could not be loaded")}</h2>
+            <p>{bt("메뉴와 선택한 작품은 그대로입니다. 목록 보기에서 작업을 이어갈 수 있습니다.", "Your menus and selected work are still available. Continue working in list view.")}</p>
+            <button type="button" onClick={() => setMode("classic")}>{bt("목록 보기로 전환", "Switch to list view")}</button>
+          </section>}><Suspense fallback={<div className="workspace-world-loading" role="status"><p>{bt("공간 보기 불러오는 중…", "Loading space view…")}</p><button type="button" onClick={() => setMode("classic")}>{bt("목록 보기로 전환", "Switch to list view")}</button></div>}>
             <WorkspaceWorld project={project} links={links} onFallback={() => setMode("classic")} />
-          </Suspense> : <div className="workspace-list-view">
+          </Suspense></StudioWorkspaceSpaceBoundary> : <div className="workspace-list-view">
             <div className="workspace-current-work"><p className="workspace-eyebrow">{bt("이어서 만들기", "Continue creating")}</p>
               <h2>{project?.title ?? bt("첫 이야기를 시작해 보세요", "Start your first story")}</h2>
               <p>{resume?.summary ?? bt("원고와 팀의 작업을 한곳에서 이어갑니다.", "Keep your artwork and team workflow together.")}</p>

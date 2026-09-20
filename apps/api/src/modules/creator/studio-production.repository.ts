@@ -1,4 +1,5 @@
 import { studioHandoffChangedRoles, studioHandoffChangedBriefs } from "./studio-handoff-envelope-basis";
+import { studioHandoffReceiptQuery } from "./studio-handoff-receipt-query";
 import { studioHandoffEnvelopeSchema } from "@toonspectrum/studio-project-model";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
@@ -528,13 +529,9 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
       const changedRoles = studioHandoffChangedRoles(currentDocument, canonical);
       const changedBriefs = studioHandoffChangedBriefs(currentDocument, canonical);
       if (changedRoles.length || changedBriefs.length) {
-        const affected = await transaction.execute<{ response: unknown }>(sql`
-          SELECT receipt.response FROM studio_mutation_receipt receipt
-          JOIN studio_artifact artifact ON artifact.id=receipt."artifactId"
-          JOIN studio_project_graph project ON project.id=artifact."projectId"
-          WHERE project."workId"=${workId} AND receipt.response->>'contract'='studio-handoff-envelope-v1'
-          AND (receipt.response->'envelope'->'recipient'->>'roleAssignmentId'=ANY(${changedRoles}::text[])
-            OR receipt.response->'envelope'->'brief'->>'id'=ANY(${changedBriefs}::text[]))`);
+        const affected = await transaction.execute<{ response: unknown }>(
+          studioHandoffReceiptQuery(workId, changedRoles, changedBriefs),
+        );
         for (const row of affected.rows) {
           const parsed = studioHandoffEnvelopeSchema.safeParse((row.response as { envelope?: unknown } | null)?.envelope);
           if (!parsed.success) continue;
