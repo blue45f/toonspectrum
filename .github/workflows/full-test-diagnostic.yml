@@ -21,6 +21,20 @@ jobs:
     name: Full pnpm test
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: studio_full_test
+          POSTGRES_PASSWORD: studio_full_test
+          POSTGRES_DB: studio_full_integration
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U studio_full_test -d studio_full_integration"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://studio_full_test:studio_full_test@127.0.0.1:5432/studio_full_integration
+      TEST_RUNTIME_DATABASE_ROLE: studio_full_runtime
     steps:
       - uses: actions/checkout@v6
         with:
@@ -31,5 +45,17 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install actual shell and PostgreSQL test prerequisites
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zsh postgresql-client
+      - name: Bootstrap a fresh disposable database with the runtime role boundary
+        env:
+          MIGRATION_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          BOOTSTRAP_RUNTIME_DATABASE_PASSWORD="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')"
+          export BOOTSTRAP_RUNTIME_DATABASE_PASSWORD
+          node scripts/bootstrap-empty-production-database.mjs --execute --allow-loopback \
+            --runtime-database-role "$TEST_RUNTIME_DATABASE_ROLE" --release-sha "$GITHUB_SHA" \
+            --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE
       - name: Run full root and performance suites
-        run: pnpm test
+        run: node scripts/run-full-test-ci.mjs
