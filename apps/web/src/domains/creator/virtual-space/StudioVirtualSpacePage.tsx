@@ -1457,6 +1457,9 @@ export function VirtualSpaceExperience({
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
               onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
 
+
+          </div>
+          <div hidden={workspacePanel !== "people"}>
             <StudioPrivateRoomPanel key={`${privateActorId}:${projectId}:${publishedScope}:${privateZoneId}`} room={privateRoom}
               zones={privateZones} zoneId={privateZoneId} onZone={setPrivateZoneSelection} peers={snapshot.peers}
               onWalk={worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus"?()=>{
@@ -1464,8 +1467,6 @@ export function VirtualSpaceExperience({
                 if(!target)return false;queuePathTo(target);return true;
               }:undefined}
               labels={Object.fromEntries(privateZones.map(zone=>{const room=worldManifest.rooms.find(item=>item.id===zone.roomId);return [zone.id,room?bt(room.labelKo,room.labelEn):bt("비공개 방","Private room")];}))} />
-          </div>
-          <div hidden={workspacePanel !== "people"}>
 
             <StudioVirtualSpaceSocialPanel
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}

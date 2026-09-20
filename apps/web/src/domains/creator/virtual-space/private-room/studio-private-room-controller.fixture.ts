@@ -18,12 +18,12 @@ export function fixture(count=2){
   participants.forEach((p,i)=>{
     const api:StudioPrivateRoomApi={
       door:vi.fn(async()=>({world,zoneId:"zone",doorId:"door",epoch:doorEpoch,open,permitted:open,allowedUserIds:["actor-0","actor-1"]})),
-      team:vi.fn(async()=>({workId:"work",viewer:{userId:`actor-${i}`,role:"owner",status:"active",capabilities:{view:true,comment:true,edit:true,manageMembers:true,respondInvite:false}},members:[]})),
+      team:vi.fn(async()=>({workId:"work",viewer:{userId:`actor-${i}`,role:"owner" as const,status:"active" as const,capabilities:{view:true,comment:true,edit:true,manageMembers:true,respondInvite:false}},members:[]})),
       changeDoor:vi.fn(async input=>{open=input.open;}),
       open:vi.fn(async()=>leases[i]!),readOpen:vi.fn(async()=>leases[i]!),readSession:vi.fn(async()=>{if(!open)throw new Error("closed");return leases[i]!;}),
       renewSession:vi.fn(async input=>{if(input.expectedLeaseRevision!==leases[i]!.leaseRevision)throw new Error("conflict");leases[i]={...leases[i]!,leaseRevision:String(Number(input.expectedLeaseRevision)+1),expiresAt:new Date(now+15000).toISOString()};return leases[i]!;}),
       closeSession:vi.fn(async()=>{}),
-      propose:vi.fn(async input=>{const record:StudioConversationSnapshot={kind:"acoustic-conversation-consent",world,zoneId:"zone",doorId:"door",doorEpoch,conversationId:input.conversationId,revisionId:"consent-1",status:"pending",reason:null,leaseRevision:"1",expiresAt:new Date(now+15000).toISOString(),members:input.memberSessionEpochs.map(epoch=>({sessionEpoch:epoch,binding:leases.find(l=>l.sessionEpoch===epoch)!.binding,accepted:epoch===input.selfSessionEpoch}))};records.set(record.conversationId,record);return structuredClone(record);}),
+      propose:vi.fn(async input=>{const record:StudioConversationSnapshot={kind:"acoustic-conversation-consent",world,zoneId:"zone",doorId:"door",doorEpoch,conversationId:input.conversationId,revisionId:"consent-1",status:"pending",reason:null,leaseRevision:"1",expiresAt:new Date(now+15000).toISOString(),members:input.memberSessionEpochs.map((epoch:string)=>({sessionEpoch:epoch,binding:leases.find(l=>l.sessionEpoch===epoch)!.binding,accepted:epoch===input.selfSessionEpoch}))};records.set(record.conversationId,record);return structuredClone(record);}),
       change:vi.fn(async input=>{const prev=records.get(input.conversationId)!;const members=prev.members.map(m=>({...m,accepted:m.accepted||(input.action==="accept"&&m.sessionEpoch===input.selfSessionEpoch)}));
         const next:StudioConversationSnapshot={...prev,revisionId:`consent-${Number(prev.revisionId.split("-")[1])+1}`,members,status:input.action==="accept"?(members.every(m=>m.accepted)?"active":"pending"):"revoked",reason:input.action==="accept"?null:input.action==="block"?"blocked":"left"};records.set(next.conversationId,next);return structuredClone(next);}),
       read:vi.fn(async input=>structuredClone(records.get(input.conversationId)!)),

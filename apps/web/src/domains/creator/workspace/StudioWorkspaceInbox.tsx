@@ -3,6 +3,7 @@ import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
 import { getAuthSessionRevision, getAuthUserId, listeners } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { StudioWorkSessionEntry } from "../work-session/StudioWorkSessionEntry";
 import { StudioHandoffEnvelopeInbox } from "../handoff-envelope/StudioHandoffEnvelope";
 import { loadStudioServerProductionWorkspace, type StudioServerProductionSnapshot } from "../studio-production/studio-production-server-client";
 import { listStudioVirtualSpaceReviewSubjects, studioVirtualSpaceReviewHref, type StudioVirtualSpaceReviewChoices } from "../virtual-space/studio-virtual-space-review-invitation";
@@ -73,6 +74,7 @@ function InboxForActor({ actor, workId }: { readonly actor: string; readonly wor
           </li>)}</ul> : <p>{bt("현재 조건에 맞는 열린 검수가 없습니다.", "No open reviews match this search.")}</p>}
       {reviews?.ok && reviews.truncated ? <p className="text-xs">{bt("일부 최신 검수만 표시합니다. 전체 검수함에서 나머지를 확인하세요.", "Only a bounded set of recent reviews is shown. Check the review workspace for more.")}</p> : null}
     </section>
+    <StudioWorkSessionEntry workId={workId} />
     <StudioHandoffEnvelopeInbox workId={workId} />
     <Link className="inline-flex min-h-11 items-center underline" href={`/studio/p/${encodeURIComponent(workId)}/review`}>{bt("검수 작업실 열기", "Open review workspace")}</Link>
   </div>;

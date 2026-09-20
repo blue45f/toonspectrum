@@ -26,7 +26,7 @@ describe("private panel explicit withdrawal while network work is pending",()=>{
     await act(async()=>{pending=c.refresh();await flush();});await waitFor(()=>expect(finish).toBeTypeOf("function"));
     expect(c.snapshot().busy).toBe(true);
     const name=action==="decline"?"거절":action==="block"?"Member 1 이번 방문에서 차단":action==="room"?"방에서 나가기":"대화 나가기";
-    const button=screen.getByRole("button",{name,exact:true});expect(button).toHaveProperty("disabled",false);
+    const button=screen.getByRole("button",{name});expect(button).toHaveProperty("disabled",false);
     fireEvent.click(button);expect(c.mediaValid(id)).toBe(false);
     if(action==="room")expect(c.snapshot().session).toBeNull();else expect(c.snapshot().conversations[0]!.status).toBe("revoked");
     await act(async()=>{finish(f.leases[index]!);await pending;await flush();await c.refresh();});
