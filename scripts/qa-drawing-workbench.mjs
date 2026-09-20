@@ -40,6 +40,18 @@ try {
     await page.waitForFunction(() => document.querySelector('[data-studio-brush-select="gpen"]')?.getAttribute("aria-pressed") === "true");
     assert(await page.locator("[data-studio-brush-workbench-dock]").isVisible());
   });
+  await record("pen and eraser switch without moving the canvas", async () => {
+    const canvas = page.locator(".konvajs-content").first();
+    const before = await canvas.boundingBox();
+    await page.getByRole("button", { name: "지우개 (E)", exact: true }).click();
+    await page.waitForTimeout(250);
+    const erased = await canvas.boundingBox();
+    assert(before && erased && Math.abs(before.y - erased.y) < 0.5);
+    await page.getByRole("button", { name: "펜 (B)", exact: true }).click();
+    await page.waitForTimeout(250);
+    const restored = await canvas.boundingBox();
+    assert(restored && Math.abs(before.y - restored.y) < 0.5);
+  });
   await record("draw and open precision transform through the rail", async () => {
     await page.mouse.move(600, 380); await page.mouse.down();
     await page.mouse.move(700, 450, { steps: 20 });

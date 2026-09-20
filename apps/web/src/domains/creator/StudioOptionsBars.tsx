@@ -167,10 +167,10 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
   if (isMobile || (!drawVisible && !selectionVisible && !draw.workbenchVisible)) return null;
 
   return (
-    <div className="relative z-[40] flex min-h-14 min-w-0 shrink-0 border-b border-line bg-panel" data-studio-workbench-options="true">
+    <div className="relative z-[40] flex min-h-16 min-w-0 shrink-0 border-b border-line bg-panel" data-studio-workbench-options="true">
       <StudioDrawingWorkbenchControls libraryOpen={draw.libraryDockOpen === true}
         undoAvailable={draw.layoutRestoreAvailable === true} handlers={stableHandlers} />
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
       {drawVisible ? (
         // One persistent context surface at a time. Selection replaces drawing instead of stacking
         // a second strip over the canvas.

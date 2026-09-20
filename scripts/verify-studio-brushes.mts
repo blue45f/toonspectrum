@@ -930,10 +930,15 @@ async function ensureDesktopBrushCatalogTrigger(page: Page): Promise<Locator> {
 }
 
 async function openDesktopCatalog(page: Page): Promise<Locator> {
-  await (await ensureDesktopBrushCatalogTrigger(page)).click();
-  const catalog = page.locator('[data-studio-brush-catalog-session="true"]');
+  const trigger = await ensureDesktopBrushCatalogTrigger(page);
+  const dock = page.locator('[data-studio-brush-workbench-dock="true"]');
+  if (!await dock.isVisible()) await trigger.click();
+  await dock.waitFor({ state: "visible" });
+  await dock.getByRole("button", { name: "확장 보기", exact: true }).click();
+  const catalog = page.locator('[role="dialog"][data-studio-brush-floating]')
+    .locator('[data-studio-brush-catalog-session="true"]');
   await catalog.waitFor({ state: "visible" });
-  invariant(await catalog.count() === 1, "desktop opened more than one built-in catalogue session");
+  invariant(await page.locator('[data-studio-brush-catalog-session="true"]').count() === 1, "desktop opened more than one built-in catalogue session");
   invariant(
     await page.locator('[role="dialog"][data-studio-brush-floating]').count() === 1,
     "desktop must expose exactly one floating built-in catalogue dialog",
@@ -947,7 +952,7 @@ async function openDesktopCatalog(page: Page): Promise<Locator> {
   return catalog;
 }
 
-/** Desktop selection deliberately keeps its floating library open for repeated picking. */
+/** Closing expanded discovery returns to the dock; the dialog itself must detach. */
 async function closeDesktopCatalog(page: Page, catalog: Locator): Promise<void> {
   const dialog = page.locator('[role="dialog"][data-studio-brush-floating]');
   await dialog.getByRole("button", { name: / 닫기$/u }).click();

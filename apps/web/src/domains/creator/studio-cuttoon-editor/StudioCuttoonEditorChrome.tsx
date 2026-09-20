@@ -713,7 +713,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
         ) : null}
       </div>
 
-      {!isMobile && !canvasOnlyMode ? <Suspense fallback={<div aria-hidden="true" className="min-h-14 shrink-0 border-b border-line bg-panel" />}><StudioOptionsBars
+      {!isMobile && !canvasOnlyMode ? <Suspense fallback={<div aria-hidden="true" className="min-h-16 shrink-0 border-b border-line bg-panel" />}><StudioOptionsBars
         draw={studioOptionsBarsDrawModel}
         selection={studioOptionsBarsSelectionModel}
         stableHandlers={studioOptionsBarsHandlers}
