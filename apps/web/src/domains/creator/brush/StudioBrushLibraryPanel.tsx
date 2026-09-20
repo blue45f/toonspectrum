@@ -1,3 +1,5 @@
+import { BRUSH_SOURCE_ARCHIVE_MAX_BYTES } from "./studio-brush-original-source";
+import { StudioBrushOriginalSourceActions } from "./StudioBrushOriginalSourceActions";
 // 브러시 라이브러리 패널 — OPFS SQLite를 제품 권위로 사용하고 StudioPage가 소유한 배열은
 // 기존 데스크톱/모바일 소비자를 위한 controlled projection으로 갱신한다. 이름 붙은 브러시 설정을
 // 저장·고정·복제·이름변경·안전 삭제하고,
@@ -80,7 +82,7 @@ import type {
 
 import { cx } from "@/shared/lib/cx";
 
-const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_IMPORT_FILE_BYTES = BRUSH_SOURCE_ARCHIVE_MAX_BYTES;
 const PREVIEW_SWATCH_MIN = 10;
 const PREVIEW_SWATCH_MAX = 30;
 const SAVED_PREVIEW_WIDTH = 84;
@@ -812,7 +814,7 @@ export function StudioBrushLibraryPanel({
       return;
     }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
-      setError("파일이 너무 커요. 2MB 이하 브러시 설정(.json) 파일만 가져올 수 있어요.");
+      setError("브러시 보존 파일이 허용 크기를 넘었습니다. 일반 설정은 2MB, 원본 포함 파일은 원본 8MiB와 설정 한도 안에서 지원합니다.");
       return;
     }
     setImporting(true);
@@ -847,18 +849,24 @@ export function StudioBrushLibraryPanel({
     reader.readAsText(file);
   }
 
-  function handleExport(brush: StudioSavedBrush) {
-    downloadBlob(
-      new Blob([writeBrushJson(brush)], { type: "application/json;charset=utf-8" }),
-      brushFileName(brush)
-    );
+  async function handleExport(brush: StudioSavedBrush) {
+    try {
+      const exported = brush.originalSource
+        ? await (await import("./studio-brush-original-source-store")).prepareStudioBrushSourceExport(brush) : brush;
+      downloadBlob(new Blob([writeBrushJson(exported)], { type: "application/json;charset=utf-8" }), brushFileName(brush));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "브러시 원본을 보존해 내보내지 못했습니다.");
+    }
   }
 
   async function handleShare(brush: StudioSavedBrush) {
     setError(null);
     setDoneMsg(null);
+    try {
+    const exported = brush.originalSource
+      ? await (await import("./studio-brush-original-source-store")).prepareStudioBrushSourceExport(brush) : brush;
     const file = new File(
-      [writeBrushJson(brush)],
+      [writeBrushJson(exported)],
       brushFileName(brush),
       { type: "application/json;charset=utf-8" }
     );
@@ -870,7 +878,6 @@ export function StudioBrushLibraryPanel({
       setDoneMsg(`공유 시트를 지원하지 않아 "${brush.name}" 파일을 내려받았어요.`);
       return;
     }
-    try {
       await navigator.share({
         title: `${brush.name} · ToonSpectrum 브러시`,
         text: "이 브러시 설정을 ToonSpectrum에서 가져올 수 있어요.",
@@ -879,7 +886,7 @@ export function StudioBrushLibraryPanel({
       setDoneMsg(`"${brush.name}" 브러시를 공유했어요.`);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") return;
-      setError("브러시 공유를 열지 못했어요. 내보내기로 파일을 저장해 다시 시도해 주세요.");
+      setError(caught instanceof Error ? caught.message : "브러시 공유를 열지 못했어요. 내보내기로 파일을 저장해 다시 시도해 주세요.");
     }
   }
 
@@ -1284,7 +1291,7 @@ export function StudioBrushLibraryPanel({
                 <button type="button" onClick={(event) => startRename(brush, event.currentTarget)} aria-label={`${brush.name} 이름 변경`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Pencil size={12} aria-hidden /> 이름
                 </button>
-                <button type="button" onClick={() => handleExport(brush)} aria-label={`${brush.name} 내보내기`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
+                <button type="button" onClick={() => void handleExport(brush)} aria-label={`${brush.name} 내보내기`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
                   <Download size={12} aria-hidden /> 내보내기
                 </button>
                 <button type="button" onClick={() => void handleShare(brush)} aria-label={`${brush.name} 브러시 공유`} className="flex min-h-11 items-center justify-center gap-1 rounded-lg text-[0.6rem] font-medium text-fg-3 hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-8">
@@ -1294,6 +1301,7 @@ export function StudioBrushLibraryPanel({
                   <Trash2 size={12} aria-hidden /> 삭제
                 </button>
                 </div>
+                {brush.originalSource ? <StudioBrushOriginalSourceActions source={brush.originalSource} name={brush.name} onError={setError} /> : null}
               </details>
             </li>
             );

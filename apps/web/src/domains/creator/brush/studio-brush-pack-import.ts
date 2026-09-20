@@ -1,3 +1,4 @@
+import { createStudioBrushOriginalSource, requireStudioBrushOriginalSource, type StudioBrushOriginalSource } from "./studio-brush-original-source";
 /**
  * Brush pack import router — one entry point for every brush file the studio
  * can actually turn into a drawable brush.
@@ -53,6 +54,7 @@ import {
 import {
   DEFAULT_STUDIO_BRUSH_SNAPSHOT,
   createBrush,
+  sanitizeBrushSnapshot,
   importBrushFromJson,
   type StudioBrushSnapshot,
   type StudioSavedBrush,
@@ -105,6 +107,8 @@ export class StudioBrushProgramImportError extends Error {
 }
 
 export interface StudioBrushPackCandidate {
+  /** Exact original file, kept separately from the drawable approximation. */
+  readonly originalSource?: StudioBrushOriginalSource;
   readonly name: string;
   readonly snapshot: StudioBrushSnapshot;
   /** Stable source path for multi-resource bundles. */
@@ -584,6 +588,9 @@ export function importStudioMybBytes(
   bytes: Uint8Array,
   fileName: string,
 ): StudioBrushPackImportResult {
+  if (!bytes.byteLength || bytes.byteLength > STUDIO_BRUSH_PROGRAM_MAX_BYTES) {
+    throw new StudioBrushProgramImportError("브러시 원본이 비어 있거나 8MiB 크기 한도를 넘었습니다.", "myb");
+  }
   const presetId = `myb:${fileName}`;
   let parsed;
   try {
@@ -608,6 +615,7 @@ export function importStudioMybBytes(
     brushes: [
       {
         name,
+        originalSource: createStudioBrushOriginalSource(bytes, fileName, "myb"),
         snapshot: { ...mapped.snapshot, sourcePresetName: name },
       },
     ],
@@ -624,6 +632,9 @@ export function importStudioKppBytes(
   bytes: Uint8Array,
   fileName: string,
 ): StudioBrushPackImportResult {
+  if (!bytes.byteLength || bytes.byteLength > STUDIO_BRUSH_PROGRAM_MAX_BYTES) {
+    throw new StudioBrushProgramImportError("브러시 원본이 비어 있거나 8MiB 크기 한도를 넘었습니다.", "kpp");
+  }
   let parsed;
   try {
     parsed = parseKppPreset(bytes);
@@ -649,7 +660,8 @@ export function importStudioKppBytes(
   }
   return {
     format: "kpp",
-    brushes: [{ name, snapshot: { ...mapped.snapshot, sourcePresetName: name } }],
+    brushes: [{ name, snapshot: { ...mapped.snapshot, sourcePresetName: name },
+      originalSource: createStudioBrushOriginalSource(bytes, fileName, "kpp") }],
     unmapped: [
       ...mapped.unmapped,
       ...parsed.unmapped.map((entry) => `kpp:${entry}`),
@@ -667,7 +679,8 @@ export function importStudioBrushJsonText(
   const { brush, adjustedFields } = importBrushFromJson(text, fallbackName);
   return {
     format: "json",
-    brushes: [{ name: brush.name, snapshot: brush }],
+    brushes: [{ name: brush.name, snapshot: sanitizeBrushSnapshot(brush).snapshot,
+      ...(brush.originalSource ? { originalSource: brush.originalSource } : {}) }],
     unmapped: [],
     warnings:
       adjustedFields.length > 0
@@ -775,8 +788,11 @@ export async function commitStudioBrushPackImport(
   repository: BrushLibraryRepositoryPort,
 ): Promise<StudioBrushPackCommitResult> {
   if (result.brushes.length === 0) throw new StudioBrushPackPreserveOnlyError(result);
-  const materialized = result.brushes.map((candidate) =>
-    createBrush(candidate.name, candidate.snapshot));
+  const materialized = result.brushes.map((candidate) => ({
+    ...createBrush(candidate.name, candidate.snapshot),
+    ...(Object.hasOwn(candidate, "originalSource")
+      ? { originalSource: requireStudioBrushOriginalSource(candidate.originalSource) } : {}),
+  }));
   const saved = await repository.putMany(materialized);
   return { result, materialized, saved };
 }

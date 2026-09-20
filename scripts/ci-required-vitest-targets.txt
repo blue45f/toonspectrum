@@ -229,3 +229,7 @@ scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
 scripts/verify-studio-living-ink-integration.test.ts
 scripts/verify-studio-menus.test.ts
 scripts/verify-virtual-studio-art-manifest.test.mjs
+apps/web/src/domains/creator/brush/studio-brush-original-source.test.ts
+apps/web/src/domains/creator/brush/studio-brush-original-source-storage.test.ts
+apps/web/src/domains/creator/brush/studio-brush-original-roundtrip.test.ts
+apps/web/src/domains/creator/brush/StudioBrushOriginalSourceActions.test.tsx

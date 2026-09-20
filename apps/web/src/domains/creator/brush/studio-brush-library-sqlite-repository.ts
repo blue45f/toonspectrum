@@ -1,3 +1,4 @@
+import type { BrushOriginalStore } from "./studio-brush-original-source-store";
 /**
  * SQLite-first product authority for the unlimited Studio brush library.
  *
@@ -94,6 +95,7 @@ export interface StudioBrushLibraryInstallCompareAndRestoreEntry {
 }
 
 interface SqliteBrushLibraryAdapterOptions {
+  readonly originalSourceStore?: BrushOriginalStore;
   readonly now?: () => number;
   readonly uuid?: () => string;
 }
@@ -285,6 +287,9 @@ export function studioBrushToSqlRecord(brush: StudioSavedBrush): StudioBrushLibr
   if (!normalized) {
     throw corruptRecord("Brush library write contains an invalid Studio brush");
   }
+  if (normalized.originalSource?.encoding === "base64") {
+    throw corruptRecord("Original brush bytes must be committed to OPFS before writing SQLite metadata");
+  }
   const category = familyOf(normalized.brushId);
   return {
     id: normalized.id,
@@ -358,6 +363,15 @@ export function createSqliteBrushLibraryAdapter(
 ): BrushLibraryRepositoryAdapter {
   const now = options.now ?? Date.now;
   const uuid = options.uuid ?? (() => crypto.randomUUID());
+  async function prepareOriginal(brush: StudioSavedBrush): Promise<StudioSavedBrush> {
+    if (!Object.hasOwn(brush, "originalSource")) return brush;
+    const normalized = normalizeStoredBrush(brush);
+    if (!normalized?.originalSource) throw corruptRecord("Brush original is invalid");
+    const { storeStudioBrushOriginal } = await import("./studio-brush-original-source-store");
+    return { ...normalized, originalSource: await storeStudioBrushOriginal(
+      normalized.originalSource, options.originalSourceStore,
+    ) };
+  }
 
   return {
     async query(input): Promise<BrushLibraryAdapterPage> {
@@ -390,7 +404,7 @@ export function createSqliteBrushLibraryAdapter(
 
     async put(brush) {
       try {
-        const record = studioBrushToSqlRecord(brush);
+        const record = studioBrushToSqlRecord(await prepareOriginal(brush));
         await database.putBrushLibraryRecord(record);
         return sqlRecordToStudioBrush(record);
       } catch (error) {
@@ -407,7 +421,9 @@ export function createSqliteBrushLibraryAdapter(
         unique.push(brush);
       }
       try {
-        await database.putBrushLibraryRecords(unique.map(studioBrushToSqlRecord));
+        const records: StudioBrushLibrarySqlRecord[] = [];
+        for (const brush of unique) records.push(studioBrushToSqlRecord(await prepareOriginal(brush)));
+        await database.putBrushLibraryRecords(records);
       } catch (error) {
         throw writeFailure("SQLite brush-library batch write failed", error);
       }
@@ -430,7 +446,7 @@ export function createSqliteBrushLibraryAdapter(
 
     async restore(deleted) {
       try {
-        const record = studioBrushToSqlRecord(deleted.brush);
+        const record = studioBrushToSqlRecord(await prepareOriginal(deleted.brush));
         await database.putBrushLibraryRecord(record);
         return sqlRecordToStudioBrush(record);
       } catch (error) {
