@@ -3,6 +3,8 @@ import {
   Download,
   Plus,
   RotateCcw,
+  Undo2,
+  Redo2,
   Save,
   Trash2,
   Upload,
@@ -13,6 +15,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type KeyboardEvent,
   type ReactNode,
 } from "react";
 
@@ -37,6 +40,8 @@ import {
   type StudioWorldSpawnDefinition,
 } from "./studio-virtual-space-world-manifest";
 import { resolveStudioWorldSpawn } from "./studio-virtual-space-world-pathfinding";
+
+import { patchStudioWorldProp, useStudioWorldEditHistory } from "./studio-virtual-space-world-edit-history";
 
 type AuthoringSection =
   | "rooms"
@@ -271,11 +276,35 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   const [section, setSection] = useState<AuthoringSection>("rooms");
   const [selected, setSelected] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  const edits = useStudioWorldEditHistory({ manifest, projectId, basePublishedRevisionId, disabled, onChange });
+  const importEpoch = useRef(0);
+  const [moveStep, setMoveStep] = useState(8);
+  useEffect(() => {
+    importEpoch.current += 1;
+    return () => { importEpoch.current += 1; };
+  }, [manifest, projectId, basePublishedRevisionId, disabled]);
+  const sectionLabel = (value: AuthoringSection) => ({
+    rooms: bt("방", "Rooms"), props: bt("소품", "Props"), colliders: bt("충돌 영역", "Colliders"),
+    interactions: bt("상호작용", "Interactions"), portals: bt("이동 지점", "Portals"),
+    spawns: bt("시작 위치", "Spawn points"), npcs: bt("도우미 캐릭터", "NPCs"),
+  })[value];
   const errors = useMemo(() => validateStudioWorldManifest(manifest), [manifest]);
   const roomIds = useMemo(() => manifest.rooms.map((room) => room.id), [manifest.rooms]);
 
+  const handleHistoryKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+        if (disabled || event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229 || !(event.ctrlKey || event.metaKey) || event.altKey) return;
+        if ((event.target as HTMLElement).closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+        const key = event.key.toLowerCase();
+        const redo = (key === "z" && event.shiftKey) || key === "y";
+        if (key !== "z" && key !== "y") return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (redo) edits.redo(); else edits.undo();
+        setMessage(null);
+  };
+
   const setManifest = (next: StudioVirtualSpaceWorldManifest) => {
-    onChange(next);
+    edits.change(next);
     setMessage(null);
   };
 
@@ -453,7 +482,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   const updateProp = (patch: Partial<StudioWorldPropDefinition>) => {
     const item = manifest.props[selected];
     if (!item) return;
-    setManifest({ ...manifest, props: replaceAt(manifest.props, selected, { ...item, ...patch }) });
+    setManifest({ ...manifest, props: replaceAt(manifest.props, selected, patchStudioWorldProp(item, patch)) });
   };
   const updateCollider = (patch: Partial<StudioWorldRect>) => {
     const item = manifest.colliders[selected];
@@ -484,13 +513,17 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || disabled) return;
+    const epoch = ++importEpoch.current;
     try {
-      const imported = parseStudioWorldAuthoringImport(await file.text(), manifest);
+      const raw = await file.text();
+      if (epoch !== importEpoch.current) return;
+      const imported = parseStudioWorldAuthoringImport(raw, manifest);
       setManifest(imported);
       setSelected(0);
       setMessage(bt("월드 JSON을 불러왔습니다.", "World JSON imported."));
     } catch (error) {
+      if (epoch !== importEpoch.current) return;
       setMessage(error instanceof Error ? error.message : bt("월드 JSON을 불러오지 못했습니다.", "Could not import world JSON."));
     }
   };
@@ -522,6 +555,18 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
             <SelectField label="Depth" value={item.depth} options={["fixed", "y-sort", "foreground"] as const} onChange={(depth) => updateProp({ depth })} />
           </div>
           <GeometryFields x={item.x} y={item.y} width={item.width} height={item.height} onChange={updateProp} />
+          <div role="group" aria-label={bt("소품 위치 조정", "Move prop")} className="grid grid-cols-2 gap-2">
+            <Field label={bt("이동 간격", "Move increment")}>
+              <select aria-label={bt("이동 간격", "Move increment")} value={moveStep} onChange={(event) => setMoveStep(Number(event.target.value))} className="min-h-11 rounded-lg border border-line bg-card px-2 text-xs">
+                {[1, 8, 16, 32].map((step) => <option key={step} value={step}>{step}px</option>)}
+              </select>
+            </Field>
+            <p className="text-xs text-fg-3">{bt("충돌 영역도 함께 이동합니다.", "The collider moves with this prop.")}</p>
+            <button onKeyDown={handleHistoryKeyDown} type="button" className="min-h-11" onClick={() => updateProp({ x: item.x - moveStep })}>{bt("왼쪽으로", "Move left")}</button>
+            <button onKeyDown={handleHistoryKeyDown} type="button" className="min-h-11" onClick={() => updateProp({ x: item.x + moveStep })}>{bt("오른쪽으로", "Move right")}</button>
+            <button onKeyDown={handleHistoryKeyDown} type="button" className="min-h-11" onClick={() => updateProp({ y: item.y - moveStep })}>{bt("위로", "Move up")}</button>
+            <button onKeyDown={handleHistoryKeyDown} type="button" className="min-h-11" onClick={() => updateProp({ y: item.y + moveStep })}>{bt("아래로", "Move down")}</button>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <TextField label="Asset key" value={item.assetKey} onChange={(assetKey) => updateProp({ assetKey: assetKey || undefined })} />
             <TextField label="Asset URL" value={item.assetUrl} onChange={(assetUrl) => updateProp({ assetUrl: assetUrl || undefined })} />
@@ -646,8 +691,9 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   }, [count, selected]);
 
   return (
-    <section className="studio-vspace-authoring" data-studio-world-authoring="true">
-      <fieldset disabled={disabled} aria-label={bt("공간 초안", "World draft")} className="min-w-0 border-0 p-0">
+    <section className="studio-vspace-authoring" data-studio-world-authoring="true" data-space-interactive="true">
+      <fieldset disabled={disabled} aria-label={bt("공간 초안", "World draft")} className="min-w-0 border-0 p-0"
+>
       <div className="studio-vspace-authoring-head">
         <div>
           <p>WORLD AUTHORING</p>
@@ -655,7 +701,13 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           <span>{manifest.width} × {manifest.height} · v{manifest.version}</span>
         </div>
         <div className="studio-vspace-authoring-actions">
-          <button
+          <button onKeyDown={handleHistoryKeyDown} type="button" className="min-h-11" disabled={!edits.canUndo} aria-keyshortcuts="Control+Z Meta+Z" onClick={() => { edits.undo(); setMessage(null); }}>
+            <Undo2 size={14} aria-hidden /> {bt("실행 취소", "Undo")}
+          </button>
+          <button onKeyDown={handleHistoryKeyDown} type="button" className="min-h-11" disabled={!edits.canRedo} aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" onClick={() => { edits.redo(); setMessage(null); }}>
+            <Redo2 size={14} aria-hidden /> {bt("다시 실행", "Redo")}
+          </button>
+          <button onKeyDown={handleHistoryKeyDown}
             type="button"
             onClick={() => {
               const ok = writeStudioWorldAuthoringDraft(projectId, manifest, basePublishedRevisionId);
@@ -664,13 +716,13 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           >
             <Save size={14} aria-hidden /> {bt("초안 저장", "Save draft")}
           </button>
-          <button type="button" onClick={() => downloadJson(`${manifest.id}.json`, studioWorldManifestToTiledMap(manifest))}>
+          <button onKeyDown={handleHistoryKeyDown} type="button" onClick={() => downloadJson(`${manifest.id}.json`, studioWorldManifestToTiledMap(manifest))}>
             <Download size={14} aria-hidden /> Tiled JSON
           </button>
-          <button type="button" onClick={() => inputRef.current?.click()}>
+          <button onKeyDown={handleHistoryKeyDown} type="button" onClick={() => inputRef.current?.click()}>
             <Upload size={14} aria-hidden /> {bt("가져오기", "Import")}
           </button>
-          <button type="button" onClick={onReset}>
+          <button onKeyDown={handleHistoryKeyDown} type="button" onClick={onReset}>
             <RotateCcw size={14} aria-hidden /> {bt("원본 복원", "Reset")}
           </button>
           <input ref={inputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImport} />
@@ -688,13 +740,13 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
       <div className="studio-vspace-authoring-body">
         <nav className="studio-vspace-authoring-sections" aria-label={bt("월드 편집 레이어", "World authoring layers")}>
           {SECTIONS.map((item) => (
-            <button
+            <button onKeyDown={handleHistoryKeyDown}
               key={item}
               type="button"
               data-active={section === item || undefined}
               onClick={() => { setSection(item); setSelected(0); setMessage(null); }}
             >
-              <span>{item}</span>
+              <span>{sectionLabel(item)}</span>
               <b>{sectionLength(manifest, item)}</b>
             </button>
           ))}
@@ -702,12 +754,12 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
 
         <div className="studio-vspace-authoring-list">
           <div className="studio-vspace-authoring-list-head">
-            <strong>{section}</strong>
-            <button type="button" onClick={addEntity}><Plus size={14} aria-hidden /> {bt("추가", "Add")}</button>
+            <strong>{sectionLabel(section)}</strong>
+            <button onKeyDown={handleHistoryKeyDown} type="button" onClick={addEntity}><Plus size={14} aria-hidden /> {bt("추가", "Add")}</button>
           </div>
           <div className="studio-vspace-authoring-scroll">
             {count ? Array.from({ length: count }, (_, index) => (
-              <button
+              <button onKeyDown={handleHistoryKeyDown}
                 key={`${section}-${entityLabel(manifest, section, index)}-${index}`}
                 type="button"
                 data-active={safeSelected === index || undefined}
@@ -720,8 +772,8 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           </div>
           {count ? (
             <div className="studio-vspace-authoring-list-actions">
-              <button type="button" onClick={duplicateEntity}><Copy size={13} aria-hidden /> {bt("복제", "Duplicate")}</button>
-              <button type="button" className="is-danger" onClick={deleteEntity}><Trash2 size={13} aria-hidden /> {bt("삭제", "Delete")}</button>
+              <button onKeyDown={handleHistoryKeyDown} type="button" onClick={duplicateEntity}><Copy size={13} aria-hidden /> {bt("복제", "Duplicate")}</button>
+              <button onKeyDown={handleHistoryKeyDown} type="button" className="is-danger" onClick={deleteEntity}><Trash2 size={13} aria-hidden /> {bt("삭제", "Delete")}</button>
             </div>
           ) : null}
         </div>
