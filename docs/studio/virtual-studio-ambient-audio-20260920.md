@@ -45,7 +45,7 @@ The browser fixture mounts the actual panel, actual Huddle launcher/controller a
 
 Reproduction fixture: `apps/web/tools/browser-harnesses/virtual-studio-ambient-audio.html` via the development server. Native ownership/loop/lifecycle observations are exposed by `window.ambientAudioQA()`. Local evidence: `/tmp/virtual-studio-ambient-audio/browser-report.json`, `browser.log`, `verify-browser.mjs`, `mobile-final.png`, `unit-final.log`, `gates.log`, `art-final.log`, `candidate-qc.json`. The automation used the agent-browser skill with an isolated session.
 
-A separate existing Huddle layout issue was discovered at **390×844**: the joined panel can extend above the viewport, clipping its header/collapse button. The visible bottom participation toggle still collapses it. Evidence: `/tmp/virtual-studio-ambient-audio/panel-open.png`. The parent owns a subsequent layout repair; ambient changes do not alter that layout.
+A separate Huddle layout repair bounds the entire dock by the available viewport above the existing mobile canvas controls. The header and participation toggle retain their size while only the content scrolls; the collapse target is at least 44×44 px. The original 390×844 failure clipped the header above the viewport (`/tmp/virtual-studio-ambient-audio/panel-open.png`). The corrected actual launcher/controller passed four browser journeys at 390×844, 320×568, 844×390 and 1280×900: join, reach and fill the message field, keyboard collapse, reopen with call/draft preserved, and leave. All dock bounds and header controls were on-screen, and there were no page errors. Launcher unit tests: 19 passed; scoped lint passed. Reproducible evidence is written to `.qa/virtual-studio-huddle-layout/report.json` and four screenshots. This uses the same empty-room development fixture, without a remote media peer.
 
 Commands:
 
@@ -54,4 +54,6 @@ pnpm exec vitest run apps/web/src/domains/creator/virtual-space/studio-virtual-s
 node --test scripts/verify-virtual-studio-art-manifest.test.mjs scripts/ci-executed-gates.test.mjs
 node scripts/verify-virtual-studio-art-manifest.mjs
 node scripts/verify-virtual-studio-ambient-audio.mjs
+# With the owned development server running (default fixture origin: port 5253):
+node scripts/verify-virtual-studio-huddle-layout.mjs
 ```

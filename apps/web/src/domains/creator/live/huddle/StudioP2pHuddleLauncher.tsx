@@ -161,19 +161,19 @@ export default function StudioP2pHuddleLauncher() {
   const canJoin = Boolean(room.direct && live.availability === "ready");
   const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
   return <aside
-    className="studio-p2p-huddle-dock pointer-events-none fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)] right-3 z-[65] max-w-[calc(100vw-1.5rem)] sm:bottom-3"
+    className="studio-p2p-huddle-dock pointer-events-none fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)] right-3 z-[65] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-5rem)] max-w-[calc(100vw-1.5rem)] flex-col items-end sm:bottom-3 sm:max-h-[calc(100dvh-1.5rem)]"
     aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "협업 대화")}
     data-studio-shell-floating-target="collaboration"
     data-studio-shell-force-visible={active ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "en", "true") : undefined}
   >
-    <section hidden={!open} className="studio-p2p-huddle-panel pointer-events-auto mb-2 w-[min(760px,calc(100vw-1.5rem))] max-w-full overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
+    <section hidden={!open} style={{ display: open ? "flex" : undefined }} className="studio-p2p-huddle-panel pointer-events-auto mb-2 min-h-0 w-[min(760px,calc(100vw-1.5rem))] max-w-full flex-col overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
-      <header className="flex items-center justify-between border-b border-line p-3">
+      <header className="flex shrink-0 items-center justify-between border-b border-line p-3">
         <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "Virtual Studio · Huddle")}</h3>
           <p className="text-[11px] text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "근접 P2P 우선 · 카메라·마이크는 직접 켤 때만 사용")}</p></div>
-        <button type="button" className={controlClass} aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화 패널 접기")} onClick={() => setOpen(false)}><X size={16} /></button>
+        <button type="button" className={`${controlClass} min-w-11 shrink-0`} aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화 패널 접기")} onClick={() => setOpen(false)}><X size={16} /></button>
       </header>
-      <div className="max-h-[68dvh] space-y-3 overflow-y-auto p-3">
+      <div className="min-h-0 max-h-[68dvh] space-y-3 overflow-y-auto overscroll-contain p-3">
         {!active ? <div className="space-y-3 text-xs leading-relaxed text-fg-2">
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "참여하면 채팅만 시작됩니다. 마이크·카메라는 직접 켜기 전까지 사용하지 않습니다.")}</p>
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화·통화는 브라우저 간 직접 전송하며 기록을 저장하지 않습니다. 상대에게 네트워크 주소가 노출될 수 있으니 신뢰하는 작업자와 사용해 주세요.")}</p>
@@ -251,7 +251,7 @@ export default function StudioP2pHuddleLauncher() {
         {(notice || snapshot?.error) && <p role="status" className="text-xs leading-relaxed text-warn">{notice ?? snapshot?.error}</p>}
       </div>
     </section>
-    <button type="button" aria-expanded={open} className="pointer-events-auto ml-auto flex min-h-11 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    <button type="button" aria-expanded={open} className="pointer-events-auto ml-auto flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       onClick={() => {
         const nextOpen = !open;
         if (nextOpen) {
