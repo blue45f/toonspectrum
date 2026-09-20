@@ -1,6 +1,7 @@
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 import { STUDIO_EXACT_RESUME_RESTORED_EVENT, studioExactResumeStorageKey } from "../apps/web/src/domains/creator/studio-exact-resume-context";
 import { readDurableStudioAutosaveDocument } from "../scripts/lib/studio-verify-durable-autosave.mjs";
+import { assertStudioWorkspaceHome } from "../scripts/lib/studio-workspace-browser-contract.mjs";
 
 import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
@@ -32,13 +33,22 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [320, 390, 820, 1440]) {
-  test(`all-in-one home stays readable and unclipped at ${width}px`, async ({ page }, testInfo) => {
+  test(`studio-first home keeps real navigation and accessible controls at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await assertStudioWorkspaceHome(page);
+    await capturePageEvidence(page, testInfo, `studio-workspace-${width}`);
+  });
+}
+
+for (const width of [320, 390, 820, 1440]) {
+  test(`studio introduction stays readable and unclipped at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/about/studio", { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
     const primaryAction = home.locator('.cf-hero a.cf-primary[href="/studio/new"]');
     const startCards = home.locator(".cf-start-card");
@@ -77,7 +87,7 @@ for (const width of [320, 390, 820, 1440]) {
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "프로젝트·컷·도구·소재를 바로 찾기" }).click();
+  await page.getByRole("button", { name: "검색", exact: true }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
   await search.fill("비 오는 교실 배경");
@@ -85,7 +95,7 @@ test("task-first search opens the global command palette without losing the quer
 });
 
 test("the front door exposes planning, 2D, 3D, assets, collaboration and publishing", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/about/studio");
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
 
   await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
@@ -101,7 +111,7 @@ test("the front door exposes planning, 2D, 3D, assets, collaboration and publish
 });
 
 test("section navigation keeps readable focus and browser history semantics", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/about/studio");
   const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
   await processLink.click();
   await expect(page).toHaveURL(/#creator-flow$/u);
@@ -234,8 +244,8 @@ test("recent work reopens the exact Studio document and restores its viewport", 
   expect(storedCheckpoint?.zoom ?? 0).toBeGreaterThan(1);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const recent = page.locator(".cf-intent-recent > .cf-recent-card");
-  await expect(recent).toContainText(/문서의 마지막 페이지·선택·화면 위치/u);
+  const recent = page.locator(".workspace-statusbar .workspace-primary");
+  await expect(recent).toContainText("이어서 작업");
   const recentHref = await recent.getAttribute("href");
   expect(recentHref).not.toBeNull();
   const recentUrl = new URL(recentHref!, "https://toonstudio.test");

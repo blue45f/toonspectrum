@@ -402,3 +402,12 @@ test("reference-project certification executes the real entrypoint and emits its
   assert.match(workflow, /path: qa-results\/studio-reference-projects/u);
   assert.doesNotMatch(workflow, /continue-on-error|--check\b/u);
 });
+
+
+test("focused session checkout retains every non-brand route-purpose image", () => {
+  const focused = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
+  const profiles = readFileSync(new URL("../apps/web/src/shared/lib/site-route-visual.ts", import.meta.url), "utf8");
+  const images = [...new Set([...profiles.matchAll(/image:\s*"(\/assets\/[^"\n]+)"/gu)].map((match) => match[1]))];
+  assert.ok(images.length >= 2, "route-purpose fixture must include both spatial and review artwork");
+  for (const image of images) assert.ok(focused.includes(`/apps/web/public${image}`), `focused checkout omits actual route-purpose artwork: ${image}`);
+});

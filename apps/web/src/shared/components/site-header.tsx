@@ -16,11 +16,12 @@ import { AuthMenuShell } from "../../domains/auth/components/auth-menu-shell";
 
 import {
   SITE_NAVIGATION_ITEMS,
-  primarySiteNavigationForPath,
+  TOONSTUDIO_PRIMARY_NAVIGATION,
   siteNavigationContextForPath,
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
+import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
 import { ToonSpectrumMark } from "./visual-marks";
 import { PublicSiteJourney } from "./public-site-journey";
 import { isDiscoverPurposeRoute, isPublicCreativeRoute } from "./site-public-routes";
@@ -116,6 +117,8 @@ function useDestinationActive() {
 
 /** Broader state used only by the top-level purpose choices. */
 function purposeActive(pathname: string, href: string, exact?: boolean): boolean {
+  const destination = TOONSTUDIO_PRIMARY_NAVIGATION.find((item) => item.href === href);
+  if (destination) return workspaceNavigationActiveId(pathname) === destination.id;
   if (href === "/production") return pathMatchesAny(pathname, STUDIO_PRODUCTION_PREFIXES);
   if (href === "/studio") return isStudioWorkPurpose(pathname);
   if (href === "/studio/new") return pathMatchesAny(pathname, STUDIO_CREATE_PREFIXES);
@@ -184,7 +187,7 @@ export function SiteHeader() {
   const isPublicPage = isPublicCreativeRoute(pathname);
   const headerRef = useRef<HTMLElement>(null);
   useSiteHeaderHeight(headerRef);
-  const primaryNavigation = primarySiteNavigationForPath(pathname);
+  const primaryNavigation = TOONSTUDIO_PRIMARY_NAVIGATION;
   const create = SITE_NAVIGATION_ITEMS.make;
   const brandHref = "/";
   const brandName = navigationContext === "studio" ? "ToonStudio" : t("app.name");

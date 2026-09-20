@@ -78,6 +78,8 @@ export function focusCreatorSection(hash: string, findTarget: FindCreatorTarget,
 
 export type CreatorNavigationHost = {
   getHash: () => string;
+  /** Opaque identity of the currently focused interactive control, if any. */
+  getFocusedControl?: () => unknown;
   findTarget: FindCreatorTarget;
   requestFrame: (callback: () => void) => number;
   cancelFrame: (handle: number) => void;
@@ -100,6 +102,7 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
     if (frame !== undefined) host.cancelFrame(frame);
     frame = undefined;
     const hash = host.getHash();
+    const focusedControl = host.getFocusedControl?.();
     if (!creatorSectionFromHash(hash)) return;
     frame = host.requestFrame(() => {
       if (disposed || request !== revision || hash !== host.getHash()) return;
@@ -108,6 +111,10 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
         blocked = true;
         return;
       }
+      // Native history may focus its destination before this deferred frame. A
+      // subsequent keyboard/user focus choice owns the interaction and must win.
+      const currentControl = host.getFocusedControl?.();
+      if (currentControl && currentControl !== focusedControl) return;
       focusCreatorSection(hash, host.findTarget, true);
     });
   };

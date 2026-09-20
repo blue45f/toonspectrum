@@ -5,8 +5,18 @@ import { readBrowserPreference, writeBrowserPreference } from "./browser-prefere
 export const CREATOR_EXPERIENCE_STORAGE_KEY = "toonspectrum-creator-experience-mode-v1";
 export type CreatorExperienceMode = "classic" | "virtual-studio";
 
+export function defaultCreatorExperienceMode(narrow: boolean): CreatorExperienceMode {
+  return narrow ? "classic" : "virtual-studio";
+}
+
+function defaultMode(): CreatorExperienceMode {
+  try {
+    return defaultCreatorExperienceMode(typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches);
+  } catch { return "virtual-studio"; }
+}
+
 function normalizeMode(value: unknown): CreatorExperienceMode {
-  return value === "virtual-studio" ? "virtual-studio" : "classic";
+  return value === "virtual-studio" || value === "classic" ? value : defaultMode();
 }
 
 function storage(): Pick<Storage, "getItem" | "setItem"> | undefined {
@@ -15,7 +25,7 @@ function storage(): Pick<Storage, "getItem" | "setItem"> | undefined {
 
 function readMode(): CreatorExperienceMode {
   const raw = readBrowserPreference(storage, CREATOR_EXPERIENCE_STORAGE_KEY);
-  if (!raw) return "classic";
+  if (!raw) return defaultMode();
   try {
     const parsed: unknown = JSON.parse(raw);
     if (parsed && typeof parsed === "object" && "mode" in parsed) {

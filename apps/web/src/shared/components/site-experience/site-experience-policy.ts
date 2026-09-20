@@ -29,7 +29,7 @@ export function supportsRoutePurposeScene(pathname: string): boolean {
   const path = normalizedExperiencePath(pathname);
   // The creator home already owns a full visual hero and brand film; a second guide card
   // above it duplicates the page purpose and creates an artificial top-spacing gap.
-  if (path === "/") return false;
+  if (["/", "/home", "/team", "/hub"].includes(path)) return false;
   if (supportsSiteExperience(path)) return true;
   if (STUDIO_ROUTE_GUIDE_PATHS.has(path) || path.startsWith("/studio/manual/")) return true;
   return /^\/studio\/p\/[^/]+\/(?:overview|story|production|assets|review|export|settings)$/u.test(path);

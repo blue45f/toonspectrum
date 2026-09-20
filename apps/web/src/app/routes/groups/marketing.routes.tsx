@@ -37,7 +37,21 @@ const BetaOpenEventPage = lazyRetry(
   "BetaOpenEventPage",
 );
 
+const StudioWorkspacePage = lazyRetry(
+  () => import("@/domains/creator/workspace/StudioWorkspacePage").then((module) => ({ default: module.StudioWorkspacePage })),
+  "StudioWorkspacePage",
+);
+
+const StudioIntroductionPage = lazyRetry(
+  () => import("@/domains/marketing/CreatorHomeExperience").then((module) => ({ default: module.CreatorHomeExperience })),
+  "StudioIntroductionPage",
+);
+
 export const marketingRoutes = defineAppRoutes([
+  { id: "marketing-studio-introduction", path: "/about/studio", element: <StudioIntroductionPage /> },
+  { id: "workspace-home", path: "/home", element: <StudioWorkspacePage /> },
+  { id: "workspace-team", path: "/team", element: <StudioWorkspacePage surface="team" /> },
+  { id: "workspace-hub", path: "/hub", element: <StudioWorkspacePage surface="hub" /> },
   { id: "marketing-product-tour", path: "/product-tour", element: <ProductTourPage /> },
   { id: "marketing-membership", path: "/membership", element: <MembershipPolicyPage /> },
   { id: "marketing-brand-film", path: "/brand-film", element: <BrandFilmPage /> },

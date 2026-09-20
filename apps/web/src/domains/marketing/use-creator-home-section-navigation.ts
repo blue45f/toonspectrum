@@ -6,6 +6,10 @@ import { bindCreatorSectionNavigation } from "./creator-home-navigation";
 export function useCreatorHomeSectionNavigation() {
   useEffect(() => bindCreatorSectionNavigation({
     getHash: () => window.location.hash,
+    getFocusedControl: () => {
+      const active = document.activeElement;
+      return active instanceof HTMLElement && (active.tabIndex >= 0 || active.isContentEditable) ? active : null;
+    },
     findTarget: (id) => document.getElementById(id),
     requestFrame: (callback) => window.requestAnimationFrame(callback),
     cancelFrame: (handle) => window.cancelAnimationFrame(handle),

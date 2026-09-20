@@ -7,6 +7,11 @@ import { resolveRouteTitle } from "./route-titles";
 const translate = ((key: string) => key) as unknown as Parameters<typeof resolveRouteTitle>[1];
 
 describe("route title resolution", () => {
+  it("preserves the complete localized introduction title at its new canonical address", () => {
+    expect(resolveRouteTitle("/about/studio", translate, "ko")).toBe(PRODUCT_IDENTITY.ko.seoTitle);
+    expect(resolveRouteTitle("/about/studio/", translate, "en")).toBe(PRODUCT_IDENTITY.en.seoTitle);
+  });
+
   it("uses the product identity registry for the all-in-one homepage title", () => {
     expect(resolveRouteTitle("/", translate, "ko")).toBe(PRODUCT_IDENTITY.ko.seoTitle);
     expect(resolveRouteTitle("/", translate, "en")).toBe(PRODUCT_IDENTITY.en.seoTitle);

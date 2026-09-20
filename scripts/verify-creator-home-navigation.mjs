@@ -42,7 +42,7 @@ try {
     page.on("request", (request) => { if (/\.mp4(?:\?|$)/.test(request.url())) mediaRequests.push(request.url()); });
 
     // The URL exists before the lazy homepage. The mounted route must resolve it.
-    await page.goto(`${origin}/#creator-faq-title`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${origin}/about/studio#creator-faq-title`, { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-home="production-first"]');
     await expect(home).toBeVisible({ timeout: 30000 });
     await dismissBetaEvent(page);
@@ -104,12 +104,16 @@ try {
     await expect(processTitle).toBeFocused();
 
     const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
+    await processLink.click({ trial: true });
     await processLink.focus();
-    await page.keyboard.press("Enter");
+    await expect(processLink).toBeFocused();
+    await processLink.press("Enter");
     await expect(page).toHaveURL(/#creator-flow$/);
     await expect(processTitle).toBeFocused();
+    await processLink.click({ trial: true });
     await processLink.focus();
-    await page.keyboard.press("Enter");
+    await expect(processLink).toBeFocused();
+    await processLink.press("Enter");
     await expect(page).toHaveURL(/#creator-flow$/);
     await expect(processTitle).toBeFocused();
 
