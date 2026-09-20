@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalJson, studioWorldManifestSchema, studioWorldPublishSchema } from "../index";
+import { studioWorldManifestSchema, studioWorldPublishSchema } from "@toonspectrum/studio-project-model/world-publication";
+
+import { canonicalJson } from "../index";
 
 const world = () => ({ id: "world", version: 1, width: 100, height: 100, backgroundAssetKey: "background", backgroundUrl: "/assets/world.png",
   rooms: [{ id: "room", x: 0, y: 0, width: 100, height: 100, labelKo: "방", labelEn: "Room" }],
