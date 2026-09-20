@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 2,
+  "trackId": "dawnfall-protocol",
+  "variant": "instrumental",
+  "provider": "ace-step",
+  "model": "acestep-v15-turbo",
+  "generatedAt": "2026-09-20T16:20:53.931404Z",
+  "durationMs": 180000,
+  "bpm": 156,
+  "seed": 967588887,
+  "sha256": "f1e39e10f82c71565d97dd2d8dee2effd2b5c0b494e374bd0b495c996951ce89",
+  "sourceFlacSha256": "877e6e1265749def8f051aa5f8f29fe6173cf33108aae9cdc911c8fd34fb5bd7",
+  "configSha256": "8ab1c6133ba0e021e8f873c5520e155512bbc89f88512cfad9f997c0b9568b47",
+  "generator": {
+    "project": "ACE-Step 1.5",
+    "sourceRevision": "ca1e85fe9430179831e6bc6be790c332190a3866",
+    "license": "MIT",
+    "sourceUrl": "https://github.com/ace-step/ACE-Step-1.5",
+    "ditSha256": "3f6e0797fad420a39bd33979eb6e840e30989e34a3794e843d23b60ec6e422d7",
+    "vaeSha256": "da17edb604c40deaf09e9b24974e590d1ca83a374070e5d0884cfa4bed9a99b0",
+    "embeddingSha256": "0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd"
+  },
+  "mastering": {
+    "sourceFormat": "flac",
+    "deliveryFormat": "mp3_48000_320",
+    "targetIntegratedLufs": -14,
+    "targetTruePeakDbfs": -1.5,
+    "targetLoudnessRangeLu": 11,
+    "passes": 2,
+    "linearNormalizationRequested": true,
+    "normalizationType": "linear",
+    "ffmpegFilter": "loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=-12.03:measured_TP=-0.67:measured_LRA=6.80:measured_thresh=-22.46:offset=-0.98:linear=true:print_format=json",
+    "firstPass": {
+      "input_i": "-12.03",
+      "input_tp": "-0.67",
+      "input_lra": "6.80",
+      "input_thresh": "-22.46",
+      "output_i": "-13.02",
+      "output_tp": "-1.50",
+      "output_lra": "6.70",
+      "output_thresh": "-23.31",
+      "normalization_type": "dynamic",
+      "target_offset": "-0.98"
+    }
+  },
+  "quality": {
+    "codec": "mp3",
+    "sampleRate": 48000,
+    "channels": 2,
+    "channelLayout": "stereo",
+    "durationSeconds": 180.0,
+    "bitRate": 320098,
+    "integratedLufs": -13.9,
+    "truePeakDbfs": -2.6,
+    "loudnessRangeLu": 6.9,
+    "fileBytes": 7202205,
+    "automatedQcPassed": true
+  },
+  "review": {
+    "ownerReleaseRequested": true,
+    "creativeDirectionRecorded": true,
+    "rightsPromptNonImitation": true,
+    "subjectiveListeningReview": "not-performed-by-assistant",
+    "approvedForSite": true
+  },
+  "masteredAt": "2026-09-20T16:23:44.071413Z"
+}

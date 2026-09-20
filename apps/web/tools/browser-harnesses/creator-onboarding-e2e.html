@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Creator onboarding browser regression</title></head>
+  <body>
+    <button id="opener">작업 목록</button><div id="root"></div>
+    <script type="module">
+      import React from "react";
+      import { createRoot } from "react-dom/client";
+      import { MemoryRouter, useNavigate } from "react-router-dom";
+      import { SessionContext, persistSession } from "../../src/compat/auth-session-store";
+      import { CreatorAdaptiveOnboardingGate } from "../../src/shared/components/CreatorAdaptiveOnboardingGate";
+      import { useI18n } from "../../src/shared/lib/i18n";
+      import { activateStudioModalSheet } from "../../src/domains/creator/useStudioModalSheet";
+      import "../../src/styles/globals.css";
+
+      // This harness is not an application entry. Browser tests intercept its API requests.
+      const params = new URLSearchParams(location.search);
+      const session = { user: { id: "onboarding-browser", role: "creator", name: "Browser tester", email: "browser@example.test", image: null }, token: null };
+      persistSession(session);
+      useI18n.setState({ lang: "ko" });
+      const harness = window.onboardingHarness = { clicks: 0 };
+      function openStudioModal() {
+        const dialog = document.createElement("div");
+        dialog.id = "studio-test-dialog";
+        dialog.setAttribute("role", "dialog");
+        dialog.setAttribute("aria-modal", "true");
+        dialog.tabIndex = -1;
+        dialog.style.cssText = "position:fixed;inset:0;z-index:80;background:white;padding:32px;color:black";
+        const button = document.createElement("button");
+        button.textContent = "3D 작업 확인";
+        button.onclick = () => { harness.clicks += 1; };
+        dialog.append(button);
+        document.body.append(dialog);
+        const release = activateStudioModalSheet({ dialog, document, root: document.body, onDismiss: () => { release(); dialog.remove(); } });
+        harness.closeStudioModal = () => { release(); dialog.remove(); };
+      }
+      harness.openStudioModal = openStudioModal;
+      document.getElementById("opener").focus();
+      if (params.has("modal")) openStudioModal();
+      function App() {
+        const navigate = useNavigate();
+        React.useEffect(() => { harness.navigate = navigate; }, [navigate]);
+        return React.createElement(CreatorAdaptiveOnboardingGate);
+      }
+      createRoot(document.getElementById("root")).render(
+        React.createElement(React.StrictMode, null,
+          React.createElement(SessionContext.Provider, { value: { data: session, status: "authenticated", ready: true, update: async () => session } },
+            React.createElement(MemoryRouter, { initialEntries: [params.get("route") || "/studio"] }, React.createElement(App)))));
+    </script>
+  </body>
+</html>

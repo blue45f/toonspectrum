@@ -263,6 +263,9 @@ function AppRuntime() {
       <StudioDocumentNavigationBridge />
       <StudioRouteImmersiveBridge />
       <SerifWebFontBridge />
+      <Suspense fallback={null}>
+        <SiteBackgroundMusicPlayer suspended={isolatedChrome} />
+      </Suspense>
       <AppShell
         header={isolatedChrome ? null : <SiteHeader />}
         footer={isolatedChrome ? null : <DeferredFooter immediate={publicExperience} />}
@@ -285,9 +288,6 @@ function AppRuntime() {
                 <StudioBg3dRetainedOwnerHost />
               </Suspense>
             </ErrorBoundary>
-            <Suspense fallback={null}>
-              <SiteBackgroundMusicPlayer suspended={isolatedChrome} />
-            </Suspense>
             {!isolatedChrome ? (
               <>
                 <DeferredBackToTop />

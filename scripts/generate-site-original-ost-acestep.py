@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, hashlib, json, os, pathlib, re, subprocess, sys, time, urllib.parse, urllib.request
+import argparse, hashlib, json, math, os, pathlib, re, subprocess, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -58,9 +58,11 @@ def prompt_for(track):
         base += '; clear natural Korean diction; expressive original lead vocal; strong verse-to-chorus lift; memorable non-derivative hook; sing only the supplied lyrics'
     return base
 
-def wait_job(task_id):
+def wait_job(task_id, max_wait_seconds=900):
     last=None; started=time.time()
     while True:
+        if time.time()-started > max_wait_seconds:
+            raise TimeoutError(f'Generation exceeded {max_wait_seconds}s for task {task_id}; check the local server before retrying.')
         time.sleep(3)
         q=post('/query_result',{'task_id_list':[task_id]})
         item=q['data'][0]; status=item.get('status')
@@ -99,11 +101,29 @@ def loudness(path):
     return {'integratedLufs':float(mi[-1].group(1)) if mi else None,'truePeakDbfs':float(mp[-1].group(1)) if mp else None,'loudnessRangeLu':float(mlra[-1].group(1)) if mlra else None}
 
 def master(raw,out,track):
-    cmd=['ffmpeg','-y','-hide_banner','-loglevel','error','-i',str(raw),'-af','loudnorm=I=-14:TP=-1:LRA=7',
-         '-ar','48000','-ac','2','-codec:a','libmp3lame','-b:a','192k','-id3v2_version','3',
+    bitrate=int(track.get('deliveryBitrateKbps',192))
+    if bitrate not in (192,256,320): raise ValueError('Unsupported MP3 bitrate')
+    target='loudnorm=I=-14:TP=-1.5:LRA=11'
+    first=subprocess.run(['ffmpeg','-hide_banner','-nostats','-i',str(raw),'-af',target+':print_format=json','-f','null','-'],text=True,capture_output=True,check=True)
+    blocks=re.findall(r'\{\s*"input_i".*?\}',first.stderr,re.S)
+    if not blocks: raise RuntimeError('Missing first-pass loudness measurements')
+    measured=json.loads(blocks[-1])
+    for key in ['input_i','input_tp','input_lra','input_thresh','target_offset']:
+        if not math.isfinite(float(measured[key])): raise RuntimeError('Silent or invalid source audio')
+    filt=(target+f":measured_I={measured['input_i']}:measured_TP={measured['input_tp']}"
+          +f":measured_LRA={measured['input_lra']}:measured_thresh={measured['input_thresh']}"
+          +f":offset={measured['target_offset']}:linear=true:print_format=json")
+    cmd=['ffmpeg','-y','-hide_banner','-nostats','-i',str(raw),'-af',filt,
+         '-ar','48000','-ac','2','-codec:a','libmp3lame','-b:a',f'{bitrate}k','-id3v2_version','3',
          '-metadata',f"title={track['title']}",'-metadata',f"artist={config['artist']}",'-metadata',f"album={config['collection']}",
          '-metadata','comment=Original ToonSpectrum soundtrack generated locally with ACE-Step 1.5; see provenance sidecar.',str(out)]
-    subprocess.run(cmd,check=True)
+    encoded=subprocess.run(cmd,text=True,capture_output=True,check=True)
+    final_blocks=re.findall(r'\{\s*"input_i".*?\}',encoded.stderr,re.S)
+    normalized=json.loads(final_blocks[-1]) if final_blocks else {}
+    return {'sourceFormat':'flac','deliveryFormat':f'mp3_48000_{bitrate}','targetIntegratedLufs':-14,
+            'targetTruePeakDbfs':-1.5,'targetLoudnessRangeLu':11,'passes':2,
+            'linearNormalizationRequested':True,'normalizationType':normalized.get('normalization_type','unknown'),
+            'ffmpegFilter':filt,'firstPass':measured}
 
 def sha(path):
     h=hashlib.sha256()
@@ -111,13 +131,13 @@ def sha(path):
         for b in iter(lambda:f.read(8*1024*1024),b''): h.update(b)
     return h.hexdigest()
 
-def generate(track, force=False, approve=False):
+def generate(track, force=False, approve=False, keep_source=False):
     variant=track['primaryVariant']; duration=track['durationMs']/1000; seed=seed_for(track['id'])
     raw=RAW/f"{track['id']}-{variant}.flac"; out=OUT/f"{track['id']}-{variant}.mp3"; side=OUT/f"{track['id']}-{variant}.json"
     if out.exists() and side.exists() and not force:
         print('SKIP',track['id'],'already exists',flush=True); return
     payload={'prompt':prompt_for(track),'lyrics':lyrics_for(track) if variant=='vocal' else '', 'thinking':False,'model':'acestep-v15-turbo',
-             'bpm':track['bpm'],'vocal_language':track['language'] if variant=='vocal' else 'unknown','audio_duration':duration,
+             'bpm':track['bpm'],'key_scale':track.get('keyScale',''),'time_signature':'4','use_cot_caption':False,'use_cot_language':False,'vocal_language':track['language'] if variant=='vocal' else 'unknown','audio_duration':duration,
              'batch_size':1,'use_random_seed':False,'seed':seed,'inference_steps':8,'guidance_scale':1.0,'audio_format':'flac','task_type':'text2music','use_format':False}
     print(f"START {track['id']} {variant} {duration:.0f}s seed={seed}",flush=True)
     submit=post('/release_task',payload); task=submit['data']['task_id']
@@ -126,7 +146,7 @@ def generate(track, force=False, approve=False):
     if not file_url: raise RuntimeError(f"missing file url: {entry}")
     download_file(file_url,raw)
     raw_sha=sha(raw)
-    master(raw,out,track)
+    master_info=master(raw,out,track)
     info=probe(out); loud=loudness(out)
     target=duration
     qc=(info['codec']=='mp3' and info['sampleRate']==48000 and info['channels']==2 and abs(info['durationSeconds']-target)<=2.5 and
@@ -138,17 +158,19 @@ def generate(track, force=False, approve=False):
           'sha256':sha(out),'sourceFlacSha256':raw_sha,'configSha256':config_sha,
           'generator':{'project':'ACE-Step 1.5','sourceRevision':PROV['sourceRevision'],'license':'MIT','sourceUrl':'https://github.com/ace-step/ACE-Step-1.5',
                        'ditSha256':PROV['ditSha256'],'vaeSha256':PROV['vaeSha256'],'embeddingSha256':PROV['embeddingSha256']},
-          'mastering':{'sourceFormat':'flac','deliveryFormat':'mp3_48000_192','targetIntegratedLufs':-14,'targetTruePeakDbfs':-1,'ffmpegFilter':'loudnorm=I=-14:TP=-1:LRA=7'},
+          'mastering':master_info,
           'quality':{**info,**loud,'fileBytes':out.stat().st_size,'automatedQcPassed':True},
           'review':{'ownerReleaseRequested':approve,'creativeDirectionRecorded':True,'rightsPromptNonImitation':True,'subjectiveListeningReview':'not-performed-by-assistant','approvedForSite':approve}}
     side.write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
-    raw.unlink(missing_ok=True)
+    if not keep_source: raw.unlink(missing_ok=True)
+    else: print(f'LOSSLESS SOURCE {raw}',flush=True)
     print(f"DONE {track['id']} {info['durationSeconds']:.1f}s {loud['integratedLufs']:.1f} LUFS peak {loud['truePeakDbfs']:.1f} dBFS {meta['sha256'][:12]}",flush=True)
 
 def main():
     parser=argparse.ArgumentParser(description='Generate ToonSpectrum OST masters with a local ACE-Step 1.5 API server.')
     parser.add_argument('--track', action='append', default=[], help='Track id to generate; repeat for multiple tracks.')
     parser.add_argument('--all', action='store_true', help='Generate all primary masters.')
+    parser.add_argument('--keep-source', action='store_true', help='Keep the original 48 kHz FLAC outside the repository for archival and editing.')
     parser.add_argument('--force', action='store_true', help='Replace existing audio and sidecar files.')
     parser.add_argument('--approve-generated', action='store_true', help='Mark generated sidecars approved for site publication.')
     args=parser.parse_args()
@@ -157,7 +179,7 @@ def main():
     if not selected: parser.error('Select --all or at least one valid --track id.')
     missing=set(args.track)-{t['id'] for t in selected}
     if missing: parser.error('Unknown track id(s): '+', '.join(sorted(missing)))
-    for track in selected: generate(track, force=args.force, approve=args.approve_generated)
+    for track in selected: generate(track, force=args.force, approve=args.approve_generated, keep_source=args.keep_source)
     print(f'Generated {len(selected)} primary master(s). Run the Node publisher after reviewing sidecars.', flush=True)
 
 if __name__ == '__main__':

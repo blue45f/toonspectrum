@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { SiteBackgroundMusicPlayer } from "./SiteBackgroundMusicPlayer";
 
 const mocks = vi.hoisted(() => ({
+  moodId: "pop",
   setEnabled: vi.fn(),
   setMood: vi.fn(),
   setVolume: vi.fn(),
@@ -27,7 +28,7 @@ vi.mock("@toonspectrum/core/fx", () => ({
   useAmbientBgm: () => ({
     enabled: false,
     mood: "",
-    moodId: "pop",
+    moodId: mocks.moodId,
     artist: "",
     creditUrl: "",
     volume: 0.48,
@@ -107,6 +108,7 @@ describe("SiteBackgroundMusicPlayer", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
+    mocks.moodId = "pop";
     mocks.resumeAudio.mockResolvedValue(undefined);
     mockManifest();
   });
@@ -168,8 +170,8 @@ describe("SiteBackgroundMusicPlayer", () => {
       },
     ]));
     await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("playlist:0"));
-    expect(fetchMock).toHaveBeenCalledWith("/audio/playlist.json", expect.objectContaining({
-      cache: "force-cache",
+    expect(fetchMock).toHaveBeenCalledWith("/audio/playlist.json?catalog=prism-awakening-20260921", expect.objectContaining({
+      cache: "no-cache",
       headers: { Accept: "application/json" },
     }));
   });
@@ -198,6 +200,43 @@ describe("SiteBackgroundMusicPlayer", () => {
     expect(await screen.findByText("사이트 OST 목록을 불러오지 못했습니다.")).toBeTruthy();
     expect((screen.getByRole("button", { name: "OST 재생" }) as HTMLButtonElement).disabled).toBe(true);
     expect(mocks.register).toHaveBeenCalledWith([]);
+    expect(mocks.setEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it("selects a new master without autoplay and disables page following", async () => {
+    mockManifest([APPROVED_TRACK_FIXTURE, { ...APPROVED_TRACK_FIXTURE, id: "spectrum-breaker-vocal", title: "SPECTRUM BREAKER", src: "/audio/original/spectrum-breaker-vocal.mp3" }]);
+    renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    await expandPlayer();
+    fireEvent.change(screen.getByLabelText("OST 곡 선택"), { target: { value: "spectrum-breaker-vocal" } });
+    expect(mocks.setMood).toHaveBeenLastCalledWith("playlist:1");
+    expect(localStorage.getItem("ts_site_bgm_follow_route")).toBe("0");
+    expect(mocks.resumeAudio).not.toHaveBeenCalled();
+    expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);
+    expect(screen.getByText("전체 OST · 2곡")).toBeTruthy();
+  });
+
+  it("shows actual ACE-Step provenance and same-origin download for the selected master", async () => {
+    mocks.moodId = "playlist:0";
+    mockManifest([{ ...APPROVED_TRACK_FIXTURE, provider: "ace-step", model: "acestep-v15-turbo", provenance: "local-generation-recorded", generatorRevision: "b".repeat(40), c2paRequested: undefined }]);
+    renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    await expandPlayer();
+    expect(screen.getByText(/ACE-Step 1.5 · Local generation recorded/u)).toBeTruthy();
+    expect(screen.queryByText(/C2PA requested/u)).toBeNull();
+    const link = screen.getByRole("link", { name: "현재 곡 MP3 저장" });
+    expect(link.getAttribute("href")).toBe(APPROVED_TRACK_FIXTURE.src);
+    expect(link.getAttribute("download")).toBe(`${APPROVED_TRACK_FIXTURE.id}.mp3`);
+  });
+
+  it("handles audio unlock rejection without claiming playback started", async () => {
+    mocks.resumeAudio.mockRejectedValue(new Error("Blocked audio context"));
+    renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "OST 재생" }));
+    await expandPlayer();
+    expect(await screen.findByText("음악 재생을 시작하지 못했습니다. 재생 버튼을 다시 눌러 주세요.")).toBeTruthy();
+    expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);
     expect(mocks.setEnabled).toHaveBeenCalledWith(false);
   });
 
