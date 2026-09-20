@@ -203,10 +203,35 @@ describe("auth session store", () => {
       signInWithGoogleIdToken("header.payload.signature"),
     ).resolves.toEqual({
       ok: false,
-      error: "Google 로그인에 실패했어요. 다시 시도해 주세요.",
+      error: "로그인 서비스가 일시적으로 중단되었어요. 잠시 후 다시 시도해 주세요.",
       status: 502,
     });
     expect(getAuthSession()).toBeNull();
+  });
+
+  it.each([502, 503, 504, 530])("HTML 서비스 장애 %s를 비밀번호 오류로 오인하지 않는다", async (status) => {
+    persistSession({ user: { id: "existing-user" }, token: null });
+    apiRaw.mockImplementation(async () => new Response(
+      "<!doctype html><title>Service Suspended</title>",
+      { status, headers: { "Content-Type": "text/html" } },
+    ));
+    const expected = {
+      ok: false,
+      status,
+      error: "로그인 서비스가 일시적으로 중단되었어요. 잠시 후 다시 시도해 주세요.",
+    };
+    await expect(signIn("credentials", { email: "artist@example.com", password: "invalid" }))
+      .resolves.toMatchObject(expected);
+    await expect(signInWithGoogleIdToken("header.payload.signature"))
+      .resolves.toMatchObject(expected);
+    expect(getAuthSession()?.user.id).toBe("existing-user");
+  });
+
+  it("401 자격 증명 오류는 서비스 장애로 바꾸지 않는다", async () => {
+    apiRaw.mockResolvedValue(new Response(null, { status: 401 }));
+    await expect(signIn("credentials", {})).resolves.toMatchObject({
+      ok: false, error: "auth-failed", status: 401,
+    });
   });
 
   it("네트워크 실패를 예외로 전파하지 않고 재시도 가능한 결과로 반환한다", async () => {

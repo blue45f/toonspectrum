@@ -1,3 +1,4 @@
+import { authFailureFallback } from "@/shared/lib/auth-service-availability";
 import { createContext, useContext } from "react";
 
 import {
@@ -264,7 +265,8 @@ export async function signInWithGoogleIdToken(
     if (!response.ok || !payload?.user) {
       return {
         ok: false,
-        error: readGoogleSignInError(payload) ?? GOOGLE_SIGN_IN_FALLBACK_ERROR,
+        error: readGoogleSignInError(payload)
+          ?? authFailureFallback(response.status, GOOGLE_SIGN_IN_FALLBACK_ERROR),
         status: response.status,
       };
     }
@@ -320,7 +322,7 @@ export async function signIn(provider?: string, options?: Record<string, unknown
   if (!response.ok || !payload?.user) {
     return {
       ok: false,
-      error: payload?.error ?? "auth-failed",
+      error: payload?.error ?? authFailureFallback(response.status, "auth-failed"),
       status: response.status,
       url: null,
     };
