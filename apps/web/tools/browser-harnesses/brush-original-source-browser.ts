@@ -32,3 +32,26 @@ Object.assign(window, { mountBrushOriginalDownload: async (source: import("../..
   actionRoot.render(createElement(StudioBrushOriginalSourceActions, { source, name: "보존 검증",
     onError: (message: string) => { document.body.dataset.downloadError = message; } }));
 } });
+
+// Isolated-origin lifecycle checks: block the actual CAS lock, not the hydration function.
+let releaseOriginalLock: (() => void) | null = null;
+let originalLockName = "";
+Object.assign(window, {
+  holdBrushOriginalStorageLock: async () => {
+    if (releaseOriginalLock) throw new Error("Original lock is already held");
+    const { STUDIO_ASSET_LIBRARY_LOCK_NAME } = await import("../../src/domains/creator/studio-asset-library-sqlite-opfs-repository");
+    originalLockName = STUDIO_ASSET_LIBRARY_LOCK_NAME;
+    await new Promise<void>((resolve, reject) => {
+      void navigator.locks.request(originalLockName, () => new Promise<void>((release) => {
+        releaseOriginalLock = release; resolve();
+      })).catch(reject);
+    });
+    return originalLockName;
+  },
+  releaseBrushOriginalStorageLock: async () => {
+    releaseOriginalLock?.(); releaseOriginalLock = null;
+    await navigator.locks.request(originalLockName, () => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  },
+  unmountBrushOriginalDownload: () => { actionRoot?.unmount(); actionRoot = null; },
+});
