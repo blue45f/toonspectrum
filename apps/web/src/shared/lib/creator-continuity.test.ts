@@ -28,7 +28,7 @@ describe("creator continuity", () => {
     );
     expect(state.recent).toEqual([{
       id: "studio",
-      href: "/studio/p/project%20one/d/episode%202?focus=cut%3A18&language=ko-KR&version=approved-4&workspace=comic",
+      href: "/studio/p/project%20one/d/episode%202?focus=cut%3A18&language=ko-KR&resume=latest&version=approved-4&workspace=comic",
       visitedAt: now,
     }]);
 
@@ -75,8 +75,8 @@ describe("creator continuity", () => {
       now + 2,
     );
     expect(state.recent.map((item) => item.href)).toEqual([
-      "/studio/p/project-1/d/document-1?workspace=draw",
-      "/studio/p/project-1/d/document-2?workspace=storyboard",
+      "/studio/p/project-1/d/document-1?resume=latest&workspace=draw",
+      "/studio/p/project-1/d/document-2?resume=latest&workspace=storyboard",
     ]);
   });
 
@@ -124,11 +124,22 @@ describe("creator continuity", () => {
     }), now);
     expect(parsed.recent).toEqual([{
       id: "studio",
-      href: "/studio/p/project-1/d/document-1?workspace=3d",
+      href: "/studio/p/project-1/d/document-1?resume=latest&workspace=3d",
       visitedAt: now,
     }]);
     expect(parsed.plan).toBeNull();
     expect(parseCreatorContinuity("not-json", now)).toBe(EMPTY_CREATOR_CONTINUITY);
+  });
+
+  it("resumes only canonical manuscripts with one fixed token and never propagates untrusted resume values", () => {
+    const now = 1_800_000_000_000;
+    const document = addCreatorDestinationInState(EMPTY_CREATOR_CONTINUITY,
+      "/studio/p/project-1/d/document-1", "?resume=attacker&resume=latest&token=secret", now);
+    expect(document.recent[0]?.href).toBe("/studio/p/project-1/d/document-1?resume=latest");
+    for (const path of ["/studio", "/studio/new", "/studio/draft/local-1", "/studio/work/remote-1/comic"]) {
+      const state = addCreatorDestinationInState(EMPTY_CREATOR_CONTINUITY, path, "?resume=latest", now);
+      expect(state.recent[0]?.href).not.toContain("resume=");
+    }
   });
 
   it("maps every launch goal and pace to a real product destination", () => {

@@ -45,7 +45,7 @@ afterEach(() => {
 
 describe("SearchExplorer", () => {
   it("uses a focus-contained mobile filter sheet and writes filters to the URL", async () => {
-    render(
+    const { container, unmount } = render(
       <MemoryRouter initialEntries={["/search?genres=%ED%8C%90%ED%83%80%EC%A7%80"]}>
         <SearchExplorer />
         <LocationProbe />
@@ -62,6 +62,10 @@ describe("SearchExplorer", () => {
       name: "search.explorer.filter",
     });
     expect(dialog).not.toBeNull();
+    // SiteShell isolates route content below its fixed mobile navigation. The sheet
+    // must escape that stacking context so its bottom action receives real touches.
+    expect(container.contains(dialog)).toBe(false);
+    expect(document.body.contains(dialog)).toBe(true);
     expect(document.body.style.overflow).toBe("hidden");
 
     fireEvent.click(within(dialog).getByRole("button", {
@@ -76,5 +80,15 @@ describe("SearchExplorer", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(document.body.style.overflow).toBe("");
     expect(document.activeElement).toBe(openFilters);
+
+    fireEvent.click(openFilters);
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "결과 보기" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(openFilters);
+
+    fireEvent.click(openFilters);
+    unmount();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.body.style.overflow).toBe("");
   });
 });

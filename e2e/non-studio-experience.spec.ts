@@ -1,8 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
 const ROOT = process.cwd();
@@ -138,7 +137,8 @@ test("all-in-one home keeps contrast surfaces, reduced motion and responsive bou
   await expect(home).toBeVisible();
   await expect(heroArtwork).toBeVisible();
   await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
-  await expect(home.locator(".cf-intent-film img")).toBeVisible();
+  await expect(home.locator('.cf-hero-links a[href="/brand-film"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
   await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
   await expect(home.locator(".cf-production-journey img")).toBeVisible();
   await expect(home.locator("h1")).toContainText("기획부터 연재까지");

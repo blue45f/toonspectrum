@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures/non-studio-test";
 
 // API failures remain explicit; this suite verifies client-side interaction, not live writes.
 test.beforeEach(async ({ page }) => {
