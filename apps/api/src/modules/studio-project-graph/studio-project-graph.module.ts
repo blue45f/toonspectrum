@@ -14,12 +14,15 @@ import { StudioReviewPreviewProducerService } from "./studio-review-preview-prod
 import { StudioWorldPublicationController } from "./studio-world-publication.controller";
 import { StudioWorldPublicationRepository } from "./studio-world-publication.repository";
 import { StudioWorldPublicationService } from "./studio-world-publication.service";
+import { StudioWorldAcousticController } from "./studio-world-acoustic.controller";
+import { StudioWorldAcousticRepository } from "./studio-world-acoustic.repository";
+import { StudioWorldAcousticService } from "./studio-world-acoustic.service";
 
 const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(process.env);
 
 @Module({
   imports: [CreatorModule, ...(privateObjectStorageModule ? [privateObjectStorageModule] : [])],
-  controllers: [StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController],
+  controllers: [StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController],
   providers: [
     StudioExternalFileBindingRepository,
     StudioProjectGraphRepository,
@@ -29,6 +32,8 @@ const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(pr
     StudioReviewPreviewProducerService,
     StudioWorldPublicationRepository,
     StudioWorldPublicationService,
+    StudioWorldAcousticRepository,
+    StudioWorldAcousticService,
   ],
   exports: [StudioProjectGraphService],
 })

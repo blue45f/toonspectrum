@@ -86,6 +86,12 @@ async function publicationRow(client: PoolClient, workId: string, revisionId?: s
   return result.rows[0] ?? null;
 }
 
+/** Internal caller must already hold the work lock and enforce fresh ACL in this transaction. */
+export async function loadStudioWorldPublication(client: PoolClient, workId: string): Promise<StudioWorldPublication | null> {
+  const row = await publicationRow(client, workId);
+  return row ? verified(row, workId) : null;
+}
+
 @Injectable()
 export class StudioWorldPublicationRepository {
   async current(actor: string, workId: string): Promise<StudioWorldPublication | null> {

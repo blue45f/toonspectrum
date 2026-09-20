@@ -457,6 +457,7 @@ describe("studio live protocol module", () => {
       leaseMs: 15_000,
     };
     expect(protocol.StudioLiveLockRequestSchema.safeParse(renewal).success).toBe(true);
+    expect(protocol.StudioLiveLockRequestSchema.safeParse({ ...renewal, resourceId: "studio-acoustic:session:forged" }).success).toBe(false);
     expect(
       protocol.StudioLiveLockRequestSchema.safeParse({ ...renewal, renewLeaseId: "x".repeat(81) })
         .success
@@ -480,6 +481,7 @@ describe("studio live protocol module", () => {
       requestId: "00000000-0000-4000-8000-000000000002",
     };
     expect(protocol.StudioLiveLockReleaseSchema.safeParse(release).success).toBe(true);
+    expect(protocol.StudioLiveLockReleaseSchema.safeParse({ ...release, resourceId: "studio-acoustic:session:forged" }).success).toBe(false);
     expect(
       protocol.StudioLiveLockReleaseSchema.safeParse({ ...release, requestId: "not-a-uuid" })
         .success

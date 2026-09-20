@@ -5,6 +5,10 @@ import { studioWorldPublishSchema, type StudioWorldPublish } from "@toonspectrum
 import type * as DatabaseRuntime from "../../db";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
 import type { StudioWorldPublicationRepository } from "./studio-world-publication.repository";
+import type { StudioWorldAcousticRepository } from "./studio-world-acoustic.repository";
+import type { StudioWorldAcousticService } from "./studio-world-acoustic.service";
+import type { StudioLiveAcousticBinding } from "../creator/studio-live-acoustic-binding";
+import type { DrizzleStudioLiveLockRepository } from "../creator/studio-live-lock.repository";
 import { CommitStudioRevisionSchema, CreateStudioProjectGraphSchema, RestoreStudioRevisionSchema } from "./studio-project-graph.dto";
 
 const connection = process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
@@ -16,6 +20,8 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
 
 (connection ? describe : describe.skip)("authoritative world publication on real PostgreSQL", () => {
   let pool: Pool, database: typeof DatabaseRuntime, repository: StudioWorldPublicationRepository, graph: StudioProjectGraphRepository;
+  let acoustic: StudioWorldAcousticRepository, genericLocks: DrizzleStudioLiveLockRepository;
+  let acousticService: new (repository: StudioWorldAcousticRepository, binding: StudioLiveAcousticBinding) => StudioWorldAcousticService;
   const works: string[] = [], users: string[] = [];
   const previousDatabase = process.env.DATABASE_URL;
   beforeAll(async () => {
@@ -24,6 +30,9 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     database = await import("../../db");
     repository = new (await import("./studio-world-publication.repository")).StudioWorldPublicationRepository();
     graph = new (await import("./studio-project-graph.repository")).StudioProjectGraphRepository();
+    acoustic = new (await import("./studio-world-acoustic.repository")).StudioWorldAcousticRepository();
+    genericLocks = new (await import("../creator/studio-live-lock.repository")).DrizzleStudioLiveLockRepository();
+    acousticService = (await import("./studio-world-acoustic.service")).StudioWorldAcousticService;
     const triggers = await pool.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal");
     expect(triggers.rows.map((row) => row.tgname)).toEqual(expect.arrayContaining(["studio_revision_immutable_update", "studio_operation_immutable_update", "studio_revision_topology_parent"]));
   });
@@ -51,6 +60,151 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     const actor = await user();
     await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,$3,$4,$5,CASE WHEN $4='pending' THEN NULL ELSE now() END)`, [workId, actor, role, status, randomUUID()]); return actor;
   }
+  async function acousticFixture() {
+    const f=await fixture(), principal={userId:f.actor,sessionVersion:1,expiresAt:Date.now()+600000};
+    const publication=(await repository.publish(f.actor,f.workId,input(),randomUUID())).publication;
+    const world={worldId:publication.manifest.id,revisionId:publication.revisionId,contentHash:publication.contentHash};
+    const doorInput={world,zoneId:"zone",expectedDoorEpoch:null,open:true,allowedUserIds:[f.actor]};
+    const {door}=await acoustic.changeDoor(principal,f.workId,doorInput,randomUUID());
+    const binding={connectionId:randomUUID(),clientInstanceId:randomUUID(),joinedAt:new Date().toISOString()};
+    const sessionInput={world,zoneId:"zone",doorEpoch:door.epoch,connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId,expectedSessionEpoch:null};
+    return {...f,principal,publication,world,doorInput,door,binding,sessionInput};
+  }
+  it("keeps manager door publication separate from a participant session lease and exposes no media grant",async()=>{
+    const f=await acousticFixture();
+    expect(await acoustic.door(f.principal,f.workId,"zone")).toMatchObject({epoch:f.door.epoch,permitted:true,open:true});
+    const session=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,randomUUID());
+    expect(session.kind).toBe("acoustic-session-lease-only"); expect(session).not.toHaveProperty("conversationId");
+    const remaining=await pool.query<{ms:string}>('SELECT EXTRACT(EPOCH FROM ("expiresAt"-statement_timestamp()))*1000 AS ms FROM creator_work_live_lock WHERE "workId"=$1',[f.workId]);
+    expect(Number(remaining.rows[0]!.ms)).toBeLessThanOrEqual(15000);
+    expect(await acoustic.current(f.principal,f.workId,session.sessionEpoch)).toEqual(session);
+    expect(await repository.current(f.actor,f.workId)).toEqual(f.publication);
+  });
+  it("requires manager permission for door changes, fresh active membership for allowlists, and separate explicit inclusion",async()=>{
+    const f=await acousticFixture(), editor=await member(f.workId,"editor"), outsider=await user();
+    const principal={...f.principal,userId:editor};
+    expect(await acoustic.door(principal,f.workId,"zone")).toMatchObject({permitted:false});
+    expect(await acoustic.door(principal,f.workId,"zone")).not.toHaveProperty("allowedUserIds");
+    await expect(acoustic.changeDoor(principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch},randomUUID())).rejects.toMatchObject({operation:"manage"});
+    await expect(acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,allowedUserIds:[outsider]},randomUUID())).rejects.toMatchObject({operation:"manage"});
+    await expect(acoustic.open(principal,f.workId,f.sessionInput,f.binding,randomUUID())).rejects.toMatchObject({reason:"closed"});
+  });
+  it("door CAS serializes competitors; replay does not reopen a newer closed door",async()=>{
+    const f=await acousticFixture(), key=randomUUID(), change={...f.doorInput,expectedDoorEpoch:f.door.epoch};
+    const results=await Promise.allSettled([acoustic.changeDoor(f.principal,f.workId,change,key),acoustic.changeDoor(f.principal,f.workId,{...change,open:false},randomUUID())]);
+    expect(results.filter((v)=>v.status==="fulfilled")).toHaveLength(1);
+    const current=await acoustic.door(f.principal,f.workId,"zone");
+    const closed=await acoustic.changeDoor(f.principal,f.workId,{...change,expectedDoorEpoch:current.epoch,open:false},randomUUID());
+    if (results[0]!.status==="fulfilled") expect((await acoustic.changeDoor(f.principal,f.workId,change,key)).replayed).toBe(true);
+    expect(await acoustic.door(f.principal,f.workId,"zone")).toMatchObject({epoch:closed.door.epoch,open:false});
+  });
+  it("same session intent replays without extension and changed input cannot reuse its key",async()=>{
+    const f=await acousticFixture(), key=randomUUID(), first=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);
+    expect(await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key)).toEqual(first);
+    await expect(acoustic.open(f.principal,f.workId,{...f.sessionInput,expectedSessionEpoch:randomUUID()},f.binding,key)).rejects.toMatchObject({message:"studio_idempotency_conflict"});
+    const renewed=await acoustic.current(f.principal,f.workId,first.sessionEpoch,first.leaseRevision);
+    expect(BigInt(renewed.leaseRevision)).toBeGreaterThan(BigInt(first.leaseRevision));
+    await expect(acoustic.current(f.principal,f.workId,first.sessionEpoch,first.leaseRevision)).rejects.toMatchObject({reason:"stale"});
+  });
+  it("door close removes its session rows atomically and late renewal/old-open replay cannot revive them",async()=>{
+    const f=await acousticFixture(), key=randomUUID(), session=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);
+    await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,open:false},randomUUID());
+    expect((await pool.query('SELECT 1 FROM creator_work_live_lock WHERE "workId"=$1',[f.workId])).rowCount).toBe(0);
+    await expect(acoustic.current(f.principal,f.workId,session.sessionEpoch,session.leaseRevision)).rejects.toMatchObject({reason:"stale"});
+    await expect(acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key)).rejects.toMatchObject({reason:"closed"});
+  });
+  it("world republish and account-session revocation invalidate old leases",async()=>{
+    const f=await acousticFixture(), session=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,randomUUID());
+    await repository.publish(f.actor,f.workId,input(f.publication.revisionId),randomUUID());
+    await expect(acoustic.current(f.principal,f.workId,session.sessionEpoch)).rejects.toMatchObject({reason:"stale"});
+    await pool.query('UPDATE "user" SET "sessionVersion"=2 WHERE id=$1',[f.actor]);
+    await expect(acoustic.current(f.principal,f.workId,session.sessionEpoch)).rejects.toMatchObject({reason:"session"});
+  });
+  it("expiry and reconnect replacement fence delayed renew/revoke while preserving the newer epoch",async()=>{
+    const f=await acousticFixture(), key=randomUUID(), old=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);
+    await pool.query(`UPDATE creator_work_live_lock SET "createdAt"=now()-interval '1 minute',"expiresAt"=now()-interval '1 second' WHERE "workId"=$1`,[f.workId]);
+    await expect(acoustic.current(f.principal,f.workId,old.sessionEpoch,old.leaseRevision)).rejects.toMatchObject({reason:"stale"});
+    await expect(acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key)).rejects.toMatchObject({reason:"stale"});
+    const binding={...f.binding,connectionId:randomUUID(),joinedAt:new Date().toISOString()};
+    const next=await acoustic.open(f.principal,f.workId,{...f.sessionInput,connectionId:binding.connectionId},binding,randomUUID());
+    await acoustic.revoke(f.actor,f.workId,old.sessionEpoch);
+    expect(await acoustic.current(f.principal,f.workId,next.sessionEpoch)).toEqual(next);
+  });
+  it("generic seat APIs neither issue/release nor expose reserved sessions; actual disconnect cleanup still removes them",async()=>{
+    const f=await acousticFixture(), session=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,randomUUID());
+    const row=(await pool.query<{resourceId:string;acquisitionId:string}>('SELECT "resourceId","acquisitionId" FROM creator_work_live_lock WHERE "workId"=$1',[f.workId])).rows[0]!;
+    expect((await genericLocks.snapshot(f.workId)).locks).toEqual([]);
+    await expect(genericLocks.acquire({workId:f.workId,resourceId:row.resourceId,ownerConnectionId:f.binding.connectionId,ownerName:"fake",leaseMs:15000,requestedLeaseId:randomUUID(),acquisitionId:randomUUID()})).rejects.toThrow("server-reserved");
+    await expect(genericLocks.release({workId:f.workId,resourceId:row.resourceId,ownerConnectionId:f.binding.connectionId,leaseId:session.sessionEpoch})).rejects.toThrow("server-reserved");
+    expect(await genericLocks.releaseConnection(f.workId,f.binding.connectionId)).toEqual([]);
+    await expect(acoustic.current(f.principal,f.workId,session.sessionEpoch)).rejects.toMatchObject({reason:"stale"});
+  });
+  it("binding loss after DB commit revokes the exact issued epoch without automatic mutation retry",async()=>{
+    const f=await acousticFixture();let checks=0;
+    const service=new acousticService(acoustic,{verify:async()=>++checks===1?f.binding:null} as unknown as StudioLiveAcousticBinding);
+    await expect(service.open(f.principal,f.workId,f.sessionInput,randomUUID())).rejects.toMatchObject({status:503});
+    expect(checks).toBe(2);expect((await pool.query('SELECT 1 FROM creator_work_live_lock WHERE "workId"=$1',[f.workId])).rowCount).toBe(0);
+  });
+  it("door close during the post-commit Core binding check cannot return a live lease",async()=>{
+    const f=await acousticFixture();let checks=0;
+    const service=new acousticService(acoustic,{verify:async()=>{if(++checks===2) await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,open:false},randomUUID());return f.binding;}} as unknown as StudioLiveAcousticBinding);
+    await expect(service.open(f.principal,f.workId,f.sessionInput,randomUUID())).rejects.toMatchObject({status:409});
+    expect(checks).toBe(2);
+  });
+  it("enforces the 24-session bound independently of generic seat locks",async()=>{
+    const f=await acousticFixture();
+    for(let index=0;index<24;index++) {
+      const binding={...f.binding,connectionId:randomUUID(),clientInstanceId:randomUUID()};
+      await acoustic.open(f.principal,f.workId,{...f.sessionInput,connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId},binding,randomUUID());
+    }
+    await expect(acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,randomUUID())).rejects.toMatchObject({reason:"limit"});
+    expect((await pool.query('SELECT count(*)::int AS count FROM creator_work_live_lock WHERE "workId"=$1',[f.workId])).rows[0].count).toBe(24);
+    expect((await genericLocks.acquire({workId:f.workId,resourceId:"seat:public",requestedLeaseId:randomUUID(),acquisitionId:randomUUID(),ownerConnectionId:"public",ownerName:"Public",leaseMs:15000})).status).toBe("acquired");
+    expect((await genericLocks.snapshot(f.workId)).locks).toHaveLength(1);
+  });
+  it.each(["door","session"] as const)("missing %s receipt cannot turn a bare record into acoustic authority",async(kind)=>{
+    const f=await acousticFixture(), session=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,randomUUID());
+    if(kind==="door") {
+      await pool.query('DELETE FROM studio_mutation_receipt WHERE "resultRevisionId"=$1',[f.door.revisionId]);
+      await expect(acoustic.door(f.principal,f.workId,"zone")).rejects.toMatchObject({reason:"proof"});
+    } else {
+      await pool.query('DELETE FROM studio_mutation_receipt WHERE response->>\'sessionEpoch\'=$1',[session.sessionEpoch]);
+    }
+    await expect(acoustic.current(f.principal,f.workId,session.sessionEpoch)).rejects.toMatchObject({reason:"proof"});
+    expect((await genericLocks.snapshot(f.workId)).locks).toHaveLength(0);
+  });
+  it("membership revocation while renewal waits on the work lock denies the lease without extending it",async()=>{
+    const f=await acousticFixture(), actor=await member(f.workId,"viewer"), principal={...f.principal,userId:actor};
+    const {door}=await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,allowedUserIds:[actor]},randomUUID());
+    const session=await acoustic.open(principal,f.workId,{...f.sessionInput,doorEpoch:door.epoch},f.binding,randomUUID());
+    const blocker=await pool.connect();let pending:Promise<unknown>|undefined;
+    try {
+      await blocker.query("BEGIN");await blocker.query('SELECT id FROM creator_work WHERE id=$1 FOR UPDATE',[f.workId]);
+      pending=acoustic.current(principal,f.workId,session.sessionEpoch,session.leaseRevision);
+      const outcome=pending.then(value=>({value}), (error:unknown)=>({error}));
+      await expect.poll(async()=>Number((await pool.query(`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE 'SELECT id FROM creator_work WHERE id=$1 FOR NO KEY UPDATE'`)).rows[0]?.count),{timeout:5000}).toBeGreaterThan(0);
+      await blocker.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2',[f.workId,actor]);await blocker.query("COMMIT");
+      expect(await outcome).toMatchObject({error:{operation:"view"}});
+      const row=await pool.query<{revision:string;expiresAt:Date}>('SELECT revision::text,"expiresAt" FROM creator_work_live_lock WHERE "leaseId"=$1',[session.sessionEpoch]);
+      expect(row.rows[0]?.revision).toBe(session.leaseRevision);expect(row.rows[0]?.expiresAt.toISOString()).toBe(session.expiresAt);
+      await acoustic.revoke(actor,f.workId,session.sessionEpoch);
+      expect((await pool.query('SELECT 1 FROM creator_work_live_lock WHERE "workId"=$1',[f.workId])).rowCount).toBe(0);
+    }finally {await blocker.query("ROLLBACK");blocker.release();await pending?.catch(()=>undefined);}
+  });
+  it("shares the lease advisory lock without deadlocking an existing generic writer's FK key-share",async()=>{
+    const f=await acousticFixture(), blocker=await pool.connect();let pending:Promise<unknown>|undefined;
+    try {
+      await blocker.query("BEGIN");await blocker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',["toonspectrum:creator-work-live-lock:v1:"+f.workId]);
+      pending=acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,randomUUID());
+      const outcome=pending.then(value=>({value}), (error:unknown)=>({error}));
+      await expect.poll(async()=>Number((await pool.query(`SELECT count(*)::int AS count FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND query LIKE 'SELECT pg_advisory_xact_lock%'`)).rows[0]?.count),{timeout:5000}).toBeGreaterThan(0);
+      await blocker.query("SET LOCAL lock_timeout='2s'");
+      await blocker.query(`INSERT INTO creator_work_live_lock ("workId","resourceId","leaseId","acquisitionId","ownerConnectionId","ownerName",revision,"expiresAt") VALUES ($1,'seat:generic','generic','generic','generic','Generic',1,statement_timestamp()+interval '15 seconds')`,[f.workId]);
+      await blocker.query("COMMIT");
+      expect(await outcome).toMatchObject({value:{kind:"acoustic-session-lease-only"}});
+      expect((await genericLocks.snapshot(f.workId)).locks.map(row=>row.resourceId)).toEqual(["seat:generic"]);
+    }finally{await blocker.query("ROLLBACK");blocker.release();await pending?.catch(()=>undefined);}
+  });
   it("bootstraps the graph transactionally and returns the exact server-pinned manifest/hash", async () => {
     const f = await fixture(); expect(await repository.current(f.actor, f.workId)).toBeNull();
     const published = await repository.publish(f.actor, f.workId, input(), randomUUID());
