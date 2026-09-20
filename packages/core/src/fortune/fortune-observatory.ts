@@ -1,9 +1,11 @@
 import { fortuneKstDate, fortuneMonthDays, resolveFortuneBirth, shiftFortuneDate, solarTermsForYear } from "./fortune-calendar";
 import { drawTarot, drawZodiac, seededRandom } from "./fortune-engine";
+import { FORTUNE_CONTENT_REVISION, type FortuneReadingContext, type FortuneZodiacId } from "./fortune-enrichment";
 import { FORTUNE_EXPERIENCES, FORTUNE_DISCLAIMER, FORTUNE_ELEMENT_NAMES as ELEMENTS, FORTUNE_ELEMENT_TEXT as ELEMENT_TEXT, FORTUNE_ELEMENT_KEYS as ELEMENT_KEYS } from "./fortune-experiences";
 import { fortuneTenGod, fortunePillarDetails, matchFortuneDream, fortuneLifeNumber, FORTUNE_PALETTES, FORTUNE_COOKIE_LINES } from "./fortune-symbols";
 import { analyzeCompatibility, analyzeSaju } from "./saju-analysis";
 import { calculateSaju, sajuPillarAt, SAJU_STEMS, SAJU_BRANCHES } from "./saju-utils";
+import { drawFortuneTarot, FORTUNE_FULL_TAROT_REVISION, type FortuneTarotDeck } from "./tarot-deck";
 
 import type { FortuneBirthInput } from "./fortune-calendar";
 import type { FortuneSection } from "./fortune-symbols";
@@ -11,6 +13,7 @@ import type { SajuResult } from "./saju-utils";
 
 export interface FortuneTrend { label: string; value: number; keyword: string; detail: string }
 export interface FortuneReading {
+  context?: FortuneReadingContext; zodiacSign?: FortuneZodiacId;
   id: string; title: string; eyebrow: string; summary: string; generatedFor: string;
   sections: FortuneSection[]; notes: string[]; chart?: SajuResult; partnerChart?: SajuResult;
   score?: number; trend?: FortuneTrend[]; colors?: { name: string; hex: string }[];
@@ -18,6 +21,7 @@ export interface FortuneReading {
   calendar?: ReturnType<typeof fortuneMonthDays>; terms?: ReturnType<typeof solarTermsForYear>;
 }
 export interface FortuneReadingInput {
+  tarotDeck?: FortuneTarotDeck;
   birth?: FortuneBirthInput; partner?: FortuneBirthInput; date?: string; month?: string;
   year?: number; question?: string; pick?: number; cycleDirection?: "forward" | "reverse";
 }
@@ -52,8 +56,8 @@ export async function buildFortuneReading(id: string, input: FortuneReadingInput
   const date = resolveFortuneBirth({ date: input.date ?? fortuneKstDate() }).solarDate;
   const year = input.year ?? Number(date.slice(0, 4)), pick = input.pick ?? 0;
   if (!Number.isInteger(year) || year < 1900 || year > 2050) throw new Error("조회 연도는 1900~2050년입니다.");
-  if (!Number.isInteger(pick) || pick < 0 || pick > 21) throw new Error("카드 선택을 확인해 주세요.");
-  const reading: FortuneReading = { id, title: experience.title, eyebrow: experience.tag, generatedFor: date, summary: "", sections: [], notes: [FORTUNE_DISCLAIMER] };
+  if (!Number.isInteger(pick) || pick < 0 || pick > (id.startsWith("tarot") && input.tarotDeck === "full-78" ? 77 : 21)) throw new Error("카드 선택을 확인해 주세요.");
+  const reading: FortuneReading = { id, title: experience.title, eyebrow: experience.tag, generatedFor: date, summary: "", sections: [], notes: [FORTUNE_DISCLAIMER], context: { referenceDate: date, timeZone: "Asia/Seoul", engineRevision: "fortune-local-20260920", contentRevision: FORTUNE_CONTENT_REVISION } };
   if (experience.input === "calendar") {
     const month = input.month ?? date.slice(0, 7);
     reading.summary = id === "almanac" ? "날짜를 누르면 음력·일진·절기 정보를 자세히 볼 수 있어요." : "절기는 달력 날짜가 아닌 태양의 위치를 기준으로 구분한 계절의 경계입니다.";
@@ -67,11 +71,12 @@ export async function buildFortuneReading(id: string, input: FortuneReadingInput
     reading.notes.push("입력 문장은 서버로 전송하지 않습니다. 상징별 편집 콘텐츠이며 꿈의 원인·정신건강을 진단하지 않습니다."); return reading;
   }
   if (id.startsWith("tarot")) {
-    const result = await drawTarot([], "leona", pick, id === "tarot-three" ? "three" : "one");
-    reading.cards = result.cards;
+    const deck = input.tarotDeck ?? "major-22";
+    reading.cards = await drawFortuneTarot(deck, date, pick, id === "tarot-three" ? "three" : "one");
+    reading.context = { ...reading.context!, tarotDeck: deck, contentRevision: deck === "full-78" ? FORTUNE_FULL_TAROT_REVISION : "classic-major-22" };
     reading.summary = id === "tarot-three" ? "세 장의 상징을 연결해 나만의 이야기를 만들어 보세요." : "직접 고른 카드의 상징에서 오늘 생각해 볼 질문을 찾아보세요.";
-    reading.sections = result.cards.map((card) => ({ title: `${card.position} · ${card.name}`, body: card.description, items: [...card.keywords, card.type === "upright" ? "정방향: 익숙한 강점을 떠올려 보세요." : "역방향: 다른 관점에서 다시 읽어 보세요."] }));
-    reading.notes.push("22장 메이저 아르카나의 상징 해석입니다. 같은 날·같은 선택은 같은 결과이며 세 장은 중복되지 않습니다. 미래 카드도 실제 예언이 아닙니다."); return reading;
+    reading.sections = reading.cards.map((card) => ({ title: `${card.position} · ${card.name}`, body: card.description, items: [...card.keywords, card.type === "upright" ? "정방향: 익숙한 강점을 떠올려 보세요." : "역방향: 다른 관점에서 다시 읽어 보세요."] }));
+    reading.notes.push(`${deck === "full-78" ? "78장 전체 덱의 자체 한국어 창작 질문" : "22장 메이저 아르카나의 상징 해석"}입니다. 같은 기준 날짜·덱·선택은 같은 결과이며 세 장은 중복되지 않습니다. 실제 예언이 아닙니다.`); return reading;
   }
   if (experience.input === "none") {
     const rand = seededRandom(`${id}:${date}:${pick}`);
@@ -127,6 +132,7 @@ export async function buildFortuneReading(id: string, input: FortuneReadingInput
   }
   if (id === "zodiac") {
     const [, month, day] = own.solarDate.split("-").map(Number), result = await drawZodiac([], "leona", month, day);
+    reading.zodiacSign = result.zodiac.id as FortuneZodiacId;
     reading.summary = `${result.zodiac.glyph} ${result.zodiac.ko} · ${result.zodiac.dateRange}`;
     reading.sections = [{ title: "별자리의 상징", body: result.zodiac.traits.join(" · "), items: [`원소: ${result.zodiac.element}`, `상징 천체: ${result.zodiac.ruling}`] }, { title: "오늘의 관찰", body: "키워드 중 내 모습과 닮은 것과 다른 것을 하나씩 골라 보세요. 다름도 좋은 발견이에요." }];
     reading.notes.push("일반적인 월·일 경계의 태양 별자리입니다. 출생지·천체 경계 시각·상승궁·달 별자리를 계산한 출생 차트가 아닙니다."); return reading;
@@ -140,5 +146,5 @@ export async function buildFortuneReading(id: string, input: FortuneReadingInput
 export function fortuneReadingText(reading: FortuneReading): string {
   // Public export excludes dates of birth, times, dream text, charts and numerology derivation.
   const sections = reading.id === "numerology" ? reading.sections.filter((s) => s.title !== "계산을 따라가기") : reading.sections;
-  return ["ToonStudio 운세 관측소", reading.title, `조회일 ${reading.generatedFor}`, reading.summary, ...sections.flatMap((s) => [s.title, s.body, ...(s.items ?? [])]), FORTUNE_DISCLAIMER].join("\n\n");
+  return ["ToonStudio 운세 관측소", reading.title, `조회일 ${reading.generatedFor}`, ...(reading.context?.tarotDeck ? [`덱 ${reading.context.tarotDeck} · ${reading.context.contentRevision}`] : []), reading.summary, ...sections.flatMap((s) => [s.title, s.body, ...(s.items ?? [])]), FORTUNE_DISCLAIMER].join("\n\n");
 }

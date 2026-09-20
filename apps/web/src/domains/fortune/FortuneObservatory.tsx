@@ -32,6 +32,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
   const [date, setDate] = useState(fortuneKstDate), [month, setMonth] = useState(() => fortuneKstDate().slice(0, 7));
   const [year, setYear] = useState(() => Number(fortuneKstDate().slice(0, 4))), [question, setQuestion] = useState("");
   const [direction, setDirection] = useState<"forward" | "reverse">("forward"), [pick, setPick] = useState<number | null>(null);
+  const [tarotDeck, setTarotDeck] = useState<"major-22" | "full-78">("major-22");
   const [reading, setReading] = useState<FortuneReading | null>(null), [running, setRunning] = useState(false);
   const [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [notebookOpen, setNotebookOpen] = useState(false);
@@ -49,7 +50,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
     event.preventDefault(); if (!selected || running) return;
     if (selected.id.startsWith("tarot") && pick === null) { setError("마음이 가는 카드를 먼저 골라 주세요."); return; }
     const request = ++sequence.current; setRunning(true); setError(""); setReading(null);
-    try { const result = await buildFortuneReading(selected.id, { birth, partner, date, month, year, question, pick: pick ?? 0, cycleDirection: direction }); if (request === sequence.current) setReading(result); }
+    try { const result = await buildFortuneReading(selected.id, { birth, partner, date, month, year, question, pick: pick ?? 0, cycleDirection: direction, tarotDeck }); if (request === sequence.current) setReading(result); }
     catch (cause) { if (request === sequence.current) setError(cause instanceof Error ? cause.message : "입력값을 확인하고 다시 열어 주세요."); }
     finally { if (request === sequence.current) setRunning(false); }
   };
@@ -73,10 +74,11 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
         <div className="fo-query-fields">
           {(["almanac", "monthly"].includes(selected.id)) && <label htmlFor="fo-month">조회할 달<input id="fo-month" type="month" value={month} required min="1900-01" max="2050-12" onChange={(e) => { setMonth(e.target.value); invalidateReading(); }} /></label>}
           {(["yearly", "terms"].includes(selected.id)) && <label htmlFor="fo-year">조회 연도<input id="fo-year" type="number" value={year} required min={1900} max={2050} onChange={(e) => { setYear(Number(e.target.value)); invalidateReading(); }} /></label>}
-          {(["today", "tomorrow", "weekly", "romance", "money", "career", "study", "creative"].includes(selected.id)) && <label htmlFor="fo-date">기준 날짜<input id="fo-date" type="date" value={date} required min="1900-01-01" max="2050-12-24" onChange={(e) => { setDate(e.target.value); invalidateReading(); }} /></label>}
+          {(["today", "tomorrow", "weekly", "romance", "money", "career", "study", "creative", "zodiac", "tarot", "tarot-three"].includes(selected.id)) && <label htmlFor="fo-date">기준 날짜<input id="fo-date" type="date" value={date} required min="1900-01-01" max="2050-12-24" onChange={(e) => { setDate(e.target.value); invalidateReading(); }} /></label>}
           {selected.id === "cycles" && <label htmlFor="fo-direction">대운 진행 방향<select id="fo-direction" value={direction} onChange={(e) => { setDirection(e.target.value === "reverse" ? "reverse" : "forward"); invalidateReading(); }}><option value="forward">순행 (직접 선택)</option><option value="reverse">역행 (직접 선택)</option></select><span className="fo-help">성별로 자동 판정하지 않습니다.</span></label>}
         </div>
-        {selected.id.startsWith("tarot") && <FortuneInteractiveDeck key={selected.id} value={pick} onChange={(value) => { setPick(value); invalidateReading(); }} three={selected.id === "tarot-three"} />}
+        {selected.id.startsWith("tarot") && <label htmlFor="fo-tarot-deck">타로 덱<select id="fo-tarot-deck" value={tarotDeck} onChange={(event) => { setTarotDeck(event.target.value === "full-78" ? "full-78" : "major-22"); setPick(null); invalidateReading(); }}><option value="major-22">기존 메이저 22장</option><option value="full-78">전체 78장 · 창작 질문</option></select><span className="fo-help">선택한 덱의 카드 뒷면에서 한 장을 고르면 결과를 엽니다. 같은 날짜·덱·위치는 같은 결과입니다.</span></label>}
+        {selected.id.startsWith("tarot") && <FortuneInteractiveDeck key={`${selected.id}:${tarotDeck}`} size={tarotDeck === "full-78" ? 78 : 22} value={pick} onChange={(value) => { setPick(value); invalidateReading(); }} three={selected.id === "tarot-three"} />}
         <div className="fo-form-actions"><button className="fo-button fo-primary" type="submit" disabled={running}>{running ? "해석을 펼치고 있어요…" : `${selected.title} 열기`}<ArrowRight size={16} /></button><button type="button" className="fo-button" onClick={clearInputs}>입력·결과 지우기</button><span>추가 요금 · API 키 · 가입 없이</span></div>
         {running && <div className="fo-analysis-sequence" role="status" aria-live="polite"><div className="fo-analysis-sigil"><span>{selected.glyph}</span><i /></div><div><strong>당신의 단서를 한 장면씩 읽고 있어요</strong><p>입력 확인 → 상징 계산 → 관계 연결 → 해석 구성</p><div className="fo-analysis-track"><i /></div></div></div>}
         {error && <p role="alert" className="fo-error">{error}</p>}

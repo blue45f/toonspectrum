@@ -17,7 +17,7 @@ export const FORTUNE_EXPERIENCES: readonly FortuneExperience[] = [
   { id: "friend-match", title: "친구 궁합", subtitle: "닮은 취향과 다른 속도 이해하기", glyph: "友", group: "관계·궁합", input: "pair", tag: "우정의 대화" },
   { id: "family-match", title: "가족 궁합", subtitle: "가까운 사이일수록 필요한 여백", glyph: "和", group: "관계·궁합", input: "pair", tag: "존중과 거리" },
   { id: "team-match", title: "협업 궁합", subtitle: "함께 창작할 때의 강점과 약속", glyph: "合", group: "관계·궁합", input: "pair", tag: "창작 파트너" },
-  { id: "tarot", title: "오늘의 타로", subtitle: "직접 고르는 한 장의 메이저 아르카나", glyph: "✦", group: "카드·상징", input: "none", tag: "22장 카드" },
+  { id: "tarot", title: "오늘의 타로", subtitle: "22장·78장 덱으로 여는 상징과 창작 질문", glyph: "✦", group: "카드·상징", input: "none", tag: "22·78장 선택" },
   { id: "tarot-three", title: "3카드 타로", subtitle: "과거·현재·미래의 이야기를 잇다", glyph: "Ⅲ", group: "카드·상징", input: "none", tag: "세 장의 스프레드" },
   { id: "zodiac", title: "별자리 운세", subtitle: "태양 별자리의 상징과 성향", glyph: "☼", group: "카드·상징", input: "birth", tag: "서양 12별자리" },
   { id: "animal", title: "열두 띠 이야기", subtitle: "입춘 기준 연지와 띠의 상징", glyph: "子", group: "카드·상징", input: "birth", tag: "설날 기준과 구분" },

@@ -18,8 +18,8 @@ export function fortuneSceneTheme(id: string): FortuneSceneTheme {
 }
 
 /** Shuffling only rearranges the 22 numbered choices; it never changes a reading seed. */
-export function shuffleFortuneDeck(random: () => number = Math.random): number[] {
-  const cards = Array.from({ length: 22 }, (_, i) => i);
+export function shuffleFortuneDeck(random: () => number = Math.random, size: 22 | 78 = 22): number[] {
+  const cards = Array.from({ length: size }, (_, i) => i);
   for (let i = cards.length - 1; i > 0; i -= 1) {
     const sample = random();
     const j = Math.floor(Math.max(0, Math.min(0.999999999, Number.isFinite(sample) ? sample : 0)) * (i + 1));
