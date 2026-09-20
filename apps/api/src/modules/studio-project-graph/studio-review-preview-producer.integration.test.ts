@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Image, decodePng, encodePng } from "image-js";
 import { Pool } from "pg";
+import { PgDialect } from "drizzle-orm/pg-core";
+import { studioHandoffReceiptQuery } from "../creator/studio-handoff-receipt-query";
 import { createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type * as DatabaseRuntime from "../../db";
@@ -139,6 +141,17 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     return { ...f, original, comment, replacement, nextIntent,
       resolve: { status: "resolved" as const, resolutionRevisionId: replacement.submissionId, resolutionSourceRef: replacement.subject } };
   }
+
+  it.each([
+    { roles: [], briefs: ["brief"] },
+    { roles: ["role"], briefs: [] },
+    { roles: [], briefs: [] },
+    { roles: ["role-a", "role-b"], briefs: ["brief-a", "brief-b"] },
+  ])("executes the handoff receipt query with PostgreSQL array parameters %j", async ({ roles, briefs }) => {
+    const f = await capture(1);
+    const query = new PgDialect().sqlToQuery(studioHandoffReceiptQuery(f.input.workId, roles, briefs));
+    expect((await pool.query(query.sql, query.params)).rows).toEqual([]);
+  });
 
   async function completionFixture() {
     const f = await resolutionFixture();

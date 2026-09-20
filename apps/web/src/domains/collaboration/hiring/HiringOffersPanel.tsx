@@ -2,12 +2,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { CollabNotice, collabButton, collabPrimary } from "../collaboration-ui";
 
-import { newOfferRequest } from "./hiring-form-values";
-
 import { hiringMatchingClient } from "./hiring-matching-client";
 import { HiringTermsView } from "./HiringSlotEditor";
 
-import type { HiringCandidate, HiringOffer, HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
+import type { HiringOffer } from "../../../../../../packages/contracts/src/creator-hiring";
 
 import Link from "@/compat/router-link";
 import { getApiErrorMessage } from "@/infrastructure/api";
@@ -32,16 +30,4 @@ export function HiringOffersPanel({ actor }: { actor: string }) {
     </article>)}
   </section>;
 }
-export function HiringDiscovery({ slot }: { slot: HiringSlot }) {
-  const [items, setItems] = useState<HiringCandidate[] | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
-  const requests = useRef(new Map<string, { expiresAt: string; mutationId: string }>());
-  async function discover() { if (busy) return; setBusy(true); setError(""); try { setItems((await hiringMatchingClient.discover(slot.postId, slot.id)).items); } catch (e) { setError(await getApiErrorMessage(e, "후보를 찾지 못했어요.")); } finally { setBusy(false); } }
-  async function send(candidateId: string) {
-    if (busy) return; setBusy(true); setError(""); setNote("");
-    const key = `${slot.id}:${slot.revision}:${candidateId}`;
-    if (!requests.current.has(key)) requests.current.set(key, newOfferRequest());
-    const request = requests.current.get(key)!;
-    try { await hiringMatchingClient.send(slot.postId, slot.id, { candidateId, expectedRevision: slot.revision, ...request }); requests.current.delete(key); setNote(`제안 저장을 확인했어요. 답변 만료는 ${new Date(request.expiresAt).toLocaleString("ko-KR")}입니다. 아직 열람·수락된 것은 아닙니다.`); } catch (e) { setError(await getApiErrorMessage(e, "제안을 보내지 못했어요. 같은 요청으로 다시 확인할 수 있어요.")); } finally { setBusy(false); }
-  }
-  return <section className="space-y-3 border-t border-line pt-4"><h4 className="font-bold">지금 작업 가능한 후보</h4><p className="text-xs text-fg-3">공개에 동의한 후보의 조건을 확인합니다. 조건과 작업 여력을 먼저 확인한 뒤 계정 식별자 순으로 최대 30명만 표시합니다. 전체 후보 목록이나 능력 순위가 아니며 다음 페이지는 제공하지 않습니다.</p><button className={collabButton} disabled={busy} onClick={() => { void discover(); }}>조건에 맞는 후보 찾기</button>{error && <CollabNotice error>{error}</CollabNotice>}{note && <CollabNotice>{note}</CollabNotice>}{items?.length === 0 && <p>조회 시점에 조건과 작업 여력이 맞는 공개 후보가 없어요.</p>}{items?.map((c) => <article key={c.userId} className="space-y-2 rounded border border-line p-3"><h5 className="font-semibold">{c.displayName}</h5><p className="text-sm">{c.reasons.join(" · ")}</p><p className="text-xs">직접 확인 {new Date(c.confirmedAt).toLocaleTimeString("ko-KR")} · 만료 {new Date(c.expiresAt).toLocaleTimeString("ko-KR")}</p><button className={collabButton} disabled={busy} onClick={() => { void send(c.userId); }}>이 조건으로 30분 유효 제안 보내기</button></article>)}</section>;
-}
+export { HiringDiscovery } from "./HiringDiscovery";
