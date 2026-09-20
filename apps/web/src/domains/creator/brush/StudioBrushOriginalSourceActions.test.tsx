@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioBrushLibraryPanel } from "./StudioBrushLibraryPanel";
+import { StudioBrushOriginalSourceActions } from "./StudioBrushOriginalSourceActions";
 import { createBrush, DEFAULT_STUDIO_BRUSH_SNAPSHOT, importBrushFromJson, type StudioSavedBrush } from "./studio-brush-library";
 import { createMemorySessionBrushLibraryRepository } from "./studio-brush-library-sqlite-repository";
 import { createStudioBrushOriginalSource, decodeStudioBrushOriginalSource } from "./studio-brush-original-source";
@@ -48,4 +49,15 @@ describe("original source actions in the actual library panel", () => {
     expect(Array.from(decodeStudioBrushOriginalSource(archived.originalSource))).toEqual(Array.from(bytes));
     expect(screen.getByText(/원본 보존은 원본 엔진/u)).toBeTruthy();
   });
+});
+
+
+it("reports a corrupt original without downloading substitute bytes", async () => {
+  const source = createStudioBrushOriginalSource(bytes, "original.myb", "myb");
+  const onError = vi.fn();
+  render(<StudioBrushOriginalSourceActions source={{ ...source, sha256: "0".repeat(64) }}
+    name="손상 원본" onError={onError} />);
+  fireEvent.click(screen.getByRole("button", { name: "손상 원본 원본 파일 내보내기" }));
+  await waitFor(() => expect(onError).toHaveBeenCalledWith(expect.stringContaining("원본")));
+  expect(calls.download).not.toHaveBeenCalled();
 });

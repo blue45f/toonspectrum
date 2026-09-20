@@ -8,7 +8,7 @@
 //
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
 
-import { BRUSH_SOURCE_ARCHIVE_KIND, BRUSH_SOURCE_ARCHIVE_MAX_CHARACTERS, BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS, requireStudioBrushOriginalSource, requireEmbeddedStudioBrushOriginalSource, type StudioBrushOriginalSource } from "./studio-brush-original-source";
+import { BRUSH_SOURCE_ARCHIVE_KIND, BRUSH_SOURCE_ARCHIVE_MAX_CHARACTERS, BRUSH_SOURCE_ARCHIVE_MAX_BYTES, BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS, requireStudioBrushOriginalSource, requireEmbeddedStudioBrushOriginalSource, type StudioBrushOriginalSource } from "./studio-brush-original-source";
 
 import { STABILIZER_MAX } from "../studio-brush";
 import { normalizeHexColor } from "../studio-color-utils";
@@ -1115,7 +1115,12 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     throw new Error("브러시 설정이 보존 파일의 크기 한도를 넘었습니다. 원본을 제거하지 않았습니다.");
   }
   // A distinct kind makes older clients refuse rather than silently discard provenance.
-  return JSON.stringify({ kind: BRUSH_SOURCE_ARCHIVE_KIND, version: 1, brush: payload, originalSource }, null, 2);
+  const archive = JSON.stringify({ kind: BRUSH_SOURCE_ARCHIVE_KIND, version: 1, brush: payload, originalSource }, null, 2);
+  if (archive.length > BRUSH_SOURCE_ARCHIVE_MAX_CHARACTERS
+    || new TextEncoder().encode(archive).byteLength > BRUSH_SOURCE_ARCHIVE_MAX_BYTES) {
+    throw new Error("원본 포함 내보내기 파일이 가져오기 크기 한도를 넘었습니다. 원본을 제거하지 않았습니다.");
+  }
+  return archive;
 }
 
 const FILENAME_ILLEGAL_CHARS = new Set(["\\", "/", ":", "*", "?", '"', "<", ">", "|"]);
