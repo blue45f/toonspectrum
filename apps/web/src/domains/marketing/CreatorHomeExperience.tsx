@@ -10,6 +10,7 @@ import { useTheme } from "@/shared/lib/theme";
 import "./creator-home-experience.css";
 import "./creator-prism.css";
 import "./creator-flagship.css";
+import "./creator-home-experience-interactions.css";
 import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
