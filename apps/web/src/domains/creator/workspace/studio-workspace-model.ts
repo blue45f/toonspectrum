@@ -3,7 +3,7 @@ import type { StudioProjectResumeTarget } from "../studio-project-resume-target"
 import { studioProjectSectionHref } from "../studio-project-views";
 
 export type WorkspaceSurface = "home" | "team" | "hub";
-export const WORKSPACE_PANELS = ["work", "tools", "help"] as const;
+export const WORKSPACE_PANELS = ["work", "tools", "help", "projects"] as const;
 export type WorkspacePanel = (typeof WORKSPACE_PANELS)[number];
 export function workspacePanel(value: string | null): WorkspacePanel | null {
   return WORKSPACE_PANELS.find((panel) => panel === value) ?? null;

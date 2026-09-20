@@ -35,12 +35,16 @@ import {
   studioCharacterSkinByKey,
   resolveStudioCharacterAppearance,
   studioCharacterWalkClip,
+  studioCharacterActionClip,
   type StudioCharacterMotionState,
   type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
 import {
   StudioCharacterAssetResidency,
   studioCharacterFrameGeometry,
+  studioCharacterActionTextureKey,
+  studioCharacterActionFrame,
+  studioCharacterActionSheetMatches,
   studioCharacterPoseTextureKey,
   studioCharacterStaticAsset,
   studioCharacterStaticTextureKey as staticTextureKey,
@@ -395,6 +399,22 @@ export function StudioVirtualSpacePhaserCanvas({
       ) => {
         const owner = sprite.getData("assetOwner") as string;
         if (sceneReady && owner) characterAssets.use(owner, studioCharacterVisualAssets(skin, nextFacing, nextState), sprite.texture.key);
+        const action = studioCharacterActionClip(skin, nextFacing, nextState);
+        const actionKey = action ? studioCharacterActionTextureKey(skin, nextFacing, nextState) : null;
+        const actionSource = actionKey && scene.textures.exists(actionKey) ? scene.textures.get(actionKey).source[0] : undefined;
+        if (action && actionKey && scene.textures.exists(actionKey)
+          && actionSource && studioCharacterActionSheetMatches(action, actionSource.width, actionSource.height)
+          && action.end < scene.textures.get(actionKey).frameTotal - 1) {
+          if (sprite.anims.isPlaying) sprite.stop();
+          if (sprite.getData("actionKey") !== actionKey) {
+            sprite.setData("actionKey", actionKey).setData("actionStartedAt", scene.time.now);
+          }
+          const frame = studioCharacterActionFrame(action, scene.time.now - Number(sprite.getData("actionStartedAt")), reducedMotion.matches);
+          sprite.setTexture(actionKey, frame).setData("framePresentation", action.frames?.[frame - action.start]);
+          updateDisplaySize(sprite);
+          return;
+        }
+        sprite.setData("actionKey", null);
         const pose = nextState === "wave" || nextState === "sit" ? skin.poses?.[nextState] : undefined;
         if (pose && (nextState === "wave" || nextState === "sit")) {
           const poseKey = studioCharacterPoseTextureKey(skin, nextState);
@@ -1216,6 +1236,7 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.walkFrame = String(localSprite.frame.name);
           parent.dataset.pathLength = String(path.length);
           parent.dataset.loadedWalkSheets = String(this.textures.getTextureKeys().filter((key) => key.includes("walk-sheet")).length);
+          parent.dataset.loadedActionSheets = String(this.textures.getTextureKeys().filter((key) => /-(talk|draw|review)-sheet-/u.test(key)).length);
           parent.dataset.walkDistance = localDistance.toFixed(2);
           parent.dataset.pixelRatio = viewport.ratio.toFixed(2);
           parent.dataset.localMoving = String(nextMoving);
@@ -1224,7 +1245,9 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.appearanceIssues = JSON.stringify(localSprite.getData("appearanceIssues") ?? []);
           parent.dataset.reaction = localReaction?.visible ? localReaction.text : "";
           parent.dataset.peers = JSON.stringify([...peers].map(([id, peer]) => ({ id, x: peer.sprite.x, y: peer.sprite.y, targetX: peer.targetX, targetY: peer.targetY, texture: peer.sprite.texture.key, reaction: peer.reaction.visible ? peer.reaction.text : "" })));
-          parent.dataset.npcs = JSON.stringify([...npcs].map(([id, npc]) => ({ id, x: npc.sprite.x, y: npc.sprite.y, floor: npc.groundPoint, phase: npc.phase, stage: npc.sprite.getData("activityStage"), anchor: npc.sprite.getData("activityAnchorId"), texture: npc.sprite.texture.key })));
+          parent.dataset.npcs = JSON.stringify([...npcs].map(([id, npc]) => ({ id, x: npc.sprite.x, y: npc.sprite.y, floor: npc.groundPoint, phase: npc.phase, stage: npc.sprite.getData("activityStage"), anchor: npc.sprite.getData("activityAnchorId"), texture: npc.sprite.texture.key,
+            frame: npc.sprite.frame.name, originX: npc.sprite.originX, originY: npc.sprite.originY,
+            displayWidth: npc.sprite.displayWidth, displayHeight: npc.sprite.displayHeight })));
           parent.dataset.props = JSON.stringify(manifest.props.filter((prop) => prop.assetUrl).map((prop) => ({ id: prop.id, depth: studioWorldPropDepth(prop) })));
         }
         moving = nextMoving;

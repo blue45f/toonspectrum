@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { decodeDrawnArtPng, DRAWN_ART_DIRECTORY, verifyDrawnArtFramePixels, verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
+import { decodeDrawnArtPng, DRAWN_ART_DIRECTORY, verifyDrawnArtFramePixels, verifyDrawnArtAtlasRemainder, verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
+import { VIRTUAL_STUDIO_AMBIENT_DIRECTORY, verifyVirtualStudioAmbientAudio } from "./verify-virtual-studio-ambient-audio.mjs";
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
@@ -27,10 +28,16 @@ function syntheticPng(width, height) {
   return bytes;
 }
 
-test("verifies all 24 drawn sheets and 96 decoded frames against runtime bindings", async () => {
+test("preserves 28 base/review sheets and verifies four pink drawing sheets against runtime bindings", async () => {
   const result = await verifyVirtualStudioDrawnArt();
-  assert.equal(result.assetCount, 24);
-  assert.equal(result.frameCount, 96);
+  assert.equal(result.assetCount, 32);
+  assert.equal(result.frameCount, 128);
+  assert.equal(result.basePoseAssetCount, 24);
+  assert.equal(result.basePoseFrameCount, 96);
+  assert.equal(result.reviewAssetCount, 4);
+  assert.equal(result.reviewFrameCount, 16);
+  assert.equal(result.drawingAssetCount, 4);
+  assert.equal(result.drawingFrameCount, 16);
   assert.equal(result.registryBindingsVerified, true);
 });
 
@@ -51,6 +58,51 @@ test("rejects unsupported drawn PNG decoding instead of trusting recorded dimens
   const unsupported = Buffer.from(bytes); unsupported[28] = 1;
   assert.throws(() => decodeDrawnArtPng(unsupported), /non-interlaced 8-bit RGBA/u);
   assert.throws(() => decodeDrawnArtPng(bytes.subarray(0, 40)), /truncated/u);
+});
+
+test("rejects silver review horizontal foot drift against actual decoded shoe pixels", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const asset = structuredClone(manifest.assets["silver/review-up"]);
+  const decoded = decodeDrawnArtPng(await readFile(path.join(DRAWN_ART_DIRECTORY, "player-silver-review-up.png")));
+  verifyDrawnArtFramePixels(decoded, asset);
+  asset.frames[2].originX += .03;
+  assert.throws(() => verifyDrawnArtFramePixels(decoded, asset), /review foot origin/u);
+});
+
+test("verifies declared pink drawing remainders and rejects larger, opaque or undeclared pixels", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const asset = manifest.assets["pink/draw-up"];
+  const decoded = decodeDrawnArtPng(await readFile(path.join(DRAWN_ART_DIRECTORY, "player-pink-draw-up.png")));
+  verifyDrawnArtFramePixels(decoded, asset);
+  assert.deepEqual(asset.atlas.remainder, { right: 0, bottom: 1, maxAlpha: 1, nonzeroAlphaPixels: 1 });
+  const wrongSize = structuredClone(asset); wrongSize.atlas.remainder.bottom = 2;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, wrongSize), /dimensions must be zero or one/u);
+  const wrongFull = structuredClone(asset); wrongFull.atlas.height--;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, wrongFull), /full atlas dimensions/u);
+  const undeclared = structuredClone(asset); delete undeclared.atlas;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, undeclared), /explicit full atlas/u);
+  const wrongCells = structuredClone(asset); wrongCells.frameHeight += .5;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, wrongCells), /positive integers/u);
+  const lastRow = (decoded.height - 1) * decoded.width * 4;
+  const opaque = { ...decoded, rgba: Buffer.from(decoded.rgba) }; opaque.rgba[lastRow + 3] = 255;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(opaque, asset), /opaque pixel/u);
+  const multiple = { ...decoded, rgba: Buffer.from(decoded.rgba) }; multiple.rgba[lastRow + 3] = 1; multiple.rgba[lastRow + 7] = 1;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(multiple, asset), /more than one/u);
+  const changedHiddenRgb = { ...decoded, rgba: Buffer.from(decoded.rgba) }; changedHiddenRgb.rgba[lastRow] ^= 1;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(changedHiddenRgb, asset), /RGBA bytes drifted/u);
+});
+
+test("keeps every pre-existing drawn sheet on the exact two-cell format without the new remainder exception", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const originalAssets = Object.values(manifest.assets).filter((asset) => !asset.state.startsWith("draw-"));
+  assert.equal(originalAssets.length, 28);
+  for (const asset of originalAssets) {
+    assert.equal(asset.atlas, undefined);
+    const decoded = { width: asset.dimensions[0], height: asset.dimensions[1], rgba: Buffer.alloc(0) };
+    verifyDrawnArtAtlasRemainder(decoded, asset);
+    assert.throws(() => verifyDrawnArtAtlasRemainder({ ...decoded, height: decoded.height + 1 }, asset), /exactly two cells/u);
+    assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, { ...asset, atlas: { remainder: { bottom: 1 } } }), /existing sheets cannot opt/u);
+  }
 });
 
 async function createFixture(context, { dimensions = [10, 12], sha256 } = {}) {
@@ -76,7 +128,13 @@ test("verifies every current production-v2 output without claiming source revali
   const assets = new Map(result.assets.map((asset) => [asset.name, asset]));
 
   assert.equal(result.assetCount, 36);
-  assert.equal(result.drawnArt.assetCount, 24);
+  assert.equal(result.drawnArt.assetCount, 32);
+  assert.equal(result.ambientAudio.assetCount, 2);
+  assert.equal(result.ambientAudio.originalBytesVerified, true);
+  assert.equal(result.ambientAudio.subjectiveListeningReverified, false);
+  assert.equal(result.drawnArt.basePoseFrameCount, 96);
+  assert.equal(result.drawnArt.reviewFrameCount, 16);
+  assert.equal(result.drawnArt.drawingFrameCount, 16);
   assert.equal(result.drawnArt.decodedPixelsVerified, true);
   assert(result.totalBytes > 0);
   assert.equal(result.outputIntegrityVerified, true);
@@ -275,4 +333,28 @@ test("rejects generated-world asset or authoring dimension drift", async (contex
   world.layers[0].imageheight = 1216;
   await writeFile(worldPath, JSON.stringify(world));
   await assert.rejects(verifyVirtualStudioLivingWorldBindings({ worldPath }), /actual dimensions/u);
+});
+
+
+test("rejects ambient recording drift and false license/provenance evidence without relaxing art checks", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "virtual-ambient-integrity-"));
+  try {
+    await cp(VIRTUAL_STUDIO_AMBIENT_DIRECTORY, directory, { recursive: true });
+    assert.equal(verifyVirtualStudioAmbientAudio({ directory }).assetCount, 2);
+    const recording = path.join(directory, "window-rain.ogg");
+    const original = await readFile(recording);
+    const changed = Buffer.from(original); changed[100] ^= 1;
+    await writeFile(recording, changed);
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /original SHA-256/u);
+    await writeFile(recording, original.subarray(0, original.length - 1));
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /byte length/u);
+    await writeFile(recording, original);
+    const manifestPath = path.join(directory, "provenance.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, license: "CC-BY-4.0" }));
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /license must remain CC0/u);
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    await writeFile(path.join(directory, "CC0-1.0.txt"), "not the original license");
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /official CC0 legal text/u);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

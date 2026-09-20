@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowRight, BookOpen, ClipboardList, Compass, FolderOpen, HelpCircle, MapPin, Plus, Settings, Users } from "lucide-react";
+import { ArrowRight, BookOpen, ClipboardList, Compass, FolderOpen, HelpCircle, MapPin, Plus, Search, Settings, Users } from "lucide-react";
 import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -15,6 +15,7 @@ import { useStudioProjectLibrary } from "../studio-shell/useStudioProjectLibrary
 import { resolveStudioProjectResumeTarget } from "../studio-project-resume-target";
 import { selectWorkspaceProject, workspacePanel, workspaceProjectLinks, type WorkspaceSurface } from "./studio-workspace-model";
 import { WorkspaceTeamContent, WorkspaceExploreContent } from "./StudioWorkspaceSections";
+import { StudioWorkspaceProjectPicker } from "./StudioWorkspaceProjectPicker";
 import "@/shared/components/workspace/workspace.css";
 
 const WorkspaceWorld = lazy(() => import("./StudioWorkspaceWorld").then((module) => ({ default: module.StudioWorkspaceWorld })));
@@ -52,6 +53,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
   }, [project, locale]);
   const links = workspaceProjectLinks(project, resume);
   const panel = workspacePanel(params.get("panel"));
+  const projectSearchRef = useRef<HTMLInputElement>(null);
   const setPanel = (next: typeof panel) => {
     setParams((current) => {
       const value = new URLSearchParams(current);
@@ -59,12 +61,15 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
       return value;
     }, { replace: Boolean(panel) });
   };
-  const chooseProject = (id: string) => setParams((current) => {
+  const chooseProject = (id: string) => {
+    if (loading || library.error || (id && !context.projects.some((item) => item.id === id))) return;
+    setParams((current) => {
     const next = new URLSearchParams(current);
     next.delete("panel");
     if (id) { next.set("project", id); next.delete("scope"); } else { next.delete("project"); next.set("scope", "personal"); }
     return next;
-  });
+    }, { replace: Boolean(panel) });
+  };
   const label = surface === "team" ? bt("팀", "Team") : surface === "hub" ? bt("둘러보기", "Explore") : bt("내 스튜디오", "My studio");
   const activeId = surface === "home" ? "workspace-home" : surface === "team" ? "workspace-team" : "workspace-hub";
   const userName = session.data?.user.name;
@@ -74,14 +79,15 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
     <div className="workspace-shell" data-route-ready="studio-workspace" data-workspace-surface={surface}>
       <header className="workspace-topbar">
         <Link href={homeHref} className="workspace-brand"><span aria-hidden="true">T</span><strong>ToonSpectrum</strong></Link>
-        <label className="workspace-project-select">
-          <span>{bt("현재 작품", "Current work")}</span>
-          <select aria-label={bt("현재 작품 선택", "Select current work")} value={project?.id ?? ""}
+        <div className="workspace-project-select">
+          <label htmlFor="workspace-current-project">{bt("현재 작품", "Current work")}</label>
+          <select id="workspace-current-project" aria-label={bt("현재 작품 선택", "Select current work")} value={project?.id ?? ""}
             disabled={loading || Boolean(library.error)} onChange={(event) => chooseProject(event.target.value)}>
             <option value="">{loading ? bt("불러오는 중…", "Loading…") : context.missing ? bt("작품을 다시 선택하세요", "Select a work again") : bt("개인 작업실", "Personal studio")}</option>
             {context.projects.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
           </select>
-        </label>
+          <button type="button" className="workspace-icon-button workspace-project-find" onClick={() => setPanel("projects")} aria-haspopup="dialog" aria-expanded={panel === "projects"} aria-label={bt("작품 찾아 전환", "Find and switch work")}><Search size={19} aria-hidden="true" /></button>
+        </div>
         <div className="workspace-utilities">
           <OpenSearchButton className="workspace-icon-button">{bt("검색", "Search")}</OpenSearchButton>
           <button type="button" className="workspace-work-shortcut" onClick={() => setPanel("work")} aria-haspopup="dialog" aria-expanded={panel === "work"} aria-label={bt("작업 바로가기 열기", "Open work shortcuts")}><ClipboardList size={20} aria-hidden="true" /></button>
@@ -119,14 +125,14 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
         </> : surface === "team" ? <WorkspaceTeamContent links={links} project={project} /> : <WorkspaceExploreContent />}
       </section>
       <footer className="workspace-statusbar">
-        <div><strong>{project?.title ?? bt("개인 작업실", "Personal studio")}</strong><small>{bt("이 기기의 작품 목록 · 공유 권한은 각 작업에서 확인합니다", "Device work library · sharing access is checked in each workspace")}</small></div>
+        <div><strong>{loading ? bt("작품 확인 중", "Checking works") : library.error ? bt("저장 공간 확인 필요", "Storage needs attention") : context.missing ? bt("선택 작품 확인 필요", "Selected work unavailable") : project?.title ?? bt("개인 작업실", "Personal studio")}</strong><small>{bt("이 기기의 작품 목록 · 공유 권한은 각 작업에서 확인합니다", "Device work library · sharing access is checked in each workspace")}</small></div>
         {surface === "home" ? <div className="workspace-footer-actions"><button type="button" className="workspace-icon-button" onClick={() => setPanel("tools")} aria-haspopup="dialog" aria-expanded={panel === "tools"} aria-label={bt("도구와 공간 메뉴", "Tools and space menu")}><Settings size={19} aria-hidden="true" /></button>
           {!loading && !library.error && !context.missing ? <Link className="workspace-primary" href={canResume ? links.resume : "/studio/new"}>{canResume ? (resume?.summary ? bt("이어서 작업", "Resume work") : bt("작품 열기", "Open work")) : bt("작품 시작", "Start creating")}<ArrowRight size={18} aria-hidden="true" /></Link> : null}</div> : <Link href={homeHref}>{bt("작업실로 돌아가기", "Back to studio")}</Link>}
       </footer>
-      <WorkspaceContextPanel open={panel !== null} title={panel === "work" ? bt("작업 바로가기", "Work shortcuts") : panel === "tools" ? bt("도구와 공간", "Tools and space") : bt("도움말", "Help")} onClose={() => setPanel(null)}>
-        <div className="workspace-link-list">
+      <WorkspaceContextPanel open={panel !== null} initialFocusRef={panel === "projects" ? projectSearchRef : undefined} title={panel === "projects" ? bt("작품 찾아 전환", "Find and switch work") : panel === "work" ? bt("작업 바로가기", "Work shortcuts") : panel === "tools" ? bt("도구와 공간", "Tools and space") : bt("도움말", "Help")} onClose={() => setPanel(null)}>
+        {panel === "projects" ? <StudioWorkspaceProjectPicker projects={context.projects} selectedId={project?.id ?? null} personal={!blocked && !project} loading={loading} error={library.error} locale={locale} searchRef={projectSearchRef} onSelect={chooseProject} onRetry={library.reload} /> : <div className="workspace-link-list">
           {panel === "work" ? blocked ? <><p>{bt("작품 목록을 확인한 후 작업을 열 수 있습니다.", "Work actions will be available after the library has been verified.")}</p><Link href="/studio">{bt("작품 목록 열기", "Open work library")}</Link></> : project ? <><Link href={links.resume}>{bt("현재 작품 열기", "Open current work")}</Link><Link href={links.review}>{bt("받은 검수 요청", "Review inbox")}</Link><Link href={links.production}>{bt("진행과 담당 작업", "Production and assignments")}</Link></> : <><p>{bt("작품을 만들거나 가져오면 이곳에서 이어갈 수 있습니다.", "Create or import a work to continue here.")}</p><Link href="/studio/new"><Plus size={20} aria-hidden="true" />{bt("새 작품", "New work")}</Link><Link href="/studio/import">{bt("파일 가져오기", "Import files")}</Link></> : panel === "tools" ? <><Link href={links.assets}>{project ? bt("현재 작품 소재", "Work materials") : bt("소재 라이브러리", "Materials library")}</Link><Link href="/market">{bt("새 소재 찾기", "Discover materials")}</Link>{project ? <Link href={links.space}>{bt("공간 입장과 꾸미기", "Enter and customize space")}</Link> : null}<Link href="/settings">{bt("테마·언어·환경 설정", "Theme, language and preferences")}</Link><button type="button" onClick={() => setPanel("help")}><HelpCircle size={20} aria-hidden="true" />{bt("도움말", "Help")}</button></> : <><Link href="/help"><BookOpen size={20} aria-hidden="true" />{bt("사용 도움말", "User help")}</Link><Link href="/about/studio">{bt("서비스 소개", "Studio introduction")}</Link><Link href="/product-tour"><Compass size={20} aria-hidden="true" />{bt("서비스 둘러보기", "Product tour")}</Link></>}
-        </div>
+        </div>}
       </WorkspaceContextPanel>
     </div>
   );

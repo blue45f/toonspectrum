@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import { useStudioModalSheet } from "../useStudioModalSheet";
 import { studioVirtualSpaceReviewHref } from "../virtual-space/studio-virtual-space-review-invitation";
+import { StudioReviewCaptureReturnLink, type StudioReviewCaptureOrigin } from "../review-resolution/StudioReviewCaptureReturnLink";
 
 import type { StudioReviewCaptureSnapshot } from "./studio-review-capture-bridge";
 
@@ -11,9 +12,10 @@ import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from
 const bi = (ko: string, en: string) => translateBilingualValueForActiveLocale("StudioReviewCaptureDialog", ko, en);
 const button = "inline-flex min-h-11 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50";
 
-export function StudioReviewCaptureDialog({ open, snapshot, onSave, onRetry, onClose }: {
+export function StudioReviewCaptureDialog({ open, snapshot, origin, onSave, onRetry, onClose }: {
   readonly open: boolean;
   readonly snapshot: StudioReviewCaptureSnapshot;
+  readonly origin?: StudioReviewCaptureOrigin | null;
   readonly onSave: () => void;
   readonly onRetry: () => void;
   readonly onClose: () => void;
@@ -66,6 +68,7 @@ export function StudioReviewCaptureDialog({ open, snapshot, onSave, onRetry, onC
           ? bi("임시 이미지 정리 재시도", "Retry image cleanup")
           : snapshot.phase === "cancel-uncertain" ? bi("취소 결과 다시 확인", "Check cancellation") : bi("같은 요청 다시 확인", "Retry this request")}</button> : null}
         {snapshot.subject ? <>
+          {origin && snapshot.phase === "completed" ? <StudioReviewCaptureReturnLink origin={origin} replacement={snapshot.subject} className={button} /> : null}
           <a className={`${button} bg-accent text-on-accent`} href={studioVirtualSpaceReviewHref(snapshot.subject)}>{bi("검수본 보기", "View pinned review")}</a>
           <a className={button} href={`/studio/p/${encodeURIComponent(snapshot.subject.workId)}/space`}>{bi("가상 스튜디오에서 초대", "Invite from Virtual Studio")}</a>
         </> : null}

@@ -1,4 +1,4 @@
-import { studioCharacterSkinByKey, type StudioCharacterMotionState } from "./studio-virtual-space-character-skins";
+import { studioCharacterSkinByKey, studioCharacterActionClip, type StudioCharacterMotionState } from "./studio-virtual-space-character-skins";
 import { StudioNpcActivityReservations, type StudioNpcActivityStage, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
 import { studioNpcGuideStops, type StudioNpcGuideStop, type StudioVirtualNpcGuideTourRequest, type StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import type { StudioVirtualSpaceFacing, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
@@ -97,7 +97,7 @@ export function studioNpcMotionBudget(environment: StudioNpcEnvironment): { move
 function availableAnimation(actor: NpcActor, requested: StudioCharacterMotionState): StudioCharacterMotionState {
   const skin = studioCharacterSkinByKey(actor.definition.skinKey);
   if (requested === "sit" || requested === "wave") return skin.poses?.[requested] ? requested : "idle";
-  if (requested === "talk" || requested === "draw" || requested === "review") return skin.state?.[requested] ? requested : "idle";
+  if (requested === "talk" || requested === "draw" || requested === "review") return skin.state?.[requested] || studioCharacterActionClip(skin, actor.facing, requested) ? requested : "idle";
   return requested;
 }
 

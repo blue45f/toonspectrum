@@ -3,6 +3,7 @@ import { createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-mo
 import { studioReviewPreviewDigest, studioReviewPreviewIntentKey } from "./studio-review-preview-producer.contract";
 import { studioReviewMappingFromOperation } from "./studio-review-source-map";
 import { StudioProjectGraphRepository } from "./studio-project-graph.repository";
+import { studioReviewResolutionCaptureFromRows } from "./studio-review-capture-attestation";
 
 const db = vi.hoisted(() => ({ query: vi.fn(), release: vi.fn(), connect: vi.fn() }));
 vi.mock("../../db", () => ({ dbPool: { connect: db.connect } }));
@@ -42,6 +43,57 @@ describe("server source-map attestation", () => {
     expect(studioReviewMappingFromOperation(operation, pin, 0, hash).status).toBe("unmapped");
     expect(studioReviewMappingFromOperation(operation, pin, 0, hash, { ...receipt, actorUserId: "other" }).status).toBe("unmapped");
     expect(studioReviewMappingFromOperation({ ...operation, commandId: "client-command" }, pin, 0, hash, receipt).status).toBe("unmapped");
+  });
+});
+
+function resolutionRows() {
+  const sequence = 11;
+  const subject = { ...pin, schemaVersion: 1, reviewId: `review-${key}`, revisionId: `review-snapshot-${key}` };
+  const payload = { ...operation.payload, previews: [{ ordinal: 0, sha256: hash }, { ordinal: 1, sha256: secondHash }] };
+  const revision = (id: string, kind: string) => ({ id, kind, artifactId: pin.artifactId, rootGraphHash: digest,
+    operationFirst: sequence, operationLast: sequence, createdBy: "owner", deviceId: intent.deviceId });
+  return { pin: subject,
+    capture: { artifactId: pin.artifactId, sequence, commandId: operation.commandId, baseRevisionId: intent.expectedHeadRevisionId,
+      resultRevisionId: subject.revisionId, actorUserId: "owner", deviceId: intent.deviceId, commandType: "review.snapshot-create",
+      payloadHash: studioReviewPreviewDigest(payload), operation: { ...operation, type: "review.snapshot-create", payload } },
+    receipt: { ...receipt, artifactId: pin.artifactId, resultRevisionId: subject.revisionId,
+      requestHash: studioReviewPreviewDigest({ intent, pages: payload.previews }), response: { ...receipt.response, subject } },
+    snapshot: revision(subject.revisionId, "review-snapshot"), submission: revision(`review-submission-${key}`, "submission"),
+    checkpoint: revision(`review-checkpoint-${key}`, "checkpoint"),
+    base: { id: intent.expectedHeadRevisionId, artifactId: pin.artifactId, rootGraphHash: intent.expectedHeadRootGraphHash },
+    snapshotParents: [{ ordinal: 0, parentRevisionId: `review-submission-${key}` }],
+    submissionParents: [{ ordinal: 0, parentRevisionId: `review-checkpoint-${key}` }],
+    checkpointParents: [{ ordinal: 0, parentRevisionId: intent.expectedHeadRevisionId }] };
+}
+
+describe("server capture resolution lineage", () => {
+  it("attests a captured document, completed receipt and exact three-revision graph without using createdAt", () => {
+    const rows = resolutionRows();
+    expect(studioReviewResolutionCaptureFromRows(rows)).toEqual({ subject: rows.pin, submissionId: rows.submission.id,
+      sourceServerRevision: 7, sequence: 11 });
+    expect(studioReviewResolutionCaptureFromRows({ ...rows, snapshot: { ...rows.snapshot, createdAt: "2099-01-01" } }))
+      .toEqual(studioReviewResolutionCaptureFromRows(rows));
+  });
+  it.each([
+    ["receipt", null], ["receipt.actorUserId", "other"], ["receipt.requestHash", hash], ["receipt.resultRevisionId", "other"],
+    ["receipt.response.status", "prepared"], ["receipt.response.fingerprint", hash], ["receipt.response.subject.rootGraphHash", hash],
+    ["capture.payloadHash", hash], ["capture.commandType", "client.snapshot"], ["capture.commandId", "client-command"],
+    ["capture.actorUserId", "other"], ["capture.resultRevisionId", "other"], ["capture.sequence", Number.MAX_SAFE_INTEGER + 1],
+    ["capture.operation.payload.sourceSnapshot", {}], ["capture.operation.payload.previews", [{ ordinal: 0, sha256: hash }]],
+    ["snapshot.kind", "checkpoint"], ["snapshot.artifactId", "other"], ["snapshot.operationFirst", 10],
+    ["submission.id", "unrelated-submission"], ["submission.kind", "autosave"], ["submission.createdBy", "other"],
+    ["checkpoint.rootGraphHash", hash], ["checkpoint.deviceId", "other"], ["base.rootGraphHash", hash],
+    ["snapshotParents", []], ["snapshotParents", [{ ordinal: 1, parentRevisionId: `review-submission-${key}` }]],
+    ["snapshotParents", [{ ordinal: 0, parentRevisionId: `review-submission-${key}` }, { ordinal: 1, parentRevisionId: "extra" }]],
+    ["submissionParents", [{ ordinal: 0, parentRevisionId: "unrelated-checkpoint" }]],
+    ["checkpointParents", [{ ordinal: 0, parentRevisionId: "unrelated-base" }]],
+  ])("rejects forged or broken %s evidence", (path, value) => {
+    const rows: Record<string, unknown> = structuredClone(resolutionRows());
+    const parts = (path as string).split(".");
+    let target = rows;
+    for (const part of parts.slice(0, -1)) target = target[part] as Record<string, unknown>;
+    target[parts.at(-1)!] = value;
+    expect(studioReviewResolutionCaptureFromRows(rows)).toBeNull();
   });
 });
 

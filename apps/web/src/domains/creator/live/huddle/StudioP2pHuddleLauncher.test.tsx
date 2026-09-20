@@ -6,6 +6,7 @@ import type { StudioLiveRoom } from "../studio-live-collaboration-room";
 import StudioP2pHuddleLauncher from "./StudioP2pHuddleLauncher";
 import { closeStudioP2pHuddle, openStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "./studio-p2p-huddle-events";
 import { resetStudioStrokeFocusActivityForTests, setStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
+import { studioHuddleAudioFocusSnapshot } from "./studio-p2p-huddle-audio-focus";
 
 const track = { kind: "audio", stop: vi.fn(), onended: null };
 const stream = { getTracks: () => [track] };
@@ -28,6 +29,18 @@ function view(room: StudioLiveRoom, canChat = true) {
 }
 afterEach(() => { resetStudioStrokeFocusActivityForTests(); cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUserMedia.mockClear(); track.stop.mockClear(); });
 describe("P2P launcher consent and lifetime", () => {
+  it("gives joined Huddles local playback priority without capturing devices or treating a panel open as a call", () => {
+    environment(); const mounted = render(view(fixture()));
+    expect(studioHuddleAudioFocusSnapshot()).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(studioHuddleAudioFocusSnapshot()).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    expect(studioHuddleAudioFocusSnapshot()).toBe(true); expect(getUserMedia).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "대화 패널 접기" }));
+    window.dispatchEvent(new Event("blur"));
+    expect(studioHuddleAudioFocusSnapshot()).toBe(true);
+    mounted.unmount(); expect(studioHuddleAudioFocusSnapshot()).toBe(false);
+  });
   it("keeps devices off until an explicit media action and preserves calls while collapsed", async () => {
     environment(); render(view(fixture()));
     fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
