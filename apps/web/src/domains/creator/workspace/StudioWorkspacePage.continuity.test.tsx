@@ -180,3 +180,15 @@ describe("workspace live resume integration", () => {
     expect(document.querySelector('[data-workspace-resume-notice="unavailable"]')).toBeTruthy();
   });
 });
+
+it("keeps the space home free of permanent cards and opens work details only on request", async () => {
+  state.mode = "virtual-studio";
+  render(<App entries={["/home?project=older"]} />);
+  await waitFor(() => expect(document.querySelector(".workspace-world")).toBeTruthy());
+  expect(document.querySelector(".workspace-main .workspace-activity")).toBeNull();
+  expect(document.querySelector(".workspace-main .workspace-recent")).toBeNull();
+  expect(document.querySelector(".workspace-world")?.getAttribute("data-space-labels")).toBe("visible");
+  fireEvent.click(screen.getByRole("button", { name: "작업 바로가기 열기" }));
+  expect(document.querySelector(".workspace-activity")).toBeTruthy();
+  expect(screen.getByTestId("location").textContent).toBe("/home?project=older&panel=work");
+});

@@ -15,7 +15,7 @@ export function StudioWorkspaceWorld({ project, links, onFallback, resumeLabel }
 }) {
   const bt = useBilingual("StudioWorkspaceWorld");
   const [failed, setFailed] = useState(false);
-  const [labels, setLabels] = useState(false);
+  const [labels, setLabels] = useState(true);
   const destinations = [
     { key: "story", label: bt("이야기와 회차", "Story and episodes"), href: links.story, icon: BookOpen },
     { key: "materials", label: bt("소재장", "Materials"), href: links.assets, icon: Boxes },

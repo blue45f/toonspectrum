@@ -44,10 +44,10 @@ describe("studio-first visual redesign retains real actions", () => {
     render(<MemoryRouter><StudioWorkspaceWorld project={null} links={workspaceProjectLinks(null)} onFallback={vi.fn()} /></MemoryRouter>);
     expect(screen.getByRole("img").getAttribute("src")).toBe("/assets/virtual-studio/production-v2/master-central-lossless.webp");
     const toggle = screen.getByRole("button", { name: "공간 안내" });
-    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("link", { name: "내 책상" })).toBeTruthy();
-    fireEvent.click(toggle); expect(toggle.getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(toggle); expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(toggle); expect(toggle.getAttribute("aria-pressed")).toBe("true");
   });
   it("keeps one four-destination navigation and a consistent UI brand", () => {
     render(<MemoryRouter initialEntries={["/team?project=exact"]}><WorkspaceBrand /><WorkspaceSidebar activeId="workspace-team" /></MemoryRouter>);

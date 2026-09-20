@@ -24,10 +24,6 @@ export function WorkspaceSidebar({ activeId, context, children }: {
     <p className="workspace-sidebar-caption" aria-hidden="true">WORKSPACE</p>
     <WorkspaceNavigation activeId={activeId} context={context} />
     {children}
-    <div className="workspace-sidebar-note">
-      <span aria-hidden="true">MAKE ROOM<br />FOR YOUR STORY.</span>
-      <p>{korean ? "혼자 시작하고, 함께 완성하는 곳." : "Start on your own. Create together."}</p>
-    </div>
     <nav className="workspace-support-nav" aria-label={korean ? "도움과 환경 설정" : "Help and preferences"}>
       <Link href="/help"><HelpCircle size={18} aria-hidden="true" /><span>{korean ? "사용 가이드" : "User guide"}</span></Link>
       <Link href="/settings"><Settings size={18} aria-hidden="true" /><span>{korean ? "환경 설정" : "Preferences"}</span></Link>
