@@ -1,3 +1,5 @@
+import * as Dialog from "@radix-ui/react-dialog";
+import { useLocation } from "react-router-dom";
 import {
   getActiveI18nLocale,
   translateBilingualValueForActiveLocale,
@@ -20,6 +22,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 
 import { useSession } from "@/compat/auth-session-store";
@@ -33,6 +36,7 @@ import {
   creatorRoleSelection,
   creatorText,
   normalizeCreatorRoleProfile,
+  withCreatorRoleOnboarding,
   type CreatorExperienceLevel,
   type CreatorRoleId,
   type CreatorRoleLocale,
@@ -53,6 +57,13 @@ import {
   type CreatorRoleUsageGoal,
   type CreatorWorkspaceMode,
 } from "@/shared/lib/creator-role-workspace-contract";
+import {
+  acknowledgeCreatorOnboarding,
+  hasAcknowledgedCreatorOnboarding,
+  isCreatorOnboardingEntry,
+  needsCreatorAdaptiveOnboarding,
+  subscribeCreatorOnboardingAcknowledgement,
+} from "@/shared/lib/creator-adaptive-onboarding-policy";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 
 import { cn } from "@/shared/lib/utils";
@@ -178,10 +189,28 @@ function toggleDistinct<T>(values: readonly T[], value: T, maximum: number): T[]
 }
 
 export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly enabled?: boolean }) {
+  const { pathname, search } = useLocation();
+  const { data, status } = useSession();
+  const userId = status === "authenticated" ? data.user.id : null;
+  const acknowledged = useSyncExternalStore(
+    subscribeCreatorOnboardingAcknowledgement,
+    () => hasAcknowledgedCreatorOnboarding(userId),
+    () => false,
+  );
+  // Editor, public and disabled routes must not even load personalization data.
+  if (!enabled || !userId || acknowledged || !isCreatorOnboardingEntry(pathname, search)) return null;
+  return <CreatorAdaptiveOnboardingDialog key={userId} userId={userId} />;
+}
+
+function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }) {
   useBilingualI18nRevision();
   const { status } = useSession();
   const locale: CreatorRoleLocale = getActiveI18nLocale();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const mountedRef = useRef(false);
+  const savingRef = useRef(false);
+  const [opened, setOpened] = useState(false);
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -206,19 +235,19 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
   );
 
   useEffect(() => {
-    if (status !== "authenticated") {
-      setProfile(null);
-      setInitializedFor(null);
-      setDismissed(false);
-      return;
-    }
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
     let alive = true;
     const controller = new AbortController();
     setProfileLoading(true);
     setProfileError(null);
     getMyProfile(controller.signal)
       .then((next) => {
-        if (alive) setProfile(next);
+        if (alive && next.id === userId) setProfile(next);
       })
       .catch((cause: unknown) => {
         if (!alive || controller.signal.aborted) return;
@@ -233,7 +262,7 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
       alive = false;
       controller.abort();
     };
-  }, [locale, status]);
+  }, [locale, status, userId]);
 
   useEffect(() => {
     if (!profile || initializedFor === profile.id) return;
@@ -261,33 +290,25 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
 
   const needsOnboarding = Boolean(
     profile
+    && profile.id === userId
     && initializedFor === profile.id
-    && (
-      (!profile.creatorRoleProfile.experienceLevel && !profile.creatorRoleProfile.creatorStage)
-      || !profile.creatorRoleProfile.primaryRole
-      || !workspace.snapshot.document.onboardingComplete
-    )
+    && needsCreatorAdaptiveOnboarding(profile.creatorRoleProfile, workspace.snapshot.document)
   );
-  const visible = enabled
-    && status === "authenticated"
-    && !profileLoading
-    && needsOnboarding
-    && !dismissed;
 
   useEffect(() => {
-    if (!visible) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    dialogRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDismissed(true);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [visible]);
+    if (opened || dismissed || profileLoading || !needsOnboarding || workspace.status !== "ready") return;
+    // Never fight an already-open editor, confirmation or authentication dialog.
+    if (document.querySelector('[aria-modal="true"], dialog[open]')) return;
+    setOpened(true);
+  }, [dismissed, needsOnboarding, opened, profileLoading, workspace.status]);
+
+  // Keep the transaction visible through optimistic writes and save failures.
+  const visible = status === "authenticated" && opened && !dismissed;
+  const dismiss = () => {
+    if (savingRef.current) return;
+    setDismissed(true);
+    acknowledgeCreatorOnboarding(userId);
+  };
 
   const primaryDefinition = creatorRoleDefinition(primaryRole);
   const experience = useMemo(
@@ -318,20 +339,23 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
   };
 
   const complete = async () => {
-    if (!profile || !experienceLevel || !primaryRole || roles.length === 0 || saving) return;
+    if (!profile || !experienceLevel || !primaryRole || roles.length === 0 || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setProfileError(null);
     try {
-      const roleProfile = normalizeCreatorRoleProfile({
+      const roleProfile = withCreatorRoleOnboarding(normalizeCreatorRoleProfile({
         ...profile.creatorRoleProfile,
         experienceLevel,
         primaryRole,
         secondaryRoles: roles.filter((role) => role !== primaryRole),
         activeRole: primaryRole,
-      });
+      }), { status: "completed", step: 4, completedAt: new Date().toISOString() });
       const updated = await updateMyProfile({ creatorRoleProfile: roleProfile });
+      // A navigation or account switch must not continue this account's save.
+      if (!mountedRef.current) return;
       setProfile(updated);
-      await workspace.save(normalizeCreatorRoleWorkspacePreference({
+      const saved = await workspace.save(normalizeCreatorRoleWorkspacePreference({
         ...workspace.snapshot.document,
         activeRole: primaryRole,
         detailedLens: creatorDetailedRoleLens(primaryRole),
@@ -342,25 +366,46 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
         workspaceMode,
         onboardingComplete: true,
       }));
+      if (!mountedRef.current) return;
+      if (saved.status !== "ready" || !saved.snapshot.document.onboardingComplete) {
+        throw new Error(saved.error ?? localized(locale,
+          "작업 환경을 저장하지 못했습니다.", "Could not save your workspace."));
+      }
+      setDismissed(true);
+      acknowledgeCreatorOnboarding(userId);
     } catch (cause) {
+      if (!mountedRef.current) return;
       setProfileError(cause instanceof Error
         ? cause.message
         : localized(locale, "작업 환경을 저장하지 못했습니다.", "Could not save your workspace."));
     } finally {
-      setSaving(false);
+      savingRef.current = false;
+      if (mountedRef.current) setSaving(false);
     }
   };
 
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6">
-      <div
+    <Dialog.Root open={visible} onOpenChange={(open) => { if (!open) dismiss(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[220] flex items-center justify-center bg-black/65 p-3 backdrop-blur-sm sm:p-6">
+      <Dialog.Content
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="adaptive-onboarding-title"
-        tabIndex={-1}
+        aria-busy={saving || undefined}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          dialogRef.current?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const target = returnFocusRef.current;
+          if (target?.isConnected && !target.closest('[inert], [hidden], [aria-hidden="true"]')
+            && !document.querySelector('[aria-modal="true"], dialog[open]')) target.focus({ preventScroll: true });
+        }}
+        onEscapeKeyDown={(event) => { if (savingRef.current) event.preventDefault(); }}
+        onPointerDownOutside={(event) => event.preventDefault()}
         className="flex max-h-[min(92dvh,900px)] w-full max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-line bg-card shadow-2xl outline-none"
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-7">
@@ -369,17 +414,18 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
               <Sparkles size={15} aria-hidden="true" />
               <p className="text-[0.68rem] font-black uppercase tracking-[0.16em]">{translateCurrentStaticSourceText("shared.components.CreatorAdaptiveOnboardingGate", "en", "ADAPTIVE WORKSPACE")}</p>
             </div>
-            <h1 id="adaptive-onboarding-title" className="mt-1 text-xl font-black tracking-tight text-fg sm:text-2xl">
+            <Dialog.Title asChild><h1 className="mt-1 text-xl font-black tracking-tight text-fg sm:text-2xl">
               {localized(locale, "나에게 맞는 작업 환경 만들기", "Build a workspace around how you create")}
-            </h1>
-            <p className="mt-1 text-xs leading-5 text-fg-2 sm:text-sm">
+            </h1></Dialog.Title>
+            <Dialog.Description asChild><p className="mt-1 text-xs leading-5 text-fg-2 sm:text-sm">
               {localized(locale, "기능을 없애지 않고 홈·메뉴·도움말의 우선순위만 조정합니다. 설정에서 언제든 다시 바꿀 수 있습니다.", "We never remove tools—only tune home, menu and guidance priority. You can change everything later.")}
-            </p>
+            </p></Dialog.Description>
           </div>
           <button
             type="button"
+            disabled={saving}
             aria-label={localized(locale, "나중에 설정", "Set up later")}
-            onClick={() => setDismissed(true)}
+            onClick={dismiss}
             className="grid size-9 shrink-0 place-items-center rounded-full border border-line text-fg-2 hover:bg-raised hover:text-fg"
           >
             <X size={16} aria-hidden="true" />
@@ -711,7 +757,8 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
         <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line bg-panel/70 px-5 py-4 sm:px-7">
           <button
             type="button"
-            onClick={() => setDismissed(true)}
+            onClick={dismiss}
+            disabled={saving}
             className={buttonClass({ variant: "quiet", size: "sm" })}
           >
             {localized(locale, "나중에 설정", "Set up later")}
@@ -751,8 +798,10 @@ export function CreatorAdaptiveOnboardingGate({ enabled = true }: { readonly ena
             )}
           </div>
         </footer>
-      </div>
-    </div>
+      </Dialog.Content>
+        </Dialog.Overlay>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
