@@ -557,7 +557,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
           <GeometryFields x={item.x} y={item.y} width={item.width} height={item.height} onChange={updateProp} />
           <div role="group" aria-label={bt("소품 위치 조정", "Move prop")} className="grid grid-cols-2 gap-2">
             <Field label={bt("이동 간격", "Move increment")}>
-              <select value={moveStep} onChange={(event) => setMoveStep(Number(event.target.value))} className="min-h-11 rounded-lg border border-line bg-card px-2 text-xs">
+              <select aria-label={bt("이동 간격", "Move increment")} value={moveStep} onChange={(event) => setMoveStep(Number(event.target.value))} className="min-h-11 rounded-lg border border-line bg-card px-2 text-xs">
                 {[1, 8, 16, 32].map((step) => <option key={step} value={step}>{step}px</option>)}
               </select>
             </Field>
