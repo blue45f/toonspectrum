@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStudioWorkSession, type StudioWorkSessionView } from "@toonspectrum/studio-project-model";
 import { StudioWorkSessionDetail } from "./StudioWorkSessionDetail";
+import { useStudioSessionFormDraft } from "./use-studio-session-form-draft";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";
 
 vi.mock("../virtual-space/use-studio-review-roster", () => ({ useStudioReviewRoster: () => ({ members: [], candidates: [], status: "idle", refresh: vi.fn() }) }));
@@ -52,4 +53,58 @@ describe("actual work-session detail actions", () => {
     render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
     expect(screen.getByText("재검토 필요")).toBeTruthy(); expect(screen.queryByRole("button", { name: "기록 저장" })).toBeNull(); expect(f.command).not.toHaveBeenCalled();
   });
+});
+
+it("shows a recovery warning and retains typed text when browser storage is full", () => {
+  const f = fixture();
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("quota"); });
+  try {
+    render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
+    const field = screen.getByRole("textbox", { name: "내용" });
+    fireEvent.change(field, { target: { value: "이 화면에 유지할 메모" } });
+    expect((field as HTMLTextAreaElement).value).toBe("이 화면에 유지할 메모");
+    expect(screen.getByText(/탭 복구 저장을 사용할 수 없습니다/u)).toBeTruthy();
+    expect(f.command).not.toHaveBeenCalled();
+  } finally { write.mockRestore(); }
+});
+
+it("switches draft fields without carrying text into another account or work", () => {
+  sessionStorage.setItem("field-a", "First draft");
+  sessionStorage.setItem("field-b", "Second draft");
+  const { result, rerender } = renderHook(({ fieldKey }) => useStudioSessionFormDraft(fieldKey, 100), { initialProps: { fieldKey: "field-a" } });
+  act(() => result.current[1]("Edited first draft"));
+  rerender({ fieldKey: "field-b" });
+  expect(result.current[0]).toBe("Second draft");
+  act(() => result.current[1]("Edited second draft"));
+  expect(sessionStorage.getItem("field-a")).toBe("Edited first draft");
+  rerender({ fieldKey: "field-a" });
+  expect(result.current[0]).toBe("Edited first draft");
+});
+it("restores bounded text without rewriting it just by opening the form", () => {
+  sessionStorage.setItem("field", "original text");
+  const write = vi.spyOn(Storage.prototype, "setItem");
+  try {
+    const { result } = renderHook(() => useStudioSessionFormDraft("field", 4));
+    expect(result.current[0]).toBe("orig");
+    expect(write).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("field")).toBe("original text");
+  } finally { write.mockRestore(); }
+});
+
+it("keeps typing and focus during a background refresh while blocking duplicate submission", () => {
+  const f = fixture();
+  const { rerender } = render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} saving={false} />);
+  const field = screen.getByRole("textbox", { name: "내용" }); field.focus();
+  fireEvent.change(field, { target: { value: "입력 중인 메모" } });
+  rerender(<StudioWorkSessionDetail {...f} actorId="host" busy saving={false} />);
+  expect(field.matches(":disabled")).toBe(false); expect(document.activeElement).toBe(field);
+  expect(screen.getByRole("button", { name: "기록 저장" }).hasAttribute("disabled")).toBe(true);
+  fireEvent.submit(field.closest("form")!); expect(f.command).not.toHaveBeenCalled();
+});
+it("reports a failed recovery read instead of silently claiming the input can be restored", () => {
+  const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("storage unavailable"); });
+  try {
+    const { result } = renderHook(() => useStudioSessionFormDraft("field", 100));
+    expect(result.current[2]).toBe(true); expect(result.current[0]).toBe("");
+  } finally { read.mockRestore(); }
 });

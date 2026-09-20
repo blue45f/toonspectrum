@@ -4,15 +4,17 @@ import { getAuthSessionRevision } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { listStudioVirtualSpaceReviewSubjects, type StudioVirtualSpaceReviewChoices } from "../virtual-space/studio-virtual-space-review-invitation";
 import { useStudioReviewRoster } from "../virtual-space/use-studio-review-roster";
+import { useStudioSessionFormDraft } from "./use-studio-session-form-draft";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";
 
 const control = "min-h-11 w-full rounded-lg border border-line bg-card px-3 text-sm";
-export function StudioWorkSessionComposer({ workId, actorId, controller, busy, onCreated }: {
+export function StudioWorkSessionComposer({ workId, actorId, controller, busy, saving = busy, onCreated }: {
   readonly workId: string; readonly actorId: string; readonly controller: StudioWorkSessionController;
-  readonly busy: boolean; readonly onCreated: () => void;
+  readonly busy: boolean; readonly saving?: boolean; readonly onCreated: () => void;
 }) {
   const bt = useBilingual("StudioWorkSessionComposer");
-  const [title, setTitle] = useState(""), [purpose, setPurpose] = useState("");
+  const [title, setTitle, titleStorageError] = useStudioSessionFormDraft(JSON.stringify(["studio-session-title", actorId, workId]), 160);
+  const [purpose, setPurpose, purposeStorageError] = useStudioSessionFormDraft(JSON.stringify(["studio-session-purpose", actorId, workId]), 1000);
   const [kind, setKind] = useState<StudioWorkSessionCreate["kind"]>("review");
   const [reviewId, setReviewId] = useState(""), [invitees, setInvitees] = useState<readonly string[]>([]);
   const [choices, setChoices] = useState<StudioVirtualSpaceReviewChoices | null>(null), [attempt, retry] = useState(0);
@@ -30,12 +32,13 @@ export function StudioWorkSessionComposer({ workId, actorId, controller, busy, o
     event.preventDefault();
     if (!choice || busy || !title.trim() || !purpose.trim() || invitees.some((id) => !members.some((member) => member.userId === id))) return;
     void controller.create({ title, purpose, kind, input: choice.subject, invitedUserIds: [...invitees] }).then(() => {
-      if (controller.getSnapshot().phase === "ready" && controller.getSnapshot().view) onCreated();
+      if (controller.getSnapshot().phase === "ready" && controller.getSnapshot().view) { setTitle(""); setPurpose(""); onCreated(); }
     });
   }}>
     <h3 className="font-semibold">{bt("새 작업 세션", "New work session")}</h3>
     <p className="text-sm text-fg-2">{bt("기존 고정 검수본과 실제 팀원으로 초안을 저장합니다. 참여·작업 시작·미디어 사용은 각각 별도 행동입니다.", "Save a draft with an existing pinned review and actual teammates. Joining, starting and using media are separate actions.")}</p>
-    <fieldset disabled={busy} className="space-y-3">
+    {titleStorageError || purposeStorageError ? <p role="status" className="text-sm">{bt("탭 복구 저장을 사용할 수 없습니다. 입력은 현재 화면에만 남으므로 닫기 전에 복사하세요.", "Tab recovery storage is unavailable. Copy your text before closing this view.")}</p> : null}
+    <fieldset disabled={saving} className="space-y-3">
       <label className="block text-sm">{bt("세션 제목", "Session title")}<input required className={control} maxLength={160} value={title} onChange={(event) => setTitle(event.target.value)} /></label>
       <label className="block text-sm">{bt("이번 작업의 목적", "Purpose")}<textarea required className={`${control} min-h-24 py-2`} maxLength={1000} value={purpose} onChange={(event) => setPurpose(event.target.value)} /></label>
       <label className="block text-sm">{bt("작업 유형", "Session type")}<select className={control} value={kind} onChange={(event) => setKind(event.target.value as StudioWorkSessionCreate["kind"])}>
@@ -57,7 +60,7 @@ export function StudioWorkSessionComposer({ workId, actorId, controller, busy, o
         </label>)}
         {!roster.members ? <p className="text-sm" role="status">{bt("팀원 권한 확인 중이거나 확인할 수 없습니다. 팀원 선택은 최신 목록에서만 가능합니다.", "Teammate access is loading or unavailable. Select only from the current verified roster.")}</p> : null}
       </fieldset>
-      <button type="submit" className="min-h-11 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent" disabled={!choice || !title.trim() || !purpose.trim()}>
+      <button type="submit" className="min-h-11 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent" disabled={busy || !choice || !title.trim() || !purpose.trim()}>
         {bt("세션 초안 저장", "Save session draft")}
       </button>
     </fieldset>

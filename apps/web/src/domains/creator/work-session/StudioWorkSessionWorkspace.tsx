@@ -34,7 +34,7 @@ function WorkspaceForActor({ workId, actorId, initialSessionId }: { readonly wor
             : bt("작업 세션을 확인하지 못했습니다. 서버와 입력본 권한을 다시 확인하세요.", "The work session could not be verified. Check server availability and input access.")}</p> : null}
     <div className="flex flex-wrap gap-2"><button className={control} type="button" disabled={busy} onClick={() => { void controller.refresh(); }}>{bt("최신 상태 다시 읽기", "Read current state")}</button>
       {snapshot.pending ? <button className={control} type="button" disabled={busy || snapshot.reason === "access-denied"} onClick={() => { void controller.reconcile(true); }}>{bt("동일 요청 확인 후 재시도", "Verify and retry the same request")}</button> : null}</div>
-    {compose ? <StudioWorkSessionComposer workId={workId} actorId={actorId} controller={controller} busy={busy || snapshot.pending} onCreated={() => setCompose(false)} /> : null}
+    {compose ? <StudioWorkSessionComposer workId={workId} actorId={actorId} controller={controller} busy={busy || snapshot.pending} saving={snapshot.phase === "saving" || snapshot.pending} onCreated={() => setCompose(false)} /> : null}
     {!compose && snapshot.list ? <div className="space-y-2">
       {snapshot.list.items.map(({ session }) => <button type="button" key={session.id} className="block min-h-11 w-full rounded-lg border border-line p-3 text-left" disabled={busy || snapshot.pending} onClick={() => controller.select(session.id)}>
         <strong className="block text-sm">{session.title}</strong><span className="mt-1 block text-xs text-fg-2">{bt(sessionStatusLabels[session.status][0], sessionStatusLabels[session.status][1])} · v{session.version} · {session.purpose}</span>
@@ -43,7 +43,7 @@ function WorkspaceForActor({ workId, actorId, initialSessionId }: { readonly wor
       {snapshot.list.nextCursor ? <button type="button" className={control} disabled={busy} onClick={() => controller.select(null, snapshot.list!.nextCursor)}>{bt("다음 세션 목록", "Next sessions")}</button> : null}
     </div> : null}
     {!compose && snapshot.view && status ? <StudioWorkSessionDetail key={JSON.stringify([snapshot.view.session.id, snapshot.view.session.input])}
-      view={snapshot.view} actorId={actorId} controller={controller} busy={busy || snapshot.pending} /> : null}
+      view={snapshot.view} actorId={actorId} controller={controller} busy={busy || snapshot.pending} saving={snapshot.phase === "saving" || snapshot.pending} /> : null}
     <Link className="inline-flex min-h-11 items-center text-sm underline" href={`/studio/p/${encodeURIComponent(workId)}/review`}>{bt("원고 검수 작업실 열기", "Open manuscript review workspace")}</Link>
   </section>;
 }
