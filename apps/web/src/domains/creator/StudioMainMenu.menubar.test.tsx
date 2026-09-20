@@ -96,14 +96,37 @@ describe("StudioMainMenu menubar interaction", () => {
 
     // A real click carries the cursor over the title first, so hover switching has already
     // opened the target menu by the time the click lands.
-    fireEvent.mouseEnter(trigger("편집"));
+    fireEvent.mouseMove(trigger("편집"), { clientX: 80, clientY: 16 });
     expect(openPanelLabels()).toEqual(["편집"]);
     fireEvent.click(trigger("편집"));
     expect(openPanelLabels()).toEqual(["편집"]);
 
-    fireEvent.mouseEnter(trigger("보기"));
+    fireEvent.mouseMove(trigger("보기"), { clientX: 120, clientY: 16 });
     fireEvent.click(trigger("보기"));
     expect(openPanelLabels()).toEqual(["보기"]);
+  });
+
+  it("keeps the chosen menu when scrolling moves another title under a stationary pointer", () => {
+    renderMenu();
+    const file = trigger("파일");
+    const edit = trigger("편집");
+    fireEvent.mouseMove(file, { clientX: 80, clientY: 16 });
+    fireEvent.click(file);
+    const save = screen.getByRole("menuitem", { name: "초안 저장" });
+    expect(document.activeElement).toBe(save);
+
+    // Browser scroll anchoring emits boundary events when the lane shifts under the pointer,
+    // without any mousemove. Preserve both the selected group and keyboard focus in its panel.
+    fireEvent.mouseLeave(file, { clientX: 80, clientY: 16 });
+    fireEvent.mouseEnter(edit, { clientX: 80, clientY: 16 });
+    expect(openPanelLabels()).toEqual(["파일"]);
+    expect(document.activeElement).toBe(save);
+
+    // Moving within the new title is intentional hover switching, and a following click commits it.
+    fireEvent.mouseMove(edit, { clientX: 81, clientY: 16 });
+    expect(openPanelLabels()).toEqual(["편집"]);
+    fireEvent.click(edit);
+    expect(openPanelLabels()).toEqual(["편집"]);
   });
 
   it("still toggles a menu closed when its own title is clicked twice", () => {
@@ -119,7 +142,7 @@ describe("StudioMainMenu menubar interaction", () => {
     renderMenu();
 
     fireEvent.click(trigger("파일"));
-    fireEvent.mouseEnter(trigger("편집"));
+    fireEvent.mouseMove(trigger("편집"), { clientX: 80, clientY: 16 });
     expect(openPanelLabels()).toEqual(["편집"]);
 
     // Pointer left both the title and its panel: the next click is an ordinary toggle.
