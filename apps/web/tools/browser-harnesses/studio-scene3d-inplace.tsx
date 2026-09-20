@@ -35,6 +35,7 @@ import type { BgCustomModelInstance } from "../../src/domains/creator/studio-bac
 declare global {
   interface Window {
     __scene3dInplace?: {
+      assertUnchanged(): unknown;
       check(): unknown;
       reopen(serialized: string): Promise<unknown>;
     };
@@ -223,6 +224,15 @@ async function mount() {
     useEffect(() => {
       if (!loaded) return;
       window.__scene3dInplace = {
+        assertUnchanged() {
+          const live = state.liveSceneRef.current;
+          assert(live.customModels[0]?.modelId === record.id && live.customModels[1]?.modelId === record.id,
+            "Review changed a selected or shared source before Apply.");
+          assert(JSON.stringify(live.customModels) === JSON.stringify(originals), "Review changed canonical model placement.");
+          const timeline = history.current.historyCommandTimelineRef.current;
+          assert(!timeline || timeline.readRetainedStates().states.length <= 1, "Review created a history command.");
+          return { sourceUnchanged: true, placementsUnchanged: true, historyCommands: 0 };
+        },
         check() {
           const live = state.liveSceneRef.current;
           const selected = live.customModels[0]!;

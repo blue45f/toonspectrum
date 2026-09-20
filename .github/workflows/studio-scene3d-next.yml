@@ -19,6 +19,7 @@ on:
       - "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanelContent.tsx"
       - "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx"
       - "scripts/verify-studio-scene3d-specialists.mjs"
+      - "scripts/lib/scene3d-review-browser-proof.mjs"
       - "scripts/verify-scene3d-specialist-bundle*.mjs"
       - "apps/web/src/domains/creator/bg3d/*capture*"
       - "apps/web/src/domains/creator/bg3d/*readback*"
