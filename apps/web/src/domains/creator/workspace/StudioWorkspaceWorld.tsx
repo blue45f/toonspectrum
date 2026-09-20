@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowRight, BookOpen, Boxes, ClipboardCheck, MapPin, Users } from "lucide-react";
+import { workspaceNavigationHref } from "@/shared/components/workspace/workspace-navigation-model";
 import Link from "@/compat/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
@@ -18,7 +19,7 @@ export function StudioWorkspaceWorld({ project, links, onFallback }: {
     { key: "materials", label: bt("소재장", "Materials"), href: links.assets, icon: Boxes },
     { key: "desk", label: bt("내 책상", "My desk"), href: links.resume, icon: ArrowRight },
     { key: "review", label: bt("작품 보드", "Work board"), href: links.review, icon: ClipboardCheck },
-    { key: "team", label: bt("팀과 함께", "With your team"), href: project ? `/team?project=${encodeURIComponent(project.id)}` : "/team", icon: Users },
+    { key: "team", label: bt("팀과 함께", "With your team"), href: workspaceNavigationHref("/team", project ? { projectId: project.id } : { personal: true }), icon: Users },
   ];
   if (failed) return <div className="workspace-world-loading" role="status">
     <p>{bt("공간 이미지를 불러오지 못했습니다. 작품은 목록에서 계속 열 수 있습니다.", "The space image could not load. Your work remains available in list view.")}</p>

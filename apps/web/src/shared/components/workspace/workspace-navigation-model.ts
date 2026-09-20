@@ -13,3 +13,30 @@ export function workspaceNavigationActiveId(pathname: string): string | null {
   ];
   return explore.some(matches) ? "workspace-hub" : null;
 }
+
+/** Navigation context is a pointer, never a grant of access or document authority. */
+export interface WorkspaceNavigationContext {
+  readonly projectId?: string | null;
+  readonly personal?: boolean;
+}
+
+export function workspaceNavigationContext(pathname: string, search: string): WorkspaceNavigationContext {
+  const match = /^\/studio\/p\/([^/]+)(?:\/|$)/u.exec(pathname);
+  if (match) {
+    // Keep malformed identities explicit rather than silently selecting another work.
+    try { return { projectId: decodeURIComponent(match[1]!) }; }
+    catch { return { projectId: match[1]! }; }
+  }
+  const params = new URLSearchParams(search);
+  return params.get("scope") === "personal" ? { personal: true }
+    : { projectId: params.get("project") };
+}
+
+/** Carry only workspace identity; panels, tabs and arbitrary URL values stay local. */
+export function workspaceNavigationHref(href: string, context: WorkspaceNavigationContext): string {
+  if (!["/home", "/team", "/hub"].includes(href)) return href;
+  const params = new URLSearchParams();
+  if (context.personal) params.set("scope", "personal");
+  else if (context.projectId) params.set("project", context.projectId);
+  return params.size ? `${href}?${params.toString()}` : href;
+}
