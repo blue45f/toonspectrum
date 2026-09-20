@@ -242,9 +242,10 @@ describe("PostgreSQL integration test runner", () => {
     ).toBe("true");
   });
 
-  it("runs exactly the thirteen direct PostgreSQL suites without file parallelism", () => {
-    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(13);
-    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 13);
+  it("runs exactly the fourteen direct PostgreSQL suites without file parallelism", () => {
+    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(14);
+    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 14);
+    expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/db/admin-schema.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain(
