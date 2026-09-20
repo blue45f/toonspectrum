@@ -1,8 +1,9 @@
-import { Controller, Get, Header, Inject, Query } from "@nestjs/common";
+import { Controller, Get, Header, Inject, Optional, Query } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 import { FORTUNE_ZODIAC_IDS, FORTUNE_SPECIAL_DAY_CATEGORIES, resolveFortuneBirth } from "../../../../../packages/core/src/fortune";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { FortuneRefreshWorker } from "./fortune-refresh.worker";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 
 const validDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).refine((date) => {
@@ -17,10 +18,11 @@ export class FortuneHoroscopeQuery extends createZodDto(z.object({
 }).strict()) {}
 @Controller("fortune")
 export class FortuneEnrichmentController {
-  constructor(@Inject(FortuneEnrichmentService) private readonly service: FortuneEnrichmentService) {}
+  constructor(@Inject(FortuneEnrichmentService) private readonly service: FortuneEnrichmentService,
+    @Optional() @Inject(FortuneRefreshWorker) private readonly worker?: FortuneRefreshWorker) {}
   @Get("capabilities")
   @Header("Cache-Control", "no-store")
-  capabilities() { return this.service.capabilities(); }
+  capabilities() { return { ...this.service.capabilities(), maintenance: this.worker?.status() ?? null }; }
   @Get("calendar")
   @Header("Cache-Control", "no-store")
   calendar(@Query(new ZodValidationPipe(FortuneCalendarQuery)) query: FortuneCalendarQuery) { return this.service.calendar(query.month); }
