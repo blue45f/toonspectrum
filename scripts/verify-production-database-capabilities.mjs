@@ -6,6 +6,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildHiringCapabilitySql } from "./creator-hiring-database-contract.mjs";
+import { buildHiringAutomationCapabilitySql } from "./creator-hiring-automation-database-contract.mjs";
+import { buildCareerConfirmationCapabilitySql } from "./creator-career-confirmation-database-contract.mjs";
 import { buildAdminCapabilitySql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql } from "./feedback-database-contract.mjs";
 import {
@@ -382,6 +385,9 @@ export function buildProductionCapabilityVerificationSql(
     .join(",\n          ");
 
   return `
+${buildHiringCapabilitySql(runtimeDatabaseRole)}
+${buildHiringAutomationCapabilitySql(runtimeDatabaseRole)}
+${buildCareerConfirmationCapabilitySql(runtimeDatabaseRole)}
 ${buildFeedbackCapabilitySql(runtimeDatabaseRole)}
 ${buildAdminCapabilitySql(runtimeDatabaseRole)}
 DO $toonspectrum_readiness$

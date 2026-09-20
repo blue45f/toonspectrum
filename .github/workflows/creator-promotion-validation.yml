@@ -53,7 +53,7 @@ jobs:
     timeout-minutes: 25
     env:
       HUSKY: '0'
-      NODE_OPTIONS: --max-old-space-size=8192
+      NODE_OPTIONS: --max-old-space-size=12288
     steps:
       - uses: actions/checkout@v6
         with:

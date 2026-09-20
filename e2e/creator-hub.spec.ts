@@ -20,6 +20,7 @@ async function fixtures(page: Page, unavailable = false) {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = {}; let status = 200;
     if (path.endsWith("/auth/session")) { data = { authenticated: false, user: null }; }
+    else if (path.endsWith("/collaborations/hiring/positions")) data = { items: [], next: null };
     else if (path.endsWith("/collaborations/posts")) {
       status = unavailable ? 503 : 200;
       data = unavailable ? { message: "구인·의뢰 저장소에 연결하지 못했어요." } : pageData([post]);
@@ -41,6 +42,15 @@ test("recruitment filters, detail and creator link", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "협업 조건 한눈에" })).toBeVisible();
   await expect(page.getByRole("link", { name: "테스트 작가", exact: true })).toHaveAttribute("href", "/u/artist");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+test("an invalid optional hiring response preserves the original post and author", async ({ page }) => {
+  await fixtures(page);
+  await page.route("**/api/collaborations/hiring/positions*", (route) => route.fulfill({ json: {} }));
+  await page.goto(`/collaborate/${ID}`);
+  await expect(page.getByRole("heading", { name: post.title, exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "테스트 작가", exact: true })).toHaveAttribute("href", "/u/artist");
+  await expect(page.getByRole("region", { name: "공개 모집 조건" }).getByRole("alert")).toBeVisible();
+  await expect(page.getByText("이 조건에 맞는 공개 모집 자리가 없어요.")).toHaveCount(0);
 });
 test("new forms require authentication and never pretend to publish", async ({ page }) => {
   await fixtures(page); await page.goto("/collaborate/new");

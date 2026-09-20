@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { installBetaEventDismissal } from "../scripts/lib/public-page-event-gate.mjs";
+
 import type { Page } from "@playwright/test";
 
 // Synthetic records exist only in tests, never in the production page.
@@ -10,6 +12,7 @@ const fixture = {
 };
 const storageKey = "toonstudio:kmas-reference-notes:v1";
 async function prepare(page: Page) {
+  await installBetaEventDismissal(page);
   await page.addInitScript(() => {
     sessionStorage.setItem("toonspectrum-intro-shown", "1");
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");

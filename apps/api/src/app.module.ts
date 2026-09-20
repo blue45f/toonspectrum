@@ -26,6 +26,7 @@ import { MessagingModule } from "./modules/messaging/messaging.module";
 import { OgModule } from "./modules/og/og.module";
 import { PersonalCloudModule } from "./modules/personal-cloud/personal-cloud.module";
 import { ProductionCollaborationModule } from "./modules/production-collaboration/production-collaboration.module";
+import { CareerConfirmationModule } from "./modules/recruitment/career-confirmation.module";
 import { SupporterPaymentModule } from "./modules/supporter-payment/supporter-payment.module";
 import { StudioAiModule } from "./modules/studio-ai/studio-ai.module";
 import { StudioMusicModule } from "./modules/studio-music/studio-music.module";
@@ -41,6 +42,7 @@ const studioRealtimeTicketModule =
     ApiHttpInfrastructureModule,
     BackendCapabilitiesModule,
     AuthModule,
+    CareerConfirmationModule,
     MeModule,
     MembershipWalletModule,
     MembershipOperationsModule,

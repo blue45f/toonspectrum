@@ -19,9 +19,10 @@ const TEST_ROOTS = ["apps", "deploy", "packages", "scripts", "tests"];
 // Read .env.local only as a last candidate. resolveVitestDatabaseTarget accepts
 // it only when it is loopback; a Neon/production URL is never inherited by the
 // root test suite. DB-backed tests opt in with TEST_DATABASE_URL.
+const hasExplicitTestTarget = Boolean(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 const envPath = path.resolve(root, ".env.local");
 let envFileDatabaseUrl: string | undefined;
-if (existsSync(envPath)) {
+if (!hasExplicitTestTarget && existsSync(envPath)) {
   try {
     const content = readFileSync(envPath, "utf-8");
     const match = content.match(/^DATABASE_URL=(.+)$/m);
@@ -41,6 +42,8 @@ const testDatabaseTarget = resolveVitestDatabaseTarget({
 process.env.DATABASE_URL = testDatabaseTarget.databaseUrl;
 
 export default defineConfig({
+  // Explicit test targets must not read operator dotenv files.
+  envDir: hasExplicitTestTarget ? false : undefined,
   resolve: {
     alias: {
       "@": path.resolve(root, "apps/web/src"),
