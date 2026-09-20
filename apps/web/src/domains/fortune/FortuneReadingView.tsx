@@ -1,3 +1,4 @@
+import { FortuneSpecialDays } from "./FortuneSpecialDays";
 import { FortuneEnrichment } from "./FortuneEnrichment";
 import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { tryCopyFortuneText } from "./fortune-sharing";
@@ -42,6 +43,7 @@ export function FortuneReadingView({ reading, cast = "ara", onCastChange }: { re
     {reading.terms && <details className="fo-terms" open={reading.id === "terms"}><summary>24절기 시각 · 한국 표준시</summary><div className="fo-terms-grid">{reading.terms.map((term) => <div key={term.name}><strong>{term.name} <small>{term.chinese}</small></strong><time>{term.atKst}</time><span>{term.isMonthBoundary ? "월주가 바뀌는 절입" : "계절의 중기"}</span></div>)}</div></details>}
     {reading.trend && <section className="fo-trend"><h3>날짜별 키워드</h3><p className="fo-help">콘텐츠 지수 0~100 · 통계·확률·길일이 아닌 재미용 표현입니다.</p><div className="fo-trend-list">{reading.trend.map((point) => <div key={point.label}><strong>{point.label}</strong><span className="fo-trend-track" aria-hidden="true"><i style={{ width: `${point.value}%` }} /></span><b>{point.value}</b><span>{point.keyword}</span><p>{point.detail}</p></div>)}</div></section>}
     {mode === "report" && <div className="fo-reading-sections">{reading.sections.map((section, i) => <section key={`${section.title}-${i}`}><span className="fo-section-no">{String(i + 1).padStart(2, "0")}</span><h3>{section.title}</h3><p>{section.body}</p>{section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}</section>)}</div>}
+    {reading.calendar?.[0] && <FortuneSpecialDays month={reading.calendar[0].date.slice(0, 7)} />}
     <FortuneEnrichment key={`${reading.id}:${reading.generatedFor}:${reading.calendar?.[0]?.date ?? reading.zodiacSign ?? ""}`} reading={reading} />
     <FortuneCreativeMission reading={reading} cast={cast} />
     <FortuneReadingTools reading={reading} />

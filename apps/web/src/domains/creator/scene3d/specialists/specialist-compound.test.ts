@@ -12,8 +12,12 @@ import type { ManifoldToplevel } from "manifold-3d";
 
 let module: ManifoldToplevel;
 beforeAll(async () => {
-  const wasmBinary = await readFile(fileURLToPath(import.meta.resolve("manifold-3d/manifold.wasm")));
-  module = await Module({ wasmBinary });
+  const wasmPath = fileURLToPath(import.meta.resolve("manifold-3d/manifold.wasm"));
+  const moduleOptions = {
+    locateFile: () => wasmPath,
+    wasmBinary: await readFile(wasmPath),
+  };
+  module = await Module(moduleOptions);
   module.setup();
 });
 const providerFactory = () => createStudioManifoldMeshProvider({ runtimeLoader: () => createStudioManifoldRuntime(module) });
