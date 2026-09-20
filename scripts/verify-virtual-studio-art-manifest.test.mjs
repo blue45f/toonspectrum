@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { decodeDrawnArtPng, DRAWN_ART_DIRECTORY, verifyDrawnArtFramePixels, verifyDrawnArtAtlasRemainder, verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
+import { VIRTUAL_STUDIO_AMBIENT_DIRECTORY, verifyVirtualStudioAmbientAudio } from "./verify-virtual-studio-ambient-audio.mjs";
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
@@ -128,6 +129,9 @@ test("verifies every current production-v2 output without claiming source revali
 
   assert.equal(result.assetCount, 36);
   assert.equal(result.drawnArt.assetCount, 32);
+  assert.equal(result.ambientAudio.assetCount, 2);
+  assert.equal(result.ambientAudio.originalBytesVerified, true);
+  assert.equal(result.ambientAudio.subjectiveListeningReverified, false);
   assert.equal(result.drawnArt.basePoseFrameCount, 96);
   assert.equal(result.drawnArt.reviewFrameCount, 16);
   assert.equal(result.drawnArt.drawingFrameCount, 16);
@@ -329,4 +333,28 @@ test("rejects generated-world asset or authoring dimension drift", async (contex
   world.layers[0].imageheight = 1216;
   await writeFile(worldPath, JSON.stringify(world));
   await assert.rejects(verifyVirtualStudioLivingWorldBindings({ worldPath }), /actual dimensions/u);
+});
+
+
+test("rejects ambient recording drift and false license/provenance evidence without relaxing art checks", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "virtual-ambient-integrity-"));
+  try {
+    await cp(VIRTUAL_STUDIO_AMBIENT_DIRECTORY, directory, { recursive: true });
+    assert.equal(verifyVirtualStudioAmbientAudio({ directory }).assetCount, 2);
+    const recording = path.join(directory, "window-rain.ogg");
+    const original = await readFile(recording);
+    const changed = Buffer.from(original); changed[100] ^= 1;
+    await writeFile(recording, changed);
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /original SHA-256/u);
+    await writeFile(recording, original.subarray(0, original.length - 1));
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /byte length/u);
+    await writeFile(recording, original);
+    const manifestPath = path.join(directory, "provenance.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    await writeFile(manifestPath, JSON.stringify({ ...manifest, license: "CC-BY-4.0" }));
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /license must remain CC0/u);
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    await writeFile(path.join(directory, "CC0-1.0.txt"), "not the original license");
+    assert.throws(() => verifyVirtualStudioAmbientAudio({ directory }), /official CC0 legal text/u);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });

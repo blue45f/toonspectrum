@@ -9,6 +9,7 @@ import { StudioP2pMediaTile as MediaTile, P2P_CONTROL_CLASS as controlClass } fr
 import { StudioP2pActivitiesPanel } from "./StudioP2pActivitiesPanel";
 import { StudioP2pVirtualStudio } from "./StudioP2pVirtualStudio";
 import { studioStrokeFocusActivitySnapshot, subscribeStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
+import { acquireStudioHuddleAudioFocus } from "./studio-p2p-huddle-audio-focus";
 
 export default function StudioP2pHuddleLauncher() {
   const live = useStudioLiveCollaboration();
@@ -33,6 +34,7 @@ export default function StudioP2pHuddleLauncher() {
   const proximityMediaRef = useRef(true);
   const log = useRef<HTMLDivElement>(null);
   const active = snapshot !== null && !snapshot.closed;
+  useEffect(() => active ? acquireStudioHuddleAudioFocus() : undefined, [active]);
   const room = live.room;
   const handleNearbyChange = useCallback((sessionIds: string[]) => {
     if (conversation.current) return;
