@@ -16,7 +16,7 @@ await page.route("**/api/fortune/special-days?**", async (route) => {
   if ([...query.keys()].sort().join(",") !== "category,month") throw new Error("Private or unexpected query fields");
   if (unavailable) return route.fulfill({ status: 503, body: "unavailable" });
   return route.fulfill({ contentType: "application/json", body: JSON.stringify({ kind: "special-days", month: query.get("month"), category: query.get("category"),
-    status: "external-cache", source: "kasi", policyRevision: "synthetic-browser-fixture", checkedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(),
+    status: "external-cache", source: "kasi", policyRevision: "synthetic-browser-fixture", checkedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 1000).toISOString(),
     items: [{ date: "2024-02-29", sequence: 1, name: "테스트 특일", isHoliday: true }] }) });
 });
 try {
@@ -34,6 +34,11 @@ try {
     if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)) throw new Error(`Overflow at ${width}`);
     await page.screenshot({ path: join(output, `special-days-${width}.png`), fullPage: true });
   }
+  await page.getByText("특일 정보의 유효기간이 지났어요. 다시 확인해 주세요.", { exact: true }).waitFor();
+  if (calls !== 2 || await page.getByText(/테스트 특일/).count()) throw new Error("Expired data leaked or automatically refetched");
+  await page.getByRole("button", { name: "특일 정보 확인", exact: true }).click();
+  await page.getByText(/테스트 특일/).waitFor();
+  if (calls !== 3) throw new Error("Explicit refresh did not issue one request");
   unavailable = true; await page.getByLabel("특일 분류").selectOption("anniversaries");
   await page.getByRole("button", { name: "특일 정보 확인", exact: true }).click();
   await page.getByText("특일 데이터를 확인할 수 없어 기본 달력을 유지합니다.", { exact: true }).waitFor();

@@ -53,4 +53,27 @@ describe.skipIf(!database)("fortune real PostgreSQL migration and non-owning run
     await repo.put(data); await owner.query("UPDATE fortune_public_snapshot SET payload = payload || '{\"birthDate\":\"1990-01-01\"}'::jsonb");
     await expect(repo.get(fortuneSnapshotKey(data), new Date())).rejects.toThrow();
   });
+  it("skips rows being refreshed and preserves the newly valid snapshot", async () => {
+    const data = value(); await repo.put(data);
+    await owner.query("UPDATE fortune_public_snapshot SET checked_at = CURRENT_TIMESTAMP - interval '2 hours', expires_at = CURRENT_TIMESTAMP - interval '1 hour'");
+    const writer = await owner.connect();
+    try {
+      await writer.query("BEGIN");
+      await writer.query("UPDATE fortune_public_snapshot SET checked_at = $1, expires_at = $2, payload = $3::jsonb", [data.checkedAt, data.expiresAt, JSON.stringify(data)]);
+      await repo.prune(); // Must not wait for the writer's row lock.
+      await writer.query("COMMIT");
+    } finally { await writer.query("ROLLBACK"); writer.release(); }
+    expect(await repo.get(fortuneSnapshotKey(data), new Date())).toEqual(data);
+  });
+  it("bounds each cleanup to 1000 rows without deleting live entries", async () => {
+    const data = value(); await repo.put(data);
+    await owner.query(`INSERT INTO fortune_public_snapshot(snapshot_key, payload, checked_at, expires_at)
+      SELECT 'expired-' || n, $1::jsonb, CURRENT_TIMESTAMP - interval '2 hours', CURRENT_TIMESTAMP - interval '1 hour'
+      FROM generate_series(1, 1001) n`, [JSON.stringify(data)]);
+    await repo.prune();
+    expect((await owner.query("SELECT count(*)::int AS n FROM fortune_public_snapshot")).rows[0].n).toBe(2);
+    expect(await repo.get(fortuneSnapshotKey(data), new Date())).toEqual(data);
+    await repo.prune();
+    expect((await owner.query("SELECT count(*)::int AS n FROM fortune_public_snapshot")).rows[0].n).toBe(1);
+  });
 });

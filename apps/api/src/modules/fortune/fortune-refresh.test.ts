@@ -41,6 +41,47 @@ it("does not start another request after shutdown during a fetch", async () => {
   const fake = service(); let complete!: (value: { status: string }) => void;
   fake.calendar.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
   const worker = new FortuneRefreshWorker(enabled, { now: followupNow, fetch }, fake as unknown as FortuneEnrichmentService, new FixtureSnapshots());
-  const pending = worker.tick(); const closing = worker.onModuleDestroy(); complete({ status: "external" }); await Promise.all([pending, closing]);
+  const pending = worker.tick(); await vi.waitFor(() => expect(fake.calendar).toHaveBeenCalledOnce());
+  const closing = worker.onModuleDestroy(); complete({ status: "external" }); await Promise.all([pending, closing]);
   expect(fake.specialDays).not.toHaveBeenCalled();
+});
+
+it("can maintain expired public snapshots with every external provider disabled", async () => {
+  const config = fortuneEnrichmentConfig({ FORTUNE_SHARED_SNAPSHOTS_ENABLED: "true", FORTUNE_MAINTENANCE_ENABLED: "true" });
+  const fake = service(), snapshots = new FixtureSnapshots();
+  const worker = new FortuneRefreshWorker(config, { now: followupNow, fetch }, fake as unknown as FortuneEnrichmentService, snapshots);
+  expect(worker.status()).toMatchObject({ enabled: true, running: false, lastRun: null });
+  await worker.tick();
+  expect(snapshots.prune).toHaveBeenCalledOnce(); expect(fake.calendar).not.toHaveBeenCalled(); expect(fake.specialDays).not.toHaveBeenCalled();
+  expect(worker.status().lastRun).toMatchObject({ cleanup: "success", refresh: "disabled", attemptedDatasets: 0 });
+  await worker.onModuleDestroy();
+});
+it.each(["fallback", "rejection"])("still prunes when collection ends with %s", async (mode) => {
+  const fake = service(), snapshots = new FixtureSnapshots();
+  if (mode === "fallback") fake.calendar.mockResolvedValueOnce({ status: "local-fallback" });
+  else fake.calendar.mockRejectedValueOnce(new Error("secret-key-and-provider-body"));
+  const worker = new FortuneRefreshWorker(enabled, { now: followupNow, fetch }, fake as unknown as FortuneEnrichmentService, snapshots);
+  await worker.tick(); expect(snapshots.prune).toHaveBeenCalledOnce();
+  expect(worker.status().lastRun).toMatchObject({ cleanup: "success", refresh: mode === "fallback" ? "fallback" : "failed", attemptedDatasets: 1 });
+  expect(JSON.stringify(worker.status())).not.toContain("secret-key");
+  await worker.onModuleDestroy();
+});
+
+it("reports cleanup failures separately and never leaks or shares mutable diagnostic state", async () => {
+  const fake = service(), snapshots = new FixtureSnapshots(); snapshots.prune.mockRejectedValueOnce(new Error("private database URL"));
+  const worker = new FortuneRefreshWorker(enabled, { now: followupNow, fetch }, fake as unknown as FortuneEnrichmentService, snapshots);
+  await worker.tick(); const state = worker.status();
+  expect(state.lastRun).toMatchObject({ cleanup: "failed", refresh: "completed", attemptedDatasets: 6 });
+  expect(JSON.stringify(state)).not.toContain("private database");
+  state.lastRun!.attemptedDatasets = 999;
+  expect(worker.status().lastRun!.attemptedDatasets).toBe(6);
+  await worker.onModuleDestroy(); expect(worker.status()).toMatchObject({ running: false, enabled: false, nextRunAt: null });
+});
+it("requires explicit shared storage and registers only one lifecycle timer", async () => {
+  expect(() => fortuneEnrichmentConfig({ FORTUNE_MAINTENANCE_ENABLED: "true" })).toThrow();
+  const schedule = vi.fn(() => ({ unref: vi.fn() }) as unknown as ReturnType<typeof setTimeout>), clear = vi.fn();
+  const worker = new FortuneRefreshWorker(enabled, { now: followupNow, fetch }, service() as unknown as FortuneEnrichmentService, new FixtureSnapshots(), { schedule, clear });
+  worker.onModuleInit(); worker.onModuleInit(); expect(schedule).toHaveBeenCalledOnce();
+  expect(worker.status().nextRunAt).toBe("2026-09-20T01:00:30.000Z");
+  await worker.onModuleDestroy(); worker.onModuleInit(); expect(schedule).toHaveBeenCalledOnce();
 });

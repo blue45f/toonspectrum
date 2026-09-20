@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fortuneMonthDays } from "../../../../../packages/core/src/fortune";
 import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { FortuneCalendarQuery, FortuneHoroscopeQuery, FortuneEnrichmentController } from "./fortune-enrichment.controller";
+import { FortuneRefreshWorker } from "./fortune-refresh.worker";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 import { compareKasiCalendar, fortuneEnrichmentConfig, parseKasiCalendarPage, parseProviderHoroscope, readBoundedProviderBody, type FortuneEnrichmentConfig } from "./fortune-enrichment.provider";
 
@@ -112,7 +113,8 @@ describe("fortune external boundaries", () => {
 });
 
 const httpService = new FortuneEnrichmentService(fortuneEnrichmentConfig({}), { fetch: globalThis.fetch, now });
-@Module({ controllers: [FortuneEnrichmentController], providers: [{ provide: FortuneEnrichmentService, useValue: httpService }] })
+const httpWorker = new FortuneRefreshWorker(fortuneEnrichmentConfig({}), { fetch: globalThis.fetch, now }, httpService);
+@Module({ controllers: [FortuneEnrichmentController], providers: [{ provide: FortuneEnrichmentService, useValue: httpService }, { provide: FortuneRefreshWorker, useValue: httpWorker }] })
 class FortuneEnrichmentHttpModule {}
 it("validates real GET routes without compiler-emitted parameter metadata", async () => {
   const app = await NestFactory.create(FortuneEnrichmentHttpModule, { logger: false });
@@ -120,7 +122,7 @@ it("validates real GET routes without compiler-emitted parameter metadata", asyn
   try {
     await app.listen(0, "127.0.0.1"); const baseUrl = await app.getUrl();
     const capabilities = await fetch(`${baseUrl}/api/fortune/capabilities`);
-    expect(await capabilities.json()).toMatchObject({ paidFallback: false, tarotDecks: ["major-22", "full-78"] });
+    expect(await capabilities.json()).toMatchObject({ paidFallback: false, tarotDecks: ["major-22", "full-78"], maintenance: { scope: "process-local", enabled: false, running: false, lastRun: null } });
     const special = await fetch(`${baseUrl}/api/fortune/special-days?month=2024-02&category=holidays`);
     expect(special.status).toBe(200); expect(special.headers.get("cache-control")).toBe("no-store");
     expect(await special.json()).toMatchObject({ kind: "special-days", status: "local-fallback", items: [] });

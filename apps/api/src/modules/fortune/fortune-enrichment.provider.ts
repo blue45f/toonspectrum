@@ -11,6 +11,7 @@ export interface FortuneEnrichmentConfig {
   specialDaysServiceKey?: string;
   snapshotsEnabled?: boolean;
   refreshEnabled?: boolean;
+  maintenanceEnabled?: boolean;
   kasiServiceKey: string;
   horoscopeEnabled: boolean;
   horoscopeRightsApproved: boolean;
@@ -22,7 +23,9 @@ export function fortuneEnrichmentConfig(env: Readonly<Record<string, string | un
   const limit = Number(env.FORTUNE_PROVIDER_DAILY_REQUEST_LIMIT ?? "100");
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("FORTUNE_PROVIDER_DAILY_REQUEST_LIMIT must be between 1 and 1000");
   if (env.FORTUNE_REFRESH_ENABLED === "true" && env.FORTUNE_SHARED_SNAPSHOTS_ENABLED !== "true") throw new Error("Fortune refresh requires shared snapshots");
+  if (env.FORTUNE_MAINTENANCE_ENABLED === "true" && env.FORTUNE_SHARED_SNAPSHOTS_ENABLED !== "true") throw new Error("Fortune maintenance requires shared snapshots");
   return {
+    maintenanceEnabled: env.FORTUNE_MAINTENANCE_ENABLED === "true",
     specialDaysEnabled: env.FORTUNE_KASI_SPECIAL_DAYS_ENABLED === "true",
     specialDaysServiceKey: env.FORTUNE_KASI_SPECIAL_SERVICE_KEY?.trim() ?? "",
     snapshotsEnabled: env.FORTUNE_SHARED_SNAPSHOTS_ENABLED === "true",

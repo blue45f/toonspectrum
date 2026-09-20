@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { readFortuneResponse, validatedFortuneExpiry } from "./fortune-response-lifetime";
+import { useFortuneExpiry } from "./useFortuneExpiry";
 import { FORTUNE_SPECIAL_DAY_CATEGORIES, FORTUNE_SPECIAL_DAY_LABELS, validateFortuneSpecialDays, type FortuneSpecialDayCategory } from "@toonspectrum/core/fortune";
 
 const schema = z.object({ kind: z.literal("special-days"), month: z.string(), category: z.enum(FORTUNE_SPECIAL_DAY_CATEGORIES),
@@ -8,19 +10,21 @@ const schema = z.object({ kind: z.literal("special-days"), month: z.string(), ca
   items: z.array(z.object({ date: z.string(), sequence: z.number().int(), name: z.string().max(50), isHoliday: z.boolean() }).strict()).max(100) }).strict();
 function SpecialDaysResult({ month, category }: { month: string; category: FortuneSpecialDayCategory }) {
   const [result, setResult] = useState<z.infer<typeof schema> | null>(null);
+  const expired = useFortuneExpiry(result?.expiresAt ?? null);
   const [busy, setBusy] = useState(false), [notice, setNotice] = useState("");
   const controller = useRef<AbortController | null>(null), sequence = useRef(0);
-  useEffect(() => () => { sequence.current += 1; controller.current?.abort(); }, []);
-  const cancel = () => { sequence.current += 1; controller.current?.abort(); setBusy(false); setNotice(""); };
+  const timeout = useRef<number | null>(null);
+  useEffect(() => () => { if (timeout.current !== null) window.clearTimeout(timeout.current); sequence.current += 1; controller.current?.abort(); }, []);
+  const cancel = () => { if (timeout.current !== null) window.clearTimeout(timeout.current); sequence.current += 1; controller.current?.abort(); setBusy(false); setNotice(""); };
   const load = async () => {
     if (busy) return;
     controller.current?.abort(); const abort = new AbortController(); controller.current = abort;
     const request = ++sequence.current; setBusy(true); setNotice(""); setResult(null);
     const timer = window.setTimeout(() => abort.abort(), 15000);
+    timeout.current = timer;
     try {
-      const response = await fetch(`/api/fortune/special-days?${new URLSearchParams({ month, category })}`, { cache: "no-store", credentials: "omit", signal: abort.signal });
-      if (!response.ok) throw new Error("unavailable");
-      const value = schema.parse(await response.json());
+      const response = await fetch(`/api/fortune/special-days?${new URLSearchParams({ month, category })}`, { cache: "no-store", credentials: "omit", redirect: "error", signal: abort.signal });
+      const value = schema.parse(await readFortuneResponse(response, abort.signal));
       if (request !== sequence.current || abort.signal.aborted) return;
       if (value.month !== month || value.category !== category || !validateFortuneSpecialDays(month, category, value.items)) throw new Error("context-mismatch");
       if (value.status === "local-fallback") {
@@ -28,6 +32,7 @@ function SpecialDaysResult({ month, category }: { month: string; category: Fortu
         setNotice(value.reason === "not-configured" ? "특일 데이터 연결은 아직 활성화되지 않았어요. 기본 달력은 계속 사용할 수 있어요." : "특일 데이터를 확인할 수 없어 기본 달력을 유지합니다.");
       } else {
         if (value.source !== "kasi" || !value.checkedAt || !value.expiresAt || Date.parse(value.expiresAt) <= Date.now() || Date.parse(value.expiresAt) <= Date.parse(value.checkedAt)) throw new Error("expired-source");
+        value.expiresAt = validatedFortuneExpiry(value);
         setResult(value);
       }
     } catch { if (request === sequence.current) setNotice("특일 데이터를 확인할 수 없어 기본 달력을 유지합니다."); }
@@ -36,8 +41,8 @@ function SpecialDaysResult({ month, category }: { month: string; category: Fortu
   return <div aria-busy={busy}>
     <button type="button" className="fo-button" disabled={busy} onClick={() => { void load(); }}>{busy ? "특일 데이터 확인 중…" : "특일 정보 확인"}</button>
     {busy && <button type="button" className="fo-button" onClick={cancel}>특일 조회 취소</button>}
-    <p role="status" aria-live="polite">{notice}</p>
-    {result && <div>
+    <p role="status" aria-live="polite">{notice || (expired ? "특일 정보의 유효기간이 지났어요. 다시 확인해 주세요." : "")}</p>
+    {result && !expired && <div>
       {result.items.length ? <ul>{result.items.map((item) => <li key={`${item.date}:${item.sequence}`}>
         <time dateTime={item.date}>{item.date}</time> · {item.name} {item.isHoliday && <strong>· 공공기관 휴일</strong>}
       </li>)}</ul> : <p>이 달에 제공된 {FORTUNE_SPECIAL_DAY_LABELS[category]} 항목이 없습니다. 미공개·변경 여부는 원 제공처에서 확인해 주세요.</p>}
