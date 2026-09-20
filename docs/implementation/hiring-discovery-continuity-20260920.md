@@ -23,3 +23,9 @@ Results are live, not a frozen list: newly available earlier account IDs appear 
 - The132-candidate SQL fixture verifies that100 capacity-exhausted early accounts do not hide later candidates; paging returns30 then2, rechecks opt-out/blocks, rejects other owners/scopes/versions, and preserves adjacent-interval capacity semantics.
 
 No production DB, migration, credentials, provider activation, automatic deployment or existing worktree was changed. Validation outputs remain local under `.qa/hiring-discovery/` and are not application source.
+
+## Integrated verification follow-up
+
+Whole Web/API typecheck passed after including the already-merged Scene3D fixture fixes from main. All12 desktop/mobile creator-hub browser tests passed, including explicit owner-side next/back/retry navigation with zero automatic offers. Browser responses are synthetic fixtures, not production authentication or matching evidence; the real first-run onboarding is dismissed through its visible postpone control.
+
+The newly merged fortune0081 migration required updating three exact-inventory test expectations. Bootstrap/manifest/ACL tests passed109 cases after matching the81-entry canonical inventory. Existing migration bytes and checksum, transaction, permissions and runtime capability checks are unchanged. This discovery feature itself adds no migration.
