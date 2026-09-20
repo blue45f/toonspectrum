@@ -25,6 +25,7 @@ export interface FortuneCalendarEnrichment {
   status: FortuneEnrichmentStatus;
   reason?: FortuneUnavailableReason;
   checkedAt?: string;
+  expiresAt?: string;
   checks: FortuneCalendarCheck[];
   source: "local" | "kasi";
   policyRevision: string;
@@ -43,6 +44,7 @@ export interface FortuneHoroscopeEnrichment {
   source: "local" | "free-horoscope";
   sourceDate?: string;
   checkedAt?: string;
+  expiresAt?: string;
   policyRevision: string;
 }
 export function fortunePeriodWindow(date: string, period: FortunePeriod) {

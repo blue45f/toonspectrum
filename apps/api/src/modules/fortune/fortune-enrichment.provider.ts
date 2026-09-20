@@ -7,6 +7,10 @@ export const FORTUNE_ENRICHMENT_RUNTIME = Symbol("FORTUNE_ENRICHMENT_RUNTIME");
 export const KASI_POLICY_REVISION = "data-go-15012679-20260920";
 export interface FortuneEnrichmentConfig {
   kasiEnabled: boolean;
+  specialDaysEnabled?: boolean;
+  specialDaysServiceKey?: string;
+  snapshotsEnabled?: boolean;
+  refreshEnabled?: boolean;
   kasiServiceKey: string;
   horoscopeEnabled: boolean;
   horoscopeRightsApproved: boolean;
@@ -17,7 +21,12 @@ export interface FortuneEnrichmentRuntime { fetch: typeof globalThis.fetch; now:
 export function fortuneEnrichmentConfig(env: Readonly<Record<string, string | undefined>>): FortuneEnrichmentConfig {
   const limit = Number(env.FORTUNE_PROVIDER_DAILY_REQUEST_LIMIT ?? "100");
   if (!Number.isInteger(limit) || limit < 1 || limit > 1000) throw new Error("FORTUNE_PROVIDER_DAILY_REQUEST_LIMIT must be between 1 and 1000");
+  if (env.FORTUNE_REFRESH_ENABLED === "true" && env.FORTUNE_SHARED_SNAPSHOTS_ENABLED !== "true") throw new Error("Fortune refresh requires shared snapshots");
   return {
+    specialDaysEnabled: env.FORTUNE_KASI_SPECIAL_DAYS_ENABLED === "true",
+    specialDaysServiceKey: env.FORTUNE_KASI_SPECIAL_SERVICE_KEY?.trim() ?? "",
+    snapshotsEnabled: env.FORTUNE_SHARED_SNAPSHOTS_ENABLED === "true",
+    refreshEnabled: env.FORTUNE_REFRESH_ENABLED === "true",
     kasiEnabled: env.FORTUNE_KASI_ENABLED === "true",
     // Use the portal's decoded key. URLSearchParams applies exactly one encoding pass.
     kasiServiceKey: env.FORTUNE_KASI_SERVICE_KEY?.trim() ?? "",
@@ -38,7 +47,7 @@ const envelopeSchema = z.object({ response: z.object({
   header: z.object({ resultCode: z.literal("00") }),
   body: z.object({ pageNo: xmlNumber, totalCount: xmlNumber, items: z.object({ item: z.union([rowSchema, z.array(rowSchema).max(31)]) }) }),
 }) });
-export function parseKasiCalendarPage(xml: string, month: string, pageNo: number) {
+export function parseBoundedKasiXml(xml: string): unknown {
   if (Buffer.byteLength(xml, "utf8") > 131072 || /<!/u.test(xml)) throw new Error("invalid-calendar-payload");
   let depth = 0;
   for (const token of xml.matchAll(/<[^>]*>/gu)) {
@@ -48,7 +57,10 @@ export function parseKasiCalendarPage(xml: string, month: string, pageNo: number
   }
   if (depth !== 0 || XMLValidator.validate(xml) !== true) throw new Error("invalid-calendar-xml");
   const parser = new XMLParser({ parseTagValue: false, processEntities: false, ignoreAttributes: true, trimValues: true });
-  const body = envelopeSchema.parse(parser.parse(xml)).response.body;
+  return parser.parse(xml) as unknown;
+}
+export function parseKasiCalendarPage(xml: string, month: string, pageNo: number) {
+  const body = envelopeSchema.parse(parseBoundedKasiXml(xml)).response.body;
   const expectedDays = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();
   if (body.pageNo !== pageNo || body.totalCount !== expectedDays) throw new Error("calendar-page-mismatch");
   const rows = Array.isArray(body.items.item) ? body.items.item : [body.items.item];
