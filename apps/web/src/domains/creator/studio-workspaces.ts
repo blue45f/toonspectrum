@@ -597,6 +597,7 @@ function createBuiltinLayout(
     StudioWorkspaceDeviceKind,
     Readonly<{ desktop: BuiltinDesktop; controlSide?: StudioMobileControlSide }>
   >>> = {},
+  libraryDockOpen = false,
 ): StudioWorkspaceLayout {
   const overrides: Record<string, StudioWorkspaceDeviceOverride> = {};
   for (const device of STUDIO_WORKSPACE_DEVICE_KINDS) {
@@ -610,7 +611,9 @@ function createBuiltinLayout(
   return freezeLayout({
     inspector,
     desktop: builtinDesktop(desktop),
-    drawingPalettes: DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+    drawingPalettes: normalizeStudioDrawingPaletteLayout({
+      ...DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT, libraryDockOpen,
+    }),
     quickActions: createQuickActions(actions),
     deviceOverrides: Object.freeze(overrides),
   });
@@ -681,6 +684,7 @@ export const STUDIO_DEFAULT_WORKSPACES: readonly StudioDefaultWorkspace[] = Obje
       { leftPanelOpen: false, rightPanelOpen: true },
       ["undo", "redo", "pen", "eraser", "eyedropper", "advanced-fill"],
       DRAWING_DEVICE_OVERRIDES,
+      true,
     ),
   }),
   Object.freeze({
@@ -922,8 +926,8 @@ function defaultWorkspace(id: StudioDefaultWorkspaceId): StudioDefaultWorkspace 
 function createDefaultState(ownerScope?: string): StudioWorkspaceState {
   return createState({
     version: STUDIO_WORKSPACE_STATE_VERSION,
-    activeWorkspaceId: "storyboard",
-    liveLayout: defaultWorkspace("storyboard").layout,
+    activeWorkspaceId: "lineart",
+    liveLayout: defaultWorkspace("lineart").layout,
     customWorkspaces: [],
     mobileControlSide: "right",
     applyQuickActionsOnSwitch: true,
@@ -2206,6 +2210,7 @@ export function areStudioWorkspaceLayoutsEqual(
     left.desktop.rightPanelOpen !== right.desktop.rightPanelOpen ||
     left.desktop.leftPanelWidth !== right.desktop.leftPanelWidth ||
     left.desktop.rightPanelWidth !== right.desktop.rightPanelWidth ||
+    left.drawingPalettes.libraryDockOpen !== right.drawingPalettes.libraryDockOpen ||
     left.drawingPalettes.order.some(
       (id, index) => right.drawingPalettes.order[index] !== id
     ) ||

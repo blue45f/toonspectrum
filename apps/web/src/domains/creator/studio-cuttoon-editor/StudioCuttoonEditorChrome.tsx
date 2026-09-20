@@ -23,12 +23,14 @@ import {
 import { StudioBrushCatalogPortal, StudioPublishContextBanner } from "../studio-page-lazy-ui";
 import { returnFromStudioEditorInBrowser } from "../studio-editor-return-navigation";
 import { LazyStudioMenubarContent } from "../studio-page-modal-lazy-boundaries";
-import { StudioOptionsBars } from "../StudioOptionsBars";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { StudioToolBeltContent } from "../StudioToolBeltContent";
 import { StudioToolHintTarget } from "../StudioToolHint";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
+
+const StudioOptionsBars = lazyRetry(() => import("../StudioOptionsBars").then((module) => ({ default: module.StudioOptionsBars })), "StudioOptionsBars");
 
 export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
   const {
@@ -711,11 +713,11 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
         ) : null}
       </div>
 
-      <StudioOptionsBars
+      {!isMobile && !canvasOnlyMode ? <Suspense fallback={<div aria-hidden="true" className="min-h-16 shrink-0 border-b border-line bg-panel" />}><StudioOptionsBars
         draw={studioOptionsBarsDrawModel}
         selection={studioOptionsBarsSelectionModel}
         stableHandlers={studioOptionsBarsHandlers}
-      />
+      /></Suspense> : null}
 
       {brushCatalogSession ? (
         <Suspense fallback={null}>

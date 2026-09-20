@@ -371,3 +371,15 @@ describe("StudioQuickStartPanel", () => {
     expect(screen.queryByText("처음 시작하는 4단계")).toBeNull();
   });
 });
+
+it("starts as a compact drawing hint and expands only after an explicit action", () => {
+  render(<StudioQuickStartPanel {...createHandlers()} startCollapsed />);
+  const button = screen.getByRole("button", { name: "사용법" });
+  expect(button.getAttribute("aria-expanded")).toBe("false");
+  expect(screen.queryByRole("button", { name: /웹툰 흐름으로 시작/u })).toBeNull();
+  fireEvent.click(button);
+  expect(screen.getByRole("button", { name: "접기" }).getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: /웹툰 흐름으로 시작/u })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "접기" }));
+  expect(screen.queryByRole("button", { name: /웹툰 흐름으로 시작/u })).toBeNull();
+});

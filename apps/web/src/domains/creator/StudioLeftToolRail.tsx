@@ -1,3 +1,4 @@
+import { isStudioDrawingCoreTool } from "./studio-drawing-core-tools";
 import {
   Box,
   Boxes,
@@ -211,7 +212,7 @@ function StudioLeftToolRailConnected() {
     eyedropperActive,
     frameAnimOpen,
     frameAnimTargetId,
-    isRailToolVisible,
+    isRailToolVisible: isConfiguredRailToolVisible,
     liquifyActive,
     mobileImmersive,
     perspectiveRulerActive,
@@ -236,6 +237,10 @@ function StudioLeftToolRailConnected() {
     viewTransformSuppressed,
     viewTool,
   } = snapshot;
+  // Core drawing/editing commands remain discoverable in every density and saved toolbar.
+  const isRailToolVisible = (id: Parameters<typeof isConfiguredRailToolVisible>[0]) =>
+    isStudioDrawingCoreTool(id)
+    || isConfiguredRailToolVisible(id);
   const railMoreDialogId = useId();
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const railMoreTriggerId = `${railMoreDialogId}-trigger`;
@@ -706,6 +711,56 @@ function StudioLeftToolRailConnected() {
               }}
             />
             ) : null}
+{isRailToolVisible("transform") ? (
+            <StudioRailToolButton
+              data-studio-rail-tool-id="transform"
+              icon={Maximize2}
+              label="변형 (⇧T)"
+              description={
+                pixelTransformRecoveryAvailable
+                  ? "이미지 픽셀 내용 변형을 위해 사각 선택을 시작합니다. 선택 뒤 다시 누르면 스케일·회전·뒤집기 패널이 열려요."
+                  : objectTransformPickRecoveryAvailable
+                    ? "변형할 선·도형·이미지를 캔버스에서 먼저 고르세요. 선택 도구로 전환합니다."
+                    : objectFreeTransformReady
+                      ? selected?.type === "draw"
+                        ? "선택한 선화 레이어의 모서리 핸들로 크기·위치를 조절합니다. 이미지 픽셀 부분 변형은 사각 선택 후 다시 눌러 주세요."
+                        : selected?.type === "image" && !isSelectionUsable(pixelSel)
+                          ? "이미지 레이어 전체를 선택해 내용 변형(스케일·회전·뒤집기) 패널을 엽니다. 부분만 바꾸려면 먼저 사각·올가미 선택하세요."
+                          : "선택한 객체의 모서리·회전 핸들로 변형하거나, 픽셀 선택이 있으면 내용 변형 패널을 엽니다."
+                      : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
+              }
+              active={false}
+              disabled={activeSurfaceReviewLocked || selectedImageLocked}
+              unavailableReason={
+                activeSurfaceReviewLocked
+                  ? REVIEW_LOCK_REASON
+                  : selectedImageMutationLocked
+                    ? IMAGE_EDIT_LOCK_REASON
+                    : undefined
+              }
+              className={
+                pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable
+                  ? "size-11"
+                  : undefined
+              }
+              onClick={() => {
+                if (pixelTransformRecoveryAvailable) {
+                  onRequestPixelSelection();
+                  return;
+                }
+                if (objectTransformPickRecoveryAvailable) {
+                  disarmAllPixelTools();
+                  returnToSelectTool();
+                  setMenu(null);
+                  announceDrawingShortcut(
+                    "변형할 요소를 클릭해 선택하세요 · 모서리 핸들로 크기 조절",
+                  );
+                  return;
+                }
+                openPixelSelectionTransform();
+              }}
+            />
+            ) : null}
 {isRailToolVisible("hand") ? (
             <StudioRailToolButton
               data-studio-rail-tool-id="hand"
@@ -971,62 +1026,6 @@ function StudioLeftToolRailConnected() {
                 data-studio-rail-group-divider="transform"
                 label={studioChromeRailGroupLabel("transform")}
               />
-            ) : null}
-{isRailToolVisible("transform") ? (
-            <StudioRailToolButton
-              data-studio-rail-tool-id="transform"
-              icon={Maximize2}
-              label={
-                pixelTransformRecoveryAvailable
-                  ? "선택 시작하기"
-                  : objectTransformPickRecoveryAvailable
-                    ? "선택 후 변형"
-                    : "변형 (⇧T)"
-              }
-              description={
-                pixelTransformRecoveryAvailable
-                  ? "이미지 픽셀 내용 변형을 위해 사각 선택을 시작합니다. 선택 뒤 다시 누르면 스케일·회전·뒤집기 패널이 열려요."
-                  : objectTransformPickRecoveryAvailable
-                    ? "변형할 선·도형·이미지를 캔버스에서 먼저 고르세요. 선택 도구로 전환합니다."
-                    : objectFreeTransformReady
-                      ? selected?.type === "draw"
-                        ? "선택한 선화 레이어의 모서리 핸들로 크기·위치를 조절합니다. 이미지 픽셀 부분 변형은 사각 선택 후 다시 눌러 주세요."
-                        : selected?.type === "image" && !isSelectionUsable(pixelSel)
-                          ? "이미지 레이어 전체를 선택해 내용 변형(스케일·회전·뒤집기) 패널을 엽니다. 부분만 바꾸려면 먼저 사각·올가미 선택하세요."
-                          : "선택한 객체의 모서리·회전 핸들로 변형하거나, 픽셀 선택이 있으면 내용 변형 패널을 엽니다."
-                      : "픽셀 선택이 있으면 속성→리터치에서 내용 변형(스케일·회전·뒤집기)을 적용합니다."
-              }
-              active={false}
-              disabled={activeSurfaceReviewLocked || selectedImageLocked}
-              unavailableReason={
-                activeSurfaceReviewLocked
-                  ? REVIEW_LOCK_REASON
-                  : selectedImageMutationLocked
-                    ? IMAGE_EDIT_LOCK_REASON
-                    : undefined
-              }
-              className={
-                pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable
-                  ? "size-11"
-                  : undefined
-              }
-              onClick={() => {
-                if (pixelTransformRecoveryAvailable) {
-                  onRequestPixelSelection();
-                  return;
-                }
-                if (objectTransformPickRecoveryAvailable) {
-                  disarmAllPixelTools();
-                  returnToSelectTool();
-                  setMenu(null);
-                  announceDrawingShortcut(
-                    "변형할 요소를 클릭해 선택하세요 · 모서리 핸들로 크기 조절",
-                  );
-                  return;
-                }
-                openPixelSelectionTransform();
-              }}
-            />
             ) : null}
 {isRailToolVisible("crop") ? (
             <StudioRailToolButton

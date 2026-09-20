@@ -93,6 +93,10 @@ export interface StudioBrushLibrarySheetProps {
   embedded?: boolean;
   closeOnSelection?: boolean;
   dismissOnOutsidePointer?: boolean;
+  /** Persistent docks must not steal canvas focus or consume transform Escape. */
+  autoFocusSearch?: boolean;
+  dismissOnEscape?: boolean;
+  workbench?: boolean;
   triggerElement?: HTMLElement | null;
   favoriteIds?: readonly string[];
   recentIds?: readonly string[];
@@ -926,6 +930,9 @@ export function StudioBrushLibrarySheet({
   embedded = false,
   closeOnSelection = true,
   dismissOnOutsidePointer = true,
+  autoFocusSearch = true,
+  dismissOnEscape = true,
+  workbench = false,
   triggerElement = null,
   favoriteIds = [],
   recentIds = [],
@@ -940,6 +947,7 @@ export function StudioBrushLibrarySheet({
   const titleId = useId();
   const tabsId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
+  const viewEditedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
   const itemGridRef = useRef<HTMLDivElement>(null);
@@ -964,6 +972,12 @@ export function StudioBrushLibrarySheet({
   const [viewMode, setViewMode] = useState<StudioBrushCatalogViewMode>(
     restoredView?.viewMode ?? "stroke",
   );
+  useEffect(() => {
+    if (!restoredView || viewEditedRef.current) return;
+    setTab(restoredView.tab as (typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"]);
+    setQuery(restoredView.query);
+    setViewMode(restoredView.viewMode);
+  }, [restoredView]);
   const [engineFamilyFilter, setEngineFamilyFilter] = useState("all");
   const [visibleLimit, setVisibleLimit] = useState(
     STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT
@@ -1023,9 +1037,10 @@ export function StudioBrushLibrarySheet({
   useEffect(() => {
     if (!open) return;
     setSelectionError(null);
+    if (!autoFocusSearch) return;
     const t = globalThis.setTimeout(() => searchRef.current?.focus(), 30);
     return () => globalThis.clearTimeout(t);
-  }, [open]);
+  }, [autoFocusSearch, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -1039,9 +1054,9 @@ export function StudioBrushLibrarySheet({
   }, [operation]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !dismissOnEscape) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !e.isComposing && !e.defaultPrevented) {
         e.preventDefault();
         selectionRequestEpochRef.current += 1;
         setPendingSelectionId(null);
@@ -1050,7 +1065,7 @@ export function StudioBrushLibrarySheet({
     }
     globalThis.addEventListener("keydown", onKey);
     return () => globalThis.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [dismissOnEscape, open, onClose]);
 
   useEffect(() => {
     if (!open || !dismissOnOutsidePointer) return;
@@ -1200,6 +1215,7 @@ export function StudioBrushLibrarySheet({
   function chooseTab(
     nextTab: (typeof STUDIO_BRUSH_LIBRARY_TABS)[number]["id"],
   ): void {
+    viewEditedRef.current = true;
     setTab(nextTab);
     setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
     setFocusedBrushId(null);
@@ -1312,6 +1328,7 @@ export function StudioBrushLibrarySheet({
       aria-labelledby={embedded ? undefined : titleId}
       aria-describedby={embedded ? undefined : `${titleId}-description`}
       data-studio-brush-library="true"
+      data-studio-brush-workbench={workbench ? "true" : undefined}
       data-studio-brush-catalog="built-in"
       data-studio-brush-catalog-session="true"
       data-studio-brush-surface-role="full-catalog-management"
@@ -1386,6 +1403,7 @@ export function StudioBrushLibrarySheet({
             type="search"
             value={query}
             onChange={(event) => {
+              viewEditedRef.current = true;
               setQuery(event.target.value);
               setVisibleLimit(STUDIO_BRUSH_PROGRESSIVE_INITIAL_COUNT);
               setFocusedBrushId(null);
@@ -1418,7 +1436,7 @@ export function StudioBrushLibrarySheet({
               ? "지우는 강도와 결과를 비교해 선택하세요."
               : "재질·엔진을 고르거나 이름·용도·질감·특성으로 전체 검색"}
         </p>
-        {operation === "paint" ? (
+        {operation === "paint" && !workbench ? (
           <div
             data-studio-brush-engine-filter="true"
             className={cn(
@@ -1492,7 +1510,7 @@ export function StudioBrushLibrarySheet({
                   aria-label={title}
                   aria-pressed={active}
                   data-studio-brush-view-option={id}
-                  onClick={() => setViewMode(id)}
+                  onClick={() => { viewEditedRef.current = true; setViewMode(id); }}
                   className={cn(
                     "flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-1.5 text-[0.62rem] font-bold",
                     STUDIO_EASE,
@@ -1518,7 +1536,26 @@ export function StudioBrushLibrarySheet({
         </div> : null}
       </div>
 
-      <div
+      {workbench ? (
+        <div className="shrink-0 space-y-2 border-b border-line p-2">
+          <div role="group" aria-label="브러시 탐색 범위" className="grid grid-cols-3 gap-1">
+            {catalogTabs.filter((item) => ["favorites", "recent", "all"].includes(item.id)).map((item) => (
+              <button type="button" key={item.id} aria-pressed={tab === item.id}
+                onClick={() => chooseTab(item.id)}
+                className={cn("min-h-11 rounded-lg border px-1 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent", tab === item.id ? "border-accent bg-accent-soft text-accent" : "border-line text-fg-2 hover:bg-raised")}>
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-fg-2">분류
+            <select aria-label="브러시 재질·용도 분류" value={tab}
+              onChange={(event) => chooseTab(event.target.value as (typeof catalogTabs)[number]["id"])}
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-2 text-xs text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+              {catalogTabs.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            </select>
+          </label>
+        </div>
+      ) : <div
         ref={tabListRef}
         data-studio-brush-catalog-tabs="true"
         className={cn(
@@ -1556,13 +1593,14 @@ export function StudioBrushLibrarySheet({
             </button>
           );
         })}
-      </div>
+      </div>}
 
       <div
         ref={scrollportRef}
         id={panelId}
-        role="tabpanel"
-        aria-labelledby={`${tabsId}-${tab}`}
+        role={workbench ? "region" : "tabpanel"}
+        aria-label={workbench ? "브러시 검색 결과" : undefined}
+        aria-labelledby={workbench ? undefined : `${tabsId}-${tab}`}
         tabIndex={0}
         data-studio-brush-catalog-scrollport="true"
         className={cn(
@@ -1582,7 +1620,7 @@ export function StudioBrushLibrarySheet({
         <p role="status" aria-live="polite" className="sr-only">
           {visibleItems.length}/{items.length}개의 {operationLabel}가 표시됩니다.
         </p>
-        {inspectedCatalogItem ? (
+        {inspectedCatalogItem && !workbench ? (
           <StudioBrushProfileCard
             item={inspectedCatalogItem}
             active={inspectedCatalogItem.id === activeBrushId}
@@ -1620,7 +1658,7 @@ export function StudioBrushLibrarySheet({
             className={cn(
               "grid",
               viewMode === "stroke"
-                ? "grid-cols-2 gap-1.5 sm:grid-cols-3"
+                ? workbench ? "grid-cols-1 gap-1.5" : "grid-cols-2 gap-1.5 sm:grid-cols-3"
                 : viewMode === "tile"
                   ? "grid-cols-3 gap-1"
                   : "grid-cols-1 gap-1"
@@ -1729,7 +1767,7 @@ export function StudioBrushLibrarySheet({
                           active ? "text-on-accent" : "text-fg-2"
                         )}
                       >
-                        <span className="block truncate text-[0.68rem] font-bold leading-tight">
+                        <span className={cn("block truncate font-bold leading-tight", workbench ? "text-[0.8125rem]" : "text-[0.68rem]")}>
                           {item.name}
                         </span>
                         {viewMode === "text" ? (
@@ -1775,6 +1813,7 @@ export function StudioBrushLibrarySheet({
                         <span className="flex min-w-0 shrink-0 items-center gap-1">
                           <span
                             data-studio-brush-engine-chip={profile.engineFamilyId}
+                            hidden={workbench}
                             className={cn(
                               "max-w-24 truncate rounded-full px-1.5 py-0.5 font-bold",
                               active

@@ -39,6 +39,7 @@ export type StudioAppSettingsTab = (typeof STUDIO_APP_SETTINGS_TABS)[number];
  */
 export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "select", label: "선택", labelKey: "studio.settings.tool.select", defaultShortcut: "V" },
+  { id: "transform", label: "크기·회전 바꾸기", labelKey: "studio.settings.tool.transform", defaultShortcut: "Shift+T" },
   { id: "hand", label: "화면 이동", labelKey: "studio.settings.tool.hand", defaultShortcut: "Space" },
   { id: "pen", label: "펜", labelKey: "studio.settings.tool.pen", defaultShortcut: "B" },
   { id: "pixel-pencil", label: "픽셀 펜", labelKey: "studio.settings.tool.pixelPencil", defaultShortcut: "P" },
@@ -53,7 +54,6 @@ export const STUDIO_RAIL_TOOL_CATALOG = [
   { id: "marquee-rect", label: "사각 선택", labelKey: "studio.settings.tool.marqueeRect", defaultShortcut: "M" },
   { id: "marquee-circle", label: "원형 선택", labelKey: "studio.settings.tool.marqueeCircle", defaultShortcut: "Shift+M" },
   { id: "lasso", label: "올가미 선택", labelKey: "studio.settings.tool.lasso", defaultShortcut: "L" },
-  { id: "transform", label: "크기·회전 바꾸기", labelKey: "studio.settings.tool.transform", defaultShortcut: "Shift+T" },
   { id: "crop", label: "자르기", labelKey: "studio.settings.tool.crop", defaultShortcut: "C" },
   { id: "smart-shape", label: "스마트 도형", labelKey: "studio.settings.tool.smartShape", defaultShortcut: "" },
   { id: "shape-rect", label: "사각형 도형", labelKey: "studio.settings.tool.shapeRect", defaultShortcut: "" },
