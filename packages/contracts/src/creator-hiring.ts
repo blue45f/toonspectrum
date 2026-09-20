@@ -44,6 +44,12 @@ export interface HiringCandidate {
   startsAt: string; endsAt: string; confirmedAt: string; expiresAt: string;
   capacity: number; minRate: number; rateUnit: HiringRateUnit; reasons: string[];
 }
+/** A live, owner-only page. Counts describe this page, not the entire talent pool. */
+export interface HiringCandidatePage {
+  items: HiringCandidate[]; limit: 30; ordering: "account-id";
+  next: string | null; termsRevision: number; observedAt: string;
+}
+export interface HiringCandidateQuery { after?: string; expectedRevision?: number; }
 export interface HiringSlotTerms {
   model: CreatorHiringModel; role: CreatorHiringRole; publicScope: string;
   quantity: number; quantityUnit: "cut" | "episode" | "page" | "task";
