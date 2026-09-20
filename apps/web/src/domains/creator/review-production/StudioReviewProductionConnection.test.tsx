@@ -107,6 +107,23 @@ describe("explicit saved comment production UI", () => {
     expect((screen.getByRole("combobox", { name: "제작 역할 · 선화 작가" }) as HTMLSelectElement).value).toBe("role-editor");
     expect(io.save).not.toHaveBeenCalled();
   });
+  it("keeps focused choices usable during background renewal, then clears them at expiry and fences its late response", async () => {
+    vi.useFakeTimers();
+    await act(async () => { renderUi(<StudioReviewProductionConnection request={f.request} />); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "제작 작업에 연결" })); });
+    fireEvent.change(screen.getByLabelText("기존 제작 작업"), { target: { value: "task" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "제작 역할 · 선화 작가" }), { target: { value: "role-editor" } });
+    const role = screen.getByRole("combobox", { name: "제작 역할 · 선화 작가" }) as HTMLSelectElement; role.focus();
+    let release!: (value: typeof f.verified) => void;
+    io.verify.mockImplementationOnce(() => new Promise((done) => { release = done; }));
+    await act(async () => { vi.advanceTimersByTime(10_250); });
+    expect(document.activeElement).toBe(role); expect(role.closest("fieldset")?.disabled).toBe(false); expect(role.value).toBe("role-editor");
+    fireEvent.change(role, { target: { value: "" } }); expect(role.value).toBe("");
+    await act(async () => { vi.advanceTimersByTime(5_000); });
+    expect(screen.queryByLabelText("기존 제작 작업")).toBeNull(); expect(io.save).not.toHaveBeenCalled();
+    await act(async () => { release({ ...f.verified, expiresAt: Date.now() + 15_000 }); });
+    expect(screen.queryByLabelText("기존 제작 작업")).toBeNull(); expect(io.save).not.toHaveBeenCalled();
+  });
   it("preserves uncertain choices for an explicit retry, with no automatic PUT retry", async () => {
     io.save.mockRejectedValueOnce(new Error("lost")); renderUi(<StudioReviewProductionConnection request={f.request} />); await select();
     fireEvent.click(screen.getByRole("button", { name: "선택한 작업에 연결" }));

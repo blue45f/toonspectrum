@@ -46,14 +46,17 @@ export class StudioReviewProductionController {
     return { abort, current, actorId: context.actorId, epoch };
   }
   async refresh(retain = false) {
-    if (this.snapshot.phase === "saving") return;
+    if (this.pending || this.snapshot.phase === "saving") return;
     let operation: ReturnType<StudioReviewProductionController["start"]> | undefined;
     try {
       operation = this.start();
-      this.publish({ phase: "loading", authority: retain && this.snapshot.authority && this.snapshot.authority.expiresAt > this.deps.now() ? this.snapshot.authority : null, reason: null });
-      const authority = await this.deps.read(this.request, operation.actorId, operation.abort.signal);
+      const authority = retain && this.snapshot.authority && this.snapshot.authority.expiresAt > this.deps.now() ? this.snapshot.authority : null;
+      // A background renewal keeps the still-valid form usable and preserves focus.
+      // A user commit supersedes this read and performs its own fresh verification.
+      this.publish({ phase: authority ? "ready" : "loading", authority, reason: null });
+      const refreshed = await this.deps.read(this.request, operation.actorId, operation.abort.signal);
       if (!operation.current()) return;
-      this.publish({ phase: "ready", authority, reason: null });
+      this.publish({ phase: "ready", authority: refreshed, reason: null });
     } catch (error) {
       if (!operation || operation.current()) this.publish({ phase: "failed", authority: null,
         reason: error instanceof StudioReviewProductionError ? error.reason : "unavailable" });
@@ -102,6 +105,9 @@ export class StudioReviewProductionController {
   }
   checkLease() {
     if (this.snapshot.authority && this.snapshot.authority.expiresAt <= this.deps.now()) {
+      // A delayed renewal must not revive expired private choices. The next attempt
+      // starts a fresh read; a write already in progress keeps its own scope fence.
+      if (this.snapshot.phase !== "saving") { ++this.epoch; this.pending?.abort(); this.pending = null; }
       this.publish({ ...this.snapshot, authority: null, reason: "expired" });
     }
   }

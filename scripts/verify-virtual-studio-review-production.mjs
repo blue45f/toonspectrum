@@ -122,6 +122,16 @@ try {
   await page.getByRole("status").filter({ hasText: /권한|계정/u }).waitFor(); assert.equal(writes.length, 0);
   assert.equal(await page.getByLabel("기존 제작 작업", { exact: true }).count(), 0);
   cases.push({ name: "late-authority-after-actor-change-zero-writes", writes: 0 });
+  await page.clock.install(); await load(); await choose();
+  const role = page.getByRole("combobox", { name: "제작 역할 · 선화 작가", exact: true }); await role.focus(); mode = "held";
+  await page.clock.runFor(10_250);
+  for (let attempt = 0; !release && attempt < 100; attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert(release); assert(await role.evaluate((element) => document.activeElement === element)); assert(await role.isEnabled());
+  assert.equal(await role.inputValue(), "role-editor"); await role.selectOption("");
+  await page.clock.runFor(5_000); assert.equal(await page.getByLabel("기존 제작 작업", { exact: true }).count(), 0);
+  mode = "normal"; release(); await page.clock.runFor(250); assert.equal(writes.length, 0);
+  assert.equal(await page.getByLabel("기존 제작 작업", { exact: true }).count(), 0);
+  cases.push({ name: "background-renewal-preserves-focus-until-lease-expiry", writes: 0 });
   assert.deepEqual(errors, []);
   const report = { passed: true, scope: "development-only synthetic saved review/team/production records; actual form, hook, controller, authenticated HTTP clients and response parsers; not production auth/storage or full editor E2E",
     origin: origin.origin, expectedCwd, cases, pageErrors: errors };

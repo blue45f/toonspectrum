@@ -84,4 +84,11 @@ describe("review production connection lifecycle", () => {
     f.read.mockResolvedValue({ ...f.authority, workspace: { ...f.authority.workspace, document: patch.document } });
     await f.controller.connect(f.choice); expect(f.controller.getSnapshot().phase).toBe("connected"); expect(f.save).not.toHaveBeenCalled();
   });
+  it("allows an explicit commit to supersede a background renewal without duplicate renewal reads", async () => {
+    const f = setup(); await f.controller.refresh(); const wait = deferred<typeof f.authority>();
+    f.read.mockReturnValueOnce(wait.promise); const renewal = f.controller.refresh(true);
+    await f.controller.refresh(true); expect(f.read).toHaveBeenCalledTimes(2); expect(f.controller.getSnapshot().phase).toBe("ready");
+    await f.controller.connect(f.choice); expect(f.save).toHaveBeenCalledOnce();
+    wait.resolve(f.authority); await renewal; expect(f.controller.getSnapshot().phase).toBe("connected");
+  });
 });
