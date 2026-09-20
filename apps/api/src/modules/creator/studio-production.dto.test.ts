@@ -123,3 +123,26 @@ describe("Studio Personal Kit and external review DTOs", () => {
     }).success).toBe(true);
   });
 });
+
+
+describe("production review task reference admission", () => {
+  const reviewRef = { subject: { schemaVersion: 1, projectId: "graph", workId: "chapter-1", artifactId: "artifact",
+    reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) }, commentId: "comment", handoffId: null };
+  const task = { id: "task-1", title: "Repair panel", owner: "", due: "2026-10-21", progress: 0, status: "todo", stage: "lineart",
+    priority: "high", role: "lineart", hierarchyNodeId: null, dependencyIds: [], assigneeIds: [], reviewerIds: [], blockedReason: "", reviewRef };
+  it("retains exact review references through API admission for tasks and recorded versions", () => {
+    const value = { ...document(), tasks: [task], versions: [{ id: "v1", name: "Linked request", createdAt: NOW,
+      tasks: [task], reviews: [], hierarchy: [], roleAssignments: [], handoffs: [] }] };
+    const parsed = StudioProductionWorkspaceDocumentSchema.parse(value);
+    expect(parsed.tasks[0]!.reviewRef).toEqual(reviewRef);
+    expect(parsed.versions[0]!.tasks[0]!.reviewRef).toEqual(reviewRef);
+  });
+  it("refuses foreign work, missing handoff and private content in both current and historical tasks", () => {
+    for (const invalid of [null, { ...reviewRef, handoffId: "missing" }, { ...reviewRef, previewUrl: "https://private.example" },
+      { ...reviewRef, subject: { ...reviewRef.subject, workId: "other" } }]) {
+      expect(StudioProductionWorkspaceDocumentSchema.safeParse({ ...document(), tasks: [{ ...task, reviewRef: invalid }] }).success).toBe(false);
+      expect(StudioProductionWorkspaceDocumentSchema.safeParse({ ...document(), versions: [{ id: "v1", name: "Invalid", createdAt: NOW,
+        tasks: [{ ...task, reviewRef: invalid }], reviews: [], hierarchy: [], roleAssignments: [], handoffs: [] }] }).success).toBe(false);
+    }
+  });
+});

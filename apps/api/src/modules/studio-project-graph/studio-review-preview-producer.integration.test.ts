@@ -12,7 +12,8 @@ import type { StudioReviewPreviewProducerRepository } from "./studio-review-prev
 import type { StudioReviewPreviewProducerService } from "./studio-review-preview-producer.service";
 import type { StudioReviewPreviewService } from "./studio-review-preview.service";
 import type { deleteWork as DeleteWork } from "../../server/creator/works";
-import { studioReviewPreviewDigest, studioReviewPreviewIntentKey, studioReviewPreviewPageAsset, type StudioReviewPreviewCapture } from "./studio-review-preview-producer.contract";
+import { studioReviewPreviewDigest, studioReviewPreviewIntentKey, studioReviewPreviewPageAsset,
+  type StudioReviewPreviewCapture, type StudioReviewPreviewIntent } from "./studio-review-preview-producer.contract";
 
 const URL = process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
 if (process.env.CI && !URL) throw new Error("CI must provide STUDIO_LIVE_POSTGRES_INTEGRATION_URL; review preview pin/delete transactions cannot be skipped");
@@ -80,6 +81,7 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
         try {
           await cleanup.query('BEGIN');
           const revisions = 'SELECT revision.id FROM studio_revision revision JOIN studio_artifact artifact ON artifact.id=revision."artifactId" JOIN studio_project_graph project ON project.id=artifact."projectId" JOIN creator_work work ON work.id=project."workId" WHERE work."userId"=ANY($1::text[])';
+          await cleanup.query(`DELETE FROM studio_review WHERE "revisionId" IN (${revisions})`, [ids]);
           await cleanup.query(`DELETE FROM studio_revision_parent WHERE "revisionId" IN (${revisions})`, [ids]);
           await cleanup.query(`DELETE FROM studio_operation WHERE "resultRevisionId" IN (${revisions})`, [ids]);
           await cleanup.query(`DELETE FROM studio_mutation_receipt WHERE "resultRevisionId" IN (${revisions})`, [ids]);
@@ -108,6 +110,183 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     const intent = await service.prepare(actor, input);
     return { actor, input, intent, doc };
   }
+
+  async function completeCapture(actor: string, intent: StudioReviewPreviewIntent) {
+    const pages = [];
+    for (let ordinal = 0; ordinal < intent.pageCount; ordinal += 1) {
+      const page = await service.upload(actor, intent, ordinal, file());
+      pages.push({ ordinal, sha256: page.sha256 });
+    }
+    const result = await service.complete(actor, { intent, pages });
+    if (result.status !== "completed") throw new Error("capture did not complete");
+    const revision = (await graph.listRevisions(actor, intent.artifactId)).find((row) => row.id === result.subject.revisionId);
+    if (!revision || revision.parentIds.length !== 1) throw new Error("missing actual capture submission");
+    return { subject: result.subject, submissionId: revision.parentIds[0]! };
+  }
+
+  async function resolutionFixture(advanceSavedSource = true) {
+    const f = await capture(1);
+    const original = await completeCapture(f.actor, f.intent);
+    const comment = await graph.createReviewComment(f.actor, original.subject.reviewId, { id: randomUUID(), body: "Correct this saved cut",
+      severity: "note", assigneeIds: [], anchor: { kind: "artifact", artifactId: f.intent.artifactId,
+        revisionId: original.subject.revisionId, scope: { projectId: f.intent.projectId } } });
+    const newDoc = advanceSavedSource ? { ...f.doc, correction: "second saved document" } : f.doc;
+    if (advanceSavedSource) await pool.query('UPDATE creator_work SET revision=5,doc=$2::jsonb WHERE id=$1', [f.input.workId, JSON.stringify(newDoc)]);
+    // Deliberately older client clock: only saved revision and server sequence prove succession.
+    const nextIntent = await service.prepare(f.actor, { ...f.input, intentId: randomUUID(), sourceServerRevision: advanceSavedSource ? 5 : 4,
+      sourceContentDigest: studioReviewPreviewDigest(newDoc), createdAt: "2020-01-01T00:00:00Z" });
+    const replacement = await completeCapture(f.actor, nextIntent);
+    return { ...f, original, comment, replacement, nextIntent,
+      resolve: { status: "resolved" as const, resolutionRevisionId: replacement.submissionId, resolutionSourceRef: replacement.subject } };
+  }
+
+  async function completionFixture() {
+    const f = await resolutionFixture();
+    await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve);
+    const production = new (await import("../creator/studio-production.repository")).DrizzleStudioProductionRepository();
+    const completion = new (await import("../creator/studio-review-task-completion.repository")).StudioReviewTaskCompletionRepository();
+    const empty = await production.getWorkspace(f.actor, f.input.workId);
+    const at = new Date().toISOString(), taskId = "선화 수정 1";
+    const task = { id: taskId, title: "Correct the saved cut", owner: "", due: "2026-09-20", progress: 50, status: "doing" as const,
+      stage: "lineart" as const, priority: "normal" as const, role: null, hierarchyNodeId: "episode", dependencyIds: [], assigneeIds: [], reviewerIds: [], blockedReason: "",
+      reviewRef: { subject: f.original.subject, commentId: f.comment.id, handoffId: "handoff" } };
+    await production.saveWorkspace(f.actor, f.input.workId, empty.revision, { ...empty.document,
+      tasks: [task, { ...task, id: "other-task", reviewRef: undefined }],
+      hierarchy: [{ id: "episode", kind: "episode", parentId: null, title: "Episode", order: 0, pageId: null }],
+      handoffs: [{ id: "handoff", hierarchyNodeId: "episode", fromRole: "story", toRole: "lineart", status: "ready", scenePurpose: "", emotionalBeat: "",
+        mustShow: [], continuityNotes: [], lockedFields: [], acceptanceCriteria: ["Direction corrected", "Sleeve preserved"], createdBy: "", assignedTo: "", updatedAt: at }] });
+    const input = async () => { const context = await completion.read(f.actor, f.input.workId, taskId);
+      return { requestId: randomUUID(), baseRevision: context.baseRevision, proofDigest: context.proofDigest, confirmedCriteria: context.criteria }; };
+    return { ...f, completion, production, taskId, completionInput: input };
+  }
+
+  it("records real captured review task completion atomically and replays without another workspace write", async () => {
+    const f = await completionFixture(), input = await f.completionInput();
+    const before = await f.production.getWorkspace(f.actor, f.input.workId);
+    const result = await f.completion.complete(f.actor, f.input.workId, f.taskId, input);
+    expect(result.evidence?.current).toBe(true); expect(result.evidence?.receipt.completedBy).toBe(f.actor);
+    expect(result.evidence?.receipt.completedAt).toMatch(/\.\d{6}Z$/u);
+    const after = await f.production.getWorkspace(f.actor, f.input.workId);
+    expect(after.revision).toBe(before.revision + 1); expect(after.document.tasks[0]).toMatchObject({ status: "done", progress: 100, stage: "lineart" });
+    expect(after.document.tasks[1]).toEqual(before.document.tasks[1]);
+    expect((await f.completion.complete(f.actor, f.input.workId, f.taskId, input)).evidence).toEqual(result.evidence);
+    expect((await f.production.getWorkspace(f.actor, f.input.workId)).revision).toBe(after.revision);
+    expect((await graph.getReview(f.actor, f.original.subject.reviewId)).status).toBe("open");
+    const receipt = (await pool.query(`SELECT response FROM studio_mutation_receipt WHERE response->>'requestId'=$1`, [input.requestId])).rows;
+    expect(receipt).toHaveLength(1);
+  });
+
+  it("preserves evidence on unrelated saves and permanently invalidates criteria A -> B -> A", async () => {
+    const f = await completionFixture(), input = await f.completionInput(); await f.completion.complete(f.actor, f.input.workId, f.taskId, input);
+    let current = await f.production.getWorkspace(f.actor, f.input.workId);
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document, title: "Renamed workspace",
+      tasks: current.document.tasks.map((task) => task.id === "other-task" ? { ...task, title: "Unrelated task renamed" } : task) });
+    expect((await f.completion.read(f.actor, f.input.workId, f.taskId)).evidence?.current).toBe(true);
+    const criteria = [...current.document.handoffs[0]!.acceptanceCriteria];
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      handoffs: current.document.handoffs.map((handoff) => ({ ...handoff, acceptanceCriteria: ["Changed criterion"] })) });
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      handoffs: current.document.handoffs.map((handoff) => ({ ...handoff, acceptanceCriteria: criteria })) });
+    expect((await f.completion.read(f.actor, f.input.workId, f.taskId)).evidence?.current).toBe(false);
+    expect((await f.completion.complete(f.actor, f.input.workId, f.taskId, input)).evidence?.current).toBe(false);
+    expect((await f.production.getWorkspace(f.actor, f.input.workId)).revision).toBe(current.revision);
+    const invalidated = (await pool.query(`SELECT count(*)::int AS count FROM studio_mutation_receipt WHERE response->>'contract'='studio-review-task-completion-invalidated-v1' AND response->>'workId'=$1`, [f.input.workId])).rows[0];
+    expect(invalidated.count).toBe(2);
+    expect((await f.completion.complete(f.actor, f.input.workId, f.taskId, await f.completionInput())).evidence?.current).toBe(true);
+  });
+
+  it("compares exact PostgreSQL microseconds and rejects reopened or unattested sources", async () => {
+    const f = await completionFixture();
+    const base = (await pool.query(`SELECT to_char(date_trunc('millisecond',clock_timestamp()) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at`)).rows[0].at;
+    await pool.query(`UPDATE studio_review_comment SET "updatedAt"=$2::timestamptz+interval '1 microsecond' WHERE id=$1`, [f.comment.id, base]);
+    await f.completion.complete(f.actor, f.input.workId, f.taskId, await f.completionInput());
+    await pool.query(`UPDATE studio_review_comment SET "updatedAt"=$2::timestamptz+interval '2 microseconds' WHERE id=$1`, [f.comment.id, base]);
+    expect((await f.completion.read(f.actor, f.input.workId, f.taskId)).evidence?.current).toBe(false);
+    await graph.reopenReviewComment(f.actor, f.comment.id);
+    await expect(f.completion.read(f.actor, f.input.workId, f.taskId)).rejects.toMatchObject({ code: "unresolved" });
+  });
+
+  it("denies a revoked editor on replay and rejects generic workspace evidence injection", async () => {
+    const f = await completionFixture(), editor = randomUUID(); users.push(editor);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [editor, "Completion editor"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'editor','active',$3,now())`, [f.input.workId, editor, randomUUID()]);
+    const input = await f.completionInput(); const done = await f.completion.complete(editor, f.input.workId, f.taskId, input);
+    await pool.query(`UPDATE creator_work_collaborator SET status='declined' WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, editor]);
+    await expect(f.completion.complete(editor, f.input.workId, f.taskId, input)).rejects.toMatchObject({ code: "forbidden" });
+    const workspace = await f.production.getWorkspace(f.actor, f.input.workId);
+    const { StudioProductionWorkspaceDocumentSchema } = await import("../creator/studio-production.dto");
+    expect(StudioProductionWorkspaceDocumentSchema.safeParse({ ...workspace.document, tasks: [{ ...workspace.document.tasks[0], reviewCompletion: done.evidence?.receipt }] }).success).toBe(false);
+  });
+
+  it("resolves against the actual newer capture submission, survives lost completion/replay and later graph heads", async () => {
+    const f = await resolutionFixture();
+    expect((await service.status(f.actor, f.nextIntent))).toMatchObject({ status: "completed", subject: f.replacement.subject });
+    expect((await service.cancel(f.actor, f.nextIntent))).toMatchObject({ status: "completed", subject: f.replacement.subject });
+    const result = await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve);
+    expect(result).toMatchObject({ status: "resolved", resolutionRevisionId: f.replacement.submissionId });
+    expect(Object.keys(result).sort()).toEqual(["id", "resolutionRevisionId", "resolvedBy", "status", "updatedAt"]);
+    const next = await service.prepare(f.actor, { ...f.input, intentId: randomUUID(), sourceServerRevision: 5,
+      sourceContentDigest: f.nextIntent.sourceContentDigest });
+    await completeCapture(f.actor, next);
+    expect(await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve)).toEqual(result);
+    await graph.reopenReviewComment(f.actor, f.comment.id);
+    expect(await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve)).toMatchObject({ status: "resolved" });
+  });
+
+  it("rejects same-artifact unrelated submissions, same snapshots and forged pins without changing the note", async () => {
+    const f = await resolutionFixture();
+    const references = [f.original.subject,
+      ...(["workId", "projectId", "artifactId", "reviewId", "revisionId", "rootGraphHash"] as const)
+        .map((field) => ({ ...f.replacement.subject, [field]: field === "rootGraphHash" ? "f".repeat(64) : randomUUID() }))];
+    for (const resolutionSourceRef of references) await expect(graph.resolveReviewComment(f.actor, f.comment.id,
+      { ...f.resolve, resolutionSourceRef })).rejects.toMatchObject({ causeCode: "review_resolution_source_mismatch" });
+    await expect(graph.resolveReviewComment(f.actor, f.comment.id, { ...f.resolve, resolutionRevisionId: f.original.submissionId }))
+      .rejects.toMatchObject({ causeCode: "review_resolution_source_mismatch" });
+    expect((await graph.getReview(f.actor, f.original.subject.reviewId)).comments[0]).toMatchObject({ status: "open", resolutionRevisionId: null });
+  });
+
+  it("requires a later saved source, not just a new capture or a later client date", async () => {
+    const f = await resolutionFixture(false);
+    await expect(graph.resolveReviewComment(f.actor, f.comment.id, f.resolve)).rejects.toMatchObject({ causeCode: "review_resolution_source_mismatch" });
+    // Legacy manual resolution remains a distinct compatible operation.
+    expect(await graph.resolveReviewComment(f.actor, f.comment.id, { status: "resolved", resolutionRevisionId: f.replacement.submissionId }))
+      .toMatchObject({ status: "resolved" });
+    await expect(graph.resolveReviewComment(f.actor, f.comment.id, f.resolve)).rejects.toMatchObject({ causeCode: "review_resolution_source_mismatch" });
+  });
+
+  it.each(["original", "replacement"] as const)("does not infer producer authority from graph operations without the %s completed receipt", async (side) => {
+    const f = await resolutionFixture();
+    // Only this fixture's receipt is removed; immutable graph rows and all database guards stay enabled.
+    await pool.query('DELETE FROM studio_mutation_receipt WHERE "resultRevisionId"=$1 AND response->>\'status\'=\'completed\'', [f[side].subject.revisionId]);
+    await expect(graph.resolveReviewComment(f.actor, f.comment.id, f.resolve)).rejects.toMatchObject({ causeCode: "review_resolution_source_mismatch" });
+    expect((await graph.getReview(f.actor, f.original.subject.reviewId)).comments[0]).toMatchObject({ status: "open", resolutionRevisionId: null });
+    expect(await graph.resolveReviewComment(f.actor, f.comment.id, { status: "resolved", resolutionRevisionId: f.replacement.submissionId }))
+      .toMatchObject({ status: "resolved" });
+  });
+
+  it.each(["approved", "rejected", "cancelled"] as const)("keeps %s review decisions and exact verified retry semantics", async (status) => {
+    const f = await resolutionFixture();
+    const untouched = await graph.createReviewComment(f.actor, f.original.subject.reviewId, { id: randomUUID(), body: "Another note",
+      severity: "note", assigneeIds: [], anchor: { kind: "artifact", artifactId: f.intent.artifactId,
+        revisionId: f.original.subject.revisionId, scope: { projectId: f.intent.projectId } } });
+    const result = await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve);
+    await graph.decideReview(f.actor, f.original.subject.reviewId, { status });
+    expect(await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve)).toEqual(result);
+    await expect(graph.resolveReviewComment(f.actor, f.comment.id, { ...f.resolve,
+      resolutionSourceRef: { ...f.resolve.resolutionSourceRef, rootGraphHash: "e".repeat(64) } }))
+      .rejects.toMatchObject({ causeCode: "review_resolution_source_mismatch" });
+    await expect(graph.resolveReviewComment(f.actor, untouched.id, f.resolve)).rejects.toMatchObject({ causeCode: "review_already_decided" });
+  });
+
+  it("allows another current editor to resolve captured work but denies a revoked editor even on exact replay", async () => {
+    const f = await resolutionFixture(), editor = randomUUID(); users.push(editor);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [editor, "Review resolver"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'editor','active',$3,now())`,
+      [f.input.workId, editor, randomUUID()]);
+    expect(await graph.resolveReviewComment(editor, f.comment.id, f.resolve)).toMatchObject({ resolvedBy: editor });
+    await pool.query(`UPDATE creator_work_collaborator SET role='viewer' WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, editor]);
+    await expect(graph.resolveReviewComment(editor, f.comment.id, f.resolve)).rejects.toMatchObject({ name: "StudioProjectForbiddenError" });
+  });
 
   it("keeps two identical transparent pages distinct through actual admission, snapshot commit and authenticated historical reading", async () => {
     const { actor, intent, doc } = await capture();

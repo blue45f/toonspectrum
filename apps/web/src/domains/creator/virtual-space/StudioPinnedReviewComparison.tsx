@@ -86,7 +86,7 @@ function ComparisonForActor({ actor, subject, title, onRevoked }: {
         {choices.truncated ? <p className="text-xs text-fg-3">{bt("최근 검수 기록 64개까지 표시합니다.", "Showing up to 64 recent review snapshots.")}</p> : null}
       </> : !busy ? <p role="status">{bt("검수 기록을 다시 확인해 주세요.", "Check the review history again.")}</p> : null}
       {!busy ? <button type="button" className={control} onClick={() => void discover()}>{bt("비교 목록 새로 확인", "Refresh comparison choices")}</button> : null}
-      {selected ? <ComparisonImages key={JSON.stringify([base, selected.subject])} base={base} title={title} choice={selected} onRevoked={onRevoked} /> : null}
+      {selected ? <StudioPinnedReviewComparisonImages key={JSON.stringify([base, selected.subject])} base={base} title={title} choice={selected} onRevoked={onRevoked} /> : null}
     </div> : null}
   </section>;
 }
@@ -98,7 +98,7 @@ function matchingPage(left: StudioVirtualSpaceReviewPreview, right: StudioVirtua
     && a.renderWidth === b.renderWidth && a.renderHeight === b.renderHeight;
 }
 
-function ComparisonImages({ base, title, choice, onRevoked }: {
+export function StudioPinnedReviewComparisonImages({ base, title, choice, onRevoked }: {
   readonly base: StudioVirtualSpaceReviewSubject; readonly title: string;
   readonly choice: StudioVirtualSpaceReviewChoice; readonly onRevoked: () => void;
 }) {

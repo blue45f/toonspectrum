@@ -1,5 +1,6 @@
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
+import { studioReviewTaskReferenceSchema, studioReviewTaskReferencesAreValid } from "@toonspectrum/studio-project-model";
 
 const OpaqueIdSchema = z
   .string()
@@ -79,6 +80,7 @@ export const ProductionTaskSchema = z.object({
   assigneeIds: IdentityListSchema,
   reviewerIds: IdentityListSchema,
   blockedReason: OptionalTextSchema,
+  reviewRef: studioReviewTaskReferenceSchema.optional(),
 }).strict().superRefine((task, context) => {
   if (task.dependencyIds.includes(task.id)) {
     context.addIssue({ code: "custom", path: ["dependencyIds"], message: "작업은 자신에게 의존할 수 없습니다." });
@@ -198,6 +200,11 @@ export const StudioProductionWorkspaceDocumentSchema = z.object({
   members: z.array(z.string().trim().min(1).max(240)).max(200),
   inviteToken: z.null(),
 }).strict().superRefine((workspace, context) => {
+  if (!studioReviewTaskReferencesAreValid(workspace.scopeKey, workspace.tasks, workspace.handoffs)
+    || workspace.versions.some((version) =>
+      !studioReviewTaskReferencesAreValid(workspace.scopeKey, version.tasks, version.handoffs))) {
+    context.addIssue({ code: "custom", path: ["tasks"], message: "제작 작업의 검수본 또는 인계 범위가 일치하지 않습니다." });
+  }
   const groups = [
     ["tasks", workspace.tasks],
     ["reviews", workspace.reviews],
