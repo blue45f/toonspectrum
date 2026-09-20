@@ -141,6 +141,9 @@ function safeStudioSearch(pathname: string, search: string): string {
     const preset = input.get("preset");
     if (preset && SAFE_STUDIO_PRESETS.has(preset)) output.set("preset", preset);
   } else {
+    // A recent manuscript link is an explicit request to restore its saved editor context.
+    // Use the fixed protocol token; never retain arbitrary query values or room authority.
+    if (/^\/studio\/p\/[^/]+\/d\/[^/]+$/u.test(pathname)) output.set("resume", "latest");
     const workspace = input.get("workspace");
     if (workspace && SAFE_STUDIO_DOCUMENT_WORKSPACES.has(workspace)) output.set("workspace", workspace);
     const focus = safeFocus(input.get("focus"));

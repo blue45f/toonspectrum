@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures/non-studio-test";
 
 const backup = { _app: "toonspectrum-library", version: 1, ratings: { "isolated-work": 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
 const reference = { id: 'kmas:["id","non-studio-control-fixture"]', title: "검증용 가상 작품", subtitle: "테스트 데이터", writer: "검증용 작가", illustrator: "검증용 작가", publisher: "검증용 출판사", platform: "", genre: "테스트", age: "전체연령", isbn: "", outline: "테스트용 줄거리" };
@@ -70,10 +70,20 @@ test("search supports mobile filters, saved-only and list controls during an out
   const field = page.locator("#search-explorer-query");
   await expect(field).toHaveValue("검증");
   await field.fill("두번째 검색");
+  // Let the real query navigation settle before checking modal focus restoration.
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe("두번째 검색");
   const toggle = page.getByRole("button", { name: "필터", exact: true });
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const filters = page.getByRole("dialog", { name: "필터", exact: true });
+  await expect(filters).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(filters).toBeHidden();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toBeFocused();
   await toggle.click();
+  await filters.getByRole("button", { name: /결과 보기$/u }).click();
+  await expect(filters).toBeHidden();
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   const saved = page.getByRole("button", { name: "내 찜만", exact: true });
   await saved.click(); await expect(saved).toHaveAttribute("aria-pressed", "true");

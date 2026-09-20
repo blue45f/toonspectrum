@@ -916,7 +916,7 @@ import {
   useStudioWorkspacePanelOpenOverrides,
 } from "./studio-page-workspace-persistence";
 import { createPalette } from "./studio-palette-library";
-import { studioExactResumeRequested } from "./studio-exact-resume-context";
+import { studioExactResumeRequested, studioExactResumeSourceReady } from "./studio-exact-resume-context";
 import { useStudioExactResumeContext } from "./useStudioExactResumeContext";
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
@@ -7218,7 +7218,7 @@ export function StudioCuttoonEditor({
     language: params.get("language") ?? studioSaveLocale,
     sourceVersion: params.get("version"),
     resumeRequested: studioExactResumeRequested(location.search),
-    hydrated: workHydrated,
+    hydrated: studioExactResumeSourceReady({ sourceHydrated: workHydrated, sourceHydrationPending, remoteSource: Boolean(workId || remixId), autosaveChecked, hasAutosave, localDocumentLocked: collaborationDocumentLocked }),
     pages,
     currentPageId,
     setCurrentPageId,
