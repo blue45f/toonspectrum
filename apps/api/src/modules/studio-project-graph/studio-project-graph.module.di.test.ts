@@ -31,6 +31,9 @@ it("compiles the actual graph and Creator modules and resolves preview producer,
   const { StudioReviewPreviewProducerRepository } = await import("./studio-review-preview-producer.repository");
   const { StudioReviewPreviewProducerController } = await import("./studio-review-preview-producer.controller");
   const { StudioReviewPreviewService } = await import("./studio-review-preview.service");
+  const { StudioWorldPublicationRepository } = await import("./studio-world-publication.repository");
+  const { StudioWorldPublicationService } = await import("./studio-world-publication.service");
+  const { StudioWorldPublicationController } = await import("./studio-world-publication.controller");
   // create() instantiates the actual Nest module graph; init()/listen() would also
   // start unrelated Creator lifecycle schedulers and is deliberately not called.
   application = await NestFactory.create(StudioProjectGraphModule, { logger: false, abortOnError: false });
@@ -44,4 +47,7 @@ it("compiles the actual graph and Creator modules and resolves preview producer,
   expect(application.get(StudioWorkAssetUploadGuard)).toBeInstanceOf(StudioWorkAssetUploadGuard);
   expect(application.get(StudioReviewPreviewProducerController)).toBeInstanceOf(StudioReviewPreviewProducerController);
   expect(application.get(StudioReviewPreviewService)).toBeInstanceOf(StudioReviewPreviewService);
+  const world = application.get(StudioWorldPublicationService) as unknown as Record<string, unknown>;
+  expect(world.repository).toBe(application.get(StudioWorldPublicationRepository));
+  expect(application.get(StudioWorldPublicationController)).toBeInstanceOf(StudioWorldPublicationController);
 });

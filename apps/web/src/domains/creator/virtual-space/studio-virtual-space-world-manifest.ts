@@ -1,3 +1,4 @@
+import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model";
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
@@ -419,7 +420,8 @@ export function isSafeStudioAssetUrl(value: string): boolean {
 }
 
 export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldManifest): readonly string[] {
-  const errors: string[] = [];
+  const structure = studioWorldManifestSchema.safeParse(manifest);
+  const errors: string[] = structure.success ? [] : structure.error.issues.map((issue) => issue.message);
   const actorRadius = 9;
   const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
   const inBounds = (point: StudioVirtualSpacePoint | null | undefined) => Boolean(

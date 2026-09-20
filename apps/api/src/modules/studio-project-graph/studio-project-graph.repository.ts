@@ -4,6 +4,7 @@ import { Injectable } from "@nestjs/common";
 
 import {
   canonicalJson,
+  STUDIO_WORLD_ARTIFACT_PREFIX,
   reviewAnchorSchema,
   scopeContains,
   scopeRefSchema,
@@ -490,6 +491,13 @@ function mapStudioReviewComment(
   });
 }
 
+/** Server-owned world assets must not be written through generic graph commands or restore. */
+function assertGenericWorldArtifact(artifactId: string): void {
+  if (artifactId.startsWith(STUDIO_WORLD_ARTIFACT_PREFIX)) {
+    throw new StudioRepositoryInvariantError("world_publication_endpoint_required", "World publication requires its dedicated authority endpoint");
+  }
+}
+
 @Injectable()
 export class StudioProjectGraphRepository {
   async createProject(
@@ -497,6 +505,7 @@ export class StudioProjectGraphRepository {
     input: CreateStudioProjectGraph,
     idempotencyKey: string,
   ): Promise<StudioProjectCreateResponse> {
+    assertGenericWorldArtifact(input.artifact.id);
     const client = await dbPool.connect();
     const keyHash = studioIdempotencyKeyHash(idempotencyKey);
     const requestHash = studioRequestHash(input);
@@ -633,6 +642,7 @@ export class StudioProjectGraphRepository {
     input: CreateStudioArtifact,
     idempotencyKey: string,
   ): Promise<StudioProjectCreateResponse> {
+    assertGenericWorldArtifact(input.artifact.id);
     const client = await dbPool.connect();
     const keyHash = studioIdempotencyKeyHash(idempotencyKey);
     const requestHash = studioRequestHash({ projectId, input });
@@ -978,6 +988,7 @@ export class StudioProjectGraphRepository {
     idempotencyKey: string,
     input: CommitStudioRevision,
   ): Promise<StudioRevisionCommitResponse> {
+    assertGenericWorldArtifact(artifactId);
     const client = await dbPool.connect();
     const keyHash = studioIdempotencyKeyHash(idempotencyKey);
     const requestHash = studioRequestHash({
@@ -1229,6 +1240,7 @@ export class StudioProjectGraphRepository {
     idempotencyKey: string,
     input: RestoreStudioRevision,
   ): Promise<StudioRevisionCommitResponse> {
+    assertGenericWorldArtifact(artifactId);
     const client = await dbPool.connect();
     const keyHash = studioIdempotencyKeyHash(idempotencyKey);
     const requestHash = studioRequestHash({

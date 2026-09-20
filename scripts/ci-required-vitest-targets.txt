@@ -242,6 +242,7 @@ packages/core/src/server/home.cpu-cache.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts
 packages/studio-project-model/src/__tests__/review-task-reference.test.ts
 packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts
+packages/studio-project-model/src/__tests__/world-publication.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs
