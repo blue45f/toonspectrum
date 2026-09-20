@@ -14,6 +14,7 @@ import {
   type StudioLiveTransportControlEvent,
   type StudioLiveTransportFactory,
 } from "./studio-live-collaboration-transport";
+import { STUDIO_LIVE_LOCK_PROTOCOL_VERSION } from "./studio-live-collaboration-protocol";
 import {
   createStudioLiveUnsupportedJamTransport,
   isStudioLiveInstantJamTransportContext,
@@ -243,6 +244,10 @@ export class StudioLiveSocketTransport implements StudioLiveTransport {
       this.selectedCrdtWireFormat !== null &&
       this.socket.connected
     );
+  }
+
+  get authoritativeLockCapability(): "fenced-v2" | null {
+    return this.ready && this.lockProtocolVersion >= STUDIO_LIVE_LOCK_PROTOCOL_VERSION ? "fenced-v2" : null;
   }
 
   /**

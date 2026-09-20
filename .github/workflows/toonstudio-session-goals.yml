@@ -50,6 +50,7 @@ jobs:
             !/artifacts/
             !/docs/
             !/tests/benchmarks/results/
+            /tests/benchmarks/results/v12-runtime-fault-matrix.json
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6

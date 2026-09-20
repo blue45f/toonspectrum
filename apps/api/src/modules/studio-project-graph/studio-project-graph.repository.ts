@@ -14,6 +14,9 @@ import {
   type CompatibilityReport,
 } from "@toonspectrum/studio-format-gateway";
 import type { PoolClient } from "pg";
+import { STUDIO_REVIEW_PREVIEW_PAGE_SIZE, type StudioReviewPreviewBlobRow,
+  type StudioReviewPreviewSource, type StudioReviewPreviewSubject } from "./studio-review-preview";
+import { lockStudioReviewPreviewStorage } from "./studio-review-preview-storage";
 
 import { dbPool } from "../../db";
 import {
@@ -198,7 +201,7 @@ function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-function projectAccess(
+export function projectAccess(
   actorUserId: string,
   row: ProjectAccessRow,
 ): StudioProjectAccess {
@@ -225,7 +228,7 @@ function projectAccess(
   return Object.freeze({ ...resolved, owner, role });
 }
 
-function assertAccess(
+export function assertAccess(
   access: StudioProjectAccess,
   operation: "view" | "comment" | "edit" | "manage",
 ): void {
@@ -264,7 +267,7 @@ async function loadProjectAccess(
   return row ? { row, access: projectAccess(actorUserId, row) } : null;
 }
 
-async function loadArtifactAccess(
+export async function loadArtifactAccess(
   client: PoolClient,
   actorUserId: string,
   artifactId: string,
@@ -325,7 +328,12 @@ export function studioUnreadyBlobHashes(
 async function verifyBlobRefsReady(
   client: PoolClient,
   blobRefs: readonly { readonly sha256: string; readonly role: string }[],
+  workId: string,
 ): Promise<void> {
+  for (const hash of [...new Set(blobRefs.filter((blob) => blob.role === "preview").map((blob) => blob.sha256))].sort()) {
+    try { await lockStudioReviewPreviewStorage(client, workId, hash); }
+    catch { throw new StudioBlobNotReadyError([hash]); }
+  }
   const hashes = [...new Set(blobRefs.map((blob) => blob.sha256))];
   if (hashes.length === 0) return;
   const result = await client.query<StudioBlobReadinessRow>(
@@ -531,7 +539,7 @@ export class StudioProjectGraphRepository {
       const work = workResult.rows[0];
       if (!work) throw new StudioProjectNotFoundError("work");
       assertAccess(projectAccess(actorUserId, work), "manage");
-      await verifyBlobRefsReady(client, input.initialRevision.blobRefs);
+      await verifyBlobRefsReady(client, input.initialRevision.blobRefs, input.workId);
 
       await client.query(
         `INSERT INTO studio_project_graph (
@@ -661,7 +669,7 @@ export class StudioProjectGraphRepository {
         return { ...receipt.rows[0].response, replayed: true };
       }
 
-      await verifyBlobRefsReady(client, input.initialRevision.blobRefs);
+      await verifyBlobRefsReady(client, input.initialRevision.blobRefs, accessResult.row.workId);
       await client.query(
         `INSERT INTO studio_artifact (
            id, "projectId", kind, title, scope, "headRevisionId",
@@ -1047,7 +1055,7 @@ export class StudioProjectGraphRepository {
         }
       }
 
-      await verifyBlobRefsReady(client, input.blobRefs);
+      await verifyBlobRefsReady(client, input.blobRefs, accessResult.row.workId);
       if (input.compatibilityReportId) {
         const report = await client.query<{
           projectId: string;
@@ -1543,6 +1551,75 @@ export class StudioProjectGraphRepository {
     }
   }
 
+  /** Reads only preview refs of the exact immutable review revision under current work access. */
+  async getReviewPreviewSource(
+    actorUserId: string,
+    subject: StudioReviewPreviewSubject,
+    cursor: string | null,
+  ): Promise<StudioReviewPreviewSource> {
+    const client = await dbPool.connect();
+    try {
+      const accessResult = await loadArtifactAccess(client, actorUserId, subject.artifactId);
+      if (!accessResult) throw new StudioProjectNotFoundError("artifact");
+      assertAccess(accessResult.access, "view");
+      const binding = await client.query<{
+        projectId: string; workId: string; artifactId: string; revisionId: string;
+        rootGraphHash: string; kind: string; status: string;
+      }>(
+        `SELECT artifact."projectId" AS "projectId", project."workId" AS "workId",
+                review."artifactId" AS "artifactId", review."revisionId" AS "revisionId",
+                revision."rootGraphHash" AS "rootGraphHash", revision.kind, review.status
+         FROM studio_review review
+         JOIN studio_revision revision ON revision.id = review."revisionId"
+           AND revision."artifactId" = review."artifactId"
+         JOIN studio_artifact artifact ON artifact.id = review."artifactId"
+         JOIN studio_project_graph project ON project.id = artifact."projectId"
+         WHERE review.id = $1 AND review."artifactId" = $2`,
+        [subject.reviewId, subject.artifactId],
+      );
+      const row = binding.rows[0];
+      if (!row) throw new StudioProjectNotFoundError("review");
+      if (row.projectId !== subject.projectId || row.workId !== subject.workId
+        || row.artifactId !== subject.artifactId || row.revisionId !== subject.revisionId
+        || row.rootGraphHash !== subject.rootGraphHash || row.kind !== "review-snapshot") {
+        throw new StudioRepositoryInvariantError("review_preview_version_mismatch", "Pinned review identity changed");
+      }
+      // Decisions close invitation/approval actions, not access to this immutable historical
+      // snapshot. Current work ACL above remains the visibility authority for every status.
+      const [afterOrdinal, afterHash] = cursor?.split(".") ?? ["-1", ""];
+      const blobs = await client.query<StudioReviewPreviewBlobRow>(
+        `SELECT blob.hash, ref.ordinal, blob.size, blob."mediaType" AS "mediaType",
+                blob."objectKey" AS "objectKey", blob."encryptionMetadata" AS "encryptionMetadata",
+                blob."malwareStatus" AS "malwareStatus", blob."formatStatus" AS "formatStatus",
+                owned.identity AS "workStorageObject"
+         FROM studio_revision_blob ref
+         JOIN studio_blob blob ON blob.hash = ref."blobHash"
+         LEFT JOIN LATERAL (
+           SELECT jsonb_build_object(
+             'contractVersion', object."contractVersion", 'providerId', object."providerId",
+             'purpose', object.purpose, 'digest', object.digest, 'objectPath', object."objectPath",
+             'byteLength', object."byteLength", 'contentType', object."contentType"
+           ) AS identity
+           FROM creator_work_asset_storage_reference ownership
+           JOIN creator_asset_storage_object object ON object.purpose = ownership.purpose
+             AND object.digest = ownership."objectDigest"
+           WHERE ownership."workId" = $5 AND ownership.purpose = 'derived'
+             AND ownership."objectDigest" = 'sha256:' || blob.hash
+             AND ownership.state = 'active' AND object.state = 'active'
+           LIMIT 1
+         ) owned ON true
+         WHERE ref."revisionId" = $1 AND ref.role = 'preview'
+           AND (ref.ordinal, blob.hash) > ($2::integer, $3::text)
+         ORDER BY ref.ordinal, blob.hash LIMIT $4`,
+        [subject.revisionId, Number(afterOrdinal), afterHash, STUDIO_REVIEW_PREVIEW_PAGE_SIZE + 1, subject.workId],
+      );
+      const page = blobs.rows.slice(0, STUDIO_REVIEW_PREVIEW_PAGE_SIZE);
+      const last = page[page.length - 1];
+      return { subject: { ...subject }, blobs: page,
+        nextCursor: blobs.rows.length > STUDIO_REVIEW_PREVIEW_PAGE_SIZE && last ? `${last.ordinal}.${last.hash}` : null };
+    } finally { client.release(); }
+  }
+
   async createReview(
     actorUserId: string,
     artifactId: string,
@@ -1681,8 +1758,9 @@ export class StudioProjectGraphRepository {
       const reviewResult = await client.query<{
         artifactId: string;
         revisionId: string;
+        status: StudioReviewSummaryRecord["status"];
       }>(
-        `SELECT "artifactId", "revisionId"
+        `SELECT "artifactId", "revisionId", status
          FROM studio_review WHERE id = $1 FOR UPDATE`,
         [reviewId],
       );
@@ -1738,6 +1816,12 @@ export class StudioProjectGraphRepository {
           anchor: current.anchor,
           createdAt: toIso(current.createdAt),
         };
+      }
+      if (!["open", "changes-requested"].includes(review.status)) {
+        throw new StudioRepositoryInvariantError(
+          "review_already_decided",
+          "new comments cannot change a terminal review",
+        );
       }
       if (input.assigneeIds.length > 0) {
         const assigneeAccess = await client.query<{ id: string }>(
@@ -1941,6 +2025,16 @@ export class StudioProjectGraphRepository {
     const client = await dbPool.connect();
     try {
       await client.query("BEGIN");
+      // Every comment mutation takes the review lock first, matching decisions and creation.
+      // Otherwise reopening a required note can race approval and alter decided history.
+      const reviewResult = await client.query<{ status: StudioReviewSummaryRecord["status"] }>(
+        `SELECT review.status FROM studio_review review
+         JOIN studio_review_comment comment ON comment."reviewId" = review.id
+         WHERE comment.id = $1 FOR UPDATE OF review`,
+        [commentId],
+      );
+      const review = reviewResult.rows[0];
+      if (!review) throw new StudioProjectNotFoundError("comment");
       const commentResult = await client.query<{
         id: string;
         artifactId: string;
@@ -1983,6 +2077,12 @@ export class StudioProjectGraphRepository {
           resolvedBy: comment.resolvedBy,
           updatedAt: toIso(comment.updatedAt),
         };
+      }
+      if (!["open", "changes-requested"].includes(review.status)) {
+        throw new StudioRepositoryInvariantError(
+          "review_already_decided",
+          "comment resolutions cannot change a terminal review",
+        );
       }
       if (["resolved", "dismissed"].includes(comment.status)) {
         throw new StudioRepositoryInvariantError(
@@ -2052,6 +2152,14 @@ export class StudioProjectGraphRepository {
     const client = await dbPool.connect();
     try {
       await client.query("BEGIN");
+      const reviewResult = await client.query<{ status: StudioReviewSummaryRecord["status"] }>(
+        `SELECT review.status FROM studio_review review
+         JOIN studio_review_comment comment ON comment."reviewId" = review.id
+         WHERE comment.id = $1 FOR UPDATE OF review`,
+        [commentId],
+      );
+      const review = reviewResult.rows[0];
+      if (!review) throw new StudioProjectNotFoundError("comment");
       const commentResult = await client.query<{
         id: string;
         artifactId: string;
@@ -2086,6 +2194,12 @@ export class StudioProjectGraphRepository {
           resolvedBy: null,
           updatedAt: toIso(comment.updatedAt),
         };
+      }
+      if (!["open", "changes-requested"].includes(review.status)) {
+        throw new StudioRepositoryInvariantError(
+          "review_already_decided",
+          "reopening comments cannot change a terminal review",
+        );
       }
       const updated = await client.query<{ updatedAt: Date }>(
         `UPDATE studio_review_comment

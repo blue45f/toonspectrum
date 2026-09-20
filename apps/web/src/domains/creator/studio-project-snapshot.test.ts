@@ -126,6 +126,23 @@ it("marks V4 strokes in raw autosave snapshots without upgrading historical stro
 });
 
 describe("resolveStudioDurableProjectPages", () => {
+  it("projects only receipted pending ink and retains the original batch for a later receipt", () => {
+    const pages = [{ id: "page-1", elements: [{ id: "saved" }] }];
+    const pending = { pageId: "page-1", strokes: [{ id: "cpu" }, { id: "gpu-waiting" }, { id: "gpu-ready" }] };
+    const receipts = new Set(["gpu-ready"]);
+    const input = { pagesHistory: [pages], historyIndex: 0, fallbackPages: [], pendingStrokeCommits: pending,
+      isPendingStrokeDurable: (stroke: { id: string }) => !stroke.id.startsWith("gpu-") || receipts.has(stroke.id) };
+    expect(resolveStudioDurableProjectPages(input).pagesList[0]?.elements.map((stroke) => stroke.id))
+      .toEqual(["saved", "cpu", "gpu-ready"]);
+    expect(pending.strokes).toHaveLength(3);
+    receipts.add("gpu-waiting");
+    expect(resolveStudioDurableProjectPages(input).pagesList[0]?.elements.map((stroke) => stroke.id))
+      .toEqual(["saved", "cpu", "gpu-waiting", "gpu-ready"]);
+    const withheld = resolveStudioDurableProjectPages({ ...input, isPendingStrokeDurable: () => false });
+    expect(withheld.status).toBe("no-pending");
+    expect(withheld.pagesList).toBe(pages);
+  });
+
   it("uses ref-backed history over a stale render and overlays the deferred stroke once", () => {
     const staleRender = [{ id: "page-1", elements: [{ id: "render-old" }] }];
     const authoritative = [{ id: "page-1", elements: [{ id: "history-new" }] }];

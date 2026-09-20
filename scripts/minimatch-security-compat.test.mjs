@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { realpathSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -10,7 +11,8 @@ const eslintConfigPath = join(
   "eslint-config",
   "package.json",
 );
-const eslintConfigRequire = createRequire(eslintConfigPath);
+// Resolve from the actual pnpm consumer so the transitive security path is tested.
+const eslintConfigRequire = createRequire(realpathSync(eslintConfigPath));
 const jsxA11yPath = eslintConfigRequire.resolve("eslint-plugin-jsx-a11y");
 const jsxA11yRequire = createRequire(jsxA11yPath);
 const minimatchPath = jsxA11yRequire.resolve("minimatch");

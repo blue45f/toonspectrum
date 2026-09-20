@@ -26,6 +26,7 @@ import {
 
 import { findFreePort, spawnVitePreview, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
+import type { StudioRailToolId } from "../apps/web/src/domains/creator/studio-app-settings";
 import type { StudioMainMenuCompositeGroupId } from "../apps/web/src/domains/creator/studio-main-menu-presentation";
 import type { ChildProcess } from "node:child_process";
 
@@ -372,26 +373,40 @@ function presentedTitleFor(catalogueGroupId: string): string {
   return group?.caption ?? catalogueGroupId;
 }
 
-/** Left vertical rail — the nine-tool first-run default must remain after more tools are appended. */
+/** Pin the shipped first-run contract independently of the settings implementation. */
+export const FIRST_RUN_RAIL_TOOL_IDS = [
+  "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
+] as const satisfies readonly StudioRailToolId[];
+
+/** Every first-run tool and the specialized tools added below must remain reachable. */
 const PERSISTENT_RAIL_TOOLS = [
   "선택 (V)",
   "펜 (B)",
   "지우개 (E)",
   // Fill: when no raster is selected the aria-label becomes the guard reason (still exposed).
   { anyOf: ["색 채우기 (G)", "래스터 이미지 레이어를 먼저 선택하세요."] },
+  "사각 선택 (M)",
+  "스마트 도형",
   "색 가져오기 (I / Alt+클릭)",
   "텍스트",
   "말풍선",
   "이미지 추가",
 ] as const;
 
-/** Optional tools must coexist after the hard nine-tool ceiling is removed. */
-const OPTIONAL_RAIL_TOOLS = [
-  ["smart-shape", "스마트 도형"],
-  ["shape-rect", "사각형 도형"],
-  ["shape-ellipse", "타원 도형"],
-  ["reference", "참고 이미지"],
-] as const;
+/** More uses catalogue names; the exposed rail also preserves its shortcut suffix. */
+export const OPTIONAL_RAIL_TOOLS = [
+  { id: "eyedropper", moreLabel: "색 가져오기", railLabel: "색 가져오기 (I / Alt+클릭)" },
+  { id: "bubble", moreLabel: "말풍선", railLabel: "말풍선" },
+  { id: "smart-shape", moreLabel: "스마트 도형", railLabel: "스마트 도형" },
+  { id: "shape-rect", moreLabel: "사각형 도형", railLabel: "사각형 도형" },
+  { id: "shape-ellipse", moreLabel: "타원 도형", railLabel: "타원 도형" },
+  { id: "reference", moreLabel: "참고 이미지", railLabel: "참고 이미지" },
+] as const satisfies readonly { id: StudioRailToolId; moreLabel: string; railLabel: string }[];
+
+export const DESKTOP_FLOATING_LAYOUT_DIALOG = {
+  name: "보기 · 플로팅 UI",
+  closeLabel: "보기 · 플로팅 UI 닫기",
+} as const;
 
 /**
  * Open via main menu → assert popover chrome appears.
@@ -861,41 +876,54 @@ async function assertRailTools(page: Page): Promise<string[]> {
   const rail = page.locator('[data-studio-tool-rail="true"]');
   const failures: string[] = [];
 
-  // The rail starts with nine tools, but every additional choice must remain mounted and
-  // vertically reachable instead of replacing the previous custom slot.
-  for (const [id, label] of OPTIONAL_RAIL_TOOLS) {
+  const initialIds = await rail.locator("[data-studio-rail-tool-id]")
+    .evaluateAll((tools) => tools.map((tool) => tool.getAttribute("data-studio-rail-tool-id")));
+  if (initialIds.length !== FIRST_RUN_RAIL_TOOL_IDS.length
+    || FIRST_RUN_RAIL_TOOL_IDS.some((id) => !initialIds.includes(id))) {
+    failures.push(`좌측 레일 기본 도구 불일치: 기대 ${FIRST_RUN_RAIL_TOOL_IDS.join(", ")} / 실제 ${initialIds.join(", ")}`);
+  }
+
+  // Add through the actual More picker and retain every previous choice, including defaults.
+  const expectedIds = new Set<string>(FIRST_RUN_RAIL_TOOL_IDS);
+  for (const { id, moreLabel, railLabel } of OPTIONAL_RAIL_TOOLS) {
     const tool = rail.locator(`[data-studio-rail-tool-id="${id}"]`);
     try {
       if (!(await tool.isVisible().catch(() => false))) {
         await page.getByRole("button", { name: "더보기 · 툴바 설정", exact: true }).click();
         const hiddenTools = page.getByRole("dialog", { name: "추가 도구", exact: true });
-        await hiddenTools.getByRole("button", { name: label, exact: true }).click();
+        await hiddenTools.getByRole("button", { name: moreLabel, exact: true }).click();
         await hiddenTools.waitFor({ state: "hidden", timeout: 5_000 });
         await tool.waitFor({ state: "visible", timeout: 5_000 });
       }
       const exposedLabel = await tool.getAttribute("aria-label");
-      if (exposedLabel !== label) {
-        failures.push(`좌측 레일 추가 도구 라벨 불일치: ${label} / 실제: ${exposedLabel ?? "없음"}`);
+      if (exposedLabel !== railLabel) {
+        failures.push(`좌측 레일 추가 도구 라벨 불일치: ${railLabel} / 실제: ${exposedLabel ?? "없음"}`);
       }
     } catch (error) {
       failures.push(
-        `좌측 레일 추가 도구 활성화 실패: ${label} (${error instanceof Error ? error.message : String(error)})`,
+        `좌측 레일 추가 도구 활성화 실패: ${railLabel} (${error instanceof Error ? error.message : String(error)})`,
       );
       await page.keyboard.press("Escape").catch(() => undefined);
     }
+    expectedIds.add(id);
+    for (const retainedId of expectedIds) {
+      if (!(await rail.locator(`[data-studio-rail-tool-id="${retainedId}"]`).isVisible().catch(() => false))) {
+        failures.push(`좌측 레일 도구가 ${moreLabel} 추가 뒤 사라짐: ${retainedId}`);
+      }
+    }
   }
 
-  const expectedToolCount = 9 + OPTIONAL_RAIL_TOOLS.length;
+  const expectedToolCount = expectedIds.size;
   const actualToolCount = await rail.locator("[data-studio-rail-tool-id]").count();
   if (actualToolCount < expectedToolCount) {
     failures.push(`좌측 레일 도구 누적 실패: 기대 최소 ${expectedToolCount} / 실제 ${actualToolCount}`);
   }
-  for (const [id, label] of OPTIONAL_RAIL_TOOLS) {
+  for (const { id, railLabel } of OPTIONAL_RAIL_TOOLS) {
     const retained = await rail
       .locator(`[data-studio-rail-tool-id="${id}"]`)
       .isVisible()
       .catch(() => false);
-    if (!retained) failures.push(`좌측 레일 추가 도구가 다음 선택 뒤 사라짐: ${label}`);
+    if (!retained) failures.push(`좌측 레일 추가 도구가 다음 선택 뒤 사라짐: ${railLabel}`);
   }
 
   for (const entry of PERSISTENT_RAIL_TOOLS) {
@@ -1126,7 +1154,7 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
     const launcher = page.locator('[data-studio-shell-view-options="true"] > button');
     await launcher.waitFor({ state: "visible", timeout: 5000 });
     await launcher.click();
-    const dialog = page.getByRole("dialog", { name: "보기 및 플로팅 UI 설정" });
+    const dialog = page.getByRole("dialog", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.name, exact: true });
     await dialog.waitFor({ state: "visible", timeout: 5000 });
 
     const drawingOptions = page.locator('[data-studio-draw-options-dock="true"]');
@@ -1200,13 +1228,15 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
     }
 
     const strokeFocusSwitch = dialog.getByRole("switch", {
-      name: "드로잉 중 자동 집중 끄기",
+      name: /펜으로 그리는 동안 자동 숨김/u,
     });
-    if (!(await strokeFocusSwitch.isVisible().catch(() => false))) {
-      failures.push("드로잉 중 자동 집중 설정 미노출");
+    if (!(await strokeFocusSwitch.isVisible().catch(() => false))
+      || await strokeFocusSwitch.getAttribute("aria-checked") !== "true") {
+      failures.push("드로잉 자동 숨김 설정 미노출 또는 활성 상태 미유지");
     }
 
-    await dialog.getByRole("button", { name: "보기 설정 닫기" }).click();
+    await dialog.getByRole("button", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.closeLabel, exact: true }).click();
+    await dialog.waitFor({ state: "hidden", timeout: 3000 });
     const viewport = await page.locator('[data-studio-canvas-viewport="true"]').first().boundingBox();
     if (!viewport) {
       failures.push("자동 집중 검증용 캔버스를 찾지 못함");
@@ -1235,7 +1265,16 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
         ) {
           failures.push(`획 입력 중 플로팅 UI가 남음: ${JSON.stringify(drawingState)}`);
         }
-        if (await launcher.isVisible()) failures.push("획 입력 중 보기 런처가 남음");
+        // Playwright considers opacity:0 visible. The launcher deliberately fades
+        // while inert/aria-hidden remove it from pointer, keyboard and AT access.
+        await page.waitForFunction(() => {
+          const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
+          if (!root) return false;
+          const style = getComputedStyle(root);
+          return root.dataset.studioShellDrawingAutoHideActive === "true"
+            && root.inert && root.getAttribute("aria-hidden") === "true"
+            && style.opacity === "0" && style.pointerEvents === "none";
+        }, undefined, { timeout: 3000 });
       } finally {
         await page.mouse.up();
       }
@@ -1248,6 +1287,13 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
       );
       await drawingOptions.waitFor({ state: "visible", timeout: 3_000 });
       await launcher.waitFor({ state: "visible", timeout: 3_000 });
+      await page.waitForFunction(() => {
+        const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
+        if (!root) return false;
+        const style = getComputedStyle(root);
+        return !root.inert && root.getAttribute("aria-hidden") !== "true"
+          && style.opacity === "1" && style.pointerEvents === "auto";
+      }, undefined, { timeout: 3000 });
     }
 
     if (failures.length === 0) log("  floating visibility + WYSIWYG layout + stroke focus ok");

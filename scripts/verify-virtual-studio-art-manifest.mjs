@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -920,6 +921,7 @@ export async function verifyVirtualStudioArtManifest({
     "art generator SHA-256 does not match the manifest",
   );
   const livingWorld = await verifyVirtualStudioLivingWorldArtManifest({ productionArtDirectory: artDirectory });
+  const drawnArt = await verifyVirtualStudioDrawnArt();
   const atlasQuality = REQUIRED_SKINS.flatMap((skin) => (
     REQUIRED_DIRECTIONS.map((direction) => (
       result.manifest.skins[skin].directions[direction]
@@ -933,6 +935,7 @@ export async function verifyVirtualStudioArtManifest({
   return Object.freeze({
     ...result,
     livingWorld,
+    drawnArt,
     outputIntegrityVerified: true,
     privateApprovedMasterSourceReverified,
     backgroundProvenanceMode: result.manifest.background.provenanceMode,
@@ -952,11 +955,12 @@ async function main() {
     ? "The private approved master source was reverified in this build."
     : "The private approved master source was not reverified in this build.";
   console.log(
-    `Virtual Studio art integrity OK: ${result.assetCount} preserved production assets + ${result.livingWorld.assetCount} living-world clean plate, ${result.totalBytes + result.livingWorld.totalBytes} bytes; `
+    `Virtual Studio art integrity OK: ${result.assetCount} preserved production assets + ${result.livingWorld.assetCount} living-world clean plate + ${result.drawnArt.assetCount} drawn character sheets, ${result.totalBytes + result.livingWorld.totalBytes + result.drawnArt.totalBytes} bytes; `
       + "output SHA-256, byte lengths, and dimensions match art-manifest.json; "
       + `minimum decoded pairwise difference is ${result.minimumPairwiseVisibleDifferencePixels} pixels. `
       + "Living-world output/reference integrity, static lossless VP8L and runtime bindings verified. "
-      + "Generated PNG pixel identity is a recorded preparation check. "
+      + "Drawn character RGBA frame pixels, alpha bounds, source references and registry bindings verified. "
+      + "Clean-plate generated PNG pixel identity is a recorded preparation check. "
       + sourceVerification,
   );
 }

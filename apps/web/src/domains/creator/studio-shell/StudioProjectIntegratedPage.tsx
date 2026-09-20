@@ -1,5 +1,5 @@
 import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
@@ -21,6 +21,7 @@ import { StudioProductionCocreatorBridgePanel } from "./StudioProductionCocreato
 import { StudioStaffingSourcingPanel } from "./StudioStaffingSourcingPanel";
 import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";
 import { StudioReviewPanel } from "./StudioReviewPanel";
+import { studioVirtualSpaceReviewSubjectFromLocation } from "../virtual-space/studio-virtual-space-review-invitation";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
 import {
@@ -47,6 +48,11 @@ const StudioProjectGraphContextBar = lazy(async () => {
 const StudioProjectVersionStackPanel = lazy(async () => {
   const module = await import("../project-graph/StudioProjectVersionStackPanel");
   return { default: module.StudioProjectVersionStackPanel };
+});
+
+const StudioPinnedReviewPanel = lazy(async () => {
+  const module = await import("../virtual-space/StudioPinnedReviewPanel");
+  return { default: module.StudioPinnedReviewPanel };
 });
 
 function ProjectGraphPanelFallback({ locale: _locale }: { readonly locale: "ko" | "en" }) {
@@ -84,7 +90,14 @@ function SectionWorkflow({
   readonly locale: "ko" | "en";
 }) {
   useBilingualI18nRevision();
+  const location = useLocation();
+  const pinnedSubject = useMemo(() => studioVirtualSpaceReviewSubjectFromLocation(projectId, location.search), [projectId, location.search]);
+  const hasReviewPin = new URLSearchParams(location.search).has("sharedReview");
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
+
+  if (section === "review" && hasReviewPin) return <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
+    <StudioPinnedReviewPanel subject={pinnedSubject} />
+  </Suspense>;
 
   return (
     <>

@@ -80,6 +80,8 @@ function navigationHarness(initialHash = "#creator-film") {
   let serial = 0;
   let subscription: (() => void) | undefined;
   let unsubscribed = 0;
+  let blocked = false;
+  let unblocked: (() => void) | undefined;
   const frames = new Map<number, () => void>();
   const cancelled: number[] = [];
   const calls: unknown[][] = [];
@@ -96,11 +98,17 @@ function navigationHarness(initialHash = "#creator-film") {
       subscription = callback;
       return () => { unsubscribed += 1; subscription = undefined; };
     },
+    isBlocked: () => blocked,
+    subscribeUnblocked: (callback) => {
+      unblocked = callback;
+      return () => { unblocked = undefined; };
+    },
   };
   return {
     host, calls, frames, cancelled,
     get unsubscribed() { return unsubscribed; },
     change(value: string, notify = true) { hash = value; if (notify) subscription?.(); },
+    block(value: boolean) { blocked = value; unblocked?.(); },
     flush(id: number) { const callback = frames.get(id); frames.delete(id); callback?.(); },
   };
 }
@@ -115,6 +123,60 @@ test("lazy initial fragment lands after mount with instant scrolling and readabl
     ["focus", "creator-process-title", { preventScroll: true }],
   ]);
   dispose();
+});
+
+test("an initial fragment waits for a blocking modal without taking its focus", () => {
+  const h = navigationHarness();
+  h.block(true);
+  const dispose = bindCreatorSectionNavigation(h.host);
+  h.flush(1);
+  assert.deepEqual(h.calls, []);
+  h.block(false); h.flush(2);
+  assert.equal(h.calls[1][1], "creator-process-title");
+  dispose();
+});
+
+test("modal dismissal only resumes the latest deferred fragment", () => {
+  const h = navigationHarness();
+  h.block(true);
+  const dispose = bindCreatorSectionNavigation(h.host);
+  h.flush(1);
+  h.change("#creator-support-title"); h.flush(2);
+  h.block(false); h.flush(3);
+  assert.equal(h.calls.length, 2);
+  assert.equal(h.calls[1][1], "creator-support-title");
+  dispose();
+});
+
+test("later modal changes cannot reclaim focus after fragment navigation completes", () => {
+  const h = navigationHarness();
+  const dispose = bindCreatorSectionNavigation(h.host);
+  h.flush(1);
+  h.block(true); h.block(false);
+  assert.equal(h.frames.size, 0);
+  assert.equal(h.calls.length, 2);
+  dispose();
+});
+
+test("an invalid URL cancels deferred fragment restoration after a modal", () => {
+  const h = navigationHarness();
+  h.block(true);
+  const dispose = bindCreatorSectionNavigation(h.host);
+  h.flush(1);
+  h.change("#unknown");
+  h.block(false);
+  assert.equal(h.frames.size, 0);
+  assert.deepEqual(h.calls, []);
+  dispose();
+});
+
+test("unmount cancels a modal-blocked fragment before dismissal", () => {
+  const h = navigationHarness();
+  h.block(true);
+  const dispose = bindCreatorSectionNavigation(h.host);
+  h.flush(1); dispose(); h.block(false);
+  assert.equal(h.frames.size, 0);
+  assert.deepEqual(h.calls, []);
 });
 
 test("initial homepage without a known fragment leaves focus and scroll untouched", () => {

@@ -44,6 +44,7 @@ import type {
 import type { StudioLiveGesturePreviewPayload } from "./studio-live-gesture-preview";
 
 class FakeHubTransport implements StudioLiveTransport {
+  authoritativeLockCapability: "fenced-v2" | null = null;
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
   private readonly crdtListeners = new Set<(event: StudioCrdtTransportMessage) => void>();
@@ -346,6 +347,40 @@ function harness(mode: StudioLiveTransportMode = "local") {
 }
 
 describe("StudioLiveRoom", () => {
+  it("requires negotiated authority and fences explicit slot renewal without automatic heartbeat", async () => {
+    const h = harness("server");
+    const room = h.room(alice);
+    await room.start();
+    expect(room.authoritativeLockCapability).toBeNull();
+    expect(await room.claimAuthoritativeLockAsync("slot-one")).toMatchObject({ status: "denied", code: "unsupported_authority" });
+    expect(h.hub.lockAcquireRequests).toHaveLength(0);
+    h.hub.transports[0]!.authoritativeLockCapability = "fenced-v2";
+    let fence = 0;
+    h.hub.lockAcquireHandler = async (request) => ({ status: "acquired", resource: request.resource, requestId: request.requestId,
+      lock: { resource: request.resource, claimId: `server-${++fence}`, owner: alice, leaseUntil: h.now() + request.leaseMs } });
+    expect(await room.claimAuthoritativeLockAsync("slot-one")).toMatchObject({ status: "acquired", lock: { claimId: "server-1" } });
+    for (const tick of h.intervalHandlers) tick();
+    expect(h.hub.published.filter((event) => event.kind === "lock:claim")).toEqual([]);
+    expect(await room.claimAuthoritativeLockAsync("slot-one", "server-1")).toMatchObject({ status: "acquired", lock: { claimId: "server-2" } });
+    expect(h.hub.lockAcquireRequests.at(-1)).toMatchObject({ resource: "slot-one", renewLeaseId: "server-1", leaseMs: 15000 });
+    h.hub.transports[0]!.receiveControl({ type: "status", status: { state: "disconnected", recoverable: true, message: "lost" } });
+    expect(room.authoritativeLockCapability).toBeNull();
+    expect(await room.claimAuthoritativeLockAsync("slot-one", "server-2")).toMatchObject({ status: "denied" });
+    room.close();
+  });
+
+  it("never uses a previously cached grant as a fresh managed lease", async () => {
+    const h = harness("server"); const room = h.room(alice); await room.start();
+    h.hub.transports[0]!.authoritativeLockCapability = "fenced-v2";
+    h.hub.lockAcquireHandler = async (request) => ({ status: "acquired", resource: request.resource, requestId: request.requestId,
+      lock: { resource: request.resource, claimId: "server-one", owner: alice, leaseUntil: h.now() + 15000 } });
+    await room.claimAuthoritativeLockAsync("slot-one");
+    h.hub.lockAcquireHandler = async (request) => ({ status: "denied", resource: request.resource, requestId: request.requestId, code: "lock_stale", message: "existing lifecycle" });
+    expect(await room.claimAuthoritativeLockAsync("slot-one")).toMatchObject({ status: "denied", code: "lock_stale" });
+    expect(h.hub.lockAcquireRequests).toHaveLength(2);
+    room.close();
+  });
+
   it("uses a replaceable local/server transport and exchanges ephemeral presence", async () => {
     const local = harness();
     const roomA = local.room(alice);

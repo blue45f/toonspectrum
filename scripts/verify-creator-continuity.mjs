@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 
 import { chromium, expect } from "@playwright/test";
 
+import { installBetaEventDismissal } from "./lib/public-page-event-gate.mjs";
+
 const origin = process.env.CREATOR_HOME_ORIGIN || "http://127.0.0.1:4173";
 const output = "artifacts/creator-continuity";
 const storageKey = "toonstudio:creator-continuity:v1";
@@ -64,6 +66,7 @@ try {
     }, { key: storageKey, now });
 
     const page = await context.newPage();
+    await installBetaEventDismissal(page);
     currentPage = page;
     const errors = [];
     page.on("pageerror", (error) => errors.push(String(error)));

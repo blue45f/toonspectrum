@@ -36,6 +36,7 @@ describe("store-social-login-credentials-macos", () => {
       env: { ...process.env, HOME: root, USER: "tester", PATH: `${bin}:${process.env.PATH}` },
     });
 
+    expect(result.error, "zsh must be installed before the actual shell regression runs").toBeUndefined();
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout.match(/: present/g)).toHaveLength(10);
@@ -48,6 +49,7 @@ describe("store-social-login-credentials-macos", () => {
       env: { ...process.env, HOME: root, USER: "tester", PATH: `${bin}:${process.env.PATH}` },
     });
 
+    expect(result.error, "zsh must be installed before the actual shell regression runs").toBeUndefined();
     expect(result.status).toBe(64);
     expect(result.stderr).toContain("Usage:");
   });

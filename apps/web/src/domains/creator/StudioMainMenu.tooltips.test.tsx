@@ -122,7 +122,7 @@ describe("StudioMainMenu tooltips", () => {
     expect(screen.getByRole("menu", { name: "파일" })).not.toBeNull();
     expect(screen.queryByRole("tooltip")).toBeNull();
 
-    fireEvent.mouseEnter(screen.getByRole("menuitem", { name: "편집" }));
+    fireEvent.mouseMove(screen.getByRole("menuitem", { name: "편집" }), { clientX: 80, clientY: 16 });
     act(() => vi.advanceTimersByTime(280));
     expect(screen.getByRole("menu", { name: "편집" })).not.toBeNull();
     expect(screen.queryByRole("tooltip")).toBeNull();

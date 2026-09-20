@@ -2,6 +2,8 @@ import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type {
   StudioVirtualSpaceWorldManifest,
   StudioWorldInteractionDefinition,
+  StudioWorldInteractionSlotDefinition,
+  StudioWorldOcclusionLayer,
   StudioWorldNpcDefinition,
   StudioWorldPortalDefinition,
   StudioWorldPropDefinition,
@@ -71,9 +73,9 @@ function layerObjects(map: StudioTiledMapLike, layerName: string): readonly Tile
       }
       if (layer.type !== "objectgroup" || layer.name !== layerName) continue;
       found = true;
-      if (!active || (layerName === "props" && invisible)) continue;
+      if (!active || ((layerName === "props" || layerName === "occlusion-layers") && invisible)) continue;
       for (const object of layer.objects ?? []) {
-        if (property(object, "enabled") === false || (layerName === "props" && object.visible === false)) continue;
+        if (property(object, "enabled") === false || ((layerName === "props" || layerName === "occlusion-layers") && object.visible === false)) continue;
         if (layerName === "colliders" && (object.polygon || object.polyline || Number(object.rotation ?? 0) !== 0)) {
           throw new Error("Arcade collision layers require axis-aligned rectangle objects");
         }
@@ -133,7 +135,7 @@ export function studioWorldManifestFromTiled(
   map: StudioTiledMapLike,
   base: StudioVirtualSpaceWorldManifest,
 ): StudioVirtualSpaceWorldManifest {
-  const layers = new Map(["rooms", "colliders", "props", "interactions", "portals", "spawns", "npcs"]
+  const layers = new Map(["rooms", "colliders", "props", "interactions", "portals", "spawns", "npcs", "interaction-slots", "occlusion-layers"]
     .map((name) => [name, layerObjects(map, name)] as const));
   const objects = (name: string) => layers.get(name) ?? [];
   const rooms = objects("rooms").map((object): StudioWorldRoomDefinition => ({
@@ -229,6 +231,25 @@ export function studioWorldManifestFromTiled(
     patrol: parsePatrol(property(object, "patrol")),
   }));
 
+  const interactionSlots = objects("interaction-slots").map((object): StudioWorldInteractionSlotDefinition => ({
+    id: object.name ?? `slot-${object.id ?? 0}`,
+    roomId: String(property(object, "roomId") ?? ""),
+    labelKo: String(property(object, "labelKo") ?? object.name ?? ""),
+    labelEn: String(property(object, "labelEn") ?? object.name ?? ""),
+    approachPoint: { x: Number(object.x ?? 0), y: Number(object.y ?? 0) },
+    anchorPoint: { x: Number(property(object, "anchorX")), y: Number(property(object, "anchorY")) },
+    ...(property(object, "seatX") !== undefined || property(object, "seatY") !== undefined
+      ? { seatAttachmentPoint: { x: Number(property(object, "seatX")), y: Number(property(object, "seatY")) } } : {}),
+    exitPoint: { x: Number(property(object, "exitX")), y: Number(property(object, "exitY")) },
+    facing: String(property(object, "facing") ?? "") as StudioWorldInteractionSlotDefinition["facing"],
+    radius: Number(property(object, "radius")),
+  }));
+
+  const occlusionLayers = objects("occlusion-layers").map((object): StudioWorldOcclusionLayer => {
+    if (Number(object.rotation ?? 0) !== 0) throw new Error("Occlusion layers require unrotated world-space polygons");
+    return { id: object.name ?? `occlusion-${object.id ?? 0}`, depth: Number(property(object, "depth")),
+      polygon: Array.isArray(object.polygon) ? object.polygon.map((p) => ({ x: Number(object.x ?? 0) + Number(p.x), y: Number(object.y ?? 0) + Number(p.y) })) : [] };
+  });
   const worldWidth = map.width * map.tilewidth;
   const worldHeight = map.height * map.tileheight;
   return {
@@ -246,5 +267,8 @@ export function studioWorldManifestFromTiled(
     portals: layers.get("portals") !== undefined ? portals : base.portals,
     spawns: layers.get("spawns") !== undefined ? spawns : base.spawns,
     npcs: layers.get("npcs") !== undefined ? npcs : base.npcs,
+    interactionSlots,
+    // Missing optional visual layers do not inherit a different background's furniture mask.
+    occlusionLayers,
   };
 }

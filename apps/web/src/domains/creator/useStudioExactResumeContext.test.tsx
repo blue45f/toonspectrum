@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCallback, useRef, useState } from "react";
 
@@ -20,9 +20,13 @@ const PAGES = [
 function Harness({
   resumeRequested,
   onRestored,
+  hydrated = true,
+  pages = PAGES,
 }: {
   readonly resumeRequested: boolean;
   readonly onRestored?: (pageId: string | null) => void;
+  readonly hydrated?: boolean;
+  readonly pages?: readonly { readonly id: string; readonly elements: readonly { readonly id: string }[] }[];
 }) {
   const [currentPageId, setCurrentPageIdState] = useState("page-1");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -45,8 +49,8 @@ function Harness({
     language: "ko-KR",
     sourceVersion: "v4",
     resumeRequested,
-    hydrated: true,
-    pages: PAGES,
+    hydrated,
+    pages,
     currentPageId,
     setCurrentPageId,
     selectedId,
@@ -101,6 +105,25 @@ afterEach(() => {
 });
 
 describe("useStudioExactResumeContext", () => {
+  it("preserves the saved target throughout recovery discovery and the user's pending restore decision", async () => {
+    const onRestored = vi.fn();
+    writeStudioExactResumeContext(window.localStorage, {
+      projectId: "project-1", documentId: "document-1", workspace: "comic", pageId: "page-2",
+      selectedElementIds: ["bubble-2"], zoom: 1.6, scrollLeft: 120, scrollTop: 760,
+    });
+    const before = readStudioExactResumeContext(window.localStorage, "project-1", "document-1");
+    const mounted = render(<Harness resumeRequested hydrated={false} pages={[PAGES[0]]} onRestored={onRestored} />);
+    // Longer than the persistence debounce: merely mounting an empty local editor must not
+    // replace a saved page-2 target while the durable candidate is still being decided.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 500)); });
+    expect(readStudioExactResumeContext(window.localStorage, "project-1", "document-1")).toEqual(before);
+    expect(onRestored).not.toHaveBeenCalled();
+    mounted.rerender(<Harness resumeRequested hydrated pages={PAGES} onRestored={onRestored} />);
+    await waitFor(() => expect(onRestored).toHaveBeenCalledExactlyOnceWith("page-2"));
+    expect(screen.getByTestId("state").textContent).toContain('"selectedId":"bubble-2"');
+    expect(screen.getByTestId("viewport").scrollTop).toBe(760);
+  });
+
   it("restores the page, selection, tool, zoom and viewport from the trusted latest context", async () => {
     writeStudioExactResumeContext(window.localStorage, {
       projectId: "project-1",

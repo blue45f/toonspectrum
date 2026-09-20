@@ -6,6 +6,7 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { REQUIRED_CORE_GATES } from "./ci-core-gate.mjs";
+import { CORE_DATABASE_VITEST_TARGETS } from "./ci-core-regression-shards.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
@@ -93,6 +94,19 @@ test("protected core aggregates every lane without another checkout", () => {
   assert.ok(job("verify").includes('test "$CORE_RESULT" = success'));
 });
 
+test("review database invariants execute with real PostgreSQL and the accepted graph triggers", () => {
+  const database = job("database");
+  assert.match(database, /image: postgres:16-alpine/u);
+  assert.match(database, /TEST_DATABASE_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
+  assert.match(database, /STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
+  assert.match(database, /node scripts\/prepare-studio-review-test-db\.mjs/u);
+  assert.match(database, /pnpm exec vitest run --no-file-parallelism/u);
+  for (const suite of CORE_DATABASE_VITEST_TARGETS) {
+    assert.ok(database.includes(suite), `Missing real database suite: ${suite}`);
+  }
+  assert.ok(REQUIRED_CORE_GATES.includes("database"), "database failures must block protected core");
+});
+
 test("mandatory lanes start independently and dependency-free contracts run first", () => {
   assert.doesNotMatch(source, /^ {2}preflight:\n/m);
   for (const name of ["lint", "typecheck", "static", "serial", "build"]) {
@@ -148,13 +162,41 @@ test("PR lint is scoped while push and merge validation stay repository-wide", (
   }
 });
 
-test("sparse core lanes retain the imported virtual world while excluding artwork binaries", () => {
+test("sparse lanes exclude artwork until foundation restores exactly its required Virtual Studio packs", () => {
   const world = "apps/web/public/assets/virtual-studio/world/default-world.json";
-  const excluded = [
+  const requiredArt = [
+    "apps/web/public/assets/virtual-studio/production-v2/art-manifest.json",
+    "apps/web/public/assets/virtual-studio/production-v2/master-central-lossless.webp",
+    "apps/web/public/assets/virtual-studio/production-v2/player-pink-direction-down.png",
     "apps/web/public/assets/virtual-studio/production-v2/player-pink-walk-down.webp",
+    "apps/web/public/assets/virtual-studio/living-world/art-manifest.json",
     "apps/web/public/assets/virtual-studio/living-world/master-clean-plate.webp",
-    "apps/web/public/assets/3d/environments/refined-v6/large-model.glb",
+    "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
+    ...["pink", "silver", "dark", "purple"].flatMap((skin) =>
+      ["walk-down", "walk-right", "walk-left", "walk-up", "sit", "wave"].map((state) =>
+        `apps/web/public/assets/virtual-studio/drawn-characters-v1/player-${skin}-${state}.png`)),
   ];
+  const unrelatedArt = [
+    "apps/web/public/assets/3d/environments/refined-v6/large-model.glb",
+    "apps/web/public/assets/virtual-studio/unrelated-pack/large-image.png",
+  ];
+  const excluded = [...requiredArt, ...unrelatedArt];
+  const staticJob = job("static");
+  const restoreStep = staticJob.split(/(?=^ {6}- )/mu)
+    .find((step) => step.includes("git sparse-checkout add"));
+  assert.ok(restoreStep, "foundation must restore the real artwork its required tests read");
+  assert.match(restoreStep, /^ {8}if: matrix\.shard == 'studio-foundation'$/mu);
+  const restoreArgs = restoreStep.match(/^ {8}run: git (.+)$/mu)?.[1].split(/\s+/u);
+  assert.deepEqual(restoreArgs, [
+    "sparse-checkout", "add",
+    "/apps/web/public/assets/virtual-studio/production-v2/",
+    "/apps/web/public/assets/virtual-studio/living-world/",
+    "/apps/web/public/assets/virtual-studio/drawn-characters-v1/",
+  ]);
+  assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
+    "artwork must be present before the required foundation tests execute");
+  assert.ok(requiredTargets.includes("scripts/verify-virtual-studio-art-manifest.test.mjs"),
+    "the full build art gate does not replace the existing foundation art regression target");
   const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
@@ -181,9 +223,36 @@ test("sparse core lanes retain the imported virtual world while excluding artwor
       for (const file of excluded) assert.equal(existsSync(join(scratch, file)), false,
         `${lane} must not download artwork/model binaries: ${file}`);
     }
+    git(...restoreArgs);
+    for (const file of [world, ...requiredArt]) assert.ok(existsSync(join(scratch, file)),
+      `foundation must retain its real art test input: ${file}`);
+    for (const file of unrelatedArt) assert.equal(existsSync(join(scratch, file)), false,
+      `foundation must still exclude unrelated artwork/models: ${file}`);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+});
+
+test("static regression checkout retains both imported 3D manifests but excludes their model payloads", () => {
+  const patterns = job("static").match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
+  assert.ok(patterns);
+  const manifests = ["refined-v6", "expansion-v1"].map((pack) => `apps/web/public/assets/3d/environments/${pack}/manifest.json`);
+  const models = ["refined-v6/hospital_reception.glb", "expansion-v1/library_reading_room.glb", "unrelated/large.glb"].map((file) => `apps/web/public/assets/3d/environments/${file}`);
+  const scratch = mkdtempSync(join(tmpdir(), "core-3d-manifests-"));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    git("init", "--quiet");
+    for (const file of [...manifests, ...models, "package.json"]) { mkdirSync(dirname(join(scratch, file)), { recursive: true }); writeFileSync(join(scratch, file), "{}\n"); }
+    git("add", ".");
+    git("-c", "user.name=CI Test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture");
+    git("config", "core.sparseCheckout", "true"); git("config", "core.sparseCheckoutCone", "false");
+    writeFileSync(join(scratch, ".git/info/sparse-checkout"), patterns.replace(/^ {12}/gmu, "")); git("read-tree", "-mu", "HEAD");
+    for (const file of manifests) assert.ok(existsSync(join(scratch, file)), `missing 3D import: ${file}`);
+    for (const file of models) assert.equal(existsSync(join(scratch, file)), false, `unrelated binary admitted: ${file}`);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
 });
 
 test("production build verifies Virtual Studio art after the single existing build", () => {
@@ -293,11 +362,13 @@ test("focused integration checks cannot collide with the protected core status",
 });
 
 
-test("focused ToonStudio checkout includes static metadata without unrelated artwork", () => {
+test("focused ToonStudio checkout includes imported metadata and fault evidence without unrelated artwork/results", () => {
   const workflow = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
   const patterns = workflow.match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
   assert.ok(patterns, "focused workflow must declare its checkout");
   const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
+  const faultEvidence = "tests/benchmarks/results/v12-runtime-fault-matrix.json";
+  const unrelatedResult = "tests/benchmarks/results/unrelated-benchmark.json";
   const artwork = "apps/web/public/assets/3d/environments/unrelated-pack/large-model.glb";
   const scratch = mkdtempSync(join(tmpdir(), "toonstudio-focused-inputs-"));
   const git = (...args) => {
@@ -306,7 +377,7 @@ test("focused ToonStudio checkout includes static metadata without unrelated art
   };
   try {
     git("init", "--quiet");
-    for (const file of [...manifests, artwork, "package.json"]) {
+    for (const file of [...manifests, faultEvidence, unrelatedResult, artwork, "package.json"]) {
       mkdirSync(dirname(join(scratch, file)), { recursive: true });
       writeFileSync(join(scratch, file), "{}\n");
     }
@@ -316,7 +387,8 @@ test("focused ToonStudio checkout includes static metadata without unrelated art
     git("config", "core.sparseCheckoutCone", "false");
     writeFileSync(join(scratch, ".git/info/sparse-checkout"), patterns.replace(/^ {12}/gmu, ""));
     git("read-tree", "-mu", "HEAD");
-    for (const file of manifests) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
+    for (const file of [...manifests, faultEvidence]) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
+    assert.equal(existsSync(join(scratch, unrelatedResult)), false);
     assert.equal(existsSync(join(scratch, artwork)), false);
   } finally { rmSync(scratch, { recursive: true, force: true }); }
 });

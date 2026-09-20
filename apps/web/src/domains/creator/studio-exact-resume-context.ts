@@ -246,6 +246,21 @@ export function studioExactResumeRequested(search: string | URLSearchParams): bo
     && params.get(STUDIO_EXACT_RESUME_QUERY_KEY) === STUDIO_EXACT_RESUME_QUERY_VALUE;
 }
 
+/** Local recovery must be decided before a saved page can be classified as deleted. */
+export function studioExactResumeSourceReady(input: {
+  readonly sourceHydrated: boolean;
+  readonly sourceHydrationPending: boolean;
+  readonly remoteSource: boolean;
+  readonly autosaveChecked: boolean;
+  readonly hasAutosave: boolean;
+  readonly localDocumentLocked: boolean;
+}): boolean {
+  if (!input.sourceHydrated || input.sourceHydrationPending) return false;
+  // A hydrated server document may be read-only; restoring its view needs no edit grant.
+  if (input.remoteSource) return true;
+  return input.autosaveChecked && !input.hasAutosave && !input.localDocumentLocked;
+}
+
 export function studioExactResumeSummary(
   context: StudioExactResumeContextV1,
   locale: "ko" | "en",

@@ -1,0 +1,2035 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-20",
+  "technique": "imagegen drawn key poses; original PNG bytes preserved",
+  "skins": [
+    "pink",
+    "silver",
+    "dark",
+    "purple"
+  ],
+  "limitations": [
+    "Four drawn walk key poses per direction, not eight in-between drawings.",
+    "Wave and sit are directional held poses, not multi-frame action loops.",
+    "Original production-v2 idle and existing work-state images retained.",
+    "Generated identity is visually matched; original source pixels are not retained in newly drawn poses."
+  ],
+  "assets": {
+    "pink/walk-right": {
+      "skin": "pink",
+      "state": "walk-right",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-walk-right.png",
+      "sourceImage": "exec-e2959a7d-f841-40f0-ad0f-89de1a64de9b.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "283efa78ad22b246931f1857661a64c798392ff59948c7162aca165540503ca7",
+      "bytes": 1059292,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.535651,
+          "originY": 0.951498,
+          "displayHeightRatio": 0.967496
+        },
+        {
+          "originX": 0.420677,
+          "originY": 0.952924,
+          "displayHeightRatio": 0.965931
+        },
+        {
+          "originX": 0.531194,
+          "originY": 0.907275,
+          "displayHeightRatio": 0.97381
+        },
+        {
+          "originX": 0.418895,
+          "originY": 0.907275,
+          "displayHeightRatio": 0.97381
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          146,
+          50,
+          461,
+          667
+        ],
+        [
+          81,
+          50,
+          391,
+          668
+        ],
+        [
+          141,
+          23,
+          455,
+          636
+        ],
+        [
+          79,
+          23,
+          391,
+          636
+        ]
+      ],
+      "transparentPixels": [
+        256796,
+        262324,
+        264270,
+        265827
+      ],
+      "frameRgbaSha256": [
+        "13ab876bd770c475c0cc397c30509fff8c4acb6974ce1f2e4bdd3ce6db1fff0a",
+        "97b0a36eab0878ed5ec21a16484d03021219cadd23018a9f6667d0ee7fdf33e6",
+        "342ec303e662e73bea53bbd0edd70d55f8f55bc1e995ab63f2d337d0f9bc656b",
+        "081b0d47f60711a868e037fc5197c86cece7b01ba945f625a4b48585dd38865c"
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-right.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-right.png": "db0f3c32ec818a6f991144a6ecedb8fd0eb2faff91c494c636268a566686517c"
+      }
+    },
+    "pink/walk-up": {
+      "skin": "pink",
+      "state": "walk-up",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-walk-up.png",
+      "sourceImage": "exec-67744884-827e-484b-b9a4-52c17a49809a.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "958bcb00ca6dee9ee512edcc414383d33e932c0b48ee92ab3f217be2f066c81e",
+      "bytes": 845247,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.534759,
+          "originY": 0.942939,
+          "displayHeightRatio": 0.991604
+        },
+        {
+          "originX": 0.464349,
+          "originY": 0.928673,
+          "displayHeightRatio": 1.01006
+        },
+        {
+          "originX": 0.534759,
+          "originY": 0.917261,
+          "displayHeightRatio": 0.989959
+        },
+        {
+          "originX": 0.468806,
+          "originY": 0.914408,
+          "displayHeightRatio": 0.994909
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          159,
+          59,
+          436,
+          661
+        ],
+        [
+          124,
+          60,
+          397,
+          651
+        ],
+        [
+          164,
+          40,
+          446,
+          643
+        ],
+        [
+          127,
+          41,
+          399,
+          641
+        ]
+      ],
+      "transparentPixels": [
+        276557,
+        274196,
+        278527,
+        274147
+      ],
+      "frameRgbaSha256": [
+        "6fd2d495134aa912bda5bad970bbbcd668362090096a0a29261c68157df62d32",
+        "198e84df47b1b2c42b8d25d3494297f84ad1023e42cb75f02995bb66c58654a9",
+        "ef8be5bd4abf684a3af4ed5b5b16ded341f9f7feccbba62b363c98a88956a5b2",
+        "7f9cfa5cc88c1283c4a92bb47c8bb61adc93e08342d1d6bcb1367c47564b3507"
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-up.png": "ba66a0ea323c2a9caef8b952e7606534b902bffca174f251676ae1eb70fac23e"
+      }
+    },
+    "pink/walk-down": {
+      "skin": "pink",
+      "state": "walk-down",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-walk-down.png",
+      "sourceImage": "exec-eab257b7-5aa8-4b55-959d-0f467d21e99d.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "58499d0592aa09d55ba21aa2f755532b70215c28d6bbf37a6ce85dd3482b98db",
+      "bytes": 982692,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.564171,
+          "originY": 0.965763,
+          "displayHeightRatio": 0.952066
+        },
+        {
+          "originX": 0.432264,
+          "originY": 0.952924,
+          "displayHeightRatio": 0.967496
+        },
+        {
+          "originX": 0.566845,
+          "originY": 0.92582,
+          "displayHeightRatio": 0.952066
+        },
+        {
+          "originX": 0.427807,
+          "originY": 0.914408,
+          "displayHeightRatio": 0.962815
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          174,
+          50,
+          459,
+          677
+        ],
+        [
+          101,
+          51,
+          384,
+          668
+        ],
+        [
+          175,
+          22,
+          461,
+          649
+        ],
+        [
+          97,
+          21,
+          383,
+          641
+        ]
+      ],
+      "transparentPixels": [
+        271252,
+        273059,
+        272030,
+        272079
+      ],
+      "frameRgbaSha256": [
+        "cf9ffa03b4722296d5976c5222522c599b5cc2ca0802fa912854efd8839c967f",
+        "741b741cff5f665bf9760353d06cf3d47923f5203c6268556e37872aa1820527",
+        "8d4b04e700a962d687b9425339c5c986bedf5377977a7b83311e5bd4b736c2e0",
+        "ad2f2a7f4d28f4d5fc756ba9008c1c592e1403d8dd7ccb6bb364b13ac4096871"
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-down.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-down.png": "bdc7798b527b04385c5618d6e05ec23d93e2d75c1cc68c13b29dee481612195e"
+      }
+    },
+    "pink/walk-left": {
+      "skin": "pink",
+      "state": "walk-left",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-walk-left.png",
+      "sourceImage": "exec-d54c4a26-bc0e-418a-b675-958fc5ed20df.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "e4f10f5c725cc4204f6cf990ef6cea892a9d7a381c7c1022142150761241e182",
+      "bytes": 1145627,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.552585,
+          "originY": 0.950071,
+          "displayHeightRatio": 0.949039
+        },
+        {
+          "originX": 0.445633,
+          "originY": 0.952924,
+          "displayHeightRatio": 0.946031
+        },
+        {
+          "originX": 0.551693,
+          "originY": 0.908702,
+          "displayHeightRatio": 0.978599
+        },
+        {
+          "originX": 0.446524,
+          "originY": 0.924394,
+          "displayHeightRatio": 0.961265
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          146,
+          37,
+          471,
+          666
+        ],
+        [
+          81,
+          37,
+          411,
+          668
+        ],
+        [
+          149,
+          27,
+          470,
+          637
+        ],
+        [
+          90,
+          27,
+          411,
+          648
+        ]
+      ],
+      "transparentPixels": [
+        251325,
+        255348,
+        262988,
+        263227
+      ],
+      "frameRgbaSha256": [
+        "fa30927b458a06a58ceb21e46f0144998d91ab398403f62bd7a1ceeed2c2ba7b",
+        "1036c48c7d34c0c783b737cc58019930ddc206908328bee999a8953d252f0ad8",
+        "5f0d83ca44ff1c8100cae7ed6310e7bad8e42fceb791f79e6830c702396d1fae",
+        "d800f494d2888123b88e0a256be2f63a07910c16607e2c1199c3ab198b023f5d"
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-left.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-left.png": "b1d956018f82335b8ffddf6d2175f5cc6929df691de77f1befbc72fe1f762aa1"
+      }
+    },
+    "pink/wave": {
+      "skin": "pink",
+      "state": "wave",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-wave.png",
+      "sourceImage": "exec-63d0be2a-7073-4bec-acfc-291a96e25568.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "c6ffcbba7576f39c9e630aba98006200e21b1f60c3a9c0729abb910fae7ec33a",
+      "bytes": 1108304,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.540998,
+          "originY": 0.917261,
+          "displayHeightRatio": 0.981818
+        },
+        {
+          "originX": 0.455437,
+          "originY": 0.918688,
+          "displayHeightRatio": 0.986686
+        },
+        {
+          "originX": 0.525847,
+          "originY": 0.914408,
+          "displayHeightRatio": 0.959719
+        },
+        {
+          "originX": 0.533868,
+          "originY": 0.910128,
+          "displayHeightRatio": 0.96437
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          149,
+          35,
+          458,
+          643
+        ],
+        [
+          75,
+          39,
+          436,
+          644
+        ],
+        [
+          112,
+          19,
+          478,
+          641
+        ],
+        [
+          120,
+          19,
+          479,
+          638
+        ]
+      ],
+      "transparentPixels": [
+        256082,
+        251807,
+        245846,
+        241444
+      ],
+      "frameRgbaSha256": [
+        "f983a59e8187708c05680afb7e7261f39790c664905222cf107354bdd750c57f",
+        "559d6956ea43868f7a889cc59d88c35c4b6a78381ac5964cd72e53840caff163",
+        "8a9cc8c04aeb894612cdc018f06550b55e63ed60ae522b6944b97bf5d7511f44",
+        "19ba17b6ffb914c26bbb7a0e7443856a3547e2eb25c8088b7338bfb328c6018c"
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-down.png",
+        "production-v2/player-pink-direction-right.png",
+        "production-v2/player-pink-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-down.png": "bdc7798b527b04385c5618d6e05ec23d93e2d75c1cc68c13b29dee481612195e",
+        "production-v2/player-pink-direction-right.png": "db0f3c32ec818a6f991144a6ecedb8fd0eb2faff91c494c636268a566686517c",
+        "production-v2/player-pink-direction-up.png": "ba66a0ea323c2a9caef8b952e7606534b902bffca174f251676ae1eb70fac23e"
+      }
+    },
+    "pink/sit": {
+      "skin": "pink",
+      "state": "sit",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-sit.png",
+      "sourceImage": "exec-2cdc3587-7ebc-4aef-9750-ec48d02611b1.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "0aa72fff23eba707ecb038c439525c01198a104d3f3ff68dd06676aada9334d7",
+      "bytes": 1115958,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.560606,
+          "originY": 0.972896,
+          "displayHeightRatio": 0.748018,
+          "seatOriginY": 0.64194
+        },
+        {
+          "originX": 0.376114,
+          "originY": 0.974322,
+          "displayHeightRatio": 0.748018,
+          "seatOriginY": 0.636234
+        },
+        {
+          "originX": 0.578431,
+          "originY": 0.942939,
+          "displayHeightRatio": 0.751455,
+          "seatOriginY": 0.634807
+        },
+        {
+          "originX": 0.462567,
+          "originY": 0.942939,
+          "displayHeightRatio": 0.752607,
+          "seatOriginY": 0.670471
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          154,
+          26,
+          475,
+          682
+        ],
+        [
+          56,
+          27,
+          384,
+          683
+        ],
+        [
+          165,
+          8,
+          483,
+          661
+        ],
+        [
+          98,
+          9,
+          421,
+          661
+        ]
+      ],
+      "transparentPixels": [
+        252864,
+        256599,
+        252264,
+        247086
+      ],
+      "frameRgbaSha256": [
+        "88f89524a7fb4e57d3bdd65e991ffab671b28a8b31f97b752f8249d2d92b3063",
+        "80dc8aa8c1920f930108d0f8f46e4757c607d816966565c241039d24f02d2ac8",
+        "635008089cab738bf69fa2e734c330436ce5905caad1acac39f1b0e2bb71cc83",
+        "7b015c3f2868a4e39dada09003f9bfcaa906eb18ee1c32968b42c379c8167677"
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-down.png",
+        "production-v2/player-pink-direction-right.png",
+        "production-v2/player-pink-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-down.png": "bdc7798b527b04385c5618d6e05ec23d93e2d75c1cc68c13b29dee481612195e",
+        "production-v2/player-pink-direction-right.png": "db0f3c32ec818a6f991144a6ecedb8fd0eb2faff91c494c636268a566686517c",
+        "production-v2/player-pink-direction-up.png": "ba66a0ea323c2a9caef8b952e7606534b902bffca174f251676ae1eb70fac23e"
+      }
+    },
+    "silver/walk-right": {
+      "skin": "silver",
+      "state": "walk-right",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-walk-right.png",
+      "sourceImage": "exec-ea8a6f4a-ef91-41c7-a21d-1371dec37586.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "903da65f9d5917b6d110d9387dbe80039b10952cfc92f1e6eb6e567b0e785045",
+      "bytes": 1059374,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.52139,
+          "originY": 0.960057,
+          "displayHeightRatio": 0.918377
+        },
+        {
+          "originX": 0.418895,
+          "originY": 0.960057,
+          "displayHeightRatio": 0.918377
+        },
+        {
+          "originX": 0.523173,
+          "originY": 0.940086,
+          "displayHeightRatio": 0.929821
+        },
+        {
+          "originX": 0.421569,
+          "originY": 0.948645,
+          "displayHeightRatio": 0.921212
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          127,
+          23,
+          469,
+          673
+        ],
+        [
+          70,
+          23,
+          400,
+          673
+        ],
+        [
+          126,
+          17,
+          481,
+          659
+        ],
+        [
+          70,
+          17,
+          403,
+          665
+        ]
+      ],
+      "transparentPixels": [
+        259820,
+        273802,
+        262152,
+        272890
+      ],
+      "frameRgbaSha256": [
+        "82e2aedda3e5293a38b80f37dca81c15ff46753c6d42ccad41500af2c5c8e3c5",
+        "f32e6478c479f2cff2667aa3657cd413fb7f13e14e188211861c885b948b6d7d",
+        "eebf0b9a6836b479e6607d9a052e6910ffe6f90f9310a4f41f6e0965dc9767d6",
+        "7357a7dbb2d050907dd9e5e91c8302ab50dcfa2eaccd8f6318f5655a663810a7"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-right.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-right.png": "edc7fdb96c13062f44f8668bde605b1c1dfc717d73c9a81879ad3f2c8f47abd0"
+      }
+    },
+    "silver/walk-up": {
+      "skin": "silver",
+      "state": "walk-up",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-walk-up.png",
+      "sourceImage": "exec-ad40ad18-2b59-4657-b042-6e915f4581b0.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "db5cf9964abb912f70698027a0bfbfdaaade2c6890c02d93f96603517e30ece9",
+      "bytes": 828273,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.531194,
+          "originY": 0.927247,
+          "displayHeightRatio": 0.989959
+        },
+        {
+          "originX": 0.459002,
+          "originY": 0.9301,
+          "displayHeightRatio": 0.986686
+        },
+        {
+          "originX": 0.531194,
+          "originY": 0.905849,
+          "displayHeightRatio": 0.981818
+        },
+        {
+          "originX": 0.459893,
+          "originY": 0.901569,
+          "displayHeightRatio": 0.986686
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          160,
+          47,
+          436,
+          650
+        ],
+        [
+          119,
+          47,
+          396,
+          652
+        ],
+        [
+          160,
+          27,
+          436,
+          635
+        ],
+        [
+          120,
+          27,
+          396,
+          632
+        ]
+      ],
+      "transparentPixels": [
+        287792,
+        289271,
+        286561,
+        288078
+      ],
+      "frameRgbaSha256": [
+        "9bfa4aab4901eac43b95666089903c151302593162f1d3f4ae4e09e4cbd957ec",
+        "09dd541c936a22d8462f37f018b063bdfe33c622c03268489744da2bc6438ef9",
+        "74a4c5e528228a8a992c517c50c872420bdcc800754b766625ca6b1dce801944",
+        "1dfbaeecd493b8ad037740be2bd81199be825cacc70edb3b77567e6e185e0336"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-up.png": "ecd9e413c09791fc11f87136df925bcab0c4e2ff2b9d52216c2676de0f03f93e"
+      }
+    },
+    "silver/walk-down": {
+      "skin": "silver",
+      "state": "walk-down",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-walk-down.png",
+      "sourceImage": "exec-f1b7c2d4-c5c8-45a0-ba58-9c0eadf33b77.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "2795c89a4d4042c04dfb54661bc0f25f3a993a0a1434f2b7b971f697b7bfff73",
+      "bytes": 1006397,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.573084,
+          "originY": 0.947218,
+          "displayHeightRatio": 0.956643
+        },
+        {
+          "originX": 0.428699,
+          "originY": 0.957204,
+          "displayHeightRatio": 0.944534
+        },
+        {
+          "originX": 0.576649,
+          "originY": 0.908702,
+          "displayHeightRatio": 0.958179
+        },
+        {
+          "originX": 0.426916,
+          "originY": 0.918688,
+          "displayHeightRatio": 0.947532
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          164,
+          40,
+          479,
+          664
+        ],
+        [
+          83,
+          39,
+          398,
+          671
+        ],
+        [
+          165,
+          14,
+          482,
+          637
+        ],
+        [
+          81,
+          14,
+          398,
+          644
+        ]
+      ],
+      "transparentPixels": [
+        278889,
+        276483,
+        277536,
+        276267
+      ],
+      "frameRgbaSha256": [
+        "15f03c7df176d0f6419d6ddb7b1f10bee6ef4d71c96fdc269179ababb0cfb046",
+        "fb0e7f12e3c73bddc9a6356af40f59fd3741ec24ff928eb8413418fdabc3f873",
+        "ed168ea5192a735729facbf9b5bbc902ad18177cdc8637190d5a8cbeb09633a7",
+        "c086d8922eec26abf4ee853be63565fb0f3b44fd3075a40b4cb0ae24ae1b2418"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-down.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-down.png": "8898e0c45c2c35caf49e87f0c06e2288aa1057069a144bf17ea39bafb80b5f80"
+      }
+    },
+    "silver/walk-left": {
+      "skin": "silver",
+      "state": "walk-left",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-walk-left.png",
+      "sourceImage": "exec-2232a423-85cf-48c4-b2fa-08f1ab529e56.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "cc9d46e59235f98762523c2c782d8f145707e49de2d9d3f110d8cde022bf1ef2",
+      "bytes": 1084688,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.539216,
+          "originY": 0.965763,
+          "displayHeightRatio": 0.938593
+        },
+        {
+          "originX": 0.462567,
+          "originY": 0.971469,
+          "displayHeightRatio": 0.932727
+        },
+        {
+          "originX": 0.541889,
+          "originY": 0.917261,
+          "displayHeightRatio": 0.956643
+        },
+        {
+          "originX": 0.467023,
+          "originY": 0.921541,
+          "displayHeightRatio": 0.95055
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          128,
+          41,
+          477,
+          677
+        ],
+        [
+          83,
+          41,
+          436,
+          681
+        ],
+        [
+          126,
+          19,
+          482,
+          643
+        ],
+        [
+          84,
+          18,
+          440,
+          646
+        ]
+      ],
+      "transparentPixels": [
+        259009,
+        263159,
+        262938,
+        261993
+      ],
+      "frameRgbaSha256": [
+        "e39d0f0fd524f3eb996acf24554dc625988bf9d2402243906c9c68050449f8f1",
+        "e77ca72f80f71ab994a509c83155143783263c314ecf4f3522cdcf9cb8ec3084",
+        "2f7d1b44fb7af67401aea7d1ebbfdcd3a75b2e48501ad5d9457eecbf92d6a250",
+        "426dc68e5aca2adfa90ae7f206bb296443285810bb7a7135fed5312909541dfe"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-left.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-left.png": "7556e3abb3e6db9b1831fb481af677436f1b7e2eed86e6ecc48f93ce4fbd4810"
+      }
+    },
+    "silver/wave": {
+      "skin": "silver",
+      "state": "wave",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-wave.png",
+      "sourceImage": "exec-3b4a0725-441d-43b2-bac1-e55de7ebb37f.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "53d18abf0e454424c38956f22b9df2d6e2faa984c23920357efa0f79357d1e94",
+      "bytes": 802582,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.55615,
+          "originY": 0.861626,
+          "displayHeightRatio": 1.16819
+        },
+        {
+          "originX": 0.444742,
+          "originY": 0.865906,
+          "displayHeightRatio": 1.170481
+        },
+        {
+          "originX": 0.568627,
+          "originY": 0.868759,
+          "displayHeightRatio": 1.145768
+        },
+        {
+          "originX": 0.480392,
+          "originY": 0.867332,
+          "displayHeightRatio": 1.145768
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          175,
+          93,
+          449,
+          604
+        ],
+        [
+          118,
+          97,
+          398,
+          607
+        ],
+        [
+          169,
+          88,
+          453,
+          609
+        ],
+        [
+          135,
+          87,
+          419,
+          608
+        ]
+      ],
+      "transparentPixels": [
+        303592,
+        310419,
+        305284,
+        297400
+      ],
+      "frameRgbaSha256": [
+        "503f9f0f26acb9c8aa1fc3a4348e86ba2ccfa613025d8128ac2a73ecb5d54ce0",
+        "b1328eed49d7988fbe313e947b7328e5a54fdb088ec4bead4fbf0d4169d6c6c5",
+        "bdef2f6dbef77261a50a26a3927e8b440d65ef6a4988f707fc8840990ab3c5d6",
+        "ee0617a27262d6952a50740e8f7e66473f6a06ce043fb0b5b121ce3785279ebc"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-down.png",
+        "production-v2/player-silver-direction-right.png",
+        "production-v2/player-silver-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-down.png": "8898e0c45c2c35caf49e87f0c06e2288aa1057069a144bf17ea39bafb80b5f80",
+        "production-v2/player-silver-direction-right.png": "edc7fdb96c13062f44f8668bde605b1c1dfc717d73c9a81879ad3f2c8f47abd0",
+        "production-v2/player-silver-direction-up.png": "ecd9e413c09791fc11f87136df925bcab0c4e2ff2b9d52216c2676de0f03f93e"
+      }
+    },
+    "silver/sit": {
+      "skin": "silver",
+      "state": "sit",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-sit.png",
+      "sourceImage": "exec-d00c7809-851c-43ff-8948-7ef89976840d.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "e4b542ba09299ae15becba4c8c2faa68d7db24fac9192105683ff6d4f3630c05",
+      "bytes": 1176137,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.580214,
+          "originY": 0.977175,
+          "displayHeightRatio": 0.730208,
+          "seatOriginY": 0.703281
+        },
+        {
+          "originX": 0.437611,
+          "originY": 0.977175,
+          "displayHeightRatio": 0.734581,
+          "seatOriginY": 0.757489
+        },
+        {
+          "originX": 0.57754,
+          "originY": 0.951498,
+          "displayHeightRatio": 0.74236,
+          "seatOriginY": 0.741797
+        },
+        {
+          "originX": 0.487522,
+          "originY": 0.945792,
+          "displayHeightRatio": 0.741239,
+          "seatOriginY": 0.726106
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          142,
+          13,
+          509,
+          685
+        ],
+        [
+          71,
+          17,
+          451,
+          685
+        ],
+        [
+          103,
+          6,
+          499,
+          667
+        ],
+        [
+          97,
+          1,
+          450,
+          663
+        ]
+      ],
+      "transparentPixels": [
+        240683,
+        252038,
+        249100,
+        244856
+      ],
+      "frameRgbaSha256": [
+        "856404ef0c1b96fc79ddea591f29aad3eb2956da2642c94592b208d03a5d3fb4",
+        "91c5da5ca7d283424f4c5c76e205f168ecb79395c85e7807de0ed90261a9e879",
+        "24d2178e89bb1ce191022c46ddd2a2878236ed3f2b38d3254dc237bee48d8390",
+        "79aab6e9354878276f65c838ea98b6c00b75925b838e5e6ee542fa079b713aa8"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-down.png",
+        "production-v2/player-silver-direction-right.png",
+        "production-v2/player-silver-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-down.png": "8898e0c45c2c35caf49e87f0c06e2288aa1057069a144bf17ea39bafb80b5f80",
+        "production-v2/player-silver-direction-right.png": "edc7fdb96c13062f44f8668bde605b1c1dfc717d73c9a81879ad3f2c8f47abd0",
+        "production-v2/player-silver-direction-up.png": "ecd9e413c09791fc11f87136df925bcab0c4e2ff2b9d52216c2676de0f03f93e"
+      }
+    },
+    "dark/walk-right": {
+      "skin": "dark",
+      "state": "walk-right",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-dark-walk-right.png",
+      "sourceImage": "exec-736c0479-9a64-4c4b-9ef7-9c6da85e921d.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "85e8cb441f73c99b36029284704917836dd20ce8a27931a7d593a4736a91149d",
+      "bytes": 1092925,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.575758,
+          "originY": 0.965763,
+          "displayHeightRatio": 0.914158
+        },
+        {
+          "originX": 0.470588,
+          "originY": 0.96719,
+          "displayHeightRatio": 0.91276
+        },
+        {
+          "originX": 0.57754,
+          "originY": 0.941512,
+          "displayHeightRatio": 0.932727
+        },
+        {
+          "originX": 0.470588,
+          "originY": 0.951498,
+          "displayHeightRatio": 0.922636
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          151,
+          24,
+          502,
+          677
+        ],
+        [
+          93,
+          24,
+          435,
+          678
+        ],
+        [
+          150,
+          20,
+          510,
+          660
+        ],
+        [
+          92,
+          20,
+          436,
+          667
+        ]
+      ],
+      "transparentPixels": [
+        255091,
+        272293,
+        258575,
+        265005
+      ],
+      "frameRgbaSha256": [
+        "e73206477058c640a73ace9aa6a2479361b1a52aed9d7d71bfe0f2fc672a3c08",
+        "06c71515b5f1cf1faf6a382ab62a1d4d8cc583dde75b10582479973f75e9a0fa",
+        "2f95b724baa4435ac5c35c29a6c7acf508ba0b3127144a3ad6e904aacfeb1813",
+        "283a1206c0d1ce1041589a428386ec3c2e680409858d959f3426b1b0c09c5a7a"
+      ],
+      "authoredReferences": [
+        "production-v2/player-dark-direction-right.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-dark-direction-right.png": "d1e83c5dae37a602cebd6e0e5fd02ad7a26eab63af9cbe008fa0bad1c29ce29b"
+      }
+    },
+    "dark/walk-up": {
+      "skin": "dark",
+      "state": "walk-up",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-dark-walk-up.png",
+      "sourceImage": "exec-5712758d-0644-43dc-bdfa-3fa1d666a5d7.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "dbebf23b6b9b779b49d2bd5291a05cf08494ea586d6136c1551bab814a224442",
+      "bytes": 897816,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.555258,
+          "originY": 0.927247,
+          "displayHeightRatio": 0.981818
+        },
+        {
+          "originX": 0.450089,
+          "originY": 0.940086,
+          "displayHeightRatio": 0.969067
+        },
+        {
+          "originX": 0.555258,
+          "originY": 0.910128,
+          "displayHeightRatio": 0.97381
+        },
+        {
+          "originX": 0.449198,
+          "originY": 0.9301,
+          "displayHeightRatio": 0.952066
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          166,
+          42,
+          457,
+          650
+        ],
+        [
+          107,
+          43,
+          398,
+          659
+        ],
+        [
+          166,
+          25,
+          457,
+          638
+        ],
+        [
+          107,
+          25,
+          397,
+          652
+        ]
+      ],
+      "transparentPixels": [
+        284737,
+        284218,
+        283487,
+        282161
+      ],
+      "frameRgbaSha256": [
+        "d52e2ba6ed6d800f01a5b38bd7199334a7679bc69e458a70bd5affa86a04efba",
+        "73df1febcfca55700364cb05bca000323f14b1eb66ce0cdcac1e438603c281e7",
+        "b6e4091469d4641b8bcb2740e293cda91b86126f2c87217bcb6993e9e5181823",
+        "5136db7f25b597f6491b35200ba222497851d88db9000c6e6bafbe328a766e03"
+      ],
+      "authoredReferences": [
+        "production-v2/player-dark-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-dark-direction-up.png": "83a5046807ba5eac405acb950099d72c8577a4ce7bde98e3abc1766bc55e0136"
+      }
+    },
+    "dark/walk-down": {
+      "skin": "dark",
+      "state": "walk-down",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-dark-walk-down.png",
+      "sourceImage": "exec-c6824643-3e04-4be9-8c65-b14091341170.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "34adc876ed5b3a48c506ac364a6b11269505f43b2a5c746cabcfb90a338b4fb7",
+      "bytes": 1120264,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.567736,
+          "originY": 0.96719,
+          "displayHeightRatio": 0.90037
+        },
+        {
+          "originX": 0.448307,
+          "originY": 0.975749,
+          "displayHeightRatio": 0.893631
+        },
+        {
+          "originX": 0.57041,
+          "originY": 0.947218,
+          "displayHeightRatio": 0.91276
+        },
+        {
+          "originX": 0.459893,
+          "originY": 0.960057,
+          "displayHeightRatio": 0.90173
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          146,
+          15,
+          491,
+          678
+        ],
+        [
+          82,
+          16,
+          421,
+          684
+        ],
+        [
+          146,
+          10,
+          494,
+          664
+        ],
+        [
+          85,
+          11,
+          431,
+          673
+        ]
+      ],
+      "transparentPixels": [
+        258598,
+        258229,
+        258096,
+        257905
+      ],
+      "frameRgbaSha256": [
+        "9767b20bd0d7e6da9fe9ca40f1298d61909961ff77c455d389a02de5a97ee001",
+        "61fc99b673b285b7266c82eacd4fa6add7d97a05094af548df1a9bbf579e788d",
+        "8d374cdac0bcb63d950b7aacc06970692f25f1dea76445e4b691d437a360ed3c",
+        "05bdeb0de85256251565ed0114e01f5b804f13d5253114592eaa191b3c4d8848"
+      ],
+      "authoredReferences": [
+        "production-v2/player-dark-direction-down.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-dark-direction-down.png": "056418cee120278c645b02173428212a173ba6b18a3699a4da04379b0f8b15de"
+      }
+    },
+    "dark/walk-left": {
+      "skin": "dark",
+      "state": "walk-left",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-dark-walk-left.png",
+      "sourceImage": "exec-0463fe0f-ebc4-4c0b-9851-4f8b3fde2d62.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "a18b036f76a1b43a1b6a2f6b588a6957702f5ef9eeb37b5f472c38896653369b",
+      "bytes": 1048629,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.518717,
+          "originY": 0.964337,
+          "displayHeightRatio": 0.928375
+        },
+        {
+          "originX": 0.440285,
+          "originY": 0.964337,
+          "displayHeightRatio": 0.931272
+        },
+        {
+          "originX": 0.525847,
+          "originY": 0.914408,
+          "displayHeightRatio": 0.956643
+        },
+        {
+          "originX": 0.453654,
+          "originY": 0.918688,
+          "displayHeightRatio": 0.955112
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          117,
+          33,
+          465,
+          676
+        ],
+        [
+          73,
+          35,
+          421,
+          676
+        ],
+        [
+          118,
+          17,
+          472,
+          641
+        ],
+        [
+          79,
+          19,
+          430,
+          644
+        ]
+      ],
+      "transparentPixels": [
+        255311,
+        270757,
+        259792,
+        271976
+      ],
+      "frameRgbaSha256": [
+        "ce6e74cfa7b4f87eddf755724a1e2cdd4910677c2ecfbf4f9bc83e2613f89c9d",
+        "5a037faaf405fa8880dffa0be65060360572e9fb5878d00fd384b51d34439f10",
+        "88dc866e2a8b8d6d697f56d00040653cc15f53541234811e8b14d032eab488c9",
+        "40740b76d11c47a787a97ebc289822b07de9732fde8277b86485ef6601480396"
+      ],
+      "authoredReferences": [
+        "production-v2/player-dark-direction-left.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-dark-direction-left.png": "527cb33352cfc8939456553577bc2452f6289eeacb67c5bfa02acb4e3e8f2bfb"
+      }
+    },
+    "dark/sit": {
+      "skin": "dark",
+      "state": "sit",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-dark-sit.png",
+      "sourceImage": "exec-db804ccb-949c-48c4-95dd-c2bd7dc45796.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "54b2307e827ea3a395a7aa7bd03215170d9534c4f11090fdbfd8fb4257bdfb02",
+      "bytes": 1173001,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.592692,
+          "originY": 0.972896,
+          "displayHeightRatio": 0.732388,
+          "seatOriginY": 0.704708
+        },
+        {
+          "originX": 0.451872,
+          "originY": 0.974322,
+          "displayHeightRatio": 0.734581,
+          "seatOriginY": 0.74893
+        },
+        {
+          "originX": 0.573975,
+          "originY": 0.954351,
+          "displayHeightRatio": 0.737895,
+          "seatOriginY": 0.736091
+        },
+        {
+          "originX": 0.474153,
+          "originY": 0.950071,
+          "displayHeightRatio": 0.74236,
+          "seatOriginY": 0.724679
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          159,
+          12,
+          506,
+          682
+        ],
+        [
+          82,
+          15,
+          461,
+          683
+        ],
+        [
+          106,
+          4,
+          496,
+          669
+        ],
+        [
+          92,
+          5,
+          440,
+          666
+        ]
+      ],
+      "transparentPixels": [
+        243710,
+        251962,
+        251770,
+        245223
+      ],
+      "frameRgbaSha256": [
+        "2a0efac219426850aa116511a227d39c1be1e2ab3157b770f68c5fc26550fa13",
+        "b00b88437854f5b6642afd4a05ff5af952378e943b4d4990f3685c17eb0614f2",
+        "b125189e834e4ce051371821c6f5918d6878dc64dcdda24676869aff92abf438",
+        "90bd1f65e4bbc9bf656c95b2b5d1fb031775cd9b0e04d223061f928082b726f4"
+      ],
+      "authoredReferences": [
+        "production-v2/player-dark-direction-down.png",
+        "production-v2/player-dark-direction-right.png",
+        "production-v2/player-dark-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-dark-direction-down.png": "056418cee120278c645b02173428212a173ba6b18a3699a4da04379b0f8b15de",
+        "production-v2/player-dark-direction-right.png": "d1e83c5dae37a602cebd6e0e5fd02ad7a26eab63af9cbe008fa0bad1c29ce29b",
+        "production-v2/player-dark-direction-up.png": "83a5046807ba5eac405acb950099d72c8577a4ce7bde98e3abc1766bc55e0136"
+      }
+    },
+    "dark/wave": {
+      "skin": "dark",
+      "state": "wave",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-dark-wave.png",
+      "sourceImage": "exec-5303807a-8908-4735-adb2-34fa8b6c5d82.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "7deb91819651ee07a2fb33f9a0f8f64f8b9a6dd73522f6f347358eaca4948485",
+      "bytes": 1043185,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.562389,
+          "originY": 0.945792,
+          "displayHeightRatio": 0.98832
+        },
+        {
+          "originX": 0.445633,
+          "originY": 0.957204,
+          "displayHeightRatio": 0.989959
+        },
+        {
+          "originX": 0.605169,
+          "originY": 0.894437,
+          "displayHeightRatio": 0.999908
+        },
+        {
+          "originX": 0.458111,
+          "originY": 0.895863,
+          "displayHeightRatio": 0.98832
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          149,
+          59,
+          482,
+          663
+        ],
+        [
+          81,
+          68,
+          421,
+          671
+        ],
+        [
+          167,
+          30,
+          504,
+          627
+        ],
+        [
+          96,
+          24,
+          421,
+          628
+        ]
+      ],
+      "transparentPixels": [
+        264329,
+        273415,
+        274162,
+        263809
+      ],
+      "frameRgbaSha256": [
+        "79831502ce79d10ab9a9f922866ab0a8e2a7b35a59cb0836dbe3dbf9c0aafc32",
+        "4051ea2421845a6f703316da4665e0efde3f050a6d896537bb4abb3e58aeb740",
+        "1a0d1eb22092cd72b97c729c2543f36b63bbffac70b1e57f67d353264b9e3829",
+        "a046c4e062f1725235d51ba48fb797f01a15728bd90f0912fbf63231c3620a99"
+      ],
+      "authoredReferences": [
+        "production-v2/player-dark-direction-down.png",
+        "production-v2/player-dark-direction-right.png",
+        "production-v2/player-dark-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-dark-direction-down.png": "056418cee120278c645b02173428212a173ba6b18a3699a4da04379b0f8b15de",
+        "production-v2/player-dark-direction-right.png": "d1e83c5dae37a602cebd6e0e5fd02ad7a26eab63af9cbe008fa0bad1c29ce29b",
+        "production-v2/player-dark-direction-up.png": "83a5046807ba5eac405acb950099d72c8577a4ce7bde98e3abc1766bc55e0136"
+      }
+    },
+    "purple/walk-down": {
+      "skin": "purple",
+      "state": "walk-down",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-purple-walk-down.png",
+      "sourceImage": "exec-6b0ec00b-3c3f-4352-bbda-f8eebfa717f6.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "e7f2ade2e905fa695568fc94503a37be32611e2bd189e03e25d3a929645489ec",
+      "bytes": 1156754,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.57754,
+          "originY": 0.960057,
+          "displayHeightRatio": 0.938593
+        },
+        {
+          "originX": 0.397504,
+          "originY": 0.961484,
+          "displayHeightRatio": 0.93712
+        },
+        {
+          "originX": 0.582888,
+          "originY": 0.934379,
+          "displayHeightRatio": 0.925497
+        },
+        {
+          "originX": 0.404635,
+          "originY": 0.934379,
+          "displayHeightRatio": 0.929821
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          148,
+          37,
+          503,
+          673
+        ],
+        [
+          45,
+          37,
+          406,
+          674
+        ],
+        [
+          147,
+          10,
+          515,
+          655
+        ],
+        [
+          47,
+          13,
+          414,
+          655
+        ]
+      ],
+      "transparentPixels": [
+        253970,
+        252164,
+        250437,
+        250119
+      ],
+      "frameRgbaSha256": [
+        "923ce827a83da58165316f3ec0518c58aa22f0959eaa08b93bae7413404261ee",
+        "6564aa778ae2699e2ad9d8889600b39dc56062035cb4aa2c9a358a904e09a0c9",
+        "a14d6d68ca177a2c2c6f3555240ea002d434f395457841db68866b7d1fc8bcd7",
+        "a75915b9fc19c4ed4d3697ee6036614f313a22384e52488a0c714ee96bb56e5c"
+      ],
+      "authoredReferences": [
+        "production-v2/player-purple-direction-down.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-purple-direction-down.png": "01651d42d1598f357041975d4241f6b691ea29334a535b181e8c21a8606cffe9"
+      }
+    },
+    "purple/walk-up": {
+      "skin": "purple",
+      "state": "walk-up",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-purple-walk-up.png",
+      "sourceImage": "exec-e0e3f9e0-4559-4210-a456-963d09e31f41.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "1a753fb201c5581648c34e5a3e7c03b137524730995498c817e4f523c1a4d159",
+      "bytes": 879153,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.524955,
+          "originY": 0.941512,
+          "displayHeightRatio": 0.980206
+        },
+        {
+          "originX": 0.469697,
+          "originY": 0.944365,
+          "displayHeightRatio": 0.980206
+        },
+        {
+          "originX": 0.527629,
+          "originY": 0.920114,
+          "displayHeightRatio": 0.976997
+        },
+        {
+          "originX": 0.466132,
+          "originY": 0.922967,
+          "displayHeightRatio": 0.97381
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          153,
+          51,
+          435,
+          660
+        ],
+        [
+          128,
+          53,
+          403,
+          662
+        ],
+        [
+          158,
+          34,
+          438,
+          645
+        ],
+        [
+          124,
+          34,
+          404,
+          647
+        ]
+      ],
+      "transparentPixels": [
+        275901,
+        274636,
+        277101,
+        273192
+      ],
+      "frameRgbaSha256": [
+        "67c52c3caa7f49e954070a76fd464e13ed4e51d564ef6a8e2c4b2e2651d9ee1d",
+        "4326bad54ab0227a788f81c7c794a1906ba00899a9aa1012dad4d2820c562c1d",
+        "762f29cb9dd823e135b5859fa40e2871465c6a9f4a0f80b0c3c3e1a5543402c0",
+        "403780f10dfabf34e9f48d5626e586224afd54f6b9cdea22f33964ebaa27555c"
+      ],
+      "authoredReferences": [
+        "production-v2/player-purple-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-purple-direction-up.png": "c13961834cd5961ac3097fd9dc010ee9441fa50d04bac63cf63c46da02488b8a"
+      }
+    },
+    "purple/walk-right": {
+      "skin": "purple",
+      "state": "walk-right",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-purple-walk-right.png",
+      "sourceImage": "exec-2a822aa7-d9a0-45c5-97d3-8b1db5b32174.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "79af99f0077dff304084614820c27c4490563557ccf2743890584d9834aa189b",
+      "bytes": 1126871,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.535651,
+          "originY": 0.974322,
+          "displayHeightRatio": 0.926934
+        },
+        {
+          "originX": 0.43672,
+          "originY": 0.980029,
+          "displayHeightRatio": 0.921212
+        },
+        {
+          "originX": 0.539216,
+          "originY": 0.924394,
+          "displayHeightRatio": 0.946031
+        },
+        {
+          "originX": 0.437611,
+          "originY": 0.928673,
+          "displayHeightRatio": 0.940071
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          114,
+          39,
+          477,
+          683
+        ],
+        [
+          64,
+          39,
+          411,
+          687
+        ],
+        [
+          115,
+          17,
+          510,
+          648
+        ],
+        [
+          58,
+          16,
+          415,
+          651
+        ]
+      ],
+      "transparentPixels": [
+        245154,
+        254710,
+        250208,
+        259910
+      ],
+      "frameRgbaSha256": [
+        "c3f6621b818f90489e470d36ff1688d92740a54e46400d4887766bf822b78a29",
+        "e47d064ba38815179aec4f50ef8f9c349cfc10ef7198ccc0a109d0e65443958b",
+        "847c9c424a823552f1d17967e7adf9f0b5e3b93b526de6fff23b40d788f321b2",
+        "fcf116491722c0e385237ae1c031232395054ccfd7e0f17a5f00ed7b3f6e702c"
+      ],
+      "authoredReferences": [
+        "production-v2/player-purple-direction-right.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-purple-direction-right.png": "3276ae39cc3762c92930731efcfe06058a0c755c3cac59c16152908b92aa8e75"
+      }
+    },
+    "purple/walk-left": {
+      "skin": "purple",
+      "state": "walk-left",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-purple-walk-left.png",
+      "sourceImage": "exec-faaf3e87-77ed-4fe1-8f65-78fcf2f8a45d.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "b6b9048a1bbc989d3210bef84cfef6ca16717921accbb7dfa099d0aab7d4629f",
+      "bytes": 1203039,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.558824,
+          "originY": 0.96291,
+          "displayHeightRatio": 0.949039
+        },
+        {
+          "originX": 0.481283,
+          "originY": 0.968616,
+          "displayHeightRatio": 0.943042
+        },
+        {
+          "originX": 0.552585,
+          "originY": 0.922967,
+          "displayHeightRatio": 0.956643
+        },
+        {
+          "originX": 0.483066,
+          "originY": 0.934379,
+          "displayHeightRatio": 0.944534
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          124,
+          46,
+          519,
+          675
+        ],
+        [
+          96,
+          46,
+          468,
+          679
+        ],
+        [
+          116,
+          23,
+          518,
+          647
+        ],
+        [
+          96,
+          23,
+          475,
+          655
+        ]
+      ],
+      "transparentPixels": [
+        236005,
+        252215,
+        236408,
+        251042
+      ],
+      "frameRgbaSha256": [
+        "3e6ad66e8dd8da24e6830ef353d9164720afe4cc77a64cb66600bde217135820",
+        "886684053c178ad68f3f322e98032df33881ccc33a1c416c0115f974a1a8061e",
+        "be5339df2c402fd468cfb1b131d5e57bbec64bb5bc0f0b6873696692cfd0a679",
+        "c037d605216e0aa5ca682eef8cdc42115cc0aef70477911cfbcb2b540b87a206"
+      ],
+      "authoredReferences": [
+        "production-v2/player-purple-direction-left.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-purple-direction-left.png": "6fa370303f53d2d73f49266c3e10caa97338e96c02b41647f23bf9952571cff7"
+      }
+    },
+    "purple/sit": {
+      "skin": "purple",
+      "state": "sit",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-purple-sit.png",
+      "sourceImage": "exec-a6c29437-d621-48ce-9efa-80093ef2bdf6.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "9c92b4e9725030c9e1f24f965bac3edd5a5a6e65b6f8579f7ece794ef1e9f297",
+      "bytes": 1223545,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.555258,
+          "originY": 0.980029,
+          "displayHeightRatio": 0.745745,
+          "seatOriginY": 0.699001
+        },
+        {
+          "originX": 0.369875,
+          "originY": 0.978602,
+          "displayHeightRatio": 0.74916,
+          "seatOriginY": 0.737518
+        },
+        {
+          "originX": 0.596257,
+          "originY": 0.954351,
+          "displayHeightRatio": 0.745745,
+          "seatOriginY": 0.701854
+        },
+        {
+          "originX": 0.43672,
+          "originY": 0.944365,
+          "displayHeightRatio": 0.752607,
+          "seatOriginY": 0.713267
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          121,
+          29,
+          505,
+          687
+        ],
+        [
+          31,
+          31,
+          413,
+          686
+        ],
+        [
+          146,
+          11,
+          514,
+          669
+        ],
+        [
+          72,
+          10,
+          430,
+          662
+        ]
+      ],
+      "transparentPixels": [
+        229067,
+        241613,
+        240862,
+        235361
+      ],
+      "frameRgbaSha256": [
+        "b957ab692f7180aa18eda518372e282f5b52ec840669cbf00bfdd1e100464c02",
+        "1f9ab556019b28714608de99f8be05c399b8f1370d1b9324d4cd7212305bb0e4",
+        "10f935e1afce7bb53fa907c4828005406a72434ac6afcf87dd6f025f2c38c1fe",
+        "b1abfcdb2303d0bff2c052b56fbe9cc635c4e6e4237811a1a82987de65bc6f56"
+      ],
+      "authoredReferences": [
+        "production-v2/player-purple-direction-down.png",
+        "production-v2/player-purple-direction-right.png",
+        "production-v2/player-purple-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-purple-direction-down.png": "01651d42d1598f357041975d4241f6b691ea29334a535b181e8c21a8606cffe9",
+        "production-v2/player-purple-direction-right.png": "3276ae39cc3762c92930731efcfe06058a0c755c3cac59c16152908b92aa8e75",
+        "production-v2/player-purple-direction-up.png": "c13961834cd5961ac3097fd9dc010ee9441fa50d04bac63cf63c46da02488b8a"
+      }
+    },
+    "purple/wave": {
+      "skin": "purple",
+      "state": "wave",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-purple-wave.png",
+      "sourceImage": "exec-54e30314-76d4-4b88-a97d-cc78181b4708.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "371c25dffe4f3c799f898f2d4a1800da9fb100aa287a1379016265d6dd93cd52",
+      "bytes": 1212170,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.531194,
+          "originY": 0.944365,
+          "displayHeightRatio": 0.941554
+        },
+        {
+          "originX": 0.454545,
+          "originY": 0.948645,
+          "displayHeightRatio": 0.940071
+        },
+        {
+          "originX": 0.545455,
+          "originY": 0.9301,
+          "displayHeightRatio": 0.928375
+        },
+        {
+          "originX": 0.516934,
+          "originY": 0.937233,
+          "displayHeightRatio": 0.919792
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          104,
+          28,
+          492,
+          662
+        ],
+        [
+          59,
+          30,
+          436,
+          665
+        ],
+        [
+          120,
+          9,
+          500,
+          652
+        ],
+        [
+          80,
+          8,
+          468,
+          657
+        ]
+      ],
+      "transparentPixels": [
+        236069,
+        248467,
+        244740,
+        237817
+      ],
+      "frameRgbaSha256": [
+        "5ebad38fece1c3a5de43e85d737d2fd5a31f43d04406030d18806a5c7f650a20",
+        "dec3c8c6914cb1c806f39ca002f8215d607e008d3c1fde1ea0e275b10e056b86",
+        "e63300f9ff1dabaf3fd9e9e43d2f4e7853ad597652fccc23c94202ae40e62779",
+        "7b98a48ff0b991a6d5e9a86789ff11fe73d19db031fff7a87d4192397f36425f"
+      ],
+      "authoredReferences": [
+        "production-v2/player-purple-direction-down.png",
+        "production-v2/player-purple-direction-right.png",
+        "production-v2/player-purple-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-purple-direction-down.png": "01651d42d1598f357041975d4241f6b691ea29334a535b181e8c21a8606cffe9",
+        "production-v2/player-purple-direction-right.png": "3276ae39cc3762c92930731efcfe06058a0c755c3cac59c16152908b92aa8e75",
+        "production-v2/player-purple-direction-up.png": "c13961834cd5961ac3097fd9dc010ee9441fa50d04bac63cf63c46da02488b8a"
+      }
+    }
+  }
+}

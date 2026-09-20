@@ -185,6 +185,8 @@ jobs:
             !/apps/web/public/assets/
             /apps/web/public/assets/virtual-studio/world/
             /apps/web/public/assets/reference-rebuild/
+            /apps/web/public/assets/3d/environments/refined-v6/manifest.json
+            /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
             !/apps/web/public/vrm/
             /apps/web/public/vrm/AvatarSample_B.vrm
             /apps/web/public/vrm/sample.vrm
@@ -196,6 +198,9 @@ jobs:
             /docs/competitor-analysis.md
             /docs/ranking-architecture.md
             !/tests/benchmarks/results/
+      - name: Restore Virtual Studio art for foundation regressions
+        if: matrix.shard == 'studio-foundation'
+        run: git sparse-checkout add /apps/web/public/assets/virtual-studio/production-v2/ /apps/web/public/assets/virtual-studio/living-world/ /apps/web/public/assets/virtual-studio/drawn-characters-v1/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
@@ -289,10 +294,44 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  database:
+    name: Core review database invariants
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: studio_review_test
+          POSTGRES_DB: studio_review_integration
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studio_review_test -d studio_review_integration"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://studio_review_test@127.0.0.1:5432/studio_review_integration
+      STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql://studio_review_test@127.0.0.1:5432/studio_review_integration
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Prepare an empty disposable database with real graph constraints
+        run: node scripts/prepare-studio-review-test-db.mjs
+      - name: Verify review production, immutable history and concurrent decisions
+        run: pnpm exec vitest run --no-file-parallelism apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts
+
   core:
     name: core
     if: ${{ always() && !cancelled() }}
-    needs: [lint, typecheck, static, serial, a11y, build]
+    needs: [lint, typecheck, static, serial, a11y, build, database]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -301,7 +340,7 @@ jobs:
           CORE_RESULTS: ${{ toJSON(needs) }}
         run: |
           node --input-type=module <<'NODE'
-          const required = ["lint", "typecheck", "static", "serial", "a11y", "build"];
+          const required = ["lint", "typecheck", "static", "serial", "a11y", "build", "database"];
           const results = JSON.parse(process.env.CORE_RESULTS ?? "null");
           if (!results || typeof results !== "object" || Array.isArray(results)) {
             throw new Error("core requires the GitHub needs object");

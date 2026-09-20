@@ -159,6 +159,37 @@ describe("database integration runner CI policy", () => {
     );
   });
 
+  it.each(["full-test-suite.yml", "full-test-diagnostic.yml"])(
+    "runs %s with a fresh real database, separated runtime role and actual shell tests", (filename) => {
+      const workflow = readYaml(`.github/workflows/${filename}`);
+      const full = workflow.jobs["full-test"];
+      expect(full["continue-on-error"]).not.toBe(true);
+      expect(full.services.postgres.image).toBe("postgres:16-alpine");
+      expect(full.services.postgres.ports).toEqual(["5432:5432"]);
+      expect(full.services.postgres.options).toContain("pg_isready");
+      const target = new URL(full.env.TEST_DATABASE_URL);
+      expect(target.hostname).toBe("127.0.0.1");
+      expect(target.pathname).toBe("/studio_full_integration");
+      expect(target.username).toBe(full.services.postgres.env.POSTGRES_USER);
+      expect(full.env.TEST_RUNTIME_DATABASE_ROLE).not.toBe(target.username);
+      const commands = runCommands(full);
+      const install = commands.findIndex((command) => command.includes("apt-get install"));
+      expect(commands[install]).toMatch(/\bzsh\b/u);
+      expect(commands[install]).toMatch(/\bpostgresql-client\b/u);
+      const bootstrap = commands.findIndex((command) => command.includes("bootstrap-empty-production-database.mjs"));
+      expect(bootstrap).toBeGreaterThan(install);
+      expect(commands[bootstrap]).toContain("--execute --allow-loopback");
+      expect(commands[bootstrap]).toContain('--runtime-database-role "$TEST_RUNTIME_DATABASE_ROLE"');
+      expect(commands[bootstrap]).toContain('--release-sha "$GITHUB_SHA"');
+      expect(commands[bootstrap]).toContain("--confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE");
+      expect(commands[bootstrap]).not.toContain("--reset-confirmation");
+      const execute = commands.indexOf("node scripts/run-full-test-ci.mjs");
+      expect(execute).toBeGreaterThan(bootstrap);
+      expect(commands.filter((command) => command.includes("run-full-test-ci.mjs"))).toHaveLength(1);
+      expect(full.steps.find((step) => step.run === commands[bootstrap]).env.MIGRATION_DATABASE_URL).toBe("${{ env.TEST_DATABASE_URL }}");
+    },
+  );
+
   it("never forwards a standalone `--` through `pnpm run`", () => {
     const workflow = readYaml(".github/workflows/ci.yml");
 
@@ -246,7 +277,7 @@ describe("database integration runner CI policy", () => {
     }
   });
 
-  const required = ["lint", "typecheck", "static", "serial", "a11y", "build"];
+  const required = ["lint", "typecheck", "static", "serial", "a11y", "build", "database"];
   const coreGate = () => readYaml(".github/workflows/ci.yml").jobs.core.steps.find(
     (step) => step.name === "Require actual success from every mandatory check",
   );

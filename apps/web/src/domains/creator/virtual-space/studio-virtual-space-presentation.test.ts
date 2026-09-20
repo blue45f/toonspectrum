@@ -16,16 +16,18 @@ import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
 
 const openWorld = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 500, height: 500, colliders: [], props: [],
   rooms: [{ id: "room", x: 0, y: 0, width: 500, height: 500, labelKo: "방", labelEn: "Room" }],
-  interactions: [], portals: [], npcs: [], spawns: [{ id: "main", point: { x: 200, y: 200 } }],
+  interactions: [], portals: [], npcs: [], occlusionLayers: [], spawns: [{ id: "main", point: { x: 200, y: 200 } }],
 };
 
 describe("Virtual Studio art and presentation", () => {
-  it("supplies eight source-preserving cutout frames in every skin/direction", () => {
+  it("keeps explicit gait technique, frame count and source paths for every skin/direction", () => {
     for (const skin of STUDIO_CHARACTER_SKINS) for (const direction of ["down", "left", "right", "up"] as const) {
       const clip = skin.clips?.[`walk-${direction}`];
-      expect(clip?.end).toBe(7); expect(clip?.technique).toBe("cutout-rig");
+      expect(clip?.start).toBe(0);
+      expect(clip?.end).toBe(clip?.technique === "drawn" ? 3 : 7);
+      expect(["drawn", "cutout-rig"]).toContain(clip?.technique);
       expect(clip?.distancePerCycle).toBeGreaterThan(0);
-      expect(clip?.textureUrl).toContain("/production-v2/");
+      expect(clip?.textureUrl).toContain(clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/");
       expect(skin.directional[direction]).toContain("/production-v2/");
     }
   });

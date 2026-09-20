@@ -66,8 +66,8 @@
   .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-hero { gap: clamp(1.75rem, 8vw, 2.25rem); padding-block: clamp(2rem, 9vw, 2.75rem); }
   .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-home-wayfinding .cf-intent { gap: 1rem; }
   .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent-search { margin-block: 0.75rem; }
-  .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent nav { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain; padding-bottom: 0.25rem; scrollbar-width: thin; }
-  .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent nav a { flex: 0 0 auto; }
+  .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent nav:not(.cf-intent-visual-nav) { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-inline: contain; padding-bottom: 0.25rem; scrollbar-width: thin; }
+  .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent nav:not(.cf-intent-visual-nav) a { flex: 0 0 auto; }
 }
 :root[data-design-theme="contrast"] .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-home-wayfinding .cf-intent { border-width: 2px; background: var(--color-panel); box-shadow: none; }
 @media (prefers-contrast: more), (forced-colors: active) { .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-home-wayfinding .cf-intent { border-width: 2px; box-shadow: none; } }

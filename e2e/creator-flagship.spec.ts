@@ -1,5 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+import { STUDIO_EXACT_RESUME_RESTORED_EVENT, studioExactResumeStorageKey } from "../apps/web/src/domains/creator/studio-exact-resume-context";
+import { readDurableStudioAutosaveDocument } from "../scripts/lib/studio-verify-durable-autosave.mjs";
 
+import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
 const THEME_STORAGE_KEY = "toonspectrum-theme";
@@ -46,7 +49,8 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(page.locator("h1")).toContainText("기획부터 연재까지");
     await expect(home.locator(".cf-home-preview img")).toBeVisible();
     await expect(home.locator(".cf-intent-visual-nav img")).toHaveCount(6);
-    await expect(home.locator(".cf-intent-film img")).toBeVisible();
+    await expect(home.locator('.cf-hero-links a[href="/brand-film"]')).toBeVisible();
+    await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
     await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
     await expect(home.locator(".cf-production-journey img")).toBeVisible();
     await expect(startCards).toHaveCount(4);
@@ -85,7 +89,8 @@ test("the front door exposes planning, 2D, 3D, assets, collaboration and publish
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
 
   await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
-  await expect(home.locator('.cf-hero a.cf-secondary[href="/production"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
+  await expect(home.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toBeVisible();
   await expect(home.locator('.cf-start-card[href="/story-lab"]')).toBeVisible();
   await expect(home.locator('.cf-start-card[href="/studio/new"]')).toBeVisible();
   await expect(home.locator('.cf-start-card[href="/studio/bg3d"]')).toBeVisible();
@@ -165,6 +170,11 @@ test("recent work reopens the exact Studio document and restores its viewport", 
   await page.setViewportSize({ width: 1280, height: 900 });
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript((eventName) => {
+    const receipts: unknown[] = [];
+    Object.assign(window, { __studioExactResumeReceipts: receipts });
+    window.addEventListener(eventName, (event) => receipts.push((event as CustomEvent).detail));
+  }, STUDIO_EXACT_RESUME_RESTORED_EVENT);
 
   await page.goto("/studio/new?kind=webtoon&template=webtoon-four-cut", {
     waitUntil: "domcontentloaded",
@@ -177,8 +187,23 @@ test("recent work reopens the exact Studio document and restores its viewport", 
 
   const createdUrl = new URL(page.url());
   const documentPath = createdUrl.pathname;
+  const [, projectId, documentId] = documentPath.match(/^\/studio\/p\/([^/]+)\/d\/([^/]+)$/u)!;
+  const resumeKey = studioExactResumeStorageKey(decodeURIComponent(projectId), decodeURIComponent(documentId));
   const viewport = page.locator("[data-studio-canvas-viewport]").first();
   await expect(viewport).toBeVisible({ timeout: 60_000 });
+
+  // Persist actual authored content through the editor before testing a durable reopen.
+  await page.keyboard.press("b");
+  const box = await viewport.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width * .45, box!.y + box!.height * .4);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width * .55, box!.y + box!.height * .45, { steps: 12 });
+  await page.mouse.up();
+  await expect.poll(async () => {
+    const saved = await readDurableStudioAutosaveDocument(page, studioAutosaveKey({ workId: decodeURIComponent(documentId) }));
+    return saved?.pagesList.some((item) => item.elements?.some((element) => (element as { type?: string }).type === "draw")) ?? false;
+  }).toBe(true);
 
   const canvasStatus = page.getByRole("group", { name: "캔버스 상태 및 보기" });
   const zoomIn = page.getByRole("button", { name: "확대", exact: true });
@@ -199,25 +224,23 @@ test("recent work reopens the exact Studio document and restores its viewport", 
     };
   });
   expect(expectedView.topRatio).toBeGreaterThan(0.3);
-  await page.waitForTimeout(1_100);
-
-  const storedCheckpoint = await page.evaluate(() => {
-    const raw = localStorage.getItem("toonstudio:studio-resume-checkpoints:v1");
-    return raw ? JSON.parse(raw) as {
-      checkpoints?: Array<{ pageId?: string; viewport?: { scrollY?: number; zoom?: number } }>;
-    } : null;
-  });
-  expect(storedCheckpoint?.checkpoints?.[0]?.pageId).toBeTruthy();
-  expect(storedCheckpoint?.checkpoints?.[0]?.viewport?.scrollY ?? 0).toBeGreaterThan(0.3);
-  expect(storedCheckpoint?.checkpoints?.[0]?.viewport?.zoom ?? 0).toBeGreaterThan(1);
+  const readResume = () => page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as { pageId?: string; scrollTop?: number; zoom?: number } : null;
+  }, resumeKey);
+  await expect.poll(async () => (await readResume())?.scrollTop ?? 0).toBeGreaterThan(0);
+  const storedCheckpoint = await readResume();
+  expect(storedCheckpoint?.pageId).toBeTruthy();
+  expect(storedCheckpoint?.zoom ?? 0).toBeGreaterThan(1);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const recent = page.locator(".cf-recent-card");
+  const recent = page.locator(".cf-intent-recent > .cf-recent-card");
   await expect(recent).toContainText(/문서의 마지막 페이지·선택·화면 위치/u);
   const recentHref = await recent.getAttribute("href");
   expect(recentHref).not.toBeNull();
   const recentUrl = new URL(recentHref!, "https://toonstudio.test");
   expect(recentUrl.pathname).toBe(documentPath);
+  expect(recentUrl.searchParams.get("resume")).toBe("latest");
   expect(recentUrl.searchParams.get("token")).toBeNull();
   expect(recentUrl.searchParams.get("room")).toBeNull();
   expect(recentUrl.searchParams.get("startTool")).toBeNull();
@@ -225,10 +248,28 @@ test("recent work reopens the exact Studio document and restores its viewport", 
   await recent.click();
   await page.waitForURL((url) => url.pathname === documentPath);
   const restoredViewport = page.locator("[data-studio-canvas-viewport]").first();
-  await expect(restoredViewport).toBeVisible({ timeout: 60_000 });
-  await expect(
-    page.getByRole("group", { name: "캔버스 상태 및 보기" }).getByText(zoomPercent!, { exact: true }),
-  ).toBeVisible();
+  const recovery = page.getByRole("button", { name: "이어서 그리기", exact: true });
+  await page.addLocatorHandler(recovery, async () => { await recovery.click(); });
+  try {
+    // Visible canvas chrome precedes asynchronous durable hydration. The same existing 60s
+    // readiness budget must wait for the authoritative page/zoom receipt, not a placeholder view.
+    await expect(page.getByText(
+      `최근 작업 위치를 복원했어요. ${storedCheckpoint!.pageId} · 확대 ${Math.round(storedCheckpoint!.zoom! * 100)}%`,
+      { exact: true },
+    )).toBeVisible({ timeout: 60_000 });
+  } finally {
+    await page.removeLocatorHandler(recovery);
+  }
+  expect(new URL(page.url()).pathname).toBe(documentPath);
+  const receipts = await page.evaluate(() =>
+    (window as unknown as { __studioExactResumeReceipts: unknown[] }).__studioExactResumeReceipts);
+  expect(receipts).toEqual([expect.objectContaining({
+    projectId: decodeURIComponent(projectId), documentId: decodeURIComponent(documentId),
+    pageId: storedCheckpoint!.pageId, zoom: storedCheckpoint!.zoom,
+  })]);
+  await expect(restoredViewport).toBeVisible();
+  await expect(canvasStatus.getByText(/^\d+%$/u)).toHaveText(zoomPercent!);
+  expect((await readResume())?.pageId).toBe(storedCheckpoint?.pageId);
 
   await expect.poll(async () => restoredViewport.evaluate((element) => {
     const viewportElement = element as HTMLElement;

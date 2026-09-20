@@ -82,6 +82,8 @@ export type CreatorNavigationHost = {
   requestFrame: (callback: () => void) => number;
   cancelFrame: (handle: number) => void;
   subscribe: (callback: () => void) => () => void;
+  isBlocked?: () => boolean;
+  subscribeUnblocked?: (callback: () => void) => () => void;
 };
 
 /** Resolve lazy-route headings without selectors, history writes or delayed focus after unmount. */
@@ -89,10 +91,12 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
   let frame: number | undefined;
   let revision = 0;
   let disposed = false;
+  let blocked = false;
 
   const schedule = () => {
     if (disposed) return;
     const request = ++revision;
+    blocked = false;
     if (frame !== undefined) host.cancelFrame(frame);
     frame = undefined;
     const hash = host.getHash();
@@ -100,11 +104,18 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
     frame = host.requestFrame(() => {
       if (disposed || request !== revision || hash !== host.getHash()) return;
       frame = undefined;
+      if (host.isBlocked?.()) {
+        blocked = true;
+        return;
+      }
       focusCreatorSection(hash, host.findTarget, true);
     });
   };
 
   const unsubscribe = host.subscribe(schedule);
+  const unsubscribeUnblocked = host.subscribeUnblocked?.(() => {
+    if (blocked && !host.isBlocked?.()) schedule();
+  });
   schedule();
 
   return () => {
@@ -113,5 +124,6 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
     revision += 1;
     if (frame !== undefined) host.cancelFrame(frame);
     unsubscribe();
+    unsubscribeUnblocked?.();
   };
 }

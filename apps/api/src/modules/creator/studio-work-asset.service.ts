@@ -594,6 +594,13 @@ export class StudioWorkAssetService {
     private readonly objectStorage?: PrivateObjectStoragePort,
   ) {}
 
+  /** Shared by server-owned producers before any image buffering/decoding or graph mutation. */
+  assertAdmissionEnabled(): void {
+    if (!isStudioWorkAssetAdmissionOptedIn(process.env.STUDIO_WORK_ASSET_ADMISSION)) {
+      throw new ForbiddenException("협업 에셋 입장은 안전한 버전 교체 기능을 준비하는 동안 비활성화되어 있습니다.");
+    }
+  }
+
   async uploadLayerLiftBatch(
     actorUserId: string,
     workId: string,
@@ -977,6 +984,7 @@ export class StudioWorkAssetService {
               expectedDigest: reference.object.digest,
             },
             allowAdminOverride,
+            true,
           )
         );
         if (plan.remoteDeleteRequired) {
