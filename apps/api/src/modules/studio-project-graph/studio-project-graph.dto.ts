@@ -12,6 +12,7 @@ import {
   scopeRefSchema,
   sha256Schema,
   studioEntityIdSchema,
+  studioReviewTaskReferenceSchema,
 } from "@toonspectrum/studio-project-model";
 import {
   compatibilityItemSchema,
@@ -290,6 +291,8 @@ export class DecideStudioReviewDto extends createZodDto(
 export const ResolveStudioReviewCommentSchema = z
   .object({
     resolutionRevisionId: studioEntityIdSchema,
+    /** Optional server-attested newer capture; identity is never an access grant. */
+    resolutionSourceRef: studioReviewTaskReferenceSchema.shape.subject.optional(),
     status: z.enum(["resolved", "dismissed"]).default("resolved"),
   })
   .strict();

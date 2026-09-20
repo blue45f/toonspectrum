@@ -4,6 +4,7 @@ import {
   CreateStudioExternalFileBindingSchema,
   UpdateStudioExternalFileBindingSchema,
   CreateStudioReviewCommentSchema,
+  ResolveStudioReviewCommentSchema,
 } from "./studio-project-graph.dto";
 
 const cloudBinding = {
@@ -57,6 +58,22 @@ describe("Studio external file binding DTOs", () => {
       lastSyncedRevisionId: null,
       lastSyncedAt: "2026-09-17T00:00:00.000Z",
     }).success).toBe(false);
+  });
+});
+
+describe("Studio comment resolution capture locator", () => {
+  const resolutionSourceRef = { schemaVersion: 1, workId: "work", projectId: "project", artifactId: "artifact",
+    reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) };
+  it("preserves the legacy body and adds only an explicit identity pin", () => {
+    expect(ResolveStudioReviewCommentSchema.parse({ resolutionRevisionId: " submission " }))
+      .toEqual({ resolutionRevisionId: "submission", status: "resolved" });
+    expect(ResolveStudioReviewCommentSchema.parse({ resolutionRevisionId: "submission", resolutionSourceRef }))
+      .toEqual({ resolutionRevisionId: "submission", status: "resolved", resolutionSourceRef });
+  });
+  it.each([null, {}, { ...resolutionSourceRef, schemaVersion: 2 }, { ...resolutionSourceRef, workId: " work " },
+    { ...resolutionSourceRef, rootGraphHash: "guess" }, { ...resolutionSourceRef, url: "https://private.invalid/image" },
+    { ...resolutionSourceRef, sourceServerRevision: 99 }])("rejects malformed or authority-shaped source input %j", (reference) => {
+    expect(ResolveStudioReviewCommentSchema.safeParse({ resolutionRevisionId: "submission", resolutionSourceRef: reference }).success).toBe(false);
   });
 });
 

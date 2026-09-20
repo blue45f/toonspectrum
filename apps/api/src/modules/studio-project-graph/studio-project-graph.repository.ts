@@ -19,6 +19,7 @@ import { STUDIO_REVIEW_PREVIEW_PAGE_SIZE, type StudioReviewPreviewBlobRow,
   type StudioReviewPreviewSource, type StudioReviewPreviewSubject } from "./studio-review-preview";
 import { lockStudioReviewPreviewStorage } from "./studio-review-preview-storage";
 import { studioReviewMappingFromOperation, studioReviewMappingsFromOperation } from "./studio-review-source-map";
+import { loadStudioReviewResolutionCaptures } from "./studio-review-capture-attestation";
 
 import { dbPool } from "../../db";
 import {
@@ -2080,6 +2081,7 @@ export class StudioProjectGraphRepository {
       const commentResult = await client.query<{
         id: string;
         artifactId: string;
+        reviewId: string;
         status: StudioReviewCommentRecord["status"];
         resolutionRevisionId: string | null;
         resolvedBy: string | null;
@@ -2087,6 +2089,7 @@ export class StudioProjectGraphRepository {
       }>(
         `SELECT comment.id,
                 review."artifactId" AS "artifactId",
+                review.id AS "reviewId",
                 comment.status,
                 comment."resolutionRevisionId" AS "resolutionRevisionId",
                 comment."resolvedBy" AS "resolvedBy",
@@ -2106,6 +2109,24 @@ export class StudioProjectGraphRepository {
       );
       if (!accessResult) throw new StudioProjectNotFoundError("artifact");
       assertAccess(accessResult.access, "edit");
+      if (input.resolutionSourceRef) {
+        const reference = input.resolutionSourceRef;
+        const captures = await loadStudioReviewResolutionCaptures(client, comment.artifactId, [comment.reviewId, reference.reviewId]);
+        const original = captures.find((capture) => capture?.subject.reviewId === comment.reviewId);
+        const replacement = captures.find((capture) => capture?.subject.reviewId === reference.reviewId);
+        // This proof is checked even for a no-op retry: a matching old resolution
+        // cannot turn an invented capture pin into a successful verified response.
+        if (captures.length !== 2 || !original || !replacement
+          || canonicalJson(replacement.subject) !== canonicalJson(reference)
+          || original.subject.workId !== accessResult.row.workId || original.subject.projectId !== accessResult.row.projectId
+          || replacement.subject.workId !== original.subject.workId || replacement.subject.projectId !== original.subject.projectId
+          || replacement.subject.revisionId === original.subject.revisionId
+          || replacement.submissionId !== input.resolutionRevisionId
+          || replacement.sourceServerRevision <= original.sourceServerRevision || replacement.sequence <= original.sequence) {
+          throw new StudioRepositoryInvariantError("review_resolution_source_mismatch",
+            "resolution source must be a server-attested subsequent saved capture and its exact submission parent");
+        }
+      }
       if (
         ["resolved", "dismissed"].includes(comment.status)
         && comment.status === input.status
