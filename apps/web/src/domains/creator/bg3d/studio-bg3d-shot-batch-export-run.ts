@@ -30,7 +30,6 @@ import {
   waitForStudioBg3dPaintFrame,
 } from "./studio-bg3d-editor-derivations";
 import { resolveStudioBg3dLtCaptureSize } from "./studio-bg3d-lt-capture-size";
-import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
 import {
   applyStudioBg3dShot,
   serializeStudioBg3dSceneDocument,
@@ -296,6 +295,9 @@ export function createStudioBg3dShotBatchExportRunner(
       STUDIO_BG3D_SHOT_BATCH_RECOVERY_AUTHORIZATION_RECEIPT_MAX_TTL_MS,
       StudioBg3dShotBatchRecoveryError,
       buildStudioBg3dShotArtifacts,
+      buildStudioBg3dTiledShotArtifacts,
+      studioBg3dBatchOutputPixelBudget, studioBg3dBatchNeedsTiles,
+      studioBg3dTilePipelineId, resolveStudioBg3dBatchTileShape, STUDIO_BG3D_TILED_PNG_PROFILE,
       buildStudioBg3dShotBatchArchiveInWorker,
       buildStudioBg3dShotContactSheetsInWorker,
       commitStudioBg3dShotBatchDownload,
@@ -385,10 +387,7 @@ export function createStudioBg3dShotBatchExportRunner(
         mode: "capture",
         signals: deviceSignals,
       });
-      const maxPixels = Math.min(
-        captureQuality.maxRenderPixels,
-        STUDIO_BG3D_LT_RENDER_MAX_PIXELS,
-      );
+      const maxPixels = studioBg3dBatchOutputPixelBudget(planningAdapter, captureQuality.maxRenderPixels);
       const captureSpecs: StudioBg3dShotBatchCaptureSpecInput[] = shots.map((sourceShot) => {
         const appliedShot = applyStudioBg3dShot(currentDocument, sourceShot.id);
         const applied = appliedShot ? freezeStudioBg3dShotAnimationsForBatch(appliedShot) : null;
@@ -451,8 +450,8 @@ export function createStudioBg3dShotBatchExportRunner(
             deviceProfile: captureQuality.profile,
             textureScale: captureQuality.textureScale,
             lodBias: captureQuality.lodBias,
-            ltPipelineId: STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
-            pngEncodingId: STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
+            ltPipelineId: planningAdapter.createTiledCapture ? studioBg3dTilePipelineId(captureQuality.maxRenderPixels) : STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1,
+            pngEncodingId: planningAdapter.createTiledCapture ? STUDIO_BG3D_TILED_PNG_PROFILE : STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1,
             psdEncodingId: STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1,
           },
           shots: captureSpecs,
@@ -572,8 +571,8 @@ export function createStudioBg3dShotBatchExportRunner(
           mode: "capture",
           signals: deviceSignals,
         });
-        if (appliedCaptureQuality.profile !== batchPlan.captureOwner.deviceProfile ||
-          Math.min(appliedCaptureQuality.maxRenderPixels, STUDIO_BG3D_LT_RENDER_MAX_PIXELS) !==
+        if (!captureRef.current.adapter || appliedCaptureQuality.profile !== batchPlan.captureOwner.deviceProfile ||
+          studioBg3dBatchOutputPixelBudget(captureRef.current.adapter!, appliedCaptureQuality.maxRenderPixels) !==
             batchPlan.captureOwner.maxPixels ||
           appliedCaptureQuality.textureScale !== batchPlan.captureOwner.textureScale ||
           appliedCaptureQuality.lodBias !== batchPlan.captureOwner.lodBias ||
@@ -614,7 +613,8 @@ export function createStudioBg3dShotBatchExportRunner(
         renderedProjection = applied.camera.projection;
 
         let captured: Awaited<ReturnType<typeof captureStudioBg3dRaster>> | null = null;
-        while (!captured) {
+        let tiledArtifacts: Awaited<ReturnType<typeof buildStudioBg3dTiledShotArtifacts>> | null = null;
+        while (!captured && !tiledArtifacts) {
           if (document.visibilityState === "hidden") {
             setShotBatchProgress({
               stage: "render",
@@ -674,7 +674,32 @@ export function createStudioBg3dShotBatchExportRunner(
             if (!rasterAuthority?.ok) {
               throw new Error(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
             }
-            captured = await captureStudioBg3dRaster(
+            const includeNormals = Boolean(captureAdapter.normalProfile && shot.capture.includeDepth
+              && applied.output.line.depthEnabled && !applied.output.line.depthOutlineOnly);
+            if (studioBg3dBatchNeedsTiles(captureAdapter, shot.capture.width * shot.capture.height,
+              appliedCaptureQuality.maxRenderPixels, includeNormals)) {
+              if (batchPlan.captureOwner.ltPipelineId !== studioBg3dTilePipelineId(appliedCaptureQuality.maxRenderPixels)) throw new Error("Tiled output is not part of the frozen recovery plan.");
+              tiledArtifacts = await buildStudioBg3dTiledShotArtifacts({
+                tileShape: resolveStudioBg3dBatchTileShape(appliedCaptureQuality.maxRenderPixels),
+                adapter: captureAdapter, shot, settings: { line: applied.output.line, tone: applied.output.tone },
+                passes: batchPlan.passes, includeLayeredPsd: shotBatchIncludeLayeredPsd,
+                committedArtifactBytes: accumulatedArtifactBytes, includeNormals, signal: controller.signal,
+                assertCurrent: async () => {
+                  await waitForStudioBg3dBatchDocumentVisible(document, controller.signal);
+                  if (!componentActiveRef.current || controller.signal.aborted || captureRef.current.adapter !== captureAdapter
+                    || viewportApiRef.current !== appliedViewportApi || shotBatchAbortRef.current !== controller
+                    || shotBatchAuthorizationEpochRef.current !== authorizationEpoch) throw Object.assign(new Error("Tiled capture owner changed."), { name: "AbortError" });
+                  const currentSize = await getStudioBg3dCaptureSourceSize(captureAdapter);
+                  if (!componentActiveRef.current || controller.signal.aborted || captureRef.current.adapter !== captureAdapter
+                    || viewportApiRef.current !== appliedViewportApi || shotBatchAbortRef.current !== controller
+                    || shotBatchAuthorizationEpochRef.current !== authorizationEpoch) throw Object.assign(new Error("Tiled capture owner changed during source-size validation."), { name: "AbortError" });
+                  if (currentSize.width !== batchPlan.captureOwner.sourceWidth || currentSize.height !== batchPlan.captureOwner.sourceHeight) throw new Error(`The output viewport changed during tiled capture: ${currentSize.width}x${currentSize.height} vs frozen ${batchPlan.captureOwner.sourceWidth}x${batchPlan.captureOwner.sourceHeight}.`);
+                  if (!verifySharedCharacterCaptureAuthority(sharedCharacterAuthorityLease, "raster")?.ok) throw new Error(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
+                },
+                onProgress: (completed, total) => setShotBatchProgress({ stage: "render", completed: index,
+                  total: batchPlan.shots.length, label: `${shot.shotName} · 타일 ${completed}/${total}` }),
+              });
+            } else captured = await captureStudioBg3dRaster(
               captureAdapter,
               {
                 width: shot.capture.width,
@@ -706,9 +731,9 @@ export function createStudioBg3dShotBatchExportRunner(
         if (!receiptAuthority?.ok) {
           throw new Error(SHARED_CHARACTER_CAPTURE_AUTHORITY_ERROR_MESSAGE);
         }
-        const shotArtifacts = await buildStudioBg3dShotArtifacts({
+        const shotArtifacts = tiledArtifacts ?? await buildStudioBg3dShotArtifacts({
           shot,
-          captured,
+          captured: captured!,
           settings: {
             line: applied.output.line,
             tone: applied.output.tone,

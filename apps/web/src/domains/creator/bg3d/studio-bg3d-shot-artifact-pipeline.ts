@@ -1,3 +1,4 @@
+import { selectStudioBg3dShotPassLayers } from "./studio-bg3d-shot-pass-layers";
 /**
  * Batch-only artifact production for one frozen 3D shot.
  *
@@ -84,11 +85,6 @@ export interface StudioBg3dShotArtifactPipelineDependencies {
   readonly maxTotalBytes: number;
 }
 
-interface PassLayerSelection {
-  readonly layers: readonly StudioBg3dLtRasterLayer[] | null;
-  readonly skipReason: StudioBg3dShotBatchSkippedArtifact["reason"];
-}
-
 const DEFAULT_DEPENDENCIES: StudioBg3dShotArtifactPipelineDependencies = {
   renderLtInWorker: renderStudioBg3dLtLayersInWorker,
   createDepthLayer: createStudioBg3dDepthRasterLayer,
@@ -100,61 +96,6 @@ const DEFAULT_DEPENDENCIES: StudioBg3dShotArtifactPipelineDependencies = {
   maxTotalBytes: STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
 };
 
-function selectPassLayers(
-  pass: StudioBg3dShotBatchPass,
-  captured: StudioBg3dCapturedRaster,
-  rendered: StudioBg3dLtRenderResult,
-  settings: StudioBg3dLtRenderSettings,
-  createDepthLayer: StudioBg3dShotArtifactPipelineDependencies["createDepthLayer"],
-): PassLayerSelection {
-  const mainLineConfigured = settings.line.enabled && settings.line.strength > 0;
-  const textureLineConfigured = mainLineConfigured &&
-    settings.line.textureLineEnabled && settings.line.textureLineStrength > 0;
-  const toneConfigured = settings.tone.mode !== "none" && settings.tone.opacity > 0;
-  const colorConfigured = toneConfigured && settings.tone.type === "color";
-  const layerByRole = new Map(rendered.layers.map((layer) => [layer.role, layer] as const));
-
-  if (pass === "beauty") {
-    return {
-      layers: [{
-        role: "color",
-        width: captured.width,
-        height: captured.height,
-        data: new Uint8ClampedArray(captured.rgba),
-      }],
-      skipReason: "disabled",
-    };
-  }
-  if (pass === "lt-composite") {
-    return {
-      layers: rendered.layers.length > 0 ? rendered.layers : null,
-      skipReason: mainLineConfigured || textureLineConfigured || toneConfigured
-        ? "unavailable"
-        : "disabled",
-    };
-  }
-  if (pass === "depth") {
-    return {
-      layers: captured.depth
-        ? [createDepthLayer(captured.width, captured.height, captured.depth)]
-        : null,
-      skipReason: "unavailable",
-    };
-  }
-
-  const layer = layerByRole.get(pass);
-  const configured = pass === "main-line"
-    ? mainLineConfigured
-    : pass === "texture-line"
-      ? textureLineConfigured
-      : pass === "tone"
-        ? toneConfigured && settings.tone.type !== "color"
-        : colorConfigured;
-  return {
-    layers: layer ? [layer] : null,
-    skipReason: configured ? "unavailable" : "disabled",
-  };
-}
 
 /**
  * Produces one shot's artifacts without publishing them. The caller must commit the returned batch
@@ -184,7 +125,7 @@ export async function buildStudioBg3dShotArtifacts(
   let artifactBytes = 0;
 
   for (const pass of input.passes) {
-    const selection = selectPassLayers(
+    const selection = selectStudioBg3dShotPassLayers(
       pass,
       input.captured,
       rendered,

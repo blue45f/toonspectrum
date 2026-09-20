@@ -26,3 +26,6 @@ export {
 export { buildStudioBg3dShotBatchArchiveInWorker } from "./studio-bg3d-shot-batch-worker-client";
 export { buildStudioBg3dShotArtifacts } from "./studio-bg3d-shot-artifact-pipeline";
 export { buildStudioBg3dShotContactSheetsInWorker } from "./studio-bg3d-shot-contact-sheet-worker-client";
+
+export { buildStudioBg3dTiledShotArtifacts } from "./studio-bg3d-tiled-shot-artifacts";
+export { STUDIO_BG3D_TILED_PNG_PROFILE, studioBg3dTilePipelineId, resolveStudioBg3dBatchTileShape, studioBg3dBatchOutputPixelBudget, studioBg3dBatchNeedsTiles } from "./studio-bg3d-tiled-batch-policy";
