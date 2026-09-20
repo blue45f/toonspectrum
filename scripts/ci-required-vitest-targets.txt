@@ -126,6 +126,7 @@ apps/web/src/domains/creator/offline
 apps/web/src/domains/creator/production-hub/ProductionStudioRevisionBridgePanel.test.tsx
 apps/web/src/domains/creator/project-graph/studio-project-graph-client.test.ts
 apps/web/src/domains/creator/review-capture
+apps/web/src/domains/creator/review-export
 apps/web/src/domains/creator/review-handoff
 apps/web/src/domains/creator/review-production
 apps/web/src/domains/creator/review-resolution

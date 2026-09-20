@@ -19,6 +19,7 @@ import { StudioPinnedReviewComparison } from "./StudioPinnedReviewComparison";
 import { StudioReviewAnnotationLocation, type StudioReviewAnnotationSelection } from "./StudioReviewSpatialAnnotation";
 
 const StudioReviewResolution = lazy(async () => ({ default: (await import("../review-resolution/StudioReviewResolution")).StudioReviewResolution }));
+const StudioReviewExport = lazy(async () => ({ default: (await import("../review-export/StudioReviewExport")).StudioReviewExport }));
 
 /** A pinned server review. This surface never substitutes the latest editable document. */
 export function StudioPinnedReviewPanel({ subject, resolutionRequest = null }: { readonly subject: StudioVirtualSpaceReviewSubject | null; readonly resolutionRequest?: StudioReviewResolutionRequest | null }) {
@@ -214,6 +215,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
         <button type="submit" className="mt-2 min-h-11 rounded-lg border border-line px-4" disabled={busy || !body.trim() || needsLocation}>{busy ? bt("저장 중…", "Saving…") : bt("의견 저장", "Save note")}</button>
       </form> : <p className="mt-3 text-xs">{bt("검토 기록을 열람하고 있습니다.", "You are viewing the review history.")}</p>}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
+      {result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
     </> : null}
     {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
     <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-4" disabled={busy || loading} onClick={() => { void refresh(); }}>{bt("검토 기록 새로 확인", "Refresh review")}</button>

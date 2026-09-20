@@ -57,6 +57,7 @@ test("required foundation execution includes virtual-world consent, media and co
   for (const target of [
     "apps/web/src/domains/creator/virtual-space",
     "apps/web/src/domains/creator/review-handoff",
+    "apps/web/src/domains/creator/review-export",
     "apps/web/src/domains/creator/review-production",
     "apps/web/src/domains/creator/review-resolution",
     "packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts",
@@ -74,6 +75,8 @@ test("required foundation execution includes virtual-world consent, media and co
     "apps/web/src/domains/creator/review-production/studio-review-production-controller.test.ts",
     "apps/web/src/domains/creator/review-production/StudioReviewProductionConnection.test.tsx",
     "apps/web/src/domains/creator/review-resolution/StudioReviewResolution.test.tsx",
+    "apps/web/src/domains/creator/review-export/studio-review-export.test.ts",
+    "apps/web/src/domains/creator/review-export/StudioReviewExport.test.tsx",
     "apps/web/src/domains/creator/virtual-space/studio-virtual-space-social.test.ts",
     "apps/web/src/domains/creator/virtual-space/studio-virtual-space-world.test.ts",
     "apps/web/src/domains/creator/virtual-space/studio-virtual-space-npc-director.test.ts",
