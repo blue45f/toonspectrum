@@ -7,8 +7,14 @@ export const STUDIO_ACOUSTIC_INVITATION_MS = 30_000;
 export const STUDIO_ACOUSTIC_MAX_CONVERSATIONS = 24;
 const id = z.string().trim().min(1).max(160);
 const epochs = z.array(z.uuid()).min(2).max(4).refine(values => new Set(values).size === values.length);
-export const studioConversationProposeSchema = z.object({ conversationId:z.uuid(), selfSessionEpoch:z.uuid(), memberSessionEpochs:epochs }).strict()
-  .refine(value => value.memberSessionEpochs.includes(value.selfSessionEpoch));
+export const studioConversationProposeSchema = z.object({ conversationId:z.uuid(), selfSessionEpoch:z.uuid(), memberSessionEpochs:epochs,
+  // A caller's selected audience is an identity constraint, never an authority claim.
+  expectedMembers:z.array(z.object({sessionEpoch:z.uuid(),clientInstanceId:studioAcousticCoreBindingSchema.shape.clientInstanceId}).strict()).min(2).max(4).optional(),
+}).strict().refine(value => value.memberSessionEpochs.includes(value.selfSessionEpoch))
+  .refine(value=>!value.expectedMembers||(value.expectedMembers.length===value.memberSessionEpochs.length
+    &&new Set(value.expectedMembers.map(member=>member.sessionEpoch)).size===value.expectedMembers.length
+    &&new Set(value.expectedMembers.map(member=>member.clientInstanceId)).size===value.expectedMembers.length
+    &&value.expectedMembers.every(member=>value.memberSessionEpochs.includes(member.sessionEpoch))));
 export const studioConversationReadSchema = z.object({ conversationId:z.uuid(), selfSessionEpoch:z.uuid() }).strict();
 export const studioConversationChangeSchema = studioConversationReadSchema.extend({ expectedRevisionId:id,
   action:z.enum(["accept","decline","cancel","leave","block"]), targetSessionEpoch:z.uuid().optional() }).strict()

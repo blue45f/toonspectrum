@@ -28,6 +28,8 @@ export class StudioWorldAcousticController {
   changeDoor(@Req() req:Request,@Param(new ZodValidationPipe(StudioWorkParamsDto)) params:StudioWorkParamsDto,@Body(new ZodValidationPipe(StudioAcousticDoorDto)) body:StudioAcousticDoorDto,@Headers("idempotency-key") key?:string) {return this.service.changeDoor(principal(req),params.workId,body,requireStudioIdempotencyKey(key));}
   @Post("/sessions/open") @HttpCode(200) @Header("Cache-Control","private, no-store, max-age=0")
   open(@Req() req:Request,@Param(new ZodValidationPipe(StudioWorkParamsDto)) params:StudioWorkParamsDto,@Body(new ZodValidationPipe(StudioAcousticOpenDto)) body:StudioAcousticOpenDto,@Headers("idempotency-key") key?:string) {return this.service.open(principal(req),params.workId,body,requireStudioIdempotencyKey(key));}
+  @Post("/sessions/read-open-intent") @HttpCode(200) @Header("Cache-Control","private, no-store, max-age=0")
+  readOpenIntent(@Req() req:Request,@Param(new ZodValidationPipe(StudioWorkParamsDto)) params:StudioWorkParamsDto,@Body(new ZodValidationPipe(StudioAcousticOpenDto)) body:StudioAcousticOpenDto,@Headers("idempotency-key") key?:string) {return this.service.readOpenIntent(principal(req),params.workId,body,requireStudioIdempotencyKey(key));}
   @Post("/sessions/read") @HttpCode(200) @Header("Cache-Control","private, no-store, max-age=0")
   current(@Req() req:Request,@Param(new ZodValidationPipe(StudioWorkParamsDto)) params:StudioWorkParamsDto,@Body(new ZodValidationPipe(StudioAcousticReadDto)) body:StudioAcousticReadDto) {return this.service.current(principal(req),params.workId,body.sessionEpoch);}
   @Post("/sessions/renew") @HttpCode(200) @Header("Cache-Control","private, no-store, max-age=0")

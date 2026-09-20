@@ -101,6 +101,25 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     await acoustic.open(other.principal,f.workId,{...f.sessionInput,doorEpoch:f.door.epoch,connectionId:other.binding.connectionId,clientInstanceId:other.binding.clientInstanceId,expectedSessionEpoch:other.session.sessionEpoch},{...other.binding,joinedAt:new Date(Date.now()+1).toISOString()},randomUUID());
     expect((await conversations.change(other.principal,f.workId,accept,randomUUID())).snapshot).toMatchObject({status:"revoked",reason:"authority_lost"});
   });
+  it("checks the selected client identity before writing any consent operation or receipt",async()=>{
+    const f=await conversationFixture(),expectedMembers=f.people.map(person=>({sessionEpoch:person.session.sessionEpoch,clientInstanceId:person.binding.clientInstanceId}));
+    const counts=()=>pool.query(`SELECT (SELECT count(*)::int FROM studio_operation operation JOIN studio_artifact artifact ON artifact.id=operation."artifactId" JOIN studio_project_graph project ON project.id=artifact."projectId" WHERE project."workId"=$1) AS operations,(SELECT count(*)::int FROM studio_mutation_receipt receipt JOIN studio_artifact artifact ON artifact.id=receipt."artifactId" JOIN studio_project_graph project ON project.id=artifact."projectId" WHERE project."workId"=$1) AS receipts`,[f.workId]);
+    const before=(await counts()).rows[0],forged={...f.proposal,expectedMembers:expectedMembers.map((member,index)=>index?{...member,clientInstanceId:"claimed-other-client"}:member)};
+    await expect(conversations.prepare(f.principal,f.workId,forged)).rejects.toMatchObject({reason:"binding"});
+    await expect(conversations.propose(f.principal,f.workId,forged,randomUUID())).rejects.toMatchObject({reason:"binding"});
+    expect((await counts()).rows[0]).toEqual(before);
+    const input={...f.proposal,expectedMembers},key=randomUUID(),first=await conversations.propose(f.principal,f.workId,input,key);
+    expect(first.snapshot.members.map(member=>member.binding.clientInstanceId).sort()).toEqual(expectedMembers.map(member=>member.clientInstanceId).sort());
+    expect((await conversations.propose(f.principal,f.workId,{...input,expectedMembers:[...expectedMembers].reverse()},key)).replayed).toBe(true);
+    await expect(conversations.propose(f.principal,f.workId,forged,key)).rejects.toMatchObject({message:"studio_idempotency_conflict"});
+  });
+  it("rejects selected-identity proposals with a foreign work epoch or a reconnected old epoch",async()=>{
+    const f=await conversationFixture(),other=await conversationFixture(),own=f.people[0]!,peer=f.people[1]!,foreign=other.people[1]!;
+    const proposal=(target:typeof peer)=>({...f.proposal,memberSessionEpochs:[own.session.sessionEpoch,target.session.sessionEpoch],expectedMembers:[own,target].map(person=>({sessionEpoch:person.session.sessionEpoch,clientInstanceId:person.binding.clientInstanceId}))});
+    await expect(conversations.propose(f.principal,f.workId,proposal(foreign),randomUUID())).rejects.toMatchObject({reason:"stale"});
+    await acoustic.open(peer.principal,f.workId,{...f.sessionInput,doorEpoch:f.door.epoch,connectionId:"reconnected",clientInstanceId:peer.binding.clientInstanceId,expectedSessionEpoch:peer.session.sessionEpoch},{...peer.binding,connectionId:"reconnected"},randomUUID());
+    await expect(conversations.propose(f.principal,f.workId,proposal(peer),randomUUID())).rejects.toMatchObject({reason:"stale"});
+  });
   it("serializes simultaneous self-accepts and requires explicit read plus a new CAS attempt",async()=>{
     const f=await conversationFixture(3),state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
     const results=await Promise.allSettled(f.people.slice(1).map(person=>conversations.change(person.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:person.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept"},randomUUID())));
@@ -255,6 +274,25 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     const closed=await acoustic.changeDoor(f.principal,f.workId,{...change,expectedDoorEpoch:current.epoch,open:false},randomUUID());
     if (results[0]!.status==="fulfilled") expect((await acoustic.changeDoor(f.principal,f.workId,change,key)).replayed).toBe(true);
     expect(await acoustic.door(f.principal,f.workId,"zone")).toMatchObject({epoch:closed.door.epoch,open:false});
+  });
+  it("reads an uncertain open intent without creating or extending a lease and binds the exact actor/input",async()=>{
+    const f=await acousticFixture(),key=randomUUID();
+    expect(await acoustic.readOpenIntent(f.principal,f.workId,f.sessionInput,key)).toBeNull();
+    const first=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);
+    const counts=()=>pool.query<{receipts:number;leases:number}>(`SELECT (SELECT count(*)::int FROM studio_mutation_receipt WHERE response->>'workId'=$1) AS receipts,(SELECT count(*)::int FROM creator_work_live_lock WHERE "workId"=$1) AS leases`,[f.workId]);
+    const before=(await counts()).rows[0];
+    expect(await acoustic.readOpenIntent(f.principal,f.workId,f.sessionInput,key)).toEqual(first);
+    expect(await acoustic.readOpenIntent(f.principal,f.workId,f.sessionInput,key)).toEqual(first);
+    await expect(acoustic.readOpenIntent(f.principal,f.workId,{...f.sessionInput,clientInstanceId:"different"},key)).rejects.toMatchObject({message:"studio_idempotency_conflict"});
+    const stranger=await user();await expect(acoustic.readOpenIntent({...f.principal,userId:stranger},f.workId,f.sessionInput,key)).rejects.toMatchObject({operation:"view"});
+    expect((await counts()).rows[0]).toEqual(before);
+  });
+  it.each(["expired","replaced","closed"] as const)("cannot resurrect an uncertain %s session via read-open-intent",async(reason)=>{
+    const f=await acousticFixture(),key=randomUUID(),first=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);
+    if(reason==="expired")await pool.query('UPDATE creator_work_live_lock SET "expiresAt"=statement_timestamp()-interval \'1 second\' WHERE "workId"=$1 AND "leaseId"=$2',[f.workId,first.sessionEpoch]);
+    if(reason==="replaced")await acoustic.open(f.principal,f.workId,{...f.sessionInput,connectionId:"new-connection",expectedSessionEpoch:first.sessionEpoch},{...f.binding,connectionId:"new-connection"},randomUUID());
+    if(reason==="closed")await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,open:false},randomUUID());
+    await expect(acoustic.readOpenIntent(f.principal,f.workId,f.sessionInput,key)).rejects.toMatchObject({reason:reason==="closed"?"closed":"stale"});
   });
   it("same session intent replays without extension and changed input cannot reuse its key",async()=>{
     const f=await acousticFixture(), key=randomUUID(), first=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import { canonicalJson, STUDIO_ACOUSTIC_INVITATION_MS, STUDIO_ACOUSTIC_MAX_CONVERSATIONS, STUDIO_ACOUSTIC_RESOURCE_PREFIX,
-  STUDIO_WORLD_ARTIFACT_PREFIX, studioConversationSnapshotSchema, type StudioConversationSnapshot, type StudioConversationReason,
+  STUDIO_WORLD_ARTIFACT_PREFIX, studioConversationSnapshotSchema, studioConversationProposeSchema, type StudioConversationSnapshot, type StudioConversationReason,
   type StudioConversationPropose, type StudioConversationRead, type StudioConversationChange, type StudioConversationRenew } from "@toonspectrum/studio-project-model";
 import type { PoolClient } from "pg";
 import type { VerifiedSessionToken } from "../../server/session";
@@ -117,17 +117,21 @@ const result=(state:State,participants:StudioAcousticParticipant[],replayed=fals
 @Injectable()
 export class StudioWorldConversationRepository {
   async prepare(principal:VerifiedSessionToken,workId:string,input:StudioConversationPropose):Promise<StudioAcousticParticipant[]>{
-    return studioAcousticTransaction(async client=>{await lockStudioAcousticWork(client,workId);await assertStudioAcousticAccess(client,principal,workId,"view");return this.participants(client,principal,workId,input);});
+    const parsed=studioConversationProposeSchema.parse(input);
+    return studioAcousticTransaction(async client=>{await lockStudioAcousticWork(client,workId);await assertStudioAcousticAccess(client,principal,workId,"view");return this.participants(client,principal,workId,parsed);});
   }
   private async participants(client:PoolClient,principal:VerifiedSessionToken,workId:string,input:StudioConversationPropose){
     const participants:StudioAcousticParticipant[]=[];for(const epoch of input.memberSessionEpochs)participants.push(await loadStudioAcousticParticipant(client,workId,epoch));
     const own=participants.find(member=>member.sessionEpoch===input.selfSessionEpoch);if(!own||own.actor!==principal.userId||own.sessionVersion!==principal.sessionVersion)throw new StudioProjectForbiddenError("view");
     const first=participants[0]!;if(new Set(participants.map(member=>member.actor)).size!==participants.length)return fail("binding");
+    if(input.expectedMembers&&participants.some(member=>!input.expectedMembers!.some(expected=>expected.sessionEpoch===member.sessionEpoch&&expected.clientInstanceId===member.binding.clientInstanceId)))return fail("binding");
     if(participants.some(member=>!same(member.world,first.world)||member.zoneId!==first.zoneId||member.doorEpoch!==first.doorEpoch))return fail("closed");
     if(await blocked(client,workId,participants))return fail("closed");return participants;
   }
   async propose(principal:VerifiedSessionToken,workId:string,raw:StudioConversationPropose,key:string):Promise<StudioConversationContext>{
-    const input={action:"propose",...raw,memberSessionEpochs:[...raw.memberSessionEpochs].sort()};
+    const parsed=studioConversationProposeSchema.parse(raw);
+    const input={action:"propose",...parsed,memberSessionEpochs:[...parsed.memberSessionEpochs].sort(),
+      ...(parsed.expectedMembers?{expectedMembers:[...parsed.expectedMembers].sort((a,b)=>a.sessionEpoch.localeCompare(b.sessionEpoch))}:{})};
     return studioAcousticTransaction(async client=>{await lockStudioAcousticWork(client,workId);await assertStudioAcousticAccess(client,principal,workId,"view");
       if(await retry(client,principal.userId,workId,input,key)){const state=await load(client,workId,input.conversationId);if(!state)return fail("proof");self(state,principal,input.selfSessionEpoch);const current=await valid(client,principal.userId,state);return result(current.state,current.participants,true,current.observation);}
       if(await load(client,workId,input.conversationId))return fail("stale");

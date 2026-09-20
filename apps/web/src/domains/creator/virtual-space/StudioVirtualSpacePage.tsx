@@ -52,6 +52,9 @@ import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaboration
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import { openStudioP2pHuddle, closeStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpaceAmbientAudio } from "./StudioVirtualSpaceAmbientAudio";
+import { useStudioPrivateRoom } from "./private-room/use-studio-private-room";
+import { StudioPrivateRoomPanel } from "./private-room/StudioPrivateRoomPanel";
+import { studioPrivateRoomWalkTarget } from "./private-room/studio-private-room-walk";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
@@ -589,6 +592,8 @@ export function VirtualSpaceExperience({
   const positionScopeKey = studioVirtualSpacePositionStorageKey(positionScope);
   const navigate = useNavigate();
   const live = useStudioLiveCollaboration();
+  const privateActorId = useSession().data?.user?.id ?? null;
+  const [privateZoneSelection,setPrivateZoneSelection] = useState<string | null>(null);
   const connectivity = useSyncExternalStore(
     subscribeStudioConnectivity,
     getStudioConnectivitySnapshot,
@@ -1076,6 +1081,14 @@ export function VirtualSpaceExperience({
         peerIds: scope.memberIds.filter((id) => id !== live.room?.participant.sessionId), source: "virtual-space" });
     },
   });
+  const privateZones = worldManifest.acousticZones?.filter(zone => Boolean(zone.doorId)) ?? [];
+  const privateZoneId = privateZones.find(zone=>zone.id===privateZoneSelection)?.id ?? privateZones[0]?.id ?? null;
+  const privateRoom = useStudioPrivateRoom({workId:projectId,actorId:privateActorId,
+    world:publishedWorld ? {worldId:publishedWorld.publication.manifest.id,revisionId:publishedWorld.publication.revisionId,contentHash:publishedWorld.publication.contentHash} : null,
+    zones:worldManifest.acousticZones??[],zoneId:privateZoneId,room:live.room,presence:snapshot,
+    enabled:signedIn&&worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus",
+    onConversation:()=>{finishSharedActivity();if(conversation.snapshot.active)conversation.leave(conversation.snapshot.active.id);},
+  });
   const pairConversation = useMemo(() => sharedActivity?.action === "talk" && live.room?.participant
     ? { id: sharedActivity.id, memberIds: [live.room.participant.sessionId, sharedActivity.peer.sessionId].sort() }
     : null, [sharedActivity, live.room]);
@@ -1423,8 +1436,17 @@ export function VirtualSpaceExperience({
             {worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
               onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
+
+            <StudioPrivateRoomPanel key={`${privateActorId}:${projectId}:${publishedScope}:${privateZoneId}`} room={privateRoom}
+              zones={privateZones} zoneId={privateZoneId} onZone={setPrivateZoneSelection} peers={snapshot.peers}
+              onWalk={worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus"?()=>{
+                const target=privateZoneId?studioPrivateRoomWalkTarget(worldManifest,privateZoneId,snapshot.self):null;
+                if(!target)return false;queuePathTo(target);return true;
+              }:undefined}
+              labels={Object.fromEntries(privateZones.map(zone=>{const room=worldManifest.rooms.find(item=>item.id===zone.roomId);return [zone.id,room?bt(room.labelKo,room.labelEn):bt("비공개 방","Private room")];}))} />
           </div>
           <div hidden={workspacePanel !== "people"}>
+
             <StudioVirtualSpaceSocialPanel
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
@@ -1441,6 +1463,11 @@ export function VirtualSpaceExperience({
               }}
               onCancel={cancelSocialRequest}
               onBlock={(id, blocked) => {
+                if(blocked){const privateConversation=privateRoom.snapshot.conversations.filter(record=>record.status!=="revoked")
+                  .sort((a,b)=>Number(b.status==="active")-Number(a.status==="active"))
+                  .find(record=>record.members.some(member=>member.binding.clientInstanceId===id));
+                  const member=privateConversation?.members.find(item=>item.binding.clientInstanceId===id);
+                  if(privateConversation&&member)void privateRoom.controller?.change(privateConversation.conversationId,"block",member.sessionEpoch);}
                 if (blocked) for (const record of conversation.snapshot.records) {
                   if (record.memberIds.includes(id)) conversation.leave(record.id);
                 }

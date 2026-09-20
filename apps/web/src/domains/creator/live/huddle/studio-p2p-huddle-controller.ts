@@ -36,6 +36,9 @@ export interface HuddleDependencies {
   createStream?: (tracks: MediaStreamTrack[]) => MediaStream;
   /** Optional RTC-only cohort gate. Virtual Space uses this to keep a huddle proximity-scoped. */
   peerFilter?: (participant: StudioLiveParticipant) => boolean;
+  /** Private-room authority is checked again after every device prompt, before any track attaches. */
+  authorityValid?: () => boolean;
+  captureRevision?: () => number;
   /** Immutable consent scope. Changing its identity or membership requires closing this session. */
   conversation?: { readonly id: string; readonly peerIds: readonly string[] };
   id?: () => string; now?: () => number;
@@ -91,7 +94,7 @@ export class StudioP2pHuddleController {
     this.listeners.add(listener); return () => { this.listeners.delete(listener); };
   }
   start(): void {
-    if (this.closed || this.unsubscribe || this.self.role === "viewer") return;
+    if (this.closed || this.unsubscribe || this.self.role === "viewer" || this.deps.authorityValid?.() === false) return;
     this.unsubscribe = this.port.subscribe((sender, raw) => this.receive(sender, raw));
     this.sync();
     this.timer = setInterval(() => this.sync(), 3_000);
@@ -99,6 +102,7 @@ export class StudioP2pHuddleController {
   private emit(): void { for (const listener of this.listeners) listener(); }
   private fail(message: string): void { this.error = message; this.emit(); }
   private eligiblePeers(): StudioLiveParticipant[] {
+    if (this.deps.authorityValid?.() === false) return [];
     return this.port.getPeers().filter((peer) =>
       peer.sessionId !== this.self.sessionId
       && peer.role !== "viewer"
@@ -403,12 +407,13 @@ export class StudioP2pHuddleController {
   }
   async setMicrophone(enabled: boolean): Promise<void> {
     const generation = ++this.mediaGeneration.audio;
+    const authorityRevision = this.deps.captureRevision?.();
     if (!enabled) { this.stopTrack("audio"); this.publishMedia(); return; }
-    if (this.closed || !this.unsubscribe) return;
+    if (this.closed || !this.unsubscribe || this.deps.authorityValid?.() === false) return;
     try {
       const constraints = { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false };
       const stream = await (this.deps.getUserMedia?.(constraints) ?? navigator.mediaDevices.getUserMedia(constraints));
-      this.acceptCapture("audio", stream, generation, false);
+      this.acceptCapture("audio", stream, generation, false, undefined, authorityRevision);
     } catch { if (!this.closed && generation === this.mediaGeneration.audio) this.fail("마이크를 켜지 못했습니다. 브라우저 권한과 장치를 확인해 주세요."); }
   }
   async setVideo(
@@ -416,15 +421,16 @@ export class StudioP2pHuddleController {
     facingMode: HuddleCameraFacingMode = this.cameraFacing,
   ): Promise<void> {
     const generation = ++this.mediaGeneration.video;
+    const authorityRevision = this.deps.captureRevision?.();
     if (!mode) { this.stopTrack("video"); this.publishMedia(); return; }
-    if (this.closed || !this.unsubscribe) return;
+    if (this.closed || !this.unsubscribe || this.deps.authorityValid?.() === false) return;
     try {
       const constraints = { video: { width: { ideal: 640, max: 1280 }, height: { ideal: 360, max: 720 },
         frameRate: { ideal: 15, max: 24 }, facingMode: { ideal: facingMode } }, audio: false };
       const stream = mode === "screen"
         ? await (this.deps.getDisplayMedia?.() ?? navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { max: 15 } }, audio: false }))
         : await (this.deps.getUserMedia?.(constraints) ?? navigator.mediaDevices.getUserMedia(constraints));
-      this.acceptCapture("video", stream, generation, mode === "screen", mode === "camera" ? facingMode : undefined);
+      this.acceptCapture("video", stream, generation, mode === "screen", mode === "camera" ? facingMode : undefined, authorityRevision);
     } catch { if (!this.closed && generation === this.mediaGeneration.video) this.fail("영상을 켜지 못했거나 공유를 취소했습니다. 브라우저 권한을 확인해 주세요."); }
   }
   private acceptCapture(
@@ -433,9 +439,11 @@ export class StudioP2pHuddleController {
     generation: number,
     sharing: boolean,
     facingMode?: HuddleCameraFacingMode,
+    authorityRevision?: number,
   ): void {
     const track = stream.getTracks().find((t) => t.kind === kind);
-    if (this.closed || generation !== this.mediaGeneration[kind] || !track) {
+    if (this.closed || generation !== this.mediaGeneration[kind] || !track || this.deps.authorityValid?.() === false
+      || authorityRevision !== this.deps.captureRevision?.()) {
       stream.getTracks().forEach((t) => t.stop()); return;
     }
     stream.getTracks().filter((t) => t !== track).forEach((t) => t.stop());

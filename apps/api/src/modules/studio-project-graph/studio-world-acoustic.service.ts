@@ -49,6 +49,12 @@ export class StudioWorldAcousticService {
       return this.finish(principal,workId,await this.repository.open(principal,workId,input,binding,key));
     });
   }
+  readOpenIntent(principal: VerifiedSessionToken,workId:string,input:StudioAcousticSessionOpen,key:string) {
+    return this.execute(async()=>{
+      const lease=await this.repository.readOpenIntent(principal,workId,input,key);
+      return {lease:lease ? await this.finish(principal,workId,lease) : null};
+    });
+  }
   current(principal: VerifiedSessionToken,workId:string,sessionEpoch:string) {
     return this.execute(async()=>this.finish(principal,workId,await this.repository.current(principal,workId,sessionEpoch)));
   }

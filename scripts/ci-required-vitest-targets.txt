@@ -136,6 +136,12 @@ apps/web/src/domains/creator/export/studio-psd-adjustment-graph.test.ts
 apps/web/src/domains/creator/handoff-envelope
 apps/web/src/domains/creator/layer
 apps/web/src/domains/creator/live/huddle
+apps/web/src/domains/creator/live/studio-live-acoustic-control.test.ts
+apps/web/src/domains/creator/live/studio-live-adaptive-cursor-transport.test.ts
+apps/web/src/domains/creator/live/studio-live-collaboration-room.test.ts
+apps/web/src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts
+apps/web/src/domains/creator/live/studio-live-purpose-routed-transport.test.ts
+apps/web/src/domains/creator/live/studio-live-socket-transport.test.ts
 apps/web/src/domains/creator/offline
 apps/web/src/domains/creator/production-hub/ProductionStudioRevisionBridgePanel.test.tsx
 apps/web/src/domains/creator/project-graph/studio-project-graph-client.test.ts

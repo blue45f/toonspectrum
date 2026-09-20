@@ -29,6 +29,7 @@ const f = vi.hoisted(() => ({
   engine: null as Engine | null,
   socialOptions: null as SocialOptions | null,
   conversationOptions: null as ConversationOptions | null,
+  privateOptions: null as Parameters<typeof import("./private-room/use-studio-private-room").useStudioPrivateRoom>[0] | null,
   conversationSnapshot: { available: true, readyPeers: [], records: [], active: null } as import("./studio-virtual-space-conversation").StudioConversationSnapshot,
   leaveConversation: vi.fn(),
   snapshot: { requests: [], readyPeerIds: ["bob", "cleo"], reviewReadyPeerIds: ["bob", "cleo"], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: true } as StudioSpaceSocialSnapshot,
@@ -50,6 +51,9 @@ vi.mock("./world-publication/use-studio-world-publication", async () => {
   return { useStudioWorldPublication: () => f.worldPublication ?? ({ enabled: false, snapshot: EMPTY_WORLD_PUBLICATION, refresh: vi.fn(), publish: vi.fn() }) };
 });
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => f.session }));
+vi.mock("./private-room/use-studio-private-room",()=>({useStudioPrivateRoom:(options:Parameters<typeof import("./private-room/use-studio-private-room").useStudioPrivateRoom>[0])=>{
+  f.privateOptions=options;return {snapshot:{door:null,team:null,session:null,conversations:[],candidates:[],busy:false,uncertain:false,reason:null},controller:null,available:false,entryReason:"outside"};
+}}));
 vi.mock("../live/use-studio-live-transport-auth", () => ({ useStudioLiveTransportAuth: () => f.transport }));
 vi.mock("../live/StudioLiveCollaborationProvider", () => ({ StudioLiveCollaborationProvider: ({ children }: { children: ReactNode }) => children }));
 vi.mock("../live/studio-live-collaboration-context", () => ({ useStudioLiveCollaboration: () => f.live }));
@@ -540,6 +544,19 @@ describe("Virtual Studio atmosphere preference storage", () => {
 
 
 describe("published world Page transition", () => {
+  it("uses the authored room name and queues a reachable walk without moving the avatar or opening admission", async () => {
+    const room = DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
+    f.worldLoad = Promise.resolve({...DEFAULT_STUDIO_WORLD_MANIFEST,colliders:[],props:[],
+      acousticZones:[{id:"private-zone",roomId:room.id,x:100,y:100,width:80,height:80,policy:"private",doorId:"door"}]});
+    await mount();
+    expect(screen.getByRole("option",{name:room.labelKo})).toBeTruthy();
+    const before = {...f.engine!.snapshot.self};
+    fireEvent.click(screen.getByRole("button",{name:"이 방으로 걸어가기"}));
+    expect(f.engine!.bridge.consumeMoveTarget()).toEqual({x:140,y:140});
+    expect(f.engine!.snapshot.self).toEqual(before);
+    expect(f.privateOptions?.world).toBeNull();
+    expect(screen.getByRole("button",{name:"이 구역에서 입장 확인"})).toHaveProperty("disabled",true);
+  });
   it("retains accepted ownership on unchanged renewal, then closes it and safely spawns on a new exact revision", async () => {
     const { EMPTY_WORLD_PUBLICATION } = await import("./world-publication/studio-world-publication-controller");
     const { studioWorldPublishManifest } = await import("./world-publication/studio-world-publication-client");
@@ -552,6 +569,7 @@ describe("published world Page transition", () => {
         authority: { publication: first.publication, canPublish: true, expiresAt: Date.now() + 15_000 } } };
     const mounted = await mount(); await accept(accepted("world-follow", "follow")); const oldBridge = f.engine!.bridge;
     expect(oldBridge.getFollowingPeer()).toBe("bob"); expect(f.engine?.worldAssetUrls).toBe(first.assetUrls);
+    expect(f.privateOptions?.world).toEqual({worldId:first.publication.manifest.id,revisionId:first.publication.revisionId,contentHash:first.publication.contentHash});
     const rerender = () => mounted.rerender(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
       <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage />} /></Routes></MemoryRouter>);
     f.worldPublication = { ...f.worldPublication, snapshot: { ...f.worldPublication.snapshot, authority: { ...f.worldPublication.snapshot.authority!, expiresAt: Date.now() + 30_000 } } };
@@ -565,6 +583,7 @@ describe("published world Page transition", () => {
       expect(f.engine?.bridge.getFollowingPeer()).toBeNull(); expect(closes).toContain("world-follow");
       expect(f.engine?.snapshot.self).toMatchObject(studioWorldSpawn(second.publication.manifest).point);
       expect(f.socialOptions?.publishedScope).toBe(second.scope); expect(f.conversationOptions?.publishedScope).toBe(second.scope);
+      expect(f.privateOptions?.world).toEqual({worldId:second.publication.manifest.id,revisionId:second.publication.revisionId,contentHash:second.publication.contentHash});
     } finally { window.removeEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, closed); }
   });
 });

@@ -174,6 +174,23 @@ export class StudioWorldAcousticRepository {
       return lease((await sessionRow(client,workId,stored.sessionEpoch))!,stored);
     });
   }
+  /** Read-only reconciliation of an open response lost in transit. Never allocates or renews. */
+  async readOpenIntent(principal: VerifiedSessionToken, workId: string, raw: StudioAcousticSessionOpen, key: string): Promise<StudioAcousticSessionLease | null> {
+    const input = studioAcousticSessionOpenSchema.parse(raw);
+    return transaction(async client => {
+      await workLock(client, workId); await access(client, principal, workId, "view");
+      const world = await currentWorld(client, workId, input.world), door = await loadDoor(client, world, input.zoneId);
+      if (!door?.input.open || door.epoch !== input.doorEpoch || !door.input.allowedUserIds.includes(principal.userId)) return fail("closed");
+      const prior = await client.query<{ requestHash:string; response:unknown }>('SELECT "requestHash",response FROM studio_mutation_receipt WHERE "artifactId"=$1 AND "actorUserId"=$2 AND "idempotencyKeyHash"=$3', [world.artifactId,principal.userId,hash({phase:"acoustic-session",key})]);
+      if (!prior.rows[0]) return null;
+      if (prior.rows[0].requestHash !== hash({workId,input})) throw new StudioIdempotencyConflictError();
+      const stored = descriptorSchema.parse(prior.rows[0].response), row = await sessionRow(client,workId,stored.sessionEpoch);
+      if (!row?.live || stored.sessionVersion !== principal.sessionVersion) return fail("stale");
+      const verified = descriptor(row,principal.userId,workId);
+      if (!same(verified,stored) || !same(stored.input,input)) return fail("proof");
+      return lease(row,verified);
+    });
+  }
   async current(principal: VerifiedSessionToken, workId: string, epoch: string, renewRevision?: string): Promise<StudioAcousticSessionLease> {
     return transaction(async (client) => {
       await workLock(client,workId); await access(client,principal,workId,"view");
