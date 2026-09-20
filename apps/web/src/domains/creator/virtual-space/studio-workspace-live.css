@@ -26,3 +26,16 @@
  .vs2-shell--project .vs2-world-wrap--live{height:calc(100dvh - 286px);min-height:380px;margin:0;flex:none}.vs2-shell--project .vs2-live-stage-host{position:absolute;inset:0}
  .vs2-shell--project .workspace-live-status{padding:12px;gap:8px}.workspace-live-actions{width:100%}.workspace-live-actions>a,.workspace-live-actions>button{flex:1;font-size:12px;padding:10px 8px}.workspace-live-state{font-size:12px}
 }
+
+/* Current-work commands remain visible independently of map rendering. */
+.vs2-shell.vs2-shell--project{grid-template-rows:64px auto minmax(320px,1fr) auto;grid-template-areas:"top top" "nav commands" "nav world" "nav foot"}
+.studio-space-commandbar{grid-area:commands;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--color-panel);border-bottom:1px solid var(--color-line);min-width:0}
+.studio-space-work-context{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
+.studio-space-work-context>div{display:grid;min-width:0;gap:2px}.studio-space-work-context strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:34ch}
+.studio-space-work-context span{font-size:12px;color:var(--color-fg-2);overflow-wrap:anywhere}
+.studio-space-command-actions{display:flex;gap:8px;flex-wrap:wrap}
+.studio-space-command-actions button,.studio-space-work-context>a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-card);color:var(--color-fg);font:inherit;font-size:13px;white-space:nowrap}
+.studio-space-command-actions kbd{font-size:11px;color:var(--color-fg-2)}
+.studio-space-commandbar :is(a,button):focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
+.workspace-inspector[data-presentation=nonmodal]{z-index:70;inset-block-start:132px;max-height:calc(100dvh - 152px)}
+@media(max-width:760px){.studio-space-commandbar{padding:10px 12px}.studio-space-work-context{flex-basis:100%;justify-content:space-between}.studio-space-work-context strong{max-width:22ch}.studio-space-command-actions{width:100%}.studio-space-command-actions>button{flex:1}.studio-space-command-actions kbd{display:none}.vs2-shell--project .vs2-world-wrap--live{height:calc(100dvh - 390px)}}

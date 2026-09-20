@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from "react";
 import { Hand, MessageCircle, Footprints, ClipboardCheck, PartyPopper, X, ShieldBan } from "lucide-react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpacePeer } from "./studio-virtual-space-model";
@@ -16,8 +17,11 @@ const ACTIONS = [
 ] as const;
 
 export function StudioVirtualSpaceSocialPanel({
-  selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock,
+  selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock, nearbyPeerIds = [], conversationPeerIds = [], renderPeerAvatar,
 }: {
+  readonly renderPeerAvatar?: (peer: StudioVirtualSpacePeer) => ReactNode;
+  readonly nearbyPeerIds?: readonly string[];
+  readonly conversationPeerIds?: readonly string[];
   readonly selectedPeer: StudioVirtualSpacePeer | null;
   readonly peers: readonly StudioVirtualSpacePeer[];
   readonly social: StudioSpaceSocialSnapshot;
@@ -31,6 +35,11 @@ export function StudioVirtualSpaceSocialPanel({
   readonly onBlock: (id: string, blocked: boolean) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceSocialPanel");
+  const [filter, setFilter] = useState<"all" | "nearby" | "conversation">("all");
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().normalize("NFKC").toLocaleLowerCase();
+  const shownPeers = peers.filter((peer) => peer.participant.displayName.normalize("NFKC").toLocaleLowerCase().includes(normalizedQuery)
+    && (filter === "all" || (filter === "nearby" ? nearbyPeerIds : conversationPeerIds).includes(peer.participant.sessionId)));
   const activeRequests = social.requests.filter((request) =>
     ["offered", "accepting", "accepted"].includes(request.status),
   );
@@ -47,11 +56,20 @@ export function StudioVirtualSpaceSocialPanel({
     <p>{focused
       ? bt("집중 중에는 새 요청을 받거나 보내지 않아요.", "New invitations are paused while focusing.")
       : bt("팀원을 선택해 인사하거나 함께할 작업을 제안하세요. 상대가 수락하면 시작됩니다.", "Select a teammate to say hello or invite them to an activity. It starts when they accept.")}</p>
+    <label className="block text-sm">{bt("팀원 이름 찾기", "Find a teammate")}
+      <input type="search" className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3" maxLength={120} value={query}
+        onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }} />
+    </label>
+    <div className="my-2 flex flex-wrap gap-2" role="group" aria-label={bt("팀원 범위", "Teammate scope")}>
+      {([["all", "전체", "All"], ["nearby", "근처", "Nearby"], ["conversation", "대화 중", "In conversation"]] as const).map(([value, ko, en]) =>
+        <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{bt(ko, en)}</button>)}
+    </div>
+    {peers.length && !shownPeers.length ? <p role="status">{bt("이 범위에서 일치하는 팀원이 없어요.", "No matching teammates in this scope.")}</p> : null}
     {peers.length ? <div className="studio-vspace-peer-picker" aria-label={bt("팀원 선택", "Choose teammate")}>
-      {peers.map((peer) => <button key={peer.participant.sessionId} type="button"
+      {shownPeers.map((peer) => <button key={peer.participant.sessionId} type="button"
         aria-pressed={selectedPeer?.participant.sessionId === peer.participant.sessionId}
         onClick={() => onSelect(peer.participant.sessionId)}>
-        <span className="studio-vspace-presence-dot" aria-hidden />{peer.participant.displayName}
+        {renderPeerAvatar?.(peer)}<span className="studio-vspace-presence-dot" aria-hidden />{peer.participant.displayName}
       </button>)}
     </div> : <p className="studio-vspace-social-empty">{bt("같은 프로젝트에 접속한 팀원이 여기에 표시됩니다. NPC는 접속 인원에 포함되지 않아요.", "Teammates in this project appear here. NPCs are not counted as online members.")}</p>}
     {selectedPeer ? <div className="studio-vspace-peer-actions">

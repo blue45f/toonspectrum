@@ -9,11 +9,9 @@ import {
   ExternalLink,
   Footprints,
   Gamepad2,
-  Headphones,
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
-  Mic2,
   MousePointer2,
   Radio,
   Settings,
@@ -34,6 +32,8 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { WorkspaceNavigation } from "@/shared/components/workspace/WorkspaceNavigation";
+import { StudioSpaceWorkContext } from "../workspace/StudioSpaceWorkContext";
+import { StudioWorkspaceInbox } from "../workspace/StudioWorkspaceInbox";
 import { WorkspaceContextPanel } from "@/shared/components/workspace/WorkspaceContextPanel";
 import "@/shared/components/workspace/workspace.css";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -610,7 +610,8 @@ function VirtualSpaceExperience({
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
-  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | null>(null);
+  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | "search" | "work" | null>(null);
+  const spaceSearchRef = useRef<HTMLInputElement>(null);
   const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
   const [openingReview, setOpeningReview] = useState(false);
   const cancelSlotsRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -642,6 +643,17 @@ function VirtualSpaceExperience({
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   useEffect(() => { if (workspacePanel) engineBridge.clearMovement(); }, [workspacePanel, engineBridge]);
+  useEffect(() => {
+    const search = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      if (document.querySelector('dialog[open][aria-modal="true"]') && workspacePanel !== "search") return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      engineBridge.clearMovement(); setWorkspacePanel("search");
+      spaceSearchRef.current?.focus();
+    };
+    window.addEventListener("keydown", search, true);
+    return () => window.removeEventListener("keydown", search, true);
+  }, [engineBridge, workspacePanel]);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -982,16 +994,6 @@ function VirtualSpaceExperience({
   }, [navigate]);
   const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
 
-  const startNearbyHuddle = useCallback(() => {
-    const peer = snapshot.nearbyPeers[0];
-    if (peer) setSelectedPeerId(peer.participant.sessionId);
-  }, [snapshot.nearbyPeers]);
-
-  const openStudioChat = useCallback(() => {
-    const peer = snapshot.nearbyPeers[0] ?? snapshot.peers[0];
-    if (peer) setSelectedPeerId(peer.participant.sessionId);
-  }, [snapshot.nearbyPeers, snapshot.peers]);
-
   const sendReaction = useCallback((reaction: StudioVirtualSpaceReaction) => {
     const controller = controllerRef.current;
     if (controller) {
@@ -1214,6 +1216,15 @@ function VirtualSpaceExperience({
         <WorkspaceNavigation activeId="workspace-home"
           studioHref={`/home?project=${encodeURIComponent(projectId)}`}
           teamHref={`/team?project=${encodeURIComponent(projectId)}`} />
+        <div className="studio-space-commandbar" data-space-interactive="true">
+          <StudioSpaceWorkContext workId={projectId} />
+          <div className="studio-space-command-actions">
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "search"}
+              onClick={() => setWorkspacePanel("search")}>{bt("방·팀원 찾기", "Find rooms & people")} <kbd>⌘ / Ctrl K</kbd></button>
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "work"}
+              onClick={() => setWorkspacePanel("work")}>{bt("검수·작업함", "Reviews & inbox")}</button>
+          </div>
+        </div>
 
 
         <section className="vs2-live-layout">
@@ -1368,9 +1379,19 @@ function VirtualSpaceExperience({
           </div>
 
           <WorkspaceContextPanel open={workspacePanel !== null}
-            title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization") : bt("사람과 대화", "People and conversations")}
+            presentation={workspacePanel === "search" ? "modal" : "adaptive"}
+            initialFocusRef={workspacePanel === "search" ? spaceSearchRef : undefined}
+            title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization")
+              : workspacePanel === "search" ? bt("방·팀원 찾기", "Find rooms & people")
+                : workspacePanel === "work" ? bt("검수·작업함", "Reviews & inbox") : bt("사람과 대화", "People and conversations")}
             onClose={() => setWorkspacePanel(null)}>
           <div className="vs2-live-inspector-content">
+          {workspacePanel === "work" ? <StudioWorkspaceInbox workId={projectId} /> : null}
+          <div hidden={workspacePanel !== "search"}>
+            {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
+              inputRef={spaceSearchRef} expanded onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} />
+              : <p role="status">{bt("공간 목록을 확인 중입니다.", "Checking the space directory.")}</p>}
+          </div>
           <div hidden={workspacePanel !== "space"}>
             <details><summary>{bt("방별 작업 바로가기", "Room work shortcuts")}</summary>
             {worldReady ? <div className="workspace-live-room-links">
@@ -1389,8 +1410,7 @@ function VirtualSpaceExperience({
               guideTour={guideTour} tourRequested={guideTourRequest !== null}
               onStartTour={atmosphere === "focus" || activity === "focused" || activity === "away" || authoringMode ? undefined : startGuideTour}
               onCancelTour={cancelGuideTour} /> : null}
-            {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
-              onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} /> : null}
+
             <section className="vs2-panel studio-vspace-atmosphere" data-space-interactive="true">
               <h2>{bt("작업실 분위기", "Studio atmosphere")}</h2>
               <div role="group" aria-label={bt("작업실 분위기", "Studio atmosphere")}>
@@ -1411,6 +1431,10 @@ function VirtualSpaceExperience({
             <StudioVirtualSpaceSocialPanel
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
+              renderPeerAvatar={(peer) => <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName}
+                compact activity={peer.state.activity} avatarIndex={peer.state.avatarIndex} appearance={peer.state.appearance} />}
+              nearbyPeerIds={snapshot.nearbyPeers.map((peer) => peer.participant.sessionId)}
+              conversationPeerIds={activeConversation?.memberIds ?? pairConversation?.memberIds ?? []}
               disabled={!signedIn || !snapshot.direct || authoringMode || !socialInteractive}
               focused={activity === "focused" || activity === "away" || atmosphere === "focus"}
               onSelect={setSelectedPeerId} onWave={() => {
@@ -1449,103 +1473,6 @@ function VirtualSpaceExperience({
               <button type="button" onClick={() => { const review = worldManifest.interactions.find((item) => item.action === "review"); if (review) queuePathTo(review.point); }}>{bt("리뷰 데스크로 이동", "Walk to review desk")}</button>
               <button type="button" disabled={openingReview || !sharedActivity.reviewSubject} onClick={() => { void openSharedReview(); }}>{openingReview ? bt("권한 확인 중…", "Verifying access…") : bt("초대한 검수본 열기", "Open invited snapshot")}</button>
             </section> : null}
-            <section className="vs2-panel vs2-live-huddle">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="mt-1 text-base font-black">{bt("근처 팀원", "Nearby teammates")}</h2>
-                </div>
-                <Headphones size={18} className="text-accent" aria-hidden />
-              </div>
-              <p className="mt-2 text-xs leading-5 text-fg-3">
-                {bt(
-                  "가까운 팀원에게 대화를 요청할 수 있어요. 서로 수락한 참여자끼리만 연결되며 마이크와 카메라는 직접 켭니다.",
-                  "Invite a nearby teammate. Only mutually accepted participants connect; you turn on your own mic and camera.",
-                )}
-              </p>
-              <div className="mt-3 space-y-2">
-                {snapshot.nearbyPeers.length ? snapshot.nearbyPeers.map((peer) => (
-                  <div key={peer.participant.sessionId} className="flex items-center gap-2 rounded-xl border border-line bg-card/70 p-2.5">
-                    <ChibiAvatar
-                      identity={peer.participant.sessionId}
-                      name={peer.participant.displayName}
-                      compact
-                      activity={peer.state.activity}
-                      avatarIndex={peer.state.avatarIndex}
-                      appearance={peer.state.appearance}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
-                      <p className="truncate text-[0.68rem] text-fg-3">
-                        {roomById.get(peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
-                      </p>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs leading-5 text-fg-3">
-                    {bt("조금 더 가까이 가면 근처 대화를 시작할 수 있어요.", "Move closer to someone to start a nearby huddle.")}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                disabled={!signedIn || !connectivity.serverAvailable || !snapshot.direct || snapshot.nearbyPeers.length === 0}
-                onClick={startNearbyHuddle}
-                className={buttonClass({ className: "mt-3 w-full gap-2 disabled:cursor-not-allowed disabled:opacity-50" })}
-              >
-                <Mic2 size={15} aria-hidden />
-                {bt("근처 팀원 선택", "Choose nearby teammate")}
-              </button>
-              {!signedIn ? (
-                <p className="mt-2 text-[0.68rem] leading-5 text-fg-3">
-                  {bt("게스트는 공간을 둘러볼 수 있지만 프로젝트 대화에는 로그인 권한이 필요합니다.", "Guests can explore the space, but project huddles require an authenticated account.")}
-                </p>
-              ) : null}
-            </section>
-
-            <section className="vs2-panel vs2-live-chat">
-              <header>
-                <strong># {bt("스튜디오 채팅", "Studio chat")}</strong>
-                <MessageCircle size={15} aria-hidden />
-              </header>
-              <div className="vs2-live-chat-body">
-                {snapshot.peers.length ? (
-                  snapshot.peers.slice(0, 3).map((peer) => (
-                    <div key={peer.participant.sessionId}>
-                      <ChibiAvatar
-                        identity={peer.participant.sessionId}
-                        name={peer.participant.displayName}
-                        compact
-                        activity={peer.state.activity}
-                        avatarIndex={peer.state.avatarIndex}
-                        appearance={peer.state.appearance}
-                      />
-                      <span>
-                        <strong>{peer.participant.displayName}</strong>
-                        <small>
-                          {bt(
-                            roomById.get(peer.state.zoneId)?.labelKo ?? "스튜디오",
-                            roomById.get(peer.state.zoneId)?.labelEn ?? "Studio",
-                          )}
-                        </small>
-                      </span>
-                      <i aria-hidden>●</i>
-                    </div>
-                  ))
-                ) : (
-                  <p>{bt("같은 프로젝트에 다른 팀원이 들어오면 P2P 채팅을 시작할 수 있어요.", "When teammates join this project, you can start P2P chat here.")}</p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={openStudioChat}
-                disabled={!signedIn || !connectivity.serverAvailable || !snapshot.direct}
-                className="vs2-live-chat-button"
-              >
-                <MessageCircle size={14} aria-hidden />
-                {bt("대화할 팀원 선택", "Choose someone to talk to")}
-              </button>
-            </section>
-
             <section className="vs2-panel vs2-live-members">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-sm font-black">
@@ -1568,43 +1495,6 @@ function VirtualSpaceExperience({
                     <p className="truncate text-[0.68rem] text-accent">{bt(currentRoom.labelKo, currentRoom.labelEn)}</p>
                   </div>
                 </div>
-                {snapshot.peers.slice(0, 7).map((peer) => {
-                  const following = followingPeerId === peer.participant.sessionId;
-                  return (
-                    <div key={peer.participant.sessionId} className="flex items-center gap-2 rounded-xl px-1 py-1">
-                      <ChibiAvatar
-                        identity={peer.participant.sessionId}
-                        name={peer.participant.displayName}
-                        compact
-                        activity={peer.state.activity}
-                        avatarIndex={peer.state.avatarIndex}
-                        appearance={peer.state.appearance}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-bold">{peer.participant.displayName}</p>
-                        <p className="truncate text-[0.68rem] text-fg-3">
-                          {roomById.get(peer.state.zoneId)?.labelKo ?? peer.state.zoneId}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        aria-pressed={following}
-                        className={cn(
-                          "grid size-8 shrink-0 place-items-center rounded-lg border transition",
-                          following
-                            ? "border-good/40 bg-good/10 text-good"
-                            : "border-line bg-card text-fg-3 hover:border-accent/40 hover:text-accent",
-                        )}
-                        aria-label={following ? bt("따라가기 중지", "Stop following") : bt(`${peer.participant.displayName} 님과 상호작용`, `Interact with ${peer.participant.displayName}`)}
-                        onClick={() => following
-                          ? cancelFollowing()
-                          : handleEnginePeerSelect(peer.participant.sessionId)}
-                      >
-                        <Footprints size={13} aria-hidden />
-                      </button>
-                    </div>
-                  );
-                })}
               </div>
 
               <fieldset className="mt-4 border-t border-line/70 pt-4">
@@ -1700,7 +1590,7 @@ function VirtualSpaceExperience({
             <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
               <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
             </button>
-            <Link href={`/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{bt("원고 열기", "Open artwork")}<ExternalLink size={16} aria-hidden /></Link>
+            <Link href={`/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
           </div>
         </footer>
       </Container>
