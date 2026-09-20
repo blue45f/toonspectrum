@@ -50,3 +50,4 @@ export * from "./assets/asset-lockfile";
 
 export * from "./compat/project-graph-v3";
 export * from "./graph/review-source-map";
+export * from "./graph/review-task-reference";

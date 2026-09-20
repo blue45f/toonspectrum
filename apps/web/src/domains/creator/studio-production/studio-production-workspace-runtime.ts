@@ -1,3 +1,4 @@
+import { studioReviewTaskReferenceSchema, studioReviewTaskReferencesAreValid, type StudioReviewTaskReference } from "@toonspectrum/studio-project-model";
 import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_PRODUCTION_NAMESPACE = "studio-production-command-center-v1";
@@ -117,6 +118,8 @@ export interface ProductionTask {
   readonly assigneeIds?: readonly string[];
   readonly reviewerIds?: readonly string[];
   readonly blockedReason?: string;
+  /** Exact saved review and optional existing handoff; it does not grant review access. */
+  readonly reviewRef?: StudioReviewTaskReference;
 }
 
 export interface ProductionReviewIssue {
@@ -390,6 +393,7 @@ function parseTask(value: unknown): ProductionTask | null {
   const assigneeIds = parseIdentityList(value.assigneeIds ?? []);
   const reviewerIds = parseIdentityList(value.reviewerIds ?? []);
   const blockedReason = optionalString(value.blockedReason, MAX_TEXT_LENGTH);
+  const reviewRef = value.reviewRef === undefined ? undefined : studioReviewTaskReferenceSchema.safeParse(value.reviewRef);
   if (
     !id
     || !title
@@ -411,6 +415,7 @@ function parseTask(value: unknown): ProductionTask | null {
     || dependencyIds.includes(id)
     || assigneeIds === null
     || reviewerIds === null
+    || (reviewRef !== undefined && !reviewRef.success)
   ) {
     return null;
   }
@@ -429,6 +434,7 @@ function parseTask(value: unknown): ProductionTask | null {
     assigneeIds,
     reviewerIds,
     blockedReason,
+    ...(reviewRef?.success ? { reviewRef: reviewRef.data } : {}),
   };
 }
 
@@ -992,6 +998,11 @@ export function parseProductionWorkspace(
   };
   if (!referencesAreValid(canonical)) {
     throw new Error("제작 운영 데이터 참조가 올바르지 않습니다.");
+  }
+  if (!studioReviewTaskReferencesAreValid(scopeKey, canonical.tasks, canonical.handoffs)
+    || (versions as ProductionVersionSnapshot[]).some((version) =>
+      !studioReviewTaskReferencesAreValid(scopeKey, version.tasks, version.handoffs ?? []))) {
+    throw new Error("제작 작업의 검수본 또는 인계 범위가 일치하지 않습니다.");
   }
   return {
     schemaVersion: STUDIO_PRODUCTION_WORKSPACE_VERSION,
