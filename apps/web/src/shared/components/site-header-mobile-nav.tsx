@@ -2,7 +2,7 @@ import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocal
 import { X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
-import { SITE_UTILITY_NAVIGATION, mobileSiteTabsForPath, siteNavigationContextForPath, siteNavigationGroupsForPath, siteNavigationLocale, siteNavigationText } from "./site-navigation";
+import { SITE_UTILITY_NAVIGATION, TOONSTUDIO_MOBILE_TABS, siteNavigationContextForPath, siteNavigationGroupsForPath, siteNavigationLocale, siteNavigationText } from "./site-navigation";
 
 import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
@@ -99,7 +99,7 @@ export function MobileHeaderNavigation({
   const overlayRef = useRef<HTMLDivElement>(null);
   const navigationContext = siteNavigationContextForPath(pathname);
   const navigationGroups = siteNavigationGroupsForPath(pathname);
-  const mobileTabs = mobileSiteTabsForPath(pathname);
+  const mobileTabs = TOONSTUDIO_MOBILE_TABS;
   const menuDescription = navigationContext === "studio"
     ? (bi("기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요", "Jump straight to planning, production, review or export"))
     : (bi("영감을 찾고, 그리고, 함께 나누는 작업실", "Discover inspiration, draw and share your work"));
@@ -307,7 +307,7 @@ export function MobileHeaderNavigation({
           data-site-product={navigationContext}
           className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/92 shadow-[0_-12px_35px_-28px_var(--color-fg)] backdrop-blur-2xl md:hidden"
         >
-          <div className="mx-auto grid max-w-md grid-cols-5 pb-[env(safe-area-inset-bottom)]">
+          <div className={navigationContext === "studio" ? "mx-auto grid max-w-md grid-cols-4 pb-[env(safe-area-inset-bottom)]" : "mx-auto grid max-w-md grid-cols-4 pb-[env(safe-area-inset-bottom)]"}>
             {mobileTabs.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
               const Icon = item.icon;

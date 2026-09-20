@@ -22,10 +22,10 @@ import {
 describe("site navigation information architecture", () => {
   it("separates creation and discovery into distinct product navigation", () => {
     expect(TOONSTUDIO_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
-      "production",
+      "workspace-home",
       "studio",
-      "research",
-      "market",
+      "workspace-team",
+      "workspace-hub",
     ]);
     expect(TOONSPECTRUM_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
       "explore",
@@ -137,13 +137,12 @@ describe("site navigation information architecture", () => {
     expect(mobileSiteTabsForPath("/discover")).toBe(TOONSPECTRUM_MOBILE_TABS);
   });
 
-  it("uses stable five-slot mobile navigation in each product", () => {
+  it("uses four Studio destinations and preserves reader navigation", () => {
     expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual([
-      "production",
+      "workspace-home",
       "studio",
-      "make",
-      "studio-assets",
-      "me",
+      "workspace-team",
+      "workspace-hub",
     ]);
     expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual([
       "home",

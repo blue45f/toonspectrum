@@ -97,6 +97,24 @@ export function canonicalSitePath(input: string): string {
 
 export const SITE_ROUTE_AUTHORITIES = Object.freeze([
   route({
+    id: "workspace-home", path: "/home", titleKey: "route.studio",
+    label: { ko: "스튜디오", en: "Studio" },
+    description: { ko: "내 작업실에서 작품을 이어서 만들기", en: "Resume your work in your studio" },
+    purpose: "create", projectContext: "optional", directory: true,
+  }),
+  route({
+    id: "workspace-team", path: "/team", titleKey: "route.collaborate",
+    label: { ko: "팀", en: "Team" },
+    description: { ko: "멤버·권한과 모집·의뢰를 구분해 관리", en: "Manage members, permissions and recruitment" },
+    purpose: "connect", projectContext: "optional", directory: true,
+  }),
+  route({
+    id: "workspace-hub", path: "/hub", titleKey: "route.discover",
+    label: { ko: "둘러보기", en: "Explore" },
+    description: { ko: "공개 작품·소재·사람·배움 둘러보기", en: "Discover public work, materials, people and learning" },
+    purpose: "discover", directory: true,
+  }),
+  route({
     id: "production",
     path: "/production",
     titleKey: "route.production",
@@ -139,7 +157,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     id: "studio-home",
     path: "/studio",
     titleKey: "route.studio",
-    label: { ko: "프로젝트", en: "Projects" },
+    label: { ko: "작품", en: "Works" },
     description: {
       ko: "최근 작품·공유 작업·복구 항목을 한곳에서",
       en: "Recent projects, shared work and recovery in one place",
@@ -303,6 +321,9 @@ export function resolveSiteRouteAuthority(input: string): SiteRouteAuthorityDefi
 }
 
 export const SITE_PRIMARY_ROUTE_IDS = [
+  "workspace-home",
+  "workspace-team",
+  "workspace-hub",
   "production",
   "studio-home",
   "studio-new",
