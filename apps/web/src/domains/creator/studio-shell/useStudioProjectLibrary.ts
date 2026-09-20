@@ -38,14 +38,6 @@ export interface StudioProjectLibraryController {
 }
 
 
-function eventState(value: unknown): StudioProjectLibraryState | null {
-  if (!value || typeof value !== "object") return null;
-  const candidate = value as Partial<StudioProjectLibraryState>;
-  return candidate.schemaVersion === 1 && Array.isArray(candidate.projects)
-    ? candidate as StudioProjectLibraryState
-    : null;
-}
-
 export function useStudioProjectLibrary(
   _locale: string,
   status?: StudioProjectStatus,
@@ -67,22 +59,29 @@ export function useStudioProjectLibrary(
   useEffect(() => {
     reload();
     if (typeof window === "undefined") return undefined;
-    const handleProjectUpdate = (event: Event) => {
-      const next = eventState((event as CustomEvent<unknown>).detail);
-      if (!next) return;
-      setState(next);
-      setError(null);
-    };
+    // Events only invalidate the view; persisted canonical state is authoritative.
+    const handleProjectUpdate = () => reload();
     const handleStorage = (event: StorageEvent) => {
-      if (event.storageArea === window.localStorage && event.key === STUDIO_PROJECT_LIBRARY_STORAGE_KEY) {
+      if (event.key !== null && event.key !== STUDIO_PROJECT_LIBRARY_STORAGE_KEY) return;
+      try {
+        if (event.storageArea === window.localStorage) reload();
+      } catch {
+        // Access can be revoked while a tab is open. Let reload expose recovery.
         reload();
       }
     };
+    const handleVisible = () => { if (document.visibilityState === "visible") reload(); };
     window.addEventListener(STUDIO_PROJECT_LIBRARY_UPDATED_EVENT, handleProjectUpdate);
     window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", reload);
+    window.addEventListener("pageshow", reload);
+    document.addEventListener("visibilitychange", handleVisible);
     return () => {
       window.removeEventListener(STUDIO_PROJECT_LIBRARY_UPDATED_EVENT, handleProjectUpdate);
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("pageshow", reload);
+      document.removeEventListener("visibilitychange", handleVisible);
     };
   }, [reload]);
 
