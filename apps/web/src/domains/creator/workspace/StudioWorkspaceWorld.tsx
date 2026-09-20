@@ -7,10 +7,11 @@ import type { StudioProjectLibraryEntry } from "../studio-project-library-reader
 import type { workspaceProjectLinks } from "./studio-workspace-model";
 
 /** Original art is a preview, never a fabricated live-presence indicator. */
-export function StudioWorkspaceWorld({ project, links, onFallback }: {
+export function StudioWorkspaceWorld({ project, links, onFallback, resumeLabel }: {
   readonly project: StudioProjectLibraryEntry | null;
   readonly links: ReturnType<typeof workspaceProjectLinks>;
   readonly onFallback: () => void;
+  readonly resumeLabel?: string | null;
 }) {
   const bt = useBilingual("StudioWorkspaceWorld");
   const [failed, setFailed] = useState(false);
@@ -29,9 +30,9 @@ export function StudioWorkspaceWorld({ project, links, onFallback }: {
     <div className="workspace-world-image">
       <img src="/assets/virtual-studio/production-v2/master-central-lossless.webp"
         alt={bt("책상, 작품 보드와 소재장이 있는 스튜디오 원본 아트. 그림 속 인물은 실제 접속자가 아닙니다.", "Original studio art. Illustrated people are not online participants.")}
-        fetchPriority="high" decoding="async" onError={() => setFailed(true)} />
+        width={850} height={798} fetchPriority="high" decoding="async" onError={() => setFailed(true)} />
       <div className="workspace-world-hotspots" aria-label={bt("공간 작업 바로가기", "Space work shortcuts")}>
-        {destinations.map(({ key, label, href, icon: Icon }) => <Link key={key} href={href} className={`workspace-hotspot workspace-hotspot--${key}`}>
+        {destinations.map(({ key, label, href, icon: Icon }) => <Link key={key} href={href} data-workspace-resume={key === "desk" && project ? "true" : undefined} aria-label={key === "desk" && resumeLabel ? `${label} · ${resumeLabel}` : undefined} className={`workspace-hotspot workspace-hotspot--${key}`}>
           <Icon size={18} aria-hidden="true" /><span>{label}</span>
         </Link>)}
       </div>

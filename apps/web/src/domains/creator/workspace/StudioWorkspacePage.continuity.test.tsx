@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import { createStudioProject } from "../studio-project-library-store";
+import { createStudioProjectDocument, trashStudioProjectDocument } from "../studio-project-document-store";
+import { writeStudioExactResumeContext } from "../studio-exact-resume-context";
 import { StudioWorkspacePage } from "./StudioWorkspacePage";
 
 const state = vi.hoisted(() => ({
@@ -47,6 +49,7 @@ function App({ entries = ["/home"] }: { entries?: string[] }) {
 }
 function nav(name: string) { return within(screen.getByRole("navigation", { name: "주 메뉴" })).getByRole("link", { name }); }
 beforeEach(() => {
+  window.localStorage.clear();
   state.projects = [makeProject("older", "2026-09-19T00:00:00.000Z"), makeProject("newer", "2026-09-20T00:00:00.000Z")];
   state.loaded = true; state.error = null; state.mode = "classic";
 });
@@ -150,5 +153,30 @@ describe("workspace search switching integration", () => {
     expect(document.querySelectorAll('button[data-workspace-project]')).toHaveLength(0);
     expect(screen.getByRole("searchbox").hasAttribute("disabled")).toBe(true);
     expect(screen.getByTestId("location").textContent).toBe("/home?project=older&panel=projects");
+  });
+});
+
+describe("workspace live resume integration", () => {
+  it("updates the footer without replacing the selected project and never opens a neighbouring document", async () => {
+    state.projects = [{ ...state.projects[0]!, lastOpenedDocumentId: "last" }];
+    createStudioProjectDocument(localStorage, "older", { id: "last", title: "최근 원고", kind: "webtoon" });
+    createStudioProjectDocument(localStorage, "older", { id: "other", title: "다른 원고", kind: "webtoon" });
+    render(<App entries={["/home?project=older"]} />);
+    await act(async () => { writeStudioExactResumeContext(localStorage, { projectId: "older", documentId: "last", workspace: "draw", zoom: 3 }, window); });
+    expect(document.querySelector(".workspace-statusbar small")?.textContent).toContain("300%");
+    act(() => { trashStudioProjectDocument(localStorage, "older", "last", { target: window }); });
+    expect(document.querySelector('[data-workspace-resume-notice="unavailable"]')).toBeTruthy();
+    expect(document.querySelector('.workspace-statusbar .workspace-primary')?.getAttribute("href")).toBe("/studio/p/older/production?view=documents");
+    expect(document.querySelector('a[href*="/d/other"]')).toBeNull();
+    expect(screen.getByTestId("location").textContent).toBe("/home?project=older");
+  });
+  it("revalidates on activation even when another tab has not delivered its event yet", () => {
+    state.projects = [{ ...state.projects[0]!, lastOpenedDocumentId: "last" }];
+    createStudioProjectDocument(localStorage, "older", { id: "last", title: "최근 원고", kind: "webtoon" });
+    render(<App entries={["/home?project=older"]} />);
+    trashStudioProjectDocument(localStorage, "older", "last");
+    fireEvent.click(document.querySelector('.workspace-statusbar .workspace-primary')!);
+    expect(screen.getByTestId("location").textContent).toBe("/home?project=older");
+    expect(document.querySelector('[data-workspace-resume-notice="unavailable"]')).toBeTruthy();
   });
 });
