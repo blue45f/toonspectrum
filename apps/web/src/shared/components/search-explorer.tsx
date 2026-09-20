@@ -19,6 +19,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 
 import {
@@ -809,7 +810,7 @@ export function SearchExplorer({
           )}
         </div>
 
-        {showFilters ? (
+        {showFilters && typeof document !== "undefined" ? createPortal(
           <div className="lg:hidden">
             <button
               type="button"
@@ -873,7 +874,8 @@ export function SearchExplorer({
                 </button>
               </footer>
             </section>
-          </div>
+          </div>,
+          document.body,
         ) : null}
 
         {loading ? (

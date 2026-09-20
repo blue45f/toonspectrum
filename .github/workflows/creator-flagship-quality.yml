@@ -35,6 +35,7 @@ on:
       - 'tests/creator-flagship-contracts.test.ts'
       - 'tools/verify-creator-flagship.mjs'
       - 'e2e/creator-flagship.spec.ts'
+      - 'e2e/fixtures/non-studio-test.ts'
       - 'e2e/open-creation.spec.ts'
       - 'e2e/helpers/capture-page-evidence.ts'
       - 'playwright.non-studio.config.ts'
