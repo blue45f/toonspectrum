@@ -6,6 +6,9 @@ import { HiringAvailabilityRepository } from "./hiring-availability.repository";
 import { expireHiringHolds } from "./hiring-expiry";
 import { HiringStore } from "./hiring.store";
 
+import type { PoolClient } from "pg";
+import type { HiringPost } from "./hiring.store";
+
 import type { HiringCampaign, HiringInvitation, HiringSlotTerms } from "../../../../../packages/contracts/src/creator-hiring";
 
 export const HIRING_CAMPAIGN_POLICY = { rounds: [5, 10], secondRoundDelayMs: 5 * 60000, candidateDaily: 5, recruiterDaily: 100, postTotal: 15, automaticDispatchEnabled: false } as const;
@@ -23,6 +26,14 @@ export class HiringCampaignRepository {
     return this.store.tx(async (c) => {
       const post = await this.store.post(c, postId); await this.store.active(c, actor); this.store.owner(post, actor);
       return this.store.receipt(c, actor, `campaign:${slotId}`, mutationId, { slotId }, async () => {
+        return this.dispatchRound(c, post, actor, slotId);
+
+      });
+    });
+  }
+  // Caller holds the parent post. Shared by manual dispatch and the fenced worker.
+  async dispatchRound(c: PoolClient, post: HiringPost, actor: string, slotId: string, fence?: () => Promise<void>) {
+        const postId = post.id;
         this.store.open(post); await expireHiringHolds(c, postId);
         await c.query(`SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, [`hiring-campaign:${actor}`]);
         const slots = await c.query<{ state: string; terms: HiringSlotTerms }>(`SELECT state,terms FROM creator_hiring_slot WHERE id=$1 AND post_id=$2 FOR UPDATE`, [slotId, postId]);
@@ -30,7 +41,7 @@ export class HiringCampaignRepository {
         await c.query(`INSERT INTO creator_hiring_campaign(slot_id) VALUES ($1) ON CONFLICT DO NOTHING`, [slotId]);
         const campaign = (await c.query<{ round: number; state: string; next_dispatch_at: Date; now: Date }>(`SELECT *,clock_timestamp() AS now FROM creator_hiring_campaign WHERE slot_id=$1 FOR UPDATE`, [slotId])).rows[0];
         if (campaign.state !== "active" || campaign.round >= 2 || campaign.next_dispatch_at > campaign.now) throw new ConflictException("다음 초대 시간이 아니거나 캠페인이 종료되었어요.");
-        const candidates = await this.availability.candidates(c, actor, slot.terms, true);
+        const candidates = await this.availability.candidates(c, actor, slot.terms, true, postId);
         let sent = 0;
         for (const candidate of candidates) {
           if (sent >= HIRING_CAMPAIGN_POLICY.rounds[campaign.round]) break;
@@ -45,14 +56,15 @@ export class HiringCampaignRepository {
           if (counts.recruiter >= HIRING_CAMPAIGN_POLICY.recruiterDaily || counts.post >= HIRING_CAMPAIGN_POLICY.postTotal) break;
           if (counts.candidate >= HIRING_CAMPAIGN_POLICY.candidateDaily || counts.duplicate) continue;
           await this.store.currentOpen(c, post, slot.terms.dueAt);
+          await fence?.();
           await c.query(`INSERT INTO creator_hiring_invitation(id,slot_id,candidate_id,recruiter_id,expires_at) VALUES ($1,$2,$3,$4,LEAST($5::timestamptz,$6::timestamptz,clock_timestamp()+interval '2 hours'))`, [randomUUID(), slotId, candidate.userId, actor, candidate.expiresAt, slot.terms.dueAt]);
           sent++;
         }
+        await this.store.currentOpen(c, post, slot.terms.dueAt);
+        await fence?.();
         const round = campaign.round + 1, state = round >= 2 ? "completed" : "active";
         await c.query(`UPDATE creator_hiring_campaign SET round=$2,state=$3,next_dispatch_at=clock_timestamp()+$4*interval '1 millisecond' WHERE slot_id=$1`, [slotId, round, state, HIRING_CAMPAIGN_POLICY.secondRoundDelayMs]);
         return { sent, round, state, automaticDispatchEnabled: false };
-      });
-    });
   }
   stop(actor: string, postId: string, slotId: string) {
     return this.store.tx(async (c) => {

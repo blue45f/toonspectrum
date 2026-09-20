@@ -33,7 +33,7 @@ export function HiringPostPanel({ postId, postVersion, canManage }: { postId: st
     {edit && <HiringSlotEditor key={edit.slot?.id ?? "new"} initial={edit.terms} busy={busy} onCancel={() => setEdit(null)} onSave={(terms) => { void act(() => hiringSlotsClient.save(postId, edit.slot?.id ?? null, terms, edit.slot?.revision ?? 0, postVersion)); }} />}
     {items?.map((s) => <article key={s.id} className="space-y-4 rounded-xl border border-line p-4"><h3 className="font-semibold">1명 모집 · {states[s.state]} · 조건 버전 {s.revision}</h3><HiringTermsView terms={s.terms} />
       {canManage && <div className="flex flex-wrap gap-2"><button className={collabButton} disabled={busy || !["open", "paused", "matching"].includes(s.state)} onClick={() => setEdit({ slot: s, terms: s.terms })}>조건 수정</button>{s.state !== "filled" && <><button className={collabButton} disabled={busy || s.state === "reserved"} onClick={() => { void act(() => hiringSlotsClient.state(postId, s, s.state === "open" ? "paused" : "open")); }}>{s.state === "open" ? "모집 일시 중지" : "모집 재개"}</button><button className={collabButton} disabled={busy || s.state === "cancelled"} onClick={() => { if (globalThis.confirm("이 모집 자리와 대기 중인 제안·예약을 취소할까요?")) void act(() => hiringSlotsClient.state(postId, s, "cancelled")); }}>모집 취소</button></>}</div>}
-      {canManage && ["open", "matching"].includes(s.state) && <><HiringDiscovery slot={s} /><HiringCampaignPanel slot={s} /></>}
+      {canManage && ["open", "matching"].includes(s.state) && <><HiringDiscovery slot={s} /><HiringCampaignPanel slot={s} postVersion={postVersion} /></>}
     </article>)}
   </section>;
 }

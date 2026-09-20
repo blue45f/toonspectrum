@@ -26,7 +26,7 @@ function disposable(raw: string) {
 }
 const content: CreatorCareerInput = { title: "완료한 선화", role: "lineart", startMonth: "2026-01", endMonth: "2026-06", episodeFrom: 1, episodeTo: 5, scope: "5회 선화 범위", contribution: "선화 직접 제작", portfolioUrl: "https://example.com/private-evidence", rights: "owned", visibility: "private", expectedRevision: 0 };
 
-describe.skipIf(!database)("career confirmation actual 0078 + pending 0080 runtime persistence", () => {
+describe.skipIf(!database)("career confirmation actual 0078 + managed 0080 runtime persistence", () => {
   const schema = `career_test_${randomUUID().replaceAll("-", "")}`, role = `career_runtime_${randomUUID().replaceAll("-", "")}`;
   let admin: Pool, pool: Pool, runtime: HiringStore, confirmations: CareerConfirmationRepository, career: CreatorCareerRepository, teams: CreatorTeamRepository, controller: CareerConfirmationController;
   beforeAll(async () => {
@@ -36,7 +36,7 @@ describe.skipIf(!database)("career confirmation actual 0078 + pending 0080 runti
     pool = new Pool({ connectionString: database!, max: 2, connectionTimeoutMillis: 3000, options: `-c search_path=${schema} -c statement_timeout=10000 -c lock_timeout=5000` });
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY,name text NOT NULL,status text NOT NULL DEFAULT 'active',role text NOT NULL DEFAULT 'user');
       CREATE TABLE member_message_block("blockerId" text NOT NULL,"blockedUserId" text NOT NULL,PRIMARY KEY("blockerId","blockedUserId"))`);
-    for (const file of ["0047_creator_collaboration_board.sql", "0078_creator_hiring_workspace.sql", "pending/0080_creator_career_confirmation.sql"]) await pool.query(await readFile(new URL(`../../db/migrations/${file}`, import.meta.url), "utf8"));
+    for (const file of ["0047_creator_collaboration_board.sql", "0078_creator_hiring_workspace.sql", "0080_creator_career_confirmation.sql"]) await pool.query(await readFile(new URL(`../../db/migrations/${file}`, import.meta.url), "utf8"));
     await pool.query(buildHiringRuntimeAclSql(role, schema));
     await pool.query(buildCareerConfirmationRuntimeAclSql(role, schema));
     // Existing auth permission, needed for row locks; not granted by confirmation ACL.

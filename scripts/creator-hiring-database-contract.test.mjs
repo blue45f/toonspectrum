@@ -4,7 +4,8 @@ import { HIRING_FUNCTIONS, HIRING_RELATIONS, buildHiringCapabilitySql, buildHiri
 import { loadMigrationManifest } from './run-production-database-migrations.mjs';
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
 test('0078 is atomic, registered and exactly covered by the hiring ACL contract', () => {
-  const migration = loadMigrationManifest().at(-1);
+  const migration = loadMigrationManifest().find((entry) => entry.id === '0078_creator_hiring_workspace');
+  expect(migration).toBeDefined();
   expect(migration.id).toBe('0078_creator_hiring_workspace');
   const sql = migration.contents;
   expect(sql).toMatch(/^--[^\n]*\nBEGIN;[\s\S]*COMMIT;\s*$/u);

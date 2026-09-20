@@ -65,7 +65,7 @@ export class HiringAvailabilityRepository {
       startsAt: availability.startsAt, endsAt: availability.endsAt, confirmedAt: availability.confirmedAt, expiresAt: availability.expiresAt,
       capacity: remaining, minRate: availability.minRate, rateUnit: availability.rateUnit, reasons: [...facts, `해당 기간 동시 작업 여력 ${remaining}건`] };
   }
-  async candidates(c: PoolClient, recruiter: string, terms: HiringSlotTerms, notification = false): Promise<HiringCandidate[]> {
+  async candidates(c: PoolClient, recruiter: string, terms: HiringSlotTerms, notification = false, campaignPost: string | null = null): Promise<HiringCandidate[]> {
     // One set-based read. Capacity is filtered BEFORE LIMIT, so saturated early
     // account IDs cannot hide later eligible candidates. Half-open intervals use
     // grouped end/start events at the same timestamp (adjacent work does not overlap).
@@ -77,6 +77,11 @@ export class HiringAvailabilityRepository {
       AND EXISTS(SELECT 1 FROM "user" recruiter WHERE recruiter.id=$1 AND recruiter.status='active')
       AND a.roles @> $2::jsonb AND a.tools @> $3::jsonb AND a.formats @> $4::jsonb
       AND a.starts_at<=$5 AND a.ends_at>=$6 AND a.min_rate<=$7 AND a.rate_unit=$8 AND (NOT $9::boolean OR a.notification_opt_in)
+      AND ($10::text IS NULL OR (
+        NOT EXISTS(SELECT 1 FROM creator_hiring_invitation i JOIN creator_hiring_slot s ON s.id=i.slot_id WHERE s.post_id=$10 AND i.candidate_id=a.user_id)
+        AND (SELECT count(*) FROM creator_hiring_invitation i WHERE i.candidate_id=a.user_id AND i.created_at>statement_timestamp()-interval '24 hours')<5
+        AND NOT EXISTS(SELECT 1 FROM creator_collab_application app WHERE app."postId"=$10 AND app."userId"=a.user_id AND app.status='withdrawn')
+      ))
       AND NOT EXISTS(SELECT 1 FROM member_message_block b WHERE (b."blockerId"=a.user_id AND b."blockedUserId"=$1) OR (b."blockerId"=$1 AND b."blockedUserId"=a.user_id))
     ), occupied AS (
       SELECT c.candidate_id,GREATEST(c.starts_at,$5::timestamptz) AS starts_at,LEAST(c.ends_at,$6::timestamptz) AS ends_at
@@ -95,7 +100,7 @@ export class HiringAvailabilityRepository {
       SELECT candidate_id,max(concurrent)::int AS peak FROM loads GROUP BY candidate_id
     ) SELECT m.*,m.capacity-COALESCE(p.peak,0) AS remaining FROM matched m LEFT JOIN peaks p ON p.candidate_id=m.user_id
       WHERE m.capacity>COALESCE(p.peak,0) ORDER BY m.user_id LIMIT 30`,
-    [recruiter, JSON.stringify([terms.role]), JSON.stringify(terms.tools), JSON.stringify(terms.formats), terms.startsAt, terms.dueAt, terms.maxRate, terms.rateUnit, notification]);
+    [recruiter, JSON.stringify([terms.role]), JSON.stringify(terms.tools), JSON.stringify(terms.formats), terms.startsAt, terms.dueAt, terms.maxRate, terms.rateUnit, notification, campaignPost]);
     return rows.rows.map((r) => {
       const a = availabilityOf(r, r.now);
       return { userId: r.user_id, displayName: r.name || "창작자", roles: a.roles, tools: a.tools, formats: a.formats,

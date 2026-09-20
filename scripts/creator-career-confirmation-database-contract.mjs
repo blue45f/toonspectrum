@@ -1,4 +1,4 @@
-/** Pending 0080 only. The coordinator wires this after numbered 0079 is integrated. */
+/** Managed 0080 counterparty confirmation: explicit migration and least-privilege runtime contract. */
 export const CAREER_CONFIRMATION_RELATIONS = Object.freeze([
   { relation: 'creator_career_confirmation_request', updates: ['state', 'revision', 'confirmed_at', 'snapshot', 'redacted_at', 'redaction_reason'] },
   { relation: 'creator_career_confirmation_event', updates: [] },

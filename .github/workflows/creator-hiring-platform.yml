@@ -1,0 +1,68 @@
+name: Creator hiring platform
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/src/modules/collaboration/**'
+      - 'apps/api/src/modules/recruitment/**'
+      - 'apps/api/src/modules/meeting/**'
+      - 'apps/api/src/db/migrations/**'
+      - 'apps/web/src/domains/collaboration/**'
+      - 'packages/contracts/src/creator-*'
+      - 'scripts/creator-*'
+      - 'scripts/production-database-migrations.manifest'
+      - 'scripts/run-production-database-migrations*'
+      - '.github/workflows/creator-hiring-platform.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: creator-hiring-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  hiring:
+    name: Creator hiring database and UI invariants
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: creator_hiring_test
+          POSTGRES_PASSWORD: creator_hiring_test
+          POSTGRES_DB: creator_hiring_disposable_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U creator_hiring_test -d creator_hiring_disposable_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+    env:
+      CI: '1'
+      DATABASE_URL: postgresql://creator_hiring_test:creator_hiring_test@127.0.0.1:5432/creator_hiring_disposable_ci
+      CREATOR_HIRING_TEST_DATABASE_URL: postgresql://creator_hiring_test:creator_hiring_test@127.0.0.1:5432/creator_hiring_disposable_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Verify real runtime ACLs, races, privacy, lifecycle and UI
+        run: >-
+          pnpm exec vitest run --maxWorkers=1 --no-file-parallelism
+          apps/api/src/modules/collaboration/hiring-
+          apps/api/src/modules/collaboration/collaboration.repository.test.ts
+          apps/api/src/modules/recruitment/
+          apps/api/src/modules/meeting/
+          apps/api/src/session-middleware.test.ts
+          apps/api/src/csrf-middleware.integration.test.ts
+          apps/web/src/domains/collaboration/hiring/
+          scripts/creator-hiring-database-contract.test.mjs
+          scripts/creator-hiring-automation-database-contract.test.mjs
+          scripts/creator-career-confirmation-database-contract.test.mjs
+          scripts/run-production-database-migrations.test.mjs
+          scripts/verify-production-database-capabilities.test.mjs

@@ -1,5 +1,7 @@
 # 경력 상대방 확인 구현 — 2026-09-20
 
+> Integration update: see `creator-platform-integration-20260920.md` for the later managed 0079/0080 integration and current verification. This document retains the earlier checkpoint evidence.
+
 상태: 기능 코드 구현 및 격리 검증. DB 통합 대기. 운영 미배포.
 
 브랜치: `feat/creator-career-confirmation-20260920`

@@ -1,5 +1,7 @@
 # Creator hiring platform — bounded implementation checkpoint, 2026-09-20
 
+> Integration update: see `creator-platform-integration-20260920.md` for the later managed 0079/0080 integration and current verification. This document retains the earlier checkpoint evidence.
+
 Status: **current source finalized for coordinator review; the entire design is not complete**. Changes remain uncommitted in `/Users/hjunkim/.chatgpt-worktrees/toonspectrum-creator-hiring-platform-20260920`, branch `feat/creator-hiring-platform-20260920`, base HEAD `2981170a292fbe83a57b2a2913d6ddcfa3cbde74`. Existing feature work and ignored coordinator tools/logs were retained. No other worktree, production database/environment/secrets, commit, push, merge, deployment, browser injection, or additional coding agent was used. No CI protection or required-target manifest was edited.
 
 This checkpoint closes the requested implementation blockers and records the remaining execution and owner gates. The original application/post, user and message-block tables remain authoritative. New shared DTOs have Web and API consumers; application source does not cross those boundaries. The separately owned health-readiness source was not edited.

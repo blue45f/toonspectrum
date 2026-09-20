@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { buildHiringCapabilitySql, buildHiringRuntimeAclSql } from "./creator-hiring-database-contract.mjs";
+import { buildHiringAutomationCapabilitySql, buildHiringAutomationRuntimeAclSql } from "./creator-hiring-automation-database-contract.mjs";
+import { buildCareerConfirmationCapabilitySql, buildCareerConfirmationRuntimeAclSql } from "./creator-career-confirmation-database-contract.mjs";
 import { buildAdminCapabilitySql, buildAdminRuntimeAclSql } from "./admin-database-contract.mjs";
 import { buildFeedbackCapabilitySql, buildFeedbackRuntimeAclSql } from "./feedback-database-contract.mjs";
 import {
@@ -3727,6 +3729,10 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     psql(databaseUrl, buildMembershipRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildHiringRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildHiringCapabilitySql(runtimeDatabaseRole));
+    psql(databaseUrl, buildHiringAutomationRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildHiringAutomationCapabilitySql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCareerConfirmationRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildCareerConfirmationCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProductionRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProjectGraphRuntimeAclSql(runtimeDatabaseRole));
     psql(

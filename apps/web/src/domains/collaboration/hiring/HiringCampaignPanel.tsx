@@ -1,3 +1,4 @@
+import { HiringAutomationPanel } from "./HiringAutomationPanel";
 import { useEffect, useRef, useState } from "react";
 
 import { CollabNotice, collabButton, collabPrimary } from "../collaboration-ui";
@@ -8,7 +9,7 @@ import Link from "@/compat/router-link";
 import { api, getApiErrorMessage } from "@/infrastructure/api";
 
 const root = "/collaborations/hiring";
-export function HiringCampaignPanel({ slot }: { slot: HiringSlot }) {
+export function HiringCampaignPanel({ slot, postVersion }: { slot: HiringSlot; postVersion: number }) {
   const [campaign, setCampaign] = useState<HiringCampaign | null>(null), [loaded, setLoaded] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");
   const request = useRef<{ round: number; id: string } | null>(null);
   const path = `${root}/posts/${encodeURIComponent(slot.postId)}/slots/${encodeURIComponent(slot.id)}/campaign`;
@@ -25,8 +26,9 @@ export function HiringCampaignPanel({ slot }: { slot: HiringSlot }) {
       await load();
     } catch (e) { setError(await getApiErrorMessage(e, "초대 캠페인을 처리하지 못했어요.")); } finally { setBusy(false); }
   }
-  return <section className="space-y-3 border-t border-line pt-4"><h4 className="font-bold">긴급 후보 초대 · 수동 실행</h4><p className="text-sm">1차 최대 5명, 5분 뒤 2차 최대 10명에게 초대합니다. 모집 성공 시간 보장이 아니며 자동 작업자는 꺼져 있습니다. 외부 문자·메일을 보내지 않습니다.</p>{error && <CollabNotice error>{error}</CollabNotice>}{note && <CollabNotice>{note}</CollabNotice>}
+  return <section className="space-y-3 border-t border-line pt-4"><h4 className="font-bold">긴급 후보 초대 · 수동 실행</h4><p className="text-sm">1차 최대 5명, 5분 뒤 2차 최대 10명에게 초대합니다. 모집 성공 시간 보장이 아니며 자동 초대는 아래에서 별도로 설정합니다. 외부 문자·메일을 보내지 않습니다.</p>{error && <CollabNotice error>{error}</CollabNotice>}{note && <CollabNotice>{note}</CollabNotice>}
     <button className={collabButton} disabled={busy} onClick={() => { void act("load"); }}>캠페인 상태 확인</button>{loaded && <><p className="text-sm">{campaign ? `${campaign.round}차 완료 · 초대 저장 ${campaign.invitedCount}건 · ${{ active: "진행 중", completed: "회차 완료", stopped: "중지", exhausted: "종료" }[campaign.state]}` : "아직 시작하지 않았어요."}{campaign?.nextDispatchAt ? ` · 다음 수동 실행 가능 ${new Date(campaign.nextDispatchAt).toLocaleString("ko-KR")}` : ""}</p>{(!campaign || campaign.state === "active") && <div className="flex gap-2"><button className={collabPrimary} disabled={busy} onClick={() => { void act("dispatch"); }}>{campaign?.round ? "2차 초대 직접 보내기" : "1차 초대 직접 보내기"}</button>{campaign && <button className={collabButton} disabled={busy} onClick={() => { void act("stop"); }}>캠페인·대기 초대 중지</button>}</div>}</>}
+    <HiringAutomationPanel slot={slot} postVersion={postVersion} />
   </section>;
 }
 export function HiringInvitationInbox() {
