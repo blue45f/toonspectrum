@@ -168,5 +168,66 @@ artistic change has been satisfied; resolution remains a deliberate user decisio
 
 Six suites passed 152 distinct tests: DTO 15, source map/attestation 45, preview reader 21,
 producer service 7, actual PostgreSQL producer 17 and existing PostgreSQL review races 47.
-Scoped lint, diff validation and full API/Web typechecks passed. Capture-return and explicit
-resolution UI integration remain in progress and are not established by these server tests.
+Scoped lint, diff validation and full API/Web typechecks passed. The separately implemented
+capture-return and explicit resolution UI are documented below.
+
+## Capture return and deliberate resolution
+
+Starting a new capture fixes the originating review/comment to that capture owner. A later
+same-work route change, reopening the dialog or retrying the same intent cannot relabel the
+result as another comment's correction. Completion offers an explicit identity-only return link;
+account changes immediately hide the link. No comment body, image URL or permission claim is
+placed in the URL. The receiving review page reacts to the current route parameters.
+
+The correction panel verifies both exact pins and the original comment, reads the new snapshot's
+single submission parent, and displays the actual existing two-preview/overlay component. The
+user compares the images and explicitly confirms the correction before a fresh authority read
+and one resolution POST with `resolutionSourceRef`. HTTP 422 cannot trigger a legacy fallback.
+An ambiguous write switches that attempt to read-only reconciliation. A user recheck also reads
+without blindly resending the POST. Approval of the new review remains a separate action.
+
+Actor/generation changes, hidden documents, expired leases and revoked access clear private
+comparison state and fence delayed results. Background renewal preserves valid keyboard focus
+and the user's checkbox while the current lease remains valid; expiry clears the confirmation
+and a late response cannot restore it. The comment's recorded resolution must identify the
+exact submitted revision before the UI reports success.
+
+The integrated portfolio passed 17 files / 118 tests, the final UI check passed five tests and CI
+routing passed eight contracts. Full Web typechecking and scoped lint passed. Eleven browser
+scenarios passed at 1280px/390px, covering the completion link, two real decoded QA previews,
+overlay, explicit write, lost responses before/after persistence, invalid source, revoked access,
+missing parent, actor changes, hidden state, renewal focus and expiry. Both comparison captures
+were visually inspected. These fixtures use actual components, parsers and controllers with
+synthetic HTTP records; they do not establish production authentication, database attestation
+or a complete router journey. Commit: `90b2db2b1`.
+
+## Actual Host capture with an isolated local API
+
+`scripts/verify-virtual-studio-review-host.mts` starts and owns a real local Nest API and Vite
+process through `studio-review-host-qa-runtime.mjs`. It rejects occupied ports and requires an
+explicit loopback test/QA database. The shared isolated environment excludes production local
+environment files and paid services. The normal CSRF/CORS boundary is retained by using an
+already supported development origin. Both owned processes terminate on completion or error.
+
+The fixture inserts a new verified test account using the current password hash, avoiding
+external verification email. Actual login issues the session cookie; actual work creation and
+saved-document reads use the API and PostgreSQL. The full Studio Host loads the real work,
+uses its actual collaboration/mutation authority, dismisses onboarding through the visible
+button and invokes the shipped capture command. Only the capture-producer HTTP endpoints
+are intercepted, since this isolated API has no external private-object store.
+
+The final owned-runtime run passed with a separate bootstrapped local PostgreSQL 16 database
+and its DML-only runtime role. The actual Host exported two distinct PNGs at the unchanged
+default 2x resolution, **1440 by 2160** each. Browser-decoded center pixels matched each saved
+fixture page's background and ordinal. The intent matched the actual saved revision/digest,
+three source reads were observed, prepare and complete each occurred once, upload SHA-256
+receipts matched the exact completion body, and there were zero page errors or source writes.
+The completion screenshot was visually inspected. This covers the two-page Host/export bridge;
+it is not proof of every drawing element's visual parity, production object storage or WAN media.
+
+To reproduce, provide `TEST_DATABASE_URL` for a dedicated, migrated local test database and run
+`pnpm exec tsx scripts/verify-virtual-studio-review-host.mts`. Optional local endpoints are
+`STUDIO_QA_BASE_URL` (default `http://127.0.0.1:5181`) and `STUDIO_QA_API_BASE_URL` (default
+`http://127.0.0.1:4355`). The verifier does not migrate, reset or drop a database. It writes its
+synthetic evidence under `.qa/virtual-studio-review-host/` by default; `STUDIO_QA_OUTPUT` changes
+that location. This manual integration verifier complements the required unit/database lanes.
