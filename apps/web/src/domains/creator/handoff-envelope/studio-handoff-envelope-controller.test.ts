@@ -77,3 +77,50 @@ describe("explicit, receipt-backed handoff", () => {
     expect(f.client.prepare).not.toHaveBeenCalled(); expect(f.client.create).not.toHaveBeenCalled();
   });
 });
+
+it("keeps the reconciled envelope selected across later background reads", async () => {
+  const f = fixture(); await f.controller.refresh(); f.client.create.mockRejectedValueOnce(new Error("lost"));
+  f.client.read.mockRejectedValueOnce(new Error("offline")); await f.controller.send(f.choice);
+  expect(f.controller.getSnapshot().phase).toBe("uncertain");
+  await f.controller.refresh(); expect(f.controller.getSnapshot().view).toEqual(f.view);
+  const prepareCount = f.client.prepare.mock.calls.length;
+  await f.controller.refresh(true);
+  expect(f.client.prepare).toHaveBeenCalledTimes(prepareCount);
+  expect(f.controller.getSnapshot().view).toEqual(f.view);
+});
+it("converges on an already recorded recipient action from another tab without another write", async () => {
+  const f = fixture(null); f.owner.actorId = "recipient"; await f.controller.select("envelope");
+  const already = { ...f.view, opened: { actorUserId: "recipient", requestId: "other-tab", at: "2026-09-20T00:03:00.000Z" }, status: "read", canAccept: true, canCancel: false };
+  f.client.read.mockResolvedValueOnce(f.view).mockResolvedValue(already); f.client.act.mockResolvedValue(already);
+  await f.controller.act("open"); await f.controller.retry();
+  expect(f.controller.getSnapshot()).toMatchObject({ phase: "ready", view: already });
+  expect(f.client.act).toHaveBeenCalledTimes(1);
+});
+it("does not reconcile a creation whose recipient or instructions differ despite an identical ID", async () => {
+  const f = fixture(); await f.controller.refresh();
+  const wrong = { ...f.view, envelope: { ...f.view.envelope, recipient: { ...f.view.envelope.recipient, userId: "someone-else" } } };
+  f.client.create.mockResolvedValue(wrong); f.client.read.mockResolvedValue(wrong);
+  await f.controller.send(f.choice); expect(f.controller.getSnapshot().phase).toBe("uncertain");
+});
+
+it.each(["actor", "envelope", "digest", "work"])("does not converge on another %s's action receipt", async (kind) => {
+  const f = fixture(null); f.owner.actorId = "recipient"; await f.controller.select("envelope");
+  const wrong = { ...f.view, envelope: { ...f.view.envelope },
+    opened: { actorUserId: "recipient", requestId: "other-tab", at: "2026-09-20T00:03:00.000Z" } };
+  if (kind === "actor") wrong.opened.actorUserId = "other";
+  if (kind === "envelope") wrong.envelope.id = "other";
+  if (kind === "digest") wrong.envelopeDigest = "a".repeat(64);
+  if (kind === "work") wrong.envelope.workId = "other";
+  f.client.read.mockResolvedValueOnce(f.view).mockResolvedValue(wrong); f.client.act.mockResolvedValue(wrong);
+  await f.controller.act("open"); expect(f.controller.getSnapshot().phase).toBe("uncertain");
+  expect(f.client.act).toHaveBeenCalledTimes(1);
+});
+it.each(["task", "role", "usage", "notes"])("does not reconcile a creation with mismatched %s data", async (kind) => {
+  const f = fixture(); await f.controller.refresh(); const wrong = structuredClone(f.view);
+  if (kind === "task") wrong.envelope.taskId = "other";
+  if (kind === "role") wrong.envelope.recipient.roleAssignmentId = "other";
+  if (kind === "usage") wrong.envelope.usageConditions = "other";
+  if (kind === "notes") wrong.envelope.remainingNotes = "other";
+  f.client.create.mockResolvedValue(wrong); f.client.read.mockResolvedValue(wrong);
+  await f.controller.send(f.choice); expect(f.controller.getSnapshot().phase).toBe("uncertain");
+});

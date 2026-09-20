@@ -1,0 +1,1863 @@
+{
+  "version": 1,
+  "date": "2026-09-20",
+  "status": "locally-verified-not-deployed",
+  "baseSha": "b3fdff10b660b2a2b65646849a35aaf07aa5f8ce",
+  "integrationBaseSha": "6c8b07a9199951c1e88c118a498e586c8a3f7dc5",
+  "validatedImplementationSha": "31966c18188e25f3425b21fc46e299826314eff1",
+  "originalWorktreeUnchanged": true,
+  "preservedOriginalFileCount": 9,
+  "sourceSha256": {
+    "apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx": "7b32477d2a91bc937cb123a9db658fbd3004d59d51466e78514231c55540bd67",
+    "apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.tsx": "0e4fad0a28963367e1a4002f29c43bd7e2ee7ea259fc9ce06babacb09e7db252",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-contract.ts": "f5b0fdf34b48fe61e413d93de839dc83fd05ada79b74fe8a28c06bed3d1406d7",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-navigation-input.test.ts": "c01ba961a82a081d759839bf5721360a08cad4764afcc1b592376e161e31b469",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-navigation-input.ts": "a6febce0c09405784d0bcf112418560b09aa9c52b391743ad9d13175babf5eb8",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-navigation-path.ts": "286a49b8047e0fbde243981a49aaf7d560dda06eacf4f8aaa9025dc797aac26e",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-navigation-preview.ts": "afbd156a97fd39f118e6b91102f5924d7183bf64d7ee313a6c596f4a4723f4f9",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-navigation.test.ts": "8715977fa207cb9b388df1b46c89c0419bf73a466a7371ce0d3a7a63b8e26d12",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-navigation.ts": "4c04ee9daf9da02e45b64cff252640aec13fce202bd87f9fa52368eca4f102af",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-recipe-reuse.ts": "52b6bd41d5a1c0dbe5de57d1889b12b62f7f0c1141bbaa27070580b637995ab6",
+    "apps/web/src/domains/creator/scene3d/specialists/specialist-runtime.test.ts": "bb708360747a189e4e4695cf52d04ae1374ac5ad0533d08900af6aa4146a0037",
+    "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx": "dac93fe5cba1afa218c90d0c2cf8331508605ac2395a7a9cb0c9537eaa156bbb",
+    "scripts/verify-studio-scene3d-specialists.mjs": "56a04eaed53bf57bd68a3adfe1226be2e646888d5edf5bf3c84cdf55cc77d99e"
+  },
+  "tests": [
+    {
+      "suite": "specialists",
+      "files": 20,
+      "passed": 201
+    },
+    {
+      "suite": "professional-completion",
+      "files": 34,
+      "passed": 207
+    },
+    {
+      "suite": "inplace",
+      "files": 9,
+      "passed": 81
+    }
+  ],
+  "testSetsOverlap": true,
+  "redBeforeFix": {
+    "suite": "waypoint UI",
+    "failed": 1,
+    "passed": 13,
+    "bug": "Missing coordinate treated as zero"
+  },
+  "typecheck": "web+API passed",
+  "lint": "13 changed sources passed with no warnings",
+  "build": "production bundle/notices/static CSP passed",
+  "optionalEngineIsolation": "passed",
+  "preCommit": "normal lockfile/lint/secret checks passed",
+  "prePush": "normal architecture/web+API types/changed lint/secrets passed",
+  "browser": {
+    "status": "ok",
+    "outcomes": [
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:5a10d7a8d2b8393a796152f78bb5005805a27affc6a5b2bdadf3e140805ab776",
+        "compoundReceipt": {
+          "version": 1,
+          "provider": "manifold-3d-3.5.1",
+          "composition": "union-of-mesh-nodes",
+          "coordinates": "source-world/right-handed/Y-up",
+          "volumeUnits": "source-units-cubed",
+          "weldTolerance": 1e-06,
+          "sourceParts": {
+            "left": [
+              {
+                "name": "part-0",
+                "primitives": 6
+              },
+              {
+                "name": "part-1",
+                "primitives": 6
+              }
+            ],
+            "right": [
+              {
+                "name": "part-0",
+                "primitives": 1
+              }
+            ]
+          },
+          "inputTriangles": 36,
+          "workUnits": 480,
+          "steps": [
+            {
+              "phase": "left-union",
+              "operation": "union",
+              "receiptHash": "sha256:7b83b2c06953c598aa94d07102c163822b2ed3e978de0471b388d8918c2b8e77",
+              "outputHash": "sha256:6cff814cdaa60d52c128b386f2a0e475460075075081f56797f0e6061435cece",
+              "triangles": 28,
+              "volume": 12
+            },
+            {
+              "phase": "result",
+              "operation": "union",
+              "receiptHash": "sha256:c55b6610ea642c4434564eaac07b946069b771e942f1b6d786e15c548e7e8b92",
+              "outputHash": "sha256:81ea3c1052d55ad105a7d70375b2a575c6410e09b451f66bd479dbafc6e66dfa",
+              "triangles": 40,
+              "volume": 14
+            }
+          ],
+          "output": {
+            "meshHash": "sha256:81ea3c1052d55ad105a7d70375b2a575c6410e09b451f66bd479dbafc6e66dfa",
+            "topology": {
+              "status": "NoError",
+              "empty": false,
+              "physicalVertexCount": 22,
+              "triangleCount": 40,
+              "genus": 0,
+              "surfaceArea": 36,
+              "volume": 14,
+              "boundingBox": {
+                "min": [
+                  -1,
+                  -1,
+                  -1
+                ],
+                "max": [
+                  2.5,
+                  1,
+                  1
+                ]
+              }
+            }
+          },
+          "authority": "derived-glb-only",
+          "materials": "not-preserved",
+          "sourceSha256": "sha256:5a10d7a8d2b8393a796152f78bb5005805a27affc6a5b2bdadf3e140805ab776",
+          "secondarySha256": "sha256:52934dac9bad68faa1e8b8e4b359272670a3a702cb25a3100b6beb9c6cda86c1",
+          "artifactSha256": "sha256:544c789e5e9badcb3cdf1f6ce71e544783b3ba60ffa280e87bcb5e6b8d83f054",
+          "operation": "union",
+          "decodedVolume": 13.999999999999996
+        },
+        "options": {
+          "kind": "csg",
+          "operation": "union",
+          "backend": "solid"
+        },
+        "sourceByteLength": 3128,
+        "before": {
+          "triangles": 12,
+          "vertices": 144,
+          "nodes": 3,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "boolean-solid.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:544c789e5e9badcb3cdf1f6ce71e544783b3ba60ffa280e87bcb5e6b8d83f054",
+            "stats": {
+              "triangles": 40,
+              "vertices": 22,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 1764
+          },
+          {
+            "name": "boolean-report.json",
+            "mime": "application/json",
+            "sha256": "sha256:d37fd0d84f8b21cbfa95b82fe0d767385a31635ad1ab408ee753c02367737d75",
+            "byteLength": 1988
+          }
+        ],
+        "warnings": [
+          "Geometry-only derivative: source transforms are baked; source documents, materials, undo and scene state are unchanged.",
+          "Secondary source SHA-256: sha256:52934dac9bad68faa1e8b8e4b359272670a3a702cb25a3100b6beb9c6cda86c1",
+          "Manifold combines mesh nodes by union before the requested Boolean. Primitives within each node must collectively form a closed oriented solid; textures, source materials and editable scene application are not preserved by this geometry-only export."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:5a10d7a8d2b8393a796152f78bb5005805a27affc6a5b2bdadf3e140805ab776",
+        "compoundReceipt": {
+          "version": 1,
+          "provider": "manifold-3d-3.5.1",
+          "composition": "union-of-mesh-nodes",
+          "coordinates": "source-world/right-handed/Y-up",
+          "volumeUnits": "source-units-cubed",
+          "weldTolerance": 1e-06,
+          "sourceParts": {
+            "left": [
+              {
+                "name": "part-0",
+                "primitives": 6
+              },
+              {
+                "name": "part-1",
+                "primitives": 6
+              }
+            ],
+            "right": [
+              {
+                "name": "part-0",
+                "primitives": 1
+              }
+            ]
+          },
+          "inputTriangles": 36,
+          "workUnits": 480,
+          "steps": [
+            {
+              "phase": "left-union",
+              "operation": "union",
+              "receiptHash": "sha256:7b83b2c06953c598aa94d07102c163822b2ed3e978de0471b388d8918c2b8e77",
+              "outputHash": "sha256:6cff814cdaa60d52c128b386f2a0e475460075075081f56797f0e6061435cece",
+              "triangles": 28,
+              "volume": 12
+            },
+            {
+              "phase": "result",
+              "operation": "difference",
+              "receiptHash": "sha256:3fcc94ed23808527cb1a0262fc8579e59ed616ba050e0b4aabf10c85879bb8d6",
+              "outputHash": "sha256:ec047dd2ff0b0ed08c1e256a02b9a7a96caaea4c2e5e0fa59eee743c4727906a",
+              "triangles": 24,
+              "volume": 6
+            }
+          ],
+          "output": {
+            "meshHash": "sha256:ec047dd2ff0b0ed08c1e256a02b9a7a96caaea4c2e5e0fa59eee743c4727906a",
+            "topology": {
+              "status": "NoError",
+              "empty": false,
+              "physicalVertexCount": 14,
+              "triangleCount": 24,
+              "genus": 0,
+              "surfaceArea": 20,
+              "volume": 6,
+              "boundingBox": {
+                "min": [
+                  -1,
+                  -1,
+                  -1
+                ],
+                "max": [
+                  0.5,
+                  1,
+                  1
+                ]
+              }
+            }
+          },
+          "authority": "derived-glb-only",
+          "materials": "not-preserved",
+          "sourceSha256": "sha256:5a10d7a8d2b8393a796152f78bb5005805a27affc6a5b2bdadf3e140805ab776",
+          "secondarySha256": "sha256:52934dac9bad68faa1e8b8e4b359272670a3a702cb25a3100b6beb9c6cda86c1",
+          "artifactSha256": "sha256:4a1e9db38dc331355de76dc64375ff70052c25b278d8c72430ef2ece38f3eb46",
+          "operation": "subtract",
+          "decodedVolume": 6
+        },
+        "options": {
+          "kind": "csg",
+          "operation": "subtract",
+          "backend": "solid"
+        },
+        "sourceByteLength": 3128,
+        "before": {
+          "triangles": 12,
+          "vertices": 144,
+          "nodes": 3,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "boolean-solid.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:4a1e9db38dc331355de76dc64375ff70052c25b278d8c72430ef2ece38f3eb46",
+            "stats": {
+              "triangles": 24,
+              "vertices": 14,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 1376
+          },
+          {
+            "name": "boolean-report.json",
+            "mime": "application/json",
+            "sha256": "sha256:ef6b8e5c607805ab331ba5ca09b5e35fa82ed78068ce331426a8ffeac03505d4",
+            "byteLength": 1994
+          }
+        ],
+        "warnings": [
+          "Geometry-only derivative: source transforms are baked; source documents, materials, undo and scene state are unchanged.",
+          "Secondary source SHA-256: sha256:52934dac9bad68faa1e8b8e4b359272670a3a702cb25a3100b6beb9c6cda86c1",
+          "Manifold combines mesh nodes by union before the requested Boolean. Primitives within each node must collectively form a closed oriented solid; textures, source materials and editable scene application are not preserved by this geometry-only export."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:5a10d7a8d2b8393a796152f78bb5005805a27affc6a5b2bdadf3e140805ab776",
+        "compoundReceipt": {
+          "version": 1,
+          "provider": "manifold-3d-3.5.1",
+          "composition": "union-of-mesh-nodes",
+          "coordinates": "source-world/right-handed/Y-up",
+          "volumeUnits": "source-units-cubed",
+          "weldTolerance": 1e-06,
+          "sourceParts": {
+            "left": [
+              {
+                "name": "part-0",
+                "primitives": 6
+              },
+              {
+                "name": "part-1",
+                "primitives": 6
+              }
+            ],
+            "right": [
+              {
+                "name": "part-0",
+                "primitives": 1
+              }
+            ]
+          },
+          "inputTriangles": 36,
+          "workUnits": 480,
+          "steps": [
+            {
+              "phase": "left-union",
+              "operation": "union",
+              "receiptHash": "sha256:7b83b2c06953c598aa94d07102c163822b2ed3e978de0471b388d8918c2b8e77",
+              "outputHash": "sha256:6cff814cdaa60d52c128b386f2a0e475460075075081f56797f0e6061435cece",
+              "triangles": 28,
+              "volume": 12
+            },
+            {
+              "phase": "result",
+              "operation": "intersection",
+              "receiptHash": "sha256:26c92cbb6b844c079253f86f31e4c2a5019c86935a68790b6e9747a05d6037f3",
+              "outputHash": "sha256:70d10f30519d2b05b36a2540c3d199c548271048927ab2cb235949428473cfd7",
+              "triangles": 16,
+              "volume": 6
+            }
+          ],
+          "output": {
+            "meshHash": "sha256:70d10f30519d2b05b36a2540c3d199c548271048927ab2cb235949428473cfd7",
+            "topology": {
+              "status": "NoError",
+              "empty": false,
+              "physicalVertexCount": 10,
+              "triangleCount": 16,
+              "genus": 0,
+              "surfaceArea": 20,
+              "volume": 6,
+              "boundingBox": {
+                "min": [
+                  0.5,
+                  -1,
+                  -1
+                ],
+                "max": [
+                  2,
+                  1,
+                  1
+                ]
+              }
+            }
+          },
+          "authority": "derived-glb-only",
+          "materials": "not-preserved",
+          "sourceSha256": "sha256:5a10d7a8d2b8393a796152f78bb5005805a27affc6a5b2bdadf3e140805ab776",
+          "secondarySha256": "sha256:52934dac9bad68faa1e8b8e4b359272670a3a702cb25a3100b6beb9c6cda86c1",
+          "artifactSha256": "sha256:dcdfe9cfbd23b0353db649930f7a3e6234bd1e0bfb7dc9d3a6aefef161aba4d9",
+          "operation": "intersect",
+          "decodedVolume": 6
+        },
+        "options": {
+          "kind": "csg",
+          "operation": "intersect",
+          "backend": "solid"
+        },
+        "sourceByteLength": 3128,
+        "before": {
+          "triangles": 12,
+          "vertices": 144,
+          "nodes": 3,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "boolean-solid.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:dcdfe9cfbd23b0353db649930f7a3e6234bd1e0bfb7dc9d3a6aefef161aba4d9",
+            "stats": {
+              "triangles": 16,
+              "vertices": 10,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 1184
+          },
+          {
+            "name": "boolean-report.json",
+            "mime": "application/json",
+            "sha256": "sha256:6dc12f398ab073006da105565a40fc22d88132273df54fa942e8a93939609859",
+            "byteLength": 1996
+          }
+        ],
+        "warnings": [
+          "Geometry-only derivative: source transforms are baked; source documents, materials, undo and scene state are unchanged.",
+          "Secondary source SHA-256: sha256:52934dac9bad68faa1e8b8e4b359272670a3a702cb25a3100b6beb9c6cda86c1",
+          "Manifold combines mesh nodes by union before the requested Boolean. Primitives within each node must collectively form a closed oriented solid; textures, source materials and editable scene application are not preserved by this geometry-only export."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b",
+        "texturePixels": {
+          "map": {
+            "maxDelta": 0,
+            "mips": 6,
+            "colorSpace": "srgb",
+            "samples": [
+              {
+                "original": [
+                  230,
+                  40,
+                  30,
+                  255
+                ],
+                "encoded": [
+                  230,
+                  40,
+                  30,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  20,
+                  210,
+                  40,
+                  255
+                ],
+                "encoded": [
+                  20,
+                  210,
+                  40,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  30,
+                  40,
+                  230,
+                  255
+                ],
+                "encoded": [
+                  30,
+                  40,
+                  230,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  200,
+                  180,
+                  20,
+                  255
+                ],
+                "encoded": [
+                  200,
+                  180,
+                  20,
+                  255
+                ]
+              }
+            ]
+          },
+          "normalMap": {
+            "maxDelta": 0,
+            "mips": 6,
+            "colorSpace": "",
+            "samples": [
+              {
+                "original": [
+                  149,
+                  159,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  149,
+                  159,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  218,
+                  159,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  218,
+                  159,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  149,
+                  211,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  149,
+                  211,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  218,
+                  211,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  218,
+                  211,
+                  247,
+                  255
+                ]
+              }
+            ]
+          }
+        },
+        "options": {
+          "kind": "textures",
+          "textureMode": "uastc",
+          "maxTextureSize": 512
+        },
+        "sourceByteLength": 45664,
+        "before": {
+          "triangles": 1472,
+          "vertices": 825,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "textures-ktx2.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:8547d8cccfb204f964578da6ecc4a12348d9d78b2de3230b0414e6b9adeceb90",
+            "stats": {
+              "triangles": 1472,
+              "vertices": 823,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 18216
+          },
+          {
+            "name": "texture-release-receipt.json",
+            "mime": "application/json",
+            "sha256": "sha256:97ffb5879cead75a7f0cbfe2677423219d55fb4a4e7dfc4fbed6deef493f6403",
+            "byteLength": 1651
+          }
+        ],
+        "warnings": [
+          "Source files remain unchanged. KTX2 encoding is lossy: inspect material/alpha/normal appearance before catalog approval.",
+          "Normal/data textures use linear UASTC; color textures use the selected transfer-aware codec. The longest edge is bounded by the selected resolution; base dimensions are 4x4-block aligned."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b",
+        "texturePixels": {
+          "map": {
+            "maxDelta": 4,
+            "mips": 6,
+            "colorSpace": "srgb",
+            "samples": [
+              {
+                "original": [
+                  230,
+                  40,
+                  30,
+                  255
+                ],
+                "encoded": [
+                  229,
+                  39,
+                  31,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  20,
+                  210,
+                  40,
+                  255
+                ],
+                "encoded": [
+                  21,
+                  211,
+                  38,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  30,
+                  40,
+                  230,
+                  255
+                ],
+                "encoded": [
+                  31,
+                  39,
+                  229,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  200,
+                  180,
+                  20,
+                  255
+                ],
+                "encoded": [
+                  198,
+                  181,
+                  16,
+                  255
+                ]
+              }
+            ]
+          },
+          "normalMap": {
+            "maxDelta": 0,
+            "mips": 6,
+            "colorSpace": "",
+            "samples": [
+              {
+                "original": [
+                  149,
+                  159,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  149,
+                  159,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  218,
+                  159,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  218,
+                  159,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  149,
+                  211,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  149,
+                  211,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  218,
+                  211,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  218,
+                  211,
+                  247,
+                  255
+                ]
+              }
+            ]
+          }
+        },
+        "options": {
+          "kind": "textures",
+          "textureMode": "etc1s",
+          "maxTextureSize": 512
+        },
+        "sourceByteLength": 45664,
+        "before": {
+          "triangles": 1472,
+          "vertices": 825,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "textures-ktx2.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:6bd8352f802971f60bc86522c6685592dab82a510cd8facddb7d02a946f9cef4",
+            "stats": {
+              "triangles": 1472,
+              "vertices": 823,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 17384
+          },
+          {
+            "name": "texture-release-receipt.json",
+            "mime": "application/json",
+            "sha256": "sha256:3d341816aa972c4f23937ff1214208059f1f31f07d159a422aa5374a8113ecf2",
+            "byteLength": 1650
+          }
+        ],
+        "warnings": [
+          "Source files remain unchanged. KTX2 encoding is lossy: inspect material/alpha/normal appearance before catalog approval.",
+          "Normal/data textures use linear UASTC; color textures use the selected transfer-aware codec. The longest edge is bounded by the selected resolution; base dimensions are 4x4-block aligned."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:16e699538ff453d25f7e70029666986639ae209e8bf032ad1755b5b6f0bd5b8b",
+        "texturePixels": {
+          "map": {
+            "maxDelta": 0,
+            "mips": 6,
+            "colorSpace": "srgb",
+            "samples": [
+              {
+                "original": [
+                  230,
+                  40,
+                  30,
+                  255
+                ],
+                "encoded": [
+                  230,
+                  40,
+                  30,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  20,
+                  210,
+                  40,
+                  255
+                ],
+                "encoded": [
+                  20,
+                  210,
+                  40,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  30,
+                  40,
+                  230,
+                  255
+                ],
+                "encoded": [
+                  30,
+                  40,
+                  230,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  200,
+                  180,
+                  20,
+                  255
+                ],
+                "encoded": [
+                  200,
+                  180,
+                  20,
+                  255
+                ]
+              }
+            ]
+          },
+          "normalMap": {
+            "maxDelta": 0,
+            "mips": 6,
+            "colorSpace": "",
+            "samples": [
+              {
+                "original": [
+                  149,
+                  159,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  149,
+                  159,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  218,
+                  159,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  218,
+                  159,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  149,
+                  211,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  149,
+                  211,
+                  247,
+                  255
+                ]
+              },
+              {
+                "original": [
+                  218,
+                  211,
+                  247,
+                  255
+                ],
+                "encoded": [
+                  218,
+                  211,
+                  247,
+                  255
+                ]
+              }
+            ]
+          }
+        },
+        "options": {
+          "kind": "release",
+          "textureMode": "uastc",
+          "maxTextureSize": 512,
+          "error": 0.03
+        },
+        "sourceByteLength": 45664,
+        "before": {
+          "triangles": 1472,
+          "vertices": 825,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "release-lod-0.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:8547d8cccfb204f964578da6ecc4a12348d9d78b2de3230b0414e6b9adeceb90",
+            "stats": {
+              "triangles": 1472,
+              "vertices": 823,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 18216
+          },
+          {
+            "name": "release-lod-1.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:f2b5412f77059b1b2c860c4d40aa23358e3eeacae137c41e52055cff392ecace",
+            "stats": {
+              "triangles": 736,
+              "vertices": 454,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 13012
+          },
+          {
+            "name": "release-lod-2.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:8171dbbed474e539836a5825b4f47af770e7d185b71e3c30406cf63cbf10f768",
+            "stats": {
+              "triangles": 294,
+              "vertices": 225,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 9660
+          },
+          {
+            "name": "texture-release-receipt.json",
+            "mime": "application/json",
+            "sha256": "sha256:aabd8fb5cba0dbbc6679e9803689bdd0c9ea706496803956981cdda70589a0d1",
+            "byteLength": 2430
+          }
+        ],
+        "warnings": [
+          "Source files remain unchanged. KTX2 encoding is lossy: inspect material/alpha/normal appearance before catalog approval.",
+          "Normal/data textures use linear UASTC; color textures use the selected transfer-aware codec. The longest edge is bounded by the selected resolution; base dimensions are 4x4-block aligned.",
+          "LOD reductions obey the geometric error and border constraints; three files alone are not proof of adequate quality or reduced triangle counts."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:7cdedd39264ff7bfc25d100e5d81cb25620e80e388db0d265829ae40ba29b746",
+        "options": {
+          "kind": "inspect"
+        },
+        "sourceByteLength": 1840,
+        "before": {
+          "triangles": 12,
+          "vertices": 24,
+          "nodes": 3,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "model-structure.json",
+            "mime": "application/json",
+            "sha256": "sha256:f1d8a1a07c2bf94bc130a3ea087fb659b25f251ce85ce82fd4879ac16664bf36",
+            "byteLength": 560
+          }
+        ],
+        "warnings": [
+          "Inspection only; no source or scene modifications."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:7cdedd39264ff7bfc25d100e5d81cb25620e80e388db0d265829ae40ba29b746",
+        "options": {
+          "kind": "ik",
+          "rootName": "upper-arm",
+          "tipName": "hand",
+          "target": [
+            1,
+            1.2,
+            0.3
+          ],
+          "angleLimitDegrees": 150,
+          "tolerance": 0.005
+        },
+        "sourceByteLength": 1840,
+        "ikReceipt": {
+          "version": 1,
+          "sourceSha256": "sha256:7cdedd39264ff7bfc25d100e5d81cb25620e80e388db0d265829ae40ba29b746",
+          "options": {
+            "kind": "ik",
+            "rootName": "upper-arm",
+            "tipName": "hand",
+            "target": [
+              1,
+              1.2,
+              0.3
+            ],
+            "angleLimitDegrees": 150,
+            "tolerance": 0.005
+          },
+          "error": 0.0011238358734322802,
+          "roundTripError": 0.0011237821987103533,
+          "persistedError": 0.0011237821987103533,
+          "solverStatuses": [
+            0
+          ],
+          "rotations": [
+            {
+              "name": "upper-arm",
+              "quaternion": [
+                -0.0023692469448931422,
+                0.007633202311807917,
+                -0.03441961624660235,
+                0.9993755104608166
+              ]
+            },
+            {
+              "name": "elbow",
+              "quaternion": [
+                0.18582109320103665,
+                -0.02187230418669743,
+                -0.5777653984289836,
+                0.7944679150282499
+              ]
+            },
+            {
+              "name": "hand",
+              "quaternion": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ],
+          "authority": "derived-glb-only"
+        },
+        "before": {
+          "triangles": 12,
+          "vertices": 24,
+          "nodes": 3,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "ik-pose.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:6fb67855dfedb1deae6128695e5f81a45a0a935fa085f0ceb03181730d4b46ba",
+            "stats": {
+              "triangles": 12,
+              "vertices": 24,
+              "nodes": 3,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 2032
+          },
+          {
+            "name": "ik-pose.json",
+            "mime": "application/json",
+            "sha256": "sha256:6618f5ce46b73064646ba789957e72cd03959c085d0a48d0a70159883f9d9fa4",
+            "byteLength": 994
+          }
+        ],
+        "warnings": [
+          "This is a position-only rotation-chain solver with symmetric XYZ limits. It does not guarantee anatomical joint limits, body contact, self-collision, full-body balance or VRM compatibility. Source and editor poses remain unchanged."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:7253fae989b9d080c4c14ceb3e8f8958cdbf114dd0539e0da2f31bd3cde9f8f6",
+        "options": {
+          "kind": "compress"
+        },
+        "sourceByteLength": 44900,
+        "before": {
+          "triangles": 1472,
+          "vertices": 825,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "compress.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:fe6982f81af2995ddbeb0ee3ff8eec26fb5884173fff21d5d79e3f4090c8a009",
+            "stats": {
+              "triangles": 1472,
+              "vertices": 823,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 14184
+          }
+        ],
+        "warnings": [
+          "Source files are unchanged. Textures are preserved, not converted to KTX2; these derivatives do not automatically receive production asset approval."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:7253fae989b9d080c4c14ceb3e8f8958cdbf114dd0539e0da2f31bd3cde9f8f6",
+        "options": {
+          "kind": "lod",
+          "error": 0.03
+        },
+        "sourceByteLength": 44900,
+        "before": {
+          "triangles": 1472,
+          "vertices": 825,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "lod-0.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:fe6982f81af2995ddbeb0ee3ff8eec26fb5884173fff21d5d79e3f4090c8a009",
+            "stats": {
+              "triangles": 1472,
+              "vertices": 823,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 14184
+          },
+          {
+            "name": "lod-1.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:6602da77faf9252a7812927e66ce173c3bcffbf53395be66a1df22aba29b9b1f",
+            "stats": {
+              "triangles": 736,
+              "vertices": 454,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 8980
+          },
+          {
+            "name": "lod-2.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:8d50814ad122361d6504c1968ca669979c8d13b395e289e6d5a4d3c5a2d6f0c3",
+            "stats": {
+              "triangles": 294,
+              "vertices": 225,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 5628
+          }
+        ],
+        "warnings": [
+          "Ratios are targets, not guaranteed reductions; border protection and error tolerance may retain triangles. Inspect each derivative before catalog admission.",
+          "Source files are unchanged. Textures are preserved, not converted to KTX2; these derivatives do not automatically receive production asset approval."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:fb06b745dd37e2130038f16862572a00527e22bc3af854e3fe9621f95f89e079",
+        "options": {
+          "kind": "tangents"
+        },
+        "sourceByteLength": 4996,
+        "before": {
+          "triangles": 128,
+          "vertices": 81,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "tangents.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:3d5bc418727a661fd93b1b9ce51a73f1820c70248eab8db813759eb8ded66dcf",
+            "stats": {
+              "triangles": 128,
+              "vertices": 384,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 1
+            },
+            "byteLength": 4168
+          }
+        ],
+        "warnings": [
+          "Source files are unchanged. Textures are preserved, not converted to KTX2; these derivatives do not automatically receive production asset approval."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:a2485932be3d4a943b067322bccefa73d7981e17f2c223fca9d3f044c65e1ce2",
+        "options": {
+          "kind": "animation"
+        },
+        "sourceByteLength": 2184,
+        "before": {
+          "triangles": 12,
+          "vertices": 24,
+          "nodes": 1,
+          "animations": 1,
+          "animationKeys": 4,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "animation.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:643d64191b22cea1e957152692b19ca5a986cec58be901879d3f4c68fba8bd27",
+            "stats": {
+              "triangles": 12,
+              "vertices": 24,
+              "nodes": 2,
+              "animations": 1,
+              "animationKeys": 2,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 2964
+          }
+        ],
+        "warnings": [
+          "Source files are unchanged. Textures are preserved, not converted to KTX2; these derivatives do not automatically receive production asset approval."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:c83ada4d269c9c4de91edd886e0644162279f727ebee97665f1fe54717214532",
+        "options": {
+          "kind": "csg",
+          "operation": "subtract",
+          "backend": "preview"
+        },
+        "sourceByteLength": 1728,
+        "before": {
+          "triangles": 12,
+          "vertices": 24,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "boolean-preview.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:8ef7c3bf47ed6b1bca3cf71e590c35ce5fe54966215e7162eee42319fcf5e4ea",
+            "stats": {
+              "triangles": 40,
+              "vertices": 114,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 3972
+          }
+        ],
+        "warnings": [
+          "Geometry-only derivative: source transforms are baked; source documents, materials, undo and scene state are unchanged.",
+          "Secondary source SHA-256: sha256:9818e939c7e0627ad0e85b780d3b6dafae7aa445474214db6091437f4052af25",
+          "BVH CSG is a preview, not a watertight solid guarantee. Select Manifold for validated solid output."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:c83ada4d269c9c4de91edd886e0644162279f727ebee97665f1fe54717214532",
+        "options": {
+          "kind": "csg",
+          "operation": "subtract",
+          "backend": "solid"
+        },
+        "sourceByteLength": 1728,
+        "before": {
+          "triangles": 12,
+          "vertices": 24,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "boolean-solid.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:54493f71aec12d7f005ee9020b1b137eea896e19c7d66f17ae02bf24cb4c870f",
+            "stats": {
+              "triangles": 24,
+              "vertices": 14,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 1376
+          },
+          {
+            "name": "boolean-report.json",
+            "mime": "application/json",
+            "sha256": "sha256:2f8c13434a6af59d496c6971698115c8eccc9dce256ea546ce422881e19dd9b1",
+            "byteLength": 1657
+          }
+        ],
+        "warnings": [
+          "Geometry-only derivative: source transforms are baked; source documents, materials, undo and scene state are unchanged.",
+          "Secondary source SHA-256: sha256:9818e939c7e0627ad0e85b780d3b6dafae7aa445474214db6091437f4052af25",
+          "Manifold combines mesh nodes by union before the requested Boolean. Primitives within each node must collectively form a closed oriented solid; textures, source materials and editable scene application are not preserved by this geometry-only export."
+        ]
+      },
+      {
+        "phases": [
+          {
+            "phase": "starting"
+          },
+          {
+            "phase": "validating"
+          },
+          {
+            "phase": "decoding"
+          },
+          {
+            "phase": "processing"
+          },
+          {
+            "phase": "verifying"
+          },
+          {
+            "phase": "ready"
+          }
+        ],
+        "sourceSha256": "sha256:fb06b745dd37e2130038f16862572a00527e22bc3af854e3fe9621f95f89e079",
+        "options": {
+          "kind": "navigation",
+          "start": [
+            -2,
+            0,
+            -2
+          ],
+          "end": [
+            2,
+            0,
+            2
+          ],
+          "cellSize": 0.2,
+          "agentRadius": 0.3,
+          "agentHeight": 1.8,
+          "waypoints": [
+            [
+              2,
+              0,
+              -2
+            ],
+            [
+              -2,
+              0,
+              2
+            ]
+          ],
+          "maxStepHeight": 0.2,
+          "maxSlopeDegrees": 35
+        },
+        "sourceByteLength": 4996,
+        "before": {
+          "triangles": 128,
+          "vertices": 81,
+          "nodes": 1,
+          "animations": 0,
+          "animationKeys": 0,
+          "tangentPrimitives": 0
+        },
+        "artifacts": [
+          {
+            "name": "navmesh.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:37793f7f368f46372a4d2eacfa70d6dc1a9385eaf8b0dcfcda5119f8c3898e97",
+            "stats": {
+              "triangles": 14,
+              "vertices": 42,
+              "nodes": 1,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 2024
+          },
+          {
+            "name": "navmesh.bin",
+            "mime": "application/octet-stream",
+            "sha256": "sha256:dbf8f443a109e88ad92f5aac95248ce244899829abf5ac394946dba74aa5ee10",
+            "byteLength": 1464
+          },
+          {
+            "name": "navigation-path.json",
+            "mime": "application/json",
+            "sha256": "sha256:3d063ff45776b99624c83fadd38c96d26aa6a63c98cf20be3b7dae15b98e1d5e",
+            "byteLength": 2811
+          },
+          {
+            "name": "navigation-route.glb",
+            "mime": "model/gltf-binary",
+            "sha256": "sha256:e8a38634d11bdaa65417bd241588499e3c0107a0068cfc5e10caed6b9bd0b17e",
+            "stats": {
+              "triangles": 118,
+              "vertices": 214,
+              "nodes": 6,
+              "animations": 0,
+              "animationKeys": 0,
+              "tangentPrimitives": 0
+            },
+            "byteLength": 9200
+          }
+        ],
+        "warnings": [
+          "Clearance/radius round up to cells; maximum step rounds down. The separate route preview uses a display offset. JSON route length is corner-polyline length, not sampled terrain motion.",
+          "Navigation is an exported static derivative, not live crowd simulation or multiplayer movement authority. Source geometry must use meters and Y-up."
+        ]
+      }
+    ],
+    "cancellation": "passed",
+    "productionWorkerJobs": 19,
+    "orchestration": {
+      "queuedSourceImmutable": true,
+      "queuedCancellationBeforeWorker": true,
+      "activeCancellationReleased": true,
+      "queuePositions": [
+        {
+          "phase": "queued",
+          "queuePosition": 2
+        },
+        {
+          "phase": "queued",
+          "queuePosition": 1
+        },
+        {
+          "phase": "starting"
+        },
+        {
+          "phase": "validating"
+        },
+        {
+          "phase": "decoding"
+        },
+        {
+          "phase": "processing"
+        },
+        {
+          "phase": "verifying"
+        },
+        {
+          "phase": "ready"
+        }
+      ],
+      "queueState": {
+        "active": 0,
+        "queued": 0,
+        "snapshotBytes": 0
+      },
+      "peakProcessingWorkers": 1,
+      "additionalWorkers": 4,
+      "additionalCompletedJobs": 3,
+      "activeCancelledJobs": 1
+    },
+    "compoundBooleanUi": {
+      "processor": "Manifold",
+      "sourceMeshNodes": 2,
+      "sourcePrimitives": 12,
+      "finalVolume": 6,
+      "preview": "passed",
+      "reportDownload": "passed",
+      "glbDownload": "passed"
+    },
+    "lodComparison": {
+      "sameProjectionPixels": {
+        "samples": 499284,
+        "mismatch": 3,
+        "maxDelta": 5,
+        "mismatchRatio": 6.008604321388228e-06
+      },
+      "wireframeChangedPixels": 74402,
+      "renderedContentPixels": 24896,
+      "contentPerHalf": {
+        "left": 12436,
+        "right": 12460
+      },
+      "measurements": "표시 메시 삼각형: 1,472 → 614\n원본 XYZ 크기: 4.000 × 4.000 × 4.000\n결과 XYZ 크기: 4.000 × 4.000 × 4.000\n중심 이동: 0.000 모델 단위",
+      "sourceLoadedExplicitly": true,
+      "singleCanvas": true,
+      "cameraRetainedAcrossLods": {
+        "samples": 503424,
+        "mismatch": 0,
+        "maxDelta": 0,
+        "mismatchRatio": 0
+      }
+    },
+    "textureReleaseUi": {
+      "generation": "passed",
+      "realGpuTranscode": "passed",
+      "download": "passed"
+    },
+    "textureComparison": {
+      "sameProjectionPixels": {
+        "samples": 499284,
+        "mismatch": 0,
+        "maxDelta": 0,
+        "mismatchRatio": 0
+      },
+      "wireframeChangedPixels": 72912,
+      "renderedContentPixels": 25178,
+      "contentPerHalf": {
+        "left": 12589,
+        "right": 12589
+      },
+      "measurements": "표시 메시 삼각형: 1,472 → 1,472\n원본 XYZ 크기: 4.000 × 4.000 × 4.000\n결과 XYZ 크기: 4.000 × 4.000 × 4.000\n중심 이동: 0.000 모델 단위",
+      "sourceLoadedExplicitly": true,
+      "singleCanvas": true
+    },
+    "navigationUi": {
+      "validation": "passed",
+      "stops": 4,
+      "segments": 3,
+      "lengthMeters": 13.65685424949238,
+      "preview": "passed",
+      "downloads": "passed",
+      "mobileWidths": [
+        320,
+        390
+      ]
+    },
+    "splat": {
+      "driver": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+      "count": 256,
+      "renderer": "Spark 2.2.0 / Three WebGL2",
+      "frames": 8,
+      "closeDisposedCanvas": true
+    },
+    "ui": {
+      "generation": "passed",
+      "preview": "mounted",
+      "download": "passed",
+      "keyboardNavigation": "passed",
+      "artifactSwitches": 3
+    },
+    "browserVersion": "151.0.7922.34",
+    "productionWorkerArtifact": "specialist.worker-CCPFTSXW.js",
+    "productionWorkerCspApplied": true,
+    "requestedGpuLane": "default",
+    "errors": [],
+    "warnings": [
+      "BVH: \"maxLeafSize\" option has been deprecated. Use \"targetLeafSize\", instead.",
+      "BVH: \"maxLeafSize\" option has been deprecated. Use \"targetLeafSize\", instead."
+    ]
+  },
+  "scope": "Static navigation authoring/export only; no live crowd, scene movement authority, deployment, migration, new dependency or protection change."
+}

@@ -45,7 +45,31 @@ try {
     if (hash !== receipt.sha256 || bytes.length !== receipt.bytes) throw new Error("Downloaded original differs");
     downloads.push({ fileName: download.suggestedFilename(), bytes: bytes.length, sha256: hash });
   }
-  const report = { generatedAt: new Date().toISOString(), browser: browser.version(), result, downloads, diagnostics };
+  const lifecycle = [];
+  let lateDownloads = 0;
+  page.on("download", () => { lateDownloads += 1; });
+  for (const mode of ["cancel", "unmount"]) {
+    const lockName = await page.evaluate(() => window.holdBrushOriginalStorageLock());
+    try {
+      await page.evaluate((source) => window.mountBrushOriginalDownload(source), result.reopened.receipts[0].source);
+      await page.getByRole("button", { name: "보존 검증 원본 파일 내보내기" }).click();
+      await page.evaluate(async (name) => {
+        for (let attempt = 0; attempt < 200; attempt++) {
+          const locks = await navigator.locks.query();
+          if (locks.pending.some((entry) => entry.name === name)) return;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        throw new Error("Actual original read never reached the blocked CAS lock");
+      }, lockName);
+      if (mode === "cancel") await page.getByRole("button", { name: "원본 파일 내보내기 취소" }).click();
+      else await page.evaluate(() => window.unmountBrushOriginalDownload());
+    } finally { await page.evaluate(() => window.releaseBrushOriginalStorageLock()); }
+    if (lateDownloads !== 0) throw new Error("Cancelled/unmounted original download produced a file");
+    const error = await page.evaluate(() => document.body.dataset.downloadError);
+    if (error) throw new Error(error);
+    lifecycle.push({ mode, actualCasReadQueued: true, lockDrained: true, lateDownloads });
+  }
+  const report = { generatedAt: new Date().toISOString(), browser: browser.version(), result, downloads, lifecycle, diagnostics };
   writeFileSync(join(output, "report.json"), JSON.stringify(report, null, 2));
   if (Object.values(diagnostics).some((values) => values.length)) throw new Error(JSON.stringify(diagnostics));
   if (result.activeWorkers !== 0) throw new Error("Worker leak");

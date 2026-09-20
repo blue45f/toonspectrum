@@ -12,7 +12,7 @@ import type {
 // A cold production page has a new module instance. Bump this when the recipe/worker contract
 // changes; the development HMR hook below also discards results from older code.
 export const SPECIALIST_RECIPE_RUNTIME_REVISION =
-  "scene3d-specialist-recipe-runtime-v1";
+  "scene3d-specialist-recipe-runtime-v2-navigation";
 export interface SpecialistRecipeReuseLimits {
   readonly maxEntries: number;
   readonly maxBytes: number;

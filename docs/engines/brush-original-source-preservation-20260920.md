@@ -4,7 +4,7 @@ Status: **current**, reconciled with the existing OPFS/CAS implementation. Sourc
 
 ## Original branch and merge resolution
 
-`fix/brush-original-source-complete-20260920` contained two unmerged commits and had no PR. Its embedded-source implementation conflicted with nine files already enhanced on main. The completion keeps the main implementation rather than replacing OPFS/CAS with embedded SQLite payloads. The original two commits remain in the merge ancestry.
+`fix/brush-original-source-complete-20260920` contained two unmerged commits and had no PR. Its embedded-source implementation conflicted with nine files already enhanced on main. The completion keeps the main implementation rather than replacing OPFS/CAS with embedded SQLite payloads. The original two commits remain in the merge ancestry. During PR review, main advanced through PR #1878 with the same export bounds plus import-byte limits and stale-download cancellation. This completion retains that stronger production implementation exactly and adds only the recovered regression coverage and this documentation relative to that main baseline.
 
 The original branch's large SQLite roundtrip, additional native brush fixtures, corrupt archive rejection, atomic batch writes, invalid size validation and original-download error handling are retained against the current APIs. The obsolete `.tsx` browser fixture is superseded by the current `.ts` harness and actual OPFS/worker browser verifier.
 

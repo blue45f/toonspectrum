@@ -81,9 +81,11 @@ apps/web/src/domains/creator/brush-lab/pigment/kubelka-munk.test.ts
 apps/web/src/domains/creator/brush-lab/pigment/pigment-material-integration.test.ts
 apps/web/src/domains/creator/brush/StudioBrushEngineProgramControls.test.tsx
 apps/web/src/domains/creator/brush/StudioBrushLibrarySheet.test.tsx
+apps/web/src/domains/creator/brush/StudioBrushOriginalSourceActions.lifecycle.test.tsx
 apps/web/src/domains/creator/brush/StudioBrushOriginalSourceActions.test.tsx
 apps/web/src/domains/creator/brush/StudioBrushTray.test.tsx
 apps/web/src/domains/creator/brush/StudioNativeBrushDocumentInspector.test.tsx
+apps/web/src/domains/creator/brush/studio-brush-archive-integrity.test.ts
 apps/web/src/domains/creator/brush/studio-brush-browser-evidence.test.ts
 apps/web/src/domains/creator/brush/studio-brush-catalog-contract.test.ts
 apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.test.ts
