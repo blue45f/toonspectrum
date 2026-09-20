@@ -8,6 +8,7 @@ apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.tes
 apps/api/src/modules/fortune/fortune.controller.test.ts
 apps/api/src/modules/og/og-page.test.ts
 apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
+apps/api/src/modules/studio-project-graph
 apps/api/src/runtime/runtime-boundary.test.ts
 apps/api/src/session-middleware.test.ts
 apps/web/src/app/app-floating-controls-startup.test.ts
@@ -56,8 +57,12 @@ apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-lens-composition.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-panel-source-boundary.test.ts
 apps/web/src/domains/creator/bg3d/studio-bg3d-scene-edit-readiness.test.tsx
+apps/web/src/domains/creator/brush-lab/StudioBrushIntegratedWorkbench.test.tsx
+apps/web/src/domains/creator/brush-lab/brush-studio-material-svg-path.test.ts
 apps/web/src/domains/creator/brush-lab/brush-studio-presentation-contract.test.tsx
+apps/web/src/domains/creator/brush-lab/brush-studio-saved-material-loader.test.ts
 apps/web/src/domains/creator/brush-lab/brush-studio-v5-quality.test.ts
+apps/web/src/domains/creator/brush-lab/brush-studio-v6-exact-authoring.test.ts
 apps/web/src/domains/creator/brush-lab/brush-studio-v6-legacy-replay.test.ts
 apps/web/src/domains/creator/brush-lab/brush-studio-v6-material-palette-cache.test.ts
 apps/web/src/domains/creator/brush-lab/brush-studio-v6-pigment-provider.test.ts
@@ -77,7 +82,10 @@ apps/web/src/domains/creator/brush/studio-brush-composition-runtime-boundary.tes
 apps/web/src/domains/creator/brush/studio-brush-composition-runtime.test.ts
 apps/web/src/domains/creator/brush/studio-brush-listed-uniqueness.test.ts
 apps/web/src/domains/creator/brush/studio-brush-quality-portfolio.test.ts
+apps/web/src/domains/creator/brush/studio-brush-selection-isolation.test.ts
+apps/web/src/domains/creator/brush/studio-brush-selection-snapshot.test.ts
 apps/web/src/domains/creator/brush/studio-draw-object-transform*.test.ts
+apps/web/src/domains/creator/brush/studio-material-brush-streaming.test.ts
 apps/web/src/domains/creator/brush/studio-native-brush-document-session.test.ts
 apps/web/src/domains/creator/brush/studio-native-brush-document-wiring.test.ts
 apps/web/src/domains/creator/brush/studio-native-brush-document.test.ts
@@ -187,6 +195,7 @@ apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts
 apps/web/src/domains/creator/writer-room/buildStudioWriterRoomCanvasPages.test.ts
 apps/web/src/domains/fortune/fortune-observatory-storage.test.ts
+apps/web/src/domains/marketing/CreatorHomeExperience.locale.test.tsx
 apps/web/src/infrastructure/creator-role-workspace-client.test.ts
 apps/web/src/infrastructure/creator-work-read-options.test.ts
 apps/web/src/infrastructure/search-client.test.ts

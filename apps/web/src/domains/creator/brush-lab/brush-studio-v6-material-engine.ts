@@ -738,14 +738,32 @@ export function renderBrushStudioV6MaterialMarks(context: CanvasRenderingContext
   context.restore();
 }
 
-/** Shared primitives keep saved SVG geometry identical to the live contacts. */
-export function brushStudioV6MaterialMarksToSvg(marks: readonly BrushStudioV6MaterialMark[]): string {
+/**
+ * Export the same contact geometry using explicit closed paths for curved marks.
+ * SVG ellipse/rounded-rect shortcuts and Canvas paths rasterize differently for very thin,
+ * translucent marks in Chromium. Arc paths preserve the geometry while keeping measured
+ * paint/alpha much closer to the canonical Canvas path. Canvas/replay calculations are unchanged.
+ */
+export function brushStudioV6MaterialMarksToSvg(
+  marks: readonly BrushStudioV6MaterialMark[],
+  curves: "legacy-primitives" | "canvas-paths" = "legacy-primitives",
+): string {
   const n = (value: number) => Number(value.toFixed(5));
   return marks.map((mark) => {
     const transform = `translate(${n(mark.x)} ${n(mark.y)}) rotate(${n(mark.angle * 180 / Math.PI)})`;
     const style = `transform="${transform}" opacity="${n(mark.opacity)}"`;
+    if (mark.shape === "capsule" && curves === "canvas-paths") {
+      const radius = Math.min(mark.radiusX, mark.radiusY);
+      const x = n(mark.radiusX), y = n(mark.radiusY), r = n(radius);
+      const ix = n(mark.radiusX - radius), iy = n(mark.radiusY - radius);
+      const arc = `A${r} ${r} 0 0 1`;
+      const d = `M${-ix} ${-y} H${ix} ${arc} ${x} ${-iy} V${iy} ${arc} ${ix} ${y} H${-ix} ${arc} ${-x} ${iy} V${-iy} ${arc} ${-ix} ${-y} Z`;
+      return `<path ${style} d="${d}" fill="${mark.color}"/>`;
+    }
     if (mark.shape === "rect" || mark.shape === "capsule") return `<rect ${style} x="${n(-mark.radiusX)}" y="${n(-mark.radiusY)}" width="${n(mark.radiusX * 2)}" height="${n(mark.radiusY * 2)}"${mark.shape === "capsule" ? ` rx="${n(Math.min(mark.radiusX, mark.radiusY))}"` : ""} fill="${mark.color}"/>`;
     const paint = mark.shape === "ring" ? `fill="none" stroke="${mark.color}" stroke-width="${n(Math.max(0.3, Math.min(mark.radiusX, mark.radiusY) * 0.2))}"` : `fill="${mark.color}"`;
-    return `<ellipse ${style} rx="${n(mark.radiusX)}" ry="${n(mark.radiusY)}" ${paint}/>`;
+    if (curves === "legacy-primitives") return `<ellipse ${style} rx="${n(mark.radiusX)}" ry="${n(mark.radiusY)}" ${paint}/>`;
+    const rx = n(mark.radiusX), ry = n(mark.radiusY);
+    return `<path ${style} d="M${rx} 0 A${rx} ${ry} 0 0 1 ${-rx} 0 A${rx} ${ry} 0 0 1 ${rx} 0 Z" ${paint}/>`;
   }).join("");
 }

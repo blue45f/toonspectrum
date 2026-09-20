@@ -109,6 +109,10 @@ export function useCharacterCanonicalParts(input: {
   readonly onNotice: (message: string) => void;
 }): CharacterCanonicalPartsWorkbench {
   const { h, manifest, modelId, onNotice } = input;
+  // A render-time host facade must not reset model-scoped restoration or selections.
+  const hostRef = useRef(h);
+  hostRef.current = h;
+  const targetVrm = h.vrm;
   const sessionRef = useRef<CharacterCanonicalPartSession | null>(null);
   const generationRef = useRef(0);
   const [selections, setSelections] = useState<Selections>(Object.freeze({}));
@@ -122,9 +126,9 @@ export function useCharacterCanonicalParts(input: {
     setSelections(Object.freeze({}));
     setBusyPartId(null);
     setError(null);
-    if (!manifest || !h.vrm) return;
+    if (!manifest || !targetVrm) return;
 
-    const session = new CharacterCanonicalPartSession({ targetVrm: h.vrm, manifest });
+    const session = new CharacterCanonicalPartSession({ targetVrm, manifest });
     sessionRef.current = session;
     let active = true;
     void readSelections(modelId).then(async (saved) => {
@@ -135,7 +139,7 @@ export function useCharacterCanonicalParts(input: {
         const availability = inspectCharacterCanonicalPartAvailability(manifest, part);
         if (availability.status !== "supported") continue;
         try {
-          await session.apply(part, viewportProjectedHeight(h));
+          await session.apply(part, viewportProjectedHeight(hostRef.current));
         } catch (restoreError) {
           if (!active || generation !== generationRef.current) return;
           setError(restoreError instanceof Error ? restoreError.message : `${part.label} 파츠를 복원하지 못했습니다.`);
@@ -155,7 +159,7 @@ export function useCharacterCanonicalParts(input: {
       if (sessionRef.current === session) sessionRef.current = null;
       session.dispose();
     };
-  }, [h, h.vrm, manifest, modelId]);
+  }, [targetVrm, manifest, modelId]);
 
   const options = useMemo<readonly CharacterCanonicalPartOption[]>(() => {
     if (!manifest) return Object.freeze([]);

@@ -394,11 +394,20 @@ export function computeStudioImpastoReliefShading(
     // both quality modes respond to normalScale with comparable slopes.
     const gain = ((8 / 2) / resolved.normalScale) * planar;
     for (let y = fromY; y < toY; y += 1) {
+      // Row bounds are constant across this scanline. Keep exactly two height reads and the
+      // original multiplication order, including for clamped borders and dirty regions.
+      const towardY = Math.max(0, Math.min(height - 1, y - offsetY));
+      const awayY = Math.max(0, Math.min(height - 1, y + offsetY));
+      const towardRow = towardY * width;
+      const awayRow = awayY * width;
+      const outputRow = y * width;
       for (let x = fromX; x < toX; x += 1) {
-        const toward = heightAt(heights, width, height, x - offsetX, y - offsetY, scale);
-        const away = heightAt(heights, width, height, x + offsetX, y + offsetY, scale);
+        const towardX = x - offsetX;
+        const awayX = x + offsetX;
+        const toward = heights[towardRow + (towardX < 0 ? 0 : towardX >= width ? width - 1 : towardX)]! * scale;
+        const away = heights[awayRow + (awayX < 0 ? 0 : awayX >= width ? width - 1 : awayX)]! * scale;
         const value = 1 + gain * (toward - away);
-        out[y * width + x] =
+        out[outputRow + x] =
           value < 0 ? 0 : value > maxMultiplier ? maxMultiplier : value;
       }
     }

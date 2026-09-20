@@ -197,9 +197,13 @@ export function renderStudioMaterialBrushMarks(context: CanvasRenderingContext2D
   for (const batch of materialSymmetryBatches(marks, symmetry)) renderBrushStudioV6MaterialMarks(context, batch);
 }
 
-export function studioMaterialBrushMarksToSvg(marks: readonly StudioMaterialBrushMark[], symmetry?: StudioBrushSymmetrySpec): string {
+export function studioMaterialBrushMarksToSvg(
+  marks: readonly StudioMaterialBrushMark[],
+  symmetry?: StudioBrushSymmetrySpec,
+  curves: "legacy-primitives" | "canvas-paths" = "legacy-primitives",
+): string {
   const parts: string[] = [];
-  for (const batch of materialSymmetryBatches(marks, symmetry)) parts.push(brushStudioV6MaterialMarksToSvg(batch));
+  for (const batch of materialSymmetryBatches(marks, symmetry)) parts.push(brushStudioV6MaterialMarksToSvg(batch, curves));
   return parts.join("");
 }
 
@@ -315,7 +319,8 @@ export function writeStudioMaterialBrushSvg(
   let serializedUtf16Bytes = 0;
   const statistics = visitStudioMaterialBrushBatches(element, (marks) => {
     for (const batch of materialSymmetryBatches(marks, element.symmetry)) {
-      const chunk = brushStudioV6MaterialMarksToSvg(batch);
+      const chunk = brushStudioV6MaterialMarksToSvg(batch,
+        element.brushEnginePrograms?.material?.version === 2 ? "canvas-paths" : "legacy-primitives");
       serializedUtf16Bytes += chunk.length * 2;
       if (serializedUtf16Bytes > byteBudget) throw new StudioMaterialBrushSvgBudgetError(byteBudget);
       write(chunk);

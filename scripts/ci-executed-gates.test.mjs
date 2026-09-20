@@ -291,3 +291,42 @@ test("focused integration checks cannot collide with the protected core status",
     /run: bash scripts\/verify-toonstudio-integration\.sh "\$\{\{ matrix\.track \}\}"/,
   );
 });
+
+
+test("focused ToonStudio checkout includes static metadata without unrelated artwork", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
+  const patterns = workflow.match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
+  assert.ok(patterns, "focused workflow must declare its checkout");
+  const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
+  const artwork = "apps/web/public/assets/3d/environments/unrelated-pack/large-model.glb";
+  const scratch = mkdtempSync(join(tmpdir(), "toonstudio-focused-inputs-"));
+  const git = (...args) => {
+    const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  try {
+    git("init", "--quiet");
+    for (const file of [...manifests, artwork, "package.json"]) {
+      mkdirSync(dirname(join(scratch, file)), { recursive: true });
+      writeFileSync(join(scratch, file), "{}\n");
+    }
+    git("add", ".");
+    git("-c", "user.name=CI Test", "-c", "user.email=ci@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture");
+    git("config", "core.sparseCheckout", "true");
+    git("config", "core.sparseCheckoutCone", "false");
+    writeFileSync(join(scratch, ".git/info/sparse-checkout"), patterns.replace(/^ {12}/gmu, ""));
+    git("read-tree", "-mu", "HEAD");
+    for (const file of manifests) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
+    assert.equal(existsSync(join(scratch, artwork)), false);
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
+});
+
+
+test("reference-project certification executes the real entrypoint and emits its receipt", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/studio-competitor-replacement-certification.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes("node scripts/verify-studio-reference-projects.mjs --run --receipt qa-results/studio-reference-projects/receipt.json"));
+  assert.doesNotMatch(workflow, /pnpm run verify:studio-reference-projects\b/u);
+  assert.ok(existsSync(join(repoRoot, "scripts/verify-studio-reference-projects.mjs")));
+  assert.match(workflow, /path: qa-results\/studio-reference-projects/u);
+  assert.doesNotMatch(workflow, /continue-on-error|--check\b/u);
+});

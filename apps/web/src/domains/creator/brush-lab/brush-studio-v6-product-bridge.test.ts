@@ -60,4 +60,28 @@ describe("Brush Editor product save", () => {
     expect(repository.put).not.toHaveBeenCalled();
     expect(repository.getById).not.toHaveBeenCalled();
   });
+  it.each(["seed", "color", "flow", "binding"])("rejects corrupted %s despite valid version flags", async (field) => {
+    const program = createBrushStudioV6Program("oil-hair-mixer");
+    repository.put.mockImplementation(async (brush) => brush);
+    repository.getById.mockImplementation(async (id) => {
+      const brush = structuredClone(createBrushStudioV6ProductBrush(program));
+      brush.id = id;
+      const material = brush.enginePrograms!.material!;
+      if (field === "seed") Object.assign(material, { seed: material.seed + 1 });
+      if (field === "color") brush.color = "#abcdef";
+      if (field === "flow") Object.assign(material.tuning, { flow: 0.37 });
+      if (field === "binding") Object.assign(material.runtime!.bindings[0]!, { version: "future" });
+      return brush;
+    });
+    await expect(saveBrushStudioV6ProductBrush(program)).rejects.toThrow("다시 읽지");
+  });
+
+  it("keeps zero material opacity in the actual saved tool snapshot", () => {
+    const base = createBrushStudioV6Program();
+    const program = { ...base, tuning: { ...base.tuning, opacity: 0 } };
+    const saved = createBrushStudioV6ProductBrush(program);
+    expect(saved.brushOpacity).toBe(0);
+    expect(saved.enginePrograms?.material?.tuning.opacity).toBe(0);
+  });
+
 });
