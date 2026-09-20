@@ -27,3 +27,9 @@ Reviewed pending introduction-route changes were copied as a point-in-time patch
 ## Explicit limits
 
 No production deployment, operator database migration, environment/secret changes, external provider activation or permission broadening is part of this merge. Existing source art and branding are preserved. Waiting-room navigation does not represent a configured real video service. Original active worktrees are not deleted or force-updated.
+
+## Final local browser and focus follow-up
+
+The production-candidate public matrix passed all 252 browser cases, covering the studio-first home, preserved introduction, public routes, actual anonymous creation, corruption preservation and CORS thumbnail behavior. The existing live-workspace check independently passed its 15 checks. Four introduction verifiers passed navigation/history, continuity, purpose-first controls and deferred media. Both public verifiers then passed their complete 42-route/viewport and 16-interaction selections after replacing a hidden-lazy-image decode wait with bounded visible-image readiness and using the real first-visit dismissal control.
+
+Remote verification revealed that the focused sparse checkout also needed the actual review hero, not only the spatial background. Both non-brand image dependencies are now included, and a source contract prevents future omissions. The remote navigation check exposed a deferred-focus race: a scheduled hash target could reclaim a newer keyboard focus. Two new regressions failed against the previous binder and pass after preserving the newer focused control; a third regression retains subsequent explicit navigation. Existing initial fragment, modal, cancellation and history checks remain. Keyboard browser checks also wait for actual link actionability before focusing, without executing a click or rewriting browser history.
