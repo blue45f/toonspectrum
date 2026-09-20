@@ -10,6 +10,7 @@ import {
   STUDIO_WORKSPACE_MAX_CUSTOM,
   normalizeStudioWorkspaceLayout,
   saveStudioWorkspace,
+  switchStudioWorkspace,
   type StudioWorkspaceLayout,
   type StudioWorkspaceState,
 } from "./studio-workspaces";
@@ -239,7 +240,8 @@ describe("StudioWorkspaceMenu guarded switching and compact navigation", () => {
 
 describe("StudioWorkspaceMenu responsive settings", () => {
   it("shows the actual current dock geometry and a responsive icon/name quick-access summary", () => {
-    const html = renderMenu();
+    const state = switchStudioWorkspace(DEFAULT_STUDIO_WORKSPACE_STATE, "storyboard");
+    const html = renderMenu(state);
 
     expect(html).toContain('data-testid="studio-workspace-layout-preview"');
     expect(html).toContain('data-mobile-fallback="canvas-first-sheets"');
@@ -298,7 +300,7 @@ describe("StudioWorkspaceMenu responsive settings", () => {
     );
 
     expect(html).toContain("변경은 이 세션에서만 유지");
-    expect(html).toContain("작업공간: 스토리보드 세션, 변경은 이 세션에서만 유지");
+    expect(html).toContain("작업공간: 선화 세션, 변경은 이 세션에서만 유지");
     expect(html).toContain("브라우저 저장에 실패해 이 세션에서만 유지");
     expect(html).toContain(">세션</span>");
     expect(html).not.toContain("이 기기 저장 확인됨");
