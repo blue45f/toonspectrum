@@ -1,8 +1,7 @@
+import { mapBrushStudioMaterialInput } from "../brush-lab/brush-studio-material-input";
 import {
   createBrushStudioV6MaterialStroke,
   brushStudioV6MaterialMarksToSvg,
-  mapBrushStudioV6Pressure,
-  mapBrushStudioV6Tilt,
   renderBrushStudioV6MaterialMarks,
   type BrushStudioV6MaterialConfig,
 } from "../brush-lab/brush-studio-v6-material-engine";
@@ -43,13 +42,11 @@ type MaterialSample = Parameters<MaterialStroke["push"]>[0];
 export type StudioMaterialBrushMark = ReturnType<MaterialStroke["push"]>[number];
 
 function sampleAt(element: StudioMaterialBrushElement, index: number, config: BrushStudioV6MaterialConfig): MaterialSample {
-  return {
-    x: element.points[index * 2]!,
-    y: element.points[index * 2 + 1]!,
-    pressure: mapBrushStudioV6Pressure(element.pressures?.[index] ?? 0.5, config.input),
-    tilt: mapBrushStudioV6Tilt(Math.hypot(element.tiltXs?.[index] ?? 0, element.tiltYs?.[index] ?? 0), config.input),
-    twist: element.twists?.[index] ?? 0,
-  };
+  return mapBrushStudioMaterialInput({
+    x: element.points[index * 2]!, y: element.points[index * 2 + 1]!,
+    pressure: element.pressures?.[index], tiltX: element.tiltXs?.[index],
+    tiltY: element.tiltYs?.[index], twist: element.twists?.[index],
+  }, config.input);
 }
 
 function sameSample(a: MaterialSample, b: MaterialSample): boolean {
