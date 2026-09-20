@@ -11,3 +11,6 @@ export * from "./fortune-calendar";
 export * from "./fortune-experiences";
 export * from "./fortune-symbols";
 export * from "./fortune-observatory";
+
+export * from "./fortune-enrichment";
+export * from "./tarot-deck";

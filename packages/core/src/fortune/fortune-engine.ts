@@ -6,6 +6,7 @@
 // 콜백으로 주입한다(없거나 throw 하면 결정적 폴백 콘티를 쓴다). 추천 작품(curateTitles)도
 // 카탈로그(TITLES)를 인자로 받아 산출하므로 데이터 공급원과 무관하게 동일 엔진이 동작합니다.
 
+import { fortuneKstDate, resolveFortuneBirth } from "./fortune-calendar";
 import {
   analyzeCompatibility,
   analyzeSaju,
@@ -114,7 +115,7 @@ export const CHARACTERS: FortuneCharacter[] = [
   },
 ];
 
-const TAROT_CARDS = [
+export const FORTUNE_MAJOR_ARCANA = [
   { id: 0, name: "광대", nameEn: "The Fool", keywords: ["시작", "자유", "모험", "무모함"], reversed: ["경솔", "망설임", "무책임"] },
   { id: 1, name: "마법사", nameEn: "The Magician", keywords: ["창조", "재능", "기술", "자신감"], reversed: ["속임수", "미숙", "자만"] },
   { id: 2, name: "여사제", nameEn: "The High Priestess", keywords: ["직관", "지혜", "비밀", "침묵"], reversed: ["혼란", "직관 무시", "숨겨진 동기"] },
@@ -199,7 +200,7 @@ function characterOf(characterId: string): FortuneCharacter {
 // 시드 키로 결정적 타로 카드 1장 생성(정/역 포함)
 function buildTarotCard(seedKey: string): TarotCard {
   const rng = seededRandom(seedKey);
-  const base = TAROT_CARDS[Math.floor(rng() * TAROT_CARDS.length)];
+  const base = FORTUNE_MAJOR_ARCANA[Math.floor(rng() * FORTUNE_MAJOR_ARCANA.length)];
   const isReversed = rng() > 0.58; // 정방향이 조금 더 잦게
   return {
     id: base.id,
@@ -695,9 +696,12 @@ export async function drawTarot<T extends CurateTitleLike>(
   cardIdx = 0,
   spread: "one" | "three" = "one",
   generateText?: FortuneTextGenerator,
+  referenceDate?: string,
 ) {
   const character = characterOf(characterId);
-  const day = dailySeed(characterId);
+  // Freeze the reference day before any async interpretation; legacy defaults are unchanged.
+  const date = referenceDate === undefined ? fortuneKstDate() : resolveFortuneBirth({ date: referenceDate }).solarDate;
+  const day = `${date}:${characterId}`;
 
   if (spread === "three") {
     const positions = ["과거", "현재", "미래"];
