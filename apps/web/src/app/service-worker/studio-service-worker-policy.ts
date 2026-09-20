@@ -136,6 +136,8 @@ export function classifyStudioServiceWorkerRequest(
 
   const { pathname } = parsed;
   if (SW_RUNTIME_PATHS.has(pathname)) return "sw-runtime";
+  // Release catalogues change independently of audio files; never replay a cached empty catalogue.
+  if (pathname === "/audio/playlist.json") return "passthrough";
 
   if (facts.mode === "navigate") {
     return isStudioServiceWorkerIsolatedPath(pathname)

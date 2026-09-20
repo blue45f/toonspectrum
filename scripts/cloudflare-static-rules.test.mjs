@@ -29,6 +29,15 @@ describe("Cloudflare static response rules", () => {
     );
   });
 
+  it("does not apply the long audio cache lifetime to the mutable OST catalogue", () => {
+    const policy = JSON.parse(readFileSync("config/http-response-headers.json", "utf8"));
+    const broadAudio = policy.headers.find((rule) => rule.source === "/audio/(.*)");
+    expect(broadAudio.headers.some((header) => header.key === "Cache-Control")).toBe(false);
+    const catalogue = policy.headers.find((rule) => rule.source === "/audio/playlist.json");
+    expect(catalogue.headers).toContainEqual({ key: "Cache-Control", value: "no-store" });
+    expect(catalogue.headers).toContainEqual({ key: "CDN-Cache-Control", value: "no-store" });
+  });
+
   it("projects the canonical CSP into the edge worker without touching other headers", () => {
     const source = `export const COMMON_SECURITY_HEADERS = {\n  "Content-Security-Policy": "old",\n  "X-Test": "kept",\n};\n`;
     const output = renderCloudflareWorkerSecurityPolicy(source, {

@@ -40,6 +40,8 @@ import {
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
+import { SiteOstTrackSelect } from "./SiteOstTrackSelect";
+
 const SITE_ROUTE_SUSPENSION = "site-route-audio-conflict";
 
 const STYLE_OPTIONS: readonly { value: SiteOstStylePreference; ko: string; en: string }[] = [
@@ -175,8 +177,14 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
       return;
     }
     if (audio.muted) setMuted(false);
-    await resumeAudio();
-    setBgmEnabled(true);
+    setSourceError("");
+    try {
+      await resumeAudio();
+      setBgmEnabled(true);
+    } catch {
+      setBgmEnabled(false);
+      setSourceError(korean ? "음악 재생을 시작하지 못했습니다. 재생 버튼을 다시 눌러 주세요." : "Could not start playback. Press play to try again.");
+    }
   };
 
   const chooseFollowRoute = (value: boolean) => {
@@ -227,7 +235,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
             </button>
           </div>
 
-          <div className="space-y-4 p-4">
+          <div className="max-h-[min(65dvh,38rem)] space-y-4 overflow-y-auto overscroll-contain p-4">
             <div className="rounded-xl border border-accent/25 bg-accent/5 px-3 py-2 text-xs leading-5 text-fg-2">
               <span className="font-black text-accent">{korean ? "오리지널 전용" : "Original only"}</span>
               <span>{korean ? " · 레퍼런스/스톡/브라우저 합성 BGM으로 자동 대체하지 않습니다." : " · No automatic fallback to reference, stock, or browser-synthesized music."}</span>
@@ -259,6 +267,13 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
               </label>
             </div>
 
+            <SiteOstTrackSelect tracks={playlistTracks} activeTrack={activeOstTrack} korean={korean} onSelect={(id) => {
+              const index = playlistTracks.findIndex((track) => track.id === id);
+              if (index < 0) return;
+              chooseFollowRoute(false);
+              setBgmMood(`playlist:${index}`);
+            }} />
+
             <label className="block text-xs font-semibold text-fg-2">
               <span className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5"><Volume2 className="size-3.5" aria-hidden="true" />{korean ? "OST 음량" : "OST volume"}</span>
@@ -289,7 +304,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
               <p className="truncate font-bold text-fg">{playing ? "● " : "○ "}{activeLabel}</p>
               {activeOstTrack?.summary ? <p className="mt-1 text-fg-3">{activeOstTrack.summary}</p> : null}
               {bgmArtist ? <p className="mt-1 truncate">{bgmArtist}</p> : null}
-              {activeOstTrack ? <p className="mt-1 text-fg-3">Eleven Music v2.5 · SHA {activeOstTrack.sha256.slice(0, 10)}… · C2PA requested</p> : null}
+              {activeOstTrack ? <p className="mt-1 text-fg-3">{activeOstTrack.provider === "ace-step" ? "ACE-Step 1.5 · Local generation recorded" : "Eleven Music v2.5 · C2PA requested"} · SHA {activeOstTrack.sha256.slice(0, 10)}…</p> : null}
               {bgmCreditUrl ? (
                 <a href={bgmCreditUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-7 items-center gap-1 text-accent underline underline-offset-4">
                   {korean ? "생성 출처·이용 조건" : "Generation provenance and terms"}<ExternalLink className="size-3" aria-hidden="true" />

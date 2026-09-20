@@ -399,10 +399,28 @@
         {
           "key": "Access-Control-Allow-Methods",
           "value": "GET, HEAD, OPTIONS"
-        },
+        }
+      ]
+    },
+    {
+      "source": "/audio/original/(.*)",
+      "headers": [
         {
           "key": "Cache-Control",
           "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/audio/playlist.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
         }
       ]
     }
