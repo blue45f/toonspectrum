@@ -170,8 +170,8 @@ describe("Studio BG3D shot UI integration boundary", () => {
     expect(handler).toContain("deviceProfile: captureQuality.profile");
     expect(handler).toContain("textureScale: captureQuality.textureScale");
     expect(handler).toContain("lodBias: captureQuality.lodBias");
-    expect(handler).toContain("ltPipelineId: STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1");
-    expect(handler).toContain("pngEncodingId: STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1");
+    expect(handler).toContain("ltPipelineId: planningAdapter.createTiledCapture ? studioBg3dTilePipelineId(captureQuality.maxRenderPixels) : STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1");
+    expect(handler).toContain("pngEncodingId: planningAdapter.createTiledCapture ? STUDIO_BG3D_TILED_PNG_PROFILE : STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1");
     expect(handler).toContain("psdEncodingId: STUDIO_BG3D_SHOT_BATCH_PSD_ENCODING_V1");
     expect(handler).toContain("contactSheet: shotBatchIncludeContactSheet");
     const acquireIndex = handler.indexOf(
@@ -218,8 +218,8 @@ describe("Studio BG3D shot UI integration boundary", () => {
       "background: shot.capture.background",
       "includeDepth: shot.capture.includeDepth",
       'verifySharedCharacterCaptureAuthority(\n          sharedCharacterAuthorityLease,\n          "receipt"',
-      "const shotArtifacts = await buildStudioBg3dShotArtifacts({",
-      "captured,",
+      "const shotArtifacts = tiledArtifacts ?? await buildStudioBg3dShotArtifacts({",
+      "captured: captured!,",
       "passes: batchPlan.passes",
       "includeLayeredPsd: shotBatchIncludeLayeredPsd",
       "committedArtifactBytes: accumulatedArtifactBytes",
@@ -236,7 +236,7 @@ describe("Studio BG3D shot UI integration boundary", () => {
 
     // A shot becomes locally archive-visible only after its validated artifacts commit atomically.
     expectInOrder(handler, [
-      "const shotArtifacts = await buildStudioBg3dShotArtifacts({",
+      "const shotArtifacts = tiledArtifacts ?? await buildStudioBg3dShotArtifacts({",
       "await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {",
       "images.push(...shotArtifacts.images)",
       "skippedArtifacts.push(...shotArtifacts.skippedArtifacts)",

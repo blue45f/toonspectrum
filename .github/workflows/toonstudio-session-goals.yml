@@ -32,6 +32,7 @@ jobs:
       HUSKY: "0"
       NODE_OPTIONS: --max-old-space-size=8192
     steps:
+      # Related tests validate tracked documentation evidence; retain docs.
       - name: Checkout focused ToonStudio source
         uses: actions/checkout@v6
         with:
@@ -50,7 +51,6 @@ jobs:
             /apps/web/public/assets/3d/characters/thumbnails/refined-v2/
             !/apps/web/public/vrm/
             !/artifacts/
-            !/docs/
             !/tests/benchmarks/results/
             /tests/benchmarks/results/v12-runtime-fault-matrix.json
 
