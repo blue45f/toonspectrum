@@ -1,0 +1,283 @@
+name: CI throughput repair validation
+
+on:
+  push:
+    branches: [ci/throughput-validation-20260920]
+    paths: [.github/workflows/ci-throughput-validation.yml]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: ci-throughput-repair-1883
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/ci/throughput-validation-20260920'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: '1'
+      NODE_OPTIONS: --max-old-space-size=12288
+      SOURCE_SHA: ba5baabe4922c69861502e250e4d66edb74971da
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ba5baabe4922c69861502e250e4d66edb74971da
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Apply narrowly asserted behavior-preserving validation deduplication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p "$RUNNER_TEMP/throughput"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          base = Path('apps/web/src/domains/creator/bg3d')
+          negative = re.compile(r'!Number\.isSafeInteger\((?P<v>[\w.]+)\)\s*\|\|\s*(?P=v) < (?P<lo>[\w.]+)\s*\|\|\s*(?P=v) > (?P<hi>[\w.]+)')
+          positive = re.compile(r'Number\.isSafeInteger\((?P<v>[\w.]+)\)\s*&&\s*(?P=v)!? >= (?P<lo>[\w.]+)\s*&&\s*(?P=v)!? <= (?P<hi>[\w.]+)')
+          float_negative = re.compile(r'typeof (?P<v>[\w.]+) !== "number"\s*\|\|\s*!Number\.isFinite\((?P=v)\)\s*\|\|\s*(?P=v) < (?P<lo>[\w.]+)\s*\|\|\s*(?P=v) > (?P<hi>[\w.]+)')
+          float_positive = re.compile(r'typeof (?P<v>[\w.]+) === "number"\s*&&\s*Number\.isFinite\((?P=v)\)\s*&&\s*(?P=v) >= (?P<lo>[\w.]+)\s*&&\s*(?P=v) <= (?P<hi>[\w.]+)')
+          integer = 'isStudioBg3dShotBatchIntegerInRange'
+          finite = 'isStudioBg3dShotBatchNumberInRange'
+          exact = 'hasStudioBg3dShotBatchExactKeys'
+          old_batch_keys = '''function hasExactKeys(value: unknown, keys: readonly string[]): boolean {
+            if (!isRecord(value)) return false;
+            const actual = Object.keys(value).sort(compareStudioValidationStrings);
+            const expected = [...keys].sort(compareStudioValidationStrings);
+            return actual.length === expected.length &&
+              actual.every((key, index) => key === expected[index]);
+          }'''
+          old_plan_keys = '''function hasExactKeys(value: unknown, expected: readonly string[]): boolean {
+            if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+            const actual = Object.keys(value).sort(compareStudioValidationStrings);
+            const canonical = [...expected].sort(compareStudioValidationStrings);
+            return actual.length === canonical.length &&
+              actual.every((key, index) => key === canonical[index]);
+          }'''
+          for name, counts, float_counts, old_keys in [
+              ('studio-bg3d-shot-batch.ts', (14, 0), (2, 0), old_batch_keys),
+              ('studio-bg3d-shot-batch-plan.ts', (1, 8), (0, 2), old_plan_keys),
+          ]:
+              p = base / name
+              source = p.read_text()
+              assert (len(negative.findall(source)), len(positive.findall(source))) == counts, name
+              assert (len(float_negative.findall(source)), len(float_positive.findall(source))) == float_counts, name
+              assert source.count(old_keys) == 1, name
+              for pattern, prefix, helper in [
+                  (negative, '!', integer), (positive, '', integer),
+                  (float_negative, '!', finite), (float_positive, '', finite),
+              ]:
+                  source = pattern.sub(lambda m: prefix + helper + '(' + m['v'] + ', ' + m['lo'] + ', ' + m['hi'] + ')', source)
+              source = source.replace(old_keys, '', 1)
+              source = 'import {\n  ' + integer + ',\n  ' + finite + ',\n  ' + exact + ' as hasExactKeys,\n} from "./studio-bg3d-shot-batch-limits";\n' + source
+              p.write_text(source)
+          limits = base / 'studio-bg3d-shot-batch-limits.ts'
+          assert limits.read_text() == '/** Lightweight editor-visible limits. Heavy archive and verification code must not live here. */\nexport const STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION = 4_096;\n'
+          limits.write_text(limits.read_text() + '''
+          /** Finite fractional capture parameters use inclusive, non-coercing bounds. */
+          export function isStudioBg3dShotBatchNumberInRange(
+            value: unknown,
+            minimum: number,
+            maximum: number,
+          ): value is number {
+            return typeof value === "number" && Number.isFinite(value) &&
+              value >= minimum && value <= maximum;
+          }
+
+          /** Persisted integers additionally reject fractions and unsafe integer precision. */
+          export function isStudioBg3dShotBatchIntegerInRange(
+            value: unknown,
+            minimum: number,
+            maximum: number,
+          ): value is number {
+            return Number.isSafeInteger(value) &&
+              isStudioBg3dShotBatchNumberInRange(value, minimum, maximum);
+          }
+
+          /** Exact own enumerable string keys, without sorting or mutating caller arrays. */
+          export function hasStudioBg3dShotBatchExactKeys(
+            value: unknown,
+            expected: readonly string[],
+          ): boolean {
+            if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+            const actual = Object.keys(value);
+            return actual.length === expected.length && actual.every((key) => expected.includes(key));
+          }
+          ''')
+          (base / 'studio-bg3d-shot-batch-limits.test.ts').write_text('''import { describe, expect, it } from "vitest";
+          import {
+            hasStudioBg3dShotBatchExactKeys,
+            isStudioBg3dShotBatchIntegerInRange,
+            isStudioBg3dShotBatchNumberInRange,
+          } from "./studio-bg3d-shot-batch-limits";
+
+          describe("shared shot-batch validation", () => {
+            it("preserves the previous inclusive integer acceptance and rejection predicates", () => {
+              const values: unknown[] = [undefined, null, false, true, "1", "256", {}, [],
+                Number.NaN, -Infinity, Infinity, Number.MIN_SAFE_INTEGER - 1,
+                Number.MIN_SAFE_INTEGER, -4096, -1, -0, 0, 0.5, 1, 255, 255.5,
+                256, 4095, 4096, 4097, 8192, 8193, Number.MAX_SAFE_INTEGER,
+                Number.MAX_SAFE_INTEGER + 1, BigInt(1), Symbol("number")];
+              const ranges = [[1, 4096], [256, 4096], [1, 8192],
+                [1, Number.MAX_SAFE_INTEGER], [-4096, 0], [0, 0]] as const;
+              for (const [minimum, maximum] of ranges) {
+                for (const value of values) {
+                  const accepted = Number.isSafeInteger(value) &&
+                    (value as number) >= minimum && (value as number) <= maximum;
+                  const rejected = !Number.isSafeInteger(value) ||
+                    (value as number) < minimum || (value as number) > maximum;
+                  const result = isStudioBg3dShotBatchIntegerInRange(value, minimum, maximum);
+                  expect(result).toBe(accepted);
+                  expect(result).toBe(!rejected);
+                }
+              }
+            });
+            it("does not invoke caller-controlled conversion hooks", () => {
+              const value = { valueOf() { throw new Error("must not coerce"); } };
+              expect(isStudioBg3dShotBatchIntegerInRange(value, 1, 4096)).toBe(false);
+              expect(isStudioBg3dShotBatchNumberInRange(value, 1, 4096)).toBe(false);
+            });
+            it("fails closed for invalid or reversed bounds", () => {
+              for (const predicate of [isStudioBg3dShotBatchIntegerInRange, isStudioBg3dShotBatchNumberInRange]) {
+                expect(predicate(1, Number.NaN, 4096)).toBe(false);
+                expect(predicate(1, 0, Number.NaN)).toBe(false);
+                expect(predicate(1, 4096, 0)).toBe(false);
+              }
+            });
+            it("preserves finite fractional capture settings", () => {
+              const values: unknown[] = [undefined, null, "0.5", {}, [], false, 0, 0.001,
+                0.01, 0.5, 1, 3.999, 4, 4.001, 8, 8.001, Number.NaN, Infinity, -Infinity];
+              for (const [minimum, maximum] of [[0.01, 4], [0, 8]] as const) {
+                for (const value of values) {
+                  const previous = typeof value === "number" && Number.isFinite(value) &&
+                    value >= minimum && value <= maximum;
+                  expect(isStudioBg3dShotBatchNumberInRange(value, minimum, maximum)).toBe(previous);
+                }
+              }
+            });
+            it("preserves exact-key checks for reordered, missing, extra, duplicate and inherited keys", () => {
+              const values: unknown[] = [null, undefined, 0, "a", [], {}, { a: 1 },
+                { a: 1, b: 2 }, { b: 2, a: 1 }, { a: 1, b: 2, extra: true },
+                Object.create({ a: 1 }), Object.assign(Object.create({ hidden: 1 }), { a: 2 }),
+                { A: 1, a: 2, "한글": 3 }, { [Symbol("ignored")]: true }];
+              const keySets = [[], ["a"], ["a", "b"], ["b", "a"], ["a", "a"],
+                ["a", "missing"], ["한글", "a", "A"]];
+              for (const value of values) {
+                for (const keys of keySets) {
+                  const expected = Object.freeze([...keys]);
+                  const actual = typeof value === "object" && value !== null && !Array.isArray(value)
+                    ? Object.keys(value).sort() : null;
+                  const sorted = [...expected].sort();
+                  const previous = actual !== null && actual.length === sorted.length &&
+                    actual.every((key, index) => key === sorted[index]);
+                  expect(hasStudioBg3dShotBatchExactKeys(value, expected)).toBe(previous);
+                  expect([...expected]).toEqual(keys);
+                }
+              }
+            });
+          });
+          ''')
+          doc = Path('docs/operations/ci-throughput-policy.md')
+          text = doc.read_text().replace('Scope: GitHub Actions only.',
+              'Scope: GitHub Actions and behavior-preserving BG3D validation deduplication needed to unblock the inherited bundle failure.')
+          text += '''\n## Inherited bundle failure and bounded repair\n\nMain CI 35513710443 and the original PR CI independently failed the same BG3D shot-batch\nraw/gzip ratchets; a clean local production build reproduced them. The repair factors\n23 integer and four fractional predicates and two exact-key validators without changing\nlimits, bundle baselines, image integrity verification or dynamic-import boundaries.\nDifferential tests preserve rejection of malformed numeric values, missing/extra keys\nand coercion. The validation runner creates an unreferenced candidate commit only after\nfocused tests, full typecheck, core preflight, lint and the unchanged production bundle\ngate pass. Actual PR/core and verify must pass on the promoted head before merge.\nThe temporary validation workflow is never included in that candidate tree or main.\nThis operation rolls out CI policy, not a Cloudflare or Render application release.\n'''
+          doc.write_text(text)
+          print('Applied exactly 27 numeric predicates and two equivalent exact-key validators.')
+          PY
+      - name: Validate source and all affected contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm exec eslint --fix apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-plan.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.test.ts
+          pnpm exec vitest run apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-client.test.ts scripts/cleanup-superseded-actions-runs.test.mjs scripts/integration-test-runner-ci-policy.test.mjs scripts/ci-throughput-policy.test.mjs scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-p5-brush-real-runtime.test.ts scripts/studio-bg3d-runtime-release-wiring.test.ts scripts/run-full-test-ci.test.mjs > "$RUNNER_TEMP/throughput/tests.log" 2>&1
+          tail -10 "$RUNNER_TEMP/throughput/tests.log"
+          pnpm run typecheck > "$RUNNER_TEMP/throughput/typecheck.log" 2>&1
+          node --test scripts/ci-core-gate.test.mjs scripts/ci-core-regression-shards.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs scripts/ci-throughput-policy.test.mjs > "$RUNNER_TEMP/throughput/preflight.log" 2>&1
+          tail -10 "$RUNNER_TEMP/throughput/preflight.log"
+          python3 scripts/verify-pr-workflow-fanout.py
+          pnpm run validate:architecture > "$RUNNER_TEMP/throughput/architecture.log" 2>&1
+          git diff --check
+          git diff --exit-code HEAD -- scripts/bundle-baseline.json scripts/check-studio-bundle.mjs scripts/lib/studio-bundle-temporary-allowance.mjs vite.config.ts apps/web/config/vite-manual-chunks.ts
+      - name: Require real production build and unchanged bundle gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm run build:bundle > "$RUNNER_TEMP/throughput/build.log" 2>&1
+          node scripts/check-studio-bundle.mjs > "$RUNNER_TEMP/throughput/bundle-gate.log" 2>&1
+          tail -30 "$RUNNER_TEMP/throughput/bundle-gate.log"
+          pnpm run test:studio-virtual-art > "$RUNNER_TEMP/throughput/art-tests.log" 2>&1
+          pnpm run verify:studio-virtual-art > "$RUNNER_TEMP/throughput/art-integrity.log" 2>&1
+      - name: Publish tested Git object and report only, never move a branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          def api(path, payload=None):
+              cmd=['gh', 'api', '--method', 'GET' if payload is None else 'POST', path]
+              if payload is not None: cmd += ['--input', '-']
+              result=subprocess.run(cmd, input=None if payload is None else json.dumps(payload), text=True, capture_output=True, check=True)
+              return json.loads(result.stdout)
+          repo='blue45f/toonspectrum'
+          source=os.environ['SOURCE_SHA']
+          assert git('rev-parse','HEAD') == source
+          pr=api(f'repos/{repo}/pulls/1883')
+          assert pr['state']=='open' and pr['head']['sha']==source and pr['head']['ref']=='fix/ci-throughput-20260920'
+          paths=[f'apps/web/src/domains/creator/bg3d/{name}' for name in [
+              'studio-bg3d-shot-batch.ts','studio-bg3d-shot-batch-plan.ts',
+              'studio-bg3d-shot-batch-limits.ts','studio-bg3d-shot-batch-limits.test.ts']]
+          paths += ['docs/operations/ci-throughput-policy.md']
+          changed=set(git('diff','--name-only','HEAD').splitlines())
+          untracked=set(git('ls-files','--others','--exclude-standard').splitlines())
+          assert changed | untracked == set(paths), (changed, untracked)
+          subprocess.run(['git','add','--',*paths],check=True)
+          local_tree=git('write-tree')
+          entries=[{'path':p,'mode':'100644','type':'blob','content':Path(p).read_text()} for p in paths]
+          tree=api(f'repos/{repo}/git/trees', {'base_tree':git('rev-parse','HEAD^{tree}'),'tree':entries})
+          assert tree['sha']==local_tree, 'GitHub tree differs from tested tree'
+          commit=api(f'repos/{repo}/git/commits', {'message':'perf(scene3d): deduplicate bounded batch validators without relaxing gates','tree':tree['sha'],'parents':[source]})
+          run=f"https://github.com/{repo}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          body='## Tested CI repair candidate — no branch changed\n\n'+json.dumps({'parent':source,'candidate_commit':commit['sha'],'tree':local_tree,'validation_run':run,'checks':['affected tests','full frontend/API typecheck','68 core preflight tests','lint','architecture','real production build','unchanged bundle gate','virtual art tests and integrity'],'changed_files':paths},indent=2)
+          api(f'repos/{repo}/issues/1883/comments', {'body':body})
+          print(body)
+          PY
+      - name: Report diagnostic failure without changing source branches
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          root=Path(os.environ['RUNNER_TEMP'])/'throughput'
+          body='## CI repair validation did not pass — no candidate promoted\n\n'
+          body+=f"Run: https://github.com/blue45f/toonspectrum/actions/runs/{os.environ['GITHUB_RUN_ID']}\n"
+          for name in ['tests.log','typecheck.log','preflight.log','architecture.log','build.log','bundle-gate.log']:
+              p=root/name
+              if p.exists(): body+='\n### '+name+'\n```\n'+'\n'.join(p.read_text(errors='replace').splitlines()[-12:])+'\n```\n'
+          subprocess.run(['gh','api','--method','POST','repos/blue45f/toonspectrum/issues/1883/comments','--input','-'],input=json.dumps({'body':body[-25000:]}),text=True,check=True)
+          PY
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ci-throughput-validation-${{ github.run_id }}
+          path: ${{ runner.temp }}/throughput
+          retention-days: 3
+          if-no-files-found: warn
