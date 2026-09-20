@@ -115,6 +115,21 @@ resolved both dependencies, and their seven focused tests passed. The complete r
 failure; these focused repairs are not relabeled as a new full-suite pass. Performance and the
 next exact-commit GitHub run remain pending. The runner, workflow and shell checks passed 88 tests.
 
+The filter browser survey passed 49 filters across three repetitions (147 apply/undo checks).
+Its later direct-image failure was isolated to selection chrome and a verifier Escape action
+that cleared the selected image. The repaired representative run passed all seven scenarios,
+including an explicitly asserted image target, 113,817 changed pixels after apply and zero
+residual pixels after undo across the unchanged 179,790-pixel crop. Static-preview readiness
+errors are classified only for the spawned loopback origin's exact optional API path; unrelated
+assets, origins and paths still fail. Browser and response error counts were zero.
+
+The full shapes stage passed with live stage coordinates, explicit first-endpoint identity,
+unchanged other control points and the existing 15-degree tolerance. Undo/redo, source metadata,
+cold restoration, narrow-screen controls and zoom/rotation checks passed. Durability verification
+recognizes the current automatic restore and the existing explicit fallback, and additionally
+requires the at-risk stroke to repaint all three measured route segments. Its real run preserved
+both strokes and their metadata, with automatic recovery, three visible segments and zero errors.
+
 Useful commands, with an explicitly owned dev origin and disposable database variables:
 
 ```sh
