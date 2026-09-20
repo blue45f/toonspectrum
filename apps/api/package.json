@@ -24,6 +24,7 @@
     "@toonspectrum/studio-project-model": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "express": "^4.22.2",
+    "fast-xml-parser": "5.10.1",
     "google-auth-library": "^10.7.0",
     "image-js": "^1.7.0",
     "js-base64": "^3.9.0",

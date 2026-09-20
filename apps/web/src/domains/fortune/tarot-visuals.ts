@@ -20,6 +20,11 @@ export const TAROT_VISUALS: Record<number, TarotVisual> = Object.fromEntries(
 ) as Record<number, TarotVisual>;
 
 export function getTarotVisual(id: number): TarotVisual {
+  if (Number.isInteger(id) && id >= 22 && id < 78) {
+    const suit = Math.floor((id - 22) / 14), rank = (id - 22) % 14;
+    const labels = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "P", "Kn", "Q", "K"];
+    return { motif: [1, 14, 11, 21][suit], hue: [38, 235, 305, 142][suit], roman: `${["WANDS", "CUPS", "SWORDS", "PENTACLES"][suit]} · ${labels[rank]}` };
+  }
   return TAROT_VISUALS[id] ?? { motif: 17, hue: 42, roman: String(id) };
 }
 
