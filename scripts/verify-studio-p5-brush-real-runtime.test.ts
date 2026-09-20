@@ -165,7 +165,7 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
 
   it("retains a bounded, non-skippable graphics gate in the main exhaustive lane", () => {
     const workflow = parseYaml(source(".github/workflows/main-full-qa-studio.yml")) as {
-      on: { push: { branches: string[] }; workflow_dispatch: unknown };
+      on: { schedule: { cron: string }[]; workflow_dispatch: unknown };
       permissions: { contents: string };
       env: { QA_COMMAND_TIMEOUT_MINUTES: string };
       jobs: Record<string, {
@@ -176,7 +176,8 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     };
     const job = workflow.jobs["studio-audit"]!;
     const lane = job.strategy!.matrix.include.find((entry) => entry.lane === "brush-rendering-b");
-    expect(workflow.on.push.branches).toEqual(["main"]);
+    expect(workflow.on.schedule).toEqual([{ cron: "17 19 * * *" }]);
+    expect(workflow.on).not.toHaveProperty("push");
     expect(workflow.on).toHaveProperty("workflow_dispatch");
     expect(workflow.permissions).toEqual({ contents: "read" });
     expect(job.needs).toBe("production-build");

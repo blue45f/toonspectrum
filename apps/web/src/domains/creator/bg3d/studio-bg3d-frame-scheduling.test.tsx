@@ -15,6 +15,7 @@ const frame = vi.hoisted(() => ({ callback: null as FrameCallback | null }));
 vi.mock("@react-three/fiber", async (importOriginal) => ({
   ...await importOriginal<typeof import("@react-three/fiber")>(),
   useFrame: (callback: FrameCallback) => { frame.callback = callback; },
+  useThree: (selector: (state: RootState) => unknown) => selector({ gl: {}, invalidate: vi.fn() } as unknown as RootState),
 }));
 
 afterEach(() => {

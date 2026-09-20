@@ -7,8 +7,14 @@ const WAITING_STATUSES = new Set(["pending", "queued"]);
 const DEFAULT_STALE_QUEUED_AFTER_MS = 6 * 60 * 60 * 1_000;
 const CODEQL_DEFAULT_SETUP_WORKFLOW_PATH = "dynamic/github-code-scanning/codeql";
 
-function isProtectedDefaultSetupRun(run) {
-  return run.event === "dynamic" && run.path === CODEQL_DEFAULT_SETUP_WORKFLOW_PATH;
+export function isProtectedActionsRun(run) {
+  if (run.event === "dynamic" && run.path === CODEQL_DEFAULT_SETUP_WORKFLOW_PATH) return true;
+  // ci.yml owns coalescing pending main runs; a started main verification must finish.
+  if (run.event === "push" && ["main", "refs/heads/main"].includes(run.head_branch) &&
+    (run.path === ".github/workflows/ci.yml" || run.name === "CI")) return true;
+  // This workflow intentionally runs AFTER a PR closes. Closed is not stale here.
+  return run.path === ".github/workflows/cleanup-merged-pr-branches.yml" ||
+    run.name === "Cleanup merged PR branches";
 }
 
 export function selectSupersededActionsRuns(
@@ -25,7 +31,7 @@ export function selectSupersededActionsRuns(
   const active = runs.filter((run) =>
     Number(run.id) !== current &&
     ACTIVE_EVENTS.has(run.event) &&
-    !isProtectedDefaultSetupRun(run),
+    !isProtectedActionsRun(run),
   );
 
   const groups = new Map();
