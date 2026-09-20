@@ -3,8 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { assertWorkspaceQaThemeChanged, readWorkspaceQaTheme, setWorkspaceQaTheme } from "./qa-studio-workspace-theme.mjs";
 
-// Run against the local Vite server. Fixtures are isolated in disposable browser contexts.
+// Fixtures are isolated in disposable browser contexts, never an existing user profile.
 const base = process.env.BASE_URL ?? "http://127.0.0.1:5317";
 const output = process.env.QA_OUT ?? "/tmp/toonstudio-site-redesign-20260920";
 if (!["127.0.0.1", "localhost"].includes(new URL(base).hostname)) throw new Error("Local development server required; never seed a real account or production origin.");
@@ -17,6 +18,14 @@ async function ready(page) {
   await page.locator('[data-workspace-state="loading"]').waitFor({ state: "detached", timeout: 30000 });
   await page.waitForTimeout(500);
 }
+async function newContext(width, height) {
+  const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
+  await context.route("**/api/auth/session", (route) => route.fulfill({ json: { user: null } }));
+  return context;
+}
+function violationsOf(analysis, theme) {
+  return analysis.violations.map(({ id, impact, nodes }) => ({ id, theme, impact, count: nodes.length, targets: nodes.map((node) => node.target) }));
+}
 async function capture(page, name) {
   await page.screenshot({ path: path.join(output, `${name}.png`), fullPage: true });
   const size = await page.evaluate(() => ({ viewport: innerWidth, scroll: document.documentElement.scrollWidth }));
@@ -27,10 +36,25 @@ async function capture(page, name) {
   assert.ok((await page.locator(".workspace-topbar").boundingBox()).y <= 1, `${name}: duplicate chrome above workspace`);
   return size;
 }
+async function auditThemes(page, name) {
+  await setWorkspaceQaTheme(page, "dark");
+  const dark = await readWorkspaceQaTheme(page);
+  const darkAudit = await new AxeBuilder({ page }).include(".workspace-shell").withTags(["wcag2a", "wcag2aa"]).analyze();
+  await setWorkspaceQaTheme(page, "light");
+  const light = await readWorkspaceQaTheme(page);
+  assertWorkspaceQaThemeChanged(dark, light);
+  await capture(page, `${name}-light`);
+  const lightAudit = await new AxeBuilder({ page }).include(".workspace-shell").withTags(["wcag2a", "wcag2aa"]).analyze();
+  await setWorkspaceQaTheme(page, "dark");
+  return { dark, light, violations: [...violationsOf(darkAudit, "dark"), ...violationsOf(lightAudit, "light")] };
+}
+async function recordFailure(page, name, error) {
+  failures.push({ name, message: String(error) });
+  await page.screenshot({ path: path.join(output, `${name}-failed.png`), fullPage: true }).catch(() => {});
+}
 try {
-  for (const width of [1440, 1024, 390, 320]) {
-    const context = await browser.newContext({ viewport: { width, height: width > 760 ? 960 : 844 }, reducedMotion: "reduce" });
-    await context.route("**/api/auth/session", (route) => route.fulfill({ json: { user: null } }));
+  for (const [width, height] of [[1440, 900], [1366, 768], [1024, 768], [390, 844], [320, 740]]) {
+    const context = await newContext(width, height);
     for (const [surface, url] of [["home", "/"], ["team", "/team"], ["explore", "/hub"], ["works", "/studio"]]) {
       const page = await context.newPage(); const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
@@ -39,27 +63,19 @@ try {
         await page.goto(base + url, { waitUntil: "domcontentloaded" });
         await ready(page);
         const size = await capture(page, name);
-        const violations = width === 1440 ? (await new AxeBuilder({ page }).include(".workspace-shell").withTags(["wcag2a", "wcag2aa"]).analyze()).violations.map(({ id, impact, nodes }) => ({ id, impact, count: nodes.length, targets: nodes.map((node) => node.target) })) : [];
-        if (width === 1440) {
-          const originalTheme = await page.evaluate(() => document.documentElement.dataset.theme);
-          await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
-          await capture(page, `${name}-light`);
-          const light = await new AxeBuilder({ page }).include(".workspace-shell").withTags(["wcag2a", "wcag2aa"]).analyze();
-          violations.push(...light.violations.map(({ id, impact, nodes }) => ({ id: `${id}:light`, impact, count: nodes.length, targets: nodes.map((node) => node.target) })));
-          await page.evaluate((theme) => { if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme; }, originalTheme);
-        }
+        const themeEvidence = width === 1440 ? await auditThemes(page, name) : null;
         if (surface === "home" && width < 761) {
           await page.getByRole("button", { name: "공간 보기", exact: true }).click();
           await page.locator(".workspace-world img").waitFor();
           await capture(page, `space-${width}`);
+          await page.getByRole("button", { name: "목록 보기", exact: true }).click();
+          assert.equal(await page.locator(".workspace-world").count(), 0);
         }
         assert.deepEqual(errors, [], `${name}: runtime errors`);
-        assert.deepEqual(violations, [], `${name}: accessibility violations`);
-        results.push({ name, ...size, runtimeErrors: errors, violations });
-      } catch (error) {
-        failures.push({ name, message: String(error) });
-        await page.screenshot({ path: path.join(output, `${name}-failed.png`), fullPage: true }).catch(() => {});
-      } finally { await page.close(); }
+        assert.deepEqual(themeEvidence?.violations ?? [], [], `${name}: accessibility violations`);
+        results.push({ name, height, ...size, runtimeErrors: errors, themeEvidence });
+      } catch (error) { await recordFailure(page, name, error); }
+      finally { await page.close(); }
     }
     await context.close();
   }
