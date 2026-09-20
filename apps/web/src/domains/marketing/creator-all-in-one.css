@@ -39,6 +39,14 @@
   max-inline-size: 100%;
 }
 
+/* The task cards reserve their artwork rows before lazy image decoding. */
+.creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-intent-card-media img {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
 .creator-home[data-creator-experience="all-in-one-studio-v3"] :where(h1, h2, h3, p, strong, span, a) {
   overflow-wrap: anywhere;
 }
