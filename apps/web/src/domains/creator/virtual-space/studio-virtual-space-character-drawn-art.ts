@@ -417,6 +417,137 @@ export const SILVER_DRAWN_POSES = {
   }
 } satisfies Record<string, StudioCharacterPoseSheet>;
 
+export const SILVER_DRAWN_REVIEWS = {
+  "down": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-down.png",
+    "frameWidth": 561,
+    "frameHeight": 701,
+    "frames": [
+      {
+        "originX": 0.558824,
+        "originY": 0.937233,
+        "displayHeightRatio": 0.935235
+      },
+      {
+        "originX": 0.44385,
+        "originY": 0.937233,
+        "displayHeightRatio": 0.935235
+      },
+      {
+        "originX": 0.567736,
+        "originY": 0.920114,
+        "displayHeightRatio": 0.935235
+      },
+      {
+        "originX": 0.44385,
+        "originY": 0.920114,
+        "displayHeightRatio": 0.935235
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  },
+  "right": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-right.png",
+    "frameWidth": 561,
+    "frameHeight": 701,
+    "frames": [
+      {
+        "originX": 0.553476,
+        "originY": 0.950071,
+        "displayHeightRatio": 0.959626
+      },
+      {
+        "originX": 0.467914,
+        "originY": 0.951498,
+        "displayHeightRatio": 0.959626
+      },
+      {
+        "originX": 0.540998,
+        "originY": 0.932953,
+        "displayHeightRatio": 0.959626
+      },
+      {
+        "originX": 0.477718,
+        "originY": 0.932953,
+        "displayHeightRatio": 0.959626
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  },
+  "left": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-left.png",
+    "frameWidth": 561,
+    "frameHeight": 701,
+    "frames": [
+      {
+        "originX": 0.527629,
+        "originY": 0.955777,
+        "displayHeightRatio": 0.951099
+      },
+      {
+        "originX": 0.459893,
+        "originY": 0.955777,
+        "displayHeightRatio": 0.951099
+      },
+      {
+        "originX": 0.532977,
+        "originY": 0.942939,
+        "displayHeightRatio": 0.951099
+      },
+      {
+        "originX": 0.458111,
+        "originY": 0.944365,
+        "displayHeightRatio": 0.951099
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  },
+  "up": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-up.png",
+    "frameWidth": 561,
+    "frameHeight": 701,
+    "frames": [
+      {
+        "originX": 0.540107,
+        "originY": 0.934379,
+        "displayHeightRatio": 0.998695
+      },
+      {
+        "originX": 0.473262,
+        "originY": 0.934379,
+        "displayHeightRatio": 0.998695
+      },
+      {
+        "originX": 0.545455,
+        "originY": 0.904422,
+        "displayHeightRatio": 0.998695
+      },
+      {
+        "originX": 0.475045,
+        "originY": 0.904422,
+        "displayHeightRatio": 0.998695
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  }
+} satisfies Record<string, StudioCharacterAtlasClip>;
+
 export const DARK_DRAWN_WALKS = {
   "walk-right": {
     "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-dark-walk-right.png",

@@ -5,7 +5,7 @@ import {
 } from "./studio-virtual-space-appearance";
 import {
   PINK_DRAWN_POSES, PINK_DRAWN_WALKS,
-  SILVER_DRAWN_POSES, SILVER_DRAWN_WALKS,
+  SILVER_DRAWN_POSES, SILVER_DRAWN_WALKS, SILVER_DRAWN_REVIEWS,
   DARK_DRAWN_POSES, DARK_DRAWN_WALKS,
   PURPLE_DRAWN_POSES, PURPLE_DRAWN_WALKS,
 } from "./studio-virtual-space-character-drawn-art";
@@ -13,6 +13,7 @@ import {
 export type StudioCharacterSkinKey = string;
 export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review" | "wave" | "sit";
 export type StudioCharacterWalkClipKey = "walk-down" | "walk-left" | "walk-right" | "walk-up";
+export type StudioCharacterAction = "talk" | "draw" | "review";
 
 export interface StudioCharacterFramePresentation {
   readonly originX: number;
@@ -52,6 +53,8 @@ export interface StudioCharacterSkin {
   readonly directional: Readonly<Record<StudioVirtualSpaceFacing, string>>;
   readonly state?: Readonly<Partial<Record<"talk" | "draw" | "review", string>>>;
   readonly clips?: Readonly<Partial<Record<StudioCharacterWalkClipKey, StudioCharacterAtlasClip>>>;
+  /** Actual stationary action frames; load only the active direction. */
+  readonly actions?: Readonly<Partial<Record<StudioCharacterAction, Readonly<Record<StudioVirtualSpaceFacing, StudioCharacterAtlasClip>>>>>;
   readonly poses?: Readonly<Partial<Record<"sit" | "wave", StudioCharacterPoseSheet>>>;
 }
 
@@ -79,21 +82,21 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
       review: "/assets/virtual-studio/production-v2/player-pink-state-review.png",
     },
   },
-  { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver"), clips: SILVER_DRAWN_WALKS, poses: SILVER_DRAWN_POSES },
+  { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver"), clips: SILVER_DRAWN_WALKS, poses: SILVER_DRAWN_POSES, actions: { review: SILVER_DRAWN_REVIEWS } },
   { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark"), clips: DARK_DRAWN_WALKS, poses: DARK_DRAWN_POSES },
   { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: PURPLE_DRAWN_WALKS, poses: PURPLE_DRAWN_POSES },
 ]);
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1";
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-review-1";
 export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
   revision: STUDIO_CHARACTER_REGISTRY_REVISION,
   fallbackSkinKey: FALLBACK_SKIN.key,
   skins: STUDIO_CHARACTER_SKINS.map((skin) => ({
     key: skin.key,
     capabilities: ["idle", ...Object.keys(skin.clips ?? {}), ...Object.keys(skin.poses ?? {}),
-      ...Object.keys(skin.state ?? {})] as StudioVirtualSpaceAppearanceClip[],
+      ...Object.keys(skin.state ?? {}), ...Object.keys(skin.actions ?? {})] as StudioVirtualSpaceAppearanceClip[],
   })),
 });
 
@@ -134,6 +137,14 @@ export function studioCharacterWalkClip(
   facing: StudioVirtualSpaceFacing,
 ): StudioCharacterAtlasClip | undefined {
   return skin.clips?.[`walk-${facing}` as StudioCharacterWalkClipKey];
+}
+
+export function studioCharacterActionClip(
+  skin: StudioCharacterSkin,
+  facing: StudioVirtualSpaceFacing,
+  state: StudioCharacterMotionState,
+): StudioCharacterAtlasClip | undefined {
+  return state === "talk" || state === "draw" || state === "review" ? skin.actions?.[state]?.[facing] : undefined;
 }
 
 export function studioCharacterTextureUrl(

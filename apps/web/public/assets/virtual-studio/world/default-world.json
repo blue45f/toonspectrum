@@ -2331,7 +2331,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -2394,7 +2394,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",

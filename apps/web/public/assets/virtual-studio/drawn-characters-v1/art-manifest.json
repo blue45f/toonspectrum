@@ -11,8 +11,8 @@
   "limitations": [
     "Four drawn walk key poses per direction, not eight in-between drawings.",
     "Wave and sit are directional held poses, not multi-frame action loops.",
-    "Original production-v2 idle and existing work-state images retained.",
-    "Generated identity is visually matched; original source pixels are not retained in newly drawn poses."
+    "Generated identity is visually matched; original source pixels are not retained in newly drawn poses.",
+    "Original production-v2 idle and existing pink work-state images retained. Silver has four directional four-frame review loops; other new work/action loops are not provided."
   ],
   "assets": {
     "pink/walk-right": {
@@ -2030,6 +2030,500 @@
         "production-v2/player-purple-direction-right.png": "3276ae39cc3762c92930731efcfe06058a0c755c3cac59c16152908b92aa8e75",
         "production-v2/player-purple-direction-up.png": "c13961834cd5961ac3097fd9dc010ee9441fa50d04bac63cf63c46da02488b8a"
       }
+    },
+    "silver/review-down": {
+      "skin": "silver",
+      "state": "review-down",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-down.png",
+      "sourceImage": "exec-3be397fb-9e73-46d5-bfd1-db339bcb87b6.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "bdcb6cfafd703fb687c34d50e41af6dbfaf64c95135d1d42350bce618ddfa62c",
+      "bytes": 1093116,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.558824,
+          "originY": 0.937233,
+          "displayHeightRatio": 0.935235
+        },
+        {
+          "originX": 0.44385,
+          "originY": 0.937233,
+          "displayHeightRatio": 0.935235
+        },
+        {
+          "originX": 0.567736,
+          "originY": 0.920114,
+          "displayHeightRatio": 0.935235
+        },
+        {
+          "originX": 0.44385,
+          "originY": 0.920114,
+          "displayHeightRatio": 0.935235
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          133,
+          24,
+          489,
+          657
+        ],
+        [
+          70,
+          33,
+          422,
+          657
+        ],
+        [
+          140,
+          17,
+          494,
+          645
+        ],
+        [
+          70,
+          14,
+          429,
+          645
+        ]
+      ],
+      "transparentPixels": [
+        262853,
+        264341,
+        263087,
+        261840
+      ],
+      "frameRgbaSha256": [
+        "f70062572097da1b24f05b35b4fc2718b565bfc3a512fa8c0f43af50e0f5763a",
+        "c613ad13bc644664c315a31bbd343c0c6262baace96f10786e47d2f6e773d77f",
+        "7c83dd82b93ae464197a874c12566918b0506cbab0decb3079138214b5b9e545",
+        "cfd11b24f1ac7730f9bd1666b5c1e4d645c0d25101c0ba6a9c01debc9f3db233"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-down.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-down.png": "8898e0c45c2c35caf49e87f0c06e2288aa1057069a144bf17ea39bafb80b5f80"
+      },
+      "action": "review",
+      "direction": "down",
+      "phases": [
+        "read-hover",
+        "track-approach",
+        "tap",
+        "lift-recover"
+      ],
+      "requestedDimensions": [
+        1024,
+        1280
+      ],
+      "byteIdentityPreserved": true,
+      "footBounds": [
+        [
+          232,
+          591,
+          395,
+          657
+        ],
+        [
+          168,
+          591,
+          330,
+          657
+        ],
+        [
+          238,
+          591,
+          399,
+          645
+        ],
+        [
+          167,
+          591,
+          331,
+          645
+        ]
+      ]
+    },
+    "silver/review-right": {
+      "skin": "silver",
+      "state": "review-right",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-right.png",
+      "sourceImage": "exec-49188558-cc50-41d6-95a3-0442ee0461da.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "60ff2592fa2351bce3ba054a74eab2276b12429e2d69da6b0a8354f20c65381e",
+      "bytes": 967216,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.553476,
+          "originY": 0.950071,
+          "displayHeightRatio": 0.959626
+        },
+        {
+          "originX": 0.467914,
+          "originY": 0.951498,
+          "displayHeightRatio": 0.959626
+        },
+        {
+          "originX": 0.540998,
+          "originY": 0.932953,
+          "displayHeightRatio": 0.959626
+        },
+        {
+          "originX": 0.477718,
+          "originY": 0.932953,
+          "displayHeightRatio": 0.959626
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          129,
+          49,
+          457,
+          666
+        ],
+        [
+          95,
+          56,
+          417,
+          667
+        ],
+        [
+          131,
+          42,
+          454,
+          654
+        ],
+        [
+          85,
+          39,
+          417,
+          654
+        ]
+      ],
+      "transparentPixels": [
+        278248,
+        279161,
+        279725,
+        277139
+      ],
+      "frameRgbaSha256": [
+        "8002d78e0c9d370bd97b0eb6de981346ad4cef920fd2e39e3e62e8b7888aea0a",
+        "1b691287a87306cf283cf94599a3bb0d55afe405f55cdfd7304bb8af4d270f56",
+        "628a08d9dfc2c8090aa76c250879179a288cc62daa2f008effdea7f2d44bb6c4",
+        "a40172f1534faa949c6fa5027a65017aec6819064438db17fc94f3b088541ffc"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-right.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-right.png": "edc7fdb96c13062f44f8668bde605b1c1dfc717d73c9a81879ad3f2c8f47abd0"
+      },
+      "action": "review",
+      "direction": "right",
+      "phases": [
+        "read-hover",
+        "track-approach",
+        "tap",
+        "lift-recover"
+      ],
+      "requestedDimensions": [
+        1024,
+        1280
+      ],
+      "byteIdentityPreserved": true,
+      "footBounds": [
+        [
+          236,
+          591,
+          385,
+          666
+        ],
+        [
+          188,
+          591,
+          337,
+          667
+        ],
+        [
+          228,
+          591,
+          379,
+          654
+        ],
+        [
+          193,
+          591,
+          343,
+          654
+        ]
+      ]
+    },
+    "silver/review-left": {
+      "skin": "silver",
+      "state": "review-left",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-left.png",
+      "sourceImage": "exec-0637ed6c-93c6-41b1-95c7-e28b51d29bd0.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "6a2d96c6181da25527f22f6a4eb93c131b028556955dd5660dfbe16eb1e13f04",
+      "bytes": 1020786,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.527629,
+          "originY": 0.955777,
+          "displayHeightRatio": 0.951099
+        },
+        {
+          "originX": 0.459893,
+          "originY": 0.955777,
+          "displayHeightRatio": 0.951099
+        },
+        {
+          "originX": 0.532977,
+          "originY": 0.942939,
+          "displayHeightRatio": 0.951099
+        },
+        {
+          "originX": 0.458111,
+          "originY": 0.944365,
+          "displayHeightRatio": 0.951099
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          131,
+          49,
+          460,
+          670
+        ],
+        [
+          91,
+          54,
+          420,
+          670
+        ],
+        [
+          130,
+          42,
+          461,
+          661
+        ],
+        [
+          95,
+          43,
+          423,
+          662
+        ]
+      ],
+      "transparentPixels": [
+        272330,
+        275538,
+        274470,
+        273159
+      ],
+      "frameRgbaSha256": [
+        "6db35560c8a3a6b05890f0c9574eb98a069e112ae6ba8726e2b677ce8e436fb9",
+        "8bc6365a3dbf63240f49a0680b3ee096f3764f5558f081e0f1be1f591fc58846",
+        "5433f752bb16d0d6cd61b2395704b786e54fd5e48e6a414e47015d4d6bf3bf38",
+        "93313a540aa5f60c40adfe1b39383b9fc675e13cd6805165f3b707d2420c6377"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-left.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-left.png": "7556e3abb3e6db9b1831fb481af677436f1b7e2eed86e6ecc48f93ce4fbd4810"
+      },
+      "action": "review",
+      "direction": "left",
+      "phases": [
+        "read-hover",
+        "track-approach",
+        "tap",
+        "lift-recover"
+      ],
+      "requestedDimensions": [
+        1024,
+        1280
+      ],
+      "byteIdentityPreserved": true,
+      "additionalGeneratedReference": "silver/review-right",
+      "footBounds": [
+        [
+          217,
+          591,
+          375,
+          670
+        ],
+        [
+          179,
+          591,
+          337,
+          670
+        ],
+        [
+          219,
+          591,
+          379,
+          661
+        ],
+        [
+          178,
+          591,
+          336,
+          662
+        ]
+      ]
+    },
+    "silver/review-up": {
+      "skin": "silver",
+      "state": "review-up",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-silver-review-up.png",
+      "sourceImage": "exec-58c8f4a3-1f94-4137-a257-af07a26ee5fc.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "01f82afc8c2f43696f9b1dbe6f9c5db81252200d9b310dd9e0de8816d34b5798",
+      "bytes": 887487,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "frames": [
+        {
+          "originX": 0.540107,
+          "originY": 0.934379,
+          "displayHeightRatio": 0.998695
+        },
+        {
+          "originX": 0.473262,
+          "originY": 0.934379,
+          "displayHeightRatio": 0.998695
+        },
+        {
+          "originX": 0.545455,
+          "originY": 0.904422,
+          "displayHeightRatio": 0.998695
+        },
+        {
+          "originX": 0.475045,
+          "originY": 0.904422,
+          "displayHeightRatio": 0.998695
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          146,
+          52,
+          444,
+          655
+        ],
+        [
+          112,
+          76,
+          409,
+          655
+        ],
+        [
+          158,
+          56,
+          459,
+          634
+        ],
+        [
+          109,
+          34,
+          411,
+          634
+        ]
+      ],
+      "transparentPixels": [
+        275510,
+        281602,
+        282593,
+        274516
+      ],
+      "frameRgbaSha256": [
+        "ff247553dd22bf26aa760e078490cbbde976954e6af308f8b75e99ea115bfbca",
+        "5b430bb569802cf69db535b40a34bd855c5047ac1cea89d4c7e92503d609815a",
+        "3136119775d4e3147f11e4402685f241076b4a1f2b1b45e38b4729fa1bc81155",
+        "299cf717fe29fde4fa6693bc5ec91fe8bf0b69045f57c55419f078a89fda7240"
+      ],
+      "authoredReferences": [
+        "production-v2/player-silver-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-silver-direction-up.png": "ecd9e413c09791fc11f87136df925bcab0c4e2ff2b9d52216c2676de0f03f93e"
+      },
+      "action": "review",
+      "direction": "up",
+      "phases": [
+        "read-hover",
+        "track-approach",
+        "tap",
+        "lift-recover"
+      ],
+      "requestedDimensions": [
+        1024,
+        1280
+      ],
+      "byteIdentityPreserved": true,
+      "additionalGeneratedReference": "silver/review-right",
+      "footBounds": [
+        [
+          217,
+          591,
+          389,
+          655
+        ],
+        [
+          179,
+          591,
+          352,
+          655
+        ],
+        [
+          220,
+          591,
+          392,
+          634
+        ],
+        [
+          180,
+          591,
+          353,
+          634
+        ]
+      ]
     }
+  },
+  "reviewActions": {
+    "silver": [
+      "down",
+      "left",
+      "right",
+      "up"
+    ]
   }
 }

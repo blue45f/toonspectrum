@@ -10,6 +10,7 @@ const PUBLIC_ROOT = path.join(ROOT, "apps/web/public");
 export const DRAWN_ART_DIRECTORY = path.join(PUBLIC_ROOT, "assets/virtual-studio/drawn-characters-v1");
 const SKINS = ["pink", "silver", "dark", "purple"];
 const STATES = ["walk-down", "walk-left", "walk-right", "walk-up", "sit", "wave"];
+const REVIEW_DIRECTIONS = ["down", "left", "right", "up"];
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /** Decode the verified pack's bounded 8-bit non-interlaced RGBA PNGs, without native dependencies. */
@@ -56,7 +57,7 @@ export function verifyDrawnArtFramePixels(decoded, asset) {
   const hashes = [];
   for (let frame = 0; frame < 4; frame++) {
     const pixels = Buffer.alloc(fw * fh * 4);
-    const bounds = [fw, fh, 0, 0]; let transparent = 0;
+    const bounds = [fw, fh, 0, 0], footBounds = [fw, fh, 0, 0]; let transparent = 0;
     for (let y = 0; y < fh; y++) {
       const begin = (((frame >> 1) * fh + y) * width + (frame % 2) * fw) * 4;
       rgba.copy(pixels, y * fw * 4, begin, begin + fw * 4);
@@ -66,6 +67,10 @@ export function verifyDrawnArtFramePixels(decoded, asset) {
         if (alpha >= asset.alphaThreshold) {
           bounds[0] = Math.min(bounds[0], x); bounds[1] = Math.min(bounds[1], y);
           bounds[2] = Math.max(bounds[2], x + 1); bounds[3] = Math.max(bounds[3], y + 1);
+          if (y >= fh - 110) {
+            footBounds[0] = Math.min(footBounds[0], x); footBounds[1] = Math.min(footBounds[1], y);
+            footBounds[2] = Math.max(footBounds[2], x + 1); footBounds[3] = Math.max(footBounds[3], y + 1);
+          }
         }
       }
     }
@@ -78,6 +83,10 @@ export function verifyDrawnArtFramePixels(decoded, asset) {
     assert(geometry && [geometry.originX, geometry.originY].every((n) => Number.isFinite(n) && n >= 0 && n <= 1));
     assert(Number.isFinite(geometry.displayHeightRatio) && geometry.displayHeightRatio > .5 && geometry.displayHeightRatio < 1.5);
     assert(Math.abs(geometry.originY * fh - bounds[3]) < .01, "feet origin must match reviewed alpha baseline");
+    if (asset.state.startsWith("review-")) {
+      assert.deepEqual(footBounds, asset.footBounds[frame], "review foot pixels drifted");
+      assert(Math.abs(geometry.originX * fw - (footBounds[0] + footBounds[2]) / 2) < .01, "review foot origin must match shoe center");
+    }
     if (asset.state === "sit") assert(geometry.seatOriginY > 0 && geometry.seatOriginY < geometry.originY);
   }
   assert.deepEqual(hashes, asset.frameRgbaSha256, `${asset.url} decoded frame pixels drifted`);
@@ -87,11 +96,14 @@ export function verifyDrawnArtFramePixels(decoded, asset) {
 export async function verifyVirtualStudioDrawnArt({ artDirectory = DRAWN_ART_DIRECTORY } = {}) {
   const manifest = JSON.parse(await readFile(path.join(artDirectory, "art-manifest.json"), "utf8"));
   assert.equal(manifest.version, 1); assert.deepEqual(manifest.skins, SKINS);
-  assert.equal(Object.keys(manifest.assets).length, 24);
+  assert.equal(Object.keys(manifest.assets).length, 28);
+  assert.deepEqual(manifest.reviewActions, { silver: REVIEW_DIRECTIONS });
   assert(manifest.limitations.some((text) => text.includes("held poses")));
   let totalBytes = 0;
   const expectedFiles = ["art-manifest.json"];
-  for (const skin of SKINS) for (const state of STATES) {
+  const capabilities = SKINS.flatMap((skin) => STATES.map((state) => [skin, state]));
+  capabilities.push(...REVIEW_DIRECTIONS.map((direction) => ["silver", `review-${direction}`]));
+  for (const [skin, state] of capabilities) {
     const asset = manifest.assets[`${skin}/${state}`];
     assert(asset && asset.skin === skin && asset.state === state, `missing drawn capability ${skin}/${state}`);
     const name = `player-${skin}-${state}.png`; expectedFiles.push(name);
@@ -125,5 +137,20 @@ export async function verifyVirtualStudioDrawnArt({ artDirectory = DRAWN_ART_DIR
       }
     }
   }
-  return { assetCount: 24, frameCount: 96, totalBytes, decodedPixelsVerified: true, registryBindingsVerified: true };
+  assert(registry.includes("actions: { review: SILVER_DRAWN_REVIEWS }"), "silver review actions are not bound to skin registry");
+  const actionMatch = source.match(/export const SILVER_DRAWN_REVIEWS = ([\s\S]*?) satisfies Record/u);
+  assert(actionMatch, "missing SILVER_DRAWN_REVIEWS");
+  const actions = JSON.parse(actionMatch[1]);
+  assert.deepEqual(Object.keys(actions).sort(), REVIEW_DIRECTIONS);
+  for (const direction of REVIEW_DIRECTIONS) {
+    const asset = manifest.assets[`silver/review-${direction}`], binding = actions[direction];
+    assert.equal(binding.textureUrl, asset.url); assert.equal(binding.frameWidth, asset.frameWidth); assert.equal(binding.frameHeight, asset.frameHeight);
+    assert.deepEqual(binding.frames, asset.frames);
+    assert.equal(binding.start, 0); assert.equal(binding.end, 3); assert.equal(binding.technique, "drawn");
+    assert.equal(binding.frameRate, 5 / 3); assert.equal(binding.repeat, -1);
+    assert.deepEqual(asset.phases, ["read-hover", "track-approach", "tap", "lift-recover"]);
+    assert.equal(new Set(binding.frames.map((frame) => frame.displayHeightRatio)).size, 1, "stationary action scale must not pulse per frame");
+  }
+  return { assetCount: 28, frameCount: 112, basePoseAssetCount: 24, basePoseFrameCount: 96,
+    reviewAssetCount: 4, reviewFrameCount: 16, totalBytes, decodedPixelsVerified: true, registryBindingsVerified: true };
 }

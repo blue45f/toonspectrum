@@ -27,10 +27,14 @@ function syntheticPng(width, height) {
   return bytes;
 }
 
-test("verifies all 24 drawn sheets and 96 decoded frames against runtime bindings", async () => {
+test("preserves 24 base sheets/96 frames and verifies four silver review sheets/16 frames against runtime bindings", async () => {
   const result = await verifyVirtualStudioDrawnArt();
-  assert.equal(result.assetCount, 24);
-  assert.equal(result.frameCount, 96);
+  assert.equal(result.assetCount, 28);
+  assert.equal(result.frameCount, 112);
+  assert.equal(result.basePoseAssetCount, 24);
+  assert.equal(result.basePoseFrameCount, 96);
+  assert.equal(result.reviewAssetCount, 4);
+  assert.equal(result.reviewFrameCount, 16);
   assert.equal(result.registryBindingsVerified, true);
 });
 
@@ -51,6 +55,15 @@ test("rejects unsupported drawn PNG decoding instead of trusting recorded dimens
   const unsupported = Buffer.from(bytes); unsupported[28] = 1;
   assert.throws(() => decodeDrawnArtPng(unsupported), /non-interlaced 8-bit RGBA/u);
   assert.throws(() => decodeDrawnArtPng(bytes.subarray(0, 40)), /truncated/u);
+});
+
+test("rejects silver review horizontal foot drift against actual decoded shoe pixels", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const asset = structuredClone(manifest.assets["silver/review-up"]);
+  const decoded = decodeDrawnArtPng(await readFile(path.join(DRAWN_ART_DIRECTORY, "player-silver-review-up.png")));
+  verifyDrawnArtFramePixels(decoded, asset);
+  asset.frames[2].originX += .03;
+  assert.throws(() => verifyDrawnArtFramePixels(decoded, asset), /review foot origin/u);
 });
 
 async function createFixture(context, { dimensions = [10, 12], sha256 } = {}) {
@@ -76,7 +89,9 @@ test("verifies every current production-v2 output without claiming source revali
   const assets = new Map(result.assets.map((asset) => [asset.name, asset]));
 
   assert.equal(result.assetCount, 36);
-  assert.equal(result.drawnArt.assetCount, 24);
+  assert.equal(result.drawnArt.assetCount, 28);
+  assert.equal(result.drawnArt.basePoseFrameCount, 96);
+  assert.equal(result.drawnArt.reviewFrameCount, 16);
   assert.equal(result.drawnArt.decodedPixelsVerified, true);
   assert(result.totalBytes > 0);
   assert.equal(result.outputIntegrityVerified, true);

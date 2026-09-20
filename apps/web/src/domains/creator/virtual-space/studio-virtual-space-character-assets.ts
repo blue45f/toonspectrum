@@ -1,8 +1,10 @@
 import {
   studioCharacterWalkClip,
+  studioCharacterActionClip,
   type StudioCharacterMotionState,
   type StudioCharacterSkin,
   type StudioCharacterFramePresentation,
+  type StudioCharacterAtlasClip,
 } from "./studio-virtual-space-character-skins";
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import { STUDIO_CHARACTER_FOOT_ORIGIN } from "./studio-virtual-space-presentation";
@@ -32,6 +34,14 @@ export const studioCharacterWalkAnimationKey = (skin: StudioCharacterSkin, facin
   `studio-player-${skin.key}-walk-animation-${facing}`;
 export const studioCharacterPoseTextureKey = (skin: StudioCharacterSkin, state: "sit" | "wave") =>
   `studio-player-${skin.key}-pose-sheet-${state}`;
+export const studioCharacterActionTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing, state: StudioCharacterMotionState) =>
+  `studio-player-${skin.key}-${state}-sheet-${facing}`;
+
+/** Local scene time drives actions; floor distance only drives walking. */
+export function studioCharacterActionFrame(clip: StudioCharacterAtlasClip, elapsedMs: number, reducedMotion: boolean): number {
+  if (reducedMotion || !Number.isFinite(elapsedMs) || elapsedMs <= 0) return clip.start;
+  return clip.start + Math.floor(elapsedMs * clip.frameRate / 1_000) % (clip.end - clip.start + 1);
+}
 
 export function studioCharacterFrameGeometry(
   frame: StudioCharacterFramePresentation | undefined,
@@ -69,6 +79,9 @@ export function studioCharacterVisualAssets(
   if (clip) assets.push({ key: studioCharacterWalkTextureKey(skin, facing), url: clip.textureUrl,
     type: "spritesheet", frameWidth: clip.frameWidth, frameHeight: clip.frameHeight,
     animationKey: studioCharacterWalkAnimationKey(skin, facing) });
+  const action = studioCharacterActionClip(skin, facing, state);
+  if (action) assets.push({ key: studioCharacterActionTextureKey(skin, facing, state), url: action.textureUrl,
+    type: "spritesheet", frameWidth: action.frameWidth, frameHeight: action.frameHeight });
   const pose = state === "sit" || state === "wave" ? skin.poses?.[state] : undefined;
   if (pose) assets.push({ key: studioCharacterPoseTextureKey(skin, state as "sit" | "wave"), url: pose.textureUrl,
     type: "spritesheet", frameWidth: pose.frameWidth, frameHeight: pose.frameHeight });

@@ -25,6 +25,30 @@ const advance = (director: StudioNpcDirector, seconds: number, env = balanced) =
 };
 
 describe("authored NPC activities", () => {
+  it("performs silver's real review action in every authored direction and returns to floor movement on exit", () => {
+    for (const facing of ["down", "left", "right", "up"] as const) {
+      const m = fixture();
+      const review = { ...anchor, facing, activity: "inspect" as const, animation: "review" as const, seatAttachmentPoint: undefined };
+      const world = { ...m, npcActivityAnchors: [review], npcs: [{ ...m.npcs[0]!, skinKey: "silver" }] };
+      expect(validateStudioWorldManifest(world)).toEqual([]);
+      const director = new StudioNpcDirector(world);
+      let performed = false, exited = false;
+      for (let frame = 0; frame < 20 * 60; frame++) {
+        const [view] = director.advance(1 / 60, balanced);
+        if (view!.activityStage === "perform") {
+          performed = true;
+          expect(view!.animation).toBe("review"); expect(view!.facing).toBe(facing);
+          expect(view!.moving).toBe(false); expect(view!.seatAttachmentPoint).toBeUndefined();
+        }
+        if (performed && view!.activityStage === "exit" && view!.moving) {
+          exited = true; expect(view!.animation).toBe("walk"); break;
+        }
+      }
+      expect(performed).toBe(true); expect(exited).toBe(true); director.dispose();
+    }
+    const writer = DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors!.filter((activity) => activity.id.startsWith("studio-writer-"));
+    expect(writer.map((activity) => activity.animation)).toEqual(["review", "review", "idle"]);
+  });
   it("validates real floor reachability, durations, furniture attachment and available skin clips", () => {
     const m = fixture(); expect(validateStudioWorldManifest(m)).toEqual([]);
     for (const changed of [
