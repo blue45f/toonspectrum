@@ -1,15 +1,8 @@
-import { expect, test as base, type Page } from "@playwright/test";
+import { expect, test as base } from "@playwright/test";
 
-/** Public journeys first dismiss the real first-visit event through its visible control. */
-export async function installBetaEventDismissal(page: Page): Promise<void> {
-  const gate = page.locator('[role="dialog"][aria-labelledby="beta-open-gate-title"]');
-  await page.addLocatorHandler(gate, async () => {
-    const close = gate.getByRole("button", { name: /^(베타 이벤트 닫기|Close beta event)$/u });
-    await expect(close).toBeVisible();
-    await close.click();
-    await expect(gate).toBeHidden();
-  });
-}
+import { installBetaEventDismissal } from "../../scripts/lib/public-page-event-gate.mjs";
+
+export { installBetaEventDismissal };
 
 export const test = base.extend<{ dismissBetaEvent: boolean }>({
   // Dedicated gate tests opt out so first exposure, keyboard close and persistence stay covered.

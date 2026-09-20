@@ -23,7 +23,6 @@ import {
   getCreatorContinuitySnapshot,
   subscribeCreatorContinuity,
 } from "@/shared/lib/creator-continuity";
-import { creatorDestinationDescription } from "@/shared/lib/creator-continuity-destinations";
 import { useI18n } from "@/shared/lib/i18n";
 import {
   PRODUCT_START_DESTINATIONS,
@@ -146,24 +145,11 @@ export function ProductIntentStart() {
         </nav>
       </div>
       <aside>
-        <p><Clock3 size={16} aria-hidden="true" />{copy.recent}</p>
-        <Link className="cf-recent-card" href={recent?.href ?? "/studio/projects"}>
-          <strong>{recent ? creatorDestinationLabel(recent.id, locale) : copy.fallback}</strong>
-          <span>{recent ? creatorRecentDestinationDescription(recent, locale) : copy.fallbackBody}</span>
-          {recent && now > 0 ? <small>{formatCreatorRelativeTime(recent.visitedAt, locale, now)}</small> : null}
-          {recent ? <WorkflowTrustBadge state="resume-ready" locale={locale} className="w-fit" /> : null}
-          <ArrowRight size={18} aria-hidden="true" />
-        </Link>
-        <Link className="cf-link" href="/studio/projects">
-          {copy.all}
-          <ArrowRight size={15} aria-hidden="true" />
-        </Link>
-
         <div className="cf-intent-recent">
           <p><Clock3 size={16} aria-hidden="true" />{copy.recent}</p>
           <Link className="cf-recent-card" href={recent?.href ?? "/studio/projects"}>
             <strong>{recent ? creatorDestinationLabel(recent.id, locale) : copy.fallback}</strong>
-            <span>{recent ? creatorDestinationDescription(recent.id, locale) : copy.fallbackBody}</span>
+            <span>{recent ? creatorRecentDestinationDescription(recent, locale) : copy.fallbackBody}</span>
             {recent && now > 0 ? <small>{formatCreatorRelativeTime(recent.visitedAt, locale, now)}</small> : null}
             {recent ? <WorkflowTrustBadge state="resume-ready" locale={locale} className="w-fit" /> : null}
             <ArrowRight size={18} aria-hidden="true" />

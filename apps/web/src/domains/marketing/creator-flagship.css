@@ -252,8 +252,8 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
 .creator-flagship .cf-intent { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; border-top: 1px solid var(--cf-line); }
 .creator-flagship .cf-intent h2 { font-size: 22px; letter-spacing: -.04em; }
 .creator-flagship .cf-intent-search { display: flex; align-items: center; gap: 10px; min-height: 46px; width: 100%; padding: 10px 12px; border: 1px solid var(--cf-line); border-radius: 7px; background: var(--cf-paper); color: var(--cf-muted); margin: 18px 0; text-align: left; font-size: 12px; }
-.creator-flagship .cf-intent nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
-.creator-flagship .cf-intent nav a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-size: 12px; }
+.creator-flagship .cf-intent nav:not(.cf-intent-visual-nav) { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.creator-flagship .cf-intent nav:not(.cf-intent-visual-nav) a { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; font-size: 12px; }
 .creator-flagship .cf-intent aside>p { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 650; margin-bottom: 12px; }
 .creator-flagship .cf-recent-card { display: grid; gap: 8px; background: var(--cf-raised); border-radius: 7px; padding: 18px; }
 .creator-flagship .cf-recent-card strong { font-size: 14px; overflow-wrap: anywhere; }

@@ -42,6 +42,7 @@ on:
       - 'e2e/non-studio-experience.spec.ts'
       - 'e2e/beta-open-event-gate.spec.ts'
       - 'e2e/fixtures/non-studio-test.ts'
+      - 'scripts/lib/public-page-event-gate.mjs'
       - 'e2e/non-studio-controls.spec.ts'
       - 'e2e/non-studio-search-layout.spec.ts'
       - 'e2e/creator-flagship.spec.ts'
