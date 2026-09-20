@@ -215,6 +215,7 @@ packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts
 packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
+packages/studio-project-model/src/__tests__/review-source-map.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs
@@ -223,6 +224,7 @@ scripts/lib/studio-3d-production-audit-policy.test.mjs
 scripts/lib/studio-inapp-sweep-harness.test.ts
 scripts/lib/studio-memory-growth-policy.test.mjs
 scripts/lib/studio-p2p-failure-diagnostics.test.ts
+scripts/lib/studio-verify-shape-readiness.test.tsx
 scripts/pigment-dependency-install-policy.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/verify-studio-3d-console.test.ts

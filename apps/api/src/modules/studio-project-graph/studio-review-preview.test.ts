@@ -47,7 +47,7 @@ describe("pinned preview storage authority", () => {
     db.query.mockResolvedValueOnce({ rows: [access] }).mockResolvedValueOnce({ rows: [binding] })
       .mockResolvedValueOnce({ rows: [blob] });
     const result = await new StudioProjectGraphRepository().getReviewPreviewSource("owner", subject, null);
-    expect(result).toEqual({ subject, blobs: [blob], nextCursor: null });
+    expect(result).toEqual({ subject, blobs: [blob], nextCursor: null, pageMappings: { 0: { status: "unmapped", reason: "legacy-review" } } });
     expect(db.query.mock.calls[0]?.[1]).toEqual([subject.artifactId, "owner"]);
     expect(db.query.mock.calls[1]?.[1]).toEqual([subject.reviewId, subject.artifactId]);
     expect(db.query.mock.calls[2]?.[1]).toEqual([subject.revisionId, -1, "", 33, subject.workId]);
@@ -78,7 +78,7 @@ describe("pinned preview storage authority", () => {
     db.query.mockResolvedValueOnce({ rows: [access] }).mockResolvedValueOnce({ rows: [{ ...binding, status }] })
       .mockResolvedValueOnce({ rows: [blob] });
     await expect(new StudioProjectGraphRepository().getReviewPreviewSource("owner", subject, null))
-      .resolves.toEqual({ subject, blobs: [blob], nextCursor: null });
+      .resolves.toEqual({ subject, blobs: [blob], nextCursor: null, pageMappings: { 0: { status: "unmapped", reason: "legacy-review" } } });
   });
 
   it("paginates immutable ordinals without changing the source", async () => {

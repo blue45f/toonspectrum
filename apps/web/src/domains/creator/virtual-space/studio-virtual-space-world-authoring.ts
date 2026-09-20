@@ -6,6 +6,7 @@ import {
   validateStudioWorldManifest,
   type StudioVirtualSpaceWorldManifest,
 } from "./studio-virtual-space-world-manifest";
+import { studioNpcActivityTiledProperties } from "./studio-virtual-space-npc-activity";
 
 const WORLD_DRAFT_PREFIX = "toonspectrum:virtual-studio-world-draft:v1";
 
@@ -213,6 +214,12 @@ export function studioWorldManifestToTiledMap(
         ...(slot.seatAttachmentPoint ? { seatX: slot.seatAttachmentPoint.x, seatY: slot.seatAttachmentPoint.y } : {}),
         facing: slot.facing, radius: slot.radius },
     ))),
+    objectLayer("acoustic-zones", (manifest.acousticZones ?? []).map((zone) => object(
+      zone.id, zone.x, zone.y, zone.width, zone.height, { roomId: zone.roomId, policy: zone.policy, doorId: zone.doorId },
+    ))),
+    objectLayer("npc-activity-anchors", (manifest.npcActivityAnchors ?? []).map((a) => object(
+      a.id, a.approachPoint.x, a.approachPoint.y, 0, 0, studioNpcActivityTiledProperties(a),
+    ))),
     objectLayer("npcs", manifest.npcs.map((npc) => object(
       npc.id,
       npc.point.x,
@@ -226,6 +233,7 @@ export function studioWorldManifestToTiledMap(
         scale: npc.scale,
         speed: npc.speed,
         behavior: npc.behavior,
+        activityAnchorIds: npc.activityAnchorIds?.join(";"),
         patrol: npc.patrol?.map((point) => `${point.x},${point.y}`).join(";"),
       },
     ))),

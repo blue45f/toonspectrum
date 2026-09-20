@@ -1,5 +1,6 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
+import { studioAcousticScope, type StudioAcousticPolicyPort } from "./studio-virtual-space-acoustics";
 import {
   parseStudioVirtualSpaceReviewSubject, sameStudioVirtualSpaceReviewSubject,
   type StudioVirtualSpaceReviewSubject,
@@ -64,6 +65,8 @@ export interface StudioVirtualSpaceSocialDependencies {
   readonly clearInterval?: (handle: unknown) => void;
   /** Consent notification only. The caller owns local movement, UI and permissions. */
   readonly onAccepted?: (request: StudioVirtualSpaceSocialRequest) => void;
+  readonly onEnded?: (request: StudioVirtualSpaceSocialRequest) => void;
+  readonly acoustics?: StudioAcousticPolicyPort;
   /** Fresh server reads for the local actor, not permissions claimed by the remote participant. */
   readonly authorizeReview?: (subject: StudioVirtualSpaceReviewSubject, intent: "propose" | "receive") => Promise<boolean>;
 }
@@ -178,19 +181,23 @@ function immutableRequest(request: StudioVirtualSpaceSocialRequest): StudioVirtu
 export class StudioVirtualSpaceSocialController {
   private readonly epoch: string;
   private readonly records = new Map<string, StudioVirtualSpaceSocialRequest>();
+  private readonly acousticZones = new Map<string, string>();
+  private readonly acousticReleases = new Map<string, () => void>();
   private readonly peers = new Map<string, PeerEpoch>();
   private readonly blockedPeers = new Set<string>();
   private readonly greetings = new Map<string, StudioVirtualSpaceGreeting>();
   private readonly lastGreetingAt = new Map<string, number>();
   private readonly listeners = new Set<() => void>();
   private readonly lastRequestAt = new Map<string, number>();
-  private readonly reviewProposals = new Set<string>();
+  private readonly reviewProposals = new Map<string, { readonly acousticZone: string; valid: boolean }>();
   private readonly reviewValidations = new Set<string>();
   private sequence = 0;
   private linkGeneration = 0;
   private proposalGeneration = 0;
+  private spatialReadiness = "";
   private closed = false;
   private unsubscribe: (() => void) | null = null;
+  private unsubscribeAcoustics: (() => void) | null = null;
   private timer: unknown | null = null;
 
   constructor(
@@ -204,7 +211,7 @@ export class StudioVirtualSpaceSocialController {
       || !safeId(world.worldId) || !safeId(world.contentRevision)) {
       throw new Error("Invalid virtual studio social identity");
     }
-    this.world = Object.freeze({ ...world });
+    this.world = Object.freeze({ worldId: world.worldId, contentRevision: world.contentRevision });
     this.participant = Object.freeze({ ...participant });
   }
 
@@ -216,14 +223,24 @@ export class StudioVirtualSpaceSocialController {
   }
 
   private now(): number { return this.dependencies.now?.() ?? Date.now(); }
+  private acousticScope(peerId: string, phase: "enter" | "retain", id?: string): string | null {
+    return studioAcousticScope(this.dependencies.acoustics, this.world, [this.participant.sessionId, peerId], phase,
+      id ? this.acousticZones.get(id) : undefined);
+  }
+
+  private pinAcousticScope(id: string, peerId: string, zone: string): void {
+    this.acousticZones.set(id, zone);
+    const release = this.dependencies.acoustics?.acquireScope?.([this.participant.sessionId, peerId]);
+    if (release) this.acousticReleases.set(id, release);
+  }
 
   snapshot(): StudioVirtualSpaceSocialSnapshot {
     return Object.freeze({
       requests: Object.freeze([...this.records.values()].map(immutableRequest).reverse()),
-      readyPeerIds: Object.freeze([...this.peers].filter(([, peer]) => peer.epoch !== null).map(([id]) => id)),
-      reviewReadyPeerIds: Object.freeze([...this.peers].filter(([, peer]) => peer.epoch !== null && peer.reviewReady).map(([id]) => id)),
+      readyPeerIds: Object.freeze([...this.peers].filter(([id, peer]) => peer.epoch !== null && this.acousticScope(id, "enter") !== null).map(([id]) => id)),
+      reviewReadyPeerIds: Object.freeze([...this.peers].filter(([id, peer]) => peer.epoch !== null && peer.reviewReady && this.acousticScope(id, "enter") !== null).map(([id]) => id)),
       blockedPeerIds: Object.freeze([...this.blockedPeers]),
-      greetingReadyPeerIds: Object.freeze([...this.peers].filter(([, peer]) => peer.epoch !== null && peer.greetingReady).map(([id]) => id)),
+      greetingReadyPeerIds: Object.freeze([...this.peers].filter(([id, peer]) => peer.epoch !== null && peer.greetingReady && this.acousticScope(id, "enter") !== null).map(([id]) => id)),
       greetings: Object.freeze([...this.greetings.values()].reverse()),
       available: !this.closed && this.unsubscribe !== null && this.participant.role !== "viewer",
     });
@@ -238,6 +255,7 @@ export class StudioVirtualSpaceSocialController {
   start(): void {
     if (this.closed || this.unsubscribe || this.participant.role === "viewer") return;
     this.unsubscribe = this.port.subscribe((sender, raw) => this.receive(sender, raw));
+    this.unsubscribeAcoustics = this.dependencies.acoustics?.subscribe(() => this.syncPeers()) ?? null;
     this.syncPeers();
     this.timer = this.dependencies.setInterval
       ? this.dependencies.setInterval(() => this.syncPeers(), TICK_MS)
@@ -271,7 +289,15 @@ export class StudioVirtualSpaceSocialController {
         peer.reviewHelloSent = this.send(id, "hello", null, undefined, STUDIO_VIRTUAL_SPACE_SOCIAL_REVIEW_WIRE);
       }
     }
+    // A pending permission read must not carry the user's click across a spatial revocation,
+    // even when the same public room or direct binding recovers before that read completes.
+    for (const [id, attempt] of this.reviewProposals) {
+      if (this.acousticScope(id, "enter") !== attempt.acousticZone) attempt.valid = false;
+    }
     for (const request of this.records.values()) {
+      if ((pending(request) || request.status === "accepted") && this.acousticScope(request.peer.sessionId, "retain", request.id) === null) {
+        this.cancel(request.id); changed = true; continue;
+      }
       if (pending(request) && request.expiresAt <= this.now()) {
         this.setStatus(request.id, "expired");
         this.send(request.peer.sessionId, "expire", this.peers.get(request.peer.sessionId)?.epoch ?? null, request);
@@ -284,6 +310,10 @@ export class StudioVirtualSpaceSocialController {
         this.greetings.set(id, Object.freeze({ ...greeting, status: "failed" })); changed = true;
       }
     }
+    if (this.dependencies.acoustics) {
+      const ready = JSON.stringify([...this.peers].filter(([id, peer]) => peer.epoch && this.acousticScope(id, "enter") !== null).map(([id]) => id));
+      if (ready !== this.spatialReadiness) { this.spatialReadiness = ready; changed = true; }
+    }
     if (changed) this.emit();
   }
 
@@ -295,14 +325,17 @@ export class StudioVirtualSpaceSocialController {
   async requestReview(targetSessionId: string, rawSubject: StudioVirtualSpaceReviewSubject, signal?: AbortSignal): Promise<string | null> {
     const subject = parseStudioVirtualSpaceReviewSubject(rawSubject);
     const peer = this.peers.get(targetSessionId);
-    if (signal?.aborted || !subject || !this.snapshot().available || !peer?.reviewReady
+    const acousticZone = this.acousticScope(targetSessionId, "enter");
+    if (signal?.aborted || !subject || !this.snapshot().available || !peer?.reviewReady || acousticZone === null
       || this.reviewProposals.has(targetSessionId) || this.reviewProposals.size >= STUDIO_VIRTUAL_SPACE_SOCIAL_MAX_PENDING) return null;
-    this.reviewProposals.add(targetSessionId);
+    const spatialAttempt = { acousticZone, valid: true };
+    this.reviewProposals.set(targetSessionId, spatialAttempt);
     const startedAt = this.now();
     const remoteEpoch = peer.epoch, proposalGeneration = this.proposalGeneration;
     try {
       const allowed = await this.authorizeReview(subject, "propose");
-      if (proposalGeneration !== this.proposalGeneration || signal?.aborted || !allowed || this.closed || this.peers.get(targetSessionId) !== peer || peer.epoch !== remoteEpoch
+      if (proposalGeneration !== this.proposalGeneration || !spatialAttempt.valid || signal?.aborted || !allowed || this.closed || this.peers.get(targetSessionId) !== peer || peer.epoch !== remoteEpoch
+        || this.acousticScope(targetSessionId, "enter") !== acousticZone
         || this.now() < startedAt || this.now() - startedAt >= STUDIO_VIRTUAL_SPACE_SOCIAL_TTL_MS) return null;
       return this.createRequest(targetSessionId, "review", subject);
     } finally { this.reviewProposals.delete(targetSessionId); }
@@ -315,7 +348,9 @@ export class StudioVirtualSpaceSocialController {
     const peer = this.availablePeers().find((candidate) => candidate.sessionId === targetSessionId);
     const epoch = this.peers.get(targetSessionId)?.epoch;
     const outstanding = [...this.records.values()].filter(pending);
+    const acousticZone = this.acousticScope(targetSessionId, "enter");
     if (!peer || !epoch || outstanding.length >= STUDIO_VIRTUAL_SPACE_SOCIAL_MAX_PENDING
+      || acousticZone === null
       || outstanding.some((request) => request.peer.sessionId === targetSessionId)
       || this.now() - (this.lastRequestAt.get(targetSessionId) ?? -Infinity) < 1_000) return null;
     const id = `${this.peers.get(targetSessionId)?.localEpoch}.${this.sequence + 1}`;
@@ -325,6 +360,7 @@ export class StudioVirtualSpaceSocialController {
       ...(reviewSubject ? { reviewSubject } : {}),
     });
     if (!this.store(request)) return null;
+    this.pinAcousticScope(id, targetSessionId, acousticZone);
     this.lastRequestAt.set(targetSessionId, this.now());
     const sent = this.send(targetSessionId, "request", epoch, request);
     if (!sent) this.setStatus(id, "failed");
@@ -358,6 +394,7 @@ export class StudioVirtualSpaceSocialController {
     this.syncPeers();
     const request = this.records.get(id);
     if (!request || request.direction !== "incoming" || request.status !== "offered") return false;
+    if (response === "accept" && this.acousticScope(request.peer.sessionId, "enter", id) === null) { this.cancel(id); return false; }
     this.setStatus(id, response === "accept" ? "accepting" : "declined");
     const sent = this.send(request.peer.sessionId, response,
       this.peers.get(request.peer.sessionId)?.epoch ?? null, request);
@@ -402,6 +439,7 @@ export class StudioVirtualSpaceSocialController {
     const epoch = this.peers.get(id);
     const peer = this.availablePeers().find((item) => item.sessionId === id);
     if (!this.snapshot().available || !peer || !epoch?.greetingReady || !epoch.epoch
+      || this.acousticScope(id, "enter") === null
       || this.now() - (this.lastGreetingAt.get(`out:${id}`) ?? -Infinity) < 2_000) return false;
     const requestId = `${epoch.localEpoch}.${this.sequence + 1}`;
     this.lastGreetingAt.set(`out:${id}`, this.now());
@@ -504,6 +542,7 @@ export class StudioVirtualSpaceSocialController {
     peer.sequence = packet.sequence;
     if (packet.kind === "greet" || packet.kind === "greet-ack") {
       if (!peer.greetingReady || !packet.requestId) return;
+      if (this.acousticScope(actualPeer.sessionId, "enter") === null) return;
       if (packet.kind === "greet") {
         if (this.now() - (this.lastGreetingAt.get(`in:${actualPeer.sessionId}`) ?? -Infinity) < 2_000) return;
         this.lastGreetingAt.set(`in:${actualPeer.sessionId}`, this.now());
@@ -535,6 +574,9 @@ export class StudioVirtualSpaceSocialController {
         this.send(actualPeer.sessionId, "decline", peer.epoch, request);
         return;
       }
+      const acousticZone = this.acousticScope(actualPeer.sessionId, "enter");
+      if (acousticZone === null) { this.respond(request.id, "decline"); return; }
+      this.pinAcousticScope(request.id, actualPeer.sessionId, acousticZone);
       if ((competing && (competing.direction === "incoming" || competing.id < request.id))
         || outstanding.length >= STUDIO_VIRTUAL_SPACE_SOCIAL_MAX_PENDING) {
         this.respond(request.id, "decline");
@@ -558,12 +600,14 @@ export class StudioVirtualSpaceSocialController {
     if (packet.kind === "cancel" || packet.kind === "expire" || packet.kind === "decline") {
       this.setStatus(request.id, packet.kind === "cancel" ? "cancelled" : packet.kind === "expire" ? "expired" : "declined");
     } else if (packet.kind === "accept" && request.direction === "outgoing" && request.status === "offered") {
+      if (this.acousticScope(actualPeer.sessionId, "enter", request.id) === null) { this.cancel(request.id); return; }
       if (request.reviewSubject) { void this.completeReviewConsent(request, "propose"); return; }
       // Establish local state before send; fake ports and embedded transports may deliver synchronously.
       this.setStatus(request.id, "accepting");
       if (this.send(actualPeer.sessionId, "commit", peer.epoch, request)) this.accept(request.id);
       else this.setStatus(request.id, "failed");
     } else if (packet.kind === "commit" && request.direction === "incoming" && request.status === "accepting") {
+      if (this.acousticScope(actualPeer.sessionId, "enter", request.id) === null) { this.cancel(request.id); return; }
       if (request.reviewSubject) { void this.completeReviewConsent(request, "receive"); return; }
       this.accept(request.id);
     }
@@ -582,7 +626,7 @@ export class StudioVirtualSpaceSocialController {
       this.syncPeers();
       const current = this.records.get(request.id);
       if (this.closed || !current || !pending(current)) return;
-      if (!allowed) { this.cancel(request.id); return; }
+      if (!allowed || this.acousticScope(request.peer.sessionId, "enter", request.id) === null) { this.cancel(request.id); return; }
       if (intent === "propose") {
         if (current.status !== "offered") return;
         this.setStatus(request.id, "accepting");
@@ -596,6 +640,7 @@ export class StudioVirtualSpaceSocialController {
   private accept(id: string): void {
     const request = this.records.get(id);
     if (!request || request.status !== "accepting") return;
+    if (this.acousticScope(request.peer.sessionId, "enter", id) === null) { this.cancel(id); return; }
     this.setStatus(id, "accepted");
     const accepted = this.records.get(id);
     if (accepted) this.dependencies.onAccepted?.(immutableRequest(accepted));
@@ -610,6 +655,7 @@ export class StudioVirtualSpaceSocialController {
       );
       if (!oldestTerminal) return false;
       this.records.delete(oldestTerminal.id);
+      this.acousticZones.delete(oldestTerminal.id);
     }
     this.records.set(request.id, request);
     return true;
@@ -618,6 +664,10 @@ export class StudioVirtualSpaceSocialController {
   private setStatus(id: string, status: StudioVirtualSpaceSocialStatus): void {
     const request = this.records.get(id);
     if (request) this.records.set(id, immutableRequest({ ...request, status }));
+    if (status !== "offered" && status !== "accepting" && status !== "accepted") {
+      this.acousticReleases.get(id)?.(); this.acousticReleases.delete(id);
+    }
+    if (request?.status === "accepted" && status !== "accepted") this.dependencies.onEnded?.(immutableRequest({ ...request, status }));
   }
 
   private endPeerRequests(peerId: string, status: "disconnected" | "cancelled"): void {
@@ -638,6 +688,7 @@ export class StudioVirtualSpaceSocialController {
     this.closed = true;
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.unsubscribeAcoustics?.(); this.unsubscribeAcoustics = null;
     if (this.timer !== null) {
       if (this.dependencies.clearInterval) this.dependencies.clearInterval(this.timer);
       else globalThis.clearInterval(this.timer as ReturnType<typeof setInterval>);

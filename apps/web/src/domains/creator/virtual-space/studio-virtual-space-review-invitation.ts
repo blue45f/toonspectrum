@@ -132,6 +132,40 @@ export type StudioVirtualSpaceReviewChoices = {
   readonly truncated: boolean;
 } | { readonly ok: false; readonly reason: StudioVirtualSpaceReviewFailure };
 
+/** Readable history for one pinned artifact. Closed reviews may be compared, never reinvited. */
+export async function listStudioVirtualSpaceReviewHistory(
+  rawSubject: unknown,
+  authority: StudioVirtualSpaceReviewAuthority = SERVER_AUTHORITY,
+): Promise<StudioVirtualSpaceReviewChoices> {
+  const current = await verifyStudioVirtualSpaceReviewSubject(rawSubject, "view", authority);
+  if (!current.ok) return current;
+  try {
+    const { subject, project } = current;
+    const artifact = project.artifacts.find((item) => item.id === subject.artifactId)!;
+    const [reviews, revisions] = await Promise.all([
+      authority.listReviews(subject.artifactId), authority.listRevisions(subject.artifactId),
+    ]);
+    const now = authority.now ?? Date.now;
+    if (now() >= current.expiresAt || now() < current.verifiedAt) return failure("unavailable");
+    const indexed = new Map(revisions.map((revision) => [revision.id, revision]));
+    const seen = new Set<string>();
+    const choices: StudioVirtualSpaceReviewChoice[] = [];
+    let truncated = false;
+    for (const review of [...reviews].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))) {
+      if (review.id === subject.reviewId || review.artifactId !== subject.artifactId || seen.has(review.id)) continue;
+      seen.add(review.id);
+      const revision = indexed.get(review.revisionId);
+      if (!revision || revision.kind !== "review-snapshot" || revision.artifactId !== subject.artifactId) continue;
+      const candidate = parseStudioVirtualSpaceReviewSubject({ ...subject, reviewId: review.id,
+        revisionId: revision.id, rootGraphHash: revision.rootGraphHash });
+      if (!candidate) continue;
+      if (choices.length >= MAX_SUBJECTS) { truncated = true; break; }
+      choices.push(Object.freeze({ subject: candidate, title: review.title, artifactTitle: artifact.title, createdAt: review.createdAt }));
+    }
+    return Object.freeze({ ok: true, choices: Object.freeze(choices), truncated });
+  } catch (error) { return serverFailure(error); }
+}
+
 /** Existing immutable snapshots only. Discovery neither creates reviews nor promotes local work. */
 export async function listStudioVirtualSpaceReviewSubjects(
   workId: string,

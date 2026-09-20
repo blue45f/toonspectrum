@@ -1,5 +1,6 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
+import { studioAcousticScope, type StudioAcousticPolicyPort } from "./studio-virtual-space-acoustics";
 
 export const STUDIO_CONVERSATION_WIRE = "toonspectrum-space-conversation-v1";
 export const STUDIO_CONVERSATION_PROPOSAL_TTL = 20_000;
@@ -54,6 +55,7 @@ export interface StudioConversationDependencies {
   readonly clearInterval?: (handle: unknown) => void;
   readonly onReady?: (scope: StudioConversationScope) => void;
   readonly onClosed?: (scope: StudioConversationScope) => void;
+  readonly acoustics?: StudioAcousticPolicyPort;
 }
 
 const safeId = (value: unknown, limit = 160): value is string => typeof value === "string"
@@ -108,6 +110,8 @@ interface PeerEpoch {
 }
 interface RecordState {
   proposal: Proposal;
+  acousticZone: string;
+  releaseAcoustics?: () => void;
   status: StudioConversationStatus;
   localAccepted: boolean;
   votes: Set<string>;
@@ -132,6 +136,7 @@ export class StudioVirtualConversationController {
   private activeId: string | null = null;
   private closed = false;
   private unsubscribe: (() => void) | null = null;
+  private unsubscribeAcoustics: (() => void) | null = null;
   private timer: unknown;
 
   constructor(private readonly self: StudioLiveParticipant, private readonly port: StudioLiveDirectPort,
@@ -139,23 +144,28 @@ export class StudioVirtualConversationController {
     private readonly dependencies: StudioConversationDependencies = {}) {
     this.instanceId = dependencies.instanceId ?? globalThis.crypto.randomUUID();
     if (!safeId(self.sessionId) || !safeId(this.instanceId, 64) || !safeId(world.worldId) || !/^[a-f0-9]{64}$/u.test(world.contentRevision)) throw new TypeError("Invalid conversation identity");
-    this.self = Object.freeze({ ...self }); this.world = Object.freeze({ ...world });
+    this.self = Object.freeze({ ...self }); this.world = Object.freeze({ worldId: world.worldId, contentRevision: world.contentRevision });
   }
   private now() { return this.dependencies.now?.() ?? performance.now(); }
   private availablePeers() { return this.port.getPeers().filter((peer) => peer.sessionId !== this.self.sessionId && peer.role !== "viewer" && safeId(peer.sessionId) && !this.blocked.has(peer.sessionId)).slice(0, MAX_PEERS); }
   private newPeer(): PeerEpoch { return { localEpoch: `${this.instanceId}:${++this.linkGeneration}`, epoch: null, instanceId: null, sequence: 0, lastProposal: 0, retired: new Set(), helloSent: false, windowAt: this.now(), count: 0 }; }
   private memberReady(id: string) { return id === this.self.sessionId || Boolean(this.peers.get(id)?.epoch && this.availablePeers().some((peer) => peer.sessionId === id)); }
+  private acousticScope(memberIds: readonly string[], phase: "enter" | "retain", expectedZoneId?: string) {
+    return studioAcousticScope(this.dependencies.acoustics, this.world, memberIds, phase, expectedZoneId);
+  }
   private emit() { for (const listener of this.listeners) listener(); }
   subscribe(listener: () => void) { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   snapshot(): StudioConversationSnapshot {
     const participants = new Map([this.self, ...this.availablePeers()].map((peer) => [peer.sessionId, peer]));
     return Object.freeze({
       available: !this.closed && this.unsubscribe !== null && this.self.role !== "viewer",
-      readyPeers: Object.freeze(this.availablePeers().filter((peer) => this.memberReady(peer.sessionId)).map((peer) => Object.freeze({ ...peer }))),
+      readyPeers: Object.freeze(this.availablePeers().filter((peer) => this.memberReady(peer.sessionId)
+        && this.acousticScope([this.self.sessionId, peer.sessionId], "enter") !== null).map((peer) => Object.freeze({ ...peer }))),
       active: this.activeId ? scopeOf(this.records.get(this.activeId)!.proposal) : null,
       records: Object.freeze([...this.records.values()].reverse().map((record) => Object.freeze({ ...record.proposal,
         memberIds: Object.freeze([...record.proposal.memberIds]), status: record.status, localAccepted: record.localAccepted,
-        acceptedIds: Object.freeze([...record.votes].sort()), canAccept: !record.localAccepted && pending(record) && record.proposal.memberIds.every((id) => this.memberReady(id)),
+        acceptedIds: Object.freeze([...record.votes].sort()), canAccept: !record.localAccepted && pending(record) && record.proposal.memberIds.every((id) => this.memberReady(id))
+          && this.acousticScope(record.proposal.memberIds, "enter", record.acousticZone) !== null,
         members: Object.freeze(record.proposal.memberIds.map((id) => Object.freeze({ ...(participants.get(id) ?? { sessionId: id, displayName: id, role: "viewer" as const }) }))),
       }))),
     });
@@ -163,6 +173,7 @@ export class StudioVirtualConversationController {
   start() {
     if (this.closed || this.unsubscribe || this.self.role === "viewer") return;
     this.unsubscribe = this.port.subscribe((sender, raw) => this.receive(sender, raw));
+    this.unsubscribeAcoustics = this.dependencies.acoustics?.subscribe(() => this.sync()) ?? null;
     this.sync();
     this.timer = this.dependencies.setInterval?.(() => this.sync(), 250) ?? globalThis.setInterval(() => this.sync(), 250);
     this.emit();
@@ -177,6 +188,7 @@ export class StudioVirtualConversationController {
     }
     for (const record of this.records.values()) {
       if (!live(record)) continue;
+      if (this.acousticScope(record.proposal.memberIds, "retain", record.acousticZone) === null) { this.end(record, "left", true); continue; }
       if (pending(record) && this.now() >= record.expiresAt) { this.end(record, "expired", true); continue; }
       if (record.status === "ready" && record.proposal.memberIds.some((id) => id !== this.self.sessionId && this.now() - (record.lastSeen.get(id) ?? -Infinity) >= STUDIO_CONVERSATION_LIVENESS_TTL)) { this.end(record, "disconnected", true); continue; }
       if (record.localAccepted && this.now() >= record.nextPulse) {
@@ -190,12 +202,14 @@ export class StudioVirtualConversationController {
   propose(memberIds: readonly string[]): string | null {
     this.sync();
     const sorted = [...memberIds].sort();
+    const acousticZone = this.acousticScope(sorted, "enter");
     if (!this.snapshot().available || !validMembers(sorted) || !sorted.includes(this.self.sessionId)
+      || acousticZone === null
       || !sorted.every((id) => this.memberReady(id)) || [...this.records.values()].filter(pending).length >= MAX_PENDING) return null;
     const ordinal = ++this.ordinal;
     const proposal: Proposal = Object.freeze({ id: `${this.instanceId}.${ordinal}`, initiatorId: this.self.sessionId, initiatorInstanceId: this.instanceId, ordinal, memberIds: Object.freeze(sorted) });
-    const record = this.create(proposal, true);
-    if (!this.store(record)) return null;
+    const record = this.create(proposal, true, acousticZone);
+    if (!this.store(record)) { record.releaseAcoustics?.(); return null; }
     if (!this.broadcast(proposal, "propose")) { this.end(record, "failed", true); return null; }
     this.emit(); return proposal.id;
   }
@@ -204,6 +218,7 @@ export class StudioVirtualConversationController {
     if (this.closed || !record || !pending(record) || record.localAccepted) return false;
     if (answer === "decline") { this.end(record, "declined", true); return true; }
     if (answer !== "accept" || !record.proposal.memberIds.every((member) => this.memberReady(member))) return false;
+    if (this.acousticScope(record.proposal.memberIds, "enter", record.acousticZone) === null) { this.end(record, "left", true); return false; }
     record.localAccepted = true; record.status = "waiting"; record.votes.add(this.self.sessionId); record.nextPulse = this.now() + PULSE_MS;
     if (!this.broadcast(record.proposal, "accept")) { this.end(record, "failed", true); return false; }
     this.tryReady(record); this.emit(); return true;
@@ -217,11 +232,13 @@ export class StudioVirtualConversationController {
     if (this.closed) return;
     for (const record of this.records.values()) if (live(record)) this.end(record, "left", true);
     this.closed = true; this.unsubscribe?.(); this.unsubscribe = null;
+    this.unsubscribeAcoustics?.(); this.unsubscribeAcoustics = null;
     if (this.dependencies.clearInterval) this.dependencies.clearInterval(this.timer); else globalThis.clearInterval(this.timer as ReturnType<typeof setInterval>);
     this.peers.clear(); this.early.clear(); this.emit(); this.listeners.clear();
   }
-  private create(proposal: Proposal, localAccepted: boolean): RecordState {
-    return { proposal: Object.freeze({ ...proposal, memberIds: Object.freeze([...proposal.memberIds]) }), status: localAccepted ? "waiting" : "offered", localAccepted,
+  private create(proposal: Proposal, localAccepted: boolean, acousticZone: string): RecordState {
+    return { proposal: Object.freeze({ ...proposal, memberIds: Object.freeze([...proposal.memberIds]) }), acousticZone,
+      releaseAcoustics: acousticZone ? this.dependencies.acoustics?.acquireScope?.(proposal.memberIds) : undefined, status: localAccepted ? "waiting" : "offered", localAccepted,
       votes: new Set([proposal.initiatorId]), lastSeen: new Map([[proposal.initiatorId, this.now()]]), expiresAt: this.now() + STUDIO_CONVERSATION_PROPOSAL_TTL, nextPulse: this.now() + PULSE_MS };
   }
   private store(record: RecordState): boolean {
@@ -248,6 +265,7 @@ export class StudioVirtualConversationController {
     if (!live(record)) return;
     const active = this.activeId === record.proposal.id;
     record.status = status;
+    record.releaseAcoustics?.(); record.releaseAcoustics = undefined;
     if (active) this.activeId = null;
     if (broadcast) this.broadcast(record.proposal, "leave");
     if (active) this.dependencies.onClosed?.(scopeOf(record.proposal));
@@ -258,6 +276,7 @@ export class StudioVirtualConversationController {
     for (const [key, item] of this.early) if (item.proposal.memberIds.includes(id)) this.early.delete(key);
   }
   private tryReady(record: RecordState) {
+    if (pending(record) && this.acousticScope(record.proposal.memberIds, "enter", record.acousticZone) === null) { this.end(record, "left", true); return; }
     if (!pending(record) || !record.localAccepted || !record.proposal.memberIds.every((id) => this.memberReady(id) && record.votes.has(id)
       && (id === this.self.sessionId || this.now() - (record.lastSeen.get(id) ?? -Infinity) < STUDIO_CONVERSATION_LIVENESS_TTL))) return;
     if (this.activeId && this.activeId !== record.proposal.id) this.end(this.records.get(this.activeId)!, "left", true);
@@ -297,8 +316,10 @@ export class StudioVirtualConversationController {
     if (packet.kind === "propose") {
       if (record || proposal.ordinal <= peer.lastProposal) return;
       peer.lastProposal = proposal.ordinal;
-      record = this.create(proposal, false);
-      if (!this.store(record)) return;
+      const acousticZone = this.acousticScope(proposal.memberIds, "enter");
+      record = this.create(proposal, false, acousticZone ?? "");
+      if (!this.store(record)) { record.releaseAcoustics?.(); return; }
+      if (acousticZone === null) { this.end(record, "declined", true); return; }
       if ([...this.records.values()].filter(pending).length > MAX_PENDING) { this.end(record, "declined", true); return; }
       for (const [key, early] of this.early) if (early.proposal.id === proposal.id) {
         this.early.delete(key);
@@ -318,6 +339,7 @@ export class StudioVirtualConversationController {
     if (!live(record) || !sameProposal(record.proposal, proposal)) return;
     if (pending(record) && this.now() >= record.expiresAt) { this.end(record, "expired", true); return; }
     if (packet.kind === "leave") { this.end(record, "left", true); return; }
+    if (this.acousticScope(proposal.memberIds, record.status === "ready" ? "retain" : "enter", record.acousticZone) === null) { this.end(record, "left", true); return; }
     if (packet.kind === "accept") record.votes.add(sender.sessionId);
     if (record.votes.has(sender.sessionId)) record.lastSeen.set(sender.sessionId, this.now());
     this.tryReady(record); this.emit();

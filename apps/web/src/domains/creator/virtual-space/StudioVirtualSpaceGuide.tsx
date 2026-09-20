@@ -2,17 +2,24 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { BookOpen, X } from "lucide-react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import { studioNpcRole } from "./studio-virtual-space-npc-director";
+import type { StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import type { StudioVirtualSpaceWorldManifest, StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
 
 const SEEN_KEY = "toonspectrum:virtual-studio-guide:v1";
 const STOPS = [null, "story", "canvas", "review", "assets", null] as const;
 /** User-operated guide: showing, skipping or changing a step never moves or opens a tool. */
-export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFocus }: {
+export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFocus, guideTour = null,
+  tourRequested = false, onStartTour, onCancelTour }: {
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly onMove: (point: StudioVirtualSpacePoint) => void;
   readonly onOpen: (action: StudioWorldInteractionDefinition["action"]) => void;
   readonly onStop: () => void;
   readonly onFocus: () => void;
+  readonly guideTour?: StudioVirtualNpcGuideTourState | null;
+  readonly tourRequested?: boolean;
+  readonly onStartTour?: (guideId: string) => void;
+  readonly onCancelTour?: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceGuide");
   const panelId = useId();
@@ -22,12 +29,15 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [seen, setSeen] = useState(() => { try { return localStorage.getItem(SEEN_KEY) === "seen"; } catch { return false; } });
+  const guide = manifest.npcs.find((npc) => studioNpcRole(npc) === "guide");
+  const touring = tourRequested && guideTour?.status !== "complete" && guideTour?.status !== "cancelled";
   const stop = useCallback(() => { if (moving.current) onStop(); moving.current = false; }, [onStop]);
   const close = useCallback(() => {
+    if (touring) onCancelTour?.();
     stop(); setOpen(false); setSeen(true);
     try { localStorage.setItem(SEEN_KEY, "seen"); } catch { /* The guide still works without storage. */ }
     trigger.current?.focus();
-  }, [stop]);
+  }, [onCancelTour, stop, touring]);
   useEffect(() => {
     if (!open) return;
     const handleEscape = (event: KeyboardEvent) => {
@@ -59,6 +69,20 @@ export function StudioVirtualSpaceGuide({ manifest, onMove, onOpen, onStop, onFo
       <header><h2>{titles[step]}</h2><button type="button" onClick={close} aria-label={bt("안내 닫기", "Close guide")}><X size={16} aria-hidden /></button></header>
       <p>{descriptions[step]}</p>
       <p className="studio-vspace-guide-progress" role="status">{bt(`${step + 1} / ${STOPS.length} 단계`, `Step ${step + 1} of ${STOPS.length}`)}</p>
+      {guide && onStartTour ? <div className="studio-vspace-guide-actions" aria-label={bt("NPC와 함께 둘러보기", "Tour with an NPC")}>
+        <p>{bt("가이드가 앞서 걷고, 멀어지면 기다려 줍니다. 직접 따라 걸으며 언제든 멈출 수 있어요.", "Your guide walks ahead and waits when you fall behind. Follow at your own pace and stop whenever you like.")}</p>
+        {touring ? <>
+          <p role="status">{guideTour?.status === "waiting-for-user"
+            ? bt("가이드가 가까이 오기를 기다리고 있어요.", "Your guide is waiting for you to catch up.")
+            : guideTour?.status === "at-stop"
+              ? bt(`${guideTour.stopIndex + 1} / ${guideTour.stopCount} 장소에 도착했어요.`, `Arrived at stop ${guideTour.stopIndex + 1} of ${guideTour.stopCount}.`)
+              : bt("가이드를 따라 걸어보세요.", "Walk along with your guide.")}</p>
+          <button type="button" onClick={onCancelTour}>{bt("함께 둘러보기 멈추기", "Stop guided tour")}</button>
+        </> : <>
+          {guideTour?.status === "complete" ? <p role="status">{bt("스튜디오를 한 바퀴 둘러봤어요. 원하는 도구를 열어 작업을 시작하세요.", "You have explored the studio. Open a tool whenever you are ready to work.")}</p> : null}
+          <button type="button" onClick={() => { stop(); onStartTour(guide.id); }}>{bt("가이드와 함께 둘러보기", "Start guided tour")}</button>
+        </>}
+      </div> : null}
       {place ? <div className="studio-vspace-guide-actions">
         <button type="button" onClick={() => { moving.current = true; onMove(place.point); }}>{bt("이곳으로 걸어가기", "Walk to this place")}</button>
         <button type="button" onClick={() => { stop(); onOpen(place.action); }}>{bt("도구 바로 열기", "Open the tool")}</button>

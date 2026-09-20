@@ -12,6 +12,7 @@ import {
   StudioNpcDirector, studioNpcActivityLabel, studioNpcInteraction, studioNpcLabel,
   type StudioNpcAtmosphere, type StudioNpcPhase,
 } from "./studio-virtual-space-npc-director";
+import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import { advanceStudioWorldPath } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
@@ -96,6 +97,8 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   /** Membership/lease authority belongs to the caller. Anchor attaches the rendered hips only. */
   readonly seatedActors?: readonly { readonly id: string; readonly anchorPoint: StudioVirtualSpacePoint; readonly facing: StudioVirtualSpaceFacing }[];
   readonly onNpcInteract?: (interaction: StudioWorldInteractionDefinition) => void;
+  readonly guideTourRequest?: StudioVirtualNpcGuideTourRequest | null;
+  readonly onGuideTourChange?: (state: StudioVirtualNpcGuideTourState) => void;
   readonly onLocalState: (state: StudioVirtualSpaceEngineLocalState) => void;
   readonly onInteract: (interaction: StudioWorldInteractionDefinition | null) => void;
   readonly onNearbyInteractionChange?: (interaction: StudioWorldInteractionDefinition | null) => void;
@@ -131,6 +134,7 @@ interface NpcVisual {
   readonly reaction: import("phaser").GameObjects.Text;
   readonly shadow: import("phaser").GameObjects.Ellipse;
   phase: StudioNpcPhase;
+  groundPoint: StudioVirtualSpacePoint;
 }
 
 function activityState(
@@ -190,6 +194,8 @@ export function StudioVirtualSpacePhaserCanvas({
   waveActorIds = [],
   seatedActors = [],
   onNpcInteract,
+  guideTourRequest = null,
+  onGuideTourChange,
   onLocalState,
   onInteract,
   onNearbyInteractionChange,
@@ -207,6 +213,8 @@ export function StudioVirtualSpacePhaserCanvas({
   atmosphereRef.current = atmosphere;
   const poseRef = useRef({ selfPose, waveActorIds, seatedActors });
   poseRef.current = { selfPose, waveActorIds, seatedActors };
+  const guideTourRef = useRef(guideTourRequest);
+  guideTourRef.current = guideTourRequest;
   const identityRef = useRef(selfIdentity);
   identityRef.current = selfIdentity;
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -216,6 +224,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onInteract,
     onNearbyInteractionChange,
     onNpcInteract,
+    onGuideTourChange,
     onPeerSelect,
     onCancelFollow,
     onPortal,
@@ -235,6 +244,7 @@ export function StudioVirtualSpacePhaserCanvas({
       onInteract,
       onNearbyInteractionChange,
       onNpcInteract,
+      onGuideTourChange,
       onPeerSelect,
       onCancelFollow,
       onPortal,
@@ -245,6 +255,7 @@ export function StudioVirtualSpacePhaserCanvas({
     onLocalState,
     onNearbyInteractionChange,
     onNpcInteract,
+    onGuideTourChange,
     onPeerSelect,
     onPortal,
   ]);
@@ -289,6 +300,9 @@ export function StudioVirtualSpacePhaserCanvas({
       const peers = new Map<string, PeerVisual>();
       const npcs = new Map<string, NpcVisual>();
       const npcDirector = new StudioNpcDirector(manifest);
+      cleanup.push(() => npcDirector.dispose());
+      let lastGuideRequestId: string | null = null;
+      let lastGuideState = "";
       const interactionMarkers = new Map<string, import("phaser").GameObjects.Text>();
       const interactions = studioWorldInteractions(manifest);
       const portals = studioWorldPortals(manifest);
@@ -801,7 +815,7 @@ export function StudioVirtualSpacePhaserCanvas({
             backgroundColor: "#292532ed", padding: { x: 6, y: 4 },
           }).setOrigin(0.5, 1).setDepth(140_000).setVisible(false);
           applySpriteVisual(sprite, skin, view.facing, view.animation);
-          npcs.set(view.id, { definition: npcDefinition, skin, sprite, label, reaction, shadow, phase: view.phase });
+          npcs.set(view.id, { definition: npcDefinition, skin, sprite, label, reaction, shadow, phase: view.phase, groundPoint: view.point });
         }
 
         keys = this.input.keyboard?.addKeys({
@@ -862,6 +876,7 @@ export function StudioVirtualSpacePhaserCanvas({
           callbacksRef.current.onCancelFollow();
         };
         const preventGameScrolling = (event: KeyboardEvent) => {
+          if (event.target === canvas && event.key === "Escape") { npcDirector.cancelGuideTour(); stopMovement(); }
           if (event.target === canvas && !event.metaKey && !event.ctrlKey && !event.altKey
             && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
         };
@@ -869,7 +884,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (this.input.keyboard) this.input.keyboard.enabled = document.activeElement === canvas;
           if (document.activeElement !== canvas) stopMovement();
         };
-        const visibility = () => { if (document.hidden) stopMovement(); };
+        const visibility = () => { if (document.hidden) { npcDirector.cancelGuideTour(); stopMovement(); } };
         const reduceMotionChanged = () => camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
         canvas.addEventListener("pointerdown", focusCanvas);
         canvas.addEventListener("keydown", preventGameScrolling);
@@ -957,7 +972,7 @@ export function StudioVirtualSpacePhaserCanvas({
         };
 
         const currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
-        const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.sprite.x - currentPoint.x, npc.sprite.y - currentPoint.y) < 55)
+        const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.groundPoint.x - currentPoint.x, npc.groundPoint.y - currentPoint.y) < 55)
           .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
           .find((npc) => studioNpcInteraction(manifest, npc.definition));
         const npcInteraction = nearbyNpc ? studioNpcInteraction(manifest, nearbyNpc.definition) : null;
@@ -1110,10 +1125,17 @@ export function StudioVirtualSpacePhaserCanvas({
           visual.reaction.setPosition(visual.sprite.x, peerSeat ? peerHeadY - 48 : visual.sprite.y - 125);
         }
 
+        const tourRequest = guideTourRef.current;
+        if ((tourRequest?.id ?? null) !== lastGuideRequestId) {
+          lastGuideRequestId = tourRequest?.id ?? null;
+          if (tourRequest) npcDirector.startGuideTour(tourRequest, identityRef.current); else npcDirector.cancelGuideTour();
+        }
         const npcViews = npcDirector.advance(dt, {
           atmosphere: atmosphereRef.current,
           reducedMotion: reducedMotion.matches,
           focused: activity === "focused" || blocked,
+          mobile: parent.clientWidth < 600,
+          viewport: this.cameras.main.worldView,
           people: [
             { id: identityRef.current, point: currentPoint, velocity: motion.velocity, focused: activity === "focused" || blocked },
             ...[...peers].map(([id, peer]) => ({
@@ -1125,17 +1147,25 @@ export function StudioVirtualSpacePhaserCanvas({
             })),
           ],
         });
+        const tourState = npcDirector.guideTourState;
+        const serializedTour = JSON.stringify(tourState);
+        if (tourState && serializedTour !== lastGuideState) { lastGuideState = serializedTour; callbacksRef.current.onGuideTourChange?.(tourState); }
         for (const view of npcViews) {
           const npc = npcs.get(view.id);
           if (!npc) continue;
           npc.phase = view.phase;
-          npc.sprite.setPosition(view.point.x, view.point.y).setDepth(Math.round(view.point.y) + 1_000);
+          npc.groundPoint = view.point;
+          const attached = view.seatAttachmentPoint && scene.textures.exists(studioCharacterPoseTextureKey(npc.skin, "sit"));
+          const visualPoint = attached ? view.seatAttachmentPoint! : view.point;
+          npc.sprite.setPosition(visualPoint.x, visualPoint.y).setDepth(Math.round(visualPoint.y) + 1_000).setData("seatAttached", Boolean(attached));
+          npc.sprite.setData("activityStage", view.activityStage).setData("activityAnchorId", view.activityAnchorId);
           npc.sprite.setData("walkDistance", view.distance);
           applySpriteVisual(npc.sprite, npc.skin, view.facing, view.animation);
-          npc.shadow.setPosition(view.point.x, view.point.y + 1).setDepth(Math.round(view.point.y) + 990);
-          npc.label.setPosition(view.point.x, view.point.y + 9).setDepth(Math.round(view.point.y) + 1_002);
+          npc.shadow.setPosition(view.point.x, view.point.y + 1).setDepth(Math.round(view.point.y) + 990).setVisible(!attached);
+          const headY = npc.sprite.y - npc.sprite.displayHeight * npc.sprite.originY;
+          npc.label.setPosition(visualPoint.x, attached ? headY - 22 : view.point.y + 9).setDepth(attached ? 160_000 : Math.round(view.point.y) + 1_002);
           const greeting = studioNpcActivityLabel(npc.definition, view.phase);
-          npc.reaction.setPosition(view.point.x, view.point.y - Number(npc.sprite.getData("visualHeight")) - 8)
+          npc.reaction.setPosition(visualPoint.x, headY - (attached ? 45 : 8))
             .setVisible(view.greeting && !reducedMotion.matches && atmosphereRef.current !== "focus");
           if (view.greeting) npc.reaction.setText(btRef.current(greeting.ko, greeting.en));
         }
@@ -1194,7 +1224,7 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.appearanceIssues = JSON.stringify(localSprite.getData("appearanceIssues") ?? []);
           parent.dataset.reaction = localReaction?.visible ? localReaction.text : "";
           parent.dataset.peers = JSON.stringify([...peers].map(([id, peer]) => ({ id, x: peer.sprite.x, y: peer.sprite.y, targetX: peer.targetX, targetY: peer.targetY, texture: peer.sprite.texture.key, reaction: peer.reaction.visible ? peer.reaction.text : "" })));
-          parent.dataset.npcs = JSON.stringify([...npcs].map(([id, npc]) => ({ id, x: npc.sprite.x, y: npc.sprite.y, phase: npc.phase, texture: npc.sprite.texture.key })));
+          parent.dataset.npcs = JSON.stringify([...npcs].map(([id, npc]) => ({ id, x: npc.sprite.x, y: npc.sprite.y, floor: npc.groundPoint, phase: npc.phase, stage: npc.sprite.getData("activityStage"), anchor: npc.sprite.getData("activityAnchorId"), texture: npc.sprite.texture.key })));
           parent.dataset.props = JSON.stringify(manifest.props.filter((prop) => prop.assetUrl).map((prop) => ({ id: prop.id, depth: studioWorldPropDepth(prop) })));
         }
         moving = nextMoving;

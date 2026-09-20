@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isoTimestampSchema, studioEntityIdSchema } from "./ids";
+import { studioReviewSourceReferenceSchema, type StudioReviewSourceReference } from "./review-source-map";
 import { scopeRefSchema } from "./scope-ref";
 
 import type {
@@ -28,6 +29,7 @@ export interface ReviewAnchor {
   readonly revisionId: RevisionId;
   readonly scope: ScopeRef;
   readonly kind: ReviewAnchorKind;
+  readonly source?: StudioReviewSourceReference;
   readonly objectId?: string;
   readonly x?: number;
   readonly y?: number;
@@ -42,6 +44,7 @@ export const reviewAnchorSchema = z
     revisionId: studioEntityIdSchema,
     scope: scopeRefSchema,
     kind: reviewAnchorKindSchema,
+    source: studioReviewSourceReferenceSchema.optional(),
     objectId: studioEntityIdSchema.optional(),
     x: z.number().finite().optional(),
     y: z.number().finite().optional(),
