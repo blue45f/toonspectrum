@@ -29,8 +29,10 @@ jobs:
           POSTGRES_PASSWORD: studio_full_test
           POSTGRES_DB: studio_full_integration
         ports: ['5432:5432']
+        # Bootstrap requires the application database to have no other clients.
+        # Keep the periodic Docker probe on the maintenance database instead.
         options: >-
-          --health-cmd "pg_isready -U studio_full_test -d studio_full_integration"
+          --health-cmd "pg_isready -U studio_full_test -d postgres"
           --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       TEST_DATABASE_URL: postgresql://studio_full_test:studio_full_test@127.0.0.1:5432/studio_full_integration
