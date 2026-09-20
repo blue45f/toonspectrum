@@ -17,3 +17,8 @@ The new five cases failed against the original code before the correction. Run t
 
 ## Release scope
 Only the repository mutation queries, their integration regressions and this note change. Production data, migration files, secrets, service configuration, deployment gates and cost policy remain unchanged. CI, final main SHA and deployment receipts are recorded separately on the pull request; local passing tests alone do not certify a completed production deployment.
+
+## Consolidated save/restore correction
+PR #1900 (`14eccf35`) independently reproduced the same clock problem in generic artifact commit and restore. Its project/artifact metadata clamping and both PostgreSQL regressions are included by ancestry, without changing client-authored immutable revision timestamps.
+
+The overlapping three review mutations retain statement-stable `GREATEST` expressions so decision and update timestamps share one database instant. All other save/restore changes from #1900 are preserved. Final combined CI and deployment evidence must refer to the integration head rather than either earlier individual branch.

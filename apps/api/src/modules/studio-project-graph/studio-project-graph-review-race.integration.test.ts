@@ -175,6 +175,19 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     return { ...f, editor, comment, current, reference, linked };
   }
 
+  it("preserves comment and review metadata when their stored clocks are ahead", async () => {
+    const f = await fixture(), comment = f.input();
+    await graph.createReviewComment(f.actor, f.reviewId, comment);
+    const future = (await pool.query<{ future: Date }>("SELECT now() + interval '1 day' AS future")).rows[0]!.future.toISOString();
+    await pool.query('UPDATE studio_review_comment SET "createdAt"=$2,"updatedAt"=$2 WHERE id=$1', [comment.id, future]);
+    const resolve = { status: "resolved" as const, resolutionRevisionId: f.initialId };
+    expect((await graph.resolveReviewComment(f.actor, comment.id, resolve)).updatedAt).toBe(future);
+    expect((await graph.reopenReviewComment(f.actor, comment.id)).updatedAt).toBe(future);
+    expect((await graph.resolveReviewComment(f.actor, comment.id, resolve)).updatedAt).toBe(future);
+    await pool.query('UPDATE studio_review SET "createdAt"=$2,"updatedAt"=$2 WHERE id=$1', [f.reviewId, future]);
+    const decided = await graph.decideReview(f.actor, f.reviewId, { status: "approved" });
+    expect(decided.updatedAt).toBe(future);
+  });
   it("binds a production task to the actual pinned comment, retaining existing extra roles and exact read permissions", async () => {
     const f = await productionFixture(); const next = f.linked(); next.tasks[0]!.assigneeIds.push("role-owner");
     const saved = await production.saveWorkspace(f.editor, f.workId, f.current.revision, next);

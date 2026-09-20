@@ -747,7 +747,7 @@ export class StudioProjectGraphRepository {
       );
       await client.query(
         `UPDATE studio_project_graph
-         SET "updatedAt" = now()
+         SET "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1`,
         [projectId],
       );
@@ -1190,12 +1190,12 @@ export class StudioProjectGraphRepository {
         `UPDATE studio_artifact
          SET "headRevisionId" = $2,
              "approvedRevisionId" = $3,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1`,
         [artifactId, nextHeadRevisionId, nextApprovedRevisionId],
       );
       await client.query(
-        `UPDATE studio_project_graph SET "updatedAt" = now() WHERE id = $1`,
+        `UPDATE studio_project_graph SET "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp()) WHERE id = $1`,
         [accessResult.row.projectId],
       );
 
@@ -1387,12 +1387,13 @@ export class StudioProjectGraphRepository {
       );
       await client.query(
         `UPDATE studio_artifact
-         SET "headRevisionId" = $2, "updatedAt" = now()
+         SET "headRevisionId" = $2,
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1`,
         [artifactId, input.revisionId],
       );
       await client.query(
-        `UPDATE studio_project_graph SET "updatedAt" = now() WHERE id = $1`,
+        `UPDATE studio_project_graph SET "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp()) WHERE id = $1`,
         [accessResult.row.projectId],
       );
 
