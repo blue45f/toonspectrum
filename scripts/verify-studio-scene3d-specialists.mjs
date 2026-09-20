@@ -247,6 +247,36 @@ try {
     await (await releaseDownload).saveAs(join(scratch, "ui-release-lod-2.glb"));
     proof.textureReleaseUi = { generation: "passed", realGpuTranscode: "passed", download: "passed" };
     proof.textureComparison = await verifyScene3dReview(page, scratch, "texture-comparison");
+    const navigationFixture = await page.evaluate(() => window.__scene3dNavigationFixture);
+    await page.locator('input[type="file"]').first().setInputFiles({ name: "navigation-floor.glb", mimeType: "model/gltf-binary", buffer: Buffer.from(navigationFixture) });
+    await page.getByText("Recast 이동 표면·경로 생성", { exact: true }).click();
+    const waypoints = page.getByLabel("경유지 XYZ (한 줄에 하나, 최대 8개)");
+    await waypoints.fill("0,1,");
+    if (!(await page.getByRole("button", { name: "이동 경로 생성", exact: true }).isDisabled())) throw new Error("Missing waypoint coordinate was accepted as zero.");
+    await waypoints.fill("2,0,-2\n-2,0,2");
+    await page.getByLabel("최대 단차(m)").fill("0.2");
+    await page.getByLabel("최대 경사(도)").fill("35");
+    await page.getByRole("button", { name: "이동 경로 생성", exact: true }).click();
+    await page.getByRole("link", { name: "navigation-route.glb", exact: true }).waitFor({ timeout: 120000 });
+    await page.getByRole("button", { name: /화면에 맞춤|Fit view/ }).click();
+    await page.locator("canvas").first().screenshot({ path: join(scratch, "navigation-route-preview.png") });
+    const routeDownload = page.waitForEvent("download");
+    await page.getByRole("link", { name: "navigation-path.json", exact: true }).click();
+    const routePath = join(scratch, "ui-navigation-path.json");
+    await (await routeDownload).saveAs(routePath);
+    const route = JSON.parse(readFileSync(routePath, "utf8"));
+    if (route.stops.length !== 4 || route.segments.length !== 3 || Math.abs(route.lengthMeters - (8 + Math.sqrt(32))) > 0.001) throw new Error("UI route skipped or reordered a requested stop.");
+    const previewDownload = page.waitForEvent("download");
+    await page.getByRole("link", { name: "navigation-route.glb", exact: true }).click();
+    await (await previewDownload).saveAs(join(scratch, "ui-navigation-route.glb"));
+    const mobileWidths = [320, 390];
+    for (const width of mobileWidths) {
+      await page.setViewportSize({ width, height: 1000 });
+      await waypoints.scrollIntoViewIfNeeded();
+      if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 2)) throw new Error(`Navigation controls overflow at ${width}px.`);
+    }
+    await page.setViewportSize({ width: 980, height: 1100 });
+    proof.navigationUi = { validation: "passed", stops: route.stops.length, segments: route.segments.length, lengthMeters: route.lengthMeters, preview: "passed", downloads: "passed", mobileWidths };
     const splat = await page.evaluate(() => window.__scene3dSplatFixture);
     // The real viewer deliberately stops when offscreen; bring it into view like a user.
     await page.locator('input[accept=".splat"]').scrollIntoViewIfNeeded();

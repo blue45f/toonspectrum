@@ -60,6 +60,9 @@ export const specialistOptionsSchema = z.discriminatedUnion("kind", [
       cellSize: z.number().min(0.05).max(2).default(0.2),
       agentRadius: z.number().min(0.05).max(2).default(0.3),
       agentHeight: z.number().min(0.2).max(4).default(1.8),
+      waypoints: z.array(point).max(8).optional(),
+      maxStepHeight: z.number().finite().min(0).max(2).optional(),
+      maxSlopeDegrees: z.number().finite().min(1).max(85).optional(),
     })
     .strict(),
 ]);

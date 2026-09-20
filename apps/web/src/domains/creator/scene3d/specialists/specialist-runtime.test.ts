@@ -114,6 +114,7 @@ describe("real Scene3D specialist toolchain", () => {
       "navmesh.glb",
       "navmesh.bin",
       "navigation-path.json",
+      "navigation-route.glb",
     ]);
     const path = JSON.parse(
       new TextDecoder().decode(result.artifacts[2]!.bytes),

@@ -10,6 +10,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { SPECIALIST_LIMITS, SpecialistError } from "./specialist-contract";
 import { runScene3dSpecialistInWorker } from "./specialist-client";
+import { parseNavigationInput } from "./specialist-navigation-input";
 
 const Preview = lazy(() =>
   import("./StudioScene3dArtifactPreview").then((module) => ({
@@ -51,6 +52,18 @@ export function StudioScene3dAssetToolsPanel({
   const [start, setStart] = useState([-2, 0, -2]);
   const [end, setEnd] = useState([2, 0, 2]);
   const [cellSize, setCellSize] = useState(0.2);
+  const [agentRadius, setAgentRadius] = useState(0.3);
+  const [agentHeight, setAgentHeight] = useState(1.8);
+  const [maxStepHeight, setMaxStepHeight] = useState(0.3);
+  const [maxSlopeDegrees, setMaxSlopeDegrees] = useState(45);
+  const [waypointText, setWaypointText] = useState("");
+  const navigationInput = parseNavigationInput({
+    start: [start[0]!, start[1]!, start[2]!],
+    end: [end[0]!, end[1]!, end[2]!],
+    cellSize, agentRadius, agentHeight, maxStepHeight, maxSlopeDegrees,
+  }, waypointText);
+  const validWaypoints = navigationInput.ok || navigationInput.reason !== "waypoints";
+
   const [textureMode, setTextureMode] = useState<"uastc" | "etc1s">("uastc");
   const [maxTextureSize, setMaxTextureSize] = useState<512 | 1024 | 2048>(2048);
   const nodeListId = useId();
@@ -192,6 +205,7 @@ export function StudioScene3dAssetToolsPanel({
         setReviewSource(SCENE3D_INPLACE_OPERATIONS.some((kind) => kind === next.operation)
           ? { label: originalName, bytes: new Uint8Array(originalBytes), sha256: next.sourceSha256, stats: next.before }
           : undefined);
+        if (next.operation === "navigation") setPreviewIndex(Math.max(0, next.artifacts.findIndex((artifact) => artifact.name === "navigation-route.glb")));
         resultSource.current = inputBinding;
         setNodeNames(next.sourceNodeNames ?? []);
       }
@@ -345,7 +359,7 @@ export function StudioScene3dAssetToolsPanel({
                 value={ikTarget[axis]}
                 disabled={locked}
                 onChange={(event) => {
-                  const value = Number(event.currentTarget.value);
+                  const value = event.currentTarget.valueAsNumber;
                   setIkTarget((old) =>
                     old.map((n, i) => (i === axis ? value : n)),
                   );
@@ -480,10 +494,10 @@ export function StudioScene3dAssetToolsPanel({
                   step="0.1"
                   disabled={locked}
                   aria-label={`${key} ${["X", "Y", "Z"][axis]}`}
-                  value={(key === "start" ? start : end)[axis]}
+                  value={Number.isFinite((key === "start" ? start : end)[axis]) ? (key === "start" ? start : end)[axis] : ""}
                   className="min-h-11 min-w-0 rounded border border-line bg-panel px-2"
                   onChange={(event) => {
-                    const value = Number(event.currentTarget.value);
+                    const value = event.currentTarget.valueAsNumber;
                     (key === "start" ? setStart : setEnd)((old) =>
                       old.map((n, i) => (i === axis ? value : n)),
                     );
@@ -500,24 +514,38 @@ export function StudioScene3dAssetToolsPanel({
             min="0.05"
             max="2"
             step="0.05"
-            value={cellSize}
+            value={Number.isFinite(cellSize) ? cellSize : ""}
             disabled={locked}
             className="ml-2 w-20 bg-panel p-2"
-            onChange={(event) => setCellSize(Number(event.currentTarget.value))}
+            onChange={(event) => setCellSize(event.currentTarget.valueAsNumber)}
           />
         </label>
+        <label className="my-2 block text-xs">
+          {t("경유지 XYZ (한 줄에 하나, 최대 8개)", "Waypoint XYZ (one per line, up to 8)")}
+          <textarea value={waypointText} maxLength={1024} rows={3} disabled={locked}
+            placeholder="0, 0, 2" className="mt-1 block w-full rounded border border-line bg-panel p-2"
+            onChange={(event) => setWaypointText(event.currentTarget.value)} />
+        </label>
+        {!validWaypoints && <p role="alert" className="text-xs text-danger">{t("각 줄에 XYZ 좌표 3개를 입력하세요. 최대 8개 경유지를 지원합니다.", "Enter three XYZ values per line, with up to 8 waypoints.")}</p>}
+        {!navigationInput.ok && navigationInput.reason === "settings" && <p role="alert" className="text-xs text-danger">{t("좌표·반경·높이·단차를 확인하세요. 높이는 최소 3개 수직 셀, 단차는 캐릭터 높이보다 작아야 하며 서로 다른 이동 지점이 필요합니다.", "Check coordinates and agent settings: height needs at least 3 vertical cells, the step must be lower than the agent, and the route needs distinct positions.")}</p>}
+        <p className="text-xs text-fg-3">{t("주황 선은 이동 경로, 노란 표식은 순서대로 방문하는 지점입니다. 미리보기 표시는 표면 위로 약간 띄우며 실제 좌표는 JSON에 보존합니다.", "The orange line shows the route; yellow markers show ordered stops. The preview is offset above the surface; exact coordinates are preserved in JSON.")}</p>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            [t("캐릭터 반경(m)", "Agent radius (m)"), agentRadius, setAgentRadius, 0.05, 2, 0.05],
+            [t("캐릭터 높이(m)", "Agent height (m)"), agentHeight, setAgentHeight, 0.2, 4, 0.1],
+            [t("최대 단차(m)", "Maximum step (m)"), maxStepHeight, setMaxStepHeight, 0, 2, 0.05],
+            [t("최대 경사(도)", "Maximum slope (degrees)"), maxSlopeDegrees, setMaxSlopeDegrees, 1, 85, 1],
+          ] as const).map(([label, value, setter, min, max, step]) => <label key={label} className="text-xs">{label}
+            <input type="number" value={Number.isFinite(value) ? value : ""} min={min} max={max} step={step} disabled={locked}
+              onChange={(event) => setter(event.currentTarget.valueAsNumber)}
+              className="mt-1 block min-h-11 w-full rounded border border-line bg-panel px-2" />
+          </label>)}
+        </div>
         <button
           className={BUTTON}
-          disabled={locked}
+          disabled={locked || !navigationInput.ok}
           onClick={() =>
-            void run({
-              kind: "navigation",
-              start: [start[0]!, start[1]!, start[2]!],
-              end: [end[0]!, end[1]!, end[2]!],
-              cellSize,
-              agentRadius: 0.3,
-              agentHeight: 1.8,
-            })
+            navigationInput.ok && void run(navigationInput.options)
           }
         >
           {t("이동 경로 생성", "Generate navigation path")}

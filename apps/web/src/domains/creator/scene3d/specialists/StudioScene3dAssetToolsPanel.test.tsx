@@ -269,4 +269,52 @@ it("opts into bounded reuse and displays reuse as reuse, not a newly executed co
   render(<StudioScene3dAssetToolsPanel />); await load();
   fireEvent.click(screen.getByRole("button", { name: "Meshopt 압축" }));
   expect(await screen.findByText("검증된 가공 결과 재사용", { exact: false })).toBeDefined();
+
+});
+
+it("submits ordered waypoints and editable agent constraints through the existing worker", async () => {
+  vi.mocked(runScene3dSpecialistInWorker).mockResolvedValue({ ...result, operation: "navigation" });
+  render(<StudioScene3dAssetToolsPanel />);
+  await load();
+  fireEvent.click(screen.getByText("Recast 이동 표면·경로 생성"));
+  fireEvent.change(screen.getByLabelText("경유지 XYZ (한 줄에 하나, 최대 8개)"), { target: { value: "2, 0, -2\n-2 0 2" } });
+  fireEvent.change(screen.getByLabelText("캐릭터 반경(m)"), { target: { value: "0.5" } });
+  fireEvent.change(screen.getByLabelText("최대 단차(m)"), { target: { value: "0.2" } });
+  fireEvent.change(screen.getByLabelText("최대 경사(도)"), { target: { value: "35" } });
+  fireEvent.click(screen.getByRole("button", { name: "이동 경로 생성" }));
+  await waitFor(() => expect(runScene3dSpecialistInWorker).toHaveBeenCalledWith(expect.objectContaining({
+    options: expect.objectContaining({ kind: "navigation", agentRadius: 0.5, maxStepHeight: 0.2, maxSlopeDegrees: 35, waypoints: [[2, 0, -2], [-2, 0, 2]] }),
+  }), expect.any(AbortSignal), expect.any(Object)));
+});
+it("rejects malformed or too many waypoints before starting a worker", async () => {
+  render(<StudioScene3dAssetToolsPanel />);
+  await load();
+  fireEvent.click(screen.getByText("Recast 이동 표면·경로 생성"));
+  const field = screen.getByLabelText("경유지 XYZ (한 줄에 하나, 최대 8개)");
+  const button = screen.getByRole("button", { name: "이동 경로 생성" }) as HTMLButtonElement;
+  for (const value of ["0,1", "0,1,", ",1,0", "0,,1", "0x10,0,1", "NaN,0,0", Array.from({ length: 9 }, () => "0,0,0").join("\n")]) {
+    fireEvent.change(field, { target: { value } });
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+  }
+  expect(runScene3dSpecialistInWorker).not.toHaveBeenCalled();
+  fireEvent.change(field, { target: { value: "" } });
+  expect(button.disabled).toBe(false);
+});
+
+it("does not silently turn blank navigation coordinates into zero or admit impossible agent settings", async () => {
+  render(<StudioScene3dAssetToolsPanel />); await load();
+  fireEvent.click(screen.getByText("Recast 이동 표면·경로 생성"));
+  const button = screen.getByRole("button", { name: "이동 경로 생성" }) as HTMLButtonElement;
+  fireEvent.change(screen.getByLabelText("start X"), { target: { value: "" } });
+  expect(button.disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("start X"), { target: { value: "-2" } });
+  expect(button.disabled).toBe(false);
+  for (const [label, invalid, restored] of [["셀 크기(m)", "2", "0.2"], ["캐릭터 높이(m)", "", "1.8"], ["최대 단차(m)", "2", "0.3"]]) {
+    fireEvent.change(screen.getByLabelText(label!), { target: { value: invalid } });
+    expect(button.disabled).toBe(true); fireEvent.click(button);
+    fireEvent.change(screen.getByLabelText(label!), { target: { value: restored } });
+    expect(button.disabled).toBe(false);
+  }
+  expect(runScene3dSpecialistInWorker).not.toHaveBeenCalled();
 });
