@@ -1,3 +1,5 @@
+import { dismissBetaEvent } from "../scripts/lib/public-page-event-gate.mjs";
+
 import { expect, test } from "./fixtures/non-studio-test";
 
 const backup = { _app: "toonspectrum-library", version: 1, ratings: { "isolated-work": 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
@@ -18,15 +20,24 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("mobile menu opens, closes with Escape and restores keyboard focus", async ({ page }) => {
-  await page.goto("/about");
-  const trigger = page.getByRole("button", { name: "전체 메뉴", exact: true, includeHidden: true });
-  await trigger.click();
-  await expect(trigger).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("dialog")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(trigger).toHaveAttribute("aria-expanded", "false");
-  await expect(trigger).toBeFocused();
+test.describe("mobile menu keyboard focus", () => {
+  // A late first-visit dialog must finish before this isolated focus round trip.
+  // Its automatic handler would otherwise click a second dialog after Escape.
+  test.use({ dismissBetaEvent: false });
+
+  test("mobile menu opens, closes with Escape and restores keyboard focus", async ({ page }) => {
+    await page.goto("/about");
+    await dismissBetaEvent(page);
+    const trigger = page.getByRole("button", { name: "전체 메뉴", exact: true, includeHidden: true });
+    const menu = page.getByRole("dialog", { name: "전체 메뉴", exact: true });
+    await trigger.click();
+    await expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+  });
 });
 
 test("anonymous account gate opens and dismisses login without submitting credentials", async ({ page }) => {
