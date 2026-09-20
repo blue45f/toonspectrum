@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { studioWorldPublishSchema, type StudioWorldPublish } from "@toonspectrum/studio-project-model";
+import { studioWorldPublishSchema, type StudioWorldPublish } from "@toonspectrum/studio-project-model/world-publication";
 import type * as DatabaseRuntime from "../../db";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
 import type { StudioWorldPublicationRepository } from "./studio-world-publication.repository";

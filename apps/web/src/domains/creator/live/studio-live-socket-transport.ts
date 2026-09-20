@@ -1,7 +1,7 @@
 import {
   resolveStudioCloudflareRealtimeOrigin,
 } from "../studio-realtime-provider-cloudflare-adapter";
-import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model/world-conversation";
 import { parseStudioLiveAcousticInvalidation, type StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
 
 import {

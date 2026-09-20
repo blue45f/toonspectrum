@@ -1,6 +1,6 @@
 import { Body, Controller, Header, Headers, HttpCode, Inject, Param, Post, Req, UnauthorizedException } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
-import { studioConversationChangeSchema, studioConversationProposeSchema, studioConversationReadSchema, studioConversationRenewSchema } from "@toonspectrum/studio-project-model";
+import { studioConversationChangeSchema, studioConversationProposeSchema, studioConversationReadSchema, studioConversationRenewSchema } from "@toonspectrum/studio-project-model/world-conversation";
 import type { Request } from "express";
 import { getSessionAuthenticationPrincipal, getSessionAuthenticationSource } from "../../session-middleware";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";

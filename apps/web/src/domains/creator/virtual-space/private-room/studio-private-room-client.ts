@@ -1,7 +1,6 @@
-import { canonicalJson, studioAcousticSessionLeaseSchema, studioAcousticWorldPinSchema, studioConversationSnapshotSchema,
-  type StudioAcousticDoorChange, type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticSessionRenew,
-  type StudioAcousticWorldPin, type StudioConversationChange, type StudioConversationPropose, type StudioConversationRead,
-  type StudioConversationRenew, type StudioConversationSnapshot } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { studioAcousticSessionLeaseSchema, studioAcousticWorldPinSchema, type StudioAcousticDoorChange, type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticSessionRenew, type StudioAcousticWorldPin } from "@toonspectrum/studio-project-model/world-acoustic";
+import { studioConversationSnapshotSchema, type StudioConversationChange, type StudioConversationPropose, type StudioConversationRead, type StudioConversationRenew, type StudioConversationSnapshot } from "@toonspectrum/studio-project-model/world-conversation";
 import { z } from "zod";
 import { api, httpStatus } from "@/infrastructure/api";
 import { getStudioTeam, type StudioTeamSnapshot } from "../../studio-team-client";

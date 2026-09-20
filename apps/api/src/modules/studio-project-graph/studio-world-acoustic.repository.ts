@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
-import { canonicalJson, STUDIO_WORLD_ARTIFACT_PREFIX, STUDIO_ACOUSTIC_MAX_SESSIONS, STUDIO_ACOUSTIC_RESOURCE_PREFIX as PREFIX, STUDIO_ACOUSTIC_SESSION_MS,
-  studioAcousticCoreBindingSchema, studioAcousticDoorChangeSchema, studioAcousticSessionOpenSchema, studioAcousticSessionLeaseSchema,
-  type StudioAcousticCoreBinding, type StudioAcousticDoorChange, type StudioAcousticSessionOpen, type StudioAcousticSessionLease,
-  type StudioAcousticWorldPin, type StudioWorldPublication } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { STUDIO_WORLD_ARTIFACT_PREFIX, type StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
+import { STUDIO_ACOUSTIC_MAX_SESSIONS, STUDIO_ACOUSTIC_RESOURCE_PREFIX as PREFIX, STUDIO_ACOUSTIC_SESSION_MS, studioAcousticCoreBindingSchema, studioAcousticDoorChangeSchema, studioAcousticSessionOpenSchema, studioAcousticSessionLeaseSchema, type StudioAcousticCoreBinding, type StudioAcousticDoorChange, type StudioAcousticSessionOpen, type StudioAcousticSessionLease, type StudioAcousticWorldPin } from "@toonspectrum/studio-project-model/world-acoustic";
 import type { PoolClient } from "pg";
 import { dbPool } from "../../db";
 import type { VerifiedSessionToken } from "../../server/session";

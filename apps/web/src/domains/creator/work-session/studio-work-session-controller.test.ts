@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createStudioWorkSession, type StudioWorkSessionCreate } from "@toonspectrum/studio-project-model";
+import { createStudioWorkSession, type StudioWorkSessionCreate } from "@toonspectrum/studio-project-model/work-session";
 import { StudioWorkSessionController } from "./studio-work-session-controller";
 import { studioWorkSessionRequestHash, type StudioSessionMutation, type StudioWorkSessionApi } from "./studio-work-session-client";
 

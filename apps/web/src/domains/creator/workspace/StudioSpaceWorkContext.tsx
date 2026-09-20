@@ -29,7 +29,7 @@ export function StudioSpaceWorkContext({ workId, personal = false }: { readonly 
     } catch { event.preventDefault(); library.reload(); resume.refresh(); }
   };
   return <div className="studio-space-work-context">
-    <div><strong>{project?.title ?? (personal ? bt("개인 가상 스튜디오", "Personal virtual studio") : bt("현재 작품", "Current work"))}</strong>
+    <div><h1 id="workspace-title">{project?.title ?? (personal ? bt("개인 가상 스튜디오", "Personal virtual studio") : bt("현재 작품", "Current work"))}</h1>
       <span>{target?.summary ?? bt("선택한 작품 안에서 작업합니다", "Working within the selected work")}</span></div>
     <Link href={href} onClick={verify} onAuxClick={verify} data-space-exact-resume={Boolean(target)}>
       {target ? bt("원고 이어하기", "Resume manuscript") : personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}

@@ -54,6 +54,10 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       '"use strict";\n',
     );
 
+    const optionalModelEntries = ["work-session", "world-publication", "world-acoustic", "world-conversation"];
+    for (const name of optionalModelEntries) {
+      await compiledPackage(root, `packages/studio-project-model/src/graph/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
+    }
     const staged = await stageApiWorkspaceRuntime(root);
     assert.deepEqual(staged.map((entry) => entry.name), [
       "@toonspectrum/contracts",
@@ -79,6 +83,9 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       gateway: "compatibility",
     });
 
+    for (const name of optionalModelEntries) {
+      assert.deepEqual(requireFromApi(`@toonspectrum/studio-project-model/${name}`), { contract: name });
+    }
     const canonicalRoot = await realpath(root);
     for (const name of [
       "@toonspectrum/core",

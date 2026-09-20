@@ -2,7 +2,7 @@
 import { useSyncExternalStore } from "react";
 import { act,cleanup,fireEvent,render,screen,waitFor } from "@testing-library/react";
 import { afterEach,describe,expect,it,vi } from "vitest";
-import type { StudioAcousticSessionLease } from "@toonspectrum/studio-project-model";
+import type { StudioAcousticSessionLease } from "@toonspectrum/studio-project-model/world-acoustic";
 import { studioVirtualSpaceState } from "../studio-virtual-space-model";
 import { fixture,flush } from "./studio-private-room-controller.fixture";
 import { StudioPrivateRoomPanel } from "./StudioPrivateRoomPanel";

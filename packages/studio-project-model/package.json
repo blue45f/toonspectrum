@@ -23,6 +23,26 @@
       "types": "./src/browser/index.ts",
       "import": "./src/browser/index.ts",
       "default": "./src/browser/index.ts"
+    },
+    "./work-session": {
+      "types": "./src/graph/work-session.ts",
+      "import": "./src/graph/work-session.ts",
+      "default": "./src/graph/work-session.ts"
+    },
+    "./world-publication": {
+      "types": "./src/graph/world-publication.ts",
+      "import": "./src/graph/world-publication.ts",
+      "default": "./src/graph/world-publication.ts"
+    },
+    "./world-acoustic": {
+      "types": "./src/graph/world-acoustic.ts",
+      "import": "./src/graph/world-acoustic.ts",
+      "default": "./src/graph/world-acoustic.ts"
+    },
+    "./world-conversation": {
+      "types": "./src/graph/world-conversation.ts",
+      "import": "./src/graph/world-conversation.ts",
+      "default": "./src/graph/world-conversation.ts"
     }
   },
   "scripts": {
@@ -30,5 +50,21 @@
   },
   "dependencies": {
     "zod": "^4.4.3"
+  },
+  "typesVersions": {
+    "*": {
+      "work-session": [
+        "src/graph/work-session.ts"
+      ],
+      "world-publication": [
+        "src/graph/world-publication.ts"
+      ],
+      "world-acoustic": [
+        "src/graph/world-acoustic.ts"
+      ],
+      "world-conversation": [
+        "src/graph/world-conversation.ts"
+      ]
+    }
   }
 }

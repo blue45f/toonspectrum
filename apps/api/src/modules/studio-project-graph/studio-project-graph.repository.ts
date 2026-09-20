@@ -2,15 +2,9 @@ import { createHash } from "node:crypto";
 
 import { Injectable } from "@nestjs/common";
 
-import {
-  canonicalJson,
-  STUDIO_WORLD_ARTIFACT_PREFIX,
-  STUDIO_WORK_SESSION_ARTIFACT_PREFIX,
-  reviewAnchorSchema,
-  scopeContains,
-  scopeRefSchema,
-  validateStudioReviewSpatialAnchor,
-} from "@toonspectrum/studio-project-model";
+import { canonicalJson, reviewAnchorSchema, scopeContains, scopeRefSchema, validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
+import { STUDIO_WORLD_ARTIFACT_PREFIX } from "@toonspectrum/studio-project-model/world-publication";
+import { STUDIO_WORK_SESSION_ARTIFACT_PREFIX } from "@toonspectrum/studio-project-model/work-session";
 import {
   compatibilityReportSchema,
   createCompatibilityReport,

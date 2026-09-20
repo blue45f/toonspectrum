@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model/world-conversation";
 import { STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE } from "./studio-live-admission-support";
 import { presentStudioLiveSyncSnapshot, projectStudioLiveSyncSnapshot } from "./studio-live-sync-safety";
 
