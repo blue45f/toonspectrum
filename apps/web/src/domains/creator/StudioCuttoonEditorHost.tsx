@@ -1,3 +1,4 @@
+import { enterStudioSelectionTransform } from "./studio-transform-entry";
 import {
   formatI18nTemplate,
   getActiveI18nLocale,
@@ -24900,99 +24901,17 @@ function clearSelectionForEdit() {
     openInspectorRoute,
     announceDrawingShortcut,
   });
-  /**
-   * Free Transform (CSP/PS-style ⇧T) — always one selected layer when possible:
-   * - freehand stroke → select tool + uniform free-scale proxy handles
-   * - image without marquee → Konva free-transform of that image layer
-   * - image with marquee → content transform panel (pixel-region scale/rotate/flip)
-   * - other objects → select tool (Konva handles already attached)
-   */
   function openPixelSelectionTransform() {
-    const transformTargets = marqueeIds.length > 0 ? elements.filter((element) => marqueeIds.includes(element.id)) : selected ? [selected] : [];
-    if (collaborationDocumentLocked || transformTargets.some((element) => isEffectivelyLocked(element, groups))) {
-      setError("잠긴 선택 항목은 변형할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
-      return;
-    }
-    if (activeSurfaceReviewLocked) {
-      setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
-      return;
-    }
-    if (marqueeIds.length > 1) {
-      if (transformTargets.length !== marqueeIds.length) {
-        setError("선택 항목이 변경되었어요. 다시 선택한 뒤 변형해 주세요.");
-        return;
-      }
-      disarmAllPixelTools();
-      setTool("select");
-      setMenu(null);
-      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
-      requestStudioInspectorFocus("selection.geometry");
-      announceDrawingShortcut("선택한 레이어를 함께 변형합니다 · 원래 레이어 구조 유지");
-      return;
-    }
-    // Vector stroke / freehand: object free-scale handles (not pixel marquee).
-    if (selected?.type === "draw") {
-      if (isEffectivelyLocked(selected, groups)) {
-        setError("잠긴 레이어는 변형할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
-        return;
-      }
-      disarmAllPixelTools();
-      setTool("select");
-      setMenu(null);
-      setError(null);
-      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
-      requestStudioInspectorFocus("selection.geometry");
-      announceDrawingShortcut("모서리 핸들을 끌어 선택 선화 레이어의 크기·위치를 조절하세요");
-      return;
-    }
-    // Whole image layer free-transform (no marquee) — keep ops on this layer only.
-    if (
-      selected?.type === "image"
-      && !isEffectivelyLocked(selected, groups)
-      && !isSelectionUsable(pixelSel)
-    ) {
-      if (selectedImageMutationLocked) {
-        setError("선택한 이미지 레이어의 편집 잠금을 먼저 해제하세요.");
-        return;
-      }
-      disarmAllPixelTools();
-      setTool("select");
-      setMenu(null);
-      setError(null);
-      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
-      requestStudioInspectorFocus("selection.geometry");
-      announceDrawingShortcut("모서리·회전 핸들로 선택 이미지 레이어를 변형하세요");
-      return;
-    }
-    // Shape / text / bubble with Konva transformer — just ensure select mode.
-    if (
-      selected
-      && selected.type !== "image"
-      && !isEffectivelyLocked(selected, groups)
-    ) {
-      disarmAllPixelTools();
-      setTool("select");
-      setMenu(null);
-      setError(null);
-      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
-      requestStudioInspectorFocus("selection.geometry");
-      announceDrawingShortcut("모서리·회전 핸들로 선택 레이어를 변형하세요");
-      return;
-    }
-
-    const target = ensurePixelToolTarget("내용 변형");
-    if (!target) return;
-    if (!isSelectionUsable(pixelSel)) {
-      // Pixel marquee path when transform was requested without a free-transformable object.
-      commitPixelSelectionState((current) => selectAllPixels(current), "select-all");
-      announceDrawingShortcut("레이어 전체 선택 · 리터치에서 크기·회전·뒤집기를 적용하세요");
-    } else {
-      announceDrawingShortcut("리터치 패널에서 선택 영역의 내용 변형을 적용하세요");
-    }
-    openInspectorRoute(
-      { primary: "properties", image: "retouch" },
-      isMobile ? "props" : null
-    );
+    const targets = marqueeIds.length ? elements.filter((element) => marqueeIds.includes(element.id)) : selected ? [selected] : [];
+    enterStudioSelectionTransform({
+      selected, selectedCount: targets.length, selectionComplete: !marqueeIds.length || targets.length === marqueeIds.length,
+      selectionLocked: collaborationDocumentLocked || targets.some((element) => isEffectivelyLocked(element, groups)),
+      activeSurfaceReviewLocked, selectedImageMutationLocked,
+      pixelSelectionUsable: isSelectionUsable(pixelSel), isMobile,
+      disarmAllPixelTools, setTool, setMenu, setError, announceDrawingShortcut, openInspectorRoute,
+      preparePixelTarget: () => Boolean(ensurePixelToolTarget("내용 변형")),
+      selectWholePixelLayer: () => commitPixelSelectionState((current) => selectAllPixels(current), "select-all"),
+    });
   }
   function openImagePastePicker() {
     editMenuImageInputRef.current?.click();
@@ -28344,8 +28263,7 @@ function clearSelectionForEdit() {
     pixelTool !== null ||
     smudgeActive ||
     wetMixActive;
-  // Selection replaces the drawing context in the fixed bottom lane. Keep the model desktop-only
-  // because mobile already owns selection actions in its thumb editing dock.
+  // Desktop selection owns the top context band; handheld sessions retain their thumb dock.
   const selectOptionsStripArmed =
     tool === "select" && !canvasOnlyMode && !selectionOptionsSuppressed;
   const selectionLaneMounted = !isMobile;
