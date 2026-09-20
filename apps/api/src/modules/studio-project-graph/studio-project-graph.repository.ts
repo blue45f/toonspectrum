@@ -747,7 +747,7 @@ export class StudioProjectGraphRepository {
       );
       await client.query(
         `UPDATE studio_project_graph
-         SET "updatedAt" = now()
+         SET "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1`,
         [projectId],
       );
@@ -1190,12 +1190,12 @@ export class StudioProjectGraphRepository {
         `UPDATE studio_artifact
          SET "headRevisionId" = $2,
              "approvedRevisionId" = $3,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1`,
         [artifactId, nextHeadRevisionId, nextApprovedRevisionId],
       );
       await client.query(
-        `UPDATE studio_project_graph SET "updatedAt" = now() WHERE id = $1`,
+        `UPDATE studio_project_graph SET "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp()) WHERE id = $1`,
         [accessResult.row.projectId],
       );
 
@@ -1387,12 +1387,13 @@ export class StudioProjectGraphRepository {
       );
       await client.query(
         `UPDATE studio_artifact
-         SET "headRevisionId" = $2, "updatedAt" = now()
+         SET "headRevisionId" = $2,
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1`,
         [artifactId, input.revisionId],
       );
       await client.query(
-        `UPDATE studio_project_graph SET "updatedAt" = now() WHERE id = $1`,
+        `UPDATE studio_project_graph SET "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp()) WHERE id = $1`,
         [accessResult.row.projectId],
       );
 
@@ -2043,9 +2044,9 @@ export class StudioProjectGraphRepository {
       }>(
         `UPDATE studio_review
          SET status = $2,
-             "decidedAt" = CASE WHEN $3 THEN now() ELSE NULL END,
+             "decidedAt" = CASE WHEN $3 THEN GREATEST("createdAt", "updatedAt", clock_timestamp()) ELSE NULL END,
              "decidedBy" = CASE WHEN $3 THEN $4 ELSE NULL END,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1
          RETURNING status, "decidedAt", "decidedBy", "updatedAt"`,
         [reviewId, input.status, terminal, actorUserId],
@@ -2190,7 +2191,7 @@ export class StudioProjectGraphRepository {
          SET status = $2,
              "resolutionRevisionId" = $3,
              "resolvedBy" = $4,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1
          RETURNING status,
                    "resolutionRevisionId" AS "resolutionRevisionId",
@@ -2283,7 +2284,7 @@ export class StudioProjectGraphRepository {
          SET status = 'reopened',
              "resolutionRevisionId" = NULL,
              "resolvedBy" = NULL,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST("createdAt", "updatedAt", clock_timestamp())
          WHERE id = $1
          RETURNING "updatedAt"`,
         [commentId],
