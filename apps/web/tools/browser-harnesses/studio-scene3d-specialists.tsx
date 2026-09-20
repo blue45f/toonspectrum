@@ -2,9 +2,11 @@
 
 
 import "../../src/styles/globals.css";
+import { WebIO } from "@gltf-transform/core";
 import { createRoot } from "react-dom/client";
 
 import { runScene3dSpecialistInWorker } from "../../src/domains/creator/scene3d/specialists/specialist-client";
+import { compoundFixtureBytes, compoundFixtureVolume } from "../../src/domains/creator/scene3d/specialists/specialist-compound-fixtures";
 import { createSpecialistFixture } from "../../src/domains/creator/scene3d/specialists/specialist-fixtures";
 import { inspectSpecialistGlbImages } from "../../src/domains/creator/scene3d/specialists/specialist-image-budget";
 import { scene3dSpecialistJobQueue } from "../../src/domains/creator/scene3d/specialists/specialist-job-queue";
@@ -23,6 +25,8 @@ declare global {
     __scene3dSpecialistFixture?: number[];
     __scene3dSplatFixture?: number[];
     __scene3dTexturedFixture?: number[];
+    __scene3dCompoundFixture?: number[];
+    __scene3dCompoundCutter?: number[];
   }
 }
 const assert = (condition: unknown, message: string) => {
@@ -57,11 +61,19 @@ async function verify() {
   const animated = await createSpecialistFixture("animated");
   const rig = await createSpecialistFixture("rig");
   const textured = await createTexturedSpecialistFixture(true);
+  const compound = await compoundFixtureBytes({ offsets: [0, 1], split: true });
+  const compoundCutter = await compoundFixtureBytes({ offsets: [1.5] });
   const jobs: {
     source: Uint8Array<ArrayBuffer>;
     secondary?: Uint8Array<ArrayBuffer>;
     options: SpecialistOptions;
+    expectedVolume?: number;
   }[] = [
+    ...(["union", "subtract", "intersect"] as const).map((operation) => ({
+      source: compound, secondary: compoundCutter,
+      options: { kind: "csg" as const, operation, backend: "solid" as const },
+      expectedVolume: operation === "union" ? 14 : 6,
+    })),
     { source: textured, options: { kind: "textures", textureMode: "uastc", maxTextureSize: 512 } },
     { source: textured, options: { kind: "textures", textureMode: "etc1s", maxTextureSize: 512 } },
     { source: textured, options: { kind: "release", textureMode: "uastc", maxTextureSize: 512, error: 0.03 } },
@@ -143,6 +155,17 @@ async function verify() {
           .length >= 2,
         "No actual path.",
       );
+    let compoundReceipt: unknown;
+    if (job.expectedVolume !== undefined) {
+      const glb = result.artifacts[0]!;
+      const receipt = JSON.parse(new TextDecoder().decode(result.artifacts[1]!.bytes));
+      const decodedVolume = compoundFixtureVolume(await new WebIO().readBinary(glb.bytes));
+      assert(Math.abs(decodedVolume - job.expectedVolume) < 0.0001, "Exported compound Boolean volume is wrong.");
+      assert(receipt.sourceParts.left.length === 2 && receipt.sourceParts.left.every((part: { primitives: number }) => part.primitives === 6), "Mesh-node/material-partition composition was not performed.");
+      assert(receipt.artifactSha256 === glb.sha256 && receipt.sourceSha256 === result.sourceSha256, "Compound report is not bound to its actual artifacts.");
+      assert(receipt.steps.length === 2 && receipt.steps[0].phase === "left-union", "Overlapping parts were not unioned before final Boolean.");
+      compoundReceipt = { ...receipt, decodedVolume };
+    }
     let texturePixels: Record<string, unknown> | undefined;
     if (job.options.kind === "textures" || job.options.kind === "release") {
       for (const artifact of result.artifacts.filter(({mime}) => mime === "model/gltf-binary")) {
@@ -152,6 +175,7 @@ async function verify() {
     }
     outcomes.push({
       phases, sourceSha256: result.sourceSha256,
+      ...(compoundReceipt ? { compoundReceipt } : {}),
       ...(texturePixels ? { texturePixels } : {}),
       options: job.options,
       sourceByteLength: job.source.length,
@@ -241,6 +265,8 @@ async function verify() {
   window.__scene3dSplatFixture = Array.from(splats);
   window.__scene3dSpecialistFixture = Array.from(sphere);
   window.__scene3dTexturedFixture = Array.from(textured);
+  window.__scene3dCompoundFixture = Array.from(compound);
+  window.__scene3dCompoundCutter = Array.from(compoundCutter);
   if (bundle)
     assert(
       bundleRequests === jobs.length + 4,

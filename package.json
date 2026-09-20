@@ -230,7 +230,9 @@
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
     "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs",
     "verify:studio-3d-inplace": "vitest run apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx apps/web/src/domains/creator/scene3d/integration/scene3d-derivative-admission.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-meshopt.test.ts apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx apps/web/src/domains/creator/bg3d/studio-bg3d-libraries-sqlite-opfs.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-history-command-adapter.test.ts apps/web/src/domains/creator/bg3d/useStudioBg3dCanonicalDocumentState.test.tsx",
-    "verify:studio-3d-inplace:browser": "node scripts/verify-studio-scene3d-inplace.mjs"
+    "verify:studio-3d-inplace:browser": "node scripts/verify-studio-scene3d-inplace.mjs",
+    "verify:studio-3d-tiled": "vitest run apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-camera.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-artifacts.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-client.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-plan.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-archive-verifier.test.ts",
+    "verify:studio-3d-tiled:browser": "node scripts/verify-studio-scene3d-tiled-output.mjs"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

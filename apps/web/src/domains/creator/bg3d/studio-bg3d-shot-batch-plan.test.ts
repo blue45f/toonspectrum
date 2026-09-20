@@ -1,3 +1,4 @@
+import { studioBg3dTilePipelineId, STUDIO_BG3D_TILED_PNG_PROFILE } from "./studio-bg3d-tiled-batch-policy";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -592,4 +593,25 @@ describe("resolveStudioBg3dShotBatchCaptureSize aspect parity", () => {
     expect(wide!.width / wide!.height).toBeCloseTo(1920 / 1080, 2);
     expect(tall!.width / tall!.height).toBeCloseTo(0.5, 2);
   });
+});
+
+
+it("admits complete 4K PNG output only under a versioned tiled profile and binds tile geometry to recovery", async () => {
+  const sourceRevision = sourceRevisionForShots([SHOTS[0]], 4096);
+  const owner = { ...CAPTURE_OWNER, sourceWidth: 512, sourceHeight: 512, maxPixels: 4096 ** 2,
+    ltPipelineId: studioBg3dTilePipelineId(4_194_304), pngEncodingId: STUDIO_BG3D_TILED_PNG_PROFILE };
+  const options = { scope: SCOPE, sourceRevision, selectedShotIds: [SHOTS[0].id], passes: ["beauty", "main-line"] as const,
+    exportHeight: 4096 as const, includeLayeredPsd: false, includeContactSheet: false,
+    capture: canonicalCapture([SHOTS[0]], sourceRevision, owner, 4096, ["beauty", "main-line"]) };
+  const result = await createStudioBg3dShotBatchPlan([SHOTS[0]], options);
+  expect(result.ok).toBe(true); if (!result.ok) return;
+  expect(result.plan.shots[0]!.capture).toMatchObject({ width: 4096, height: 4096, wasReduced: false });
+  expect(isStudioBg3dShotBatchPlan(result.plan)).toBe(true);
+  const legacy = await createStudioBg3dShotBatchPlan([SHOTS[0]], { ...options,
+    capture: { ...options.capture, owner: { ...owner, ltPipelineId: STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1 } } });
+  expect(legacy.ok).toBe(false);
+  const smallerOwner = { ...owner, ltPipelineId: studioBg3dTilePipelineId(76_800) };
+  const smaller = await createStudioBg3dShotBatchPlan([SHOTS[0]], { ...options,
+    capture: canonicalCapture([SHOTS[0]], sourceRevision, smallerOwner, 4096, ["beauty", "main-line"]) });
+  expect(smaller.ok).toBe(true); if (smaller.ok) expect(smaller.plan.planDigest).not.toBe(result.plan.planDigest);
 });

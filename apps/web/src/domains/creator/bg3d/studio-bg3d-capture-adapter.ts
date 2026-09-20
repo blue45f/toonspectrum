@@ -1,3 +1,4 @@
+import type { StudioBg3dTiledCaptureSession } from "./studio-bg3d-tiled-session";
 /**
  * Renderer-neutral asynchronous capture boundary for Studio's 3D line-and-tone pipeline.
  *
@@ -71,6 +72,8 @@ export interface StudioBg3dCaptureAdapter {
   readonly graphicsApi: StudioBg3dCaptureGraphicsApi;
   readonly profileId: typeof STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1;
   readonly normalProfile?: typeof STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1;
+  /** Explicit same-renderer tile capability; session freezes the current projection. */
+  createTiledCapture?(): StudioBg3dTiledCaptureSession;
   getSourceSize(): StudioBg3dCaptureSize;
   capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster>;
   /** Release cached capture resources; active GPU work retains its lease until settlement. */

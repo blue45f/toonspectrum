@@ -1,3 +1,5 @@
+import { assertStudioBg3dTiledSceneAdmission } from "./studio-bg3d-tiled-scene-admission";
+import { createStudioBg3dTiledCameraSession } from "./studio-bg3d-tiled-session";
 /**
  * Three/WebGPU implementation of the renderer-neutral Studio 3D capture contract.
  *
@@ -66,6 +68,8 @@ export const STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V2 =
   "studio-three-webgpu-capture-adapter-v2-hdr-owned";
 export const STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V3 =
   "studio-three-webgpu-capture-adapter-v3-hdr-mrt-normals";
+export const STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V4 =
+  "studio-three-webgpu-capture-adapter-v4-tiles-hdr-mrt-normals";
 
 export interface CreateStudioBg3dThreeWebGpuCaptureAdapterInput {
   readonly renderer: WebGPURenderer;
@@ -485,7 +489,7 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
   const shared = retainCapturePool(renderer);
   let disposed = false;
 
-  async function capture(request: StudioBg3dCaptureRequest): Promise<StudioBg3dCapturedRaster> {
+  async function capture(request: StudioBg3dCaptureRequest, captureCamera = camera): Promise<StudioBg3dCapturedRaster> {
     if (disposed) throw new Error("3D capture adapter is disposed.");
     assertStudioBg3dCaptureRequest(request);
     const snapshot = { ...request, background: { ...request.background } };
@@ -499,9 +503,9 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
     try {
       const restoreCaptureExcludedObjects = hideStudioBg3dCaptureExcludedObjects(scene);
       try {
-        pending.push(submitColorCapture({ camera, renderer, request: snapshot, scene, resources: lease.value }));
+        pending.push(submitColorCapture({ camera: captureCamera, renderer, request: snapshot, scene, resources: lease.value }));
         if (snapshot.includeDepth) {
-          pending.push(submitDepthCapture({ camera, renderer, scene, width: snapshot.width,
+          pending.push(submitDepthCapture({ camera: captureCamera, renderer, scene, width: snapshot.width,
             height: snapshot.height, resources: lease.value }));
         }
       } catch (error) {
@@ -541,7 +545,7 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
     backend: "three-webgpu" as const,
     engineId: "three" as const,
     engineVersion: String(THREE.REVISION).toLowerCase(),
-    implementationRevision: STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V3,
+    implementationRevision: STUDIO_BG3D_THREE_WEBGPU_CAPTURE_IMPLEMENTATION_V4,
     normalProfile: STUDIO_BG3D_CAPTURE_NORMAL_PROFILE_V1,
     graphicsApi: "webgpu" as const,
     profileId: STUDIO_BG3D_CAPTURE_PROFILE_RGBA8_DEPTH_V1,
@@ -550,6 +554,11 @@ export function createStudioBg3dThreeWebGpuCaptureAdapter(
       height: renderer.domElement.height,
     }),
     capture,
+    createTiledCapture: () => {
+      if (renderer.reversedDepthBuffer) throw new Error("Reversed-depth tiled capture is not supported.");
+      assertStudioBg3dTiledSceneAdmission(scene);
+      return createStudioBg3dTiledCameraSession(camera, capture, THREE.WebGPUCoordinateSystem);
+    },
     dispose,
   });
 }
