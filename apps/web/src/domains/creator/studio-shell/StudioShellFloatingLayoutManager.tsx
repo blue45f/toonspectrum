@@ -572,7 +572,7 @@ export function StudioShellFloatingLayoutManager() {
         aria-hidden={drawingAutoHideRunning ? true : undefined}
         inert={drawingAutoHideRunning ? true : undefined}
         className={cn(
-          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3",
+          "pointer-events-auto fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.75rem)] left-3 z-[70] max-w-[calc(100vw-1.5rem)] text-fg print:hidden lg:bottom-3 lg:left-1/2 lg:-translate-x-1/2",
           "transition-[opacity,transform] duration-150 motion-reduce:transition-none",
           drawingAutoHideRunning && "pointer-events-none translate-y-2 opacity-0",
         )}
