@@ -38,6 +38,9 @@ it("compiles the actual graph and Creator modules and resolves preview producer,
   const { StudioWorldAcousticService } = await import("./studio-world-acoustic.service");
   const { StudioWorldAcousticController } = await import("./studio-world-acoustic.controller");
   const { StudioLiveAcousticBinding } = await import("../creator/studio-live-acoustic-binding");
+  const { StudioWorldConversationService } = await import("./studio-world-conversation.service");
+  const { StudioWorldConversationRepository } = await import("./studio-world-conversation.repository");
+  const { StudioWorldConversationController } = await import("./studio-world-conversation.controller");
   // create() instantiates the actual Nest module graph; init()/listen() would also
   // start unrelated Creator lifecycle schedulers and is deliberately not called.
   application = await NestFactory.create(StudioProjectGraphModule, { logger: false, abortOnError: false });
@@ -58,4 +61,8 @@ it("compiles the actual graph and Creator modules and resolves preview producer,
   expect(acoustic.repository).toBe(application.get(StudioWorldAcousticRepository));
   expect(acoustic.bindings).toBe(application.get(StudioLiveAcousticBinding));
   expect(application.get(StudioWorldAcousticController)).toBeInstanceOf(StudioWorldAcousticController);
+  const conversation = application.get(StudioWorldConversationService) as unknown as Record<string,unknown>;
+  expect(conversation.repository).toBe(application.get(StudioWorldConversationRepository));
+  expect(conversation.bindings).toBe(application.get(StudioLiveAcousticBinding));
+  expect(application.get(StudioWorldConversationController)).toBeInstanceOf(StudioWorldConversationController);
 });

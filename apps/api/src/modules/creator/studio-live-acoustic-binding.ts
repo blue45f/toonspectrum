@@ -1,6 +1,6 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { z } from "zod";
-import { studioAcousticCoreBindingSchema, type StudioAcousticCoreBinding } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT, studioConversationInvalidationSchema, studioAcousticCoreBindingSchema, type StudioAcousticCoreBinding, type StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
 import { studioLivePrincipalFingerprint, type VerifiedSessionToken } from "../../server/session";
 import type { StudioLiveGatewayHost } from "./studio-live-gateway-host";
 
@@ -13,6 +13,7 @@ interface NamespacePort {
   on(event: string, listener: (request: unknown, ack: (value: unknown) => void) => void): unknown;
   off(event: string, listener: (request: unknown, ack: (value: unknown) => void) => void): unknown;
   serverSideEmitWithAck(event: string, request: Request): Promise<unknown[]>;
+  to(connectionId:string): {emit(event:string,payload:unknown):unknown};
 }
 
 /** Internal one-shot RPC only. Public room tickets and adapter-visible claims are insufficient. */
@@ -31,6 +32,10 @@ export class StudioLiveAcousticBinding implements OnModuleDestroy {
     this.namespace.on(EVENT, this.listener);
   }
   onModuleDestroy(): void { this.namespace?.off(EVENT, this.listener); this.namespace = null; this.receive = null; }
+  notify(connectionId:string,event:StudioConversationInvalidation):void {
+    // A targeted hint, never a broadcast of membership, private actors or permissions.
+    try { this.namespace?.to(connectionId).emit(STUDIO_ACOUSTIC_CONVERSATION_EVENT,studioConversationInvalidationSchema.parse(event)); } catch { /* authoritative reads reconcile dropped hints */ }
+  }
   async verify(principal: VerifiedSessionToken, workId: string, identity: { connectionId: string; clientInstanceId: string }): Promise<StudioAcousticCoreBinding | null> {
     const namespace = this.namespace, receive = this.receive;
     if (!namespace || !receive) return null;

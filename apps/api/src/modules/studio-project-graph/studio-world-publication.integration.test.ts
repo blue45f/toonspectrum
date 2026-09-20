@@ -7,6 +7,8 @@ import type { StudioProjectGraphRepository } from "./studio-project-graph.reposi
 import type { StudioWorldPublicationRepository } from "./studio-world-publication.repository";
 import type { StudioWorldAcousticRepository } from "./studio-world-acoustic.repository";
 import type { StudioWorldAcousticService } from "./studio-world-acoustic.service";
+import type { StudioWorldConversationRepository } from "./studio-world-conversation.repository";
+import type { StudioWorldConversationService } from "./studio-world-conversation.service";
 import type { StudioLiveAcousticBinding } from "../creator/studio-live-acoustic-binding";
 import type { DrizzleStudioLiveLockRepository } from "../creator/studio-live-lock.repository";
 import { CommitStudioRevisionSchema, CreateStudioProjectGraphSchema, RestoreStudioRevisionSchema } from "./studio-project-graph.dto";
@@ -21,6 +23,8 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
 (connection ? describe : describe.skip)("authoritative world publication on real PostgreSQL", () => {
   let pool: Pool, database: typeof DatabaseRuntime, repository: StudioWorldPublicationRepository, graph: StudioProjectGraphRepository;
   let acoustic: StudioWorldAcousticRepository, genericLocks: DrizzleStudioLiveLockRepository;
+  let conversations:StudioWorldConversationRepository;
+  let ConversationService:new(repository:StudioWorldConversationRepository,binding:StudioLiveAcousticBinding)=>StudioWorldConversationService;
   let acousticService: new (repository: StudioWorldAcousticRepository, binding: StudioLiveAcousticBinding) => StudioWorldAcousticService;
   const works: string[] = [], users: string[] = [];
   const previousDatabase = process.env.DATABASE_URL;
@@ -33,6 +37,8 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     acoustic = new (await import("./studio-world-acoustic.repository")).StudioWorldAcousticRepository();
     genericLocks = new (await import("../creator/studio-live-lock.repository")).DrizzleStudioLiveLockRepository();
     acousticService = (await import("./studio-world-acoustic.service")).StudioWorldAcousticService;
+    conversations=new (await import("./studio-world-conversation.repository")).StudioWorldConversationRepository();
+    ConversationService=(await import("./studio-world-conversation.service")).StudioWorldConversationService;
     const triggers = await pool.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal");
     expect(triggers.rows.map((row) => row.tgname)).toEqual(expect.arrayContaining(["studio_revision_immutable_update", "studio_operation_immutable_update", "studio_revision_topology_parent"]));
   });
@@ -70,6 +76,158 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     const sessionInput={world,zoneId:"zone",doorEpoch:door.epoch,connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId,expectedSessionEpoch:null};
     return {...f,principal,publication,world,doorInput,door,binding,sessionInput};
   }
+  async function conversationFixture(count=2){
+    const f=await acousticFixture(),actors=[f.actor];for(let index=1;index<count;index++)actors.push(await member(f.workId,"viewer"));
+    const {door}=await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,allowedUserIds:actors},randomUUID());
+    const people=[];
+    for(const actor of actors){const principal={...f.principal,userId:actor},binding={...f.binding,connectionId:randomUUID(),clientInstanceId:randomUUID()};
+      const session=await acoustic.open(principal,f.workId,{...f.sessionInput,doorEpoch:door.epoch,connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId},binding,randomUUID());people.push({principal,binding,session});}
+    const proposal={conversationId:randomUUID(),selfSessionEpoch:people[0]!.session.sessionEpoch,memberSessionEpochs:people.map(person=>person.session.sessionEpoch)};
+    return {...f,door,people,proposal};
+  }
+  it.each([2,3,4])("requires each of %i actual actors to self-accept one exact symmetric conversation",async(count)=>{
+    const f=await conversationFixture(count);let state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    expect(state.status).toBe("pending");expect(state.members.filter(member=>member.accepted)).toHaveLength(1);
+    for(const person of f.people.slice(1)){state=(await conversations.change(person.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:person.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept"},randomUUID())).snapshot;}
+    expect(state.status).toBe("active");expect(state.members.every(member=>member.accepted)).toBe(true);
+    for(const person of f.people){const read=await conversations.current(person.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:person.session.sessionEpoch});expect(read.snapshot).toEqual(state);}
+    expect(JSON.stringify(state)).not.toContain(f.actor);expect(state.members.every(member=>!("sessionVersion" in member))).toBe(true);
+  });
+  it("rejects accepting for another member, unknown callers and a replaced session epoch",async()=>{
+    const f=await conversationFixture(),other=f.people[1]!,state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const accept={conversationId:state.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept" as const};
+    await expect(conversations.change(f.principal,f.workId,accept,randomUUID())).rejects.toMatchObject({operation:"view"});
+    const outsider=await member(f.workId,"editor");await expect(conversations.current({...f.principal,userId:outsider},f.workId,accept)).rejects.toMatchObject({operation:"view"});
+    await acoustic.open(other.principal,f.workId,{...f.sessionInput,doorEpoch:f.door.epoch,connectionId:other.binding.connectionId,clientInstanceId:other.binding.clientInstanceId,expectedSessionEpoch:other.session.sessionEpoch},{...other.binding,joinedAt:new Date(Date.now()+1).toISOString()},randomUUID());
+    expect((await conversations.change(other.principal,f.workId,accept,randomUUID())).snapshot).toMatchObject({status:"revoked",reason:"authority_lost"});
+  });
+  it("serializes simultaneous self-accepts and requires explicit read plus a new CAS attempt",async()=>{
+    const f=await conversationFixture(3),state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const results=await Promise.allSettled(f.people.slice(1).map(person=>conversations.change(person.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:person.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept"},randomUUID())));
+    expect(results.filter(result=>result.status==="fulfilled")).toHaveLength(1);expect(results.filter(result=>result.status==="rejected")).toHaveLength(1);
+    const loser=f.people[results.findIndex(result=>result.status==="rejected")+1]!;
+    const latest=await conversations.current(loser.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:loser.session.sessionEpoch});
+    expect((await conversations.change(loser.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:loser.session.sessionEpoch,expectedRevisionId:latest.snapshot.revisionId,action:"accept"},randomUUID())).snapshot.status).toBe("active");
+  });
+  it.each(["decline","cancel","leave"] as const)("%s is terminal and late accepts or fresh-ID reuse cannot revive it",async(action)=>{
+    const f=await conversationFixture(),other=f.people[1]!,state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const terminal=(await conversations.change(other.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:state.revisionId,action},randomUUID())).snapshot;
+    expect(terminal.status).toBe("revoked");
+    expect((await conversations.change(other.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept"},randomUUID())).snapshot).toEqual(terminal);
+    await expect(conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).rejects.toMatchObject({reason:"stale"});
+  });
+  it("reconciles ambiguous accept with the same intent while changed-input key reuse conflicts",async()=>{
+    const f=await conversationFixture(),other=f.people[1]!,state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const body={conversationId:state.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept" as const},key=randomUUID();
+    const first=await conversations.change(other.principal,f.workId,body,key),replay=await conversations.change(other.principal,f.workId,body,key);
+    expect(replay.snapshot).toEqual(first.snapshot);expect(replay.replayed).toBe(true);
+    await expect(conversations.change(other.principal,f.workId,{...body,action:"leave"},key)).rejects.toMatchObject({message:"studio_idempotency_conflict"});
+    expect((await pool.query('SELECT count(*)::int AS count FROM studio_operation WHERE "artifactId"=$1 AND "commandType"=$2',[f.publication.artifactId,"studio.world.acoustic-conversation"])).rows[0].count).toBe(2);
+  });
+  it("expiry creates a permanent tombstone even if participant leases remain valid",async()=>{
+    const f=await conversationFixture(),state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    await pool.query('UPDATE creator_work_live_lock SET "createdAt"=statement_timestamp()-interval \'1 minute\',"expiresAt"=statement_timestamp()-interval \'1 second\' WHERE "leaseId"=$1',[state.conversationId]);
+    const ended=await conversations.current(f.principal,f.workId,f.proposal);expect(ended.snapshot).toMatchObject({status:"revoked",reason:"expired"});
+    expect((await conversations.current(f.principal,f.workId,f.proposal)).snapshot).toEqual(ended.snapshot);
+  });
+  it.each(["door","world","membership","session-version"] as const)("%s authority loss revokes the entire symmetric scope",async(reason)=>{
+    const f=await conversationFixture(),other=f.people[1]!,pending=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    await conversations.change(other.principal,f.workId,{conversationId:pending.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:pending.revisionId,action:"accept"},randomUUID());
+    if(reason==="door")await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,open:false},randomUUID());
+    if(reason==="world")await repository.publish(f.actor,f.workId,input(f.publication.revisionId,"Updated"),randomUUID());
+    if(reason==="membership")await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2',[f.workId,other.principal.userId]);
+    if(reason==="session-version")await pool.query('UPDATE "user" SET "sessionVersion"=2 WHERE id=$1',[other.principal.userId]);
+    expect((await conversations.current(f.principal,f.workId,f.proposal)).snapshot.status).toBe("revoked");
+    expect((await pool.query('SELECT 1 FROM creator_work_live_lock WHERE "leaseId"=$1',[pending.conversationId])).rowCount).toBe(0);
+  });
+  it("session-scoped peer block revokes related offers and refuses new invitations for the same pair",async()=>{
+    const f=await conversationFixture(),first=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const secondInput={...f.proposal,conversationId:randomUUID()},second=await conversations.propose(f.principal,f.workId,secondInput,randomUUID());
+    await conversations.change(f.principal,f.workId,{conversationId:first.conversationId,selfSessionEpoch:f.proposal.selfSessionEpoch,expectedRevisionId:first.revisionId,action:"block",targetSessionEpoch:f.people[1]!.session.sessionEpoch},randomUUID());
+    expect((await conversations.current(f.principal,f.workId,{...f.proposal,conversationId:second.snapshot.conversationId})).snapshot).toMatchObject({status:"revoked",reason:"blocked"});
+    await expect(conversations.propose(f.principal,f.workId,{...f.proposal,conversationId:randomUUID()},randomUUID())).rejects.toMatchObject({reason:"closed"});
+  });
+  it("a target reconnect or second tab cannot bypass a blocker visit, while a new blocker epoch starts a new visit",async()=>{
+    const f=await conversationFixture(),target=f.people[1]!,state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    await conversations.change(f.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:f.proposal.selfSessionEpoch,expectedRevisionId:state.revisionId,action:"block",targetSessionEpoch:target.session.sessionEpoch},randomUUID());
+    for(const reconnect of [false,true]){
+      const binding=reconnect?{...target.binding,connectionId:randomUUID(),joinedAt:new Date().toISOString()}:{...target.binding,connectionId:randomUUID(),clientInstanceId:randomUUID()};
+      const session=await acoustic.open(target.principal,f.workId,{...f.sessionInput,doorEpoch:f.door.epoch,connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId,expectedSessionEpoch:reconnect?target.session.sessionEpoch:null},binding,randomUUID());
+      await expect(conversations.propose(f.principal,f.workId,{...f.proposal,conversationId:randomUUID(),memberSessionEpochs:[f.proposal.selfSessionEpoch,session.sessionEpoch]},randomUUID())).rejects.toMatchObject({reason:"closed"});
+      if(reconnect){
+        const own=f.people[0]!,ownBinding={...own.binding,connectionId:randomUUID(),joinedAt:new Date().toISOString()};
+        const fresh=await acoustic.open(f.principal,f.workId,{...f.sessionInput,doorEpoch:f.door.epoch,connectionId:ownBinding.connectionId,clientInstanceId:ownBinding.clientInstanceId,expectedSessionEpoch:own.session.sessionEpoch},ownBinding,randomUUID());
+        const reopened=await conversations.propose(f.principal,f.workId,{conversationId:randomUUID(),selfSessionEpoch:fresh.sessionEpoch,memberSessionEpochs:[fresh.sessionEpoch,session.sessionEpoch]},randomUUID());
+        expect(reopened.snapshot.status).toBe("pending");expect(reopened.snapshot.members.filter(member=>member.accepted)).toHaveLength(1);
+      }
+    }
+  });
+  it("missing latest consent receipt fails closed instead of restoring an earlier accepted member set",async()=>{
+    const f=await conversationFixture(),other=f.people[1]!,state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const active=await conversations.change(other.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept"},randomUUID());
+    await pool.query('DELETE FROM studio_mutation_receipt WHERE "resultRevisionId"=$1',[active.snapshot.revisionId]);
+    await expect(conversations.current(f.principal,f.workId,f.proposal)).rejects.toMatchObject({reason:"proof"});
+  });
+  it("a post-commit Core loss revokes the complete offer and emits only exact-recipient invalidation hints",async()=>{
+    const f=await conversationFixture();let checks=0;const hints:Array<{connection:string;event:unknown}>=[];
+    const service=new ConversationService(conversations,{verify:async(principal)=>{checks++;return checks<=2?f.people.find(person=>person.principal.userId===principal.userId)!.binding:null;},notify:(connection,event)=>hints.push({connection,event})} as unknown as StudioLiveAcousticBinding);
+    const result=await service.propose(f.principal,f.workId,f.proposal,randomUUID());expect(result.conversation.status).toBe("revoked");expect(checks).toBe(4);
+    expect(hints).toHaveLength(2);for(const hint of hints){expect(Object.keys(hint.event as object).sort()).toEqual(["conversationId","selfSessionEpoch","version","workId"]);expect(f.people.some(person=>person.binding.connectionId===hint.connection)).toBe(true);}
+  });
+  it("a removed and re-added member cannot revive prior consent even before a prior read noticed revocation",async()=>{
+    const f=await conversationFixture(),other=f.people[1]!,state=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    await conversations.change(other.principal,f.workId,{conversationId:state.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:state.revisionId,action:"accept"},randomUUID());
+    await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2',[f.workId,other.principal.userId]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'viewer','active',$3,now())`,[f.workId,other.principal.userId,randomUUID()]);
+    expect((await conversations.current(f.principal,f.workId,f.proposal)).snapshot).toMatchObject({status:"revoked",reason:"authority_lost"});
+  });
+  it("bounds active scopes and renews only ephemeral rows without growing graph or changing another participant lease",async()=>{
+    const f=await conversationFixture(),other=f.people[1]!,first=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const active=(await conversations.change(other.principal,f.workId,{conversationId:first.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:first.revisionId,action:"accept"},randomUUID())).snapshot;
+    const second=(await conversations.propose(f.principal,f.workId,{...f.proposal,conversationId:randomUUID()},randomUUID())).snapshot;
+    await expect(conversations.change(other.principal,f.workId,{conversationId:second.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:second.revisionId,action:"accept"},randomUUID())).rejects.toMatchObject({reason:"limit"});
+    const counts=()=>pool.query(`SELECT (SELECT count(*)::int FROM studio_revision WHERE "artifactId"=$1) AS revisions,(SELECT count(*)::int FROM studio_operation WHERE "artifactId"=$1) AS operations,(SELECT count(*)::int FROM studio_mutation_receipt WHERE "artifactId"=$1) AS receipts`,[f.publication.artifactId]);
+    const before=(await counts()).rows[0],otherBefore=await acoustic.current(other.principal,f.workId,other.session.sessionEpoch);
+    let latest=active;
+    for(let index=0;index<3;index++){
+      const renew={conversationId:active.conversationId,selfSessionEpoch:f.proposal.selfSessionEpoch,expectedRevisionId:active.revisionId,expectedLeaseRevision:latest.leaseRevision!};
+      latest=(await conversations.renew(f.principal,f.workId,renew)).snapshot;
+      expect(latest.revisionId).toBe(active.revisionId);
+      await expect(conversations.renew(f.principal,f.workId,renew)).rejects.toMatchObject({reason:"stale"});
+      expect((await conversations.current(f.principal,f.workId,f.proposal)).snapshot).toEqual(latest);
+    }
+    expect((await counts()).rows[0]).toEqual(before);
+    expect(await acoustic.current(other.principal,f.workId,other.session.sessionEpoch)).toEqual(otherBefore);
+    await expect(conversations.renew(f.principal,f.workId,{conversationId:active.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:active.revisionId,expectedLeaseRevision:latest.leaseRevision!})).rejects.toMatchObject({operation:"view"});
+  });
+  it("allows no more than 24 outstanding conversations, independently of the session admission count",async()=>{
+    const f=await conversationFixture();for(let index=0;index<24;index++)await conversations.propose(f.principal,f.workId,{...f.proposal,conversationId:randomUUID()},randomUUID());
+    await expect(conversations.propose(f.principal,f.workId,{...f.proposal,conversationId:randomUUID()},randomUUID())).rejects.toMatchObject({reason:"limit"});
+    const binding={...f.binding,connectionId:randomUUID(),clientInstanceId:randomUUID()};
+    expect((await acoustic.open(f.principal,f.workId,{...f.sessionInput,doorEpoch:f.door.epoch,connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId},binding,randomUUID())).kind).toBe("acoustic-session-lease-only");
+  });
+  it("never advertises a conversation expiry beyond a participant's shortened current cookie/session lease",async()=>{
+    const f=await conversationFixture(),other=f.people[1]!,pending=(await conversations.propose(f.principal,f.workId,f.proposal,randomUUID())).snapshot;
+    const active=(await conversations.change(other.principal,f.workId,{conversationId:pending.conversationId,selfSessionEpoch:other.session.sessionEpoch,expectedRevisionId:pending.revisionId,action:"accept"},randomUUID())).snapshot;
+    const shorter=await acoustic.current({...other.principal,expiresAt:Date.now()+6000},f.workId,other.session.sessionEpoch,other.session.leaseRevision);
+    expect(Date.parse(shorter.expiresAt)).toBeLessThan(Date.parse(active.expiresAt));
+    const read=(await conversations.current(f.principal,f.workId,f.proposal)).snapshot;
+    expect(read.expiresAt).toBe(shorter.expiresAt);expect(read.status).toBe("active");expect(read.revisionId).toBe(active.revisionId);
+    expect((await conversations.current(other.principal,f.workId,{conversationId:active.conversationId,selfSessionEpoch:other.session.sessionEpoch})).snapshot).toEqual(read);
+  });
+  it("door cleanup binds each receipt to its exact resource even when different actors reuse the same intent key",async()=>{
+    const f=await fixture(),other=await member(f.workId,"viewer"),principal={userId:f.actor,sessionVersion:1,expiresAt:Date.now()+600000};
+    const source=input();source.manifest.acousticZones=[{id:"left",roomId:"room",x:0,y:0,width:50,height:100,policy:"private",doorId:"left-door"},{id:"right",roomId:"room",x:50,y:0,width:50,height:100,policy:"private",doorId:"right-door"}];
+    const publication=(await repository.publish(f.actor,f.workId,source,randomUUID())).publication,world={worldId:publication.manifest.id,revisionId:publication.revisionId,contentHash:publication.contentHash};
+    const key=randomUUID(),sessions=[];
+    for(const [zoneId,actor] of [["left",f.actor],["right",other]]){
+      const door=await acoustic.changeDoor(principal,f.workId,{world,zoneId:zoneId!,expectedDoorEpoch:null,open:true,allowedUserIds:[actor!]},randomUUID());
+      const binding={connectionId:randomUUID(),clientInstanceId:randomUUID(),joinedAt:new Date().toISOString()};
+      const session=await acoustic.open({...principal,userId:actor!},f.workId,{world,zoneId:zoneId!,doorEpoch:door.door.epoch,...{connectionId:binding.connectionId,clientInstanceId:binding.clientInstanceId},expectedSessionEpoch:null},binding,key);sessions.push({door:door.door,session,actor:actor!});
+    }
+    await acoustic.changeDoor(principal,f.workId,{world,zoneId:"left",expectedDoorEpoch:sessions[0]!.door.epoch,open:false,allowedUserIds:[]},randomUUID());
+    expect(await acoustic.current({...principal,userId:other},f.workId,sessions[1]!.session.sessionEpoch)).toEqual(sessions[1]!.session);
+  });
   it("keeps manager door publication separate from a participant session lease and exposes no media grant",async()=>{
     const f=await acousticFixture();
     expect(await acoustic.door(f.principal,f.workId,"zone")).toMatchObject({epoch:f.door.epoch,permitted:true,open:true});

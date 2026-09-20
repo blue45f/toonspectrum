@@ -41,8 +41,8 @@ async function workLock(client: PoolClient, workId: string): Promise<void> {
   await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [ADVISORY + workId]);
 }
 async function access(client: PoolClient, principal: VerifiedSessionToken, workId: string, mode: "view" | "manage") {
-  const result = await client.query<{ projectId: string; workId: string; ownerUserId: string; membershipRole: string | null; membershipStatus: string | null; sessionVersion: number; status: string; now: Date }>(
-    `SELECT '' AS "projectId", work.id AS "workId", work."userId" AS "ownerUserId", member.role AS "membershipRole", member.status AS "membershipStatus", actor."sessionVersion", actor.status, statement_timestamp() AS now
+  const result = await client.query<{ projectId: string; workId: string; ownerUserId: string; membershipRole: string | null; membershipStatus: string | null; membershipInvitationId:string|null; membershipUpdatedAt: string | null; sessionVersion: number; status: string; now: Date }>(
+    `SELECT '' AS "projectId", work.id AS "workId", work."userId" AS "ownerUserId", member.role AS "membershipRole", member.status AS "membershipStatus", member."invitationId" AS "membershipInvitationId", member."updatedAt"::text AS "membershipUpdatedAt", actor."sessionVersion", actor.status, statement_timestamp() AS now
      FROM creator_work work JOIN "user" actor ON actor.id=$2 LEFT JOIN creator_work_collaborator member ON member."workId"=work.id AND member."userId"=$2 WHERE work.id=$1`, [workId, principal.userId]);
   const row = result.rows[0];
   if (!row) throw new StudioProjectNotFoundError("work");
@@ -140,9 +140,11 @@ export class StudioWorldAcousticRepository {
       await client.query('INSERT INTO studio_revision_parent ("revisionId","parentRevisionId",ordinal) VALUES ($1,$2,0)', [state.revisionId, world.revisionId]);
       await client.query(`INSERT INTO studio_operation ("artifactId",sequence,"commandId","baseRevisionId","resultRevisionId","actorUserId","deviceId","commandType",scope,"payloadHash",operation,"issuedAt") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11::jsonb,$12)`, [world.artifactId,state.sequence,randomUUID(),world.revisionId,state.revisionId,principal.userId,DEVICE,COMMAND,JSON.stringify({projectId:world.projectId}),hash(input),JSON.stringify({payload:input,state,receiptKey}),state.createdAt]);
       await client.query(`INSERT INTO studio_mutation_receipt ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response) VALUES ($1,$2,$3,$4,$5,$6::jsonb)`, [world.artifactId,principal.userId,receiptKey,requestHash,state.revisionId,JSON.stringify(state)]);
-      const removed = await client.query(`DELETE FROM creator_work_live_lock lease USING studio_mutation_receipt receipt WHERE lease."workId"=$1 AND lease."resourceId" LIKE $2 AND receipt."idempotencyKeyHash"=lease."acquisitionId" AND receipt.response->>'workId'=$1 AND receipt.response->'input'->>'zoneId'=$3`, [workId, PREFIX + "%", input.zoneId]);
+      const removed = await client.query<{response:unknown}>(`DELETE FROM creator_work_live_lock lease USING studio_mutation_receipt receipt WHERE lease."workId"=$1 AND lease."resourceId" LIKE $2 AND receipt."artifactId"=$4 AND receipt."idempotencyKeyHash"=lease."acquisitionId" AND receipt.response->>'workId'=$1
+        AND (receipt.response->>'resourceId'=lease."resourceId" OR $5||(receipt.response->>'conversationId')=lease."resourceId")
+        AND COALESCE(receipt.response->'input'->>'zoneId',receipt.response->>'zoneId')=$3 RETURNING receipt.response`, [workId, PREFIX + "%", input.zoneId,world.artifactId,PREFIX+"conversation:"]);
       if (removed.rowCount) await clock(client, workId);
-      return { door: state, replayed: false };
+      return { door: state, replayed: false, invalidatedConversations: removed.rows.map(row=>row.response) };
     });
   }
   async open(principal: VerifiedSessionToken, workId: string, raw: StudioAcousticSessionOpen, binding: StudioAcousticCoreBinding, key: string): Promise<StudioAcousticSessionLease> {
@@ -163,7 +165,7 @@ export class StudioWorldAcousticRepository {
       const resourceId = PREFIX + "session:" + hash({ actor: principal.userId, clientInstanceId: input.clientInstanceId });
       const existing = await client.query<{ leaseId: string }>('SELECT "leaseId" FROM creator_work_live_lock WHERE "workId"=$1 AND "resourceId"=$2 AND "expiresAt">statement_timestamp()', [workId,resourceId]);
       if ((existing.rows[0]?.leaseId ?? null) !== input.expectedSessionEpoch) return fail("stale");
-      const count = await client.query<{ count: number }>('SELECT count(*)::int AS count FROM creator_work_live_lock WHERE "workId"=$1 AND "resourceId" LIKE $2 AND "expiresAt">statement_timestamp() AND "resourceId"<>$3', [workId,PREFIX + "%",resourceId]);
+      const count = await client.query<{ count: number }>('SELECT count(*)::int AS count FROM creator_work_live_lock WHERE "workId"=$1 AND "resourceId" LIKE $2 AND "expiresAt">statement_timestamp() AND "resourceId"<>$3', [workId,PREFIX + "session:%",resourceId]);
       if (count.rows[0]!.count >= STUDIO_ACOUSTIC_MAX_SESSIONS) return fail("limit");
       const stored: Descriptor = {contract:"studio-acoustic-session-v1",input,actor:principal.userId,sessionVersion:principal.sessionVersion,binding,sessionEpoch:randomUUID(),resourceId,doorId:door.doorId,workId,requestHash};
       await client.query(`INSERT INTO studio_mutation_receipt ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response) VALUES ($1,$2,$3,$4,$5,$6::jsonb)`, [world.artifactId,principal.userId,receiptKey,requestHash,world.revisionId,JSON.stringify(stored)]);
@@ -195,3 +197,18 @@ export class StudioWorldAcousticRepository {
     });
   }
 }
+
+/** Server-only helpers for a caller holding exactly one work/advisory transaction. */
+export { transaction as studioAcousticTransaction, workLock as lockStudioAcousticWork, access as assertStudioAcousticAccess, clock as nextStudioAcousticClock };
+export async function loadStudioAcousticParticipant(client:PoolClient,workId:string,epoch:string) {
+  const row=await sessionRow(client,workId,epoch);if(!row?.live) return fail("stale");
+  const stored=descriptor(row,row.receiptActor,workId);
+  const principal={userId:stored.actor,sessionVersion:stored.sessionVersion,expiresAt:row.expiresAt.getTime()};
+  const permissions=await access(client,principal,workId,"view");
+  const world=await currentWorld(client,workId,stored.input.world),door=await loadDoor(client,world,stored.input.zoneId);
+  if(!door?.input.open||door.epoch!==stored.input.doorEpoch||!door.input.allowedUserIds.includes(stored.actor))return fail("closed");
+  const authorityFence=hash(permissions.ownerUserId===stored.actor?{owner:stored.actor}:{owner:permissions.ownerUserId,role:permissions.membershipRole,status:permissions.membershipStatus,invitationId:permissions.membershipInvitationId,updatedAt:permissions.membershipUpdatedAt});
+  return {actor:stored.actor,sessionVersion:stored.sessionVersion,authorityFence,sessionEpoch:epoch,binding:stored.binding,
+    world:stored.input.world,zoneId:stored.input.zoneId,doorId:stored.doorId,doorEpoch:stored.input.doorEpoch,expiresAt:row.expiresAt.toISOString(),publication:world};
+}
+export type StudioAcousticParticipant = Awaited<ReturnType<typeof loadStudioAcousticParticipant>>;

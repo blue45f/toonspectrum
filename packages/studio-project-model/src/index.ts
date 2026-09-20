@@ -56,3 +56,4 @@ export * from "./graph/review-task-completion";
 export * from "./graph/handoff-envelope";
 export * from "./graph/world-publication";
 export * from "./graph/world-acoustic";
+export * from "./graph/world-conversation";

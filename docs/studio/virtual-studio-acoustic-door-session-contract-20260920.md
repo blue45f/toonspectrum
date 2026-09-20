@@ -1,6 +1,6 @@
 # Virtual Studio server door and Core session lease
 
-Status: current server contract. This is a door and verified Core session lease, **not a conversation grant**. Private acoustic zones remain closed in the client policy until a separate consent grant and media adapter are implemented and verified. The API does not open microphones, add Huddle members, prove participant position, or authorize audio/video/screen sharing.
+Status: current server contract. This is a door and verified Core session lease, **not a conversation grant**. The separate server consent contract is documented in [conversation consent](virtual-studio-conversation-consent-contract-20260920.md). Private acoustic zones remain closed in the client policy until the media adapter is implemented and verified. The session API does not open microphones, add Huddle members, prove participant position, or authorize audio/video/screen sharing.
 
 ## Authority and API
 

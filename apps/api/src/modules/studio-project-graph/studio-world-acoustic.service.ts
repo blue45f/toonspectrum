@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from "@nestjs/common";
-import { canonicalJson, type StudioAcousticDoorChange, type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticSessionRenew } from "@toonspectrum/studio-project-model";
+import { canonicalJson, studioConversationMemberSchema, type StudioAcousticDoorChange, type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticSessionRenew } from "@toonspectrum/studio-project-model";
+import { z } from "zod";
 import type { VerifiedSessionToken } from "../../server/session";
 import { StudioLiveAcousticBinding } from "../creator/studio-live-acoustic-binding";
 import { StudioIdempotencyConflictError, StudioProjectForbiddenError, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
@@ -24,7 +25,14 @@ export class StudioWorldAcousticService {
     }
   }
   door(principal: VerifiedSessionToken, workId: string, zoneId: string) { return this.execute(()=>this.repository.door(principal,workId,zoneId)); }
-  changeDoor(principal: VerifiedSessionToken, workId: string, input: StudioAcousticDoorChange, key: string) { return this.execute(()=>this.repository.changeDoor(principal,workId,input,key)); }
+  changeDoor(principal: VerifiedSessionToken, workId: string, input: StudioAcousticDoorChange, key: string) { return this.execute(async()=>{
+    const result=await this.repository.changeDoor(principal,workId,input,key);
+    for(const raw of result.invalidatedConversations??[]){
+      const parsed=z.object({contract:z.literal("studio-acoustic-conversation-v1"),conversationId:z.uuid(),members:z.array(studioConversationMemberSchema.loose())}).safeParse(raw);
+      if(parsed.success)for(const member of parsed.data.members)this.bindings.notify(member.binding.connectionId,{version:1,workId,conversationId:parsed.data.conversationId,selfSessionEpoch:member.sessionEpoch});
+    }
+    return {door:result.door,replayed:result.replayed};
+  }); }
   private async finish(principal: VerifiedSessionToken, workId: string, lease: StudioAcousticSessionLease) {
     // No adapter/RPC await occurs inside a work/lease database transaction.
     const current = await this.bindings.verify(principal,workId,lease.binding);
