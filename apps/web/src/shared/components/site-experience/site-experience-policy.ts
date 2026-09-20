@@ -16,7 +16,7 @@ export function supportsSiteExperience(pathname: string): boolean {
 }
 
 const STUDIO_ROUTE_GUIDE_PATHS = new Set([
-  "/studio", "/studio/ai-settings", "/studio/assets", "/studio/ecosystem", "/studio/growth-ip",
+  "/studio/ai-settings", "/studio/assets", "/studio/ecosystem", "/studio/growth-ip",
   "/studio/engines", "/studio/environment", "/studio/immersive", "/studio/import", "/studio/jobs",
   "/studio/manual", "/studio/new", "/studio/templates", "/studio/toolchain",
 ]);
@@ -27,9 +27,9 @@ const STUDIO_ROUTE_GUIDE_PATHS = new Set([
  */
 export function supportsRoutePurposeScene(pathname: string): boolean {
   const path = normalizedExperiencePath(pathname);
-  // The creator home already owns a full visual hero and brand film; a second guide card
-  // above it duplicates the page purpose and creates an artificial top-spacing gap.
-  if (["/", "/home", "/team", "/hub"].includes(path)) return false;
+  // The four studio destinations own their headers. Do not prepend promotional guide cards
+  // to an operational workspace or its work library.
+  if (["/", "/home", "/team", "/hub", "/studio"].includes(path)) return false;
   if (supportsSiteExperience(path)) return true;
   if (STUDIO_ROUTE_GUIDE_PATHS.has(path) || path.startsWith("/studio/manual/")) return true;
   return /^\/studio\/p\/[^/]+\/(?:overview|story|production|assets|review|export|settings)$/u.test(path);

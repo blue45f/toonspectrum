@@ -7,8 +7,8 @@ import { workspaceTab, type workspaceProjectLinks } from "./studio-workspace-mod
 
 type Destination = readonly [href: string, title: string, description: string];
 function DestinationList({ items }: { readonly items: readonly Destination[] }) {
-  return <div className="workspace-link-list">{items.map(([href, title, description]) =>
-    <Link key={`${href}:${title}`} href={href}><span><strong>{title}</strong><small>{description}</small></span><ArrowRight size={18} aria-hidden="true" /></Link>,
+  return <div className="workspace-destination-list">{items.map(([href, title, description], index) =>
+    <Link key={`${href}:${title}`} href={href}><span className="workspace-destination-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span><strong>{title}</strong><small>{description}</small></span><ArrowRight size={18} aria-hidden="true" /></Link>,
   )}</div>;
 }
 function useWorkspaceSection<T extends string>(allowed: readonly [T, ...T[]]) {

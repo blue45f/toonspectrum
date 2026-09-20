@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, type MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowRight, BookOpen, ClipboardList, Compass, FolderOpen, HelpCircle, MapPin, Plus, Search, Settings, Users } from "lucide-react";
+import { ArrowRight, BookOpen, ClipboardList, Compass, FolderOpen, HelpCircle, MapPin, Plus, Search, Settings } from "lucide-react";
 import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -9,7 +9,7 @@ import { useCreatorExperienceMode } from "@/shared/lib/creator-experience-mode";
 import { CreatorExperienceModeSwitch } from "@/shared/components/CreatorExperienceModeSwitch";
 import { OpenSearchButton } from "@/shared/components/open-search-button";
 import { workspaceNavigationHref } from "@/shared/components/workspace/workspace-navigation-model";
-import { WorkspaceNavigation } from "@/shared/components/workspace/WorkspaceNavigation";
+import { WorkspaceAccountAction, WorkspaceBrand, WorkspaceSidebar } from "@/shared/components/workspace/WorkspaceChrome";
 import { WorkspaceContextPanel } from "@/shared/components/workspace/WorkspaceContextPanel";
 import { useStudioProjectLibrary } from "../studio-shell/useStudioProjectLibrary";
 import { useStudioWorkspaceResume } from "./useStudioWorkspaceResume";
@@ -18,7 +18,10 @@ import { selectWorkspaceProject, workspacePanel, workspaceProjectLinks, type Wor
 import { WorkspaceTeamContent, WorkspaceExploreContent } from "./StudioWorkspaceSections";
 import { StudioWorkspaceProjectPicker } from "./StudioWorkspaceProjectPicker";
 import { StudioWorkspaceSpaceBoundary } from "./StudioWorkspaceSpaceBoundary";
+import { StudioWorkspaceActivityRail } from "./StudioWorkspaceActivityRail";
+import { StudioWorkspaceRecentWorks } from "./StudioWorkspaceRecentWorks";
 import "@/shared/components/workspace/workspace.css";
+import "@/shared/components/workspace/workspace-redesign.css";
 
 const WorkspaceWorld = lazy(() => import("./StudioWorkspaceWorld").then((module) => ({ default: module.StudioWorkspaceWorld })));
 
@@ -85,7 +88,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
   return (
     <div className="workspace-shell" onClickCapture={verifyResumeClick} onAuxClickCapture={verifyResumeClick} data-workspace-resume-state={resumeState.status} data-route-ready="studio-workspace" data-workspace-surface={surface}>
       <header className="workspace-topbar">
-        <Link href={homeHref} className="workspace-brand"><span aria-hidden="true">T</span><strong>ToonSpectrum</strong></Link>
+        <WorkspaceBrand href={homeHref} />
         <div className="workspace-project-select">
           <label htmlFor="workspace-current-project">{bt("현재 작품", "Current work")}</label>
           <select id="workspace-current-project" aria-label={bt("현재 작품 선택", "Select current work")} value={project?.id ?? ""}
@@ -96,15 +99,16 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
           <button type="button" className="workspace-icon-button workspace-project-find" onClick={() => setPanel("projects")} aria-haspopup="dialog" aria-expanded={panel === "projects"} aria-label={bt("작품 찾아 전환", "Find and switch work")}><Search size={19} aria-hidden="true" /></button>
         </div>
         <div className="workspace-utilities">
-          <OpenSearchButton className="workspace-icon-button">{bt("검색", "Search")}</OpenSearchButton>
+          <OpenSearchButton className="workspace-search-trigger"><Search size={17} aria-hidden="true" /><span>{bt("작품·도구·메뉴 검색", "Search works, tools, menus")}</span><kbd aria-hidden="true">⌘ K</kbd></OpenSearchButton>
           <button type="button" className="workspace-work-shortcut" onClick={() => setPanel("work")} aria-haspopup="dialog" aria-expanded={panel === "work"} aria-label={bt("작업 바로가기 열기", "Open work shortcuts")}><ClipboardList size={20} aria-hidden="true" /></button>
-          <Link href="/my" aria-label={bt("내 프로필", "My profile")}><Users size={20} aria-hidden="true" /></Link>
+          <WorkspaceAccountAction />
         </div>
       </header>
-      <WorkspaceNavigation activeId={activeId} context={navigationContext} />
+      <WorkspaceSidebar activeId={activeId} context={navigationContext} />
       <section className="workspace-main" aria-labelledby="workspace-title">
+        <p className="workspace-section-marker" aria-hidden="true">{surface === "home" ? "YOUR CREATIVE SPACE" : surface === "team" ? "BETTER TOGETHER" : "BEYOND YOUR STUDIO"}</p>
         <div className="workspace-heading">
-          <div><p className="workspace-eyebrow">{userName ? bt(`${userName} 님의 작업실`, `${userName}'s workspace`) : bt("나만의 온라인 작업실", "Your creative workspace")}</p><h1 id="workspace-title">{label}</h1></div>
+          <div><p className="workspace-eyebrow">{userName ? bt(`${userName} 님의 작업실`, `${userName}'s workspace`) : bt("나만의 온라인 작업실", "Your creative workspace")}</p><h1 id="workspace-title">{label}</h1><p className="workspace-heading-description">{surface === "home" ? bt("좋은 이야기는, 나만의 공간에서 시작됩니다.", "Every good story begins with a space of your own.") : surface === "team" ? bt("같은 이야기를 만드는 사람들과, 한곳에서.", "One place for the people creating the same story.") : bt("새로운 영감을 만나, 내 작업실로 가져오세요.", "Find fresh inspiration. Bring it back to your studio.")}</p></div>
           {surface === "home" ? <CreatorExperienceModeSwitch /> : null}
         </div>
         {surface === "home" && panel !== "work" ? <WorkspaceResumeNotice snapshot={resumeState} onRetry={resumeState.refresh} /> : null}
@@ -115,6 +119,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
           <p role={loading ? "status" : undefined}>{loading ? bt("작품을 확인하는 동안 다른 원고를 열지 않습니다.", "No other artwork will open while your library is being checked.") : library.error ? bt("브라우저 저장 공간을 확인한 뒤 다시 시도해 주세요. 원고는 변경하지 않았습니다.", "Check browser storage and try again. Your artwork has not been changed.") : bt("원고를 다른 작품으로 대체하지 않았습니다. 작품 목록에서 다시 선택하거나 개인 작업실로 돌아가세요.", "No other artwork has been substituted. Choose a work from the library or return to your personal studio.")}</p>
           {!loading ? <div><Link className="workspace-primary" href={library.error ? "/studio?view=storage" : "/studio"}>{library.error ? bt("저장 공간 확인", "Check storage") : bt("작품 목록 열기", "Open work library")}</Link>{!library.error ? <button type="button" className="workspace-icon-button" onClick={() => chooseProject("")}>{bt("개인 작업실로 돌아가기", "Return to personal studio")}</button> : null}</div> : null}
         </section> : surface === "home" ? <>
+          <div className="workspace-home-layout">
           {mode === "virtual-studio" ? <StudioWorkspaceSpaceBoundary fallback={<section className="workspace-world-loading" data-workspace-space-error="true" role="alert">
             <h2>{bt("공간 보기를 불러오지 못했습니다", "Space view could not be loaded")}</h2>
             <p>{bt("메뉴와 선택한 작품은 그대로입니다. 목록 보기에서 작업을 이어갈 수 있습니다.", "Your menus and selected work are still available. Continue working in list view.")}</p>
@@ -132,8 +137,10 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
               <Link href={links.production}><FolderOpen size={20} aria-hidden="true" /><span><strong>{bt("진행과 담당 작업", "Production and assignments")}</strong><small>{bt("실제 제작 보드에서 상태 확인", "Check the actual production board")}</small></span><ArrowRight size={18} aria-hidden="true" /></Link>
               <Link href={links.space}><MapPin size={20} aria-hidden="true" /><span><strong>{bt("가상스튜디오 입장", "Enter virtual studio")}</strong><small>{bt("이 작품의 실시간 공간으로 이동", "Open this work's live space")}</small></span><ArrowRight size={18} aria-hidden="true" /></Link></> : <Link href="/studio/import"><FolderOpen size={20} aria-hidden="true" /><span>{bt("기존 파일 가져오기", "Import existing work")}</span><ArrowRight size={18} aria-hidden="true" /></Link>}
             </div>
-            <section className="workspace-recent"><h2>{bt("최근 작품", "Recent work")}</h2>{loading ? <p role="status">{bt("작품 목록 불러오는 중…", "Loading works…")}</p> : context.projects.length ? context.projects.slice(0, 3).map((item) => <button key={item.id} type="button" onClick={() => chooseProject(item.id)} aria-pressed={project?.id === item.id}><span>{item.title}</span><small>{bt("작품 선택", "Select work")}</small></button>) : <p>{bt("아직 이 기기에 등록된 작품이 없습니다.", "No works are registered on this device yet.")}</p>}<Link href="/studio">{bt("작품 전체 보기", "View all works")}</Link></section>
           </div>}
+          {mode === "virtual-studio" ? <StudioWorkspaceActivityRail project={project} links={links} resume={resume} resumeLabel={resumeActionLabel} /> : null}
+          </div>
+          <StudioWorkspaceRecentWorks projects={context.projects} selectedId={project?.id} locale={locale} onSelect={chooseProject} />
         </> : surface === "team" ? <WorkspaceTeamContent links={links} project={project} /> : <WorkspaceExploreContent />}
       </section>
       <footer className="workspace-statusbar">
