@@ -1228,10 +1228,11 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
     }
 
     const strokeFocusSwitch = dialog.getByRole("switch", {
-      name: "드로잉 중 자동 집중 끄기",
+      name: /펜으로 그리는 동안 자동 숨김/u,
     });
-    if (!(await strokeFocusSwitch.isVisible().catch(() => false))) {
-      failures.push("드로잉 중 자동 집중 설정 미노출");
+    if (!(await strokeFocusSwitch.isVisible().catch(() => false))
+      || await strokeFocusSwitch.getAttribute("aria-checked") !== "true") {
+      failures.push("드로잉 자동 숨김 설정 미노출 또는 활성 상태 미유지");
     }
 
     await dialog.getByRole("button", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.closeLabel, exact: true }).click();
@@ -1264,7 +1265,16 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
         ) {
           failures.push(`획 입력 중 플로팅 UI가 남음: ${JSON.stringify(drawingState)}`);
         }
-        if (await launcher.isVisible()) failures.push("획 입력 중 보기 런처가 남음");
+        // Playwright considers opacity:0 visible. The launcher deliberately fades
+        // while inert/aria-hidden remove it from pointer, keyboard and AT access.
+        await page.waitForFunction(() => {
+          const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
+          if (!root) return false;
+          const style = getComputedStyle(root);
+          return root.dataset.studioShellDrawingAutoHideActive === "true"
+            && root.inert && root.getAttribute("aria-hidden") === "true"
+            && style.opacity === "0" && style.pointerEvents === "none";
+        }, undefined, { timeout: 3000 });
       } finally {
         await page.mouse.up();
       }
@@ -1277,6 +1287,13 @@ async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
       );
       await drawingOptions.waitFor({ state: "visible", timeout: 3_000 });
       await launcher.waitFor({ state: "visible", timeout: 3_000 });
+      await page.waitForFunction(() => {
+        const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
+        if (!root) return false;
+        const style = getComputedStyle(root);
+        return !root.inert && root.getAttribute("aria-hidden") !== "true"
+          && style.opacity === "1" && style.pointerEvents === "auto";
+      }, undefined, { timeout: 3000 });
     }
 
     if (failures.length === 0) log("  floating visibility + WYSIWYG layout + stroke focus ok");
