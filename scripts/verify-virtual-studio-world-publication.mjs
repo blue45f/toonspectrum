@@ -59,7 +59,8 @@ await page.route("**/*", async (route) => {
 const panel = () => page.getByRole("region", { name: "공간 게시", exact: true });
 const refresh = () => panel().getByRole("button", { name: "게시 공간 확인·적용", exact: true });
 const runtime = () => page.locator('[data-studio-phaser-runtime="true"]');
-async function ready() { await page.locator('[data-studio-engine-status="ready"]').waitFor({ timeout: 40_000 }); }
+async function showPublication() { if (!await panel().isVisible()) await page.getByRole("button", { name: "공간·꾸미기", exact: true }).click(); }
+async function ready() { await page.locator('[data-studio-engine-status="ready"]').waitFor({ timeout: 40_000 }); await showPublication(); }
 async function active(revision) {
   await page.waitForFunction((wanted) => {
     const state = JSON.parse(document.querySelector("#fixture-state").textContent);
@@ -77,12 +78,13 @@ async function load(width = 1280) {
   if (page.url().startsWith(origin.origin)) await page.evaluate(() => { localStorage.removeItem("toonspectrum:virtual-studio-world-draft:v1:world-qa"); });
   await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
   await page.goto(`${origin.origin}/tools/browser-harnesses/virtual-studio-world-publication.html?worldEdit=1`);
-  await panel().getByRole("button", { name: "초안 게시·적용", exact: true }).waitFor(); await ready();
+  await ready(); await panel().getByRole("button", { name: "초안 게시·적용", exact: true }).waitFor();
 }
 async function editAndPublish(label) {
   const editor = page.locator('[data-studio-world-authoring="true"]'); await editor.getByLabel("Label KO", { exact: true }).fill(label);
   const publish = panel().getByRole("button", { name: "초안 게시·적용", exact: true }); await publish.focus();
-  assert((await publish.boundingBox()).height >= 44); await page.keyboard.press("Enter");
+  const geometry = await publish.evaluate(element => ({ height: element.getBoundingClientRect().height, minHeight: getComputedStyle(element).minHeight, rootFont: getComputedStyle(document.documentElement).fontSize }));
+  assert(geometry.height >= 44, JSON.stringify(geometry)); await page.keyboard.press("Enter");
 }
 try {
   for (const width of [1280, 390]) {
@@ -139,10 +141,13 @@ try {
   cases.push({ name: "lost-response-explicit-same-intent-and-bytes", requests: 2, publications: 1 });
   await load(); mode = "held"; await editAndPublish("늦은 응답"); await waitHeld(); actor = "other-actor";
   await page.getByRole("button", { name: "예시 계정 전환", exact: true }).click(); release();
-  await panel().getByText(/접근 권한을 확인할 수 없어요/u).waitFor(); assert.equal(writes.length, 0);
+  await page.waitForFunction(() => JSON.parse(document.querySelector("#fixture-state").textContent).phase === "failed");
+  await showPublication(); await panel().getByText(/접근 권한을 확인할 수 없어요/u).waitFor(); assert.equal(writes.length, 0);
   cases.push({ name: "actor-change-fences-late-authority-zero-POST" });
   await load(); await editAndPublish("권한 회수 공간"); await active("published-1"); const revoked = await runtime().elementHandle();
-  mode = "revoked"; await refresh().click(); await panel().getByText(/접근 권한을 확인할 수 없어요/u).waitFor();
+  mode = "revoked"; await refresh().click();
+  await page.waitForFunction(() => JSON.parse(document.querySelector("#fixture-state").textContent).phase === "failed");
+  await showPublication(); await panel().getByText(/접근 권한을 확인할 수 없어요/u).waitFor();
   assert.equal(JSON.parse(await page.locator("#fixture-state").textContent()).revision, null); assert.equal(await revoked.evaluate((element) => element.isConnected), false);
   cases.push({ name: "fresh-ACL-revocation-removes-published-realm" });
   assert.deepEqual(errors, []);

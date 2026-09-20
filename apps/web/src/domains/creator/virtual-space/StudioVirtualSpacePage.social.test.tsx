@@ -288,9 +288,8 @@ describe("Virtual Studio social activity ownership", () => {
     const src = (skin: string) => `/assets/virtual-studio/production-v2/player-${skin}-direction-down.png`;
     const surfaces = [
       [".vs2-stack", ["dark", "silver", "pink"]],
-      [".vs2-live-huddle", ["silver", "pink"]],
-      [".vs2-live-chat-body", ["silver", "pink"]],
-      [".vs2-live-members", ["dark", "silver", "pink"]],
+      [".studio-vspace-peer-picker", ["silver", "pink"]],
+      [".vs2-live-members", ["dark"]],
     ] as const;
     for (const [selector, skins] of surfaces) {
       const images = view.container.querySelectorAll(`${selector} img.studio-vspace-reference-compact-player`);
@@ -308,7 +307,7 @@ describe("Virtual Studio social activity ownership", () => {
       cleo: { avatarIndex: 3, activity: "reviewing", appearance: { ...appearance, capabilities: ["idle"] } },
     };
     const view = await mount();
-    const images = view.container.querySelectorAll(".vs2-live-chat-body img.studio-vspace-reference-compact-player");
+    const images = view.container.querySelectorAll(".studio-vspace-peer-picker img.studio-vspace-reference-compact-player");
     expect([...images].map((image) => image.getAttribute("src"))).toEqual([
       "/assets/virtual-studio/production-v2/player-pink-state-review.png",
       "/assets/virtual-studio/production-v2/player-pink-direction-down.png",
@@ -548,7 +547,7 @@ describe("published world Page transition", () => {
     const room = DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
     f.worldLoad = Promise.resolve({...DEFAULT_STUDIO_WORLD_MANIFEST,colliders:[],props:[],
       acousticZones:[{id:"private-zone",roomId:room.id,x:100,y:100,width:80,height:80,policy:"private",doorId:"door"}]});
-    await mount();
+    await mount("space");
     expect(screen.getByRole("option",{name:room.labelKo})).toBeTruthy();
     const before = {...f.engine!.snapshot.self};
     fireEvent.click(screen.getByRole("button",{name:"이 방으로 걸어가기"}));

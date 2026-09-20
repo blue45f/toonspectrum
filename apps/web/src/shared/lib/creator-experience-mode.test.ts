@@ -17,10 +17,10 @@ describe("studio view preference", () => {
     expect(document.documentElement.dataset.creatorExperience).toBe("classic");
     expect(JSON.parse(localStorage.getItem(CREATOR_EXPERIENCE_STORAGE_KEY) ?? "{}")).toEqual({ mode: "classic" });
   });
-  it("defaults to list view on a narrow device", async () => {
+  it("defaults to virtual studio on a narrow device", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
     const { useCreatorExperienceMode } = await import("./creator-experience-mode");
-    expect(useCreatorExperienceMode.getState().mode).toBe("classic");
+    expect(useCreatorExperienceMode.getState().mode).toBe("virtual-studio");
   });
   it.each(["classic", "virtual-studio"])("preserves the explicit legacy preference %s", async (mode) => {
     localStorage.setItem("toonspectrum-creator-experience-mode-v1", JSON.stringify({ mode }));
