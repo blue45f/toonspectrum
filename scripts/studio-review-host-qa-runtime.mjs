@@ -38,6 +38,9 @@ export async function withStudioReviewHostQaRuntime(environment, verify) {
         TMPDIR: environment.TMPDIR,
         NODE_ENV: "test",
         NEST_API_URL: target.apiOrigin,
+        // Authoring a shared source must receive the actual Nest CRDT save acknowledgement.
+        // The existing same-origin Vite WS proxy targets only the owned loopback API above.
+        VITE_STUDIO_LIVE_DEV_PROXY_ENABLED: "true",
       },
       stdio: "inherit",
     });

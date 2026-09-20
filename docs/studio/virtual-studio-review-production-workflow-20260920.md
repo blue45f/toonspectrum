@@ -212,18 +212,24 @@ already supported development origin. Both owned processes terminate on completi
 The fixture inserts a new verified test account using the current password hash, avoiding
 external verification email. Actual login issues the session cookie; actual work creation and
 saved-document reads use the API and PostgreSQL. The full Studio Host loads the real work,
-uses its actual collaboration/mutation authority, dismisses onboarding through the visible
-button and invokes the shipped capture command. Only the capture-producer HTTP endpoints
+uses its actual mutation-authority code, dismisses onboarding through the visible button
+and invokes the shipped capture command. Only the capture-producer HTTP endpoints
 are intercepted, since this isolated API has no external private-object store.
 
-The final owned-runtime run passed with a separate bootstrapped local PostgreSQL 16 database
+The initial empty-page owned-runtime run passed with a separate bootstrapped local PostgreSQL 16 database
 and its DML-only runtime role. The actual Host exported two distinct PNGs at the unchanged
 default 2x resolution, **1440 by 2160** each. Browser-decoded center pixels matched each saved
 fixture page's background and ordinal. The intent matched the actual saved revision/digest,
 three source reads were observed, prepare and complete each occurred once, upload SHA-256
 receipts matched the exact completion body, and there were zero page errors or source writes.
-The completion screenshot was visually inspected. This covers the two-page Host/export bridge;
-it is not proof of every drawing element's visual parity, production object storage or WAN media.
+The completion screenshot was visually inspected. This covered the two-page Host/export bridge,
+actual login and source reads; it did **not** exercise authored manuscript persistence or the
+collaboration server's save acknowledgement. Extending the fixture to real pen input exposed
+the missing development WebSocket opt-in in the QA runtime. The runtime now explicitly uses
+the existing same-origin Vite proxy to its owned loopback Nest gateway. No save-authority check
+was relaxed. The [authored manuscript follow-up](virtual-studio-review-host-authored-evidence-20260920.md)
+records real pen input, the shared save and per-stroke PNG evidence. Neither run establishes
+production object storage or WAN media.
 
 To reproduce, provide `TEST_DATABASE_URL` for a dedicated, migrated local test database and run
 `pnpm exec tsx scripts/verify-virtual-studio-review-host.mts`. Optional local endpoints are
