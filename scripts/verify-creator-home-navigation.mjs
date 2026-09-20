@@ -104,11 +104,13 @@ try {
     await expect(processTitle).toBeFocused();
 
     const processLink = page.locator('.cf-jump-nav a[href="#creator-flow"]');
+    await processLink.click({ trial: true });
     await processLink.focus();
     await expect(processLink).toBeFocused();
     await processLink.press("Enter");
     await expect(page).toHaveURL(/#creator-flow$/);
     await expect(processTitle).toBeFocused();
+    await processLink.click({ trial: true });
     await processLink.focus();
     await expect(processLink).toBeFocused();
     await processLink.press("Enter");

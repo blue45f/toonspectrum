@@ -45,6 +45,7 @@ jobs:
             /apps/web/public/assets/3d/environments/refined-v6/
             /apps/web/public/assets/3d/environments/expansion-v1/
             /apps/web/public/assets/virtual-studio/world/default-world.json
+            /apps/web/public/assets/create/creator-board-hero.png
             /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-research-lab-vertical-depth/background.png
             /apps/web/public/assets/3d/characters/thumbnails/refined-v2/
             !/apps/web/public/vrm/
