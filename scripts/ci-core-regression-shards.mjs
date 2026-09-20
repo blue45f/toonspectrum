@@ -22,6 +22,7 @@ const GLOB_PATTERN = /[*?[\]]/u;
 export const CORE_DATABASE_VITEST_TARGETS = Object.freeze([
   "apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts",
   "apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts",
+  "apps/api/src/modules/studio-project-graph/studio-work-session.integration.test.ts",
 ]);
 
 export function buildShardVitestArgs(targets) {

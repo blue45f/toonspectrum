@@ -215,6 +215,7 @@ apps/web/src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts
+apps/web/src/domains/creator/work-session
 apps/web/src/domains/creator/workspace/StudioWorkspacePage.continuity.test.tsx
 apps/web/src/domains/creator/workspace/StudioWorkspaceProjectPicker.test.tsx
 apps/web/src/domains/creator/workspace/StudioWorkspaceSpaceBoundary.test.tsx
@@ -242,6 +243,7 @@ packages/core/src/server/home.cpu-cache.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts
 packages/studio-project-model/src/__tests__/review-task-reference.test.ts
 packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts
+packages/studio-project-model/src/__tests__/work-session.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs

@@ -4,6 +4,7 @@ import { Injectable } from "@nestjs/common";
 
 import {
   canonicalJson,
+  STUDIO_WORK_SESSION_ARTIFACT_PREFIX,
   reviewAnchorSchema,
   scopeContains,
   scopeRefSchema,
@@ -276,6 +277,7 @@ export async function loadArtifactAccess(
   artifactId: string,
   lock = false,
 ): Promise<{ row: ArtifactAccessRow; access: StudioProjectAccess } | null> {
+  assertGenericWorkSessionArtifact(artifactId);
   const suffix = lock ? " FOR UPDATE OF artifact" : "";
   const result = await client.query<ArtifactAccessRow>(
     `SELECT
@@ -490,6 +492,10 @@ function mapStudioReviewComment(
   });
 }
 
+function assertGenericWorkSessionArtifact(id: string): void {
+  if (id.startsWith(STUDIO_WORK_SESSION_ARTIFACT_PREFIX)) throw new StudioRepositoryInvariantError("work_session_endpoint_required", "Work sessions require the dedicated authorized endpoint");
+}
+
 @Injectable()
 export class StudioProjectGraphRepository {
   async createProject(
@@ -497,6 +503,7 @@ export class StudioProjectGraphRepository {
     input: CreateStudioProjectGraph,
     idempotencyKey: string,
   ): Promise<StudioProjectCreateResponse> {
+    assertGenericWorkSessionArtifact(input.artifact.id);
     const client = await dbPool.connect();
     const keyHash = studioIdempotencyKeyHash(idempotencyKey);
     const requestHash = studioRequestHash(input);
@@ -633,6 +640,7 @@ export class StudioProjectGraphRepository {
     input: CreateStudioArtifact,
     idempotencyKey: string,
   ): Promise<StudioProjectCreateResponse> {
+    assertGenericWorkSessionArtifact(input.artifact.id);
     const client = await dbPool.connect();
     const keyHash = studioIdempotencyKeyHash(idempotencyKey);
     const requestHash = studioRequestHash({ projectId, input });
@@ -809,7 +817,7 @@ export class StudioProjectGraphRepository {
         createdAt: toIso(project.createdAt),
         updatedAt: toIso(project.updatedAt),
         access: accessResult.access,
-        artifacts: artifactResult.rows.map((artifact) => ({
+        artifacts: artifactResult.rows.filter((artifact) => !artifact.id.startsWith(STUDIO_WORK_SESSION_ARTIFACT_PREFIX)).map((artifact) => ({
           ...artifact,
           createdAt: toIso(artifact.createdAt),
           updatedAt: toIso(artifact.updatedAt),
@@ -2379,6 +2387,7 @@ export class StudioProjectGraphRepository {
     projectId: string,
     input: CreateCompatibilityReport,
   ): Promise<CompatibilityReport> {
+    if (input.artifactId) assertGenericWorkSessionArtifact(input.artifactId);
     const client = await dbPool.connect();
     try {
       await client.query("BEGIN");
