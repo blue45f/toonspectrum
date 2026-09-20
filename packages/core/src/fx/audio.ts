@@ -1,3 +1,5 @@
+import { releasePlaylistMedia } from "./playlist-media-release";
+
 /**
  * @toonspectrum/core/fx/audio — 브라우저용 isomorphic 오디오 엔진.
  *
@@ -1870,7 +1872,7 @@ const disposePlaylistVoice = (voice: PlaylistVoice): void => {
   setTimeout(
     () => {
       try {
-        voice.el.pause();
+        releasePlaylistMedia(voice.el);
         voice.src?.disconnect();
         voice.node.disconnect();
       } catch {
