@@ -115,3 +115,11 @@
 .workspace-project-picker-actions>a,.workspace-project-picker-state>a{display:inline-flex;align-items:center;min-height:44px;color:var(--color-accent)}
 .workspace-project-picker-state p{width:100%;overflow-wrap:anywhere;margin:0}
 @media(min-width:761px) and (max-width:1000px){.workspace-project-select>label{display:none}}
+
+/* Reserve the original art ratio instead of letterboxing phones into a 380px frame. */
+@media(max-width:760px){
+  .workspace-world-image{min-height:0}
+  .workspace-world-image>img{height:auto;aspect-ratio:850/798;min-height:0}
+  html:has(.workspace-shell){scroll-padding-block-end:calc(84px + env(safe-area-inset-bottom))}
+  .workspace-main :is(a,button,input,select),.workspace-statusbar :is(a,button){scroll-margin-block:16px calc(84px + env(safe-area-inset-bottom))}
+}
