@@ -115,7 +115,7 @@ export const CHARACTERS: FortuneCharacter[] = [
   },
 ];
 
-export const FORTUNE_MAJOR_ARCANA = [
+const FORTUNE_MAJOR_ARCANA = [
   { id: 0, name: "광대", nameEn: "The Fool", keywords: ["시작", "자유", "모험", "무모함"], reversed: ["경솔", "망설임", "무책임"] },
   { id: 1, name: "마법사", nameEn: "The Magician", keywords: ["창조", "재능", "기술", "자신감"], reversed: ["속임수", "미숙", "자만"] },
   { id: 2, name: "여사제", nameEn: "The High Priestess", keywords: ["직관", "지혜", "비밀", "침묵"], reversed: ["혼란", "직관 무시", "숨겨진 동기"] },
@@ -139,6 +139,10 @@ export const FORTUNE_MAJOR_ARCANA = [
   { id: 20, name: "심판", nameEn: "Judgement", keywords: ["부활", "깨달음", "결단", "평가"], reversed: ["자기 비판", "후회", "결단 지연"] },
   { id: 21, name: "세계", nameEn: "The World", keywords: ["완성", "통합", "조화", "여행의 끝"], reversed: ["미완성", "지연", "마무리 부족"] },
 ];
+
+export function fortuneMajorArcanaCatalog() {
+  return FORTUNE_MAJOR_ARCANA.map((card) => ({ ...card, keywords: [...card.keywords], reversed: [...card.reversed] }));
+}
 
 // 오행 영문키 → 한글 (오늘의 운세 개인화 텍스트용)
 const ELEMENT_NAMES_KO: Record<string, string> = {

@@ -1,5 +1,5 @@
 import { resolveFortuneBirth } from "./fortune-calendar";
-import { drawTarot, FORTUNE_MAJOR_ARCANA, seededRandom, type TarotCard } from "./fortune-engine";
+import { drawTarot, fortuneMajorArcanaCatalog, seededRandom, type TarotCard } from "./fortune-engine";
 
 export type FortuneTarotDeck = "major-22" | "full-78";
 export const FORTUNE_FULL_TAROT_REVISION = "toonstudio-tarot-78-v1";
@@ -27,7 +27,7 @@ const RANKS = [
   ["왕", "King", "책임 있는 선택", "이끌기와 경청하기가 함께 드러나는 대사를 써 보세요."],
 ] as const;
 export function fortuneTarotCatalog() {
-  const majors = FORTUNE_MAJOR_ARCANA.map((card) => ({ ...card, keywords: [...card.keywords], reversed: [...card.reversed],
+  const majors = fortuneMajorArcanaCatalog().map((card) => ({ ...card, keywords: [...card.keywords], reversed: [...card.reversed],
     uprightText: `${card.name}의 '${card.keywords[0]}'을 한 컷의 소재로 삼아 보세요. 내가 선택할 수 있는 다음 행동을 적어 보세요.`,
     reversedText: `${card.name}의 상징을 뒤집어 읽어 보세요. '${card.reversed[0]}'은 운명이나 진단이 아니라 다른 관점을 찾는 질문입니다.` }));
   const minors = SUITS.flatMap((suit, suitIndex) => RANKS.map(([ko, en, keyword, action], rank) => ({
@@ -44,15 +44,17 @@ export async function drawFortuneTarot(deck: FortuneTarotDeck, date: string, pic
   if (deck === "major-22") return (await drawTarot([], "leona", pick, spread, undefined, date)).cards;
   if (deck !== "full-78") throw new Error("지원하지 않는 타로 덱입니다.");
   const cards = fortuneTarotCatalog();
-  const random = seededRandom(`${FORTUNE_FULL_TAROT_REVISION}:${date}:${pick}:${spread}`);
+  const random = seededRandom(`${FORTUNE_FULL_TAROT_REVISION}:${date}`);
   // Fisher-Yates: bounded work, no duplicate/retry exhaustion, same selection can be replayed.
   for (let i = cards.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
     [cards[i], cards[j]] = [cards[j], cards[i]];
   }
+  const reversedByPosition = cards.map(() => random() > 0.58);
   const positions = spread === "three" ? ["지금의 장면", "다른 관점", "작은 실천"] : ["오늘의 질문"];
   return positions.map((position, index): TarotCard & { position: string } => {
-    const card = cards[index], reversed = random() > 0.58;
+    const deckPosition = (pick + index) % cards.length;
+    const card = cards[deckPosition], reversed = reversedByPosition[deckPosition];
     return { id: card.id, name: card.name, nameEn: card.nameEn, position, type: reversed ? "reversed" : "upright",
       keywords: [...(reversed ? card.reversed : card.keywords)], description: reversed ? card.reversedText : card.uprightText };
   });

@@ -37,6 +37,13 @@ describe("versioned, local-only fortune enrichment", () => {
     expect(seen.size).toBe(78); expect(orientations.size).toBe(2);
     expect(await drawFortuneTarot("full-78", "2026-09-20", 3, "three")).toEqual(await drawFortuneTarot("full-78", "2026-09-20", 3, "three"));
   });
+  it("maps all 78 selection positions to distinct cards of one daily deck", async () => {
+    const choices = await Promise.all(Array.from({ length: 78 }, (_, pick) => drawFortuneTarot("full-78", "2026-09-20", pick, "one")));
+    expect(new Set(choices.map(([card]) => card.id)).size).toBe(78);
+    const [single] = choices[77];
+    const [first] = await drawFortuneTarot("full-78", "2026-09-20", 77, "three");
+    expect(first.id).toBe(single.id); expect(first.type).toBe(single.type);
+  });
   it("rejects invalid dates and selections", async () => {
     expect(await drawFortuneTarot("full-78", "2026-02-28", 77, "one")).toHaveLength(1);
     await expect(drawFortuneTarot("major-22", "2026-02-28", 22, "one")).rejects.toThrow();
