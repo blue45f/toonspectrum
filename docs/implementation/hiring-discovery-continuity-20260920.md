@@ -29,3 +29,7 @@ No production DB, migration, credentials, provider activation, automatic deploym
 Whole Web/API typecheck passed after including the already-merged Scene3D fixture fixes from main. All12 desktop/mobile creator-hub browser tests passed, including explicit owner-side next/back/retry navigation with zero automatic offers. Browser responses are synthetic fixtures, not production authentication or matching evidence; the real first-run onboarding is dismissed through its visible postpone control.
 
 The newly merged fortune0081 migration required updating three exact-inventory test expectations. Bootstrap/manifest/ACL tests passed109 cases after matching the81-entry canonical inventory. Existing migration bytes and checksum, transaction, permissions and runtime capability checks are unchanged. This discovery feature itself adds no migration.
+
+## Full-suite integration correction
+
+The first remote full-suite run completed the81-migration bootstrap and capability verification, then failed in an existing review/production integration case: direct Drizzle array interpolation emitted `ANY(()::text[])` when only handoff briefs changed. The receipt query now binds both role and brief arrays as individual PostgreSQL parameters, preserving the work/contract predicates and all invalidation semantics. Five SQL-shape cases passed locally; four actual PostgreSQL cases were added to the existing mandatory review integration suite for CI. No migration, capability check or production permission was changed to address this failure.
