@@ -5,6 +5,8 @@ apps/api/src/modules/catalog/catalog-pagination.test.ts
 apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts
 apps/api/src/modules/catalog/catalog-search-cache.test.ts
 apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts
+apps/api/src/modules/creator/studio-review-task-completion-invalidation.test.ts
+apps/api/src/modules/creator/studio-review-task-completion.repository.test.ts
 apps/api/src/modules/fortune/fortune.controller.test.ts
 apps/api/src/modules/og/og-page.test.ts
 apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
@@ -130,6 +132,7 @@ apps/web/src/domains/creator/review-export
 apps/web/src/domains/creator/review-handoff
 apps/web/src/domains/creator/review-production
 apps/web/src/domains/creator/review-resolution
+apps/web/src/domains/creator/review-task-completion
 apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts
 apps/web/src/domains/creator/scene3d/specialists/specialist-orchestration.test.ts
 apps/web/src/domains/creator/studio-autosave-explicit-delete.test.ts

@@ -40,6 +40,8 @@ import {
   studioLiveSessionAuthenticatorProvider,
   studioLiveSessionRevalidatorProvider,
 } from "./studio-live.protocol";
+import { StudioReviewTaskCompletionController, StudioReviewTaskCompletionService } from "./studio-review-task-completion.controller";
+import { StudioReviewTaskCompletionRepository } from "./studio-review-task-completion.repository";
 import { StudioProductionController } from "./studio-production.controller";
 import { studioProductionRepositoryProvider } from "./studio-production.repository";
 import { StudioProductionService } from "./studio-production.service";
@@ -83,6 +85,7 @@ const privateObjectStorageModule =
     StudioRasterAssetController,
     StudioRemoteReferenceImageController,
     StudioProductionController,
+    StudioReviewTaskCompletionController,
     StudioTeamCommentController,
     StudioVoiceIcePolicyController,
     StudioWorkAssetController,
@@ -112,6 +115,8 @@ const privateObjectStorageModule =
     StudioRasterAssetService,
     StudioRemoteReferenceImageService,
     StudioProductionService,
+    StudioReviewTaskCompletionService,
+    StudioReviewTaskCompletionRepository,
     StudioTeamCommentLivePublisher,
     StudioTeamCommentService,
     StudioVoiceIcePolicyService,

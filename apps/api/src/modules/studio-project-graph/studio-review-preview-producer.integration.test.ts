@@ -140,6 +140,84 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
       resolve: { status: "resolved" as const, resolutionRevisionId: replacement.submissionId, resolutionSourceRef: replacement.subject } };
   }
 
+  async function completionFixture() {
+    const f = await resolutionFixture();
+    await graph.resolveReviewComment(f.actor, f.comment.id, f.resolve);
+    const production = new (await import("../creator/studio-production.repository")).DrizzleStudioProductionRepository();
+    const completion = new (await import("../creator/studio-review-task-completion.repository")).StudioReviewTaskCompletionRepository();
+    const empty = await production.getWorkspace(f.actor, f.input.workId);
+    const at = new Date().toISOString(), taskId = "선화 수정 1";
+    const task = { id: taskId, title: "Correct the saved cut", owner: "", due: "2026-09-20", progress: 50, status: "doing" as const,
+      stage: "lineart" as const, priority: "normal" as const, role: null, hierarchyNodeId: "episode", dependencyIds: [], assigneeIds: [], reviewerIds: [], blockedReason: "",
+      reviewRef: { subject: f.original.subject, commentId: f.comment.id, handoffId: "handoff" } };
+    await production.saveWorkspace(f.actor, f.input.workId, empty.revision, { ...empty.document,
+      tasks: [task, { ...task, id: "other-task", reviewRef: undefined }],
+      hierarchy: [{ id: "episode", kind: "episode", parentId: null, title: "Episode", order: 0, pageId: null }],
+      handoffs: [{ id: "handoff", hierarchyNodeId: "episode", fromRole: "story", toRole: "lineart", status: "ready", scenePurpose: "", emotionalBeat: "",
+        mustShow: [], continuityNotes: [], lockedFields: [], acceptanceCriteria: ["Direction corrected", "Sleeve preserved"], createdBy: "", assignedTo: "", updatedAt: at }] });
+    const input = async () => { const context = await completion.read(f.actor, f.input.workId, taskId);
+      return { requestId: randomUUID(), baseRevision: context.baseRevision, proofDigest: context.proofDigest, confirmedCriteria: context.criteria }; };
+    return { ...f, completion, production, taskId, completionInput: input };
+  }
+
+  it("records real captured review task completion atomically and replays without another workspace write", async () => {
+    const f = await completionFixture(), input = await f.completionInput();
+    const before = await f.production.getWorkspace(f.actor, f.input.workId);
+    const result = await f.completion.complete(f.actor, f.input.workId, f.taskId, input);
+    expect(result.evidence?.current).toBe(true); expect(result.evidence?.receipt.completedBy).toBe(f.actor);
+    expect(result.evidence?.receipt.completedAt).toMatch(/\.\d{6}Z$/u);
+    const after = await f.production.getWorkspace(f.actor, f.input.workId);
+    expect(after.revision).toBe(before.revision + 1); expect(after.document.tasks[0]).toMatchObject({ status: "done", progress: 100, stage: "lineart" });
+    expect(after.document.tasks[1]).toEqual(before.document.tasks[1]);
+    expect((await f.completion.complete(f.actor, f.input.workId, f.taskId, input)).evidence).toEqual(result.evidence);
+    expect((await f.production.getWorkspace(f.actor, f.input.workId)).revision).toBe(after.revision);
+    expect((await graph.getReview(f.actor, f.original.subject.reviewId)).status).toBe("open");
+    const receipt = (await pool.query(`SELECT response FROM studio_mutation_receipt WHERE response->>'requestId'=$1`, [input.requestId])).rows;
+    expect(receipt).toHaveLength(1);
+  });
+
+  it("preserves evidence on unrelated saves and permanently invalidates criteria A -> B -> A", async () => {
+    const f = await completionFixture(), input = await f.completionInput(); await f.completion.complete(f.actor, f.input.workId, f.taskId, input);
+    let current = await f.production.getWorkspace(f.actor, f.input.workId);
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document, title: "Renamed workspace",
+      tasks: current.document.tasks.map((task) => task.id === "other-task" ? { ...task, title: "Unrelated task renamed" } : task) });
+    expect((await f.completion.read(f.actor, f.input.workId, f.taskId)).evidence?.current).toBe(true);
+    const criteria = [...current.document.handoffs[0]!.acceptanceCriteria];
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      handoffs: current.document.handoffs.map((handoff) => ({ ...handoff, acceptanceCriteria: ["Changed criterion"] })) });
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      handoffs: current.document.handoffs.map((handoff) => ({ ...handoff, acceptanceCriteria: criteria })) });
+    expect((await f.completion.read(f.actor, f.input.workId, f.taskId)).evidence?.current).toBe(false);
+    expect((await f.completion.complete(f.actor, f.input.workId, f.taskId, input)).evidence?.current).toBe(false);
+    expect((await f.production.getWorkspace(f.actor, f.input.workId)).revision).toBe(current.revision);
+    const invalidated = (await pool.query(`SELECT count(*)::int AS count FROM studio_mutation_receipt WHERE response->>'contract'='studio-review-task-completion-invalidated-v1' AND response->>'workId'=$1`, [f.input.workId])).rows[0];
+    expect(invalidated.count).toBe(2);
+    expect((await f.completion.complete(f.actor, f.input.workId, f.taskId, await f.completionInput())).evidence?.current).toBe(true);
+  });
+
+  it("compares exact PostgreSQL microseconds and rejects reopened or unattested sources", async () => {
+    const f = await completionFixture();
+    const base = (await pool.query(`SELECT to_char(date_trunc('millisecond',clock_timestamp()) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at`)).rows[0].at;
+    await pool.query(`UPDATE studio_review_comment SET "updatedAt"=$2::timestamptz+interval '1 microsecond' WHERE id=$1`, [f.comment.id, base]);
+    await f.completion.complete(f.actor, f.input.workId, f.taskId, await f.completionInput());
+    await pool.query(`UPDATE studio_review_comment SET "updatedAt"=$2::timestamptz+interval '2 microseconds' WHERE id=$1`, [f.comment.id, base]);
+    expect((await f.completion.read(f.actor, f.input.workId, f.taskId)).evidence?.current).toBe(false);
+    await graph.reopenReviewComment(f.actor, f.comment.id);
+    await expect(f.completion.read(f.actor, f.input.workId, f.taskId)).rejects.toMatchObject({ code: "unresolved" });
+  });
+
+  it("denies a revoked editor on replay and rejects generic workspace evidence injection", async () => {
+    const f = await completionFixture(), editor = randomUUID(); users.push(editor);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [editor, "Completion editor"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'editor','active',$3,now())`, [f.input.workId, editor, randomUUID()]);
+    const input = await f.completionInput(); const done = await f.completion.complete(editor, f.input.workId, f.taskId, input);
+    await pool.query(`UPDATE creator_work_collaborator SET status='declined' WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, editor]);
+    await expect(f.completion.complete(editor, f.input.workId, f.taskId, input)).rejects.toMatchObject({ code: "forbidden" });
+    const workspace = await f.production.getWorkspace(f.actor, f.input.workId);
+    const { StudioProductionWorkspaceDocumentSchema } = await import("../creator/studio-production.dto");
+    expect(StudioProductionWorkspaceDocumentSchema.safeParse({ ...workspace.document, tasks: [{ ...workspace.document.tasks[0], reviewCompletion: done.evidence?.receipt }] }).success).toBe(false);
+  });
+
   it("resolves against the actual newer capture submission, survives lost completion/replay and later graph heads", async () => {
     const f = await resolutionFixture();
     expect((await service.status(f.actor, f.nextIntent))).toMatchObject({ status: "completed", subject: f.replacement.subject });

@@ -23,6 +23,7 @@ import {
   StudioPersonalKitDocumentSchema,
   StudioProductionWorkspaceDocumentSchema,
 } from "./studio-production.dto";
+import { studioReviewTaskCompletionChangedTasks, studioReviewTaskCompletionFingerprint, studioReviewTaskCompletionInvalidations } from "./studio-review-task-completion-invalidation";
 import { StudioProductionReviewReferenceError, validateStudioProductionReviewChanges } from "./studio-production-review-reference";
 
 import type { CreatorCollaborationAccess } from "./creator-collaboration.policy";
@@ -504,6 +505,24 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
           return [context.ownerUserId, ...members.map((member) => member.userId)];
         },
       });
+      // Completion receipts are server-owned and immutable. A reversal cannot revive
+      // old checks; unrelated workspace edits do not invalidate completed obligations.
+      const changedCompletionTasks = studioReviewTaskCompletionChangedTasks(currentDocument, canonical);
+      if (changedCompletionTasks.length) {
+      const completions = await transaction.execute<{ response: unknown }>(sql`
+        SELECT receipt.response FROM studio_mutation_receipt receipt
+        JOIN studio_artifact artifact ON artifact.id=receipt."artifactId"
+        JOIN studio_project_graph project ON project.id=artifact."projectId"
+        WHERE project."workId"=${workId} AND receipt.response->>'contract'='studio-review-task-completion-v1'
+          AND receipt.response->>'taskId' IN (${sql.join(changedCompletionTasks.map((id) => sql`${id}`), sql`, `)})`);
+      for (const invalidation of studioReviewTaskCompletionInvalidations(currentDocument, canonical, completions.rows.map((row) => row.response))) {
+        const key = studioReviewTaskCompletionFingerprint({ contract: invalidation.contract, actorUserId, invalidation });
+        await transaction.execute(sql`INSERT INTO studio_mutation_receipt
+          ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response,"createdAt")
+          VALUES (${invalidation.artifactId},${actorUserId},${key},${key},${invalidation.revisionId},${JSON.stringify(invalidation)}::jsonb,${now})
+          ON CONFLICT DO NOTHING`);
+      }
+      }
       await transaction
         .insert(creatorWorkProductionWorkspaces)
         .values({

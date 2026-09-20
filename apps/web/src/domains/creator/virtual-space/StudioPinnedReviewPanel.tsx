@@ -7,6 +7,7 @@ import { createStudioReviewComment, newStudioProjectGraphId } from "../project-g
 import type { StudioReviewCommentCreateInput } from "../project-graph/studio-project-graph-contract";
 import { getStudioTeam } from "../studio-team-client";
 import { StudioReviewEditorLink } from "../review-handoff/StudioReviewEditorLink";
+import { StudioReviewTaskCompletion } from "../review-task-completion/StudioReviewTaskCompletion";
 import { StudioReviewProductionConnection } from "../review-production/StudioReviewProductionConnection";
 import { studioReviewResolutionMatchesComment, type StudioReviewResolutionRequest } from "../review-resolution/studio-review-resolution-route";
 import { StudioReviewCommentAssignment } from "./StudioReviewCommentAssignment";
@@ -187,6 +188,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
           {comment.dueAt ? <p className="mt-1 text-xs text-fg-3">{bt("완료 기한", "Due date")} · <time dateTime={comment.dueAt}>{new Date(comment.dueAt).toLocaleString()}</time></p> : null}
           {result.project.access.edit && comment.anchor?.source ? <div className="mt-2"><StudioReviewEditorLink request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
           {result.project.access.edit ? <div className="mt-2"><StudioReviewProductionConnection request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
+          {result.project.access.edit && comment.status === "resolved" ? <div className="mt-2"><StudioReviewTaskCompletion request={{ subject: result.subject, commentId: comment.id }} /></div> : null}
           {result.project.access.edit && resolutionRequest && studioReviewResolutionMatchesComment(resolutionRequest, result.subject, comment.id)
             ? <Suspense fallback={<p role="status">{bt("수정 검토를 불러오는 중…", "Loading correction review…")}</p>}>
               <StudioReviewResolution request={resolutionRequest} onRecorded={() => { void refresh(true); }}
