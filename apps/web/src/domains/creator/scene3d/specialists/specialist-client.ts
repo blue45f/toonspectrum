@@ -1,3 +1,4 @@
+import type { SpecialistRecipeReuseCache } from "./specialist-recipe-reuse";
 import {
   scene3dSpecialistJobQueue,
   type SpecialistJobQueue,
@@ -187,9 +188,14 @@ export function runScene3dSpecialistInWorker(
   options: {
     readonly onProgress?: SpecialistProgressListener;
     readonly queue?: SpecialistJobQueue;
+    readonly reuse?: "none" | "memory";
+    readonly reuseCache?: SpecialistRecipeReuseCache;
   } = {},
 ): Promise<SpecialistResult> {
   const report = options.onProgress;
+  const reuse = options.reuse;
+  const reuseCache = options.reuseCache;
+  let reused = false;
   const rejected = (error: unknown): Promise<SpecialistResult> => {
     notifySpecialistProgress(report, { phase: specialistFailurePhase(error) });
     return Promise.reject(error);
@@ -223,11 +229,21 @@ export function runScene3dSpecialistInWorker(
         source: parsed.source.slice(0),
         secondary: parsed.secondary?.slice(0),
       };
-      return () => executeSpecialistWorker(owned, signal, report);
+      return () => {
+        if (reuse !== "memory") return executeSpecialistWorker(owned, signal, report);
+        return import("./specialist-recipe-reuse").then(async ({ getProductSpecialistRecipeReuseCache }) => {
+          const outcome = await (reuseCache ?? getProductSpecialistRecipeReuseCache()).run(owned, {
+            signal, execute: () => executeSpecialistWorker(owned, signal, report),
+            onCheck: () => notifySpecialistProgress(report, { phase: "reuse-check" }),
+          });
+          reused = outcome.reused;
+          return outcome.result;
+        }, () => executeSpecialistWorker(owned, signal, report));
+      };
     },
   });
   return queued.then((result) => {
-    notifySpecialistProgress(report, { phase: "ready" });
+    notifySpecialistProgress(report, { phase: reused ? "reused" : "ready" });
     return result;
   }, rejected);
 }

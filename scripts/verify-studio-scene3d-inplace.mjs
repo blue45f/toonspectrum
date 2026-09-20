@@ -19,6 +19,7 @@ const output =
   join(tmpdir(), `scene3d-inplace-${Date.now()}`);
 mkdirSync(output, { recursive: true });
 const operation = process.env.SCENE3D_INPLACE_OPERATION === "release" ? "release" : "lod";
+const verifyReuse = process.env.SCENE3D_INPLACE_REUSE === "1";
 const artifactName = operation === "release" ? "release-lod-2.glb" : "lod-2.glb";
 const production = process.env.SCENE3D_SPECIALISTS_PRODUCTION_WORKER === "1";
 const worker = production
@@ -163,6 +164,13 @@ try {
   await page
     .getByRole("button", { name: `${artifactName} 선택 객체에 적용`, exact: true })
     .waitFor({ timeout: 120000 });
+  let reusedBeforeApply = false;
+  if (verifyReuse) {
+    await page.getByRole("button", { name: operation === "release" ? "LOD+KTX2 릴리스 생성" : "LOD 3단계 생성", exact: true }).click();
+    await page.getByText("검증된 가공 결과 재사용", { exact: false }).waitFor({ timeout: 120000 });
+    await page.getByRole("button", { name: `${artifactName} 선택 객체에 적용`, exact: true }).waitFor({ timeout: 120000 });
+    reusedBeforeApply = true;
+  }
   await page.getByRole("button", { name: /^미리보기$|^Preview$/ }).nth(2).click();
   await page.locator(`canvas[data-review-ready="true"][data-review-artifact="${artifactName}"]`).waitFor({ timeout: 60000 });
   const unchangedBeforeReview = await page.evaluate(() => window.__scene3dInplace.assertUnchanged());
@@ -197,6 +205,7 @@ try {
     comparison,
     unchangedBeforeReview,
     unchangedAfterReview,
+    reusedBeforeApply,
     applied,
     reopened,
     errors,

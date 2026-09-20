@@ -8,6 +8,8 @@ import {
 } from "react";
 import * as THREE from "three";
 
+import type { StudioScene3dGpuDiagnostics } from "../scene3d/studio-scene3d-gpu-diagnostics";
+
 import {
   createStudioBg3dEditableThreeClone,
   sampleStudioBg3dAnimationActionAtTime,
@@ -354,11 +356,13 @@ export function BgPlacementPreview({
 const FRAME_TIME_REPORT_INTERVAL_MS = 500;
 
 export function BgAdaptiveDprController({
+  diagnostics,
   targetFps,
   paused,
   onScaleChange,
   onFrameTimeChange,
 }: {
+  diagnostics?: StudioScene3dGpuDiagnostics;
   targetFps: number;
   paused: boolean;
   onScaleChange: (scale: number) => void;
@@ -369,6 +373,15 @@ export function BgAdaptiveDprController({
    */
   onFrameTimeChange?: (frameTimeMs: number | null) => void;
 }) {
+  const gl = useThree((state) => state.gl);
+  const invalidate = useThree((state) => state.invalidate);
+  useEffect(() => diagnostics?.attach(gl, invalidate), [diagnostics, gl, invalidate]);
+  useLayoutEffect(() => {
+    const update = () => diagnostics?.setPaused(paused || document.hidden);
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, [diagnostics, paused]);
   const governorRef = useRef(createStudioBg3dFrameQualityState(targetFps));
   const scaleChangeRef = useRef(onScaleChange);
   const frameTimeChangeRef = useRef(onFrameTimeChange);

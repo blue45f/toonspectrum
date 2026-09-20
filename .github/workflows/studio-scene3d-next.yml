@@ -18,6 +18,8 @@ on:
       - "scripts/verify-studio-scene3d-inplace.mjs"
       - "apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanelContent.tsx"
       - "apps/web/tools/browser-harnesses/studio-scene3d-specialists.tsx"
+      - "apps/web/tools/browser-harnesses/studio-scene3d-recipe-reuse.tsx"
+      - "scripts/verify-studio-scene3d-recipe-reuse.mjs"
       - "scripts/verify-studio-scene3d-specialists.mjs"
       - "scripts/lib/scene3d-review-browser-proof.mjs"
       - "scripts/verify-scene3d-specialist-bundle*.mjs"
@@ -123,7 +125,12 @@ jobs:
         env:
           TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.qa/scene3d-output-quality/specialist-ci/inplace-release
           SCENE3D_INPLACE_OPERATION: release
+          SCENE3D_INPLACE_REUSE: "1"
         run: pnpm run verify:studio-3d-inplace:browser
+      - name: Verify exact recipe reuse without rerunning the processing Worker
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ github.workspace }}/.qa/scene3d-output-quality/specialist-ci/recipe-reuse
+        run: node scripts/verify-studio-scene3d-recipe-reuse.mjs
       - name: Preserve specialist verification evidence
         if: always()
         uses: actions/upload-artifact@v6
@@ -137,6 +144,9 @@ jobs:
             .qa/scene3d-output-quality/specialist-ci/inplace/*.png
             .qa/scene3d-output-quality/specialist-ci/inplace-release/*.json
             .qa/scene3d-output-quality/specialist-ci/inplace-release/*.png
+            .qa/scene3d-output-quality/specialist-ci/recipe-reuse/*.json
+            .qa/scene3d-output-quality/specialist-ci/recipe-reuse/*.png
+            .qa/scene3d-output-quality/specialist-ci/recipe-reuse/*.glb
           if-no-files-found: warn
           retention-days: 7
 

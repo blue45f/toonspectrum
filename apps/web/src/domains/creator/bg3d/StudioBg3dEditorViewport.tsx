@@ -461,6 +461,7 @@ export function StudioBg3dEditorViewport({ h }) {
                     onStateChange={handleWebXrSessionStateChange}
                   />
                   <BgAdaptiveDprController
+                    diagnostics={engineRuntime.diagnostics}
                     targetFps={deviceQuality.targetFps}
                     // Freeze resolution beneath a held gizmo, including when a separate animation
                     // keeps the renderer continuous. Demand-frame idle gaps are not GPU timings.

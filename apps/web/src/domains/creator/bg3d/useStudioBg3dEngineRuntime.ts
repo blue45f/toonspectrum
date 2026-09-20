@@ -16,6 +16,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { createStudioScene3dGpuDiagnostics, type StudioScene3dGpuDiagnostics } from "../scene3d/studio-scene3d-gpu-diagnostics";
+
 import {
   EMPTY_STUDIO_BG3D_ENGINE_WEBGL_ONLY_FEATURES,
   latchStudioBg3dWebglOnlyFeatures,
@@ -48,6 +50,7 @@ export type StudioBg3dEngineRuntimePhase = "probing" | "ready";
 export const STUDIO_BG3D_DEVICE_LOSS_NOTICE_MS = 10_000;
 
 export interface StudioBg3dEngineRuntimeState {
+  readonly diagnostics: StudioScene3dGpuDiagnostics;
   readonly phase: StudioBg3dEngineRuntimePhase;
   readonly plan: StudioBg3dEngineSelectionPlan;
   readonly preference: StudioBg3dEnginePreference;
@@ -300,6 +303,8 @@ export function useStudioBg3dEngineRuntime(
     return () => clearTimeout(timer);
   }, [deviceLostMessage]);
 
+  const diagnostics = useMemo(() => createStudioScene3dGpuDiagnostics(), []);
+
   const glFactory = useMemo<StudioBg3dRendererFactory | null>(() => {
     if (!enabled || phase !== "ready" || plan.backend !== "webgpu" || plan.status !== "available") {
       return null;
@@ -323,6 +328,7 @@ export function useStudioBg3dEngineRuntime(
   }, [enabled, phase, plan.backend, plan.status, antialias, createWebGpuRenderer, handleWebGpuFailure]);
 
   return {
+    diagnostics,
     phase,
     plan,
     preference,

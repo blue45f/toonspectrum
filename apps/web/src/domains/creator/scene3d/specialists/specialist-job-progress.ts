@@ -10,6 +10,8 @@ export type SpecialistWorkerPhase = (typeof SPECIALIST_WORKER_PHASES)[number];
 export type SpecialistJobPhase =
   | "queued"
   | "starting"
+  | "reuse-check"
+  | "reused"
   | SpecialistWorkerPhase
   | "ready"
   | "cancelled"
