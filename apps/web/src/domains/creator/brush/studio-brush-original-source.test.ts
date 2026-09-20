@@ -53,3 +53,14 @@ describe("original brush bytes and bounded integrity", () => {
     expect(() => decodeStudioBrushOriginalSource(ref)).toThrow(/OPFS/u);
   });
 });
+
+
+it.each([0, -1, 1.5, Number.NaN, STUDIO_BRUSH_PROGRAM_MAX_BYTES + 1])(
+  "rejects an invalid original byte count %s", (byteLength) => {
+    expect(() => requireStudioBrushOriginalSource({ ...fixture(), byteLength })).toThrow(StudioBrushOriginalSourceError);
+  });
+it("removes path, bidi and unsafe filename characters without modifying the original", () => {
+  const source = createStudioBrushOriginalSource(bytes, "../폴더/원본\u202e?.myb", "myb");
+  expect(source.fileName).toBe("원본.myb");
+  expect(decodeStudioBrushOriginalSource(source)).toEqual(bytes);
+});

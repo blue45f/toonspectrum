@@ -28,6 +28,7 @@ export function CreatorExperienceModeSwitch({
       role="group"
       aria-label={korean ? "스튜디오 보기" : "Studio view"}
       data-creator-experience-switch="true"
+      data-app-tooltip-exclude="true"
     >
       {OPTIONS.map(({ mode: option, ko, en, icon: Icon }) => (
         <button
@@ -41,7 +42,8 @@ export function CreatorExperienceModeSwitch({
               ? "bg-accent text-on-accent "
               : "text-fg-2 hover:bg-raised hover:text-fg")
           }
-          title={korean ? ko : en}
+          aria-label={korean ? ko : en}
+          title={compact ? (korean ? ko : en) : undefined}
         >
           <Icon size={14} aria-hidden="true" />
           {!compact || mode === option ? <span>{korean ? ko : en}</span> : null}

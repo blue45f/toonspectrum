@@ -35,7 +35,10 @@ describe("native brush source through existing storage and JSON owners", () => {
   it.each(["sqlite", "session"])("keeps exact MYB/KPP bytes through %s CRUD and archive reimport", async (mode) => {
     const repository = mode === "sqlite" ? createSqliteBrushLibraryRepository(database, { originalSourceStore: store }) : createMemorySessionBrushLibraryRepository();
     for (const [relative, importer] of [["myb/ink-crisp.myb", importStudioMybBytes],
-      ["kpp/paintbrush-ink-basic.kpp", importStudioKppBytes]] as const) {
+      ["myb/wash-soft.myb", importStudioMybBytes],
+      ["kpp/paintbrush-ink-basic.kpp", importStudioKppBytes],
+      ["kpp/paintbrush-pressure-curve.kpp", importStudioKppBytes],
+      ["kpp/mypaint-wash-soft.kpp", importStudioKppBytes]] as const) {
       const bytes = corpus(relative);
       const imported = importer(bytes, relative);
       expect(imported.brushes[0]!.snapshot).not.toHaveProperty("originalSource");
@@ -58,12 +61,23 @@ describe("native brush source through existing storage and JSON owners", () => {
       expect(sanitizeBrushSnapshot(reopened).snapshot).not.toHaveProperty("originalSource");
     }
   });
-  it("preserves original archives larger than the ordinary 2MiB JSON ceiling", () => {
-    const bytes = new Uint8Array(1_700_000); bytes[0] = 137; bytes[bytes.length - 1] = 255;
+  it("round-trips large originals through SQLite, compact CAS and portable archives", async () => {
+    const bytes = new Uint8Array(2 * 1024 * 1024).fill(17);
     const brush = { ...originalBrush(), originalSource: createStudioBrushOriginalSource(bytes, "large.kpp", "kpp") };
-    const exported = writeBrushJson(brush);
+    const repository = createSqliteBrushLibraryRepository(database, { originalSourceStore: store });
+    await repository.put(brush);
+    const reopened = createSqliteBrushLibraryRepository(database, { originalSourceStore: store });
+    const stored = (await reopened.getById(brush.id))!;
+    expect(stored.originalSource?.encoding).toBe("opfs-cas");
+    expect(stored.originalSource).not.toHaveProperty("base64");
+    expect(JSON.stringify(stored.originalSource).length).toBeLessThan(512);
+    const exported = writeBrushJson(await prepareStudioBrushSourceExport(stored, store));
     expect(exported.length).toBeGreaterThan(2 * 1024 * 1024);
-    expect(decodeStudioBrushOriginalSource(importBrushFromJson(exported).brush.originalSource)).toEqual(bytes);
+    const restored = importBrushFromJson(exported).brush;
+    expect(createHash("sha256").update(decodeStudioBrushOriginalSource(restored.originalSource)).digest("hex"))
+      .toBe(brush.originalSource.sha256);
+    expect(() => importBrushFromJson(" ".repeat(2 * 1024 * 1024)
+      + writeBrushJson(createBrush("legacy", DEFAULT_STUDIO_BRUSH_SNAPSHOT)))).toThrow(/2MB/u);
   });
   it("keeps ordinary JSON format and drawing values unchanged", () => {
     const brush = createBrush("기존", DEFAULT_STUDIO_BRUSH_SNAPSHOT);
@@ -85,12 +99,37 @@ describe("native brush source through existing storage and JSON owners", () => {
     const record = studioBrushToSqlRecord(await repository.put(brush));
     expect(() => sqlRecordToStudioBrush({ ...record, payload: JSON.stringify(damaged) })).toThrow();
   });
-  it.each(["futureVersion", "missingSource", "extraKey", "badDigest"])("fails closed for archive %s", (scenario) => {
+  it.each(["futureVersion", "missingSource", "extraKey", "badDigest", "badBytes", "nestedVersion"])("fails closed for archive %s", (scenario) => {
     const archive = JSON.parse(writeBrushJson(originalBrush()));
     if (scenario === "futureVersion") archive.version = 2;
     if (scenario === "missingSource") delete archive.originalSource;
     if (scenario === "extraKey") archive.future = {};
     if (scenario === "badDigest") archive.originalSource.sha256 = "0".repeat(64);
+    if (scenario === "badBytes") archive.originalSource.base64 = "AQIE";
+    if (scenario === "nestedVersion") archive.brush.version = 999;
     expect(() => importBrushFromJson(JSON.stringify(archive))).toThrow();
+  });
+});
+
+describe("original completion branch regression coverage", () => {
+  it("preserves importer whitespace rather than reconstructing MYB JSON", () => {
+    const bytes = new TextEncoder().encode(" \r\n" + new TextDecoder().decode(corpus("myb/ink-crisp.myb")) + "\r\n  ");
+    const imported = importStudioMybBytes(bytes, "spaces.myb");
+    expect(decodeStudioBrushOriginalSource(imported.brushes[0]!.originalSource)).toEqual(bytes);
+  });
+  it.each(["sqlite", "session"])("keeps %s library intact after corrupt single and batch writes", async (mode) => {
+    const repository = mode === "sqlite"
+      ? createSqliteBrushLibraryRepository(database, { originalSourceStore: store })
+      : createMemorySessionBrushLibraryRepository();
+    const good = await repository.put(originalBrush());
+    const next = originalBrush();
+    // Embedded bytes require both owners to validate the digest before any record commits.
+    const badOriginal = originalBrush();
+    const bad = { ...badOriginal, originalSource: { ...badOriginal.originalSource, sha256: "0".repeat(64) } };
+    await expect(repository.put(bad)).rejects.toThrow();
+    await expect(repository.putMany([next, bad])).rejects.toThrow();
+    expect(await repository.getById(next.id)).toBeNull();
+    expect(await repository.getById(bad.id)).toBeNull();
+    expect((await repository.getById(good.id))?.originalSource).toEqual(good.originalSource);
   });
 });
