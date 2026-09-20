@@ -183,7 +183,7 @@ export function StudioScene3dAssetToolsPanel({
           options,
         },
         controller.signal,
-        { onProgress: (progress) => {
+        { reuse: "memory", onProgress: (progress) => {
           if (ticket === generation.current && !controller.signal.aborted) setJobProgress(progress);
         } },
       );
@@ -542,7 +542,9 @@ export function StudioScene3dAssetToolsPanel({
       {result && (
         <div className="space-y-2">
           <p role="status" className="text-xs font-semibold">
-            {t("파생본 생성 완료", "Derivatives generated")} ·{" "}
+            {jobProgress?.phase === "reused"
+          ? t("검증된 가공 결과 재사용", "Verified processing result reused")
+          : t("파생본 생성 완료", "Derivatives generated")} ·{" "}
             {t("원본 삼각형", "Source triangles")}: {result.before.triangles}
           </p>
           {result.artifacts.map((artifact, index) => (

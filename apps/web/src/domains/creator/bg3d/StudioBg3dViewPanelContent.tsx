@@ -193,6 +193,7 @@ interface StudioBg3dViewPanelContext {
 }
 
 export interface StudioBg3dViewPanelProps {
+  readonly engineDiagnostics?: import("../scene3d/studio-scene3d-gpu-diagnostics").StudioScene3dGpuDiagnostics;
   readonly inplaceTools?: Scene3dInplaceToolsBridge;
   readonly hidden: boolean;
   readonly context: StudioBg3dViewPanelContext;
@@ -417,6 +418,7 @@ export function StudioBg3dViewPanel({
   engineProbing,
   engineDeviceLostMessage,
   engineFrameTimeMs,
+  engineDiagnostics,
   onEnginePreferenceChange,
   babylonDiagnosticState,
   onRunBabylonDiagnostic,
@@ -1602,6 +1604,7 @@ export function StudioBg3dViewPanel({
                   </label>
                 </div>
                 <StudioBg3dEnginePanel
+                  diagnostics={engineDiagnostics}
                   plan={enginePlan}
                   preference={enginePreference}
                   inApp={engineInAppBrowser}
