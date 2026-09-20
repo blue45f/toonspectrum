@@ -13,14 +13,14 @@ import type { StudioWorkSessionController } from "./studio-work-session-controll
 const control = "min-h-11 rounded-lg border border-line bg-card px-3 text-sm";
 const noteLabels = { note: ["작업 메모", "Work note"], decision: ["결정 기록", "Decision"], unresolved: ["미결 문제", "Unresolved issue"],
   "material-choice": ["소재 선택 이유", "Material rationale"], "ai-evidence": ["AI 검토 메모", "AI review note"] } as const;
-export function StudioWorkSessionDetail({ view, actorId, controller, busy }: {
-  readonly view: StudioWorkSessionView; readonly actorId: string; readonly controller: StudioWorkSessionController; readonly busy: boolean;
+export function StudioWorkSessionDetail({ view, actorId, controller, busy, saving = busy }: {
+  readonly view: StudioWorkSessionView; readonly actorId: string; readonly controller: StudioWorkSessionController; readonly busy: boolean; readonly saving?: boolean;
 }) {
   const bt = useBilingual("StudioWorkSessionDetail"), session = view.session;
   const roster = useStudioReviewRoster({ workId: session.workId, actorId, enabled: true, autoStart: true });
-  const [body, setBody] = useStudioSessionFormDraft(JSON.stringify(["studio-session-note", actorId, session.workId, session.id]), 2000);
+  const [body, setBody, bodyStorageError] = useStudioSessionFormDraft(JSON.stringify(["studio-session-note", actorId, session.workId, session.id]), 2000);
   const [category, setCategory] = useState<StudioWorkSession["notes"][number]["category"]>("note");
-  const [closing, setClosing] = useState<"close" | "cancel" | null>(null), [summary, setSummary] = useStudioSessionFormDraft(JSON.stringify(["studio-session-outcome", actorId, session.workId, session.id]), 4000), [confirmed, setConfirmed] = useState(false);
+  const [closing, setClosing] = useState<"close" | "cancel" | null>(null), [summary, setSummary, summaryStorageError] = useStudioSessionFormDraft(JSON.stringify(["studio-session-outcome", actorId, session.workId, session.id]), 4000), [confirmed, setConfirmed] = useState(false);
   useLayoutEffect(() => { setConfirmed(false); }, [session.version]);
   const terminal = session.status === "closed" || session.status === "cancelled", joined = session.participantUserIds.includes(actorId);
   const host = view.capabilities.edit, canWrite = joined && view.capabilities.comment && !terminal;
@@ -28,6 +28,7 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy }: {
   const lifecycle = session.status === "draft" ? ["ready", "준비 완료", "Mark ready"] as const : session.status === "ready" ? ["start", "작업 시작", "Start session"] as const
     : session.status === "active" ? ["pause", "일시정지", "Pause"] as const : session.status === "paused" ? ["resume", "작업 재개", "Resume session"] as const : null;
   return <article className="space-y-4" data-work-session-id={session.id}>
+    {bodyStorageError || summaryStorageError ? <p role="status" className="text-sm">{bt("탭 복구 저장을 사용할 수 없습니다. 입력은 현재 화면에만 남으므로 닫기 전에 복사하세요.", "Tab recovery storage is unavailable. Copy your text before closing this view.")}</p> : null}
     <header><h3 className="text-lg font-semibold">{session.title}</h3><p className="text-sm text-fg-2">{bt(sessionStatusLabels[session.status][0], sessionStatusLabels[session.status][1])} · v{session.version}</p><p className="mt-2 whitespace-pre-wrap text-sm">{session.purpose}</p></header>
     <section className="rounded-lg border border-line p-3"><h4 className="font-semibold">{bt("참여 기록", "Participation record")}</h4>
       <p className="text-sm">{session.participantUserIds.map(name).join(" · ") || bt("참여 기록 없음", "No participants")}</p>
@@ -45,7 +46,7 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy }: {
       event.preventDefault(); if (!confirmed || busy || (closing === "close" && !summary.trim())) return;
       void controller.command(closing === "close" ? { action: "close", summary } : { action: "cancel" });
     }}><h4 className="font-semibold">{closing === "close" ? bt("종료 결과", "Closing outcome") : bt("세션 취소 확인", "Confirm cancellation")}</h4>
-      {closing === "close" ? <label className="block text-sm">{bt("결론·미결·다음 행동 (결론 없음도 명시)", "Conclusion, unresolved issues and next step (or explicitly no conclusion)")}<textarea required maxLength={4000} className="mt-1 min-h-24 w-full rounded border border-line bg-card p-2" value={summary} disabled={busy} onChange={(event) => setSummary(event.target.value)} /></label> : null}
+      {closing === "close" ? <label className="block text-sm">{bt("결론·미결·다음 행동 (결론 없음도 명시)", "Conclusion, unresolved issues and next step (or explicitly no conclusion)")}<textarea required maxLength={4000} className="mt-1 min-h-24 w-full rounded border border-line bg-card p-2" value={summary} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></label> : null}
       <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={(event) => setConfirmed(event.target.checked)} />{bt("기록은 남고 원고 승인·작업 완료·공개 상태는 바뀌지 않음을 확인합니다.", "I understand that the record remains and manuscript approval, task completion and publication do not change.")}</label>
       <div className="flex gap-2"><button type="submit" className={control} disabled={busy || !confirmed}>{bt("확인하고 적용", "Confirm")}</button><button type="button" className={control} disabled={busy} onClick={() => setClosing(null)}>{bt("돌아가기", "Go back")}</button></div>
     </form> : null}
@@ -63,15 +64,15 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy }: {
         <p className="text-xs text-fg-2">{bt(noteLabels[note.category][0], noteLabels[note.category][1])} · {name(note.authorUserId)} · {new Date(note.at).toLocaleString()}</p><p className="whitespace-pre-wrap break-words text-sm">{note.body}</p>
       </li>)}</ul> : <p className="text-sm text-fg-2">{bt("아직 기록이 없습니다.", "No notes yet.")}</p>}
       {canWrite ? <form className="space-y-2" onSubmit={(event) => {
-        event.preventDefault(); if (!body.trim()) return;
+        event.preventDefault(); if (busy || !body.trim()) return;
         const text = body;
         void controller.command({ action: "note", category, body: text }).then(() => {
           const current = controller.getSnapshot(); if (current.phase === "ready" && current.view?.session.notes.some((note) => note.authorUserId === actorId && note.body === text)) setBody("");
         });
-      }}><fieldset disabled={busy} className="space-y-2"><label className="block text-sm">{bt("기록 유형", "Note type")}<select className={`${control} ml-2`} value={category} onChange={(event) => setCategory(event.target.value as typeof category)}>
+      }}><fieldset disabled={saving} className="space-y-2"><label className="block text-sm">{bt("기록 유형", "Note type")}<select className={`${control} ml-2`} value={category} onChange={(event) => setCategory(event.target.value as typeof category)}>
         {Object.entries(noteLabels).filter(([value]) => value !== "decision" || host).map(([value, label]) => <option key={value} value={value}>{bt(label[0], label[1])}</option>)}
       </select></label><label className="block text-sm">{bt("내용", "Content")}<textarea required maxLength={2000} className="mt-1 min-h-24 w-full rounded border border-line bg-card p-2" value={body} onChange={(event) => setBody(event.target.value)} /></label>
-        <button className={control} type="submit" disabled={!body.trim()}>{bt("기록 저장", "Save note")}</button>
+        <button className={control} type="submit" disabled={busy || !body.trim()}>{bt("기록 저장", "Save note")}</button>
       </fieldset></form> : null}
       <p className="text-xs text-fg-2">{bt("소재·AI 메모는 사람이 작성한 검토 기록입니다. 소재 사용 허가, AI 실행 결과 검증 또는 검수 승인이 아닙니다.", "Material and AI notes are human-authored review records, not usage permission, verified AI execution or review approval.")}</p>
     </section>
