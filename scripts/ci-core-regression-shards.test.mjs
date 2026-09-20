@@ -56,6 +56,8 @@ test("required foundation execution includes virtual-world consent, media and co
   const foundation = executionTargetsByShard()["studio-foundation"];
   for (const target of [
     "apps/web/src/domains/creator/virtual-space",
+    "apps/web/src/domains/creator/review-handoff",
+    "apps/web/src/domains/creator/studio-comment-editor-selection.test.ts",
     "apps/web/src/domains/creator/live/huddle",
     "apps/web/tests/vite-react-compiler-runtime-interop.test.ts",
   ]) {
@@ -64,6 +66,8 @@ test("required foundation execution includes virtual-world consent, media and co
     assert.ok(targetIsCovered(target, foundation), `target must execute in foundation: ${target}`);
   }
   for (const test of [
+    "apps/web/src/domains/creator/review-handoff/studio-review-editor-host.test.ts",
+    "apps/web/src/domains/creator/review-handoff/StudioReviewEditorHandoffMount.test.tsx",
     "apps/web/src/domains/creator/virtual-space/studio-virtual-space-social.test.ts",
     "apps/web/src/domains/creator/virtual-space/studio-virtual-space-world.test.ts",
     "apps/web/src/domains/creator/virtual-space/studio-virtual-space-npc-director.test.ts",

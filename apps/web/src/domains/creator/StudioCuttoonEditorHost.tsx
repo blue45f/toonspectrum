@@ -268,6 +268,7 @@ import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import { StudioFormalSaveDialogMount as StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialogMount";
 import { studioReviewCaptureSaveNavigation } from "./review-capture/studio-review-capture-navigation";
 import { useStudioReviewCaptureHost } from "./review-capture/useStudioReviewCaptureHost";
+import { selectStudioEditorCommentTarget, studioEditorTargetForComment, type StudioEditorCommentTarget } from "./studio-comment-editor-selection";
 import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
 import {
   chooseStudioProjectPackageSaveTarget,
@@ -13685,31 +13686,25 @@ export function StudioCuttoonEditor({
     return Boolean(target) && (anchor.type !== "frame" || target?.type === "frame");
   }, [pages]);
 
+  function selectCommentEditorTarget(target: StudioEditorCommentTarget, current?: () => boolean) {
+    return selectStudioEditorCommentTarget(target, {
+      getPages: () => currentStudioProjectSnapshot().pagesList,
+      getMasterElements: () => currentStudioProjectSnapshot().master?.elements ?? [],
+      getCurrentPageId: () => currentPageIdRef.current, changePage: setCurrentPageId,
+      applySelection: (selection) => {
+        setMasterEditMode(selection.master);
+        setPointCommentAnchor(selection.point);
+        applyGroupSelectionState({ activeGroupId: null, selectedId: selection.elementId, marqueeIds: [] });
+        setTool("select");
+        setError(null);
+      },
+      onMissing: (kind) => setError(kind === "page"
+        ? "댓글이 연결된 페이지를 현재 문서에서 찾을 수 없어요."
+        : "댓글이 연결된 컷 또는 요소를 현재 문서에서 찾을 수 없어요."),
+    }, current);
+  }
   function selectStudioCommentAnchor(anchor: StudioCommentAnchor) {
-    const page = pages.find((candidate) => candidate.id === anchor.pageId);
-    if (!page) {
-      setError("댓글이 연결된 페이지를 현재 문서에서 찾을 수 없어요.");
-      return;
-    }
-    if (anchor.type === "point") {
-      setPointCommentAnchor({ pageId: anchor.pageId, x: anchor.x, y: anchor.y });
-      setSelectedId(null);
-    } else if (anchor.type !== "page") {
-      const elementId = anchor.type === "frame" ? anchor.frameId : anchor.elementId;
-      if (!page.elements.some((element) => element.id === elementId)) {
-        setError("댓글이 연결된 컷 또는 요소를 현재 문서에서 찾을 수 없어요.");
-        return;
-      }
-      setPointCommentAnchor(null);
-      setSelectedId(elementId);
-    } else {
-      setPointCommentAnchor(null);
-      setSelectedId(null);
-    }
-    setMasterEditMode(false);
-    setCurrentPageId(page.id);
-    setTool("select");
-    setError(null);
+    return selectCommentEditorTarget(studioEditorTargetForComment(anchor));
   }
   const studioOpenCanvasThreads = useMemo(
     () =>
@@ -26417,6 +26412,12 @@ function clearSelectionForEdit() {
     isDurableMask: (surfaceId) => (studioCrdtDocumentRef.current?.getRasterOperationLog(surfaceId) ?? null) !== null,
     save: (status) => handleSave(status, { preserveEditor: true }),
     captureAll: () => handleCapturePagesForPreset("all"),
+    reviewHandoff: {
+      search: location.search,
+      getCurrentPageId: () => currentPageIdRef.current,
+      hasActivePointer: () => Boolean(requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()),
+      select: selectCommentEditorTarget,
+    },
   });
 
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
