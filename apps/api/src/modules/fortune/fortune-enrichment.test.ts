@@ -130,3 +130,23 @@ it("validates real GET routes without compiler-emitted parameter metadata", asyn
     expect((await fetch(`${baseUrl}/api/fortune/horoscope?sign=aries&period=daily&date=2026-02-30`)).status).toBe(400);
   } finally { await app.close(); }
 });
+
+it.each([429, 503, 200])("cancels rejected upstream streams (%s)", async (status) => {
+  const cancel = vi.fn();
+  const body = new ReadableStream<Uint8Array>({ cancel });
+  const response = new Response(body, { status, headers: status === 200 ? { "content-length": "131073" } : {} });
+  await expect(readBoundedProviderBody(response)).rejects.toThrow("provider-response-rejected");
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+it("expires cached horoscope originals at KST midnight", async () => {
+  let clock = new Date("2026-09-20T14:59:59.000Z");
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ data: {
+    sign: "Aries", period: "daily", date: "2026-09-20", horoscope: "Pause to notice the small details in the scene around you.",
+  } })));
+  const service = new FortuneEnrichmentService(config, { fetch: fetcher, now: () => clock }, port() as unknown as UpstashCoordinationPort);
+  expect((await service.horoscope("aries", "daily", "2026-09-20")).status).toBe("external");
+  expect((await service.horoscope("aries", "daily", "2026-09-20")).status).toBe("external-cache");
+  clock = new Date("2026-09-20T15:00:00.000Z");
+  expect(await service.horoscope("aries", "daily", "2026-09-20")).toMatchObject({ source: "local", reason: "historical-request" });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+});

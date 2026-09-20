@@ -87,7 +87,11 @@ export function parseProviderHoroscope(text: string, sign: FortuneZodiacId, peri
   return result.data.horoscope;
 }
 export async function readBoundedProviderBody(response: Response): Promise<string> {
-  if (!response.ok || !response.body || Number(response.headers.get("content-length")) > 131072) throw new Error("provider-response-rejected");
+  if (!response.ok || !response.body || Number(response.headers.get("content-length")) > 131072) {
+    // Cancel rejected bodies instead of leaving an unread upstream connection open.
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error("provider-response-rejected");
+  }
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let result = "", size = 0;
