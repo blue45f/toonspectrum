@@ -1,5 +1,6 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
+import { parseStudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
   STUDIO_VIRTUAL_SPACE_AVATAR_COUNT,
@@ -68,6 +69,7 @@ export interface StudioVirtualSpaceSnapshot {
 }
 
 export interface StudioVirtualSpacePresenceDependencies {
+  readonly appearanceForAvatarIndex?: (avatarIndex: number, identity: string) => StudioVirtualSpaceAppearance;
   readonly now?: () => number;
   readonly setInterval?: (handler: () => void, delayMs: number) => unknown;
   readonly clearInterval?: (handle: unknown) => void;
@@ -141,6 +143,7 @@ function runtimePresenceState(
   moving = false,
   avatarIndex = STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
   zoneId?: StudioVirtualSpaceZoneId,
+  appearance?: StudioVirtualSpaceAppearance,
 ): StudioVirtualSpacePresenceState {
   // The Phaser/Tiled world may be larger than the built-in 850×798 master scene. Use the
   // model helper for avatar/facing/activity sanitization and default-room fallback, but preserve
@@ -151,6 +154,7 @@ function runtimePresenceState(
     x: point.x,
     y: point.y,
     zoneId: zoneId ?? fallback.zoneId,
+    ...(appearance ? { appearance } : {}),
   });
 }
 
@@ -213,6 +217,8 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
     return null;
   }
   const point = { x: state.x, y: state.y };
+  const appearance = state.appearance === undefined ? undefined : parseStudioVirtualSpaceAppearance(state.appearance);
+  if (appearance === null) return null;
   return {
     wire: STUDIO_VIRTUAL_SPACE_WIRE,
     kind: "presence",
@@ -229,6 +235,7 @@ export function parseStudioVirtualSpacePacket(raw: string): StudioVirtualSpacePa
         ? Number(state.avatarIndex)
         : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
       state.zoneId as StudioVirtualSpaceZoneId,
+      appearance,
     ),
   };
 }
@@ -264,9 +271,14 @@ export class StudioVirtualSpacePresenceController {
     initialPoint: StudioVirtualSpacePoint | StudioVirtualSpacePresenceState,
     private readonly dependencies: StudioVirtualSpacePresenceDependencies = {},
   ) {
-    this.self = "facing" in initialPoint
+    const initialState = "facing" in initialPoint
       ? runtimePresenceState(initialPoint, initialPoint.facing, initialPoint.activity, initialPoint.moving, initialPoint.avatarIndex, initialPoint.zoneId)
       : runtimePresenceState(initialPoint);
+    const appearance = parseStudioVirtualSpaceAppearance(
+      dependencies.appearanceForAvatarIndex?.(initialState.avatarIndex, participant.sessionId)
+        ?? ("appearance" in initialPoint ? initialPoint.appearance : undefined),
+    );
+    this.self = Object.freeze({ ...initialState, ...(appearance ? { appearance } : {}) });
   }
 
   private now(): number {
@@ -339,7 +351,11 @@ export class StudioVirtualSpacePresenceController {
     zoneId?: StudioVirtualSpaceZoneId,
   ): void {
     if (this.closed) return;
-    const next = runtimePresenceState(point, facing, activity, moving, avatarIndex, zoneId);
+    const nextState = runtimePresenceState(point, facing, activity, moving, avatarIndex, zoneId);
+    const appearance = nextState.avatarIndex === this.self.avatarIndex
+      ? this.self.appearance
+      : parseStudioVirtualSpaceAppearance(this.dependencies.appearanceForAvatarIndex?.(nextState.avatarIndex, this.participant.sessionId)) ?? undefined;
+    const next = Object.freeze({ ...nextState, ...(appearance ? { appearance } : {}) });
     if (
       next.x === this.self.x
       && next.y === this.self.y

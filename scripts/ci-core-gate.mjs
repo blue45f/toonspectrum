@@ -10,6 +10,7 @@ export const REQUIRED_CORE_GATES = Object.freeze([
   "serial",
   "a11y",
   "build",
+  "database",
 ]);
 
 export function assertCoreResults(results) {

@@ -195,5 +195,5 @@ export interface BuildStudioMainMenuGroupsInput {
   state: StudioMainMenuBuilderState;
   editor: StudioMainMenuEditorActions;
   ui: StudioMainMenuUiActions;
-  t: (key: string) => string;
+  t: (key: string, fallbackText?: string) => string;
 }

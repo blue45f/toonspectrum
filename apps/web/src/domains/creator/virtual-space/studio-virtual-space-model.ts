@@ -1,4 +1,5 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
+import type { StudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 
 export const STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH = 1180;
 export const STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT = 720;
@@ -66,6 +67,8 @@ export interface StudioVirtualSpacePresenceState extends StudioVirtualSpacePoint
   readonly activity: StudioVirtualSpaceActivity;
   readonly moving: boolean;
   readonly avatarIndex: number;
+  /** Optional for legacy peers; only locally registered presentation identifiers are accepted. */
+  readonly appearance?: StudioVirtualSpaceAppearance;
 }
 
 export interface StudioVirtualSpacePeer {

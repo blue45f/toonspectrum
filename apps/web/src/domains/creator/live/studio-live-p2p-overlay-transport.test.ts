@@ -331,6 +331,7 @@ class SignalingBus {
 }
 
 class FakePrimaryTransport implements StudioLiveTransport {
+  authoritativeLockCapability: "fenced-v2" | null = null;
   readonly mode = "server" as const;
   readonly sent: StudioLiveEnvelope[] = [];
   readonly sentInk: StudioLiveInkWireMessage[] = [];
@@ -520,6 +521,18 @@ async function connectedThreePeerMesh(): Promise<{
 }
 
 describe("Studio live P2P overlay", () => {
+  it("never derives lock authority from a connected peer mesh", async () => {
+    const { local, remote, localPrimary } = await connectedMesh();
+    expect(local.authoritativeLockCapability).toBeNull();
+    localPrimary.authoritativeLockCapability = "fenced-v2";
+    expect(local.authoritativeLockCapability).toBe("fenced-v2");
+    localPrimary.ready = false;
+    expect(local.authoritativeLockCapability).toBeNull();
+    localPrimary.ready = true; localPrimary.authoritativeLockCapability = null;
+    expect(local.authoritativeLockCapability).toBeNull();
+    local.close(); remote.close();
+  });
+
   it("leaves local BroadcastChannel transports unwrapped", () => {
     const localTransport: StudioLiveTransport = {
       mode: "local",

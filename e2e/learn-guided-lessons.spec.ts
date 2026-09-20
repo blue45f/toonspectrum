@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
-
 import { LESSONS } from "../apps/web/src/domains/learn/learning-content";
 import { STORAGE_KEY } from "../apps/web/src/domains/learn/learning-model";
 import { LEARNING_PATHS, getPathLessons } from "../apps/web/src/domains/learn/learning-paths";
+
+import { expect, test } from "./fixtures/non-studio-test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));

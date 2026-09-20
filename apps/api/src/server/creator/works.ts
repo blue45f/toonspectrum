@@ -43,6 +43,7 @@ import { assertJoinableChallenge } from "./challenges";
 import { parseSeriesStatus } from "./community-contract";
 import { ensureCreatorCommunitySchema } from "./community-schema";
 import { insertCreatorWorkRelease } from "./community-publishing";
+import { deleteOwnedStudioGraphForWork } from "./works-studio-graph-deletion";
 import { getOwnedSeriesOrThrow, nextEpisodeNoOf, touchSeries } from "./series";
 import {
   authorOf,
@@ -963,6 +964,7 @@ export async function deleteWork(userId: string, id: string, isAdmin: boolean): 
       throw new Error("생성 에셋 정리가 완료된 뒤 작품을 삭제할 수 있습니다.");
     }
 
+    await deleteOwnedStudioGraphForWork(transaction, id);
     const deleted = await transaction
       .delete(creatorWorks)
       .where(eq(creatorWorks.id, id))

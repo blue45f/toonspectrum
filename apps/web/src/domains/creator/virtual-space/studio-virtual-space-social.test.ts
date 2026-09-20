@@ -7,15 +7,19 @@ import {
   StudioVirtualSpaceSocialController,
   STUDIO_VIRTUAL_SPACE_SOCIAL_MAX_BYTES,
   STUDIO_VIRTUAL_SPACE_SOCIAL_TTL_MS,
+  STUDIO_VIRTUAL_SPACE_SOCIAL_REVIEW_WIRE,
   type StudioVirtualSpaceSocialAction,
   type StudioVirtualSpaceSocialPacket,
   type StudioVirtualSpaceSocialWorld,
+  type StudioVirtualSpaceSocialDependencies,
 } from "./studio-virtual-space-social";
 
 const A: StudioLiveParticipant = { sessionId: "a", displayName: "Alice", role: "editor" };
 const B: StudioLiveParticipant = { sessionId: "b", displayName: "Bob", role: "editor" };
 const C: StudioLiveParticipant = { sessionId: "c", displayName: "Cleo", role: "editor" };
 const WORLD = { worldId: "studio", contentRevision: "layout-7" };
+const REVIEW_SUBJECT = Object.freeze({ schemaVersion: 1 as const, projectId: "graph-1", workId: "work-1",
+  artifactId: "artifact-1", reviewId: "review-1", revisionId: "snapshot-1", rootGraphHash: "a".repeat(64) });
 interface Message { sender: StudioLiveParticipant; target: string; raw: string }
 
 class PairedPorts {
@@ -46,7 +50,9 @@ class PairedPorts {
 
   deliver(message: Message): void { this.listeners.get(message.target)?.(message.sender, message.raw); }
   flush(): void {
-    let budget = 100;
+    // Three negotiated protocol versions have bounded bilateral challenge/reply traffic.
+    // Scale the feedback-loop guard to this fixture's complete peer mesh.
+    let budget = Math.max(100, this.participants.length * (this.participants.length - 1) * 12);
     while (this.queue.length && budget-- > 0) this.deliver(this.queue.shift()!);
     if (this.queue.length) throw new Error("Unexpected protocol feedback loop");
   }
@@ -60,7 +66,9 @@ class PairedPorts {
 const controllers: StudioVirtualSpaceSocialController[] = [];
 afterEach(() => { for (const controller of controllers.splice(0)) controller.close(); });
 
-function setup(options: { worldB?: StudioVirtualSpaceSocialWorld; synchronous?: boolean } = {}) {
+function setup(options: { worldB?: StudioVirtualSpaceSocialWorld; synchronous?: boolean;
+  authorizeA?: StudioVirtualSpaceSocialDependencies["authorizeReview"];
+  authorizeB?: StudioVirtualSpaceSocialDependencies["authorizeReview"]; } = {}) {
   const hub = new PairedPorts();
   hub.synchronous = options.synchronous ?? false;
   let now = 5_000;
@@ -70,6 +78,7 @@ function setup(options: { worldB?: StudioVirtualSpaceSocialWorld; synchronous?: 
   const make = (participant: StudioLiveParticipant, epoch: string, world = WORLD, onAccepted = vi.fn()) => {
     const controller = new StudioVirtualSpaceSocialController(participant, hub.port(participant), world, {
       epoch, now: () => now, onAccepted,
+      authorizeReview: participant.sessionId === A.sessionId ? options.authorizeA : options.authorizeB,
       setInterval: (handler) => { ticks.push(handler); return handler; },
       clearInterval: (handler) => { const index = ticks.indexOf(handler as () => void); if (index >= 0) ticks.splice(index, 1); },
     });
@@ -89,7 +98,49 @@ function setup(options: { worldB?: StudioVirtualSpaceSocialWorld; synchronous?: 
 }
 
 describe("virtual studio social consent", () => {
-  it.each<StudioVirtualSpaceSocialAction>(["talk", "follow", "review", "high-five"])(
+  it("delivers an addressed greeting only after the matching receipt and never starts an activity", () => {
+    const { a, b, hub, acceptedA, acceptedB } = setup();
+    expect(a.snapshot().greetingReadyPeerIds).toEqual([B.sessionId]);
+    expect(a.wave(B.sessionId)).toBe(true);
+    expect(a.snapshot().greetings[0]?.status).toBe("sending");
+    expect(a.wave(B.sessionId)).toBe(false);
+    hub.deliver(hub.take("greet"));
+    expect(b.snapshot().greetings[0]).toMatchObject({ direction: "incoming", status: "received", peer: A });
+    expect(a.snapshot().greetings[0]?.status).toBe("sending");
+    hub.deliver(hub.take("greet-ack"));
+    expect(a.snapshot().greetings[0]?.status).toBe("delivered");
+    expect(a.snapshot().requests).toEqual([]); expect(b.snapshot().requests).toEqual([]);
+    expect(acceptedA).not.toHaveBeenCalled(); expect(acceptedB).not.toHaveBeenCalled();
+    expect(hub.history.filter((message) => JSON.parse(message.raw).kind === "greet").map((message) => message.target)).toEqual([B.sessionId]);
+  });
+  it("does not claim greeting delivery after a lost or late acknowledgement and never retries it", () => {
+    const { a, b, hub, advance } = setup();
+    a.wave(B.sessionId); hub.deliver(hub.take("greet"));
+    const acknowledgement = hub.take("greet-ack");
+    advance(3_100);
+    expect(a.snapshot().greetings[0]?.status).toBe("failed");
+    hub.deliver(acknowledgement);
+    expect(a.snapshot().greetings[0]?.status).toBe("failed");
+    expect(b.snapshot().greetings).toHaveLength(1);
+    expect(hub.history.filter((message) => JSON.parse(message.raw).kind === "greet")).toHaveLength(1);
+  });
+  it("blocks this session's consent and greetings, cancels an accepted activity and fences unblock", () => {
+    const { a, b, hub, state, advance } = setup();
+    const id = a.request(B.sessionId, "talk")!; hub.flush(); b.respond(id, "accept"); hub.flush();
+    expect(state(a, id)).toBe("accepted");
+    b.wave(A.sessionId); const delayedGreeting = hub.take("greet");
+    a.setPeerBlocked(B.sessionId, true); hub.flush();
+    expect(state(a, id)).toBe("cancelled"); expect(state(b, id)).toBe("cancelled");
+    expect(a.snapshot().blockedPeerIds).toEqual([B.sessionId]);
+    expect(a.snapshot().readyPeerIds).toEqual([]);
+    expect(a.request(B.sessionId, "follow")).toBeNull(); expect(a.wave(B.sessionId)).toBe(false);
+    hub.deliver(delayedGreeting); expect(a.snapshot().greetings).toEqual([]);
+    a.setPeerBlocked(B.sessionId, false); advance(3_100); b.syncPeers(); hub.flush();
+    expect(a.snapshot().readyPeerIds).toEqual([B.sessionId]);
+    hub.deliver(delayedGreeting); expect(a.snapshot().greetings).toEqual([]);
+    expect(state(a, id)).toBe("cancelled");
+  });
+  it.each<StudioVirtualSpaceSocialAction>(["talk", "follow", "high-five"])(
     "requires receiver consent before completing %s, with exactly one callback per participant", (action) => {
       const { a, b, hub, state, acceptedA, acceptedB } = setup();
       expect(a.snapshot().readyPeerIds).toEqual([B.sessionId]);
@@ -129,7 +180,7 @@ describe("virtual studio social consent", () => {
 
   it("declines explicitly and cannot later accept the declined offer", () => {
     const { a, b, hub, state, acceptedA, acceptedB } = setup();
-    const id = a.request(B.sessionId, "review")!;
+    const id = a.request(B.sessionId, "follow")!;
     hub.flush();
     expect(b.respond(id, "decline")).toBe(true);
     hub.flush();
@@ -216,7 +267,7 @@ describe("virtual studio social consent", () => {
   it.each(["request", "accept", "commit"])("surfaces %s send failure and never reports that failed action as accepted", (kind) => {
     const { a, b, hub, state, acceptedA, acceptedB } = setup();
     if (kind === "request") hub.failKind = kind;
-    const id = a.request(B.sessionId, "review");
+    const id = a.request(B.sessionId, "follow");
     if (kind === "request") {
       expect(id).toBeNull();
       expect(a.snapshot().requests[0]?.status).toBe("failed");
@@ -303,7 +354,7 @@ describe("virtual studio social consent", () => {
     }
     hub.deliver(oldOffer);
     expect(current.snapshot().requests).toHaveLength(0);
-    const id = a.request(B.sessionId, "review")!;
+    const id = a.request(B.sessionId, "follow")!;
     hub.flush();
     expect(current.respond(id, "accept")).toBe(true);
     hub.flush();
@@ -315,14 +366,14 @@ describe("virtual studio social consent", () => {
       const { a, b, hub } = setup({ worldB });
       expect(a.snapshot().readyPeerIds).toEqual([]);
       expect(b.snapshot().readyPeerIds).toEqual([]);
-      expect(a.request(B.sessionId, "review")).toBeNull();
+      expect(a.request(B.sessionId, "follow")).toBeNull();
       expect(hub.history.every((message) => JSON.parse(message.raw).kind === "hello")).toBe(true);
     },
   );
 
   it("binds sender and target to the actual authorized port and refuses remote command payloads", () => {
     const { a, b, hub } = setup();
-    a.request(B.sessionId, "review");
+    a.request(B.sessionId, "follow");
     const offer = hub.take("request");
     const original = JSON.parse(offer.raw) as StudioVirtualSpaceSocialPacket;
     hub.deliver({ ...offer, sender: C });
@@ -383,7 +434,7 @@ describe("virtual studio social consent", () => {
     a.subscribe(() => activeStates.push(state(a, activeId)));
     for (let index = 0; index < 70; index++) {
       advance(3_100);
-      const id = direction === "incoming" ? c.request(A.sessionId, "review") : a.request(C.sessionId, "review");
+      const id = direction === "incoming" ? c.request(A.sessionId, "follow") : a.request(C.sessionId, "follow");
       expect(id).not.toBeNull();
       hub.flush();
       (direction === "incoming" ? a : c).respond(id!, "decline");
@@ -413,7 +464,7 @@ describe("virtual studio social consent", () => {
       hub.flush();
     }
     advance(3_100);
-    expect(a.request(B.sessionId, "review")).toBeNull();
+    expect(a.request(B.sessionId, "follow")).toBeNull();
     expect(a.snapshot().requests).toHaveLength(64);
     expect(a.snapshot().requests.every((request) => request.status === "accepted")).toBe(true);
     hub.participants.push(C);
@@ -427,7 +478,7 @@ describe("virtual studio social consent", () => {
     expect(a.snapshot().requests.every((request) => request.status === "accepted")).toBe(true);
     expect(a.cancel(activeIds[0]!)).toBe(true);
     hub.flush();
-    const nextId = a.request(B.sessionId, "review")!;
+    const nextId = a.request(B.sessionId, "follow")!;
     expect(nextId).not.toBeNull();
     hub.flush();
     expect(b.respond(nextId, "accept")).toBe(true);
@@ -473,5 +524,146 @@ describe("social packet validation", () => {
       { expiresAfterMs: STUDIO_VIRTUAL_SPACE_SOCIAL_TTL_MS + 1 }, { requestId: "unrelated" },
       { contentRevision: "" }, { action: "enable-microphone" }, { payload: {} },
     ]) expect(parseStudioVirtualSpaceSocialPacket(JSON.stringify({ ...packet, ...edit }))).toBeNull();
+  });
+});
+
+describe("pinned shared review consent", () => {
+  async function settle(hub: PairedPorts): Promise<void> {
+    // Drain asynchronous authority reads and each reliable control hop deterministically.
+    for (let index = 0; index < 12; index++) { await Promise.resolve(); hub.flush(); }
+  }
+
+  it("negotiates v2, checks local authority on both consent edges, and carries the exact snapshot to both participants", async () => {
+    const authorizeA = vi.fn(async () => true);
+    const authorizeB = vi.fn(async () => true);
+    const { a, b, hub, state, acceptedA, acceptedB } = setup({ authorizeA, authorizeB });
+    expect(a.snapshot().reviewReadyPeerIds).toEqual([B.sessionId]);
+    expect(b.snapshot().reviewReadyPeerIds).toEqual([A.sessionId]);
+    expect(a.request(B.sessionId, "review")).toBeNull();
+    const id = (await a.requestReview(B.sessionId, REVIEW_SUBJECT))!;
+    hub.flush();
+    expect(b.snapshot().requests[0]).toMatchObject({ id, reviewSubject: REVIEW_SUBJECT, status: "offered" });
+    expect(b.respond(id, "accept")).toBe(false);
+    expect(await b.respondReview(id, "accept")).toBe(true);
+    await settle(hub);
+    expect(state(a, id)).toBe("accepted");
+    expect(state(b, id)).toBe("accepted");
+    expect(authorizeA.mock.calls).toEqual([[REVIEW_SUBJECT, "propose"], [REVIEW_SUBJECT, "propose"]]);
+    expect(authorizeB.mock.calls).toEqual([[REVIEW_SUBJECT, "receive"], [REVIEW_SUBJECT, "receive"]]);
+    expect(acceptedA).toHaveBeenCalledWith(expect.objectContaining({ reviewSubject: REVIEW_SUBJECT }));
+    expect(acceptedB).toHaveBeenCalledWith(expect.objectContaining({ reviewSubject: REVIEW_SUBJECT }));
+    for (const message of [...hub.history]) hub.deliver(message);
+    await settle(hub);
+    expect(acceptedA).toHaveBeenCalledTimes(1);
+    expect(acceptedB).toHaveBeenCalledTimes(1);
+    a.cancel(id); hub.flush();
+    expect(state(b, id)).toBe("cancelled");
+  });
+
+  it("keeps v1 peer actions usable while refusing review capability downgrade", async () => {
+    const { a, b, hub, state } = setup({ authorizeA: async () => true });
+    expect(a.snapshot().readyPeerIds).toEqual([B.sessionId]);
+    expect(a.snapshot().reviewReadyPeerIds).toEqual([]);
+    expect(await a.requestReview(B.sessionId, REVIEW_SUBJECT)).toBeNull();
+    const id = a.request(B.sessionId, "talk")!;
+    hub.flush();
+    b.respond(id, "accept"); hub.flush();
+    expect(state(a, id)).toBe("accepted");
+    const request = hub.history.find((message) => JSON.parse(message.raw).kind === "request")!;
+    const packet = JSON.parse(request.raw);
+    packet.action = "review";
+    packet.sequence += 20;
+    packet.requestId = `${packet.sessionEpoch}.${packet.sequence}`;
+    hub.deliver({ ...request, raw: JSON.stringify(packet) });
+    expect(b.snapshot().requests).toHaveLength(1);
+  });
+
+  it("never publishes a proposal when proposer authority is missing or throws", async () => {
+    const authorizeA = vi.fn(async () => false);
+    const { a, hub } = setup({ authorizeA, authorizeB: async () => true });
+    expect(await a.requestReview(B.sessionId, REVIEW_SUBJECT)).toBeNull();
+    authorizeA.mockRejectedValue(new Error("access revoked"));
+    expect(await a.requestReview(B.sessionId, REVIEW_SUBJECT)).toBeNull();
+    expect(a.snapshot().requests).toEqual([]);
+    expect(hub.history.filter((message) => JSON.parse(message.raw).kind === "request")).toEqual([]);
+  });
+
+  it("declines when recipient access was revoked before acceptance", async () => {
+    const { a, b, hub, state, acceptedA } = setup({ authorizeA: async () => true, authorizeB: async () => false });
+    const id = (await a.requestReview(B.sessionId, REVIEW_SUBJECT))!;
+    hub.flush();
+    expect(await b.respondReview(id, "accept")).toBe(false);
+    hub.flush();
+    expect(state(a, id)).toBe("declined");
+    expect(state(b, id)).toBe("declined");
+    expect(acceptedA).not.toHaveBeenCalled();
+  });
+
+  it.each(["proposer", "recipient"])("cancels both sides if %s permission/version expires during the handshake", async (side) => {
+    const gate = vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false);
+    const { a, b, hub, state } = setup({
+      authorizeA: side === "proposer" ? gate : async () => true,
+      authorizeB: side === "recipient" ? gate : async () => true,
+    });
+    const id = (await a.requestReview(B.sessionId, REVIEW_SUBJECT))!;
+    hub.flush();
+    expect(await b.respondReview(id, "accept")).toBe(true);
+    await settle(hub);
+    expect(state(a, id)).toBe("cancelled");
+    expect(state(b, id)).toBe("cancelled");
+  });
+
+  it.each(["cancel", "expire", "disconnect"])("cannot revive a review after %s while authority reads are pending", async (terminal) => {
+    let finish!: (allowed: boolean) => void;
+    const { a, b, hub, state, advance, acceptedA, acceptedB } = setup({ authorizeA: async () => true,
+      authorizeB: () => new Promise<boolean>((resolve) => { finish = resolve; }) });
+    const id = (await a.requestReview(B.sessionId, REVIEW_SUBJECT))!;
+    hub.flush();
+    const response = b.respondReview(id, "accept");
+    if (terminal === "cancel") { a.cancel(id); hub.flush(); }
+    if (terminal === "expire") { advance(STUDIO_VIRTUAL_SPACE_SOCIAL_TTL_MS + 1); hub.flush(); }
+    if (terminal === "disconnect") { hub.participants = [B]; b.syncPeers(); }
+    finish(true);
+    expect(await response).toBe(false);
+    await settle(hub);
+    expect(state(b, id)).toBe(terminal === "cancel" ? "cancelled" : terminal === "expire" ? "expired" : "disconnected");
+    expect(acceptedA).not.toHaveBeenCalled();
+    expect(acceptedB).not.toHaveBeenCalled();
+  });
+
+  it("binds every accept/commit to its immutable subject and rejects unknown v2 commands", async () => {
+    const { a, b, hub, state } = setup({ authorizeA: async () => true, authorizeB: async () => true });
+    const id = (await a.requestReview(B.sessionId, REVIEW_SUBJECT))!;
+    const request = hub.take("request");
+    const packet = JSON.parse(request.raw);
+    expect(packet.wire).toBe(STUDIO_VIRTUAL_SPACE_SOCIAL_REVIEW_WIRE);
+    expect(parseStudioVirtualSpaceSocialPacket(request.raw)?.reviewSubject).toEqual(REVIEW_SUBJECT);
+    for (const edit of [{ reviewSubject: null }, { action: "talk" }, { reviewSubject: { ...REVIEW_SUBJECT, url: "https://bad.test" } }]) {
+      expect(parseStudioVirtualSpaceSocialPacket(JSON.stringify({ ...packet, ...edit }))).toBeNull();
+    }
+    hub.deliver(request);
+    await b.respondReview(id, "accept");
+    const accepted = hub.take("accept");
+    const altered = JSON.parse(accepted.raw);
+    altered.reviewSubject.rootGraphHash = "b".repeat(64);
+    hub.deliver({ ...accepted, raw: JSON.stringify(altered) });
+    await settle(hub);
+    expect(state(a, id)).toBe("offered");
+    // A mismatched authenticated packet consumes its sequence; replaying an older accept cannot revive it.
+    hub.deliver(accepted);
+    expect(state(a, id)).toBe("offered");
+  });
+
+  it("bounds simultaneous pre-request authority reads and fences results across peer restart", async () => {
+    let finish!: (allowed: boolean) => void;
+    const gate = vi.fn(() => new Promise<boolean>((resolve) => { finish = resolve; }));
+    const { a, b, hub, make } = setup({ authorizeA: gate, authorizeB: async () => true });
+    const first = a.requestReview(B.sessionId, REVIEW_SUBJECT);
+    expect(await a.requestReview(B.sessionId, REVIEW_SUBJECT)).toBeNull();
+    expect(gate).toHaveBeenCalledTimes(1);
+    b.close(); hub.flush();
+    make(B, "restarted-epoch-b"); a.syncPeers(); hub.flush();
+    finish(true);
+    expect(await first).toBeNull();
   });
 });

@@ -1,4 +1,3 @@
-import { expect, test } from "@playwright/test";
 
 import { serializeStudioAutosave, studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 import {
@@ -7,19 +6,13 @@ import {
 } from "../apps/web/src/domains/creator/studio-exact-resume-context";
 import { studioProjectDocumentStorageKey } from "../apps/web/src/domains/creator/studio-project-document-store";
 import { STUDIO_PROJECT_LIBRARY_STORAGE_KEY } from "../apps/web/src/domains/creator/studio-project-library-store";
+import { readDurableStudioAutosaveDocument, resolveDurableStudioAutosaveModuleUrl, seedDurableStudioAutosaveDocument } from "../scripts/lib/studio-verify-durable-autosave.mjs";
 
+import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
 const PROJECT_ID = "exact-resume-project";
 const DOCUMENT_ID = "episode-01";
-const USER_ID = "11111111-2222-4333-8444-555555555555";
-const AUTHENTICATED_USER = Object.freeze({
-  email: "exact-resume@toonspectrum.invalid",
-  id: USER_ID,
-  image: null,
-  name: "정확한 재개 QA",
-  role: "creator",
-});
 const CREATED_AT = "2026-09-17T08:00:00.000Z";
 const UPDATED_AT = "2026-09-17T09:00:00.000Z";
 
@@ -121,12 +114,14 @@ const autosave = serializeStudioAutosave({
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(({ payload, restoredEvent }) => {
-    localStorage.clear();
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
-    localStorage.setItem(payload.projectLibraryKey, JSON.stringify(payload.projectLibrary));
-    localStorage.setItem(payload.documentsKey, JSON.stringify(payload.projectDocuments));
-    localStorage.setItem(payload.autosaveKey, payload.autosave);
-    localStorage.setItem(payload.resumeKey, JSON.stringify(payload.resumeContext));
+    if (sessionStorage.getItem("exact-resume-fixture-seeded") !== "true") {
+      localStorage.clear();
+      localStorage.setItem(payload.projectLibraryKey, JSON.stringify(payload.projectLibrary));
+      localStorage.setItem(payload.documentsKey, JSON.stringify(payload.projectDocuments));
+      localStorage.setItem(payload.resumeKey, JSON.stringify(payload.resumeContext));
+      sessionStorage.setItem("exact-resume-fixture-seeded", "true");
+    }
     (window as Window & { __studioExactResumeEvents?: unknown[] }).__studioExactResumeEvents = [];
     window.addEventListener(restoredEvent, (event) => {
       (window as Window & { __studioExactResumeEvents?: unknown[] }).__studioExactResumeEvents?.push(
@@ -139,8 +134,6 @@ test.beforeEach(async ({ page }) => {
       projectLibrary,
       documentsKey: studioProjectDocumentStorageKey(PROJECT_ID),
       projectDocuments,
-      autosaveKey: studioAutosaveKey({ userId: USER_ID, workId: DOCUMENT_ID }),
-      autosave,
       resumeKey: studioExactResumeStorageKey(PROJECT_ID, DOCUMENT_ID),
       resumeContext,
     },
@@ -150,14 +143,28 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (/\/auth\/session$/u.test(pathname)) {
-      await route.fulfill({ status: 200, json: AUTHENTICATED_USER });
+      await route.fulfill({ status: 200, json: { authenticated: false, user: null } });
       return;
     }
     await route.fulfill({ status: 503, json: { message: "Deliberate offline fixture" } });
   });
+  // Browser storage is compatibility data, not manuscript authority. Prepare the fixture
+  // through the shipped OPFS writer and release its lease before mounting this document.
+  await page.goto("/studio/draft/exact-resume-primer?workspace=draw", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-studio-canvas-viewport]").first()).toBeVisible({ timeout: 60_000 });
+  let moduleUrl: string | null = null;
+  await expect.poll(async () => {
+    moduleUrl = await resolveDurableStudioAutosaveModuleUrl(page);
+    return moduleUrl;
+  }).not.toBeNull();
+  await page.goto("/studio");
+  const key = studioAutosaveKey({ workId: DOCUMENT_ID });
+  await seedDurableStudioAutosaveDocument(page, key, autosave, moduleUrl);
+  const saved = await readDurableStudioAutosaveDocument(page, key, { moduleUrl });
+  expect(saved?.pagesList.map((item) => item.id)).toEqual(["page-1", "page-2"]);
 });
 
-test("My work resumes the exact document context and keeps it after returning", async ({ page }, testInfo) => {
+test("Local My work resumes the exact document context and keeps it after returning", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   const pageErrors: string[] = [];
@@ -176,7 +183,20 @@ test("My work resumes the exact document context and keeps it after returning", 
   await continueLink.click();
 
   await expect(page).toHaveURL(new RegExp(`/studio/p/${PROJECT_ID}/d/${DOCUMENT_ID}\\?`));
-  await expect(page.getByText(/최근 작업 위치를 복원했어요\. page-2 · 확대 160%/u)).toBeVisible({ timeout: 30_000 });
+  const restore = page.getByRole("button", { name: "이어서 그리기", exact: true });
+  let explicitlyRestored = false;
+  await expect.poll(async () => {
+    // The durable source may hydrate directly. When recovery needs a decision,
+    // use the actual action and preserve the pending context until that decision.
+    if (!explicitlyRestored && await restore.isVisible()) {
+      expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!),
+        studioExactResumeStorageKey(PROJECT_ID, DOCUMENT_ID))).toMatchObject({ pageId: "page-2", zoom: 1.6 });
+      await restore.click();
+      explicitlyRestored = true;
+    }
+    return page.evaluate(() => (window as Window & { __studioExactResumeEvents?: unknown[] }).__studioExactResumeEvents?.length ?? 0);
+  }).toBeGreaterThan(0);
+  await expect(page.getByText(/최근 작업 위치를 복원했어요\. page-2 · 확대 160%/u)).toBeVisible();
   await expect.poll(async () => page.evaluate(() => (
     (window as Window & { __studioExactResumeEvents?: Array<{ pageId?: string; zoom?: number; selectedElementIds?: string[] }> })
       .__studioExactResumeEvents?.at(-1) ?? null

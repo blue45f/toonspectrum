@@ -5,10 +5,28 @@ import {
   removeStudioExactResumeContext,
   studioExactResumeHref,
   studioExactResumeRequested,
+  studioExactResumeSourceReady,
   studioExactResumeSummary,
   writeStudioExactResumeContext,
   type StudioExactResumeStorage,
 } from "./studio-exact-resume-context";
+
+describe("exact resume source authority", () => {
+  const ready = { sourceHydrated: true, sourceHydrationPending: false, remoteSource: false,
+    autosaveChecked: true, hasAutosave: false, localDocumentLocked: false };
+  it.each([
+    { autosaveChecked: false }, { hasAutosave: true }, { localDocumentLocked: true },
+    { sourceHydrated: false }, { sourceHydrationPending: true },
+  ])("keeps local resume pending while source/recovery is unresolved: %j", (pending) => {
+    expect(studioExactResumeSourceReady({ ...ready, ...pending })).toBe(false);
+    expect(studioExactResumeSourceReady(ready)).toBe(true);
+  });
+  it("allows a hydrated read-only server document without granting edits or consuming a pending source", () => {
+    expect(studioExactResumeSourceReady({ ...ready, remoteSource: true, localDocumentLocked: true,
+      autosaveChecked: false })).toBe(true);
+    expect(studioExactResumeSourceReady({ ...ready, remoteSource: true, sourceHydrationPending: true })).toBe(false);
+  });
+});
 
 class MemoryStorage implements StudioExactResumeStorage {
   readonly values = new Map<string, string>();

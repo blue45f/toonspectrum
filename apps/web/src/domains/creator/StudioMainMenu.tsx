@@ -653,8 +653,10 @@ function MenuDropdown({
       // Presentational: the menubar owns the `menuitem` trigger, not this positioning shell.
       role="none"
       className="relative shrink-0"
-      onMouseEnter={() => {
+      onMouseMove={() => {
         if (barActive && !open) {
+          // A horizontal scroll or layout change can move another title underneath a stationary
+          // pointer and emit mouseenter. Only actual mouse movement should switch the open group.
           // Desktop hover switching should not yank keyboard focus into the newly revealed menu.
           hoverOpenedRef.current = true;
           openMenu("preserve");

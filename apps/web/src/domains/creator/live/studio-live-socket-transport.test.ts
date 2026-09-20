@@ -2849,8 +2849,10 @@ describe("StudioLiveSocketTransport", () => {
       now: () => NOW,
       randomId: () => requestIds.shift() ?? "30303030-3030-4030-8030-303030303030",
     });
+    expect(transport.authoritativeLockCapability).toBeNull();
     await transport.connect();
     activate(transport);
+    expect(transport.authoritativeLockCapability).toBe("fenced-v2");
     const claimId = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
 
     expect(transport.send(envelope("lock:claim", {

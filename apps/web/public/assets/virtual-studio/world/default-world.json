@@ -10,8 +10,8 @@
   "type": "map",
   "version": "1.10",
   "tiledversion": "1.11.2",
-  "nextlayerid": 9,
-  "nextobjectid": 77,
+  "nextlayerid": 11,
+  "nextobjectid": 80,
   "properties": [
     {
       "name": "backgroundUrl",
@@ -26,7 +26,7 @@
     {
       "name": "manifestVersion",
       "type": "float",
-      "value": 3
+      "value": 4
     },
     {
       "name": "manifestId",
@@ -1681,7 +1681,7 @@
     },
     {
       "id": 8,
-      "name": "npcs",
+      "name": "occlusion-layers",
       "type": "objectgroup",
       "visible": true,
       "opacity": 1,
@@ -1691,6 +1691,234 @@
       "objects": [
         {
           "id": 73,
+          "name": "review-sofa-front",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1720
+            }
+          ],
+          "polygon": [
+            {
+              "x": 101.326,
+              "y": 692.082
+            },
+            {
+              "x": 107.905,
+              "y": 690.767
+            },
+            {
+              "x": 134.878,
+              "y": 710.503
+            },
+            {
+              "x": 208.56,
+              "y": 679.583
+            },
+            {
+              "x": 210.533,
+              "y": 667.083
+            },
+            {
+              "x": 242.769,
+              "y": 648.663
+            },
+            {
+              "x": 251.979,
+              "y": 649.979
+            },
+            {
+              "x": 254.611,
+              "y": 685.504
+            },
+            {
+              "x": 253.295,
+              "y": 702.608
+            },
+            {
+              "x": 136.852,
+              "y": 752.607
+            },
+            {
+              "x": 119.747,
+              "y": 748.002
+            },
+            {
+              "x": 101.326,
+              "y": 734.186
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "interaction-slots",
+      "type": "objectgroup",
+      "visible": true,
+      "opacity": 1,
+      "draworder": "topdown",
+      "x": 0,
+      "y": 0,
+      "objects": [
+        {
+          "id": 74,
+          "name": "review-left",
+          "type": "",
+          "x": 151.27118644067795,
+          "y": 737.0416666666667,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "리뷰 소파 왼쪽"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Review sofa · left"
+            },
+            {
+              "name": "anchorX",
+              "type": "float",
+              "value": 151.27118644067795
+            },
+            {
+              "name": "anchorY",
+              "type": "float",
+              "value": 737.0416666666667
+            },
+            {
+              "name": "exitX",
+              "type": "float",
+              "value": 54.02542372881356
+            },
+            {
+              "name": "exitY",
+              "type": "float",
+              "value": 737.0416666666667
+            },
+            {
+              "name": "seatX",
+              "type": "float",
+              "value": 154
+            },
+            {
+              "name": "seatY",
+              "type": "float",
+              "value": 690
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "up"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 10
+            }
+          ]
+        },
+        {
+          "id": 75,
+          "name": "review-right",
+          "type": "",
+          "x": 223.3050847457627,
+          "y": 737.0416666666667,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "리뷰 소파 오른쪽"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Review sofa · right"
+            },
+            {
+              "name": "anchorX",
+              "type": "float",
+              "value": 223.3050847457627
+            },
+            {
+              "name": "anchorY",
+              "type": "float",
+              "value": 737.0416666666667
+            },
+            {
+              "name": "exitX",
+              "type": "float",
+              "value": 280.9322033898305
+            },
+            {
+              "name": "exitY",
+              "type": "float",
+              "value": 737.0416666666667
+            },
+            {
+              "name": "seatX",
+              "type": "float",
+              "value": 220
+            },
+            {
+              "name": "seatY",
+              "type": "float",
+              "value": 664
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "up"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "npcs",
+      "type": "objectgroup",
+      "visible": true,
+      "opacity": 1,
+      "draworder": "topdown",
+      "x": 0,
+      "y": 0,
+      "objects": [
+        {
+          "id": 76,
           "name": "studio-guide",
           "type": "",
           "x": 363.7711864406779,
@@ -1738,7 +1966,7 @@
           ]
         },
         {
-          "id": 74,
+          "id": 77,
           "name": "studio-writer",
           "type": "",
           "x": 313.3474576271186,
@@ -1786,7 +2014,7 @@
           ]
         },
         {
-          "id": 75,
+          "id": 78,
           "name": "studio-artist",
           "type": "",
           "x": 637.5,
@@ -1834,7 +2062,7 @@
           ]
         },
         {
-          "id": 76,
+          "id": 79,
           "name": "studio-librarian",
           "type": "",
           "x": 208.89830508474574,

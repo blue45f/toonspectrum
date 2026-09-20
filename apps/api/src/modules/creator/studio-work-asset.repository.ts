@@ -249,6 +249,7 @@ export interface StudioWorkAssetRepository {
       expectedDigest: string;
     },
     allowAdminOverride?: boolean,
+    forWorkDeletion?: boolean,
   ): Promise<StudioWorkAssetGeneratedDeletePlan>;
   completeGeneratedStorageReferenceDelete(
     plan: StudioWorkAssetGeneratedDeletePlan,
@@ -1447,17 +1448,18 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
       expectedDigest: string;
     },
     allowAdminOverride = false,
+    forWorkDeletion = false,
   ): Promise<StudioWorkAssetGeneratedDeletePlan> {
     if (input.purpose === ("source" as PrivateObjectPurpose)) {
       throw new StudioWorkAssetStorageReferenceConflictError();
     }
     return db.transaction(async (transaction) => {
-      if (allowAdminOverride) {
+      if (allowAdminOverride || forWorkDeletion) {
         await requireWorkDeleteAccess(
           transaction,
           actorUserId,
           input.workId,
-          true,
+          allowAdminOverride,
           true,
         );
       } else {
@@ -1512,6 +1514,20 @@ export class DrizzleStudioWorkAssetRepository implements StudioWorkAssetReposito
         .for("update");
       if (!objectRow || !referenceRow) {
         throw new StudioWorkAssetStorageReferenceNotFoundError();
+      }
+      if (!forWorkDeletion && input.purpose === "derived") {
+        // The preview producer holds this exact object-row lock while adding immutable graph
+        // references. Check before removing even a shared storage reference: its same-work
+        // ownership is required by the authenticated preview reader.
+        const pinned = await transaction.execute(sql`
+          SELECT 1 FROM studio_revision_blob pinned
+          JOIN studio_revision revision ON revision.id = pinned."revisionId"
+          JOIN studio_artifact artifact ON artifact.id = revision."artifactId"
+          JOIN studio_project_graph project ON project.id = artifact."projectId"
+          WHERE project."workId" = ${input.workId} AND pinned.role = 'preview'
+            AND pinned."blobHash" = ${candidate.objectDigest.slice("sha256:".length)} LIMIT 1
+        `);
+        if (pinned.rows.length > 0) throw new StudioWorkAssetReferencedError();
       }
       const reference = {
         workId: referenceRow.workId,

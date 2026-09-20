@@ -10,12 +10,25 @@ import {
   assertShardManifest,
   executionTargetsByShard,
   targetsByShard,
+  targetIsCovered,
 } from "./ci-core-regression-shards-impl.mjs";
 
 export * from "./ci-core-regression-shards-impl.mjs";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const GLOB_PATTERN = /[*?[\]]/u;
+
+/** These mandatory suites belong to the real PostgreSQL lane, never to a DB-less shard. */
+export const CORE_DATABASE_VITEST_TARGETS = Object.freeze([
+  "apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts",
+  "apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts",
+]);
+
+export function buildShardVitestArgs(targets) {
+  const databaseOwned = CORE_DATABASE_VITEST_TARGETS.filter((target) => targetIsCovered(target, targets));
+  return ["pnpm", "exec", "vitest", "run", ...targets,
+    ...databaseOwned.flatMap((target) => ["--exclude", target]), "--pool=forks", "--maxWorkers=4"];
+}
 
 export function expandGlobTargets(
   targets,
@@ -61,7 +74,7 @@ export function runShard(name) {
   const targets = expandGlobTargets(executionTargetsByShard()[name]);
   runCommand({
     label: `Vitest shard ${name} (${targets.length} expanded execution targets)`,
-    argv: ["pnpm", "exec", "vitest", "run", ...targets, "--pool=forks", "--maxWorkers=4"],
+    argv: buildShardVitestArgs(targets),
   });
 }
 

@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 
-import { expect, test } from "@playwright/test";
-
 import { EMPTY_LESSON, STORAGE_KEY } from "../apps/web/src/domains/learn/learning-model";
+
+import { expect, test, installBetaEventDismissal } from "./fixtures/non-studio-test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
@@ -31,6 +31,7 @@ test("exports a real file and restores only after preview and explicit confirmat
   try {
     await fresh.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
     const destination = await fresh.newPage();
+    await installBetaEventDismissal(destination);
     await destination.goto(new URL("/learn/records", page.url()).href);
     await destination.getByText("백업 파일에서 복원", { exact: true }).click();
     await destination.getByLabel("학습 백업 파일 선택 (.json, 최대 512 KiB)", { exact: true }).setInputFiles({ name: "my-learning.json", mimeType: "application/json", buffer: Buffer.from(raw) });
@@ -114,6 +115,7 @@ test("failed writes survive real other-tab edits and SPA navigation to record ma
   await page.goto("/learn/lessons/story-board");
   await page.getByLabel("나의 실습 메모", { exact: true }).fill("기준 메모");
   const other = await context.newPage();
+  await installBetaEventDismissal(other);
   try {
     await other.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
     await other.goto(new URL("/learn/lessons/story-board", page.url()).href);

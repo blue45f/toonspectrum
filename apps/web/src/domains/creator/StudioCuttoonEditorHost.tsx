@@ -266,6 +266,8 @@ import { createStudioAutosaveBusyRetry } from "./studio-autosave-busy-retry";
 import { studioAutosaveLeadershipAllowsLocalEdit } from "./studio-autosave-document-leader";
 import { studioAutosaveDocumentBusy } from "./studio-autosave-opfs-session";
 import { StudioFormalSaveDialogMount as StudioFormalSaveDialog } from "./save-first/StudioFormalSaveDialogMount";
+import { studioReviewCaptureSaveNavigation } from "./review-capture/studio-review-capture-navigation";
+import { useStudioReviewCaptureHost } from "./review-capture/useStudioReviewCaptureHost";
 import { resolveStudioEditorExplicitSaveAction } from "./save-first/studio-editor-save-policy";
 import {
   chooseStudioProjectPackageSaveTarget,
@@ -913,7 +915,7 @@ import {
   useStudioWorkspacePanelOpenOverrides,
 } from "./studio-page-workspace-persistence";
 import { createPalette } from "./studio-palette-library";
-import { studioExactResumeRequested } from "./studio-exact-resume-context";
+import { studioExactResumeRequested, studioExactResumeSourceReady } from "./studio-exact-resume-context";
 import { useStudioExactResumeContext } from "./useStudioExactResumeContext";
 import {
   DEFAULT_STUDIO_PAPER_SURFACE,
@@ -7215,7 +7217,7 @@ export function StudioCuttoonEditor({
     language: params.get("language") ?? studioSaveLocale,
     sourceVersion: params.get("version"),
     resumeRequested: studioExactResumeRequested(location.search),
-    hydrated: workHydrated,
+    hydrated: studioExactResumeSourceReady({ sourceHydrated: workHydrated, sourceHydrationPending, remoteSource: Boolean(workId || remixId), autosaveChecked, hasAutosave, localDocumentLocked: collaborationDocumentLocked }),
     pages,
     currentPageId,
     setCurrentPageId,
@@ -24256,7 +24258,7 @@ const puppetWarpArmed =
   // 가드(saveScopeStillCurrent·mutation ticket)·CRDT 승인 장벽·revision fencing 은 전부 함께
   // 이관됐고, 이 선언은 호출 시점 렌더 바인딩을 deps 로 흘리는 얇은 지점만 유지한다
   // (함수 선언 hoisting 으로 상단 handleSaveRef 배선이 그대로 동작한다).
-  async function handleSave(status: "published" | "draft") {
+  async function handleSave(status: "published" | "draft", options?: { preserveEditor?: boolean }) {
     const localProjectContext = localStudioProjectForSave();
     const explicitSaveAction = resolveStudioEditorExplicitSaveAction({
       status,
@@ -24278,7 +24280,8 @@ const puppetWarpArmed =
     }
     await runStudioPageSavePipeline(status, {
       studioAuthUserId, workId, remixId, loggedIn, autosaveKey,
-      linkedTitleId, linkedSeriesId, linkedChallengeId, location, navigate,
+      linkedTitleId, linkedSeriesId, linkedChallengeId, location,
+      navigate: studioReviewCaptureSaveNavigation(navigate, workId, options?.preserveEditor),
       currentStudioDocumentScopeRef, editorMountedRef,
       captureStudioMutationTicket, canApplyStudioMutation,
       markStudioDocumentChanged, lockStudioMutationsNow, documentSaveInFlightRef,
@@ -26390,20 +26393,13 @@ function clearSelectionForEdit() {
     const pendingBatch = options.pendingStrokeCommits === undefined
       ? pendingStrokeCommitsRef.current
       : options.pendingStrokeCommits;
-    const snapshotEligiblePendingStrokes = pendingBatch?.strokes.filter((stroke) => (
-      !selectedGpuStrokeRequiresFinalReceipt(stroke.id)
-      || hasExactSelectedGpuFinalReceipt(stroke.id)
-    )) ?? [];
-    const receiptedPendingBatch = pendingBatch && snapshotEligiblePendingStrokes.length > 0
-      ? { pageId: pendingBatch.pageId, strokes: snapshotEligiblePendingStrokes }
-      : null;
     const durablePages = resolveStudioDurableProjectPages({
       pagesHistory: pagesHistoryRef.current,
       historyIndex: pagesHiRef.current,
       fallbackPages: pages,
-      pendingStrokeCommits: receiptedPendingBatch
-        ? { pageId: receiptedPendingBatch.pageId, strokes: receiptedPendingBatch.strokes }
-        : null,
+      pendingStrokeCommits: pendingBatch,
+      isPendingStrokeDurable: (stroke) => !selectedGpuStrokeRequiresFinalReceipt(stroke.id)
+        || hasExactSelectedGpuFinalReceipt(stroke.id),
     }).pagesList as PageState[];
     return buildCurrentStudioProjectFileSnapshot(
       durablePages,
@@ -26411,6 +26407,17 @@ function clearSelectionForEdit() {
       options.recoveredMasterStroke
     );
   }
+
+  const reviewCapture = useStudioReviewCaptureHost({
+    studioAuthUserId, workId, captureStudioMutationTicket, canApplyStudioMutation,
+    editorMountedRef, studioRevisionProjectGenerationRef, drawingRef, pendingStrokeCommitsRef,
+    available: loggedIn && workHydrated && !sourceHydrationPending && !documentReloadRequired
+      && !collaborationReadOnly && !workHydrationFailed && !workHydrationUnsupportedFormat,
+    getSnapshot: currentStudioProjectSnapshot, canvasWidth: CANVAS_W,
+    isDurableMask: (surfaceId) => (studioCrdtDocumentRef.current?.getRasterOperationLog(surfaceId) ?? null) !== null,
+    save: (status) => handleSave(status, { preserveEditor: true }),
+    captureAll: () => handleCapturePagesForPreset("all"),
+  });
 
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
   // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
@@ -27529,6 +27536,7 @@ function clearSelectionForEdit() {
     handleImportInterchangeArchive,
     handleImportPsd,
     handleSave,
+    openPinnedReviewCapture: reviewCapture.open,
     openAutoActions,
     openOwnerFxPanel,
     redo,
@@ -29635,6 +29643,7 @@ function clearSelectionForEdit() {
       >
         {editorSurface}
         {smartShapeDialog}
+        {reviewCapture.dialog}
         <StudioFormalSaveDialog
           open={formalSaveOpen}
           locale={studioSaveLocale}

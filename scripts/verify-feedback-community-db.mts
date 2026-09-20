@@ -25,7 +25,9 @@ function input(category = "bug", title = "브러시 오류") {
 let runtimeRole: string | null = null;
 try {
   // Test-only database is rebuilt to simulate an existing Q&A installation without the new columns.
-  await dbPool.query('DROP TABLE IF EXISTS feedback_vote, feedback_reply, feedback_post, "user" CASCADE');
+  await dbPool.query(`DROP TABLE IF EXISTS commerce_payment_event, commerce_entitlement, commerce_order,
+    commerce_product_price, creator_support_offer, creator_support_application, supporter_payment,
+    supporter_funding_setting, business_inquiry, feedback_vote, feedback_reply, feedback_post, "user" CASCADE`);
   await dbPool.query('CREATE TABLE "user" (id TEXT PRIMARY KEY, name TEXT, avatar TEXT, role TEXT NOT NULL DEFAULT \'user\')');
   await dbPool.query(`INSERT INTO "user"(id,name,role) VALUES ('member','창작자','user'),('other','다른 창작자','user'),('staff','운영자','operator')`);
   await dbPool.query(`CREATE TABLE feedback_post (
@@ -119,6 +121,15 @@ try {
     await assert.rejects(feedback.setFeedbackVote(bugId, "other", true), { statusCode: 404 });
     await assert.rejects(feedback.createFeedbackReply({ postId: bugId, userId: "member", text: "숨김 글 댓글", isOfficial: false }), { statusCode: 404 });
     await assert.rejects(feedback.updateFeedbackProgress(bugId, "staff", "completed", "숨김 처리", "reviewing"), { statusCode: 404 });
+  });
+  await check("managed prerequisite migrations supply the complete shared runtime ACL contract", async () => {
+    // The production feedback ACL also checks private inquiries, supporter and commerce tables.
+    // Install their real managed schemas in this isolated fixture; never weaken that authority.
+    for (const file of ["0068_business_inquiries.sql", "0071_supporter_payments.sql",
+      "0072_creator_support_program.sql", "0073_commerce_payments.sql"]) {
+      const migration = await readFile(new URL(`../apps/api/src/db/migrations/${file}`, import.meta.url), "utf8");
+      for (let index = 0; index < 2; index++) await dbPool.query(migration);
+    }
   });
   await check("non-owning runtime can read, post, reply, vote and manage without DDL", async () => {
     runtimeRole = `feedback_runtime_${process.pid}`;

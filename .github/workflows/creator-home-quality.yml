@@ -29,6 +29,7 @@ on:
       - "scripts/verify-creator-home.mjs"
       - "scripts/verify-creator-film-upgrades.mjs"
       - "scripts/verify-creator-home-navigation.mjs"
+      - "scripts/lib/public-page-event-gate.mjs"
       - "scripts/verify-creator-continuity.mjs"
       - "scripts/creator-film-automation.test.mjs"
       - "scripts/creator-home-checkout-policy.test.mjs"
@@ -60,6 +61,7 @@ on:
       - "scripts/verify-creator-home.mjs"
       - "scripts/verify-creator-film-upgrades.mjs"
       - "scripts/verify-creator-home-navigation.mjs"
+      - "scripts/lib/public-page-event-gate.mjs"
       - "scripts/verify-creator-continuity.mjs"
       - "scripts/creator-film-automation.test.mjs"
       - "scripts/creator-home-checkout-policy.test.mjs"
@@ -202,6 +204,11 @@ jobs:
                   install=true
                   navigation=true
                   ;;
+                scripts/lib/public-page-event-gate.mjs)
+                  install=true
+                  navigation=true
+                  continuity=true
+                  ;;
                 scripts/verify-creator-continuity.mjs)
                   install=true
                   continuity=true
@@ -322,6 +329,7 @@ jobs:
               scripts/verify-creator-home.mjs|\
               scripts/verify-creator-film-upgrades.mjs|\
               scripts/verify-creator-home-navigation.mjs|\
+              scripts/lib/public-page-event-gate.mjs|\
               scripts/verify-creator-continuity.mjs|\
               scripts/creator-film-automation.test.mjs|\
               scripts/creator-home-checkout-policy.test.mjs|\
@@ -372,6 +380,7 @@ jobs:
           scripts/verify-purpose-first-home.mjs
           scripts/verify-creator-film-upgrades.mjs
           scripts/verify-creator-home-navigation.mjs
+          scripts/lib/public-page-event-gate.mjs
           scripts/verify-creator-continuity.mjs
           scripts/creator-home-checkout-policy.test.mjs
           scripts/creator-film-automation.test.mjs

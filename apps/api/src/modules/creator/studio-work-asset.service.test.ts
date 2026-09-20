@@ -692,6 +692,7 @@ describe("StudioWorkAssetService", () => {
         expectedDigest: sharedObject.digest,
       },
       false,
+      true,
     );
     expect(objectStorage.verifyPrivatePurposeBuckets).toHaveBeenCalledOnce();
     expect(objectStorage.deleteGeneratedObject).toHaveBeenCalledOnce();

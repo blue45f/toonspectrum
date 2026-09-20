@@ -9,6 +9,10 @@ import { StudioVirtualSpaceSocialController, type StudioVirtualSpaceSocialAction
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 import { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 
+const reviewAuthority = vi.hoisted(() => ({ verify: vi.fn(async () => ({ ok: true })) }));
+vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: reviewAuthority.verify }));
+const subject = { schemaVersion: 1 as const, workId: "work-1", projectId: "graph-1", artifactId: "artifact-1", reviewId: "review-1", revisionId: "snapshot-1", rootGraphHash: "a".repeat(64) };
+
 const A: StudioLiveParticipant = { sessionId: "hook-alice", displayName: "Alice", role: "editor" };
 const B: StudioLiveParticipant = { sessionId: "hook-bob", displayName: "Bob", role: "editor" };
 type HookProps = Parameters<typeof useStudioVirtualSpaceSocial>[0];
@@ -46,24 +50,56 @@ async function setup() {
   const remoteAccepted = vi.fn();
   const remote = new StudioVirtualSpaceSocialController(B, pair.b,
     { worldId: DEFAULT_STUDIO_WORLD_MANIFEST.id, contentRevision: revision },
-    { onAccepted: remoteAccepted, setInterval: () => 0, clearInterval: () => undefined });
+    { onAccepted: remoteAccepted, authorizeReview: async () => true, setInterval: () => 0, clearInterval: () => undefined });
   sessions.push(remote); remote.start();
   const onAccepted = vi.fn();
-  const props: HookProps = { participant: A, port: pair.a, manifest: DEFAULT_STUDIO_WORLD_MANIFEST, enabled: true, onAccepted };
+  const props: HookProps = { workId: "work-1", participant: A, port: pair.a, manifest: DEFAULT_STUDIO_WORLD_MANIFEST, enabled: true, onAccepted };
   return { pair, remote, remoteAccepted, onAccepted, props };
 }
 
-beforeEach(() => { vi.stubGlobal("crypto", webcrypto); });
+beforeEach(() => { vi.stubGlobal("crypto", webcrypto); reviewAuthority.verify.mockClear().mockResolvedValue({ ok: true }); });
 afterEach(() => { cleanup(); for (const session of sessions.splice(0)) session.close(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("social hook consent and lifetime", () => {
+  it.each(["abort", "blur"])("does not emit a delayed review proposal after %s", async (cause) => {
+    const f = await setup();
+    const hook = renderHook(() => useStudioVirtualSpaceSocial(f.props));
+    await waitFor(() => expect(hook.result.current.snapshot.reviewReadyPeerIds).toContain(B.sessionId));
+    let resolve!: (value: { ok: boolean }) => void;
+    reviewAuthority.verify.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const intent = new AbortController();
+    let result!: Promise<string | null>;
+    act(() => { result = hook.result.current.requestReview(B.sessionId, subject, intent.signal); });
+    act(() => { if (cause === "abort") intent.abort(); else globalThis.dispatchEvent(new Event("blur")); });
+    await act(async () => { resolve({ ok: true }); expect(await result).toBeNull(); });
+    expect(f.remote.snapshot().requests).toEqual([]);
+    expect(f.onAccepted).not.toHaveBeenCalled();
+    if (cause === "blur") {
+      expect(hook.result.current.interactive).toBe(false);
+      act(() => { globalThis.dispatchEvent(new Event("focus")); });
+      await waitFor(() => expect(hook.result.current.snapshot.available).toBe(true));
+      expect(hook.result.current.snapshot.requests).toEqual([]);
+    }
+  });
+  it("preserves bounded session blocks across controller replacement and rejects cross-work invitations", async () => {
+    const f = await setup();
+    const hook = renderHook((props: HookProps) => useStudioVirtualSpaceSocial(props), { initialProps: f.props });
+    await waitFor(() => expect(hook.result.current.snapshot.reviewReadyPeerIds).toContain(B.sessionId));
+    await act(async () => { expect(await hook.result.current.requestReview(B.sessionId, { ...subject, workId: "another-work" })).toBeNull(); });
+    expect(reviewAuthority.verify).not.toHaveBeenCalled();
+    act(() => { hook.result.current.setPeerBlocked(B.sessionId, true); });
+    hook.rerender({ ...f.props, enabled: false }); hook.rerender(f.props);
+    await waitFor(() => expect(hook.result.current.snapshot.available).toBe(true));
+    expect(hook.result.current.snapshot.blockedPeerIds).toEqual([B.sessionId]);
+    expect(hook.result.current.snapshot.readyPeerIds).toEqual([]);
+  });
   it.each<StudioVirtualSpaceSocialAction>(["talk", "follow", "review", "high-five"])(
     "does not start %s from receiving or rendering an invitation, only from explicit acceptance", async (action) => {
       const f = await setup();
       const hook = renderHook((props: HookProps) => useStudioVirtualSpaceSocial(props), { initialProps: f.props });
       await waitFor(() => expect(hook.result.current.snapshot.readyPeerIds).toEqual([B.sessionId]));
       let id: string | null = null;
-      act(() => { id = f.remote.request(A.sessionId, action); });
+      await act(async () => { id = action === "review" ? await f.remote.requestReview(A.sessionId, subject) : f.remote.request(A.sessionId, action); });
       expect(id).not.toBeNull();
       expect(hook.result.current.snapshot.requests[0]).toMatchObject({ id, status: "offered", direction: "incoming" });
       const methods = { request: hook.result.current.request, respond: hook.result.current.respond, cancel: hook.result.current.cancel };
@@ -75,8 +111,8 @@ describe("social hook consent and lifetime", () => {
       expect(hook.result.current.request).toBe(methods.request);
       expect(hook.result.current.respond).toBe(methods.respond);
       expect(hook.result.current.cancel).toBe(methods.cancel);
-      act(() => { expect(hook.result.current.respond(id!, "accept")).toBe(true); });
-      expect(latestAccepted).toHaveBeenCalledOnce();
+      await act(async () => { expect(action === "review" ? await hook.result.current.respondReview(id!, "accept") : hook.result.current.respond(id!, "accept")).toBe(true); });
+      await waitFor(() => expect(latestAccepted).toHaveBeenCalledOnce());
       expect(f.onAccepted).not.toHaveBeenCalled();
       expect(f.remoteAccepted).toHaveBeenCalledOnce();
       expect(hook.result.current.snapshot.requests[0]?.status).toBe("accepted");
@@ -87,6 +123,21 @@ describe("social hook consent and lifetime", () => {
     },
   );
 
+  it("keeps an accepted talk through a browser permission-window blur without replaying consent", async () => {
+    const f = await setup();
+    const hook = renderHook(() => useStudioVirtualSpaceSocial(f.props));
+    await waitFor(() => expect(hook.result.current.snapshot.readyPeerIds).toContain(B.sessionId));
+    let id: string | null = null;
+    act(() => { id = hook.result.current.request(B.sessionId, "talk"); f.remote.respond(id!, "accept"); });
+    act(() => { globalThis.dispatchEvent(new Event("blur")); });
+    expect(hook.result.current.interactive).toBe(false);
+    expect(hook.result.current.snapshot.requests.find((request) => request.id === id)?.status).toBe("accepted");
+    expect(f.remote.snapshot().requests.find((request) => request.id === id)?.status).toBe("accepted");
+    expect(hook.result.current.request(B.sessionId, "follow")).toBeNull();
+    act(() => { globalThis.dispatchEvent(new Event("focus")); });
+    expect(hook.result.current.interactive).toBe(true);
+    expect(f.onAccepted).toHaveBeenCalledOnce();
+  });
   it("cancels an active accepted activity on focus disable and does not revive it on resume", async () => {
     const f = await setup();
     const hook = renderHook((props: HookProps) => useStudioVirtualSpaceSocial(props), { initialProps: f.props });
@@ -112,7 +163,7 @@ describe("social hook consent and lifetime", () => {
     const hook = renderHook((props: HookProps) => useStudioVirtualSpaceSocial(props), { initialProps: f.props });
     await waitFor(() => expect(hook.result.current.snapshot.readyPeerIds).toContain(B.sessionId));
     let id: string | null = null;
-    act(() => { id = hook.result.current.request(B.sessionId, "review"); });
+    await act(async () => { id = await hook.result.current.requestReview(B.sessionId, subject); });
     expect(f.remote.snapshot().requests[0]?.status).toBe("offered");
     const next = change === "manifest"
       ? { ...f.props, manifest: { ...DEFAULT_STUDIO_WORLD_MANIFEST, backgroundUrl: "/assets/different-layout.webp" } }

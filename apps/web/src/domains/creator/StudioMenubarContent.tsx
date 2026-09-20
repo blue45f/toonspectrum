@@ -903,6 +903,7 @@ export interface StudioMenubarContentHandlers extends StudioProjectReviewActionH
   handleImportInterchangeArchive: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleImportPsd: (e: ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleSave: (status: "published" | "draft") => Promise<void>;
+  openPinnedReviewCapture?: () => void;
   openAutoActions: () => Promise<void>;
   openMannequinPoser?: () => void;
   openOwnerFxPanel: () => Promise<void>;
@@ -1096,6 +1097,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     handleExportProjectArchive,
     // Import onChange handlers live on StudioPage root inputs (ref-click only here).
     handleSave,
+    openPinnedReviewCapture,
     openAutoActions,
     openOwnerFxPanel,
     redo,
@@ -2206,6 +2208,15 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
           >
             <Package size={14} /> 게시 패키지
           </button>
+          {openPinnedReviewCapture ? <button
+            type="button"
+            onClick={openPinnedReviewCapture}
+            disabled={saving || isExporting || collaborationDocumentLocked}
+            className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 shrink-0 whitespace-nowrap gap-1.5" })}
+            title="저장된 원고 버전과 모든 페이지의 PNG를 고정한 공동 검수본 만들기"
+          >
+            <ShieldCheck size={14} /> 저장된 원고로 검수본 만들기
+          </button> : null}
           {/* 벨트 전용이던 검수·미리보기 7종의 정본 진입점. 벨트 호스트는 전 뷰포트에서
               display:none이라 여기가 유일한 포인터 경로다(StudioProjectReviewActions 주석). */}
           <StudioProjectReviewActions

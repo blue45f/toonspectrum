@@ -5,7 +5,7 @@ import type {
   StudioMainMenuItem,
 } from "./studio-main-menu-model";
 
-export type StudioMainMenuTranslate = (key: string) => string;
+export type StudioMainMenuTranslate = (key: string, fallbackText?: string) => string;
 
 export interface StudioMainMenuLocalizationState {
   readonly sharedNonOwnerSave: boolean;
@@ -37,7 +37,9 @@ function localizeText(
   fallback: string,
   key: string,
 ): string {
-  const text = t(key);
+  // useT formats unknown keys for display. Supply the authored fallback before that
+  // formatting, otherwise missing group keys become the generic word "Label".
+  const text = t(key, fallback);
   return text === key ? fallback : text;
 }
 

@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -12,7 +12,8 @@ const gltfFunctionsPackagePath = join(
   "functions",
   "package.json",
 );
-const gltfFunctionsRequire = createRequire(gltfFunctionsPackagePath);
+// pnpm keeps consumer dependencies beside the real package, not the root symlink.
+const gltfFunctionsRequire = createRequire(realpathSync(gltfFunctionsPackagePath));
 const ndarrayPixelsEntry = gltfFunctionsRequire.resolve("ndarray-pixels");
 const ndarrayPixelsRequire = createRequire(ndarrayPixelsEntry);
 const ndarray = ndarrayPixelsRequire("ndarray");

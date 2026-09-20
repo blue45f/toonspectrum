@@ -1,8 +1,35 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
+import {
+  createStudioVirtualSpaceAppearance, resolveStudioVirtualSpaceAppearance,
+  type StudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearanceClip, type StudioVirtualSpaceAppearanceRegistry,
+} from "./studio-virtual-space-appearance";
+import {
+  PINK_DRAWN_POSES, PINK_DRAWN_WALKS,
+  SILVER_DRAWN_POSES, SILVER_DRAWN_WALKS,
+  DARK_DRAWN_POSES, DARK_DRAWN_WALKS,
+  PURPLE_DRAWN_POSES, PURPLE_DRAWN_WALKS,
+} from "./studio-virtual-space-character-drawn-art";
 
 export type StudioCharacterSkinKey = string;
-export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review";
+export type StudioCharacterMotionState = "idle" | "walk" | "talk" | "draw" | "review" | "wave" | "sit";
 export type StudioCharacterWalkClipKey = "walk-down" | "walk-left" | "walk-right" | "walk-up";
+
+export interface StudioCharacterFramePresentation {
+  readonly originX: number;
+  readonly originY: number;
+  /** Uniform scaling preserves the original cell aspect ratio. */
+  readonly displayHeightRatio: number;
+  /** Optional hip attachment for a real world seat; physics still uses the ground point. */
+  readonly seatOriginY?: number;
+}
+
+export interface StudioCharacterPoseSheet {
+  readonly textureUrl: string;
+  readonly frameWidth: number;
+  readonly frameHeight: number;
+  readonly directionFrames: Readonly<Record<StudioVirtualSpaceFacing, number>>;
+  readonly frames: readonly StudioCharacterFramePresentation[];
+}
 
 export interface StudioCharacterAtlasClip {
   readonly textureUrl: string;
@@ -15,6 +42,7 @@ export interface StudioCharacterAtlasClip {
   /** Preserve phase while speed/direction changes. */
   readonly distancePerCycle?: number;
   readonly technique?: "cutout-rig" | "drawn";
+  readonly frames?: readonly StudioCharacterFramePresentation[];
 }
 
 export interface StudioCharacterSkin {
@@ -24,6 +52,7 @@ export interface StudioCharacterSkin {
   readonly directional: Readonly<Record<StudioVirtualSpaceFacing, string>>;
   readonly state?: Readonly<Partial<Record<"talk" | "draw" | "review", string>>>;
   readonly clips?: Readonly<Partial<Record<StudioCharacterWalkClipKey, StudioCharacterAtlasClip>>>;
+  readonly poses?: Readonly<Partial<Record<"sit" | "wave", StudioCharacterPoseSheet>>>;
 }
 
 function directionUrls(skin: string): Readonly<Record<StudioVirtualSpaceFacing, string>> {
@@ -36,34 +65,50 @@ function directionUrls(skin: string): Readonly<Record<StudioVirtualSpaceFacing, 
   };
 }
 
-function walkClips(skin: string): NonNullable<StudioCharacterSkin["clips"]> {
-  const clip = (direction: StudioVirtualSpaceFacing): StudioCharacterAtlasClip => ({
-    textureUrl: `/assets/virtual-studio/production-v2/player-${skin}-walk-${direction}.webp`,
-    frameWidth: 384, frameHeight: 512, start: 0, end: 7, frameRate: 18,
-    repeat: -1, distancePerCycle: 84, technique: "cutout-rig",
-  });
-  return { "walk-down": clip("down"), "walk-left": clip("left"), "walk-right": clip("right"), "walk-up": clip("up") };
-}
-
 export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.freeze([
   {
     key: "pink",
     labelKo: "하늘",
     labelEn: "Haneul",
     directional: directionUrls("pink"),
-    clips: walkClips("pink"),
+    clips: PINK_DRAWN_WALKS,
+    poses: PINK_DRAWN_POSES,
     state: {
       talk: "/assets/virtual-studio/production-v2/player-pink-state-talk.png",
       draw: "/assets/virtual-studio/production-v2/player-pink-state-draw.png",
       review: "/assets/virtual-studio/production-v2/player-pink-state-review.png",
     },
   },
-  { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver"), clips: walkClips("silver") },
-  { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark"), clips: walkClips("dark") },
-  { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: walkClips("purple") },
+  { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver"), clips: SILVER_DRAWN_WALKS, poses: SILVER_DRAWN_POSES },
+  { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark"), clips: DARK_DRAWN_WALKS, poses: DARK_DRAWN_POSES },
+  { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: PURPLE_DRAWN_WALKS, poses: PURPLE_DRAWN_POSES },
 ]);
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
+
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1";
+export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
+  revision: STUDIO_CHARACTER_REGISTRY_REVISION,
+  fallbackSkinKey: FALLBACK_SKIN.key,
+  skins: STUDIO_CHARACTER_SKINS.map((skin) => ({
+    key: skin.key,
+    capabilities: ["idle", ...Object.keys(skin.clips ?? {}), ...Object.keys(skin.poses ?? {}),
+      ...Object.keys(skin.state ?? {})] as StudioVirtualSpaceAppearanceClip[],
+  })),
+});
+
+export function studioCharacterAppearanceForAvatarIndex(index: number, identity?: string): StudioVirtualSpaceAppearance {
+  return createStudioVirtualSpaceAppearance(STUDIO_CHARACTER_APPEARANCE_REGISTRY, index, identity);
+}
+
+export function resolveStudioCharacterAppearance(
+  state: { readonly avatarIndex: number; readonly appearance?: StudioVirtualSpaceAppearance },
+  identity?: string,
+  requestedClip: StudioVirtualSpaceAppearanceClip = "idle",
+) {
+  const resolved = resolveStudioVirtualSpaceAppearance(STUDIO_CHARACTER_APPEARANCE_REGISTRY, state, identity, requestedClip);
+  return { ...resolved, skin: studioCharacterSkinByKey(resolved.skinKey) };
+}
 
 export function studioCharacterSkinForAvatarIndex(index: number, identity?: string): StudioCharacterSkin {
   let hash = 2166136261;
