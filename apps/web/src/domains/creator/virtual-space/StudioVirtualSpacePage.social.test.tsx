@@ -130,6 +130,64 @@ async function accept(request: StudioSpaceSocialRequest): Promise<void> {
 // The transport and renderer are boundaries; these tests execute the real Page's
 // activity ownership, UI events, engine bridge and Huddle event integration.
 describe("Virtual Studio social activity ownership", () => {
+  it("starts an NPC tour only on request and fences stale guide status after cancellation or restart", async () => {
+    await mount();
+    expect(f.engine?.guideTourRequest).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
+    expect(f.engine?.guideTourRequest).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
+    const request = f.engine?.guideTourRequest;
+    if (!request) throw new Error("Guide request was not sent to the renderer");
+    act(() => f.engine?.onGuideTourChange?.({ requestId: "stale", guideId: request.guideId,
+      status: "waiting-for-user", stopIndex: 0, stopCount: 4 }));
+    expect(screen.queryByText("가이드가 가까이 오기를 기다리고 있어요.")).toBeNull();
+    act(() => f.engine?.onGuideTourChange?.({ requestId: request.id, guideId: request.guideId,
+      status: "waiting-for-user", stopIndex: 0, stopCount: 4 }));
+    expect(screen.getByText("가이드가 가까이 오기를 기다리고 있어요.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "함께 둘러보기 멈추기" }));
+    expect(f.engine?.guideTourRequest).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
+    expect(f.engine?.guideTourRequest?.id).not.toBe(request.id);
+    act(() => f.engine?.onGuideTourChange?.({ requestId: request.id, guideId: request.guideId,
+      status: "complete", stopIndex: 3, stopCount: 4 }));
+    expect(screen.queryByText(/스튜디오를 한 바퀴 둘러봤어요/u)).toBeNull();
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it.each(["escape", "blur", "hidden", "focus"])("cancels the requested guide tour on %s without resuming automatically", async (reason) => {
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
+    fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
+    expect(f.engine?.guideTourRequest).not.toBeNull();
+    if (reason === "escape") fireEvent.keyDown(window, { key: "Escape" });
+    if (reason === "blur") fireEvent.blur(window);
+    if (reason === "hidden") {
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      fireEvent(document, new Event("visibilitychange"));
+    }
+    if (reason === "focus") fireEvent.click(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "집중" }));
+    expect(f.engine?.guideTourRequest).toBeNull();
+    fireEvent.focus(window);
+    if (reason === "focus") fireEvent.click(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "일상" }));
+    expect(f.engine?.guideTourRequest).toBeNull();
+  });
+
+  it("passes the renderer's current presence and world readiness to both acoustic consent boundaries", async () => {
+    let finish!: (world: StudioVirtualSpaceWorldManifest) => void;
+    f.worldLoad = new Promise((resolve) => { finish = resolve; });
+    render(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
+      <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage />} /></Routes>
+    </MemoryRouter>);
+    expect(f.socialOptions?.acousticBindingAvailable).toBe(false);
+    expect(f.conversationOptions?.acousticBindingAvailable).toBe(false);
+    await act(async () => { finish(DEFAULT_STUDIO_WORLD_MANIFEST); });
+    await screen.findByTestId("engine-ready");
+    await waitFor(() => expect(f.socialOptions?.acousticBindingAvailable).toBe(true));
+    expect(f.socialOptions?.presence).toBe(f.engine?.snapshot);
+    expect(f.conversationOptions?.presence).toBe(f.engine?.snapshot);
+    expect(f.conversationOptions?.acousticBindingAvailable).toBe(true);
+  });
+
   it("uses the same stable character and unknown-skin fallback in every self and peer thumbnail", async () => {
     f.presenceOverrides = {
       alice: { avatarIndex: 0, appearance: studioCharacterAppearanceForAvatarIndex(2) },

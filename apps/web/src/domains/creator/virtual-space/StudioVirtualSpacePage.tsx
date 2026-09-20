@@ -120,6 +120,8 @@ import { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import { useStudioVirtualSpaceConversation } from "./use-studio-virtual-space-conversation";
 import { StudioVirtualSpaceConversationPanel } from "./StudioVirtualSpaceConversationPanel";
 import { StudioVirtualSpaceGuide } from "./StudioVirtualSpaceGuide";
+import { studioNpcRole } from "./studio-virtual-space-npc-director";
+import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
@@ -727,6 +729,10 @@ function VirtualSpaceExperience({
   const sharedActivityRef = useRef<StudioSpaceSocialRequest | null>(null);
   const acceptedActivityHandler = useRef<(request: StudioSpaceSocialRequest) => void>(() => undefined);
   const [socialNotice, setSocialNotice] = useState("");
+  const [guideTourRequest, setGuideTourRequest] = useState<StudioVirtualNpcGuideTourRequest | null>(null);
+  const [guideTour, setGuideTour] = useState<StudioVirtualNpcGuideTourState | null>(null);
+  const guideRequestRef = useRef<StudioVirtualNpcGuideTourRequest | null>(null);
+  const guideSequence = useRef(0);
   const [atmosphere, setAtmosphere] = useState<"focus" | "balanced" | "lively">(() => {
     try { const saved = localStorage.getItem("toonspectrum:virtual-atmosphere:v1"); return saved === "focus" || saved === "lively" ? saved : "balanced"; }
     catch { return "balanced"; }
@@ -750,6 +756,33 @@ function VirtualSpaceExperience({
   const movingRef = useRef(false);
   const visibleParticipantCount = connectivity.serverAvailable ? snapshot.peers.length + 1 : 1;
   const worldReady = worldLoaded && loadedPositionScope === positionScopeKey;
+  const cancelGuideTour = useCallback(() => {
+    guideRequestRef.current = null; setGuideTourRequest(null);
+    setGuideTour((current) => current ? { ...current, status: "cancelled" } : null);
+  }, []);
+  const startGuideTour = useCallback((guideId: string) => {
+    if (!worldReady || authoringMode || atmosphere === "focus" || activity === "focused" || activity === "away"
+      || !worldManifest.npcs.some((npc) => npc.id === guideId && studioNpcRole(npc) === "guide")) return;
+    const request = { id: `guide-tour:${++guideSequence.current}`, guideId };
+    engineBridge.clearMovement();
+    guideRequestRef.current = request; setGuideTour(null); setGuideTourRequest(request);
+  }, [worldReady, authoringMode, atmosphere, activity, worldManifest, engineBridge]);
+  const updateGuideTour = useCallback((state: StudioVirtualNpcGuideTourState) => {
+    if (state.requestId === guideRequestRef.current?.id && state.guideId === guideRequestRef.current.guideId) setGuideTour(state);
+  }, []);
+  useEffect(() => { cancelGuideTour(); }, [worldManifest, worldReady, authoringMode, cancelGuideTour]);
+  useEffect(() => {
+    if (atmosphere === "focus" || activity === "focused" || activity === "away") cancelGuideTour();
+  }, [atmosphere, activity, cancelGuideTour]);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && guideRequestRef.current) cancelGuideTour(); };
+    const hide = () => { if (document.visibilityState === "hidden") cancelGuideTour(); };
+    window.addEventListener("keydown", escape);
+    window.addEventListener("blur", cancelGuideTour);
+    document.addEventListener("visibilitychange", hide);
+    return () => { guideRequestRef.current = null; window.removeEventListener("keydown", escape);
+      window.removeEventListener("blur", cancelGuideTour); document.removeEventListener("visibilitychange", hide); };
+  }, [cancelGuideTour]);
 
   useEffect(() => {
     selfRef.current = snapshot.self;
@@ -1099,6 +1132,8 @@ function VirtualSpaceExperience({
     participant: live.room?.participant,
     port: live.room?.direct,
     manifest: worldManifest,
+    presence: snapshot,
+    acousticBindingAvailable: worldReady && !authoringMode && snapshot.direct,
     enabled: signedIn && worldReady && !authoringMode && snapshot.direct
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     onAccepted: (request) => acceptedActivityHandler.current(request),
@@ -1133,6 +1168,8 @@ function VirtualSpaceExperience({
   }, [finishSharedActivity]);
   const conversation = useStudioVirtualSpaceConversation({
     participant: live.room?.participant, port: live.room?.direct, manifest: worldManifest,
+    presence: snapshot,
+    acousticBindingAvailable: worldReady && !authoringMode && snapshot.direct,
     enabled: signedIn && worldReady && !authoringMode && snapshot.direct
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     blockedPeerIds: socialSnapshot.blockedPeerIds,
@@ -1298,6 +1335,8 @@ function VirtualSpaceExperience({
                   selfIdentity={fallbackIdentity}
                   seatedActors={seatedActors}
                   waveActorIds={waveActorIds}
+                  guideTourRequest={guideTourRequest}
+                  onGuideTourChange={updateGuideTour}
                   debugWorld={authoringMode}
                   atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
                   onNpcInteract={activateInteraction}
@@ -1442,7 +1481,10 @@ function VirtualSpaceExperience({
 
           <aside className="vs2-rightbar vs2-rightbar--live">
             {worldReady ? <StudioVirtualSpaceGuide manifest={worldManifest} onMove={queuePathTo} onOpen={activateAction}
-              onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")} /> : null}
+              onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")}
+              guideTour={guideTour} tourRequested={guideTourRequest !== null}
+              onStartTour={atmosphere === "focus" || activity === "focused" || activity === "away" || authoringMode ? undefined : startGuideTour}
+              onCancelTour={cancelGuideTour} /> : null}
             {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
               onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} /> : null}
             <section className="vs2-panel studio-vspace-atmosphere" data-space-interactive="true">

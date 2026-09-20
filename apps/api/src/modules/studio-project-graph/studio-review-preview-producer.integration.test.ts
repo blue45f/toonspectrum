@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Image, decodePng, encodePng } from "image-js";
 import { Pool } from "pg";
+import { createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type * as DatabaseRuntime from "../../db";
 import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
@@ -99,7 +100,8 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
   async function capture(pageCount = 2) {
     const actor = randomUUID(), workId = randomUUID(); users.push(actor);
     await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [actor, "Review capture integration"]);
-    const doc = { version: 3, pagesList: Array.from({ length: pageCount }, (_, index) => ({ id: `page-${index}`, elements: [] })) };
+    const doc = { version: 3, width: 2, pagesList: Array.from({ length: pageCount }, (_, index) => ({ id: `page-${index}`, canvasH: 1,
+      elements: [{ id: `cut-${index}`, type: "frame", x: 0, y: 0, width: 1, height: 1 }] })) };
     await pool.query('INSERT INTO creator_work (id,"userId",title,doc,revision) VALUES ($1,$2,$3,$4::jsonb,4)', [workId, actor, "Review source", JSON.stringify(doc)]);
     const input: StudioReviewPreviewCapture = { intentId: randomUUID(), workId, sourceServerRevision: 4, sourceContentDigest: studioReviewPreviewDigest(doc), pageCount,
       title: "Pinned review", deviceId: "test-device", createdAt: new Date().toISOString() };
@@ -116,6 +118,26 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     expect(completed.status).toBe("completed"); if (completed.status !== "completed") throw new Error("capture did not complete");
     const read = await reader.read(actor, completed.subject, null);
     expect(read).toMatchObject({ ok: true, previews: refs, nextCursor: null });
+    if (!read.ok) throw new Error("missing preview");
+    expect(read.previews.map((preview) => preview.mapping)).toMatchObject([
+      { status: "mapped", sourceServerRevision: 4, sourceContentDigest: intent.sourceContentDigest,
+        page: { ordinal: 0, id: "page-0", width: 2, height: 1, renderWidth: 2, renderHeight: 1, frames: [{ id: "cut-0" }] } },
+      { status: "mapped", page: { ordinal: 1, id: "page-1", frames: [{ id: "cut-1" }] } },
+    ]);
+    const spatial = createStudioReviewSpatialAnchor(read.previews[0]!.mapping, { kind: "panel", frameId: "cut-0" });
+    if (!spatial) throw new Error("missing spatial source");
+    const note = { id: randomUUID(), body: "Pinned first cut", severity: "note" as const, assigneeIds: [],
+      anchor: { ...spatial, artifactId: completed.subject.artifactId, revisionId: completed.subject.revisionId, scope: { projectId: completed.subject.projectId } } };
+    expect(await graph.createReviewComment(actor, completed.subject.reviewId, note)).toMatchObject({ anchor: note.anchor });
+    await expect(graph.createReviewComment(actor, completed.subject.reviewId, { ...note, id: randomUUID(),
+      anchor: { ...note.anchor, source: { ...note.anchor.source, frameId: "cut-1" } },
+    })).rejects.toMatchObject({ causeCode: "review_source_anchor_mismatch" });
+    await expect(graph.createReviewComment(actor, completed.subject.reviewId, { ...note, id: randomUUID(),
+      anchor: { ...note.anchor, scope: { ...note.anchor.scope, episodeId: "guessed-episode", panelId: "page-0" } },
+    })).rejects.toMatchObject({ causeCode: "review_anchor_scope_mismatch" });
+    await pool.query('UPDATE creator_work SET revision=5,doc=$2::jsonb WHERE id=$1', [intent.workId, JSON.stringify({ width: 900, pagesList: [] })]);
+    expect(await reader.read(actor, completed.subject, null)).toMatchObject({ ok: true,
+      previews: [{ mapping: { sourceServerRevision: 4, page: { id: "page-0", width: 2 } } }, { mapping: { page: { id: "page-1" } } }] });
     for (const page of refs) expect([...decodePng(stored.get(`derived:sha256:${page.sha256}`)!).getRawImage().data]).toEqual([...pixels]);
     const operation = await pool.query<{ operation: { payload: { sourceSnapshot: unknown } } }>('SELECT operation FROM studio_operation WHERE "resultRevisionId"=$1', [completed.subject.revisionId]);
     expect(operation.rows[0]!.operation.payload.sourceSnapshot).toEqual(doc);

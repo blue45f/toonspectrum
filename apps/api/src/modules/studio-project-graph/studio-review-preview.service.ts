@@ -1,4 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import type { StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
 
 import { PrivateSignedReadUrlSchema } from "../../infrastructure/private-object-storage/private-object-storage.contract";
 import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
@@ -15,6 +16,7 @@ export interface StudioReviewPreviewRead {
   readonly byteLength: number;
   readonly url: string;
   readonly expiresAt: number;
+  readonly mapping: StudioReviewPageMapping;
 }
 type PreviewFailure = { readonly ok: false; readonly reason: "preview-unavailable" | "closed" | "version-mismatch" };
 export type StudioReviewPreviewResult = PreviewFailure | {
@@ -58,7 +60,8 @@ export class StudioReviewPreviewService {
           const blob = source.blobs[offset + index]!;
           return { sha256: blob.hash, ordinal: blob.ordinal,
             mediaType: blob.mediaType as StudioReviewPreviewRead["mediaType"], byteLength: Number(blob.size),
-            url: signed.url, expiresAt: signed.expiresAtEpochMs };
+            url: signed.url, expiresAt: signed.expiresAtEpochMs,
+            mapping: source.pageMappings?.[blob.ordinal] ?? { status: "unmapped" as const, reason: "legacy-review" as const } };
         }));
         previews.push(...batch);
       }

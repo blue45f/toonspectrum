@@ -215,6 +215,7 @@ packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts
 packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
+packages/studio-project-model/src/__tests__/review-source-map.test.ts
 scripts/browser-core-entry-isolation.test.ts
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs

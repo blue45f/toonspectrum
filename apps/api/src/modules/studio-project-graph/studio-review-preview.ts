@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sha256Schema, studioEntityIdSchema } from "@toonspectrum/studio-project-model";
+import { sha256Schema, studioEntityIdSchema, type StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
 
 import {
   LocatedPrivateObjectReferenceSchema, type LocatedPrivateObjectReference,
@@ -36,6 +36,7 @@ export interface StudioReviewPreviewSource {
   readonly subject: StudioReviewPreviewSubject;
   readonly blobs: readonly StudioReviewPreviewBlobRow[];
   readonly nextCursor: string | null;
+  readonly pageMappings?: Readonly<Record<number, StudioReviewPageMapping>>;
 }
 
 /**

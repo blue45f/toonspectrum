@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-model";
 
 import { getStudioVirtualSpaceReviewPreview } from "./studio-virtual-space-review-preview";
 
@@ -11,11 +12,33 @@ const subject = { schemaVersion: 1 as const, projectId: "graph-1", workId: "work
 const HASH = "b".repeat(64);
 function response() {
   return { ok: true, subject, previews: [{ sha256: HASH, ordinal: 0, mediaType: "image/png", byteLength: 128,
-    url: "https://storage.example.test/immutable.png?signature=private", expiresAt: Date.now() + 29_000 }], nextCursor: null };
+    url: "https://storage.example.test/immutable.png?signature=private", expiresAt: Date.now() + 29_000,
+    mapping: { status: "unmapped", reason: "legacy-review" } }], nextCursor: null };
 }
 beforeEach(() => { http.get.mockReset(); http.post.mockReset(); });
 
 describe("pinned review preview client", () => {
+  it("turns a legacy server response into an explicit unmapped page", async () => {
+    const value = response();
+    const { mapping: _mapping, ...legacy } = value.previews[0]!;
+    http.get.mockResolvedValue({ ...value, previews: [legacy] });
+    expect(await getStudioVirtualSpaceReviewPreview(subject)).toEqual(value);
+  });
+  it("parses stable authoring page/cut coordinates and rejects cross-version or cross-page mappings", async () => {
+    const mapping = deriveStudioReviewPageMapping({ width: 800, pagesList: [{ id: "page-one", canvasH: 1200,
+      elements: [{ id: "cut-one", type: "frame", x: 20, y: 30, width: 200, height: 100 }] }] },
+    { sourceServerRevision: 7, sourceContentDigest: subject.rootGraphHash, ordinal: 0, renderWidth: 1600, renderHeight: 2400 });
+    if (mapping.status !== "mapped") throw new Error("Expected mapped fixture");
+    const value = response(), preview = value.previews[0]!;
+    http.get.mockResolvedValue({ ...value, previews: [{ ...preview, mapping }] });
+    expect(await getStudioVirtualSpaceReviewPreview(subject)).toMatchObject({ ok: true, previews: [{ mapping }] });
+    for (const changed of [{ ...mapping, sourceContentDigest: HASH }, { ...mapping, page: { ...mapping.page, ordinal: 1 } }]) {
+      http.get.mockResolvedValue({ ...value, previews: [{ ...preview, mapping: changed }] });
+      expect(await getStudioVirtualSpaceReviewPreview(subject)).toEqual({ ok: false, reason: "version-mismatch" });
+    }
+    http.get.mockResolvedValue({ ...value, previews: [{ ...preview, mapping: { ...mapping, remoteDocumentUrl: "https://untrusted.invalid" } }] });
+    expect(await getStudioVirtualSpaceReviewPreview(subject)).toEqual({ ok: false, reason: "preview-unavailable" });
+  });
   it("uses the authenticated read endpoint with every exact source coordinate", async () => {
     const value = response(); http.get.mockResolvedValue(value);
     expect(await getStudioVirtualSpaceReviewPreview(subject)).toEqual(value);

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { studioReviewSourceReferenceSchema } from "../graph/review-source-map";
+
 export const studioEntityIdSchema = z
   .string()
   .trim()
@@ -114,6 +116,7 @@ export const reviewAnchorSchema = z
     revisionId: studioEntityIdSchema,
     scope: scopeRefSchema,
     kind: reviewAnchorKindSchema,
+    source: studioReviewSourceReferenceSchema.optional(),
     objectId: studioEntityIdSchema.optional(),
     x: z.number().finite().optional(),
     y: z.number().finite().optional(),

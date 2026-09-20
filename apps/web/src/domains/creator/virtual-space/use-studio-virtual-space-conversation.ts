@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import { closeStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../live/huddle/studio-p2p-huddle-events";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { StudioVirtualConversationController, type StudioConversationScope, type StudioConversationSnapshot } from "./studio-virtual-space-conversation";
+import { StudioVirtualSpaceAcousticPolicy } from "./studio-virtual-space-acoustics";
+import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
 
 const EMPTY: StudioConversationSnapshot = { available: false, readyPeers: [], records: [], active: null };
 const NO_BLOCKED_PEERS: readonly string[] = [];
 const foreground = () => typeof document !== "undefined" && document.visibilityState !== "hidden" && document.hasFocus();
 
-export function useStudioVirtualSpaceConversation({ participant, port, manifest, enabled, blockedPeerIds = NO_BLOCKED_PEERS, onReady, onClosed }: {
+export function useStudioVirtualSpaceConversation({ participant, port, manifest, enabled, blockedPeerIds = NO_BLOCKED_PEERS, onReady, onClosed, presence, acousticBindingAvailable = true }: {
   readonly participant: StudioLiveParticipant | undefined;
   readonly port: StudioLiveDirectPort | null | undefined;
   readonly manifest: StudioVirtualSpaceWorldManifest;
@@ -17,8 +19,16 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
   readonly blockedPeerIds?: readonly string[];
   readonly onReady: (scope: StudioConversationScope) => void;
   readonly onClosed?: (scope: StudioConversationScope) => void;
+  readonly presence?: StudioVirtualSpaceSnapshot;
+  readonly acousticBindingAvailable?: boolean;
 }) {
   const controller = useRef<StudioVirtualConversationController | null>(null);
+  const acoustics = useRef<StudioVirtualSpaceAcousticPolicy | null>(null);
+  const spatial = useRef({ presence, acousticBindingAvailable });
+  useLayoutEffect(() => {
+    spatial.current = { presence, acousticBindingAvailable };
+    acoustics.current?.update(presence, acousticBindingAvailable);
+  }, [presence, acousticBindingAvailable]);
   const ready = useRef(onReady), closed = useRef(onClosed), blocked = useRef(blockedPeerIds);
   const [snapshot, setSnapshot] = useState(EMPTY);
   const [isForeground, setForeground] = useState(foreground);
@@ -53,11 +63,16 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
     if (!enabled || !participant || !port || typeof globalThis.crypto?.subtle?.digest !== "function") return;
     let disposed = false;
     let owner: StudioVirtualConversationController | undefined;
+    let policy: StudioVirtualSpaceAcousticPolicy | undefined;
     let unsubscribe: (() => void) | undefined;
     void crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest))).then((digest) => {
       if (disposed) return;
       const contentRevision = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      policy = new StudioVirtualSpaceAcousticPolicy({ ...manifest, worldId: manifest.id, contentRevision }, participant.sessionId);
+      policy.update(spatial.current.presence, spatial.current.acousticBindingAvailable);
+      acoustics.current = policy;
       owner = new StudioVirtualConversationController(participant, port, { worldId: manifest.id, contentRevision }, {
+        acoustics: policy,
         onReady: (scope) => { if (!disposed && foregroundRef.current) ready.current(scope); },
         onClosed: (scope) => { closeStudioP2pHuddle({ conversationId: scope.id }); closed.current?.(scope); },
       });
@@ -68,6 +83,7 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
     return () => {
       disposed = true; unsubscribe?.(); owner?.close();
       if (controller.current === owner) controller.current = null;
+      if (acoustics.current === policy) acoustics.current = null;
     };
   }, [enabled, participant, port, manifest]);
   const propose = useCallback((memberIds: readonly string[]) => foregroundRef.current ? controller.current?.propose(memberIds) ?? null : null, []);

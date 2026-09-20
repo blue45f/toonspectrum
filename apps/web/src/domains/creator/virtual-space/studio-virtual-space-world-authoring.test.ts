@@ -73,12 +73,27 @@ describe("Virtual Studio world authoring", () => {
     );
     expect(restored.colliders).toHaveLength(DEFAULT_STUDIO_WORLD_MANIFEST.colliders.length);
     expect(restored.occlusionLayers).toEqual(DEFAULT_STUDIO_WORLD_MANIFEST.occlusionLayers);
+    expect(restored.npcActivityAnchors).toEqual(DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors);
+    expect(restored.acousticZones).toEqual(DEFAULT_STUDIO_WORLD_MANIFEST.acousticZones);
     expect(tiled).toMatchObject({
       width: DEFAULT_STUDIO_WORLD_MANIFEST.width,
       height: DEFAULT_STUDIO_WORLD_MANIFEST.height,
       tilewidth: 1,
       tileheight: 1,
     });
+  });
+
+  it("preserves explicit acoustic policies and never inherits missing acoustic access geometry", () => {
+    const manifest = { ...DEFAULT_STUDIO_WORLD_MANIFEST, acousticZones: DEFAULT_STUDIO_WORLD_MANIFEST.acousticZones!.map((zone, index) =>
+      index === 0 ? { ...zone, policy: "private" as const, doorId: "lounge-door" } : zone) };
+    const tiled = studioWorldManifestToTiledMap(manifest);
+    expect(parseStudioWorldAuthoringImport(JSON.stringify(tiled), manifest).acousticZones).toEqual(manifest.acousticZones);
+    const layers = tiled.layers as { name: string; objects?: { properties?: { name: string; value: unknown }[] }[] }[];
+    const missing = { ...tiled, layers: layers.filter((layer) => layer.name !== "acoustic-zones") };
+    expect(parseStudioWorldAuthoringImport(JSON.stringify(missing), manifest).acousticZones).toEqual([]);
+    const malformed = { ...tiled, layers: layers.map((layer) => layer.name === "acoustic-zones"
+      ? { ...layer, objects: layer.objects?.map((object) => ({ ...object, properties: object.properties?.filter((property) => property.name !== "policy") })) } : layer) };
+    expect(() => parseStudioWorldAuthoringImport(JSON.stringify(malformed), manifest)).toThrow(/acoustic zone/iu);
   });
 
   it("exports odd integer pixel dimensions as valid integer Tiled dimensions", () => {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { studioNpcActivityTiledProperties } from "../apps/web/src/domains/creator/virtual-space/studio-virtual-space-npc-activity";
 import { DEFAULT_STUDIO_WORLD_MANIFEST as manifest } from "../apps/web/src/domains/creator/virtual-space/studio-virtual-space-world-manifest";
 
 let objectId = 1;
@@ -157,6 +158,12 @@ const layers = [
       ...(slot.seatAttachmentPoint ? { seatX: slot.seatAttachmentPoint.x, seatY: slot.seatAttachmentPoint.y } : {}),
       facing: slot.facing, radius: slot.radius },
   ))),
+  objectLayer("acoustic-zones", (manifest.acousticZones ?? []).map((zone) => object(
+    zone.id, zone.x, zone.y, zone.width, zone.height, { roomId: zone.roomId, policy: zone.policy, doorId: zone.doorId },
+  ))),
+  objectLayer("npc-activity-anchors", (manifest.npcActivityAnchors ?? []).map((a) => object(
+    a.id, a.approachPoint.x, a.approachPoint.y, 0, 0, studioNpcActivityTiledProperties(a),
+  ))),
   objectLayer("npcs", manifest.npcs.map((npc) => object(
     npc.id,
     npc.point.x,
@@ -170,6 +177,7 @@ const layers = [
       scale: npc.scale,
       speed: npc.speed,
       behavior: npc.behavior,
+      activityAnchorIds: npc.activityAnchorIds?.join(";"),
       patrol: npc.patrol?.map((point) => String(point.x) + "," + String(point.y)).join(";"),
     },
   ))),

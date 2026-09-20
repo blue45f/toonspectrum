@@ -7,6 +7,7 @@ import {
   reviewAnchorSchema,
   scopeContains,
   scopeRefSchema,
+  validateStudioReviewSpatialAnchor,
 } from "@toonspectrum/studio-project-model";
 import {
   compatibilityReportSchema,
@@ -17,6 +18,7 @@ import type { PoolClient } from "pg";
 import { STUDIO_REVIEW_PREVIEW_PAGE_SIZE, type StudioReviewPreviewBlobRow,
   type StudioReviewPreviewSource, type StudioReviewPreviewSubject } from "./studio-review-preview";
 import { lockStudioReviewPreviewStorage } from "./studio-review-preview-storage";
+import { studioReviewMappingFromOperation, studioReviewMappingsFromOperation } from "./studio-review-source-map";
 
 import { dbPool } from "../../db";
 import {
@@ -1564,16 +1566,23 @@ export class StudioProjectGraphRepository {
       assertAccess(accessResult.access, "view");
       const binding = await client.query<{
         projectId: string; workId: string; artifactId: string; revisionId: string;
-        rootGraphHash: string; kind: string; status: string;
+        rootGraphHash: string; kind: string; status: string; captureOperation?: unknown; captureReceipt?: unknown;
       }>(
         `SELECT artifact."projectId" AS "projectId", project."workId" AS "workId",
                 review."artifactId" AS "artifactId", review."revisionId" AS "revisionId",
-                revision."rootGraphHash" AS "rootGraphHash", revision.kind, review.status
+                revision."rootGraphHash" AS "rootGraphHash", revision.kind, review.status,
+                capture.operation AS "captureOperation", captured.receipt AS "captureReceipt"
          FROM studio_review review
          JOIN studio_revision revision ON revision.id = review."revisionId"
            AND revision."artifactId" = review."artifactId"
          JOIN studio_artifact artifact ON artifact.id = review."artifactId"
          JOIN studio_project_graph project ON project.id = artifact."projectId"
+         LEFT JOIN studio_operation capture ON capture."artifactId" = revision."artifactId"
+           AND capture."resultRevisionId" = revision.id AND capture.sequence = revision."operationLast"
+           AND revision."operationFirst" = revision."operationLast" AND capture."commandType" = 'review.snapshot-create'
+         LEFT JOIN LATERAL (SELECT jsonb_build_object('actorUserId', receipt."actorUserId", 'idempotencyKeyHash', receipt."idempotencyKeyHash", 'response', receipt.response) AS receipt
+           FROM studio_mutation_receipt receipt WHERE receipt."artifactId"=revision."artifactId" AND receipt."resultRevisionId"=revision.id
+             AND receipt.response->>'status'='completed' AND receipt.response->'subject'->>'reviewId'=review.id LIMIT 1) captured ON true
          WHERE review.id = $1 AND review."artifactId" = $2`,
         [subject.reviewId, subject.artifactId],
       );
@@ -1616,6 +1625,7 @@ export class StudioProjectGraphRepository {
       const page = blobs.rows.slice(0, STUDIO_REVIEW_PREVIEW_PAGE_SIZE);
       const last = page[page.length - 1];
       return { subject: { ...subject }, blobs: page,
+        pageMappings: studioReviewMappingsFromOperation(row.captureOperation, subject, page, row.captureReceipt),
         nextCursor: blobs.rows.length > STUDIO_REVIEW_PREVIEW_PAGE_SIZE && last ? `${last.ordinal}.${last.hash}` : null };
     } finally { client.release(); }
   }
@@ -1783,10 +1793,11 @@ export class StudioProjectGraphRepository {
         );
       }
       const artifactScope = scopeRefSchema.safeParse(accessResult.row.projectScope);
-      if (!artifactScope.success || !scopeContains(artifactScope.data, anchor.scope)) {
+      if (!artifactScope.success || !scopeContains(artifactScope.data, anchor.scope)
+        || (anchor.source && canonicalJson(artifactScope.data) !== canonicalJson(anchor.scope))) {
         throw new StudioRepositoryInvariantError(
           "review_anchor_scope_mismatch",
-          "comment scope must stay inside the reviewed artifact scope",
+          "comment scope must stay inside the reviewed artifact scope; authoring coordinates do not create graph scope identities",
         );
       }
       const existing = await client.query<{
@@ -1822,6 +1833,28 @@ export class StudioProjectGraphRepository {
           "review_already_decided",
           "new comments cannot change a terminal review",
         );
+      }
+      if (anchor.source) {
+        const source = await client.query<{ rootGraphHash: string; operation: unknown; hash: string; captureReceipt: unknown }>(
+          `SELECT revision."rootGraphHash", capture.operation, ref."blobHash" AS hash,
+             jsonb_build_object('actorUserId', receipt."actorUserId", 'idempotencyKeyHash', receipt."idempotencyKeyHash", 'response', receipt.response) AS "captureReceipt"
+           FROM studio_revision revision
+           JOIN studio_operation capture ON capture."artifactId" = revision."artifactId"
+             AND capture."resultRevisionId" = revision.id AND capture.sequence = revision."operationLast"
+             AND revision."operationFirst" = revision."operationLast" AND capture."commandType" = 'review.snapshot-create'
+           JOIN studio_revision_blob ref ON ref."revisionId" = revision.id AND ref.role = 'preview' AND ref.ordinal = $3
+           JOIN studio_mutation_receipt receipt ON receipt."artifactId"=revision."artifactId" AND receipt."resultRevisionId"=revision.id
+             AND receipt.response->>'status'='completed' AND receipt.response->'subject'->>'reviewId'=$4
+           WHERE revision.id = $1 AND revision."artifactId" = $2 AND revision.kind = 'review-snapshot'`,
+          [review.revisionId, review.artifactId, anchor.source.pageOrdinal, reviewId]);
+        const row = source.rows.length === 1 ? source.rows[0] : undefined;
+        const mapping = row ? studioReviewMappingFromOperation(row.operation, {
+          workId: accessResult.row.workId, projectId: accessResult.row.projectId,
+          artifactId: review.artifactId, rootGraphHash: row.rootGraphHash,
+          reviewId, revisionId: review.revisionId,
+        }, anchor.source.pageOrdinal, row.hash, row.captureReceipt) : { status: "unmapped" as const, reason: "source-unavailable" as const };
+        if (!validateStudioReviewSpatialAnchor(mapping, anchor)) throw new StudioRepositoryInvariantError(
+          "review_source_anchor_mismatch", "comment source coordinates must match the immutable saved review page");
       }
       if (input.assigneeIds.length > 0) {
         const assigneeAccess = await client.query<{ id: string }>(

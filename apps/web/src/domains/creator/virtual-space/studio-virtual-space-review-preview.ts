@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { studioReviewPageMappingSchema, type StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
 
 import { api, httpStatus } from "@/infrastructure/api";
 
@@ -15,6 +16,7 @@ const previewSchema = z.object({
     return url.protocol === "https:" && !url.username && !url.password;
   }),
   expiresAt: z.number().int().positive(),
+  mapping: studioReviewPageMappingSchema.optional().default({ status: "unmapped", reason: "legacy-review" }),
 }).strict();
 const successSchema = z.object({ ok: z.literal(true), subject: z.unknown(),
   previews: z.array(previewSchema).min(1).max(32), nextCursor: cursorSchema.nullable() }).strict();
@@ -22,6 +24,7 @@ const failureSchema = z.object({ ok: z.literal(false),
   reason: z.enum(["preview-unavailable", "closed", "version-mismatch"]) }).strict();
 
 export type StudioVirtualSpaceReviewPreview = z.infer<typeof previewSchema>;
+export type { StudioReviewPageMapping };
 export type StudioVirtualSpaceReviewPreviews = {
   readonly ok: true;
   readonly subject: StudioVirtualSpaceReviewSubject;
@@ -55,6 +58,8 @@ export async function getStudioVirtualSpaceReviewPreview(
     for (const preview of response.previews) {
       if (preview.expiresAt <= now || preview.expiresAt > now + 30_000
         || identities.has(preview.sha256) || preview.ordinal <= previousOrdinal) return { ok: false, reason: "preview-unavailable" };
+      if (preview.mapping.status === "mapped" && (preview.mapping.sourceContentDigest !== subject.rootGraphHash
+        || preview.mapping.page.ordinal !== preview.ordinal)) return { ok: false, reason: "version-mismatch" };
       identities.add(preview.sha256);
       previousOrdinal = preview.ordinal;
     }

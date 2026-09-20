@@ -1,4 +1,6 @@
-import type { StudioCharacterMotionState } from "./studio-virtual-space-character-skins";
+import { studioCharacterSkinByKey, type StudioCharacterMotionState } from "./studio-virtual-space-character-skins";
+import { StudioNpcActivityReservations, type StudioNpcActivityStage, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
+import { studioNpcGuideStops, type StudioNpcGuideStop, type StudioVirtualNpcGuideTourRequest, type StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import type { StudioVirtualSpaceFacing, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { DEFAULT_STUDIO_MOTION_CONFIG, stepStudioVirtualSpaceMotion } from "./studio-virtual-space-motion";
 import { advanceStudioWorldPath } from "./studio-virtual-space-path-steering";
@@ -27,6 +29,8 @@ export interface StudioNpcEnvironment {
   readonly atmosphere: StudioNpcAtmosphere;
   readonly reducedMotion?: boolean;
   readonly focused?: boolean;
+  readonly mobile?: boolean;
+  readonly viewport?: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
 }
 
 export interface StudioNpcView {
@@ -38,6 +42,9 @@ export interface StudioNpcView {
   readonly distance: number;
   readonly moving: boolean;
   readonly greeting: boolean;
+  readonly activityAnchorId?: string;
+  readonly activityStage: StudioNpcActivityStage | null;
+  readonly seatAttachmentPoint?: StudioVirtualSpacePoint;
 }
 
 interface NpcActor {
@@ -62,6 +69,8 @@ interface NpcActor {
   seed: number;
   distance: number;
   moving: boolean;
+  activity: StudioWorldNpcActivityAnchor | null;
+  activityStage: StudioNpcActivityStage | null;
 }
 
 const FIXED_STEP = 1 / 60;
@@ -78,6 +87,19 @@ const roles = {
   librarian: { ko: "에셋 담당", en: "Librarian", workKo: "자료 정리 중", workEn: "Sorting assets", action: "assets" },
   resident: { ko: "스튜디오 멤버", en: "Studio resident", workKo: "작업 중", workEn: "Working", action: undefined },
 } as const;
+
+export function studioNpcMotionBudget(environment: StudioNpcEnvironment): { movers: number; routines: number } {
+  const quiet = environment.atmosphere === "focus" || Boolean(environment.reducedMotion) || Boolean(environment.focused);
+  const movers = quiet ? 1 : environment.atmosphere === "lively" ? environment.mobile ? 2 : 3 : environment.mobile ? 1 : 2;
+  return { movers, routines: quiet ? 0 : Math.max(0, movers - Math.floor(environment.people.length / 8)) };
+}
+
+function availableAnimation(actor: NpcActor, requested: StudioCharacterMotionState): StudioCharacterMotionState {
+  const skin = studioCharacterSkinByKey(actor.definition.skinKey);
+  if (requested === "sit" || requested === "wave") return skin.poses?.[requested] ? requested : "idle";
+  if (requested === "talk" || requested === "draw" || requested === "review") return skin.state?.[requested] ? requested : "idle";
+  return requested;
+}
 
 /** Roles derive from the authored room, so both manifest and existing Tiled exports retain them. */
 export function studioNpcRole(definition: StudioWorldNpcDefinition): StudioNpcRole {
@@ -132,6 +154,11 @@ export class StudioNpcDirector {
   private time = 0;
   private lastGreetingAt = -Infinity;
   private pathsThisStep = 0;
+  private readonly reservations = new StudioNpcActivityReservations();
+  private disposed = false;
+  private tour: { request: StudioVirtualNpcGuideTourRequest; actor: NpcActor; personId: string;
+    stops: readonly StudioNpcGuideStop[]; index: number; status: StudioVirtualNpcGuideTourState["status"]; deadline: number; blockedAt: number | null } | null = null;
+  private lastTourState: StudioVirtualNpcGuideTourState | null = null;
 
   constructor(private readonly manifest: StudioVirtualSpaceWorldManifest) {
     // Invalid spawns are omitted, never silently teleported to the player's spawn.
@@ -142,10 +169,10 @@ export class StudioNpcDirector {
       const seed = seedFor(definition.id);
       return {
         definition, anchors, greetings: new Map(), point: { ...definition.point }, previous: { ...definition.point },
-        velocity: ZERO, facing: definition.facing ?? "down", phase: "work", resumePhase: "work",
-        targetIndex: 0, target: null, path: [], deadline: 6500 + seed % 13000,
+        velocity: ZERO, facing: definition.facing ?? "down", phase: definition.activityAnchorIds?.length ? "wait" : "work", resumePhase: "work",
+        targetIndex: definition.activityAnchorIds?.length ? -1 : 0, target: null, path: [], deadline: definition.activityAnchorIds?.length ? 400 + seed % 1800 : 6500 + seed % 13000,
         nextDecisionAt: seed % DECISION_MS, nextAwarenessAt: 0, threat: null,
-        blockedSince: null, retries: 0, seed, distance: 0, moving: false,
+        blockedSince: null, retries: 0, seed, distance: 0, moving: false, activity: null, activityStage: null,
       };
     });
   }
@@ -155,7 +182,8 @@ export class StudioNpcDirector {
     return this.actors.map((actor) => {
       const role = studioNpcRole(actor.definition);
       const animation: StudioCharacterMotionState = actor.moving ? "walk"
-        : actor.phase === "greet" ? "talk"
+        : actor.phase === "greet" ? "wave"
+          : actor.activityStage === "perform" && actor.activity ? actor.activity.animation
           : actor.phase === "inspect" ? "review"
             : actor.phase === "work" && (role === "artist" || role === "writer") ? "draw"
               : actor.phase === "work" && ["talk", "draw", "review"].includes(actor.definition.behavior ?? "")
@@ -163,14 +191,17 @@ export class StudioNpcDirector {
       return {
         id: actor.definition.id,
         point: { x: actor.previous.x + (actor.point.x - actor.previous.x) * alpha, y: actor.previous.y + (actor.point.y - actor.previous.y) * alpha },
-        facing: actor.facing, phase: actor.phase, animation, distance: actor.distance,
+        facing: actor.facing, phase: actor.phase, animation: availableAnimation(actor, animation), distance: actor.distance,
         moving: actor.moving, greeting: actor.phase === "greet",
+        activityAnchorId: actor.activity?.id, activityStage: actor.activityStage,
+        ...(actor.activityStage === "perform" && actor.activity?.animation === "sit" && availableAnimation(actor, "sit") === "sit"
+          ? { seatAttachmentPoint: actor.activity.seatAttachmentPoint } : {}),
       };
     });
   }
 
   advance(deltaSeconds: number, environment: StudioNpcEnvironment): readonly StudioNpcView[] {
-    if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return this.views;
+    if (this.disposed || !Number.isFinite(deltaSeconds) || deltaSeconds <= 0) return this.views;
     // A suspended tab resumes in place; it does not run minutes of queued decisions.
     this.accumulator += Math.min(0.05, deltaSeconds);
     while (this.accumulator + 1e-9 >= FIXED_STEP) {
@@ -180,6 +211,109 @@ export class StudioNpcDirector {
       this.tick(environment);
     }
     return this.views;
+  }
+
+  get guideTourState(): StudioVirtualNpcGuideTourState | null {
+    const tour = this.tour;
+    return tour ? { requestId: tour.request.id, guideId: tour.actor.definition.id, status: tour.status,
+      stopIndex: tour.index, stopCount: tour.stops.length, stopAction: tour.stops[tour.index]?.action } : this.lastTourState;
+  }
+
+  startGuideTour(request: StudioVirtualNpcGuideTourRequest, personId: string): void {
+    if (this.disposed || this.guideTourState?.requestId === request.id) return;
+    this.cancelGuideTour();
+    const actor = this.actors.find((candidate) => candidate.definition.id === request.guideId && studioNpcRole(candidate.definition) === "guide");
+    const stops = actor ? studioNpcGuideStops(this.manifest, actor.point) : [];
+    if (!actor || stops.length === 0 || !request.id || request.id.length > 128 || !personId) {
+      this.lastTourState = { requestId: request.id, guideId: request.guideId, status: "cancelled", stopIndex: 0, stopCount: 0 }; return;
+    }
+    this.releaseActivity(actor); this.clearRoute(actor); actor.phase = "wait";
+    this.tour = { request, actor, personId, stops, index: 0, status: "waiting-for-user", deadline: 0, blockedAt: null };
+  }
+
+  cancelGuideTour(): void {
+    if (!this.tour) return;
+    this.lastTourState = { ...this.guideTourState!, status: "cancelled" };
+    this.clearRoute(this.tour.actor); this.releaseActivity(this.tour.actor);
+    this.tour.actor.phase = "rest"; this.tour.actor.deadline = this.time + 5000; this.tour = null;
+  }
+
+  dispose(): void {
+    this.cancelGuideTour(); this.disposed = true; this.reservations.clear();
+    for (const actor of this.actors) { this.clearRoute(actor); actor.activity = null; actor.activityStage = null; }
+  }
+
+  private releaseActivity(actor: NpcActor): void {
+    this.reservations.release(actor.definition.id); actor.activity = null; actor.activityStage = null;
+  }
+
+  private activityTick(actor: NpcActor, environment: StudioNpcEnvironment, canMove: boolean): boolean {
+    const ids = actor.definition.activityAnchorIds;
+    if (!ids?.length) return false;
+    if (actor.activity) {
+      if (!this.reservations.reserve(actor.activity, actor.definition.id, environment.people, this.time)) {
+        this.releaseActivity(actor); this.clearRoute(actor); actor.phase = "wait"; actor.deadline = this.time + 2500; return true;
+      }
+      if (actor.activityStage === "align" && !actor.target && this.time >= actor.deadline) {
+        if (distance(actor.point, actor.activity.anchorPoint) > 2.5) {
+          if (canMove) this.route(actor, actor.activity.anchorPoint, "walk");
+        } else {
+          actor.activityStage = "perform"; actor.phase = actor.activity.activity;
+          actor.facing = actor.activity.facing;
+          actor.deadline = this.time + actor.activity.minDurationMs + random(actor) * (actor.activity.maxDurationMs - actor.activity.minDurationMs);
+        }
+      } else if (actor.activityStage === "perform" && this.time >= actor.deadline && canMove) {
+        if (this.route(actor, actor.activity.exitPoint, "walk")) actor.activityStage = "exit";
+      }
+      return true;
+    }
+    if (!canMove || this.time < actor.deadline || actor.threat) return true;
+    const choices = ids.map((id, index) => ({ index, anchor: this.manifest.npcActivityAnchors?.find((a) => a.id === id) }))
+      .filter((choice): choice is { index: number; anchor: StudioWorldNpcActivityAnchor } => Boolean(choice.anchor) && choice.index !== actor.targetIndex);
+    if (!choices.length && actor.targetIndex >= 0) { actor.targetIndex = -1; return true; }
+    const choice = actor.targetIndex > 0 && random(actor) < .72 ? choices.find((value) => value.index === 0) ?? choices[0]
+      : choices[actor.targetIndex === -1 ? 0 : Math.floor(random(actor) * choices.length)];
+    if (!choice || !this.reservations.reserve(choice.anchor, actor.definition.id, environment.people, this.time)) { actor.deadline = this.time + 2500; return true; }
+    if (this.route(actor, choice.anchor.approachPoint, "walk")) {
+      actor.activity = choice.anchor; actor.activityStage = "approach"; actor.targetIndex = choice.index;
+    } else { this.reservations.release(actor.definition.id); actor.deadline = this.time + 2500; }
+    return true;
+  }
+
+  private tourTick(actor: NpcActor, environment: StudioNpcEnvironment, canMove: boolean): boolean {
+    const tour = this.tour;
+    if (!tour || tour.actor !== actor) return false;
+    const person = environment.people.find((candidate) => candidate.id === tour.personId);
+    if (!person || person.focused || environment.focused || environment.atmosphere === "focus" || environment.reducedMotion) { this.cancelGuideTour(); return true; }
+    if (actor.phase === "yield") return false;
+    const gap = distance(person.point, actor.point), stop = tour.stops[tour.index]!;
+    if (gap > (tour.status === "waiting-for-user" ? 90 : 125)) {
+      this.clearRoute(actor); actor.phase = "wait"; tour.status = "waiting-for-user"; tour.blockedAt = null; return true;
+    }
+    if (distance(actor.point, stop.point) < 4) {
+      this.clearRoute(actor); actor.phase = "wait";
+      actor.facing = studioStableFacing({ x: person.point.x - actor.point.x, y: person.point.y - actor.point.y }, actor.facing);
+      if (tour.status !== "at-stop") { tour.status = "at-stop"; tour.deadline = this.time + 2500; }
+      if (this.time >= tour.deadline && distance(person.point, stop.point) < 95) {
+        if (tour.index + 1 === tour.stops.length) {
+          this.lastTourState = { ...this.guideTourState!, status: "complete" }; this.tour = null;
+          actor.phase = "rest"; actor.deadline = this.time + 5000;
+        } else { tour.index++; tour.status = "waiting-for-user"; }
+      }
+      return true;
+    }
+    if (actor.target) {
+      tour.status = "walking"; this.move(actor, environment);
+      if (!actor.moving) tour.blockedAt ??= this.time; else tour.blockedAt = null;
+      if (tour.blockedAt !== null && this.time - tour.blockedAt > 8000) this.cancelGuideTour();
+      return true;
+    }
+    if (canMove && this.time >= actor.nextDecisionAt) {
+      actor.nextDecisionAt = this.time + DECISION_MS;
+      if (this.route(actor, stop.point, "walk")) tour.status = "walking";
+      else { tour.blockedAt ??= this.time; if (this.time - tour.blockedAt > 8000) this.cancelGuideTour(); }
+    }
+    return true;
   }
 
   private clearRoute(actor: NpcActor): void {
@@ -235,28 +369,50 @@ export class StudioNpcDirector {
   }
 
   private tick(environment: StudioNpcEnvironment): void {
-    const quiet = environment.atmosphere === "focus" || Boolean(environment.reducedMotion);
-    const moverLimit = quiet ? 1 : environment.atmosphere === "lively" ? 3 : 2;
-    // A crowded room spends its motion budget on people. Yielding remains possible.
-    const routineLimit = quiet ? 0 : Math.max(1, moverLimit - Math.floor(environment.people.length / 8));
+    const quiet = environment.atmosphere === "focus" || Boolean(environment.reducedMotion) || Boolean(environment.focused);
+    const { movers: moverLimit, routines: routineLimit } = studioNpcMotionBudget(environment);
+    if (quiet) this.cancelGuideTour();
     let activeMovers = this.actors.filter((actor) => actor.phase === "walk" || actor.phase === "yield").length;
+    let activeRoutines = this.actors.filter((actor) => actor.phase === "walk" && this.tour?.actor !== actor).length;
     for (const actor of [...this.actors].reverse()) {
-      if (activeMovers <= moverLimit) break;
-      if (actor.phase !== "walk") continue;
-      this.clearRoute(actor); actor.phase = "rest"; actor.deadline = this.time + 5000; activeMovers--;
+      if (activeMovers <= moverLimit && activeRoutines <= routineLimit) break;
+      if (actor.phase !== "walk" || this.tour?.actor === actor) continue;
+      this.clearRoute(actor); this.releaseActivity(actor); actor.phase = "rest"; actor.deadline = this.time + 5000; activeMovers--;
+      activeRoutines--;
     }
     for (const actor of this.actors) {
       actor.previous = actor.point;
+      const viewport = environment.viewport;
+      const offscreen = viewport && (actor.point.x < viewport.x - 100 || actor.point.y < viewport.y - 100
+        || actor.point.x > viewport.x + viewport.width + 100 || actor.point.y > viewport.y + viewport.height + 100);
+      if (offscreen && this.tour?.actor !== actor && !environment.people.some((person) => distance(person.point, actor.point) < 100)) {
+        if (actor.phase === "walk" || actor.phase === "yield") activeMovers--;
+        this.clearRoute(actor); this.releaseActivity(actor); actor.phase = "rest"; actor.deadline = this.time + 1000; continue;
+      }
       if (this.time >= actor.nextAwarenessAt) {
         actor.nextAwarenessAt = this.time + AWARENESS_MS;
         actor.threat = this.closestThreat(actor, environment.people);
       }
       if ((quiet || environment.focused) && actor.phase === "greet") { actor.phase = actor.resumePhase; actor.deadline = this.time + 8000; }
-      if (quiet && actor.phase === "walk") { this.clearRoute(actor); actor.phase = "rest"; actor.deadline = this.time + 5000; activeMovers--; }
+      if (quiet && actor.phase === "walk") { this.clearRoute(actor); this.releaseActivity(actor); actor.phase = "rest"; actor.deadline = this.time + 5000; activeMovers--; }
+      if (actor.threat && actor.phase !== "walk" && actor.phase !== "yield" && activeMovers >= moverLimit) {
+        const routine = this.actors.find((other) => other !== actor && other.phase === "walk" && this.tour?.actor !== other);
+        if (routine) { this.clearRoute(routine); this.releaseActivity(routine); routine.phase = "wait"; routine.deadline = this.time + 2000; activeMovers--; }
+      }
       if (actor.threat && actor.phase !== "yield" && (actor.phase === "walk" || activeMovers < moverLimit)) {
         const wasWalking = actor.phase === "walk";
         const point = this.yieldPoint(actor, actor.threat, environment.people);
-        if (point && this.route(actor, point, "yield") && !wasWalking) activeMovers++;
+        if (point && this.route(actor, point, "yield")) { this.releaseActivity(actor); if (!wasWalking) activeMovers++; }
+      }
+      const routedBeforeTour = actor.phase === "walk" || actor.phase === "yield";
+      if (this.tourTick(actor, environment, activeMovers < moverLimit || routedBeforeTour)) {
+        if (!routedBeforeTour && actor.target) activeMovers++;
+        continue;
+      }
+      if (actor.activity) {
+        const routed = actor.phase === "walk";
+        this.activityTick(actor, environment, !quiet && (routed || activeMovers < routineLimit));
+        if (!routed && actor.target) activeMovers++;
       }
       if (actor.phase === "walk" || actor.phase === "yield") {
         this.move(actor, environment);
@@ -269,7 +425,7 @@ export class StudioNpcDirector {
         if (this.time >= actor.deadline) { actor.phase = actor.resumePhase; actor.deadline = this.time + 4000; }
         continue;
       }
-      if (!quiet && !environment.focused && !actor.threat && this.time - this.lastGreetingAt >= 8000) {
+      if (!quiet && !actor.activity && !actor.threat && this.time - this.lastGreetingAt >= 8000) {
         const person = environment.people.find((candidate) => !candidate.focused
           && distance(actor.point, candidate.point) < 90
           && Math.hypot(candidate.velocity?.x ?? 0, candidate.velocity?.y ?? 0) < 8
@@ -283,6 +439,10 @@ export class StudioNpcDirector {
           this.lastGreetingAt = this.time;
           continue;
         }
+      }
+      if (this.activityTick(actor, environment, !quiet && activeMovers < routineLimit)) {
+        if (actor.target) activeMovers++;
+        continue;
       }
       if (quiet || this.time < actor.deadline || actor.anchors.length < 2 || activeMovers >= routineLimit) continue;
       const choices = actor.anchors.map((_, index) => index).filter((index) => index !== actor.targetIndex);
@@ -304,6 +464,13 @@ export class StudioNpcDirector {
     if (distance(actor.point, actor.target) <= 2.5) {
       const yielded = actor.phase === "yield";
       this.clearRoute(actor);
+      if (actor.activity) {
+        actor.phase = "wait";
+        if (actor.activityStage === "approach") { actor.activityStage = "align"; actor.deadline = this.time + 350; }
+        else if (actor.activityStage === "align") { actor.facing = actor.activity.facing; actor.deadline = this.time + 350; }
+        else if (actor.activityStage === "exit") { this.releaseActivity(actor); actor.phase = "rest"; actor.deadline = this.time + 500; }
+        return;
+      }
       actor.phase = yielded ? "rest" : actor.targetIndex === 0 ? "work" : actor.targetIndex % 2 === 0 ? "rest" : "inspect";
       actor.facing = actor.definition.facing ?? actor.facing;
       actor.deadline = this.time + (yielded ? 2500 : actor.phase === "work" ? 20000 + random(actor) * 18000 : 7000 + random(actor) * 9000);
@@ -345,7 +512,7 @@ export class StudioNpcDirector {
       actor.blockedSince ??= this.time;
       if (this.time - actor.blockedSince > 1000 && this.pathsThisStep === 0) {
         if (actor.retries >= 2 || personBlocked || npcBlocked) {
-          this.clearRoute(actor); actor.phase = "wait"; actor.deadline = this.time + 2500 + random(actor) * 2500;
+          this.clearRoute(actor); this.releaseActivity(actor); actor.phase = "wait"; actor.deadline = this.time + 2500 + random(actor) * 2500;
         } else {
           this.pathsThisStep++;
           actor.path = findStudioWorldPath(this.manifest, actor.point, actor.target);
