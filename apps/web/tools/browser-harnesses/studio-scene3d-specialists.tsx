@@ -23,6 +23,7 @@ declare global {
   interface Window {
     __scene3dSpecialistProof?: unknown;
     __scene3dSpecialistFixture?: number[];
+    __scene3dNavigationFixture?: number[];
     __scene3dSplatFixture?: number[];
     __scene3dTexturedFixture?: number[];
     __scene3dCompoundFixture?: number[];
@@ -112,6 +113,9 @@ async function verify() {
         cellSize: 0.2,
         agentRadius: 0.3,
         agentHeight: 1.8,
+        waypoints: [[2, 0, -2], [-2, 0, 2]],
+        maxStepHeight: 0.2,
+        maxSlopeDegrees: 35,
       },
     },
   ];
@@ -165,6 +169,13 @@ async function verify() {
       assert(receipt.artifactSha256 === glb.sha256 && receipt.sourceSha256 === result.sourceSha256, "Compound report is not bound to its actual artifacts.");
       assert(receipt.steps.length === 2 && receipt.steps[0].phase === "left-union", "Overlapping parts were not unioned before final Boolean.");
       compoundReceipt = { ...receipt, decodedVolume };
+
+    }
+    if (job.options.kind === "navigation") {
+      const route = JSON.parse(new TextDecoder().decode(result.artifacts[2]!.bytes));
+      assert(route.stops.length === 4 && route.segments.length === 3, "Ordered navigation stops were skipped.");
+      assert(Math.abs(route.lengthMeters - (8 + Math.sqrt(32))) < 0.001, "Navigation route length is inconsistent.");
+      assert(result.artifacts.some((artifact) => artifact.name === "navigation-route.glb"), "No highlighted route artifact.");
     }
     let texturePixels: Record<string, unknown> | undefined;
     if (job.options.kind === "textures" || job.options.kind === "release") {
@@ -264,6 +275,7 @@ async function verify() {
   }
   window.__scene3dSplatFixture = Array.from(splats);
   window.__scene3dSpecialistFixture = Array.from(sphere);
+  window.__scene3dNavigationFixture = Array.from(floor);
   window.__scene3dTexturedFixture = Array.from(textured);
   window.__scene3dCompoundFixture = Array.from(compound);
   window.__scene3dCompoundCutter = Array.from(compoundCutter);

@@ -14,13 +14,18 @@ import type {
   SpecialistArtifact,
   SpecialistOptions,
 } from "./specialist-contract";
+import { buildNavigationRoute, navigationBuildSettings } from "./specialist-navigation-path";
+import { addNavigationRoutePreview } from "./specialist-navigation-preview";
 import type { WebIO } from "@gltf-transform/core";
+
+export { validateNavigationEndpoints } from "./specialist-navigation-path";
 
 export async function processNavigation(
   io: WebIO,
   source: Uint8Array,
   options: Extract<SpecialistOptions, { kind: "navigation" }>,
 ): Promise<{ artifacts: SpecialistArtifact[]; warnings: string[] }> {
+  const settings = navigationBuildSettings(options);
   const document = await readSpecialistDocument(io, source);
   const geometries = await extractStaticGeometry(document);
   const positions: number[] = [];
@@ -58,16 +63,7 @@ export async function processNavigation(
   const generated = generateSoloNavMesh(
     positions,
     indices,
-    {
-      cs,
-      ch,
-      walkableHeight: Math.ceil(options.agentHeight / ch),
-      walkableRadius: Math.ceil(options.agentRadius / cs),
-      walkableClimb: Math.floor(0.3 / ch),
-      walkableSlopeAngle: 45,
-      minRegionArea: 0,
-      mergeRegionArea: 0,
-    },
+    settings,
     false,
   );
   let query: NavMeshQuery | undefined;
@@ -78,49 +74,7 @@ export async function processNavigation(
         "NavMesh generation failed: " + generated.error,
       );
     query = new NavMeshQuery(generated.navMesh);
-    const vector = (p: readonly number[]) => ({ x: p[0]!, y: p[1]!, z: p[2]! });
-    const endpointTolerance = {
-      horizontal: Math.max(0.1, cs * 2),
-      vertical: Math.max(0.1, ch * 2),
-    };
-    const projection = {
-      halfExtents: { x: cs * 2, y: options.agentHeight, z: cs * 2 },
-    };
-    const projectedStart = query.findClosestPoint(
-      vector(options.start),
-      projection,
-    );
-    const projectedEnd = query.findClosestPoint(
-      vector(options.end),
-      projection,
-    );
-    if (!projectedStart.success || !projectedEnd.success)
-      throw new SpecialistError(
-        "runtime",
-        "Navigation endpoints are outside the walkable surface.",
-      );
-    validateNavigationEndpoints(
-      [projectedStart.point, projectedEnd.point],
-      options.start,
-      options.end,
-      endpointTolerance,
-    );
-    const result = query.computePath(projectedStart.point, projectedEnd.point, {
-      halfExtents: { x: cs * 2, y: options.agentHeight, z: cs * 2 },
-      maxPathPolys: 2048,
-      maxStraightPathPoints: 2048,
-    });
-    if (!result.success || result.path.length < 2)
-      throw new SpecialistError(
-        "runtime",
-        "No path connects the requested positions on this walkable surface.",
-      );
-    validateNavigationEndpoints(
-      result.path,
-      options.start,
-      options.end,
-      endpointTolerance,
-    );
+    const route = buildNavigationRoute(query, options);
     const [navPositions, navIndices] = getNavMeshPositionsAndIndices(
       generated.navMesh,
     );
@@ -131,13 +85,13 @@ export async function processNavigation(
       )
       .setIndex(new BufferAttribute(new Uint32Array(navIndices), 1));
     let preview: SpecialistArtifact;
+    let routePreview: SpecialistArtifact;
     try {
       geometry.computeVertexNormals();
-      preview = await glbArtifact(
-        io,
-        geometryDocument(geometry, "Walkable surface"),
-        "navmesh.glb",
-      );
+      const previewDocument = geometryDocument(geometry, "Walkable surface");
+      preview = await glbArtifact(io, previewDocument, "navmesh.glb");
+      addNavigationRoutePreview(previewDocument, route, cs);
+      routePreview = await glbArtifact(io, previewDocument, "navigation-route.glb");
     } finally {
       geometry.dispose();
     }
@@ -148,8 +102,14 @@ export async function processNavigation(
           version: 1,
           coordinates: "meter/right/Y/-Z",
           options,
-          path: result.path,
-          endpointTolerance,
+          ...route,
+          buildSettings: settings,
+          effectiveAgent: {
+            minimumClearanceMeters: settings.walkableHeight * ch,
+            radiusMeters: settings.walkableRadius * cs,
+            maximumStepMeters: settings.walkableClimb * ch,
+            maximumSlopeDegrees: settings.walkableSlopeAngle,
+          },
           sourceSha256: sha256(source),
         },
         null,
@@ -171,8 +131,10 @@ export async function processNavigation(
           bytes: path,
           sha256: sha256(path),
         },
+        routePreview,
       ],
       warnings: [
+        "Clearance/radius round up to cells; maximum step rounds down. The separate route preview uses a display offset. JSON route length is corner-polyline length, not sampled terrain motion.",
         "Navigation is an exported static derivative, not live crowd simulation or multiplayer movement authority. Source geometry must use meters and Y-up.",
       ],
     };
@@ -180,31 +142,5 @@ export async function processNavigation(
     query?.destroy();
     if (generated.success) generated.navMesh.destroy();
     Raw.destroy(generated.intermediates.buildContext.raw);
-  }
-}
-
-/** Detour may snap to a nearby polygon; never silently route on a different floor. */
-export function validateNavigationEndpoints(
-  route: readonly { x: number; y: number; z: number }[],
-  start: readonly [number, number, number],
-  end: readonly [number, number, number],
-  tolerance: { horizontal: number; vertical: number },
-): void {
-  for (const [actual, requested, label] of [
-    [route[0], start, "start"],
-    [route.at(-1), end, "end"],
-  ] as const) {
-    if (
-      !actual ||
-      ![actual.x, actual.y, actual.z].every(Number.isFinite) ||
-      Math.hypot(actual.x - requested[0], actual.z - requested[2]) >
-        tolerance.horizontal ||
-      Math.abs(actual.y - requested[1]) > tolerance.vertical
-    ) {
-      throw new SpecialistError(
-        "runtime",
-        `Navigation ${label} is outside the allowed XYZ projection tolerance; select the intended walkable surface.`,
-      );
-    }
   }
 }
