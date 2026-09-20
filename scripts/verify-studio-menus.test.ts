@@ -18,6 +18,7 @@ import { buildStudioBrushMenuItems } from "../apps/web/src/domains/creator/studi
 import { localizeStudioRailToolLabel } from "../apps/web/src/domains/creator/studio-rail-tool-localization";
 import { StudioShellFloatingLayoutManager } from "../apps/web/src/domains/creator/studio-shell/StudioShellFloatingLayoutManager";
 import { StudioShellFloatingLayoutProvider } from "../apps/web/src/domains/creator/studio-shell/StudioShellFloatingLayoutProvider";
+import { resetStudioStrokeFocusActivityForTests, setStudioStrokeFocusActivity } from "../apps/web/src/domains/creator/studio-stroke-focus-activity";
 import { createStudioUiPreferencesRepository } from "../apps/web/src/domains/creator/studio-ui-preferences-sqlite";
 import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBackgroundPanel";
 
@@ -43,6 +44,7 @@ vi.mock("@/shared/lib/i18n", () => ({
 afterEach(() => {
   cleanup();
   resetStudioFloatingSurfaceStackForTest();
+  resetStudioStrokeFocusActivityForTests();
   sessionStorage.clear();
   vi.unstubAllGlobals();
 });
@@ -100,8 +102,21 @@ describe("production menu verifier follows shipped feature entry points", () => 
     expect(within(dialog).getByRole("heading", { name: "플로팅 UI 작업공간", exact: true })).toBeTruthy();
     fireEvent.click(await within(dialog).findByRole("switch", { name: "그리기 옵션 숨기기", exact: true }));
     expect(await within(dialog).findByRole("switch", { name: "그리기 옵션 표시하기", exact: true })).toBeTruthy();
+    const autoHide = within(dialog).getByRole("switch", { name: /펜으로 그리는 동안 자동 숨김/u });
+    if (autoHide.getAttribute("aria-checked") !== "true") fireEvent.click(autoHide);
+    expect(autoHide.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(within(dialog).getByRole("button", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.closeLabel, exact: true }));
     expect(screen.queryByRole("dialog", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.name, exact: true })).toBeNull();
+    const launcher = screen.getByRole("button", { name: /보기 설정/u });
+    const launcherRoot = launcher.closest('[data-studio-shell-view-options="true"]')!;
+    act(() => setStudioStrokeFocusActivity("canvas-stroke", true));
+    expect(launcherRoot.hasAttribute("inert")).toBe(true);
+    expect(launcherRoot.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.queryByRole("button", { name: /보기 설정/u })).toBeNull();
+    act(() => resetStudioStrokeFocusActivityForTests());
+    expect(launcherRoot.hasAttribute("inert")).toBe(false);
+    expect(launcherRoot.hasAttribute("aria-hidden")).toBe(false);
+    expect(screen.getByRole("button", { name: /보기 설정/u })).toBe(launcher);
   });
 
   it("matches a direct menu-row label exactly without confusing shortcut or prefix text", () => {

@@ -77,6 +77,39 @@ locked dependencies, prepares only a fresh test schema, and runs both real integ
 requires Drizzle's positive completion receipt because the CLI can exit zero after logging SQL
 errors. Existing database triggers are applied to the fixture; no new migration is introduced.
 
+## Integration repairs found by GitHub checks
+
+The first PR run exposed an over-budget Host file and existing verification assumptions that
+no longer matched the integrated application. Capture context and navigation were extracted
+into focused modules without raising the Host ceiling. Nine related suites / 75 tests passed,
+including pending-stroke durability and navigation guards. A new production build, its full
+Web type check, static CSP and bundle structure checks also passed locally.
+
+The menu fix keeps horizontal layout changes from opening a different group under a stationary
+pointer and sends authored fallback text through the translation resolver. Regression tests
+exercise actual pointer movement and missing translations. The menu verifier now adds the
+specialized tools through More and checks all 13 retained tools against the current eight-tool
+default; its desktop settings flow uses the actual desktop floating window.
+The complete production-preview menu verifier passed all primary menus, AI entry, platform
+resize/undo, the 13-tool rail, popovers, docking and drawing-time hide/restore. Launcher checks
+measure opacity, pointer access, inertness and accessibility hiding rather than treating a
+fully transparent element as visible merely because Playwright reports a layout box.
+
+Sparse checkouts include the exact fault-matrix and world-metadata files consumed by their
+checks. The product shard's 31 static suites / 290 tests and the dedicated two PostgreSQL suites /
+18 tests form the same 33-suite coverage without running database suites in an unprepared static
+job. The 3D shard passed 30 suites / 329 tests. Feedback verification now prepares its existing
+shared ACL dependencies in its disposable database; both runs passed all 13 scenarios. These
+local results do not imply that the repaired commit's GitHub checks or main merge have finished.
+
+Both full-suite workflows provision their own disposable PostgreSQL 16 database and the actual
+zsh interpreter used by shell regressions. The existing bootstrap applies the complete migration
+ledger and separates the runtime role. The full-suite wrapper serializes all 14 database files,
+then executes the unchanged remainder and performance entrypoint. Actual Vitest collection
+verified the exact 4,612-file union (14 database + 4,598 remaining, no overlap). The first phase
+passed 188 database tests and the marketplace database verifier; full root/performance results
+remain pending. The runner, workflow and shell regression checks passed 88 tests.
+
 Useful commands, with an explicitly owned dev origin and disposable database variables:
 
 ```sh
