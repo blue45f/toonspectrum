@@ -23,6 +23,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -79,6 +81,8 @@ import {
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
+
+const StudioHandoffEnvelopeInbox = lazy(() => import("../handoff-envelope/StudioHandoffEnvelope").then((module) => ({ default: module.StudioHandoffEnvelopeInbox })));
 
 const STUDIO_PRODUCTION_SURFACES = [
   "projects",
@@ -822,6 +826,8 @@ function StudioProductionHubWorkspace({
             {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "개인 작업 중심으로 협업 UI를 간소화했습니다. 공유는 계속 사용할 수 있고, 실제 팀 프로젝트에 참여하면 참여자·역할·협업 동선이 자동으로 다시 표시됩니다.")}
           </div>
         ) : null}
+
+        {mode === "server-work" && serverWorkId ? <Suspense fallback={null}><StudioHandoffEnvelopeInbox workId={serverWorkId} /></Suspense> : null}
 
         {loadError ? (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm" role="alert">

@@ -172,6 +172,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/living-world/art-manifest.json",
     "apps/web/public/assets/virtual-studio/living-world/master-clean-plate.webp",
     "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
+    ...["gentle-window-rain.ogg", "window-rain.ogg", "provenance.json", "CC0-1.0.txt"].map((name) =>
+      `apps/web/public/assets/virtual-studio/ambient-audio/${name}`),
     ...["pink", "silver", "dark", "purple"].flatMap((skin) =>
       ["walk-down", "walk-right", "walk-left", "walk-up", "sit", "wave"].map((state) =>
         `apps/web/public/assets/virtual-studio/drawn-characters-v1/player-${skin}-${state}.png`)),
@@ -192,6 +194,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/production-v2/",
     "/apps/web/public/assets/virtual-studio/living-world/",
     "/apps/web/public/assets/virtual-studio/drawn-characters-v1/",
+    "/apps/web/public/assets/virtual-studio/ambient-audio/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");

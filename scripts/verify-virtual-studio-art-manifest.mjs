@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { lstat, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { verifyVirtualStudioAmbientAudio } from "./verify-virtual-studio-ambient-audio.mjs";
 import { verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
@@ -922,6 +923,7 @@ export async function verifyVirtualStudioArtManifest({
   );
   const livingWorld = await verifyVirtualStudioLivingWorldArtManifest({ productionArtDirectory: artDirectory });
   const drawnArt = await verifyVirtualStudioDrawnArt();
+  const ambientAudio = verifyVirtualStudioAmbientAudio();
   const atlasQuality = REQUIRED_SKINS.flatMap((skin) => (
     REQUIRED_DIRECTIONS.map((direction) => (
       result.manifest.skins[skin].directions[direction]
@@ -936,6 +938,7 @@ export async function verifyVirtualStudioArtManifest({
     ...result,
     livingWorld,
     drawnArt,
+    ambientAudio,
     outputIntegrityVerified: true,
     privateApprovedMasterSourceReverified,
     backgroundProvenanceMode: result.manifest.background.provenanceMode,
@@ -960,6 +963,7 @@ async function main() {
       + `minimum decoded pairwise difference is ${result.minimumPairwiseVisibleDifferencePixels} pixels. `
       + "Living-world output/reference integrity, static lossless VP8L and runtime bindings verified. "
       + "Drawn character RGBA frame pixels, alpha bounds, source references and registry bindings verified. "
+      + `${result.ambientAudio.assetCount} unchanged CC0 ambient recordings and their license text verified separately (${result.ambientAudio.totalBytes} bytes); no new subjective listening claim. `
       + "Clean-plate generated PNG pixel identity is a recorded preparation check. "
       + sourceVerification,
   );

@@ -12,6 +12,7 @@ import {
   scopeRefSchema,
   sha256Schema,
   studioEntityIdSchema,
+  studioReviewTaskReferenceSchema,
 } from "@toonspectrum/studio-project-model";
 import {
   compatibilityItemSchema,
@@ -264,7 +265,8 @@ export const CreateStudioReviewCommentSchema = z
     anchor: reviewAnchorSchema,
     body: HumanTextSchema.max(20_000),
     severity: z.enum(["required", "recommended", "note"]),
-    assigneeIds: z.array(studioEntityIdSchema).max(64).default([]),
+    assigneeIds: z.array(studioEntityIdSchema).max(64)
+      .refine((ids) => new Set(ids).size === ids.length, "assigneeIds must contain unique user IDs").default([]),
     dueAt: isoTimestampSchema.optional(),
   })
   .strict();
@@ -289,6 +291,8 @@ export class DecideStudioReviewDto extends createZodDto(
 export const ResolveStudioReviewCommentSchema = z
   .object({
     resolutionRevisionId: studioEntityIdSchema,
+    /** Optional server-attested newer capture; identity is never an access grant. */
+    resolutionSourceRef: studioReviewTaskReferenceSchema.shape.subject.optional(),
     status: z.enum(["resolved", "dismissed"]).default("resolved"),
   })
   .strict();

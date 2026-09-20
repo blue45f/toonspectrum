@@ -51,6 +51,7 @@ import {
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import { openStudioP2pHuddle, closeStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../live/huddle/studio-p2p-huddle-events";
+import { StudioVirtualSpaceAmbientAudio } from "./StudioVirtualSpaceAmbientAudio";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
@@ -1399,6 +1400,8 @@ function VirtualSpaceExperience({
               <p>{bt("NPC의 움직임과 인사 빈도를 조절해요. 집중 모드에서는 대화 요청도 잠시 쉬어갑니다.", "Adjust NPC movement and greetings. Focus mode also pauses social invitations.")}</p>
               {connectivity.localOnly ? <details data-studio-virtual-offline="true"><summary>{bt("로컬 작업 중", "Working locally")}</summary><p>{bt("이동과 캐시된 작업은 계속할 수 있어요. 팀원 연결은 온라인으로 돌아오면 복구됩니다.", "Movement and cached work remain available. Teammates reconnect when you return online.")}</p></details> : null}
             </section>
+            <StudioVirtualSpaceAmbientAudio key={projectId} scope={worldManifest} ready={worldReady && !authoringMode}
+              focused={atmosphere === "focus" || activity === "focused"} away={activity === "away"} />
             {worldReady ? <StudioVirtualSpaceNpcPanel manifest={worldManifest} onInteract={activateInteraction} /> : null}
             {worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}

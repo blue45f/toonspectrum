@@ -22,6 +22,7 @@ import { StudioStaffingSourcingPanel } from "./StudioStaffingSourcingPanel";
 import { StudioProjectFeatureSuitePanel } from "./StudioProjectFeatureSuitePanel";
 import { StudioReviewPanel } from "./StudioReviewPanel";
 import { studioVirtualSpaceReviewSubjectFromLocation } from "../virtual-space/studio-virtual-space-review-invitation";
+import { studioReviewResolutionRequestFromLocation } from "../review-resolution/studio-review-resolution-route";
 import { StudioProductionToolchainPanel } from "../toolchain/StudioProductionToolchainPanel";
 import { StudioSeriesKitPanel } from "./StudioSeriesKitPanel";
 import {
@@ -92,11 +93,12 @@ function SectionWorkflow({
   useBilingualI18nRevision();
   const location = useLocation();
   const pinnedSubject = useMemo(() => studioVirtualSpaceReviewSubjectFromLocation(projectId, location.search), [projectId, location.search]);
+  const resolutionRequest = useMemo(() => studioReviewResolutionRequestFromLocation(projectId, location.search), [projectId, location.search]);
   const hasReviewPin = new URLSearchParams(location.search).has("sharedReview");
   const showDelivery = section === "export" || (section === "settings" && view === "archive");
 
   if (section === "review" && hasReviewPin) return <Suspense fallback={<ProjectGraphPanelFallback locale={locale} />}>
-    <StudioPinnedReviewPanel subject={pinnedSubject} />
+    <StudioPinnedReviewPanel subject={pinnedSubject} resolutionRequest={resolutionRequest} />
   </Suspense>;
 
   return (

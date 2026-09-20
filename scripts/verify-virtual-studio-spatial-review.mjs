@@ -18,7 +18,7 @@ for (const pid of new Set(stdout.trim().split(/\s+/u))) {
   if (cwd && await fs.realpath(cwd) === expectedCwd) owned = true;
 }
 assert(owned, "Review QA server must belong to this worktree");
-const output = path.resolve(".qa/virtual-studio-spatial-review");
+const output = path.resolve(".qa/virtual-studio-review-workflow");
 await fs.mkdir(output, { recursive: true });
 const date = "2026-09-20T00:00:00.000Z";
 const subject = { schemaVersion: 1, projectId: "qa-graph", workId: "qa-work", artifactId: "qa-artifact", reviewId: "qa-review", revisionId: "qa-snapshot", rootGraphHash: "a".repeat(64) };
@@ -40,9 +40,16 @@ function mapping(pin, ordinal) {
       elements: [{ id: `cut-${ordinal}-1`, type: "frame", origin: "page" }, { id: `cut-${ordinal}-2`, type: "frame", origin: "page" }, { id: `dialogue-${ordinal}`, type: "text", origin: "page" }] } };
 }
 const mutations = [], errors = [], requests = [], fixtures = new Map();
-let revoked = false;
+let revoked = false, editorEligible = true, loseFirstCommentResponse = true;
+const team = () => ({ workId: subject.workId, viewer: { userId: "reviewer", role: "owner", status: "active", capabilities: project.access },
+  members: [
+    { userId: "reviewer", name: "민서 · 감독", image: "", role: "owner", status: "active", isOwner: true },
+    { userId: "qa-editor", name: "시나 · 원화", image: "", role: editorEligible ? "editor" : "viewer", status: "active", isOwner: false },
+    { userId: "qa-viewer", name: "초대 관람객", image: "", role: "viewer", status: "active", isOwner: false },
+    { userId: "qa-pending", name: "미수락 초대", image: "", role: "editor", status: "pending", isOwner: false },
+  ] });
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, locale: "ko-KR" });
+const context = await browser.newContext({ viewport: { width: 1280, height: 1000 }, locale: "ko-KR", timezoneId: "Asia/Seoul" });
 const page = await context.newPage();
 page.on("pageerror", (error) => errors.push(error.message));
 await page.route("**/*", async (route) => {
@@ -50,6 +57,11 @@ await page.route("**/*", async (route) => {
   if (url.hostname === "review-fixture.invalid") {
     assert.equal(request.headers().referer, undefined);
     return route.fulfill({ contentType: "image/png", body: fixtures.get(url.pathname) });
+  }
+  if (url.pathname.endsWith("/creator/works/qa-work/team")) {
+    requests.push({ method: request.method(), path: url.pathname });
+    assert.equal(request.method(), "GET");
+    return route.fulfill(revoked ? { status: 403, json: { message: "fixture ACL revoked" } } : { json: team() });
   }
   if (!url.pathname.includes("/studio-project-graph/")) {
     if (url.origin !== origin.origin) return route.abort();
@@ -84,8 +96,14 @@ await page.route("**/*", async (route) => {
     assert.equal(body.anchor.source.sourceContentDigest, subject.rootGraphHash);
     assert.equal(body.anchor.source.sourceServerRevision, 8);
     assert.equal(body.anchor.kind, "panel");
-    const created = { ...comment, ...body, reviewId: review.id, severity: "note" };
-    review.comments.push(created);
+    assert.deepEqual(body.assigneeIds, ["qa-editor", "reviewer"]);
+    assert.equal(body.dueAt, "2026-10-21T05:30:00.000Z");
+    assert.equal(body.severity, "required");
+    const prior = review.comments.find((item) => item.id === body.id);
+    if (prior) assert.deepEqual(mutations.at(-1).body, mutations[0].body, "An explicit retry must reuse the same semantic request");
+    const created = prior ?? { ...comment, ...body, reviewId: review.id };
+    if (!prior) { review.comments.push(created); review.openRequiredCommentCount++; }
+    if (loseFirstCommentResponse) { loseFirstCommentResponse = false; return route.abort("connectionreset"); }
     return route.fulfill({ json: { id: created.id, reviewId: created.reviewId, status: created.status, anchor: created.anchor, createdAt: created.createdAt } });
   }
   throw new Error(`Unexpected fixture request ${request.method()} ${suffix}`);
@@ -132,19 +150,55 @@ try {
   await placement.getByRole("combobox", { name: "연결할 컷" }).selectOption("cut-0-2");
   await placement.getByRole("button", { name: "이 위치에 의견 연결" }).click();
   await page.getByRole("textbox", { name: "이 버전에 의견 남기기" }).fill("두 번째 컷의 색상 대비를 확인했습니다.");
+  await page.getByRole("combobox", { name: "의견 유형" }).selectOption("required");
+  await page.getByRole("button", { name: "배정 가능한 팀원 확인" }).click();
+  await page.getByRole("checkbox", { name: "민서 · 감독" }).check();
+  await page.getByRole("checkbox", { name: "시나 · 원화" }).check();
+  assert.equal(await page.getByRole("checkbox", { name: "초대 관람객" }).count(), 0);
+  assert.equal(await page.getByRole("checkbox", { name: "미수락 초대" }).count(), 0);
+  await page.getByLabel("완료 기한", { exact: true }).fill("2026-10-21T14:30");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: path.join(output, "assignment-draft-mobile.png"), fullPage: true });
+  editorEligible = false;
+  await page.getByRole("button", { name: "의견 저장", exact: true }).click();
+  await page.getByText(/선택한 담당자의 현재 편집 권한을 확인/u).waitFor();
+  assert.equal(mutations.length, 0, "Revoked assignee must prevent the comment POST");
+  assert.equal(await page.getByRole("textbox", { name: "이 버전에 의견 남기기" }).inputValue(), "두 번째 컷의 색상 대비를 확인했습니다.");
+  assert.equal(await page.getByLabel("완료 기한", { exact: true }).inputValue(), "2026-10-21T14:30");
+  editorEligible = true;
+  await page.getByRole("button", { name: "의견 저장", exact: true }).click();
+  await page.getByText(/저장 결과를 확인하지 못했어요/u).waitFor();
+  assert.equal(mutations.length, 1, "An uncertain response must not auto-retry");
+  assert.equal(await page.getByLabel("완료 기한", { exact: true }).inputValue(), "2026-10-21T14:30");
   await page.getByRole("button", { name: "의견 저장", exact: true }).click();
   await page.waitForFunction(() => document.querySelector("textarea")?.value === "");
   await page.getByText("두 번째 컷의 색상 대비를 확인했습니다.", { exact: true }).first().waitFor();
-  assert.equal(mutations.length, 1);
+  assert.equal(mutations.length, 2);
+  assert.equal(review.comments.length, 2, "Two explicit attempts create exactly one new comment");
+  assert.deepEqual(mutations[1].body, mutations[0].body);
   assert.equal(project.artifacts[0].headRevisionId, "different-latest-head");
+  const savedNote = page.getByRole("article").filter({ hasText: "두 번째 컷의 색상 대비를 확인했습니다." });
+  await savedNote.getByText("담당자 · 시나 · 원화, 민서 · 감독", { exact: true }).waitFor();
+  assert.equal((await savedNote.textContent()).includes("qa-editor"), false);
+  const editorLink = savedNote.getByRole("link", { name: "편집기에서 의견 위치 확인" });
+  const editorUrl = new URL(await editorLink.getAttribute("href"), origin);
+  assert.equal(editorUrl.origin, origin.origin);
+  assert.equal(editorUrl.searchParams.get("reviewComment"), mutations[0].body.id);
+  assert.equal(editorUrl.searchParams.get("sharedReview"), subject.reviewId);
+  assert.equal(editorUrl.searchParams.get("revision"), subject.revisionId);
+  assert.equal(editorUrl.searchParams.get("digest"), subject.rootGraphHash);
+  assert.deepEqual([...editorUrl.searchParams.keys()].sort(), ["artifact", "digest", "graphProject", "reviewComment", "revision", "sharedReview"].sort());
+  await editorLink.focus();
+  assert.equal(await editorLink.evaluate((link) => link === document.activeElement), true);
   await page.screenshot({ path: path.join(output, "cut-note-mobile.png"), fullPage: true });
   revoked = true; await page.getByRole("button", { name: "검토 기록 새로 확인" }).click();
   await page.getByRole("alert").waitFor();
   assert.equal(await page.getByRole("img").count(), 0);
   assert.equal(await page.getByText(comment.body, { exact: true }).count(), 0);
-  assert.equal(mutations.length, 1); assert.deepEqual(errors, []);
+  assert.equal(mutations.length, 2); assert.deepEqual(errors, []);
   const report = { passed: true, scope: "real React, image decoding and client parsers with intercepted HTTP fixtures; synthetic QA panels, not production authentication or source-to-pixel equivalence",
     origin: origin.origin, expectedCwd, requestCount: requests.length, mutations, comparison: { base: subject, prior: priorSubject, independentPages: true, overlay: true },
+    assignment: { userIds: ["qa-editor", "reviewer"], dueAt: "2026-10-21T05:30:00.000Z", revokedAssigneePreventedPost: true, uncertainResponseExplicitRetry: true, uniqueCreatedComments: 1, currentAssigneeNames: true, identityOnlyEditorLink: true },
     sourcePageAndCutPreserved: true, differentEditableHeadPreserved: true, revokedPrivateContentRemoved: true, mobileWidth: 390, pageErrors: errors };
   await fs.writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2)); console.log(JSON.stringify(report));
 } catch (error) {

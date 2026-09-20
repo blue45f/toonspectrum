@@ -203,3 +203,25 @@ describe("production mode and broadcast authority", () => {
     expect(() => createStudioProductionWorkspaceInvalidation({ scopeKey: SCOPE, revision: -1, sourceClientId: "peer" })).toThrow();
   });
 });
+
+
+describe("saved review task locators", () => {
+  const reviewRef = { subject: { schemaVersion: 1, projectId: "graph", workId: "production-runtime-tests", artifactId: "artifact",
+    reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) }, commentId: "comment", handoffId: null };
+  it("preserves exact references in the current task and its version through serialization", () => {
+    const linked = { ...task, reviewRef };
+    const raw = stored({ tasks: [linked], versions: [{ id: "v1", name: "Linked request", createdAt: NOW, tasks: [linked], reviews: [] }] });
+    const parsed = parseProductionWorkspace(raw, SCOPE)!;
+    expect(parsed.tasks[0]!.reviewRef).toEqual(reviewRef);
+    expect(parsed.versions[0]!.tasks[0]!.reviewRef).toEqual(reviewRef);
+    expect(parseProductionWorkspace(serializeProductionWorkspace(parsed), SCOPE)).toEqual(parsed);
+  });
+  it("rejects foreign work, missing handoff and secret-bearing references without silently dropping them", () => {
+    for (const invalid of [null, { ...reviewRef, handoffId: "missing" }, { ...reviewRef, previewUrl: "https://private.example" },
+      { ...reviewRef, subject: { ...reviewRef.subject, workId: "other" } }]) {
+      expect(() => parseProductionWorkspace(stored({ tasks: [{ ...task, reviewRef: invalid }] }), SCOPE)).toThrow();
+      expect(() => parseProductionWorkspace(stored({ versions: [{ id: "v1", name: "Invalid", createdAt: NOW,
+        tasks: [{ ...task, reviewRef: invalid }], reviews: [] }] }), SCOPE)).toThrow();
+    }
+  });
+});

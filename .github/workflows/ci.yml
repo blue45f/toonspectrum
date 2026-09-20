@@ -200,7 +200,7 @@ jobs:
             !/tests/benchmarks/results/
       - name: Restore Virtual Studio art for foundation regressions
         if: matrix.shard == 'studio-foundation'
-        run: git sparse-checkout add /apps/web/public/assets/virtual-studio/production-v2/ /apps/web/public/assets/virtual-studio/living-world/ /apps/web/public/assets/virtual-studio/drawn-characters-v1/
+        run: git sparse-checkout add /apps/web/public/assets/virtual-studio/production-v2/ /apps/web/public/assets/virtual-studio/living-world/ /apps/web/public/assets/virtual-studio/drawn-characters-v1/ /apps/web/public/assets/virtual-studio/ambient-audio/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:

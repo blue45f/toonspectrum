@@ -114,3 +114,41 @@ describe("studio workspace continuity and safe recovery", () => {
     expect(nav("스튜디오").getAttribute("href")).toBe("/home?project=older");
   });
 });
+
+describe("workspace search switching integration", () => {
+  it("switches exact work in the same team category and Back returns without reopening the picker", () => {
+    render(<App entries={["/team?project=older&tab=recruit"]} />);
+    fireEvent.click(screen.getByRole("button", { name: "작품 찾아 전환" }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "newer" } });
+    fireEvent.click(screen.getByRole("button", { name: /작품 newer\s*작품 ID: newer/ }));
+    expect(screen.getByTestId("location").textContent).toBe("/team?project=newer&tab=recruit");
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "뒤로" }));
+    expect(screen.getByTestId("location").textContent).toBe("/team?project=older&tab=recruit");
+    expect(screen.queryByRole("searchbox")).toBeNull();
+  });
+  it("removes a deleted result while the picker is open instead of opening another work", () => {
+    const view = render(<App entries={["/home?project=older&panel=projects"]} />);
+    state.projects = state.projects.filter((project) => project.id !== "older"); view.rerender(<App />);
+    expect(document.querySelector('button[data-workspace-project="older"]')).toBeNull();
+    expect(document.querySelector('.workspace-statusbar strong')?.textContent).toBe("선택 작품 확인 필요");
+    expect(document.querySelector('.workspace-statusbar .workspace-primary')).toBeNull();
+    expect(screen.getByTestId("location").textContent).toBe("/home?project=older&panel=projects");
+    fireEvent.click(screen.getByRole("button", { name: /작품 newer\s*작품 ID: newer/ }));
+    expect(screen.getByTestId("location").textContent).toBe("/home?project=newer");
+  });
+  it("clears artwork identity only after explicitly selecting the personal workspace", () => {
+    render(<App entries={["/hub?project=older&tab=materials&panel=projects"]} />);
+    fireEvent.click(screen.getByRole("button", { name: /개인 작업실\s*작품을 선택하지 않고/ }));
+    expect(screen.getByTestId("location").textContent).toBe("/hub?tab=materials&scope=personal");
+    expect(nav("스튜디오").getAttribute("href")).toBe("/home?scope=personal");
+  });
+  it("does not mislabel a library failure as a personal workspace", () => {
+    state.error = "저장 공간 오류";
+    render(<App entries={["/home?project=older&panel=projects"]} />);
+    expect(document.querySelector('.workspace-statusbar strong')?.textContent).toBe("저장 공간 확인 필요");
+    expect(document.querySelectorAll('button[data-workspace-project]')).toHaveLength(0);
+    expect(screen.getByRole("searchbox").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("location").textContent).toBe("/home?project=older&panel=projects");
+  });
+});
