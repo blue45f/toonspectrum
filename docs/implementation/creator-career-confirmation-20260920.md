@@ -1,0 +1,74 @@
+# 경력 상대방 확인 구현 — 2026-09-20
+
+> Integration update: see `creator-platform-integration-20260920.md` for the later managed 0079/0080 integration and current verification. This document retains the earlier checkpoint evidence.
+
+상태: 기능 코드 구현 및 격리 검증. DB 통합 대기. 운영 미배포.
+
+브랜치: `feat/creator-career-confirmation-20260920`
+기준 커밋: `561daf1f9d56ec87c35534ba11daa197fd9a8a09`
+기준에는 기존 채용 구현 `f99f2a8db`와 main `9ceb6d9b2`가 포함되어 있다.
+
+자동 급구의 동시 작업이 발견되어 경력 확인만 별도 워크트리로 분리했다.
+기존 자동 급구 작업물과 다른 세션의 브러시·가상공간·3D 작업은 그대로 보존했다.
+이번 변경은 운영 배포나 운영 DB 적용을 포함하지 않는다.
+
+## 실제 연결한 기능
+
+1. 본인의 현재 경력 버전과 같은 팀의 현재 구성원을 선택한다.
+2. 서버가 해당 버전의 기여·기간·회차·작업 범위와 공유 링크를 미리 보여 준다.
+3. 작성자가 선택한 상대방에게 내용을 제공하는 데 동의한 뒤 요청한다.
+4. 상대방만 정확한 내용을 확인하거나 거절할 수 있다. 당사자는 확인을 철회할 수 있다.
+5. 받은 요청·보낸 요청을 페이지 단위로 조회하고, 상태 변경 후 서버 결과를 다시 확인한다.
+6. 공개 전시는 내용 지문이 일치하는 현재 확인 결과만 일괄 조회하여 표시한다.
+
+‘상대방 확인’은 팀원의 진술이다. 플랫폼의 신원·고용 검증, 지급 확인, 실력 평가 또는 채용 순위가 아니다. 팀 참여만으로 실제 제작 완료를 주장하지 않으며 비공개 경력을 자동 공개하지 않는다.
+
+## 상태와 개인정보 보호
+
+- 요청의 대상, 경력 버전, 원본 지문, 멤버십 리비전은 고정된다.
+- 자기 확인, 무관한 계정, 초대 대기·탈퇴·차단 관계를 거부한다.
+- 경력 수정·권리 철회·원본 및 계정 삭제·계정 정지·팀 관계 종료·차단 시 연결된 스냅샷을 무효화하고 정리한다.
+- 탈퇴 후 재가입하거나 차단을 해제해도 이전 확인이 되살아나지 않는다.
+- 공개 결과에는 비공개 요청 ID, 상대방 계정·팀 ID, 연락처 및 증빙 링크가 포함되지 않는다.
+- 요청과 응답은 중복 실행을 막는 영수증을 갖는다. 과거 영수증 재조회가 현재 확인을 복구하지는 않는다.
+- 확인은 요청일부터 30일간 유효하며 만료 판단은 DB 시각을 사용한다.
+- 공개 화면은 마지막 조회 시각을 표시한다. 보이는 화면에서 60초마다 재확인하며 숨김·포커스 이탈 시 기존 배지를 지운다. 서버의 무효화와 브라우저의 다음 조회는 구분한다.
+
+## 코드와 API
+
+- 서버: `apps/api/src/modules/recruitment/career-confirmation.*`
+- 전용 Nest 모듈은 `apps/api/src/app.module.ts`에서 조립한다. 자동 급구가 수정 중인 collaboration 모듈에는 추가 변경을 하지 않는다.
+- UI: `CareerConfirmationPanel.tsx`, `career-confirmation-public.tsx`, `use-career-public-confirmations.ts` 및 기존 `CreatorCareerPanel.tsx` 연결.
+- 공용 계약: `packages/contracts/src/creator-career-confirmation.ts`.
+- API 기본 경로: `/collaborations/career-confirmations`.
+- `GET /capability`, `GET /collaborators`, `POST /preview`, `GET /requests`, `POST /requests`, `POST /requests/:id/actions`, `POST /public-summaries`.
+- 기존 세션 인증·CSRF 경계를 유지한다. 비공개 응답은 `private, no-store`이며 공개 요약도 캐시하지 않는다.
+
+## DB 통합 게이트
+
+SQL은 `apps/api/src/db/migrations/pending/0080_creator_career_confirmation.sql`에 준비되어 있다.
+자동 급구의 0079가 다른 세션에서 통합 중이므로 번호 공백이나 가짜 0079를 만들지 않았다. 기존 0078의 내용을 변경하지 않았고, 정식 마이그레이션 목록은 이 브랜치에서 기존 78개를 유지한다.
+
+0079 통합 후 0080을 정식 경로로 이동하고, 승인된 실행기의 목록·권한·준비 상태 검증을 함께 연결해야 한다. 현재 pending SQL을 운영 적용된 것으로 해석하지 않는다.
+
+별도 `scripts/creator-career-confirmation-database-contract.mjs`가 최소 권한과 준비 상태 검증을 제공한다. 새 스키마가 없으면 새 확인 기능만 사용 불가로 응답하며 기존 경력·이력서·팀 기능은 유지된다. 런타임에는 스키마 생성 권한이나 감사 기록 변경·삭제 권한을 주지 않는다.
+
+## 검증 근거
+
+일반 루트 설정의 관련 단위·화면 검사에서 102개가 통과했다. 그 실행에서 건너뛴 네이티브 DB 검사 17개는 아래 별도 실환경 실행에서 모두 검사했다.
+
+격리된 PostgreSQL 17.10에서 새 경력 확인 17개, 기존 채용 14개, 실제 CSRF 통합 11개를 함께 실행하여 42개 모두 통과했다. 실패·건너뜀은 0개였다. 원본 스키마 전체 마이그레이션 체인이나 운영 환경을 검사한 결과는 아니다.
+
+최종 실행 파일: `career-confirmation-postgres.test.ts`, `hiring-postgres.test.ts`, `csrf-middleware.integration.test.ts`.
+실행 근거: `.qa/creator-platform/continuation-native-Z6jK0E/{result,tests}.json` (2026-09-20 03:57:47 UTC).
+검증용 DB와 서버는 해당 실행 후 종료했다.
+
+최종 소스에서 관련 단위·화면 테스트 102개를 다시 실행해 모두 통과했다(`.qa/creator-career/verified-unit.json`). 이후 배지가 다음 네트워크 조회 전에 만료 시각에 사라지는 테스트를 1개 추가하고 해당 파일 4개 테스트도 통과했다. 중복 실행을 제외하면 단위·화면 검증은 103개다.
+
+API 타입 검사 재실행과 변경 파일 린트, 아키텍처 경계 검사는 통과했다. 웹 전체 타입 검사는 별도 검증 게이트로 남아 있으며 완료되기 전에는 통과로 취급하지 않는다. 처음 발견한 상태값 타입 오류와 컨트롤러 생성자를 HTTP 핸들러로 잘못 포함한 테스트는 수정했다.
+
+## 원래 통합 설계에서 별도로 남은 범위
+
+이번 변경은 경력 상대방 확인의 추가 구현이며 전체 설계 완료 선언이 아니다. 자동 급구의 0079 통합, 실제 외부 음성·영상 제공자, 제작 RoleAssignment 활성화와 기존 버전 호환 점검, 상업 이용 조건이 확인된 운세 공급자, 이미지 원본 전시, 검증된 활동 적립은 별도 작업 또는 설정·출시 검증이 필요하다. 가상공간·아바타·브러시·3D의 다른 세션 작업을 이 변경의 완료 실적으로 포함하지 않는다.
+
+운영 배포, 운영 DB 마이그레이션, main 병합은 이 문서의 구현·테스트 결과와 별개다.

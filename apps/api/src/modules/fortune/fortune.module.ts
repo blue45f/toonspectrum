@@ -7,6 +7,7 @@ import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordina
 import { FortuneEnrichmentController } from "./fortune-enrichment.controller";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 import { fortuneEnrichmentConfig, FORTUNE_ENRICHMENT_CONFIG, FORTUNE_ENRICHMENT_RUNTIME } from "./fortune-enrichment.provider";
+import { FortuneProvenanceController } from "./fortune-provenance.controller";
 import { FortuneController } from "./fortune.controller";
 import { FortuneService } from "./fortune.service";
 
@@ -16,7 +17,7 @@ const coordination = enrichmentConfig.kasiEnabled || enrichmentConfig.horoscopeE
 
 @Module({
   imports: [MembershipWalletModule, ...(coordination ? [coordination] : [])],
-  controllers: [FortuneController, FortuneEnrichmentController],
+  controllers: [FortuneController, FortuneProvenanceController, FortuneEnrichmentController],
   providers: [FortuneService, FortuneEnrichmentService,
     { provide: FORTUNE_ENRICHMENT_CONFIG, useValue: enrichmentConfig },
     { provide: FORTUNE_ENRICHMENT_RUNTIME, useFactory: () => ({ fetch: globalThis.fetch.bind(globalThis), now: () => new Date() }) },
