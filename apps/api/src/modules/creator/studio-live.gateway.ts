@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { StudioLiveAcousticBinding, verifyLocalStudioAcousticBinding } from "./studio-live-acoustic-binding";
 import {
   Ack,
   ConnectedSocket,
@@ -238,10 +239,13 @@ export class StudioLiveGateway
     @Inject(StudioCrdtService)
     private readonly studioCrdtService: StudioCrdtService,
     @Inject(STUDIO_LIVE_LOCK_REPOSITORY)
-    private readonly studioLiveLockRepository: StudioLiveLockRepository
+    private readonly studioLiveLockRepository: StudioLiveLockRepository,
+    @Inject(StudioLiveAcousticBinding)
+    private readonly acousticBinding: StudioLiveAcousticBinding = new StudioLiveAcousticBinding()
   ) {}
 
   afterInit(server: Namespace): void {
+    this.acousticBinding.bind(server, (request) => verifyLocalStudioAcousticBinding(this as unknown as import("./studio-live-gateway-host").StudioLiveGatewayHost, request));
     this.interServerRelayTransport.bind(
       server as StudioLiveNamespace,
       (request) => this.receiveInterServerRelay(request)
@@ -278,6 +282,7 @@ export class StudioLiveGateway
   }
 
   onModuleDestroy(): void {
+    this.acousticBinding.onModuleDestroy();
     if (this.accessRecheckTimer) clearInterval(this.accessRecheckTimer);
     this.accessRecheckTimer = null;
     this.participantsBySocket.clear();

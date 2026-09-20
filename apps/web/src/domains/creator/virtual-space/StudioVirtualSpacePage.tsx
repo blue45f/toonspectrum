@@ -52,6 +52,9 @@ import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaboration
 import { useStudioLiveCollaboration } from "../live/studio-live-collaboration-context";
 import { openStudioP2pHuddle, closeStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpaceAmbientAudio } from "./StudioVirtualSpaceAmbientAudio";
+import { useStudioPrivateRoom } from "./private-room/use-studio-private-room";
+import { StudioPrivateRoomPanel } from "./private-room/StudioPrivateRoomPanel";
+import { studioPrivateRoomWalkTarget } from "./private-room/studio-private-room-walk";
 import { useStudioLiveTransportAuth } from "../live/use-studio-live-transport-auth";
 import {
   STUDIO_VIRTUAL_SPACE_AUTO_AVATAR,
@@ -88,9 +91,12 @@ import {
 import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 import {
   clearStudioWorldAuthoringDraft,
-  readStudioWorldAuthoringDraft,
+  readStudioWorldAuthoringDraftRecord,
+  writeStudioWorldAuthoringDraft,
 } from "./studio-virtual-space-world-authoring";
 import { StudioVirtualSpaceWorldAuthoringPanel } from "./StudioVirtualSpaceWorldAuthoringPanel";
+import { useStudioWorldPublication } from "./world-publication/use-studio-world-publication";
+import { StudioWorldPublicationPanel } from "./world-publication/StudioWorldPublicationPanel";
 import {
   DEFAULT_STUDIO_WORLD_MANIFEST,
   studioWorldPresenceState,
@@ -561,11 +567,13 @@ function LiveStudioTopbar({
   );
 }
 
-function VirtualSpaceExperience({
+export function VirtualSpaceExperience({
   projectId,
   preparing,
   signedIn,
+  publication,
 }: {
+  readonly publication: ReturnType<typeof useStudioWorldPublication>;
   readonly projectId: string;
   readonly preparing: boolean;
   readonly signedIn: boolean;
@@ -573,6 +581,10 @@ function VirtualSpaceExperience({
   const bt = useBilingual("StudioVirtualSpaceExperience");
   const location = useLocation();
   const authoringMode = new URLSearchParams(location.search).get("worldEdit") === "1";
+  const publishedWorld = publication.snapshot.active;
+  const publishedScope = publishedWorld?.scope;
+  const [draftBaseRevision, setDraftBaseRevision] = useState<string | null | undefined>(undefined);
+  const sharedWorldAllowed = !publication.enabled || (publication.snapshot.viewVerified && (Boolean(publishedWorld) || !publication.snapshot.hasPublishedWorld));
   const positionScope = useMemo(
     () => studioVirtualSpacePositionScope(projectId, authoringMode),
     [authoringMode, projectId],
@@ -580,6 +592,8 @@ function VirtualSpaceExperience({
   const positionScopeKey = studioVirtualSpacePositionStorageKey(positionScope);
   const navigate = useNavigate();
   const live = useStudioLiveCollaboration();
+  const privateActorId = useSession().data?.user?.id ?? null;
+  const [privateZoneSelection,setPrivateZoneSelection] = useState<string | null>(null);
   const connectivity = useSyncExternalStore(
     subscribeStudioConnectivity,
     getStudioConnectivitySnapshot,
@@ -696,17 +710,15 @@ function VirtualSpaceExperience({
     setWorldLoaded(false);
     setLoadedPositionScope(null);
     setWorldLoadError(false);
-    void loadStudioVirtualSpaceWorldManifest(
-      undefined,
-      undefined,
-      abortController.signal,
-    ).then((manifest) => {
+    void (publishedWorld ? Promise.resolve(publishedWorld.publication.manifest) : loadStudioVirtualSpaceWorldManifest(
+      undefined, undefined, abortController.signal,
+    )).then((manifest) => {
       if (abortController.signal.aborted) return;
       baselineWorldManifestRef.current = manifest;
-      const activeManifest = authoringMode
-        ? readStudioWorldAuthoringDraft(projectId) ?? manifest
-        : manifest;
-      const point = resolveStudioVirtualSpaceSessionPoint(
+      const storedDraft = authoringMode ? readStudioWorldAuthoringDraftRecord(projectId) : null;
+      const activeManifest = storedDraft?.manifest ?? manifest;
+      setDraftBaseRevision(storedDraft ? storedDraft.basePublishedRevisionId : publishedWorld?.publication.revisionId ?? null);
+      const point = publishedWorld ? resolveStudioWorldSpawn(activeManifest, studioWorldSpawn(activeManifest).point) : resolveStudioVirtualSpaceSessionPoint(
         positionScope,
         activeManifest,
         studioWorldSpawn(activeManifest).point,
@@ -727,7 +739,7 @@ function VirtualSpaceExperience({
       setWorldLoaded(true);
     });
     return () => abortController.abort();
-  }, [authoringMode, engineBridge, positionScope, positionScopeKey, projectId]);
+  }, [authoringMode, engineBridge, positionScope, positionScopeKey, projectId, publishedWorld]);
 
   const setFollowingPeer = useCallback((sessionId: string | null) => {
     engineBridge.setFollowingPeer(sessionId);
@@ -781,7 +793,8 @@ function VirtualSpaceExperience({
   const resetAuthoringManifest = useCallback(() => {
     clearStudioWorldAuthoringDraft(projectId);
     setAuthoringDraft(baselineWorldManifestRef.current);
-  }, [projectId]);
+    setDraftBaseRevision(publishedWorld?.publication.revisionId ?? null);
+  }, [projectId, publishedWorld]);
 
   useEffect(() => {
     if (!worldReady) return;
@@ -833,7 +846,7 @@ function VirtualSpaceExperience({
   useEffect(() => {
     const room = live.room;
     if (!worldReady) return;
-    if (authoringMode || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
+    if (authoringMode || !sharedWorldAllowed || !connectivity.serverAvailable || !room?.direct || live.availability !== "ready") {
       controllerRef.current?.close();
       controllerRef.current = null;
       setSnapshot((current) => ({
@@ -850,7 +863,7 @@ function VirtualSpaceExperience({
       room.participant,
       room.direct,
       selfRef.current,
-      { appearanceForAvatarIndex: studioCharacterAppearanceForAvatarIndex },
+      { appearanceForAvatarIndex: studioCharacterAppearanceForAvatarIndex, worldScope: publishedScope },
     );
     clearLocalReactionTimer();
     controllerRef.current = controller;
@@ -864,7 +877,7 @@ function VirtualSpaceExperience({
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [authoringMode, clearLocalReactionTimer, connectivity.serverAvailable, live.availability, live.room, worldReady]);
+  }, [authoringMode, clearLocalReactionTimer, connectivity.serverAvailable, live.availability, live.room, worldReady, publishedScope, sharedWorldAllowed]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -931,8 +944,8 @@ function VirtualSpaceExperience({
   }, [engineBridge, setFollowingPeer, worldReady]);
 
   const slots = useStudioVirtualSpaceSlots({
-    room: live.room, manifest: worldManifest,
-    enabled: signedIn && worldReady && !authoringMode && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
+    room: live.room, manifest: worldManifest, publishedScope,
+    enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     point: snapshot.self, moving,
     onApproach: (point) => { setFollowingPeer(null); engineBridge.requestMove(point); },
   });
@@ -1020,10 +1033,10 @@ function VirtualSpaceExperience({
     workId: projectId,
     participant: live.room?.participant,
     port: live.room?.direct,
-    manifest: worldManifest,
+    manifest: worldManifest, publishedScope,
     presence: snapshot,
     acousticBindingAvailable: worldReady && !authoringMode && snapshot.direct,
-    enabled: signedIn && worldReady && !authoringMode && snapshot.direct
+    enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && snapshot.direct
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     onAccepted: (request) => acceptedActivityHandler.current(request),
   });
@@ -1056,10 +1069,10 @@ function VirtualSpaceExperience({
     return () => { globalThis.removeEventListener("blur", suspend); document.removeEventListener("visibilitychange", visibility); };
   }, [finishSharedActivity]);
   const conversation = useStudioVirtualSpaceConversation({
-    participant: live.room?.participant, port: live.room?.direct, manifest: worldManifest,
+    participant: live.room?.participant, port: live.room?.direct, manifest: worldManifest, publishedScope,
     presence: snapshot,
     acousticBindingAvailable: worldReady && !authoringMode && snapshot.direct,
-    enabled: signedIn && worldReady && !authoringMode && snapshot.direct
+    enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && snapshot.direct
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     blockedPeerIds: socialSnapshot.blockedPeerIds,
     onReady: (scope) => {
@@ -1069,6 +1082,14 @@ function VirtualSpaceExperience({
       openStudioP2pHuddle({ conversationId: scope.id,
         peerIds: scope.memberIds.filter((id) => id !== live.room?.participant.sessionId), source: "virtual-space" });
     },
+  });
+  const privateZones = worldManifest.acousticZones?.filter(zone => Boolean(zone.doorId)) ?? [];
+  const privateZoneId = privateZones.find(zone=>zone.id===privateZoneSelection)?.id ?? privateZones[0]?.id ?? null;
+  const privateRoom = useStudioPrivateRoom({workId:projectId,actorId:privateActorId,
+    world:publishedWorld ? {worldId:publishedWorld.publication.manifest.id,revisionId:publishedWorld.publication.revisionId,contentHash:publishedWorld.publication.contentHash} : null,
+    zones:worldManifest.acousticZones??[],zoneId:privateZoneId,room:live.room,presence:snapshot,
+    enabled:signedIn&&worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus",
+    onConversation:()=>{finishSharedActivity();if(conversation.snapshot.active)conversation.leave(conversation.snapshot.active.id);},
   });
   const pairConversation = useMemo(() => sharedActivity?.action === "talk" && live.room?.participant
     ? { id: sharedActivity.id, memberIds: [live.room.participant.sessionId, sharedActivity.peer.sessionId].sort() }
@@ -1238,6 +1259,7 @@ function VirtualSpaceExperience({
               >
                 {worldReady ? <StudioVirtualSpacePhaserCanvas
                   manifest={worldManifest}
+                  worldAssetUrls={publishedWorld?.assetUrls}
                   snapshot={snapshot}
                   bridge={engineBridge}
                   selfIdentity={fallbackIdentity}
@@ -1369,6 +1391,8 @@ function VirtualSpaceExperience({
             {authoringMode && worldReady ? (
               <StudioVirtualSpaceWorldAuthoringPanel
                 projectId={projectId}
+                basePublishedRevisionId={draftBaseRevision}
+                disabled={publication.enabled && (["reading", "publishing", "preparing"].includes(publication.snapshot.phase) || !publication.snapshot.viewVerified)}
                 manifest={authoringDraft}
                 onChange={setAuthoringDraft}
                 onReset={resetAuthoringManifest}
@@ -1405,6 +1429,12 @@ function VirtualSpaceExperience({
               ))}
             </div> : null}
             </details>
+            <StudioWorldPublicationPanel publication={publication} draft={authoringMode ? authoringDraft : undefined} draftBaseRevision={draftBaseRevision}
+              onRebaseDraft={(revisionId) => { if (!writeStudioWorldAuthoringDraft(projectId, authoringDraft, revisionId)) return false;
+                setDraftBaseRevision(revisionId); return true; }}
+              onEdit={() => { const search = new URLSearchParams(location.search); search.set("worldEdit", "1"); navigate({ pathname: location.pathname, search: search.toString() }); }}
+              onApplied={() => { if (authoringMode) { const search = new URLSearchParams(location.search); search.delete("worldEdit");
+                navigate({ pathname: location.pathname, search: search.toString() }); } }} />
             {worldReady ? <StudioVirtualSpaceGuide manifest={worldManifest} onMove={queuePathTo} onOpen={activateAction}
               onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")}
               guideTour={guideTour} tourRequested={guideTourRequest !== null}
@@ -1426,8 +1456,17 @@ function VirtualSpaceExperience({
             {worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
               onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
+
+            <StudioPrivateRoomPanel key={`${privateActorId}:${projectId}:${publishedScope}:${privateZoneId}`} room={privateRoom}
+              zones={privateZones} zoneId={privateZoneId} onZone={setPrivateZoneSelection} peers={snapshot.peers}
+              onWalk={worldReady&&!authoringMode&&activity!=="focused"&&activity!=="away"&&atmosphere!=="focus"?()=>{
+                const target=privateZoneId?studioPrivateRoomWalkTarget(worldManifest,privateZoneId,snapshot.self):null;
+                if(!target)return false;queuePathTo(target);return true;
+              }:undefined}
+              labels={Object.fromEntries(privateZones.map(zone=>{const room=worldManifest.rooms.find(item=>item.id===zone.roomId);return [zone.id,room?bt(room.labelKo,room.labelEn):bt("비공개 방","Private room")];}))} />
           </div>
           <div hidden={workspacePanel !== "people"}>
+
             <StudioVirtualSpaceSocialPanel
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
@@ -1448,6 +1487,11 @@ function VirtualSpaceExperience({
               }}
               onCancel={cancelSocialRequest}
               onBlock={(id, blocked) => {
+                if(blocked){const privateConversation=privateRoom.snapshot.conversations.filter(record=>record.status!=="revoked")
+                  .sort((a,b)=>Number(b.status==="active")-Number(a.status==="active"))
+                  .find(record=>record.members.some(member=>member.binding.clientInstanceId===id));
+                  const member=privateConversation?.members.find(item=>item.binding.clientInstanceId===id);
+                  if(privateConversation&&member)void privateRoom.controller?.change(privateConversation.conversationId,"block",member.sessionEpoch);}
                 if (blocked) for (const record of conversation.snapshot.records) {
                   if (record.memberIds.includes(id)) conversation.leave(record.id);
                 }
@@ -1604,6 +1648,8 @@ export function StudioVirtualSpacePage() {
   const decodedProjectId = decodeProjectId(projectId);
   const session = useSession();
   const userId = session.data?.user.id ?? null;
+  const publication = useStudioWorldPublication(decodedProjectId, userId, session.ready && Boolean(userId)
+    && validProjectId(decodedProjectId) && !/^(?:virtual-demo|draft|local)(?:$|[:_-])/u.test(decodedProjectId));
   const transportFactory = useStudioLiveTransportAuth({
     authReady: session.ready,
     userId,
@@ -1645,7 +1691,8 @@ export function StudioVirtualSpacePage() {
       ephemeralOnly
     >
       <VirtualSpaceExperience
-        key={projectId}
+        key={JSON.stringify([projectId, userId, publication.snapshot.active?.scope ?? "bundled"])}
+        publication={publication}
         projectId={decodedProjectId}
         preparing={!session.ready || !transportFactory}
         signedIn={Boolean(session.data)}

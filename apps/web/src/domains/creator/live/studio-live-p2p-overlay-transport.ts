@@ -461,6 +461,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     return this.ready ? this.primary.authoritativeLockCapability ?? null : null;
   }
 
+  get acousticCoreBinding() {
+    return this.ready ? this.primary.acousticCoreBinding ?? null : null;
+  }
+
   acquireLock?(
     request: Parameters<NonNullable<StudioLiveTransport["acquireLock"]>>[0],
   ): ReturnType<NonNullable<StudioLiveTransport["acquireLock"]>> {

@@ -6,6 +6,8 @@ export interface StudioP2pHuddleOpenDetail {
   readonly peerIds?: readonly string[];
   readonly source?: "virtual-space" | "toolbar" | "unknown";
   readonly conversationId?: string;
+  /** Opaque local capability; never accepted from a network packet. */
+  readonly authorityToken?: string;
 }
 
 export interface StudioP2pHuddleCloseDetail { readonly conversationId?: string }
@@ -32,7 +34,8 @@ export function normalizeStudioP2pHuddleOpenDetail(detail: StudioP2pHuddleOpenDe
     !validConversationId(detail.conversationId) || !peerIds?.length
     || peerIds.length !== detail.peerIds?.length
   )) return null;
-  return { peerIds, conversationId: detail.conversationId, source: detail.source ?? "unknown" };
+  if (detail.authorityToken !== undefined && (!validConversationId(detail.authorityToken) || !detail.conversationId)) return null;
+  return { peerIds, conversationId: detail.conversationId, source: detail.source ?? "unknown", ...(detail.authorityToken ? {authorityToken:detail.authorityToken} : {}) };
 }
 
 export function openStudioP2pHuddle(detail: StudioP2pHuddleOpenDetail = {}): void {

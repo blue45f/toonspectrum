@@ -67,6 +67,7 @@ const CONTEXT: StudioLiveTransportContext = {
 
 class FakePrimaryTransport implements StudioLiveTransport {
   authoritativeLockCapability: "fenced-v2" | null = null;
+  acousticCoreBinding: StudioLiveTransport["acousticCoreBinding"] = null;
   readonly mode = "server" as const;
   readonly sent: StudioLiveEnvelope[] = [];
   readonly sentInk: StudioLiveInkWireMessage[] = [];
@@ -312,14 +313,19 @@ describe("Studio purpose-routed live transport", () => {
     const { primary, coordinator, transport } = harness();
     expect(transport.authoritativeLockCapability).toBeNull();
     await transport.connect(); coordinator.setReady("presence");
+    expect(transport.acousticCoreBinding).toBeNull();
+    primary.acousticCoreBinding = { connectionId: "core-socket", clientInstanceId: CONTEXT.participant.sessionId };
+    expect(transport.acousticCoreBinding).toEqual(primary.acousticCoreBinding);
     expect(transport.authoritativeLockCapability).toBeNull();
     primary.authoritativeLockCapability = "fenced-v2";
     expect(transport.authoritativeLockCapability).toBe("fenced-v2");
     primary.ready = false;
+    expect(transport.acousticCoreBinding).toBeNull();
     expect(transport.authoritativeLockCapability).toBeNull();
     primary.ready = true; primary.authoritativeLockCapability = null;
     expect(transport.authoritativeLockCapability).toBeNull();
     transport.close();
+    expect(transport.acousticCoreBinding).toBeNull();
   });
 
   it("routes only presence and screen signaling while CRDT, locks, and chat stay primary", async () => {

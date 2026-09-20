@@ -20,6 +20,7 @@ import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition
 import { STUDIO_LIVE_LOCK_LIMIT_PER_WORK } from "./studio-live-lock.repository";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
 import { StudioLiveSocketAuthService } from "./studio-live-socket-auth.service";
+import { StudioLiveAcousticBinding } from "./studio-live-acoustic-binding";
 import {
   STUDIO_LIVE_ADAPTER_DISCOVERY_TIMEOUT_MS,
   STUDIO_LIVE_MAX_CONNECTIONS_PER_USER,
@@ -457,6 +458,7 @@ function createHarness(
   const socketAuthentication = new StudioLiveSocketAuthService(authenticate, revalidate);
   const joinTransitions = new StudioLiveJoinTransitionSequencer();
   const roomTransitions = new StudioLiveRoomTransitionCoordinator();
+  const acousticBinding = new StudioLiveAcousticBinding();
   const gateway = new StudioLiveGateway(
     service as unknown as CreatorService,
     adapterCleanup,
@@ -467,7 +469,8 @@ function createHarness(
     roomTransitions,
     liveFeatures,
     crdtService as unknown as StudioCrdtService,
-    lockRepository
+    lockRepository,
+    acousticBinding
   );
   gateway.server = namespace as unknown as Namespace;
 
@@ -516,6 +519,7 @@ function createHarness(
     socketAuthentication,
     joinTransitions,
     roomTransitions,
+    acousticBinding,
     lockRepository,
     emissions,
     sockets,
@@ -1177,6 +1181,33 @@ describe("studio live protocol", () => {
 });
 
 describe("StudioLiveGateway", () => {
+  it("verifies acoustic bindings through actual joined local and remote Gateway authority",async()=>{
+    let allowed=true;
+    const first=createHarness(),second=createHarness(async(actor,work)=>teamSnapshot(actor,work,{view:allowed}));
+    const bus=connectFakeInterServerBus(first,second);
+    try{
+      const socket=second.socket("acoustic-member","valid:acoustic-actor");await connectAndJoin(second,socket);
+      const principal=privateAuthPrincipal(second,socket)!,identity={connectionId:socket.id,clientInstanceId:`client-${socket.id}`};
+      const local=await second.acousticBinding.verify(principal,"work-1",identity);
+      expect(local).toMatchObject(identity);expect(local?.joinedAt).toBeTruthy();
+      expect(await first.acousticBinding.verify(principal,"work-1",identity)).toEqual(local);
+      expect(await first.acousticBinding.verify({...principal,userId:"other"},"work-1",identity)).toBeNull();
+      expect(await first.acousticBinding.verify({...principal,sessionVersion:principal.sessionVersion+1},"work-1",identity)).toBeNull();
+      allowed=false;expect(await first.acousticBinding.verify(principal,"work-1",identity)).toBeNull();
+    }finally{bus.destroy();}
+  });
+  it("rejects stale acoustic ownership after an actual Gateway disconnect or room transition",async()=>{
+    const h=createHarness();h.gateway.afterInit(h.namespace as unknown as Namespace);
+    try{
+      const socket=h.socket("acoustic-transition");await connectAndJoin(h,socket);
+      const principal=privateAuthPrincipal(h,socket)!,identity={connectionId:socket.id,clientInstanceId:`client-${socket.id}`};
+      expect(await h.acousticBinding.verify(principal,"work-1",identity)).not.toBeNull();
+      await h.gateway.join(socket as never,{workId:"work-2",clientInstanceId:`client-${socket.id}`},undefined);
+      expect(await h.acousticBinding.verify(principal,"work-1",identity)).toBeNull();
+      await h.gateway.handleDisconnect(socket as never);
+      expect(await h.acousticBinding.verify(principal,"work-2",identity)).toBeNull();
+    }finally{h.gateway.onModuleDestroy();}
+  });
   it("publishes the exact comment invalidation through the adapter-backed work room", () => {
     const harness = createHarness();
     const change = {

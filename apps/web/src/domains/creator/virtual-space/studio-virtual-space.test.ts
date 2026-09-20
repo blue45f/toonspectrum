@@ -439,3 +439,20 @@ describe("Studio virtual space object interactions", () => {
     ).toBe("ai-producer-desk");
   });
 });
+
+
+describe("published world presence isolation", () => {
+  it("rejects legacy and another publication's position/reaction/leave while preserving bundled compatibility", () => {
+    const hub = new DirectHub(), scope = "a".repeat(64);
+    const scoped = new StudioVirtualSpacePresenceController(A, hub.port(A), { x: 40, y: 40 }, { worldScope: scope });
+    let peer = new StudioVirtualSpacePresenceController(B, hub.port(B), { x: 50, y: 50 });
+    scoped.start(); peer.start(); peer.sendReaction("wave");
+    expect(scoped.snapshot().peers).toHaveLength(0); expect(scoped.snapshot().peerReactions).toHaveLength(0); peer.close();
+    peer = new StudioVirtualSpacePresenceController(B, hub.port(B), { x: 50, y: 50 }, { worldScope: "b".repeat(64) });
+    peer.start(); expect(scoped.snapshot().peers).toHaveLength(0); peer.close();
+    peer = new StudioVirtualSpacePresenceController(B, hub.port(B), { x: 50, y: 50 }, { worldScope: scope });
+    peer.start(); peer.sendReaction("wave"); expect(scoped.snapshot().peers).toHaveLength(1); expect(scoped.snapshot().peerReactions).toHaveLength(1);
+    hub.port(B).send(A.sessionId, JSON.stringify({ wire: "toonspectrum-space-v1", kind: "leave", sequence: Number.MAX_SAFE_INTEGER, at: 1, worldScope: "b".repeat(64) }));
+    expect(scoped.snapshot().peers).toHaveLength(1); peer.close(); expect(scoped.snapshot().peers).toHaveLength(0); scoped.close();
+  });
+});

@@ -245,6 +245,10 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     return this.ready ? this.primary.authoritativeLockCapability ?? null : null;
   }
 
+  get acousticCoreBinding() {
+    return this.ready ? this.primary.acousticCoreBinding ?? null : null;
+  }
+
   /**
    * Binary lane negotiation is owned by the authority transport. The provider routing table
    * (presence / comments / screen-signaling) has no ink workload or capability in protocol v1,

@@ -89,6 +89,8 @@ export interface StudioVirtualSpaceEngineLocalState {
 
 export interface StudioVirtualSpacePhaserCanvasProps {
   readonly manifest: StudioVirtualSpaceWorldManifest;
+  /** Decoded publication bytes, owned and disposed by the publication controller. */
+  readonly worldAssetUrls?: ReadonlyMap<string, string>;
   readonly snapshot: StudioVirtualSpaceSnapshot;
   readonly bridge: StudioVirtualSpaceEngineBridge;
   readonly selfIdentity?: string;
@@ -188,6 +190,7 @@ function nearestInteraction(
 
 export function StudioVirtualSpacePhaserCanvas({
   manifest,
+  worldAssetUrls,
   snapshot,
   bridge,
   selfIdentity = "local",
@@ -598,7 +601,7 @@ export function StudioVirtualSpacePhaserCanvas({
 
       scene.preload = function preload() {
         this.load.on("loaderror", (file: import("phaser").Loader.File) => failedTextures.add(file.key));
-        this.load.image(backgroundTextureKey, manifest.backgroundUrl);
+        this.load.image(backgroundTextureKey, worldAssetUrls?.get(manifest.backgroundUrl) ?? manifest.backgroundUrl);
 
         // Ready means the world and a safe actor frame exist, not that every clip has downloaded.
         for (const asset of new Map([fallbackAsset, bootSelfAsset].map((item) => [item.key, item])).values()) {
@@ -611,7 +614,7 @@ export function StudioVirtualSpacePhaserCanvas({
           const key = propTextureKey(prop);
           if (loadedProps.has(key)) continue;
           loadedProps.add(key);
-          this.load.image(key, prop.assetUrl);
+          this.load.image(key, worldAssetUrls?.get(prop.assetUrl) ?? prop.assetUrl);
         }
       };
 
@@ -1311,7 +1314,7 @@ export function StudioVirtualSpacePhaserCanvas({
       game?.destroy(true);
       mount.remove();
     };
-  }, [attempt, bridge, debugWorld, manifest, renderer]);
+  }, [attempt, bridge, debugWorld, manifest, renderer, worldAssetUrls]);
 
   return (
     <div
