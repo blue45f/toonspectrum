@@ -70,6 +70,31 @@ describe("server review completion transaction", () => {
     const f = fixture(); await f.repository.complete("actor", "work", f.taskId, await f.input()); f.state.resolutionAt = "2026-09-20T00:00:00.000002Z";
     expect((await f.repository.read("actor", "work", f.taskId)).evidence?.current).toBe(false);
   });
+  it("marks completion historical after its stable node changes source page, including return to the old binding", async () => {
+    const f = fixture();
+    f.state.document.hierarchy.push(
+      { id: "sequence", kind: "sequence", parentId: "episode", title: "Sequence", order: 0, pageId: null },
+      { id: "scene", kind: "scene", parentId: "sequence", title: "Scene", order: 0, pageId: null },
+      { id: "page-node", kind: "page", parentId: "scene", title: "Page", order: 0, pageId: "source-page-A" },
+    );
+    f.state.document.tasks[0]!.hierarchyNodeId = "page-node";
+    f.state.document.handoffs[0]!.hierarchyNodeId = "page-node";
+    const input = await f.input();
+    const completed = await f.repository.complete("actor", "work", f.taskId, input);
+    f.state.document.hierarchy.find((node) => node.id === "page-node")!.pageId = "source-page-B";
+    f.state.document.revision = ++f.state.revision;
+    const changed = await f.repository.read("actor", "work", f.taskId);
+    expect(changed.proofDigest).not.toBe(completed.proofDigest);
+    expect(changed.evidence).toEqual({ receipt: completed.evidence!.receipt, current: false });
+    // The workspace save keeps this invalidation even after the page binding returns.
+    f.state.invalidated = true;
+    f.state.document.hierarchy.find((node) => node.id === "page-node")!.pageId = "source-page-A";
+    f.state.document.revision = ++f.state.revision;
+    const replay = await f.repository.complete("actor", "work", f.taskId, input);
+    expect(replay.proofDigest).toBe(completed.proofDigest);
+    expect(replay.evidence).toEqual({ receipt: completed.evidence!.receipt, current: false });
+    expect(f.state.writes).toBe(1);
+  });
   it.each(["viewer", "revoked", "unresolved", "criteria", "CAS", "capture"])("rejects %s before any workspace write", async (failure) => {
     const f = fixture(), input = await f.input();
     if (failure === "viewer") f.state.role = "viewer";

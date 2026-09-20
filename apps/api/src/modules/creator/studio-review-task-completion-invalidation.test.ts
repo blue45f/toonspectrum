@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { studioReviewTaskCompletionReceiptSchema } from "@toonspectrum/studio-project-model";
 import { StudioProductionWorkspaceDocumentSchema } from "./studio-production.dto";
-import { studioReviewTaskCompletionChangedTasks, studioReviewTaskCompletionFingerprint, studioReviewTaskCompletionInvalidations } from "./studio-review-task-completion-invalidation";
+import { studioReviewTaskCompletionBasis, studioReviewTaskCompletionChangedTasks, studioReviewTaskCompletionFingerprint, studioReviewTaskCompletionInvalidations } from "./studio-review-task-completion-invalidation";
 
 function fixture() {
   const reference = { subject: { schemaVersion: 1 as const, projectId: "project", workId: "work", artifactId: "artifact", reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) }, commentId: "comment", handoffId: "handoff" };
@@ -15,6 +15,18 @@ function fixture() {
     tasks: [task, { ...task, id: "other", reviewRef: undefined }], reviews: [], hierarchy: [{ id: "episode", kind: "episode", parentId: null, title: "Episode", order: 0, pageId: null }], roleAssignments: [],
     handoffs: [{ id: "handoff", hierarchyNodeId: "episode", fromRole: "story", toRole: "lineart", status: "ready", scenePurpose: "", emotionalBeat: "", mustShow: [], continuityNotes: [], lockedFields: [], acceptanceCriteria: ["A"], createdBy: "", assignedTo: "", updatedAt: at }], versions: [], slides: [], members: [], inviteToken: null });
   return { receipt, document };
+}
+
+function pageFixture() {
+  const { receipt, document } = fixture();
+  document.hierarchy.push(
+    { id: "sequence", kind: "sequence", parentId: "episode", title: "Sequence", order: 0, pageId: null },
+    { id: "scene", kind: "scene", parentId: "sequence", title: "Scene", order: 0, pageId: null },
+    { id: "page-node", kind: "page", parentId: "scene", title: "Page", order: 0, pageId: "source-page-A" },
+  );
+  document.tasks[0]!.hierarchyNodeId = "page-node";
+  document.handoffs[0]!.hierarchyNodeId = "page-node";
+  return { receipt, document: StudioProductionWorkspaceDocumentSchema.parse(document) };
 }
 describe("server completion invalidation", () => {
   it("keeps unrelated tasks, workspace names and completed task title edits out of receipt reads", () => {
@@ -52,6 +64,38 @@ describe("server completion invalidation", () => {
     next.hierarchy[1]!.parentId = "episode-other";
     expect(studioReviewTaskCompletionChangedTasks(document, next)).toEqual(["task"]);
     expect(studioReviewTaskCompletionInvalidations(document, next, [receipt])).toHaveLength(1);
+  });
+  it("invalidates a changed source page behind the same task and handoff scope IDs", () => {
+    const { document, receipt } = pageFixture(); const next = structuredClone(document); next.revision++;
+    next.hierarchy.find((node) => node.id === "page-node")!.pageId = "source-page-B";
+    const parsed = StudioProductionWorkspaceDocumentSchema.parse(next);
+    expect(studioReviewTaskCompletionBasis(parsed, "task")).not.toEqual(studioReviewTaskCompletionBasis(document, "task"));
+    expect(studioReviewTaskCompletionChangedTasks(document, parsed)).toEqual(["task"]);
+    expect(studioReviewTaskCompletionInvalidations(document, parsed, [receipt])).toEqual([
+      expect.objectContaining({ taskId: "task", completionFingerprint: studioReviewTaskCompletionFingerprint(receipt), workspaceRevision: parsed.revision }),
+    ]);
+  });
+  it("keeps page binding A -> B -> A invalidated without replacing its original receipt", () => {
+    const { document, receipt } = pageFixture(); const originalReceipt = structuredClone(receipt);
+    const b = structuredClone(document); b.revision++;
+    b.hierarchy.find((node) => node.id === "page-node")!.pageId = "source-page-B";
+    const a = structuredClone(document); a.revision += 2;
+    const invalidations = [...studioReviewTaskCompletionInvalidations(document, b, [receipt]), ...studioReviewTaskCompletionInvalidations(b, a, [receipt])];
+    expect(studioReviewTaskCompletionBasis(a, "task")).toEqual(studioReviewTaskCompletionBasis(document, "task"));
+    expect(invalidations).toHaveLength(2);
+    expect(invalidations.map((item) => item.workspaceRevision)).toEqual([b.revision, a.revision]);
+    expect(invalidations.every((item) => item.completionFingerprint === studioReviewTaskCompletionFingerprint(receipt))).toBe(true);
+    expect(receipt).toEqual(originalReceipt);
+  });
+  it("preserves a page-scoped completion after hierarchy labels, order and unrelated task edits", () => {
+    const { document, receipt } = pageFixture(); const next = structuredClone(document); next.revision++;
+    next.hierarchy.forEach((node) => { node.title = `Renamed ${node.id}`; node.order += 1; });
+    next.title = "Renamed work"; next.tasks[0]!.title = "Renamed completed task";
+    next.tasks[1]!.status = "doing"; next.tasks[1]!.progress = 15; next.tasks[1]!.hierarchyNodeId = "page-node";
+    const parsed = StudioProductionWorkspaceDocumentSchema.parse(next);
+    expect(studioReviewTaskCompletionBasis(parsed, "task")).toEqual(studioReviewTaskCompletionBasis(document, "task"));
+    expect(studioReviewTaskCompletionChangedTasks(document, parsed)).toEqual([]);
+    expect(studioReviewTaskCompletionInvalidations(document, parsed, [receipt])).toEqual([]);
   });
   it("rejects completion evidence in a generic workspace document and client-supplied completion actors", async () => {
     const { document, receipt } = fixture();

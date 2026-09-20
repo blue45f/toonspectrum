@@ -6,9 +6,16 @@ export const studioReviewTaskCompletionFingerprint = (value: unknown) => createH
 
 /** Only fields that change the completed obligation invalidate its evidence. Labels and
  * unrelated tasks are not grounds to ask someone to repeat their confirmation. */
-function lineage(document: StudioProductionWorkspaceDocument, id: string | null): readonly string[] {
-  const result: string[] = [];
-  while (id !== null && !result.includes(id)) { result.push(id); id = document.hierarchy.find((node) => node.id === id)?.parentId ?? null; }
+function lineage(document: StudioProductionWorkspaceDocument, id: string | null) {
+  const result: { id: string; kind: StudioProductionWorkspaceDocument["hierarchy"][number]["kind"] | null; pageId: string | null }[] = [];
+  const visited = new Set<string>();
+  while (id !== null && !visited.has(id)) {
+    visited.add(id);
+    const node = document.hierarchy.find((candidate) => candidate.id === id);
+    // A stable production node can be rebound to a different source page.
+    result.push({ id, kind: node?.kind ?? null, pageId: node?.pageId ?? null });
+    id = node?.parentId ?? null;
+  }
   return result;
 }
 export function studioReviewTaskCompletionBasis(document: StudioProductionWorkspaceDocument, taskId: string) {
