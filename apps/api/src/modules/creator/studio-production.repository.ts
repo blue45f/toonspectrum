@@ -10,6 +10,12 @@ import {
   creatorWorkReviewLinks,
   creatorWorks,
   db,
+  studioArtifacts,
+  studioProjectGraphs,
+  studioRevisions,
+  studioReviewComments,
+  studioReviewCommentAssignees,
+  studioReviews,
   users,
 } from "../../db";
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
@@ -17,6 +23,7 @@ import {
   StudioPersonalKitDocumentSchema,
   StudioProductionWorkspaceDocumentSchema,
 } from "./studio-production.dto";
+import { StudioProductionReviewReferenceError, validateStudioProductionReviewChanges } from "./studio-production-review-reference";
 
 import type { CreatorCollaborationAccess } from "./creator-collaboration.policy";
 import type {
@@ -26,6 +33,8 @@ import type {
   StudioReviewFeedbackInput,
   StudioReviewLinkRole,
 } from "./studio-production.dto";
+
+export { StudioProductionReviewReferenceError } from "./studio-production-review-reference";
 
 export const STUDIO_PRODUCTION_REPOSITORY = Symbol("STUDIO_PRODUCTION_REPOSITORY");
 const MAX_ACTIVE_REVIEW_LINKS = 50;
@@ -447,6 +456,10 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
       if (currentRevision !== baseRevision) {
         throw new StudioProductionRevisionConflictError(currentRevision);
       }
+      if ([...document.tasks, ...document.versions.flatMap((version) => version.tasks)]
+        .some((task) => task.reviewRef && task.reviewRef.subject.workId !== workId)) {
+        throw new StudioProductionReviewReferenceError("reference");
+      }
       const now = this.now();
       const nextRevision = currentRevision + 1;
       const canonical = StudioProductionWorkspaceDocumentSchema.parse({
@@ -463,6 +476,34 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
         const protectedOperation = protectedProductionOperation(currentDocument, canonical);
         if (protectedOperation) throw new StudioProductionForbiddenError(protectedOperation);
       }
+      await validateStudioProductionReviewChanges(currentDocument, canonical, {
+        readReference: async (reference) => {
+          const pin = reference.subject;
+          const rows = await transaction.select({ id: studioReviewComments.id })
+            .from(studioReviewComments)
+            .innerJoin(studioReviews, eq(studioReviewComments.reviewId, studioReviews.id))
+            .innerJoin(studioRevisions, and(eq(studioReviews.revisionId, studioRevisions.id), eq(studioReviews.artifactId, studioRevisions.artifactId)))
+            .innerJoin(studioArtifacts, eq(studioRevisions.artifactId, studioArtifacts.id))
+            .innerJoin(studioProjectGraphs, eq(studioArtifacts.projectId, studioProjectGraphs.id))
+            .where(and(eq(studioProjectGraphs.workId, workId), eq(studioProjectGraphs.id, pin.projectId),
+              eq(studioArtifacts.id, pin.artifactId), eq(studioReviews.id, pin.reviewId),
+              eq(studioRevisions.id, pin.revisionId), eq(studioRevisions.kind, "review-snapshot"),
+              eq(studioRevisions.rootGraphHash, pin.rootGraphHash), eq(studioReviewComments.id, reference.commentId),
+              sql`${studioReviewComments.anchor}->>'artifactId' = ${pin.artifactId}`,
+              sql`${studioReviewComments.anchor}->>'revisionId' = ${pin.revisionId}`))
+            .limit(1).for("share", { of: [studioReviewComments, studioReviews, studioRevisions, studioArtifacts, studioProjectGraphs] });
+          if (!rows.length) return null;
+          const assignees = await transaction.select({ userId: studioReviewCommentAssignees.assigneeUserId })
+            .from(studioReviewCommentAssignees).where(eq(studioReviewCommentAssignees.commentId, reference.commentId)).for("share");
+          return assignees.map((row) => row.userId);
+        },
+        readEligibleUserIds: async () => {
+          const members = await transaction.select({ userId: creatorWorkCollaborators.userId })
+            .from(creatorWorkCollaborators).where(and(eq(creatorWorkCollaborators.workId, workId),
+              eq(creatorWorkCollaborators.status, "active"), sql`${creatorWorkCollaborators.role} IN ('admin', 'editor')`)).for("share");
+          return [context.ownerUserId, ...members.map((member) => member.userId)];
+        },
+      });
       await transaction
         .insert(creatorWorkProductionWorkspaces)
         .values({

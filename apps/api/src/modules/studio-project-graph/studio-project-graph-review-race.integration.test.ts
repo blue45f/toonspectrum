@@ -6,6 +6,8 @@ import type * as DatabaseRuntime from "../../db";
 import type { CreateStudioReviewComment } from "./studio-project-graph.dto";
 import { CreateStudioReviewCommentSchema } from "./studio-project-graph.dto";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
+import type { DrizzleStudioProductionRepository } from "../creator/studio-production.repository";
+import type { StudioProductionWorkspaceDocument } from "../creator/studio-production.dto";
 
 const databaseUrl = process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
 if (process.env.CI && !databaseUrl) throw new Error("CI must provide STUDIO_LIVE_POSTGRES_INTEGRATION_URL for review decision races");
@@ -15,6 +17,7 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
   let pool: Pool;
   let database: typeof DatabaseRuntime;
   let graph: StudioProjectGraphRepository;
+  let production: DrizzleStudioProductionRepository;
   const users: string[] = [];
   const works: string[] = [];
   const applicationName = `review-race-${randomUUID()}`;
@@ -28,6 +31,7 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     database = await import("../../db");
     const module = await import("./studio-project-graph.repository");
     graph = new module.StudioProjectGraphRepository();
+    production = new (await import("../creator/studio-production.repository")).DrizzleStudioProductionRepository();
     const triggers = await pool.query<{ count: string }>(`SELECT count(*)::text FROM pg_trigger
       WHERE tgname IN ('studio_revision_topology_revision','studio_review_snapshot_check','studio_review_reviewer_check') AND tgenabled <> 'D'`);
     expect(Number(triggers.rows[0]?.count)).toBe(3);
@@ -101,6 +105,150 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
       VALUES ($1,$2,$3,$4,$5,CASE WHEN $4='pending' THEN NULL ELSE now() END)`, [workId, userId, role, status, randomUUID()]);
     return userId;
   }
+  async function productionFixture() {
+    const f = await fixture(), editor = await member(f.workId, "editor");
+    const comment = { ...f.input(), assigneeIds: [editor] };
+    await graph.createReviewComment(f.actor, f.reviewId, comment);
+    const empty = await production.getWorkspace(f.actor, f.workId);
+    const document: StudioProductionWorkspaceDocument = { ...empty.document,
+      hierarchy: [
+        { id: "episode", parentId: null, kind: "episode", title: "Episode", order: 0, pageId: null },
+        { id: "sequence", parentId: "episode", kind: "sequence", title: "Sequence", order: 0, pageId: null },
+        { id: "scene", parentId: "sequence", kind: "scene", title: "Scene", order: 0, pageId: null },
+        { id: "other-scene", parentId: "sequence", kind: "scene", title: "Other scene", order: 1, pageId: null },
+        { id: "page", parentId: "scene", kind: "page", title: "Page", order: 0, pageId: "source-page" },
+      ], roleAssignments: [
+        { id: "role-editor", memberId: editor, displayName: "Editor", roles: ["lineart"], hierarchyNodeId: null },
+        { id: "role-owner", memberId: f.actor, displayName: "Owner", roles: ["director"], hierarchyNodeId: null },
+        { id: "role-ancestor", memberId: editor, displayName: "Episode editor", roles: ["lineart"], hierarchyNodeId: "episode" },
+        { id: "role-same", memberId: editor, displayName: "Scene editor", roles: ["lineart"], hierarchyNodeId: "scene" },
+        { id: "role-sibling", memberId: editor, displayName: "Other scene editor", roles: ["lineart"], hierarchyNodeId: "other-scene" },
+        { id: "role-child", memberId: editor, displayName: "Page editor", roles: ["lineart"], hierarchyNodeId: "page" },
+      ], tasks: [{ id: "task", title: "Correct panel", owner: "Editor", due: "2026-10-21", progress: 0, status: "todo", stage: "lineart",
+        priority: "normal", role: "lineart", hierarchyNodeId: "scene", dependencyIds: [], assigneeIds: ["role-editor"], reviewerIds: [], blockedReason: "" }] };
+    const current = await production.saveWorkspace(f.actor, f.workId, 0, document);
+    const reference = { subject: { schemaVersion: 1 as const, workId: f.workId, projectId: f.projectId, artifactId: f.artifactId,
+      reviewId: f.reviewId, revisionId: f.snapshotId, rootGraphHash: "a".repeat(64) }, commentId: comment.id, handoffId: null };
+    const linked = (): StudioProductionWorkspaceDocument => ({ ...structuredClone(current.document),
+      tasks: [{ ...current.document.tasks[0]!, reviewRef: structuredClone(reference) }] });
+    return { ...f, editor, comment, current, reference, linked };
+  }
+
+  it("binds a production task to the actual pinned comment, retaining existing extra roles and exact read permissions", async () => {
+    const f = await productionFixture(); const next = f.linked(); next.tasks[0]!.assigneeIds.push("role-owner");
+    const saved = await production.saveWorkspace(f.editor, f.workId, f.current.revision, next);
+    expect(saved.revision).toBe(2); expect(saved.document.tasks[0]?.reviewRef).toEqual(f.reference);
+    expect(saved.document.tasks[0]?.assigneeIds).toEqual(["role-editor", "role-owner"]);
+    const viewer = await member(f.workId, "viewer");
+    expect((await production.getWorkspace(viewer, f.workId)).document.tasks[0]?.reviewRef).toEqual(f.reference);
+    await expect(production.saveWorkspace(viewer, f.workId, saved.revision, saved.document)).rejects.toMatchObject({ name: "StudioProductionForbiddenError" });
+    const other = await fixture(); await expect(production.getWorkspace(other.actor, f.workId)).rejects.toMatchObject({ name: "StudioProductionForbiddenError" });
+  });
+
+  it.each(["projectId", "artifactId", "reviewId", "revisionId", "rootGraphHash", "commentId", "workId"] as const)("rejects a forged review %s before changing production state", async (field) => {
+    const f = await productionFixture(), next = f.linked();
+    if (field === "commentId") next.tasks[0]!.reviewRef!.commentId = randomUUID();
+    else next.tasks[0]!.reviewRef!.subject[field] = field === "rootGraphHash" ? "b".repeat(64) : randomUUID();
+    await expect(production.saveWorkspace(f.actor, f.workId, 1, next)).rejects.toMatchObject({ name: "StudioProductionReviewReferenceError", reason: "reference" });
+    expect((await production.getWorkspace(f.actor, f.workId)).revision).toBe(1);
+  });
+
+  it("does not accept another real work's graph/review/comment under an editable work's locator", async () => {
+    const f = await productionFixture(), other = await productionFixture(), next = f.linked();
+    next.tasks[0]!.reviewRef = { ...other.reference, subject: { ...other.reference.subject, workId: f.workId } };
+    await expect(production.saveWorkspace(f.actor, f.workId, 1, next)).rejects.toMatchObject({ reason: "reference" });
+  });
+
+  it.each(["role-editor", "role-ancestor", "role-same"])("accepts the explicit %s role in global/ancestor/same task scope", async (roleId) => {
+    const f = await productionFixture(), next = f.linked(); next.tasks[0]!.assigneeIds = [roleId];
+    expect((await production.saveWorkspace(f.actor, f.workId, 1, next)).document.tasks[0]?.assigneeIds).toEqual([roleId]);
+  });
+
+  it.each(["legacy-user", "missing-user-binding", "role-sibling", "role-child", "uncovered-comment"])("rejects a new link with %s role mapping", async (kind) => {
+    const f = await productionFixture(), next = f.linked();
+    if (kind === "legacy-user") next.tasks[0]!.assigneeIds = [f.editor];
+    else if (kind === "missing-user-binding") next.roleAssignments[0]!.memberId = null;
+    else if (kind === "uncovered-comment") next.tasks[0]!.assigneeIds = ["role-owner"];
+    else next.tasks[0]!.assigneeIds = [kind];
+    await expect(production.saveWorkspace(f.actor, f.workId, 1, next)).rejects.toMatchObject({ reason: "assignees" });
+    expect((await production.getWorkspace(f.actor, f.workId)).revision).toBe(1);
+  });
+
+  it.each(["viewer", "pending", "removed"])("rejects new assignment after the comment assignee becomes %s", async (kind) => {
+    const f = await productionFixture();
+    if (kind === "removed") await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2', [f.workId, f.editor]);
+    else await pool.query(`UPDATE creator_work_collaborator SET role=$3,status=$4,"respondedAt"=CASE WHEN $4='pending' THEN NULL ELSE now() END
+      WHERE "workId"=$1 AND "userId"=$2`, [f.workId, f.editor, kind === "viewer" ? "viewer" : "editor", kind === "pending" ? "pending" : "active"]);
+    await expect(production.saveWorkspace(f.actor, f.workId, 1, f.linked())).rejects.toMatchObject({ reason: "assignees" });
+  });
+
+  it("retains historical references and ordinary task edits after membership revocation, but requires fresh permission for reassignment", async () => {
+    const f = await productionFixture(); const linked = f.linked(); linked.tasks[0]!.assigneeIds = ["role-editor", "role-owner"];
+    const saved = await production.saveWorkspace(f.actor, f.workId, 1, linked);
+    await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2', [f.workId, f.editor]);
+    const next = structuredClone(saved.document); next.tasks[0]!.title = "Completed correction"; next.tasks[0]!.status = "done"; next.tasks[0]!.assigneeIds.reverse();
+    next.versions = [{ id: "history", name: "Original link", createdAt: new Date().toISOString(), tasks: saved.document.tasks,
+      reviews: saved.document.reviews, hierarchy: saved.document.hierarchy, roleAssignments: saved.document.roleAssignments, handoffs: saved.document.handoffs }];
+    const updated = await production.saveWorkspace(f.actor, f.workId, 2, next);
+    expect(updated.document.tasks[0]?.reviewRef).toEqual(f.reference); expect(updated.document.versions[0]?.tasks[0]?.reviewRef).toEqual(f.reference);
+    const reassigned = structuredClone(updated.document); reassigned.tasks[0]!.assigneeIds = ["role-owner"];
+    await expect(production.saveWorkspace(f.actor, f.workId, 3, reassigned)).rejects.toMatchObject({ reason: "assignees" });
+    const rebound = structuredClone(updated.document); rebound.roleAssignments[0]!.memberId = f.actor;
+    await expect(production.saveWorkspace(f.actor, f.workId, 3, rebound)).rejects.toMatchObject({ reason: "assignees" });
+  });
+
+  it("validates a new reference hidden only in a version without rejecting ordinary legacy user-ID tasks", async () => {
+    const f = await productionFixture(), legacy = structuredClone(f.current.document); legacy.tasks[0]!.assigneeIds = [f.editor];
+    const saved = await production.saveWorkspace(f.actor, f.workId, 1, legacy); expect(saved.document.tasks[0]?.assigneeIds).toEqual([f.editor]);
+    const forged = structuredClone(saved.document), task = f.linked().tasks[0]!; task.reviewRef!.commentId = randomUUID();
+    forged.versions = [{ id: "forged", name: "Unverified history", createdAt: new Date().toISOString(), tasks: [task], reviews: [], hierarchy: forged.hierarchy,
+      roleAssignments: forged.roleAssignments, handoffs: [] }];
+    await expect(production.saveWorkspace(f.actor, f.workId, 2, forged)).rejects.toMatchObject({ reason: "reference" });
+  });
+
+  it("revalidates scope changes behind an existing role ID and requires approval authority independently of the review link", async () => {
+    const f = await productionFixture(); const saved = await production.saveWorkspace(f.actor, f.workId, 1, f.linked());
+    const moved = structuredClone(saved.document); moved.roleAssignments[0]!.hierarchyNodeId = "other-scene";
+    await expect(production.saveWorkspace(f.actor, f.workId, 2, moved)).rejects.toMatchObject({ reason: "assignees" });
+    const approved = structuredClone(saved.document); approved.tasks[0]!.stage = "approved";
+    await expect(production.saveWorkspace(f.editor, f.workId, 2, approved)).rejects.toMatchObject({ name: "StudioProductionForbiddenError", operation: "approve" });
+    expect((await production.getWorkspace(f.actor, f.workId)).revision).toBe(2);
+  });
+
+  it("keeps a completed immutable review usable as an explicit historical task reference", async () => {
+    const f = await productionFixture();
+    await graph.resolveReviewComment(f.actor, f.comment.id, { status: "resolved", resolutionRevisionId: f.initialId });
+    await graph.decideReview(f.actor, f.reviewId, { status: "approved" });
+    const saved = await production.saveWorkspace(f.actor, f.workId, 1, f.linked());
+    expect(saved.document.tasks[0]?.reviewRef).toEqual(f.reference);
+    expect((await graph.getReview(f.actor, f.reviewId)).status).toBe("approved");
+  });
+
+  it("preserves mandatory CAS for duplicate saves and allows distinct explicitly selected tasks to reference the same comment", async () => {
+    const f = await productionFixture(); const outcomes = await Promise.allSettled([
+      production.saveWorkspace(f.actor, f.workId, 1, f.linked()), production.saveWorkspace(f.actor, f.workId, 1, f.linked()),
+    ]);
+    expect(outcomes.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.find((result) => result.status === "rejected")).toMatchObject({ reason: { name: "StudioProductionRevisionConflictError", currentRevision: 2 } });
+    const current = await production.getWorkspace(f.actor, f.workId); expect(current.document.tasks).toHaveLength(1);
+    const next = structuredClone(current.document); next.tasks.push({ ...next.tasks[0]!, id: "second-explicit-task" });
+    const saved = await production.saveWorkspace(f.actor, f.workId, 2, next); expect(saved.document.tasks).toHaveLength(2);
+  });
+
+  it("rechecks a membership change that was already queued when linking the task", async () => {
+    const f = await productionFixture(), blocker = await pool.connect();
+    let save: Promise<unknown> | undefined;
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query('UPDATE creator_work_collaborator SET role=\'viewer\' WHERE "workId"=$1 AND "userId"=$2', [f.workId, f.editor]);
+      save = production.saveWorkspace(f.actor, f.workId, 1, f.linked()).then((value) => ({ value }), (error: unknown) => ({ error }));
+      await expect.poll(async () => Number((await pool.query<{ count: string }>(`SELECT count(*)::text FROM pg_stat_activity
+        WHERE application_name=$1 AND wait_event_type='Lock' AND query LIKE '%creator_work_collaborator%'`, [applicationName])).rows[0]?.count ?? 0)).toBe(1);
+      await blocker.query("COMMIT");
+      expect(await save).toMatchObject({ error: { reason: "assignees" } });
+      expect((await production.getWorkspace(f.actor, f.workId)).revision).toBe(1);
+    } finally { await blocker.query("ROLLBACK"); blocker.release(); await save; }
+  });
   function observed<T>(promise: Promise<T>) {
     return promise.then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
   }

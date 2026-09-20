@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { validateStudioProductionReviewChanges } from "./studio-production-review-reference";
 
 import {
   hashStudioReviewToken,
@@ -121,5 +122,43 @@ describe("external review page projection", () => {
     expect(digest).toMatch(/^[a-f0-9]{64}$/u);
     expect(digest).not.toContain(raw);
     expect(hashStudioReviewToken(raw)).toBe(digest);
+  });
+});
+
+describe("production review assignment change boundary", () => {
+  function linked(): StudioProductionWorkspaceDocument {
+    return { ...workspace(), roleAssignments: [{ id: "role-editor", memberId: "user-editor", displayName: "Editor", roles: ["lineart"], hierarchyNodeId: null }],
+      tasks: [{ ...task("planning"), assigneeIds: ["role-editor"], reviewRef: { subject: { schemaVersion: 1,
+        workId: "chapter-1", projectId: "project", artifactId: "artifact", reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) },
+      commentId: "comment", handoffId: null } }] };
+  }
+  function authority() { return { readReference: vi.fn(async () => ["user-editor"] as readonly string[] | null), readEligibleUserIds: vi.fn(async () => ["user-editor"]) }; }
+  it("does not require new membership admission for unchanged historical links, equivalent role order, or display-only edits", async () => {
+    const current = linked(), port = authority(); const next = structuredClone(current);
+    next.tasks[0]!.title = "Completed work"; next.tasks[0]!.status = "done"; next.roleAssignments[0]!.displayName = "Updated display name";
+    port.readEligibleUserIds.mockResolvedValue([]);
+    await validateStudioProductionReviewChanges(current, next, port);
+    expect(port.readReference).not.toHaveBeenCalled(); expect(port.readEligibleUserIds).not.toHaveBeenCalled();
+  });
+  it("detects semantic rebindings behind an unchanged role ID and requires current comment-user coverage", async () => {
+    const current = linked(), next = structuredClone(current), port = authority();
+    next.roleAssignments[0]!.memberId = "other-user"; port.readEligibleUserIds.mockResolvedValue(["other-user", "user-editor"]);
+    await expect(validateStudioProductionReviewChanges(current, next, port)).rejects.toMatchObject({ reason: "assignees" });
+    expect(port.readReference).toHaveBeenCalledOnce();
+  });
+  it("validates newly manufactured version-only references while preserving existing historical ones", async () => {
+    const current = linked(), next = structuredClone(current), port = authority();
+    next.versions = [{ id: "version", name: "Saved version", createdAt: NOW, tasks: structuredClone(next.tasks), reviews: [], hierarchy: [], roleAssignments: next.roleAssignments, handoffs: [] }];
+    await validateStudioProductionReviewChanges(current, next, port); expect(port.readReference).not.toHaveBeenCalled();
+    next.versions[0]!.tasks[0]!.reviewRef!.commentId = "forged-comment"; port.readReference.mockResolvedValue(null);
+    await expect(validateStudioProductionReviewChanges(current, next, port)).rejects.toMatchObject({ reason: "reference" });
+    expect(port.readReference).toHaveBeenCalledOnce();
+  });
+  it("preserves legacy member-ID assignments on ordinary unlinked work but never silently converts them for a new link", async () => {
+    const current = linked(), next = structuredClone(current), port = authority();
+    delete current.tasks[0]!.reviewRef; current.tasks[0]!.assigneeIds = ["user-editor"];
+    await validateStudioProductionReviewChanges(workspace(), current, port); expect(port.readReference).not.toHaveBeenCalled();
+    next.tasks[0]!.assigneeIds = ["user-editor"];
+    await expect(validateStudioProductionReviewChanges(current, next, port)).rejects.toMatchObject({ reason: "assignees" });
   });
 });
