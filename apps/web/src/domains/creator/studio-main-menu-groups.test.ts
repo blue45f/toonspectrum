@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { resolveTranslationForDisplay } from "@/shared/lib/i18n-core";
+
 import {
   STUDIO_COMMAND_CATALOG,
   STUDIO_MENU_ITEM_INVENTORY,
@@ -202,7 +204,7 @@ type StateOverrides = Partial<Omit<StudioMainMenuBuilderState, "edit">> & {
 
 function buildMenu(
   stateOverrides: StateOverrides = {},
-  translate: (key: string) => string = (key) => key,
+  translate: (key: string, fallbackText?: string) => string = (key) => key,
 ) {
   const editor = createEditorActions();
   const ui = createUiActions();
@@ -235,6 +237,21 @@ function menuItem(
 }
 
 describe("buildStudioMainMenuGroups", () => {
+  it("preserves authored menu names through the real display resolver when locale keys are missing", () => {
+    const known: Record<string, string> = {
+      "studio.mainMenu.item.view.feature-tutorials": "기능 튜토리얼",
+      "studio.canvas.section": "캔버스",
+      "studio.mainMenu.item.file.quick-start": "새 문서 번역 유지",
+    };
+    const { groups } = buildMenu({}, (key, fallback) => known[key]
+      ?? resolveTranslationForDisplay("ko", key, undefined, fallback));
+    expect(groups.find((group) => group.id === "canvas")?.label).toBe("캔버스");
+    expect(groups.find((group) => group.id === "layer")?.label).toBe("레이어");
+    expect(groups.find((group) => group.id === "help")?.label).toBe("도움말");
+    expect(groups.some((group) => group.label === "Label")).toBe(false);
+    expect(menuItem(groups, "file", "quick-start").label).toBe("새 문서 번역 유지");
+  });
+
   it("keeps the new Help group localized by reusing the established item keys", () => {
     const english = buildMenu({}, (key) => ({
       "studio.mainMenu.item.view.feature-tutorials": "Feature tutorials",
