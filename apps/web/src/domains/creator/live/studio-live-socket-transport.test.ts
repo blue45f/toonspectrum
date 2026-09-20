@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model";
 import { STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE } from "./studio-live-admission-support";
 import { presentStudioLiveSyncSnapshot, projectStudioLiveSyncSnapshot } from "./studio-live-sync-safety";
 
@@ -444,6 +445,63 @@ describe("Studio live admission support boundaries", () => {
 });
 
 describe("StudioLiveSocketTransport", () => {
+  it("exposes Core identity only after a matching join and replaces it after reconnect acknowledgement", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN }); socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, { createSocket: () => socket });
+    const joining = transport.connect();
+    expect(transport.acousticCoreBinding).toBeNull();
+    socket.reply("studio:join", joinSuccess()); await joining;
+    expect(transport.acousticCoreBinding).toEqual({ connectionId: self.connectionId, clientInstanceId: localParticipant.sessionId });
+    socket.serverDisconnect(); expect(transport.acousticCoreBinding).toBeNull();
+    socket.serverReconnect(); expect(transport.acousticCoreBinding).toBeNull();
+    const next = { ...self, connectionId: "new-connection-self" };
+    socket.reply("studio:join", joinSuccess({ self: next, participants: [next, remote] }));
+    expect(transport.acousticCoreBinding?.connectionId).toBe(next.connectionId);
+    socket.serverEmit("studio:access:revoked", { workId: "work-1", message: "revoked" });
+    expect(transport.acousticCoreBinding).toBeNull();
+    transport.close(); expect(socket.listeners.get(STUDIO_ACOUSTIC_CONVERSATION_EVENT)?.size).toBe(0);
+  });
+
+  it("does not advertise a different client identity returned by a join acknowledgement", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    socket.joinResponse = joinSuccess({ self: { ...self, clientInstanceId: "different-client" } });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, { createSocket: () => socket });
+    await transport.connect(); expect(transport.ready).toBe(true); expect(transport.acousticCoreBinding).toBeNull(); transport.close();
+  });
+
+  it("ignores a superseded join acknowledgement and late hints after access revocation", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN }); socket.holdEvents.add("studio:join");
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, { createSocket: () => socket });
+    const received: StudioLiveTransportControlEvent[] = [];
+    transport.subscribeControl((event) => { if (event.type === "acoustic-invalidation") received.push(event); });
+    const joining = transport.connect(); socket.serverDisconnect(); socket.serverReconnect();
+    socket.reply("studio:join", joinSuccess()); expect(transport.acousticCoreBinding).toBeNull();
+    const next = { ...self, connectionId: "fresh-core" };
+    socket.reply("studio:join", joinSuccess({ self: next, participants: [next, remote] })); await joining;
+    expect(transport.acousticCoreBinding?.connectionId).toBe("fresh-core");
+    socket.serverEmit("studio:access:revoked", { workId: "work-1", message: "revoked" });
+    socket.serverEmit(STUDIO_ACOUSTIC_CONVERSATION_EVENT, { version: 1, workId: "work-1",
+      conversationId: "00000000-0000-4000-8000-000000000001", selfSessionEpoch: "00000000-0000-4000-8000-000000000002" });
+    expect(transport.acousticCoreBinding).toBeNull(); expect(received).toEqual([]); transport.close();
+  });
+
+  it("delivers strict current-work invalidation hints through the real Socket-to-Room control path only while joined", async () => {
+    const socket = new FakeSocket({ sessionToken: TOKEN });
+    const transport = new StudioLiveSocketTransport(context(), TOKEN, { createSocket: () => socket });
+    const room = new StudioLiveRoom({ workId: "work-1", participant: localParticipant, dependencies: { transportFactory: () => transport } });
+    const received: StudioLiveRoomEvent[] = []; room.subscribe((event) => { if (event.type === "acoustic-invalidation") received.push(event); });
+    const hint = { version: 1, workId: "work-1", conversationId: "00000000-0000-4000-8000-000000000001", selfSessionEpoch: "00000000-0000-4000-8000-000000000002" };
+    socket.serverEmit(STUDIO_ACOUSTIC_CONVERSATION_EVENT, hint); expect(received).toEqual([]);
+    await room.start(); expect(room.acousticCoreBinding).toEqual(transport.acousticCoreBinding);
+    for (const invalid of [{ ...hint, workId: "other" }, { ...hint, grant: true }, { ...hint, conversationId: "malformed" }]) socket.serverEmit(STUDIO_ACOUSTIC_CONVERSATION_EVENT, invalid);
+    expect(received).toEqual([]);
+    socket.serverEmit(STUDIO_ACOUSTIC_CONVERSATION_EVENT, hint);
+    expect(received).toEqual([{ type: "acoustic-invalidation", invalidation: hint }]);
+    socket.serverDisconnect(); expect(room.acousticCoreBinding).toBeNull();
+    socket.serverEmit(STUDIO_ACOUSTIC_CONVERSATION_EVENT, hint); expect(received).toHaveLength(1);
+    room.close(); expect(room.acousticCoreBinding).toBeNull();
+  });
+
   it("keeps retries bounded while covering a configured free host cold start", () => {
     expect(STUDIO_LIVE_GESTURE_PREVIEW_SOCKET_EVENT).toBe(
       "studio:gesture:preview"

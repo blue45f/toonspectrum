@@ -35,6 +35,22 @@ function pair() {
   return { a, b, packets, listeners, fail: () => { failChat = true; } };
 }
 describe("P2P huddle consent and delivery", () => {
+  it("preserves active audio across same-actor renewal but rejects a pending prompt from the earlier session publication",async()=>{
+    let revision=0,finish!:(value:MediaStream)=>void;const audio=track("audio"),video=track("video");
+    const getUserMedia=vi.fn<NonNullable<HuddleDependencies["getUserMedia"]>>().mockResolvedValueOnce(stream([audio])).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+    const {controller}=single({authorityValid:()=>true,captureRevision:()=>revision,getUserMedia});await controller.setMicrophone(true);
+    const pending=controller.setVideo("camera");revision++;finish(stream([video]));await pending;
+    expect(video.stop).toHaveBeenCalledOnce();expect(audio.stop).not.toHaveBeenCalled();expect(controller.snapshot().muted).toBe(false);expect(controller.snapshot().camera).toBe(false);
+  });
+  it("rechecks private authority after a pending device prompt without attaching the late track",async()=>{
+    let valid=true,finish!:(value:MediaStream)=>void;
+    const getUserMedia=vi.fn(()=>new Promise<MediaStream>(resolve=>{finish=resolve;}));
+    const {controller}=single({authorityValid:()=>valid,getUserMedia});
+    expect(getUserMedia).not.toHaveBeenCalled();const pending=controller.setMicrophone(true);valid=false;
+    const audio=track("audio");finish(stream([audio]));await pending;
+    expect(audio.stop).toHaveBeenCalledOnce();expect(controller.snapshot().localStream).toBeNull();
+    await controller.setVideo("camera");expect(getUserMedia).toHaveBeenCalledOnce();
+  });
   it("starts text-only without requesting devices or creating media peers", () => {
     const getUserMedia = vi.fn(); const createPeerConnection = vi.fn();
     const { controller } = single({ getUserMedia, createPeerConnection });

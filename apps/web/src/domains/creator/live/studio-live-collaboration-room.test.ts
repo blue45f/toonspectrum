@@ -44,6 +44,7 @@ import type {
 import type { StudioLiveGesturePreviewPayload } from "./studio-live-gesture-preview";
 
 class FakeHubTransport implements StudioLiveTransport {
+  acousticCoreBinding: StudioLiveTransport["acousticCoreBinding"] = null;
   authoritativeLockCapability: "fenced-v2" | null = null;
   private readonly listeners = new Set<(value: unknown) => void>();
   private readonly controlListeners = new Set<(event: StudioLiveTransportControlEvent) => void>();
@@ -347,6 +348,26 @@ function harness(mode: StudioLiveTransportMode = "local") {
 }
 
 describe("StudioLiveRoom", () => {
+  it("never promotes local/provider readiness or a forged control hint into Core authority", async () => {
+    const hint = { version: 1 as const, workId: "work-1", conversationId: "00000000-0000-4000-8000-000000000001", selfSessionEpoch: "00000000-0000-4000-8000-000000000002" };
+    for (const mode of ["local", "server"] as const) {
+      const h = harness(mode), room = h.room(alice), received: StudioLiveRoomEvent[] = [];
+      room.subscribe((event) => { if (event.type === "acoustic-invalidation") received.push(event); });
+      await room.start(); const transport = h.hub.transports[0]!;
+      transport.receiveControl({ type: "acoustic-invalidation", invalidation: hint });
+      expect(room.acousticCoreBinding).toBeNull(); expect(received).toEqual([]);
+      transport.acousticCoreBinding = { connectionId: "core-connection", clientInstanceId: alice.sessionId };
+      transport.receiveControl({ type: "acoustic-invalidation", invalidation: { ...hint, workId: "other" } });
+      expect(received).toEqual([]);
+      transport.receiveControl({ type: "acoustic-invalidation", invalidation: hint });
+      expect(received).toHaveLength(mode === "server" ? 1 : 0);
+      transport.receiveControl({ type: "status", status: { state: "revoked", recoverable: false, message: "revoked" } });
+      expect(room.acousticCoreBinding).toBeNull();
+      transport.receiveControl({ type: "acoustic-invalidation", invalidation: hint });
+      expect(received).toHaveLength(mode === "server" ? 1 : 0); room.close();
+    }
+  });
+
   it("requires negotiated authority and fences explicit slot renewal without automatic heartbeat", async () => {
     const h = harness("server");
     const room = h.room(alice);

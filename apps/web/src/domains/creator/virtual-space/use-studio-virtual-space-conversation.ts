@@ -11,7 +11,7 @@ const EMPTY: StudioConversationSnapshot = { available: false, readyPeers: [], re
 const NO_BLOCKED_PEERS: readonly string[] = [];
 const foreground = () => typeof document !== "undefined" && document.visibilityState !== "hidden" && document.hasFocus();
 
-export function useStudioVirtualSpaceConversation({ participant, port, manifest, enabled, blockedPeerIds = NO_BLOCKED_PEERS, onReady, onClosed, presence, acousticBindingAvailable = true }: {
+export function useStudioVirtualSpaceConversation({ participant, port, manifest, enabled, blockedPeerIds = NO_BLOCKED_PEERS, onReady, onClosed, presence, acousticBindingAvailable = true, publishedScope }: {
   readonly participant: StudioLiveParticipant | undefined;
   readonly port: StudioLiveDirectPort | null | undefined;
   readonly manifest: StudioVirtualSpaceWorldManifest;
@@ -21,6 +21,8 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
   readonly onClosed?: (scope: StudioConversationScope) => void;
   readonly presence?: StudioVirtualSpaceSnapshot;
   readonly acousticBindingAvailable?: boolean;
+  /** Server publication revision+hash digest, not a peer-issued grant. */
+  readonly publishedScope?: string;
 }) {
   const controller = useRef<StudioVirtualConversationController | null>(null);
   const acoustics = useRef<StudioVirtualSpaceAcousticPolicy | null>(null);
@@ -65,9 +67,9 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
     let owner: StudioVirtualConversationController | undefined;
     let policy: StudioVirtualSpaceAcousticPolicy | undefined;
     let unsubscribe: (() => void) | undefined;
-    void crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest))).then((digest) => {
+    void (publishedScope ? Promise.resolve(publishedScope) : crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest)))
+      .then((digest) => [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join(""))).then((contentRevision) => {
       if (disposed) return;
-      const contentRevision = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
       policy = new StudioVirtualSpaceAcousticPolicy({ ...manifest, worldId: manifest.id, contentRevision }, participant.sessionId);
       policy.update(spatial.current.presence, spatial.current.acousticBindingAvailable);
       acoustics.current = policy;
@@ -85,7 +87,7 @@ export function useStudioVirtualSpaceConversation({ participant, port, manifest,
       if (controller.current === owner) controller.current = null;
       if (acoustics.current === policy) acoustics.current = null;
     };
-  }, [enabled, participant, port, manifest]);
+  }, [enabled, participant, port, manifest, publishedScope]);
   const propose = useCallback((memberIds: readonly string[]) => foregroundRef.current ? controller.current?.propose(memberIds) ?? null : null, []);
   const respond = useCallback((id: string, answer: "accept" | "decline") => answer === "decline" || foregroundRef.current ? controller.current?.respond(id, answer) ?? false : false, []);
   const leave = useCallback((id: string) => controller.current?.leave(id) ?? false, []);

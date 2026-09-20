@@ -6,10 +6,11 @@ import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-wor
 const EMPTY: StudioVirtualSlotLeaseSnapshot = { available: false, status: "idle", slotId: null, claimId: null, ownerSessionId: null, reason: null, occupied: [] };
 const foreground = () => typeof document !== "undefined" && document.visibilityState !== "hidden" && document.hasFocus();
 
-export function useStudioVirtualSpaceSlots({ room, manifest, enabled, point, moving, onApproach }: {
+export function useStudioVirtualSpaceSlots({ room, manifest, enabled, point, moving, onApproach, publishedScope }: {
   readonly room: StudioVirtualSlotRoom | null | undefined;
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly enabled: boolean;
+  readonly publishedScope?: string;
   readonly point: StudioVirtualSpacePoint;
   readonly moving: boolean;
   readonly onApproach: (point: StudioVirtualSpacePoint) => void;
@@ -55,9 +56,9 @@ export function useStudioVirtualSpaceSlots({ room, manifest, enabled, point, mov
     const epoch = foregroundEpoch.current;
     let owner: StudioVirtualSlotLeaseController | undefined;
     let unsubscribe: (() => void) | undefined;
-    void crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest))).then((digest) => {
+    void (publishedScope ? Promise.resolve(publishedScope) : crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest)))
+      .then((digest) => [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join(""))).then((revision) => {
       if (disposed || epoch !== foregroundEpoch.current || !foregroundAllowed.current || !foreground()) return;
-      const revision = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
       owner = new StudioVirtualSlotLeaseController(room, revision, (manifest.interactionSlots ?? []).map((slot) => slot.id));
       controller.current = owner;
       const refresh = () => { if (owner && !disposed && controller.current === owner && foregroundAllowed.current && foreground()) setSnapshot(owner.snapshot()); };
@@ -68,7 +69,7 @@ export function useStudioVirtualSpaceSlots({ room, manifest, enabled, point, mov
       unsubscribe?.(); if (owner) void owner.close();
       if (controller.current === owner) controller.current = null;
     };
-  }, [enabled, room, manifest, invalidateRequest, foregroundSession.active, foregroundSession.generation]);
+  }, [enabled, room, manifest, invalidateRequest, foregroundSession.active, foregroundSession.generation, publishedScope]);
 
   const cancel = useCallback(() => {
     invalidateRequest(); pendingSlot.current = null; setApproachingSlotId(null);

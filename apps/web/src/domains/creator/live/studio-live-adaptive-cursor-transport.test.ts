@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { StudioLiveRoom } from "./studio-live-collaboration-room";
 
 import {
   createStudioAdaptiveCursorTransportFactory,
@@ -66,6 +67,8 @@ class ManualScheduler {
 }
 
 class FakeTransport implements StudioLiveTransport {
+  authoritativeLockCapability: StudioLiveTransport["authoritativeLockCapability"] = null;
+  acousticCoreBinding: StudioLiveTransport["acousticCoreBinding"] = null;
   readonly mode = "server" as const;
   readonly crdtFanout = "authoritative" as const;
   readonly sent: StudioLiveEnvelope[] = [];
@@ -160,6 +163,31 @@ afterEach(() => {
 });
 
 describe("adaptive cursor transport", () => {
+  it("preserves negotiated slot authority through the actual Room wrapper without inventing a provider grant", async () => {
+    const { inner, transport } = createHarness();
+    const room = new StudioLiveRoom({ workId: CONTEXT.workId, participant: PARTICIPANT,
+      dependencies: { transportFactory: () => transport } });
+    await room.start(); expect(room.authoritativeLockCapability).toBeNull();
+    inner.authoritativeLockCapability = "fenced-v2";
+    expect(room.authoritativeLockCapability).toBe("fenced-v2");
+    inner.ready = false; expect(room.authoritativeLockCapability).toBeNull();
+    inner.ready = true; inner.authoritativeLockCapability = null;
+    expect(room.authoritativeLockCapability).toBeNull();
+    inner.authoritativeLockCapability = "fenced-v2"; room.close();
+    expect(transport.authoritativeLockCapability).toBeNull(); expect(room.authoritativeLockCapability).toBeNull();
+  });
+
+  it("forwards only the inner current Core join identity without caching it across disconnects", () => {
+    const { inner, transport } = createHarness();
+    expect(transport.acousticCoreBinding).toBeNull();
+    inner.acousticCoreBinding = { connectionId: "first-core", clientInstanceId: PARTICIPANT.sessionId };
+    expect(transport.acousticCoreBinding).toEqual(inner.acousticCoreBinding);
+    inner.ready = false; expect(transport.acousticCoreBinding).toBeNull();
+    inner.acousticCoreBinding = { connectionId: "second-core", clientInstanceId: PARTICIPANT.sessionId };
+    inner.ready = true; expect(transport.acousticCoreBinding?.connectionId).toBe("second-core");
+    transport.close(); expect(transport.acousticCoreBinding).toBeNull();
+  });
+
   it("sends the first cursor immediately and keeps the newest trailing cursor", () => {
     const { scheduler, inner, transport } = createHarness();
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STUDIO_ACOUSTIC_RESOURCE_PREFIX } from "@toonspectrum/studio-project-model";
 
 import {
   STUDIO_CRDT_BINARY_HEADER_BYTES,
@@ -66,7 +67,7 @@ const boundedIdentifier = (maximum: number) =>
 const WorkIdSchema = boundedIdentifier(160);
 const ClientInstanceIdSchema = boundedIdentifier(80);
 const PageIdSchema = boundedIdentifier(160);
-const ResourceIdSchema = boundedIdentifier(200);
+const ResourceIdSchema = boundedIdentifier(200).refine((value) => !value.startsWith(STUDIO_ACOUSTIC_RESOURCE_PREFIX), "server-reserved acoustic resource");
 const ConnectionIdSchema = boundedIdentifier(128);
 const ScreenShareIdSchema = boundedIdentifier(160);
 const ScreenShareLabelSchema = boundedIdentifier(80);
