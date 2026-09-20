@@ -1,5 +1,6 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from "@nestjs/common";
-import { canonicalJson, type StudioConversationPropose, type StudioConversationRead, type StudioConversationChange, type StudioConversationRenew } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { type StudioConversationPropose, type StudioConversationRead, type StudioConversationChange, type StudioConversationRenew } from "@toonspectrum/studio-project-model/world-conversation";
 import type { VerifiedSessionToken } from "../../server/session";
 import { StudioLiveAcousticBinding } from "../creator/studio-live-acoustic-binding";
 import { StudioProjectForbiddenError, StudioProjectNotFoundError, StudioIdempotencyConflictError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { StudioWorkSessionCreate } from "@toonspectrum/studio-project-model";
+import type { StudioWorkSessionCreate } from "@toonspectrum/studio-project-model/work-session";
 import { getAuthSessionRevision } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { listStudioVirtualSpaceReviewSubjects, type StudioVirtualSpaceReviewChoices } from "../virtual-space/studio-virtual-space-review-invitation";

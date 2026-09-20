@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { getAuthUserId, listeners as authListeners } from "@/compat/auth-session-state";
-import type { StudioAcousticWorldPin } from "@toonspectrum/studio-project-model";
+import type { StudioAcousticWorldPin } from "@toonspectrum/studio-project-model/world-acoustic";
 import type { StudioLiveRoom } from "../../live/studio-live-collaboration-room";
 import { closeStudioP2pHuddle, openStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT, type StudioP2pHuddleClosedDetail } from "../../live/huddle/studio-p2p-huddle-events";
 import { registerStudioHuddleAuthority } from "../../live/huddle/studio-p2p-huddle-authority";

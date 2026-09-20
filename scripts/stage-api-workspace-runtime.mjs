@@ -37,6 +37,12 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   {
     name: "@toonspectrum/studio-project-model",
     compiledEntry: "packages/studio-project-model/src/index.js",
+    exports: { ".": "./index.js", ...Object.fromEntries(
+      ["work-session", "world-publication", "world-acoustic", "world-conversation"].map((name) => [`./${name}`, `./${name}.js`]),
+    ) },
+    subpathEntries: ["work-session", "world-publication", "world-acoustic", "world-conversation"].map((name) => ({
+      target: `${name}.js`, compiledEntry: `packages/studio-project-model/src/graph/${name}.js`,
+    })),
   },
   {
     name: "@toonspectrum/studio-format-gateway",

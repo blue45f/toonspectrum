@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { HttpException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
-import { studioWorldPublishSchema } from "@toonspectrum/studio-project-model";
+import { studioWorldPublishSchema } from "@toonspectrum/studio-project-model/world-publication";
 import { StudioIdempotencyConflictError, StudioProjectForbiddenError, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
 import { StudioWorldPublicationController, StudioWorldPublishDto } from "./studio-world-publication.controller";
 import { StudioWorldPublicationConflictError, type StudioWorldPublicationRepository } from "./studio-world-publication.repository";

@@ -35,6 +35,18 @@
       ],
       "@toonspectrum/contracts/*": [
         "../../packages/contracts/src/*"
+      ],
+      "@toonspectrum/studio-project-model/work-session": [
+        "../../packages/studio-project-model/src/graph/work-session.ts"
+      ],
+      "@toonspectrum/studio-project-model/world-publication": [
+        "../../packages/studio-project-model/src/graph/world-publication.ts"
+      ],
+      "@toonspectrum/studio-project-model/world-acoustic": [
+        "../../packages/studio-project-model/src/graph/world-acoustic.ts"
+      ],
+      "@toonspectrum/studio-project-model/world-conversation": [
+        "../../packages/studio-project-model/src/graph/world-conversation.ts"
       ]
     },
     "outDir": "dist",

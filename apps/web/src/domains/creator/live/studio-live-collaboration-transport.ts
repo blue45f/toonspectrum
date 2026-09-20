@@ -28,7 +28,7 @@ import type {
   StudioLiveLockRequest,
 } from "./studio-live-collaboration-protocol";
 import type { StudioTeamCommentLiveEvent } from "../studio-team-comment-live-event";
-import type { StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
+import type { StudioConversationInvalidation } from "@toonspectrum/studio-project-model/world-conversation";
 import type { StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
 
 import type { StudioLiveDirectPort } from "./studio-live-direct-port";

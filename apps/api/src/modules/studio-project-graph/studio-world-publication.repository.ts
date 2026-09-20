@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { canonicalJson, STUDIO_WORLD_ARTIFACT_PREFIX, studioWorldPublicationSchema, studioWorldPublishSchema,
-  type StudioWorldPublication, type StudioWorldPublish, type StudioWorldPublishResult } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { STUDIO_WORLD_ARTIFACT_PREFIX, studioWorldPublicationSchema, studioWorldPublishSchema, type StudioWorldPublication, type StudioWorldPublish, type StudioWorldPublishResult } from "@toonspectrum/studio-project-model/world-publication";
 import type { PoolClient } from "pg";
 import { dbPool } from "../../db";
 import { assertAccess, projectAccess, studioRequestHash, StudioIdempotencyConflictError, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StudioWorkSessionView } from "@toonspectrum/studio-project-model";
+import type { StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioReviewImage } from "../virtual-space/StudioPinnedReviewPreview";
 import { useStudioPinnedReviewPreviews } from "../virtual-space/use-studio-pinned-review-previews";

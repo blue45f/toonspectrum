@@ -1369,7 +1369,7 @@ export function VirtualSpaceExperience({
                 </div>
                 <button
                   type="button"
-                  className="absolute bottom-5 left-4 z-50 inline-flex min-h-12 max-w-[11rem] items-center gap-2 rounded-2xl border border-accent/35 bg-panel/90 px-4 text-xs font-black text-accent shadow-xl backdrop-blur lg:hidden"
+                  className="studio-vspace-touch-action absolute bottom-5 left-4 z-50 inline-flex min-h-12 max-w-[11rem] items-center gap-2 rounded-2xl border border-accent/35 bg-panel/90 px-4 text-xs font-black text-accent shadow-xl backdrop-blur lg:hidden"
                   data-space-interactive="true"
                   onClick={activateCurrentRoom}
                 >
@@ -1636,7 +1636,7 @@ export function VirtualSpaceExperience({
         <footer className="workspace-live-status">
           <div className="workspace-live-state">
             <span>{bt(currentRoom.labelKo, currentRoom.labelEn)}</span>
-            <ConnectionBadge preparing={preparing} />
+            {personal ? <span>{bt("개인 로컬 공간", "Personal local space")}</span> : <ConnectionBadge preparing={preparing} />}
             {sharedActivity ? <span role="status">{bt("공동 작업 진행 중", "Shared activity active")}</span> : null}
           </div>
           <div className="workspace-live-actions" data-space-interactive="true">

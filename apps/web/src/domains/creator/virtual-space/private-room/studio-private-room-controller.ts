@@ -1,5 +1,6 @@
-import { canonicalJson, studioConversationInvalidationSchema, type StudioAcousticSessionLease, type StudioAcousticSessionOpen,
-  type StudioAcousticWorldPin, type StudioConversationChange, type StudioConversationSnapshot } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { studioConversationInvalidationSchema, type StudioConversationChange, type StudioConversationSnapshot } from "@toonspectrum/studio-project-model/world-conversation";
+import { type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticWorldPin } from "@toonspectrum/studio-project-model/world-acoustic";
 import { z } from "zod";
 import type { StudioLiveDirectPort } from "../../live/studio-live-direct-port";
 import type { StudioTeamSnapshot } from "../../studio-team-client";
