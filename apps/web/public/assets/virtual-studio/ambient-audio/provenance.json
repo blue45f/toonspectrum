@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "author": "Ylmir",
+  "title": "Rain (loopable)",
+  "sourcePage": "https://opengameart.org/content/rain-loopable",
+  "sourceArchive": "https://opengameart.org/sites/default/files/Rain%20OGG.zip",
+  "sourceArchiveSha256": "e68f3e1c77493cf43bec84cebff5043bff6be9ce16d59b24caa988cd460aa75b",
+  "retrievedAt": "2026-09-20",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "licenseTextSha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+  "recordingProvenance": "Author reports a mono microphone recording at their window, processed by the author for stereo.",
+  "processing": "None. Selected OGG bytes copied unchanged from author archive. Browser decodes at output sample rate.",
+  "subjectiveListeningReview": "not-performed-by-assistant",
+  "files": [
+    {
+      "file": "1.ogg",
+      "bytes": 550049,
+      "sha256": "4f659f68cf5219007d0bb0969a1862491ceee4057fda4c491c6001e8608fa2cb",
+      "sampleRate": 44100,
+      "channels": 2,
+      "duration": 27.0,
+      "peak": 0.5703578591346741,
+      "clippedSamples": 0,
+      "dc": 1.7432779486625805e-06,
+      "rmsDb": -22.308710325608658,
+      "oneSecondRmsRangeDb": 3.7969035162395812,
+      "seamJump": 0.022587522864341736,
+      "differenceP99": 0.10808391869068146,
+      "startEndRmsDeltaDb": 0.19445693930818014,
+      "deliveredFile": "window-rain.ogg"
+    },
+    {
+      "file": "3.ogg",
+      "bytes": 913769,
+      "sha256": "73a0f5ef19ed9f64599c0425b1fb52d857acfc42c0fd5eab85c4577ace18f0ed",
+      "sampleRate": 44100,
+      "channels": 2,
+      "duration": 45.0,
+      "peak": 0.42428869009017944,
+      "clippedSamples": 0,
+      "dc": -6.81165886362578e-07,
+      "rmsDb": -27.015956726082102,
+      "oneSecondRmsRangeDb": 2.6583628334065046,
+      "seamJump": 0.0118337981402874,
+      "differenceP99": 0.06729539483785629,
+      "startEndRmsDeltaDb": 0.5543112362269581,
+      "deliveredFile": "gentle-window-rain.ogg"
+    }
+  ]
+}

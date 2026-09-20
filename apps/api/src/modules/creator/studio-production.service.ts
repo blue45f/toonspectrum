@@ -22,6 +22,7 @@ import {
   StudioProductionNotFoundError,
   StudioProductionQuotaError,
   StudioProductionRevisionConflictError,
+  StudioProductionReviewReferenceError,
   StudioReviewLinkUnavailableError,
 } from "./studio-production.repository";
 
@@ -138,6 +139,11 @@ export class StudioProductionService {
         throw new BadRequestException(
           "선택한 검토 페이지가 현재 작품에 없거나 더 이상 존재하지 않습니다."
         );
+      }
+      if (error instanceof StudioProductionReviewReferenceError) {
+        throw new BadRequestException({ code: `studio_production_review_${error.reason}_invalid`,
+          message: error.reason === "reference" ? "검수 의견의 작품과 고정 버전을 확인할 수 없습니다. 검수 기록을 다시 확인해 주세요."
+            : "검수 담당자의 현재 편집 권한과 제작 역할 범위를 확인해 주세요." });
       }
       if (error instanceof StudioProductionForbiddenError) {
         let message: string;

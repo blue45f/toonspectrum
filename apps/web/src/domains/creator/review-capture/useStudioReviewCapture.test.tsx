@@ -51,7 +51,7 @@ describe("review capture hook integration", () => {
     const hook = renderHook(() => useStudioReviewCapture("user:work", f.bindings), { wrapper });
     hook.rerender();
     expect(api.prepare).not.toHaveBeenCalled(); expect(f.bindings.captureAll).not.toHaveBeenCalled();
-    act(() => { hook.result.current.open(); hook.result.current.open(); });
+    act(() => { expect(hook.result.current.open()).toBe(true); expect(hook.result.current.open()).toBe(false); });
     await waitFor(() => expect(hook.result.current.snapshot).toMatchObject({ phase: "completed" }));
     expect(api.prepare).toHaveBeenCalledOnce(); expect(f.bindings.captureAll).toHaveBeenCalledOnce();
     expect(hook.result.current.visible).toBe(true);
@@ -87,13 +87,14 @@ describe("review capture hook integration", () => {
     const hook = renderHook(() => useStudioReviewCapture("user:work", f.bindings));
     act(() => hook.result.current.open());
     await waitFor(() => expect(hook.result.current.snapshot.phase).toBe("uncertain"));
-    act(() => hook.result.current.open()); hook.rerender();
+    act(() => { expect(hook.result.current.open()).toBe(false); }); hook.rerender();
     expect(api.produce).toHaveBeenCalledOnce();
     act(() => hook.result.current.retry());
     await waitFor(() => expect(hook.result.current.snapshot.phase).toBe("completed"));
     expect(api.produce.mock.calls[1]![0]).toBe(api.produce.mock.calls[0]![0]);
     expect(api.produce.mock.calls[1]![1]).toBe(api.produce.mock.calls[0]![1]);
     expect(f.bindings.captureAll).toHaveBeenCalledOnce();
+    act(() => { expect(hook.result.current.open()).toBe(true); });
   });
   it("keeps the cancellation dialog open when its outcome is unknown", async () => {
     const f = fixture(); api.produce.mockRejectedValueOnce({ ambiguous: true }); api.cancel.mockRejectedValueOnce(new Error("offline"));

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { studioReviewTaskReferenceSchema, type StudioReviewTaskReference } from "@toonspectrum/studio-project-model";
 
 import { api } from "@/infrastructure/api";
 
@@ -295,10 +296,12 @@ export async function resolveStudioReviewComment(
   commentId: string,
   resolutionRevisionId: string,
   status: "resolved" | "dismissed" = "resolved",
+  resolutionSourceRef?: StudioReviewTaskReference["subject"],
 ) {
+  const source = resolutionSourceRef === undefined ? undefined : studioReviewTaskReferenceSchema.shape.subject.parse(resolutionSourceRef);
   const body = await api.post<unknown>(
     `${BASE}/review-comments/${resourceId(commentId)}/resolve`,
-    { resolutionRevisionId, status },
+    { resolutionRevisionId, status, ...(source ? { resolutionSourceRef: source } : {}) },
   );
   return reviewCommentDecisionSchema.parse(body);
 }

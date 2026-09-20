@@ -21,7 +21,7 @@ import {
   STUDIO_VIRTUAL_SPACE_INTERACTIONS,
   type StudioVirtualSpaceInteractionAction,
 } from "./studio-virtual-space-interactions";
-import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
+import { STUDIO_CHARACTER_SKINS, studioCharacterActionClip } from "./studio-virtual-space-character-skins";
 import {
   StudioWorldConnectivityIndex,
   studioWorldCircleCanOccupy,
@@ -200,8 +200,9 @@ const DEFAULT_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] = [
     exitPoint: { x: anchorPoint.x + 16, y: anchorPoint.y },
     facing: (index === 2 ? "down" : profile.facing) as StudioVirtualSpaceFacing,
     activity: index === 0 ? "work" : index === 1 ? "inspect" : "rest",
-    // Only pink has authored drawing/review artwork. Other roles retain their own static art.
-    animation: profile.id === "studio-artist" && index < 2 ? index === 0 ? "draw" : "review" : "idle",
+    // Pink retains its work artwork; silver has a real directional review loop.
+    animation: index < 2 && profile.id === "studio-writer" ? "review"
+      : profile.id === "studio-artist" && index < 2 ? index === 0 ? "draw" : "review" : "idle",
     minDurationMs: index === 0 ? 20000 : 7000, maxDurationMs: index === 0 ? 38000 : 16000 };
 }));
 
@@ -594,7 +595,8 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
         const anchor: StudioWorldNpcActivityAnchor | undefined = Array.isArray(manifest.npcActivityAnchors) ? manifest.npcActivityAnchors.find((value) => value?.id === id) : undefined;
         if (!anchor) { errors.push(`npc references missing activity anchor: ${npc.id}`); continue; }
         const skin = STUDIO_CHARACTER_SKINS.find((value) => value.key === npc.skinKey);
-        if (anchor.animation !== "idle" && !(anchor.animation === "sit" ? skin?.poses?.sit : skin?.state?.[anchor.animation])) errors.push(`npc activity clip is unavailable: ${npc.id}/${anchor.id}`);
+        if (anchor.animation !== "idle" && !(anchor.animation === "sit" ? skin?.poses?.sit
+          : skin?.state?.[anchor.animation] || (skin && studioCharacterActionClip(skin, anchor.facing, anchor.animation)))) errors.push(`npc activity clip is unavailable: ${npc.id}/${anchor.id}`);
         if (inBounds(anchor.approachPoint) && actorCanOccupy(npc.point) && actorCanOccupy(anchor.approachPoint)
           && !connectivity.connected(npc.point, anchor.approachPoint)) errors.push(`npc activity is unreachable: ${npc.id}/${anchor.id}`);
       }

@@ -9,6 +9,7 @@ import {
   StudioProductionForbiddenError,
   StudioProductionInvalidPageError,
   StudioProductionRevisionConflictError,
+  StudioProductionReviewReferenceError,
   type StudioProductionRepository,
 } from "./studio-production.repository";
 import { StudioProductionService } from "./studio-production.service";
@@ -65,6 +66,20 @@ const reviewLinkInput = {
 };
 
 describe("StudioProductionService error boundary", () => {
+  it.each(["reference", "assignees"] as const)("maps invalid review %s to a stable error without private identities", async (reason) => {
+    const service = new StudioProductionService(repository({
+      saveWorkspace: vi.fn().mockRejectedValue(new StudioProductionReviewReferenceError(reason)),
+    }));
+    try {
+      await service.saveWorkspace("private-user", "private-work", 0, workspaceDocument);
+      throw new Error("expected rejection");
+    } catch (error) {
+      expect(error).toBeInstanceOf(BadRequestException);
+      const response = (error as BadRequestException).getResponse();
+      expect(response).toMatchObject({ code: `studio_production_review_${reason}_invalid` });
+      expect(JSON.stringify(response)).not.toContain("private-");
+    }
+  });
   it("maps invalid review pages to a stable client error without exposing identifiers", async () => {
     const service = new StudioProductionService(repository({
       createReviewLink: vi.fn().mockRejectedValue(new StudioProductionInvalidPageError("private-page")),

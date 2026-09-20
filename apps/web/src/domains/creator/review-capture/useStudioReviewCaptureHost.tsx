@@ -1,45 +1,21 @@
+import { useState } from "react";
 import { StudioReviewCaptureDialogMount } from "./StudioReviewCaptureDialogMount";
 import { useStudioReviewCapture } from "./useStudioReviewCapture";
 
-import type { StudioEditorMutationTicket } from "../studio-editor-scope";
-import type { StudioProjectSnapshot } from "../studio-project-snapshot";
-import type { StudioReviewCaptureBridgeDependencies } from "./studio-review-capture-bridge";
+import { StudioReviewEditorHandoffMount } from "../review-handoff/StudioReviewEditorHandoffMount";
+import type { StudioReviewEditorHostNavigation } from "../review-handoff/studio-review-editor-host";
+import { studioReviewEditorRequestFromLocation } from "../review-handoff/studio-review-editor-route";
+import type { StudioReviewCaptureOrigin } from "../review-resolution/StudioReviewCaptureReturnLink";
+import { useStudioStableHandlers } from "../studio-stable-handlers";
+import { studioReviewCaptureHostContext, type StudioReviewCaptureHostBindings } from "./studio-review-capture-host-context";
 
-type Current<T> = { readonly current: T };
-interface StudioReviewCaptureHostBindings {
-  readonly studioAuthUserId: string | null;
-  readonly workId: string | null;
-  readonly available: boolean;
-  readonly editorMountedRef: Current<boolean>;
-  readonly studioRevisionProjectGenerationRef: Current<number>;
-  readonly drawingRef: Current<unknown>;
-  readonly pendingStrokeCommitsRef: Current<unknown>;
-  readonly captureStudioMutationTicket: () => StudioEditorMutationTicket;
-  readonly canApplyStudioMutation: (ticket: StudioEditorMutationTicket) => boolean;
-  readonly getSnapshot: () => StudioProjectSnapshot;
-  readonly canvasWidth: number;
-  readonly isDurableMask: (surfaceId: string) => boolean;
-  readonly save: StudioReviewCaptureBridgeDependencies["save"];
-  readonly captureAll: StudioReviewCaptureBridgeDependencies["captureAll"];
-}
-
-/** Read authority refs at each bridge boundary, including before React publishes an edit. */
-export function studioReviewCaptureHostContext(bindings: StudioReviewCaptureHostBindings) {
-  const ticket = bindings.captureStudioMutationTicket();
-  return {
-    workId: ticket.workId,
-    scopeKey: JSON.stringify([ticket.authScopeKey, ticket.workId]),
-    generation: JSON.stringify([ticket.accessGeneration, ticket.documentGeneration,
-      bindings.studioRevisionProjectGenerationRef.current]),
-    available: bindings.available && bindings.editorMountedRef.current
-      && bindings.canApplyStudioMutation(ticket)
-      && !bindings.drawingRef.current && !bindings.pendingStrokeCommitsRef.current,
-  };
-}
+export { studioReviewCaptureHostContext } from "./studio-review-capture-host-context";
 
 /** The host supplies runtime authority; this adapter owns capture projection and its dialog. */
-export function useStudioReviewCaptureHost(bindings: StudioReviewCaptureHostBindings) {
-  const capture = useStudioReviewCapture(JSON.stringify([bindings.studioAuthUserId, bindings.workId]), {
+export function useStudioReviewCaptureHost(bindings: StudioReviewCaptureHostBindings & { readonly reviewHandoff?: StudioReviewEditorHostNavigation }) {
+  const scopeKey = JSON.stringify([bindings.studioAuthUserId, bindings.workId]);
+  const [origin, setOrigin] = useState<{ key: string; value: StudioReviewCaptureOrigin | null } | null>(null);
+  const capture = useStudioReviewCapture(scopeKey, {
     getContext: () => studioReviewCaptureHostContext(bindings),
     projectRuntime: async (saved) => {
       const snapshot = bindings.getSnapshot();
@@ -49,14 +25,25 @@ export function useStudioReviewCaptureHost(bindings: StudioReviewCaptureHostBind
     save: bindings.save,
     captureAll: bindings.captureAll,
   });
+  const handlers = useStudioStableHandlers({ open: () => {
+    // Only a new capture owner can choose a new origin. Reopening or retrying the
+    // same intent must not relabel it after another comment's route is opened.
+    if (!capture.open()) return;
+    const request = studioReviewEditorRequestFromLocation(bindings.workId, bindings.reviewHandoff?.search ?? "");
+    setOrigin({ key: scopeKey, value: request && bindings.studioAuthUserId && bindings.workId
+      ? { actorId: bindings.studioAuthUserId, workId: bindings.workId, request } : null });
+  } });
   return {
-    open: capture.open,
-    dialog: <StudioReviewCaptureDialogMount
+    open: handlers.open,
+    dialog: <>
+      {bindings.reviewHandoff && <StudioReviewEditorHandoffMount bindings={bindings} navigation={bindings.reviewHandoff} />}
+      <StudioReviewCaptureDialogMount
       open={capture.visible}
       snapshot={capture.snapshot}
+      origin={origin?.key === scopeKey ? origin.value : null}
       onSave={() => { void capture.save(); }}
       onRetry={capture.retry}
       onClose={() => { void capture.close(); }}
-    />,
+    /></>,
   };
 }

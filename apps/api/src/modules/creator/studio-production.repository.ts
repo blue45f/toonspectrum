@@ -1,3 +1,5 @@
+import { studioHandoffChangedRoles, studioHandoffChangedBriefs } from "./studio-handoff-envelope-basis";
+import { studioHandoffEnvelopeSchema } from "@toonspectrum/studio-project-model";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
@@ -10,6 +12,12 @@ import {
   creatorWorkReviewLinks,
   creatorWorks,
   db,
+  studioArtifacts,
+  studioProjectGraphs,
+  studioRevisions,
+  studioReviewComments,
+  studioReviewCommentAssignees,
+  studioReviews,
   users,
 } from "../../db";
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
@@ -17,6 +25,8 @@ import {
   StudioPersonalKitDocumentSchema,
   StudioProductionWorkspaceDocumentSchema,
 } from "./studio-production.dto";
+import { studioReviewTaskCompletionChangedTasks, studioReviewTaskCompletionFingerprint, studioReviewTaskCompletionInvalidations } from "./studio-review-task-completion-invalidation";
+import { StudioProductionReviewReferenceError, validateStudioProductionReviewChanges } from "./studio-production-review-reference";
 
 import type { CreatorCollaborationAccess } from "./creator-collaboration.policy";
 import type {
@@ -26,6 +36,8 @@ import type {
   StudioReviewFeedbackInput,
   StudioReviewLinkRole,
 } from "./studio-production.dto";
+
+export { StudioProductionReviewReferenceError } from "./studio-production-review-reference";
 
 export const STUDIO_PRODUCTION_REPOSITORY = Symbol("STUDIO_PRODUCTION_REPOSITORY");
 const MAX_ACTIVE_REVIEW_LINKS = 50;
@@ -447,6 +459,10 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
       if (currentRevision !== baseRevision) {
         throw new StudioProductionRevisionConflictError(currentRevision);
       }
+      if ([...document.tasks, ...document.versions.flatMap((version) => version.tasks)]
+        .some((task) => task.reviewRef && task.reviewRef.subject.workId !== workId)) {
+        throw new StudioProductionReviewReferenceError("reference");
+      }
       const now = this.now();
       const nextRevision = currentRevision + 1;
       const canonical = StudioProductionWorkspaceDocumentSchema.parse({
@@ -462,6 +478,75 @@ export class DrizzleStudioProductionRepository implements StudioProductionReposi
       if (!context.access.manageMembers) {
         const protectedOperation = protectedProductionOperation(currentDocument, canonical);
         if (protectedOperation) throw new StudioProductionForbiddenError(protectedOperation);
+      }
+      await validateStudioProductionReviewChanges(currentDocument, canonical, {
+        readReference: async (reference) => {
+          const pin = reference.subject;
+          const rows = await transaction.select({ id: studioReviewComments.id })
+            .from(studioReviewComments)
+            .innerJoin(studioReviews, eq(studioReviewComments.reviewId, studioReviews.id))
+            .innerJoin(studioRevisions, and(eq(studioReviews.revisionId, studioRevisions.id), eq(studioReviews.artifactId, studioRevisions.artifactId)))
+            .innerJoin(studioArtifacts, eq(studioRevisions.artifactId, studioArtifacts.id))
+            .innerJoin(studioProjectGraphs, eq(studioArtifacts.projectId, studioProjectGraphs.id))
+            .where(and(eq(studioProjectGraphs.workId, workId), eq(studioProjectGraphs.id, pin.projectId),
+              eq(studioArtifacts.id, pin.artifactId), eq(studioReviews.id, pin.reviewId),
+              eq(studioRevisions.id, pin.revisionId), eq(studioRevisions.kind, "review-snapshot"),
+              eq(studioRevisions.rootGraphHash, pin.rootGraphHash), eq(studioReviewComments.id, reference.commentId),
+              sql`${studioReviewComments.anchor}->>'artifactId' = ${pin.artifactId}`,
+              sql`${studioReviewComments.anchor}->>'revisionId' = ${pin.revisionId}`))
+            .limit(1).for("share", { of: [studioReviewComments, studioReviews, studioRevisions, studioArtifacts, studioProjectGraphs] });
+          if (!rows.length) return null;
+          const assignees = await transaction.select({ userId: studioReviewCommentAssignees.assigneeUserId })
+            .from(studioReviewCommentAssignees).where(eq(studioReviewCommentAssignees.commentId, reference.commentId)).for("share");
+          return assignees.map((row) => row.userId);
+        },
+        readEligibleUserIds: async () => {
+          const members = await transaction.select({ userId: creatorWorkCollaborators.userId })
+            .from(creatorWorkCollaborators).where(and(eq(creatorWorkCollaborators.workId, workId),
+              eq(creatorWorkCollaborators.status, "active"), sql`${creatorWorkCollaborators.role} IN ('admin', 'editor')`)).for("share");
+          return [context.ownerUserId, ...members.map((member) => member.userId)];
+        },
+      });
+      // Completion receipts are server-owned and immutable. A reversal cannot revive
+      // old checks; unrelated workspace edits do not invalidate completed obligations.
+      const changedCompletionTasks = studioReviewTaskCompletionChangedTasks(currentDocument, canonical);
+      if (changedCompletionTasks.length) {
+      const completions = await transaction.execute<{ response: unknown }>(sql`
+        SELECT receipt.response FROM studio_mutation_receipt receipt
+        JOIN studio_artifact artifact ON artifact.id=receipt."artifactId"
+        JOIN studio_project_graph project ON project.id=artifact."projectId"
+        WHERE project."workId"=${workId} AND receipt.response->>'contract'='studio-review-task-completion-v1'
+          AND receipt.response->>'taskId' IN (${sql.join(changedCompletionTasks.map((id) => sql`${id}`), sql`, `)})`);
+      for (const invalidation of studioReviewTaskCompletionInvalidations(currentDocument, canonical, completions.rows.map((row) => row.response))) {
+        const key = studioReviewTaskCompletionFingerprint({ contract: invalidation.contract, actorUserId, invalidation });
+        await transaction.execute(sql`INSERT INTO studio_mutation_receipt
+          ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response,"createdAt")
+          VALUES (${invalidation.artifactId},${actorUserId},${key},${key},${invalidation.revisionId},${JSON.stringify(invalidation)}::jsonb,${now})
+          ON CONFLICT DO NOTHING`);
+      }
+      }
+      const changedRoles = studioHandoffChangedRoles(currentDocument, canonical);
+      const changedBriefs = studioHandoffChangedBriefs(currentDocument, canonical);
+      if (changedRoles.length || changedBriefs.length) {
+        const affected = await transaction.execute<{ response: unknown }>(sql`
+          SELECT receipt.response FROM studio_mutation_receipt receipt
+          JOIN studio_artifact artifact ON artifact.id=receipt."artifactId"
+          JOIN studio_project_graph project ON project.id=artifact."projectId"
+          WHERE project."workId"=${workId} AND receipt.response->>'contract'='studio-handoff-envelope-v1'
+          AND (receipt.response->'envelope'->'recipient'->>'roleAssignmentId'=ANY(${changedRoles}::text[])
+            OR receipt.response->'envelope'->'brief'->>'id'=ANY(${changedBriefs}::text[]))`);
+        for (const row of affected.rows) {
+          const parsed = studioHandoffEnvelopeSchema.safeParse((row.response as { envelope?: unknown } | null)?.envelope);
+          if (!parsed.success) continue;
+          const envelope = parsed.data;
+          const invalidation = { contract: "studio-handoff-envelope-invalidated-v1", workId, envelopeId: envelope.id,
+            workspaceRevision: nextRevision, reason: "recipient-or-brief-changed" };
+          const key = studioReviewTaskCompletionFingerprint({ invalidation, actorUserId });
+          await transaction.execute(sql`INSERT INTO studio_mutation_receipt
+            ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response,"createdAt")
+            VALUES (${envelope.completion.replacement.artifactId},${actorUserId},${key},${key},${envelope.completion.replacement.revisionId},${JSON.stringify(invalidation)}::jsonb,${now})
+            ON CONFLICT DO NOTHING`);
+        }
       }
       await transaction
         .insert(creatorWorkProductionWorkspaces)
