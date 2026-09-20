@@ -2034,6 +2034,7 @@ export class StudioProjectGraphRepository {
         }
       }
 
+      // Preserve exact database time even after a row-lock wait or clock correction.
       const terminal = input.status !== "changes-requested";
       const updated = await client.query<{
         status: StudioReviewSummaryRecord["status"];
@@ -2043,9 +2044,9 @@ export class StudioProjectGraphRepository {
       }>(
         `UPDATE studio_review
          SET status = $2,
-             "decidedAt" = CASE WHEN $3 THEN now() ELSE NULL END,
+             "decidedAt" = CASE WHEN $3 THEN GREATEST(statement_timestamp(), "createdAt", "updatedAt") ELSE NULL END,
              "decidedBy" = CASE WHEN $3 THEN $4 ELSE NULL END,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST(statement_timestamp(), "createdAt", "updatedAt")
          WHERE id = $1
          RETURNING status, "decidedAt", "decidedBy", "updatedAt"`,
         [reviewId, input.status, terminal, actorUserId],
@@ -2190,7 +2191,7 @@ export class StudioProjectGraphRepository {
          SET status = $2,
              "resolutionRevisionId" = $3,
              "resolvedBy" = $4,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST(statement_timestamp(), "createdAt", "updatedAt")
          WHERE id = $1
          RETURNING status,
                    "resolutionRevisionId" AS "resolutionRevisionId",
@@ -2283,7 +2284,7 @@ export class StudioProjectGraphRepository {
          SET status = 'reopened',
              "resolutionRevisionId" = NULL,
              "resolvedBy" = NULL,
-             "updatedAt" = now()
+             "updatedAt" = GREATEST(statement_timestamp(), "createdAt", "updatedAt")
          WHERE id = $1
          RETURNING "updatedAt"`,
         [commentId],
