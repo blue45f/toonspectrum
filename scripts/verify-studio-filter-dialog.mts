@@ -277,7 +277,11 @@ async function compareScreenshotPixels(
 async function openMainMenuGroup(page: Page, label: string): Promise<void> {
   const nav = page.locator('[data-studio-main-menu="true"]');
   await nav.waitFor({ state: "visible", timeout: 15_000 });
-  await page.keyboard.press("Escape").catch(() => undefined);
+  // Escape without an open menu belongs to the canvas and clears its image selection.
+  // Close an existing main-menu panel only; a normal title click must preserve the filter target.
+  if (await page.locator('[data-studio-main-menu-panel="true"]').count() > 0) {
+    await page.keyboard.press("Escape");
+  }
   await page.waitForTimeout(80);
   await nav.getByRole("menuitem", { name: label, exact: true }).click({ timeout: 5_000 });
   await page
@@ -406,7 +410,7 @@ async function main(): Promise<void> {
   cleanScratchDir({
     directory: SCRATCH,
     filePrefix: "studio-filter-dialog",
-    extensions: [".log", ".json"],
+    extensions: [".log", ".json", ".png"],
   });
 
   const startedAt = new Date().toISOString();
@@ -713,7 +717,14 @@ async function main(): Promise<void> {
       try {
         // 1) Place a fresh image via the file chooser; it becomes the selected element.
         await placeTestImage(page);
+        // Materialize the selected image's interactive handles before the baseline, using the
+        // same visible selection state that Undo restores. File placement can select the image
+        // before its transformer has mounted. Compare the entire crop, including these handles.
+        await page.locator('[data-studio-rail-tool-id="select"][aria-pressed="true"]').waitFor({ state: "visible" });
+        await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2);
+        await page.mouse.move(4, 4);
         const preScenario = await screenshotClipped(page, clip);
+        writeFileSync(join(SCRATCH, "studio-filter-dialog-image-target-before.png"), preScenario);
 
         // 2) The dialog must declare the direct-image (non-destructive) target.
         const openStartedAt = Date.now();
@@ -741,7 +752,9 @@ async function main(): Promise<void> {
         result.applyMs = Date.now() - applyStartedAt;
         await page.waitForTimeout(700);
 
+        await page.mouse.move(4, 4);
         const after = await screenshotClipped(page, clip);
+        writeFileSync(join(SCRATCH, "studio-filter-dialog-image-target-applied.png"), after);
         result.diff = await compareScreenshotPixels(page, preScenario, after);
         invariant(
           result.diff.changedPixels > result.diff.totalPixels * 0.005,
@@ -752,7 +765,9 @@ async function main(): Promise<void> {
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
         await page.waitForTimeout(900);
+        await page.mouse.move(4, 4);
         const restored = await screenshotClipped(page, clip);
+        writeFileSync(join(SCRATCH, "studio-filter-dialog-image-target-restored.png"), restored);
         result.undoDiff = await compareScreenshotPixels(page, preScenario, restored);
         invariant(
           result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
