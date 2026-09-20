@@ -1,3 +1,4 @@
+import { StudioWorkSessionEntry } from "../work-session/StudioWorkSessionEntry";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
@@ -828,6 +829,7 @@ function StudioProductionHubWorkspace({
         ) : null}
 
         {mode === "server-work" && serverWorkId ? <Suspense fallback={null}><StudioHandoffEnvelopeInbox workId={serverWorkId} /></Suspense> : null}
+        {mode === "server-work" && serverWorkId ? <StudioWorkSessionEntry key={serverWorkId} workId={serverWorkId} /> : null}
 
         {loadError ? (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm" role="alert">

@@ -6,12 +6,12 @@ apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts
 apps/api/src/modules/catalog/catalog-search-cache.test.ts
 apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts
 apps/api/src/modules/creator/studio-handoff-envelope.repository.test.ts
-apps/api/src/modules/creator/studio-review-task-completion-invalidation.test.ts
-apps/api/src/modules/creator/studio-review-task-completion.repository.test.ts
 apps/api/src/modules/creator/studio-live-acoustic-binding.test.ts
 apps/api/src/modules/creator/studio-live-lock.repository.test.ts
 apps/api/src/modules/creator/studio-live.gateway.test.ts
 apps/api/src/modules/creator/studio-live.protocol.test.ts
+apps/api/src/modules/creator/studio-review-task-completion-invalidation.test.ts
+apps/api/src/modules/creator/studio-review-task-completion.repository.test.ts
 apps/api/src/modules/fortune/fortune.controller.test.ts
 apps/api/src/modules/og/og-page.test.ts
 apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
@@ -225,6 +225,8 @@ apps/web/src/domains/creator/vrm/studio-vrm-torso-silhouette-measure.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts
+apps/web/src/domains/creator/work-session
+apps/web/src/domains/creator/workspace
 apps/web/src/domains/creator/workspace/StudioWorkspacePage.continuity.test.tsx
 apps/web/src/domains/creator/workspace/StudioWorkspaceProjectPicker.test.tsx
 apps/web/src/domains/creator/workspace/StudioWorkspaceSpaceBoundary.test.tsx
@@ -239,6 +241,7 @@ apps/web/src/infrastructure/search-client.test.ts
 apps/web/src/infrastructure/use-paginated-search.test.tsx
 apps/web/src/shared/catalog/catalog-pagination.test.ts
 apps/web/src/shared/components/CreatorExperienceModeSwitch.test.tsx
+apps/web/src/shared/components/workspace
 apps/web/src/shared/components/workspace/WorkspaceContextPanel.test.tsx
 apps/web/src/shared/lib/__tests__/search.test.ts
 apps/web/src/shared/lib/creator-role-contract.test.ts
@@ -252,6 +255,7 @@ packages/core/src/server/home.cpu-cache.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts
 packages/studio-project-model/src/__tests__/review-task-reference.test.ts
 packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts
+packages/studio-project-model/src/__tests__/work-session.test.ts
 packages/studio-project-model/src/__tests__/world-acoustic.test.ts
 packages/studio-project-model/src/__tests__/world-conversation.test.ts
 packages/studio-project-model/src/__tests__/world-publication.test.ts
