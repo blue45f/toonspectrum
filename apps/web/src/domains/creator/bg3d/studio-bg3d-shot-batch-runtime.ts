@@ -27,5 +27,11 @@ export { buildStudioBg3dShotBatchArchiveInWorker } from "./studio-bg3d-shot-batc
 export { buildStudioBg3dShotArtifacts } from "./studio-bg3d-shot-artifact-pipeline";
 export { buildStudioBg3dShotContactSheetsInWorker } from "./studio-bg3d-shot-contact-sheet-worker-client";
 
-export { buildStudioBg3dTiledShotArtifacts } from "./studio-bg3d-tiled-shot-artifacts";
+/** Heavy tiled protocol validation is required only when a shot actually exceeds the raster budget. */
+export async function buildStudioBg3dTiledShotArtifacts(
+  ...args: Parameters<typeof import("./studio-bg3d-tiled-shot-artifacts").buildStudioBg3dTiledShotArtifacts>
+): ReturnType<typeof import("./studio-bg3d-tiled-shot-artifacts").buildStudioBg3dTiledShotArtifacts> {
+  const runtime = await import("./studio-bg3d-tiled-shot-artifacts");
+  return runtime.buildStudioBg3dTiledShotArtifacts(...args);
+}
 export { STUDIO_BG3D_TILED_PNG_PROFILE, studioBg3dTilePipelineId, resolveStudioBg3dBatchTileShape, studioBg3dBatchOutputPixelBudget, studioBg3dBatchNeedsTiles } from "./studio-bg3d-tiled-batch-policy";

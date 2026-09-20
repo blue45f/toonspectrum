@@ -146,6 +146,11 @@ must report their actually exposed adapter, not rely on the requested command-li
 An actual saved-shot proof found an omitted `await` around the existing lazy source-size reader.
 It was corrected; identity checks now occur on both sides of that await. A test-only plan-id typo
 was also corrected to the real `planDigest` field, preserving the intended recovery assertion.
+The first production build passed but the existing bundle ratchet correctly detected eager inclusion
+of a shared 636 KB validation chunk in the batch runtime. The tiled artifact implementation now loads
+only when a shot actually enters the tiled path; the baseline is not raised to hide that regression.
+The final build must re-run the same ratchet and report its actual result.
+
 Existing upstream build, readback and codec warnings are kept visible. Small PSD results/fallbacks
 are inspected in the real ZIP manifest; 4K PSD is intentionally outside this implementation.
 
