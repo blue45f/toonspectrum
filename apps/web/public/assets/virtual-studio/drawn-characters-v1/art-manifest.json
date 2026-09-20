@@ -12,7 +12,7 @@
     "Four drawn walk key poses per direction, not eight in-between drawings.",
     "Wave and sit are directional held poses, not multi-frame action loops.",
     "Generated identity is visually matched; original source pixels are not retained in newly drawn poses.",
-    "Original production-v2 idle and existing pink work-state images retained. Silver has four directional four-frame review loops; other new work/action loops are not provided."
+    "Original production-v2 idle and existing pink work-state images retained. Silver has four directional four-frame review loops and pink has four directional four-frame drawing loops. Other new work/action loops are not provided."
   ],
   "assets": {
     "pink/walk-right": {
@@ -2516,10 +2516,546 @@
           634
         ]
       ]
+    },
+    "pink/draw-down": {
+      "skin": "pink",
+      "state": "draw-down",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-down.png",
+      "sourceImage": "exec-22e04a68-134a-4f2c-9e86-6f1837b57b17.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "737b24a666d8b61d8dcfa4c5204b132ccf6d212a81742ac242771041a8496015",
+      "bytes": 1124096,
+      "dimensions": [
+        1121,
+        1403
+      ],
+      "frameWidth": 560,
+      "frameHeight": 701,
+      "atlas": {
+        "width": 1121,
+        "height": 1403,
+        "remainder": {
+          "right": 1,
+          "bottom": 1,
+          "maxAlpha": 0,
+          "nonzeroAlphaPixels": 0
+        }
+      },
+      "remainderRgbaSha256": "0618b626d47c3b416c435b3fa496f6be0a875357ac280b3cabf60b510332a8ec",
+      "frames": [
+        {
+          "originX": 0.578571,
+          "originY": 0.975749,
+          "displayHeightRatio": 0.925677
+        },
+        {
+          "originX": 0.428571,
+          "originY": 0.975749,
+          "displayHeightRatio": 0.925677
+        },
+        {
+          "originX": 0.580357,
+          "originY": 0.942939,
+          "displayHeightRatio": 0.925677
+        },
+        {
+          "originX": 0.429464,
+          "originY": 0.941512,
+          "displayHeightRatio": 0.925677
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          163,
+          46,
+          477,
+          684
+        ],
+        [
+          82,
+          47,
+          397,
+          684
+        ],
+        [
+          160,
+          26,
+          487,
+          661
+        ],
+        [
+          77,
+          27,
+          399,
+          660
+        ]
+      ],
+      "transparentPixels": [
+        255921,
+        253233,
+        251907,
+        249979
+      ],
+      "frameRgbaSha256": [
+        "0de513ec2941a64760d9f126c808580553ce6c196badb185bcc79c2e642900d5",
+        "c7bed5e9408ce72a32589ccf6e477ac0c5da239a305e9a622a655d79e2cd983e",
+        "d525167f9454e2d013c5275717b74ff17787597097fd978dbd5ba7b67d21bde9",
+        "45c6af5d763c8d68a06a6159e1d00bc20a4edfbe7705cc623e523ec2fc6d821c"
+      ],
+      "footBounds": [
+        [
+          258,
+          591,
+          390,
+          684
+        ],
+        [
+          174,
+          591,
+          306,
+          684
+        ],
+        [
+          260,
+          591,
+          390,
+          661
+        ],
+        [
+          175,
+          591,
+          306,
+          660
+        ]
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-down.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-down.png": "bdc7798b527b04385c5618d6e05ec23d93e2d75c1cc68c13b29dee481612195e"
+      },
+      "drawingPropReference": {
+        "path": "production-v2/player-pink-state-draw.png",
+        "sha256": "bf39afaf60fbf2158353e1d892bc5afef64ea6edfb09b0f3c9ef678f328d8c68"
+      },
+      "action": "draw",
+      "direction": "down",
+      "phases": [
+        "observe",
+        "long-stroke",
+        "refine",
+        "check-recover"
+      ],
+      "byteIdentityPreserved": true
+    },
+    "pink/draw-right": {
+      "skin": "pink",
+      "state": "draw-right",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-right.png",
+      "sourceImage": "exec-d7960ae5-88b1-42e3-8add-6573084bb736.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "b8df511cb19651e5dfca5aab84ffbf7a0ffc0cdd7eb63c826ec46d3570f11f09",
+      "bytes": 1018185,
+      "dimensions": [
+        1122,
+        1402
+      ],
+      "frameWidth": 561,
+      "frameHeight": 701,
+      "atlas": {
+        "width": 1122,
+        "height": 1402,
+        "remainder": {
+          "right": 0,
+          "bottom": 0,
+          "maxAlpha": 0,
+          "nonzeroAlphaPixels": 0
+        }
+      },
+      "remainderRgbaSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "frames": [
+        {
+          "originX": 0.587344,
+          "originY": 0.96291,
+          "displayHeightRatio": 0.896771
+        },
+        {
+          "originX": 0.465241,
+          "originY": 0.965763,
+          "displayHeightRatio": 0.896771
+        },
+        {
+          "originX": 0.590018,
+          "originY": 0.955777,
+          "displayHeightRatio": 0.896771
+        },
+        {
+          "originX": 0.465241,
+          "originY": 0.955777,
+          "displayHeightRatio": 0.896771
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          140,
+          21,
+          482,
+          675
+        ],
+        [
+          73,
+          22,
+          423,
+          677
+        ],
+        [
+          140,
+          12,
+          483,
+          670
+        ],
+        [
+          75,
+          12,
+          419,
+          670
+        ]
+      ],
+      "transparentPixels": [
+        267729,
+        265452,
+        265741,
+        265110
+      ],
+      "frameRgbaSha256": [
+        "91d09135455a695cf1fc7c2590d46219bdb2f75e8d3da296233ed5031f4fe45f",
+        "c5a2d918e1578dfd387dc9ce6549729d5dad4bb07c12927e7f4f7e26c396d735",
+        "5eb23f95a0d47d14676c420dd185aaefa4bb18a9b702be635bea3d737addecec",
+        "42b9ea6b94ee848904ddc752dc2d06ae4a23bfdfc46b6cf0166771f092cfa21f"
+      ],
+      "footBounds": [
+        [
+          266,
+          591,
+          393,
+          675
+        ],
+        [
+          196,
+          591,
+          326,
+          677
+        ],
+        [
+          268,
+          591,
+          394,
+          670
+        ],
+        [
+          197,
+          591,
+          325,
+          670
+        ]
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-right.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-right.png": "db0f3c32ec818a6f991144a6ecedb8fd0eb2faff91c494c636268a566686517c"
+      },
+      "drawingPropReference": {
+        "path": "production-v2/player-pink-state-draw.png",
+        "sha256": "bf39afaf60fbf2158353e1d892bc5afef64ea6edfb09b0f3c9ef678f328d8c68"
+      },
+      "action": "draw",
+      "direction": "right",
+      "phases": [
+        "observe",
+        "long-stroke",
+        "refine",
+        "check-recover"
+      ],
+      "byteIdentityPreserved": true
+    },
+    "pink/draw-left": {
+      "skin": "pink",
+      "state": "draw-left",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-left.png",
+      "sourceImage": "exec-0d51eb8d-2edb-4f0d-98f1-133f795484a1.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "650f4581f321bb1de7af0f91a4cf9bd610e9ae9506b87612bda1c13af65ece75",
+      "bytes": 1134144,
+      "dimensions": [
+        1072,
+        1467
+      ],
+      "frameWidth": 536,
+      "frameHeight": 733,
+      "atlas": {
+        "width": 1072,
+        "height": 1467,
+        "remainder": {
+          "right": 0,
+          "bottom": 1,
+          "maxAlpha": 0,
+          "nonzeroAlphaPixels": 0
+        }
+      },
+      "remainderRgbaSha256": "1e86afc67a97177fc1bb99dd14b34066386b507704ce0bfc3a3f6174bf8251a8",
+      "frames": [
+        {
+          "originX": 0.54944,
+          "originY": 0.952251,
+          "displayHeightRatio": 0.942013
+        },
+        {
+          "originX": 0.472948,
+          "originY": 0.952251,
+          "displayHeightRatio": 0.942013
+        },
+        {
+          "originX": 0.551306,
+          "originY": 0.911323,
+          "displayHeightRatio": 0.942013
+        },
+        {
+          "originX": 0.472948,
+          "originY": 0.911323,
+          "displayHeightRatio": 0.942013
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          114,
+          44,
+          471,
+          698
+        ],
+        [
+          74,
+          45,
+          431,
+          698
+        ],
+        [
+          116,
+          15,
+          473,
+          668
+        ],
+        [
+          74,
+          13,
+          432,
+          668
+        ]
+      ],
+      "transparentPixels": [
+        254178,
+        253444,
+        255122,
+        253973
+      ],
+      "frameRgbaSha256": [
+        "b4b5a36ff619d64c2ad8aa38065829585d78451250bc3f515fc9d5a183cf527f",
+        "e94e79acb31fec2b1adc09e53555478b0db3567658964f3e2eacdbdaba242671",
+        "f2664011f006319a6437287d4c14520b70eadf7bd9d13902ee62c5f01050eea8",
+        "69a726ebe5311c07c3e0b922c39c17c68ece4caae72c1d13963b4e3f93e04fa3"
+      ],
+      "footBounds": [
+        [
+          227,
+          623,
+          362,
+          698
+        ],
+        [
+          186,
+          623,
+          321,
+          698
+        ],
+        [
+          228,
+          623,
+          363,
+          668
+        ],
+        [
+          186,
+          623,
+          321,
+          668
+        ]
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-left.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-left.png": "b1d956018f82335b8ffddf6d2175f5cc6929df691de77f1befbc72fe1f762aa1"
+      },
+      "drawingPropReference": {
+        "path": "production-v2/player-pink-state-draw.png",
+        "sha256": "bf39afaf60fbf2158353e1d892bc5afef64ea6edfb09b0f3c9ef678f328d8c68"
+      },
+      "action": "draw",
+      "direction": "left",
+      "phases": [
+        "observe",
+        "long-stroke",
+        "refine",
+        "check-recover"
+      ],
+      "byteIdentityPreserved": true
+    },
+    "pink/draw-up": {
+      "skin": "pink",
+      "state": "draw-up",
+      "url": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-up.png",
+      "sourceImage": "exec-2b30c624-f20e-4745-818d-79526f6f86cb.png",
+      "sourceRun": "01a0bb3f-0968-7303-bc77-c66fc680d664",
+      "sha256": "191f032e1e1d1ac96ed13ffcbf4658cc62a0777f7ae2cb9053e79dbe32fd71a0",
+      "bytes": 863900,
+      "dimensions": [
+        1072,
+        1467
+      ],
+      "frameWidth": 536,
+      "frameHeight": 733,
+      "atlas": {
+        "width": 1072,
+        "height": 1467,
+        "remainder": {
+          "right": 0,
+          "bottom": 1,
+          "maxAlpha": 1,
+          "nonzeroAlphaPixels": 1
+        }
+      },
+      "remainderRgbaSha256": "8fc0f5a312be29412752a8c4ef221337433ae55d575ffbeceaaabc8842577d54",
+      "frames": [
+        {
+          "originX": 0.57556,
+          "originY": 0.918145,
+          "displayHeightRatio": 1.014177
+        },
+        {
+          "originX": 0.440299,
+          "originY": 0.91678,
+          "displayHeightRatio": 1.014177
+        },
+        {
+          "originX": 0.580224,
+          "originY": 0.919509,
+          "displayHeightRatio": 1.014177
+        },
+        {
+          "originX": 0.442164,
+          "originY": 0.918145,
+          "displayHeightRatio": 1.014177
+        }
+      ],
+      "alphaThreshold": 64,
+      "alphaBounds": [
+        [
+          154,
+          66,
+          448,
+          673
+        ],
+        [
+          86,
+          65,
+          394,
+          672
+        ],
+        [
+          152,
+          67,
+          451,
+          674
+        ],
+        [
+          87,
+          66,
+          376,
+          673
+        ]
+      ],
+      "transparentPixels": [
+        269603,
+        266264,
+        267829,
+        266709
+      ],
+      "frameRgbaSha256": [
+        "4c71b4b7ad7f01015098ba03c45331e631a940daaed55b7260902612e7adcc31",
+        "754617fc26353f7bef3179d7e1833566d5e4b0d64fc58e5fd7186136e2204d9f",
+        "9c45020aad4596c4cdd1c5936938802f8bd32d4c5a900e3e37bccad25bc33e0d",
+        "7dbd1899e3b8626e4b06be75af0a0bba5d313eeefcb3cd97ec3a0ba074a1adba"
+      ],
+      "footBounds": [
+        [
+          245,
+          623,
+          372,
+          673
+        ],
+        [
+          172,
+          623,
+          300,
+          672
+        ],
+        [
+          247,
+          623,
+          375,
+          674
+        ],
+        [
+          173,
+          623,
+          301,
+          673
+        ]
+      ],
+      "authoredReferences": [
+        "production-v2/player-pink-direction-up.png"
+      ],
+      "authoredReferenceSha256": {
+        "production-v2/player-pink-direction-up.png": "ba66a0ea323c2a9caef8b952e7606534b902bffca174f251676ae1eb70fac23e"
+      },
+      "drawingPropReference": {
+        "path": "production-v2/player-pink-state-draw.png",
+        "sha256": "bf39afaf60fbf2158353e1d892bc5afef64ea6edfb09b0f3c9ef678f328d8c68"
+      },
+      "action": "draw",
+      "direction": "up",
+      "phases": [
+        "observe",
+        "long-stroke",
+        "refine",
+        "check-recover"
+      ],
+      "byteIdentityPreserved": true
     }
   },
   "reviewActions": {
     "silver": [
+      "down",
+      "left",
+      "right",
+      "up"
+    ]
+  },
+  "drawingActions": {
+    "pink": [
       "down",
       "left",
       "right",

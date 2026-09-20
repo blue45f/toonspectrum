@@ -4,6 +4,7 @@ import {
   StudioCharacterAssetResidency, studioCharacterStaticAsset, studioCharacterVisualAssets,
   studioCharacterFrameGeometry,
   studioCharacterActionFrame,
+  studioCharacterActionSheetMatches,
   type StudioCharacterTextureAsset,
 } from "./studio-virtual-space-character-assets";
 
@@ -31,6 +32,7 @@ describe("Virtual Studio character texture residency", () => {
       expect(appearance.capabilities).toEqual(expect.arrayContaining(["idle", "walk-down", "walk-left", "walk-right", "walk-up", "sit", "wave"]));
       expect(appearance.capabilities.includes("draw")).toBe(index === 0);
       expect(appearance.capabilities.includes("review")).toBe(index < 2);
+      expect(new Set(appearance.capabilities).size).toBe(appearance.capabilities.length);
       const resolved = resolveStudioCharacterAppearance({ avatarIndex: (index + 1) % 4, appearance }, "peer", "sit");
       expect(resolved.skin.key).toBe(STUDIO_CHARACTER_SKINS[index]!.key);
       expect(resolved.clip).toBe("sit");
@@ -64,6 +66,24 @@ describe("Virtual Studio character texture residency", () => {
       expect(studioCharacterVisualAssets(silver, direction, "idle")).toEqual([assets[0]]);
       expect(studioCharacterVisualAssets(STUDIO_CHARACTER_SKINS[2]!, direction, "review")).toHaveLength(1);
     }
+  });
+  it("loads one actual pink drawing direction and accepts only its declared original PNG layout", () => {
+    for (const direction of ["down", "left", "right", "up"] as const) {
+      const clip = studioCharacterActionClip(skin, direction, "draw")!;
+      const assets = studioCharacterVisualAssets(skin, direction, "draw");
+      expect(assets.filter((asset) => asset.type === "spritesheet").map((asset) => asset.key))
+        .toEqual([`studio-player-pink-draw-sheet-${direction}`]);
+      expect(assets).toContainEqual(studioCharacterStaticAsset(skin, direction, "draw"));
+      expect(studioCharacterActionSheetMatches(clip, clip.atlas!.width, clip.atlas!.height)).toBe(true);
+      expect(studioCharacterActionSheetMatches(clip, clip.atlas!.width + 1, clip.atlas!.height)).toBe(false);
+      expect(studioCharacterActionSheetMatches(clip, clip.atlas!.width, clip.atlas!.height - 1)).toBe(false);
+      expect([0, 600, 1200, 1800, 2400].map((ms) => studioCharacterActionFrame(clip, ms, false))).toEqual([0, 1, 2, 3, 0]);
+      expect(studioCharacterActionFrame(clip, 1800, true)).toBe(0);
+      expect(studioCharacterVisualAssets(skin, direction, "walk").some((asset) => asset.key.includes("draw-sheet"))).toBe(false);
+    }
+    const silver = studioCharacterActionClip(STUDIO_CHARACTER_SKINS[1]!, "up", "review")!;
+    expect(studioCharacterActionSheetMatches(silver, 1122, 1402)).toBe(true);
+    expect(studioCharacterActionSheetMatches(silver, 1122, 1403)).toBe(false);
   });
   it("plays four genuine review phases at a fixed foot attachment and freezes the first frame for reduced motion", () => {
     for (const direction of ["down", "left", "right", "up"] as const) {

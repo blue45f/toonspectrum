@@ -4,7 +4,7 @@ import {
   type StudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearanceClip, type StudioVirtualSpaceAppearanceRegistry,
 } from "./studio-virtual-space-appearance";
 import {
-  PINK_DRAWN_POSES, PINK_DRAWN_WALKS,
+  PINK_DRAWN_POSES, PINK_DRAWN_WALKS, PINK_DRAWN_DRAWS,
   SILVER_DRAWN_POSES, SILVER_DRAWN_WALKS, SILVER_DRAWN_REVIEWS,
   DARK_DRAWN_POSES, DARK_DRAWN_WALKS,
   PURPLE_DRAWN_POSES, PURPLE_DRAWN_WALKS,
@@ -36,6 +36,12 @@ export interface StudioCharacterAtlasClip {
   readonly textureUrl: string;
   readonly frameWidth: number;
   readonly frameHeight: number;
+  /** Original PNG dimensions and explicitly inspected pixels outside the four integer cells. */
+  readonly atlas?: {
+    readonly width: number;
+    readonly height: number;
+    readonly remainder: { readonly right: 0 | 1; readonly bottom: 0 | 1; readonly maxAlpha: 0 | 1; readonly nonzeroAlphaPixels: 0 | 1 };
+  };
   readonly start: number;
   readonly end: number;
   readonly frameRate: number;
@@ -76,6 +82,7 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
     directional: directionUrls("pink"),
     clips: PINK_DRAWN_WALKS,
     poses: PINK_DRAWN_POSES,
+    actions: { draw: PINK_DRAWN_DRAWS },
     state: {
       talk: "/assets/virtual-studio/production-v2/player-pink-state-talk.png",
       draw: "/assets/virtual-studio/production-v2/player-pink-state-draw.png",
@@ -89,14 +96,14 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-review-1";
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-actions-2";
 export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
   revision: STUDIO_CHARACTER_REGISTRY_REVISION,
   fallbackSkinKey: FALLBACK_SKIN.key,
   skins: STUDIO_CHARACTER_SKINS.map((skin) => ({
     key: skin.key,
-    capabilities: ["idle", ...Object.keys(skin.clips ?? {}), ...Object.keys(skin.poses ?? {}),
-      ...Object.keys(skin.state ?? {}), ...Object.keys(skin.actions ?? {})] as StudioVirtualSpaceAppearanceClip[],
+    capabilities: [...new Set(["idle", ...Object.keys(skin.clips ?? {}), ...Object.keys(skin.poses ?? {}),
+      ...Object.keys(skin.state ?? {}), ...Object.keys(skin.actions ?? {})])] as StudioVirtualSpaceAppearanceClip[],
   })),
 });
 

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { decodeDrawnArtPng, DRAWN_ART_DIRECTORY, verifyDrawnArtFramePixels, verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
+import { decodeDrawnArtPng, DRAWN_ART_DIRECTORY, verifyDrawnArtFramePixels, verifyDrawnArtAtlasRemainder, verifyVirtualStudioDrawnArt } from "./verify-virtual-studio-drawn-art.mjs";
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
@@ -27,14 +27,16 @@ function syntheticPng(width, height) {
   return bytes;
 }
 
-test("preserves 24 base sheets/96 frames and verifies four silver review sheets/16 frames against runtime bindings", async () => {
+test("preserves 28 base/review sheets and verifies four pink drawing sheets against runtime bindings", async () => {
   const result = await verifyVirtualStudioDrawnArt();
-  assert.equal(result.assetCount, 28);
-  assert.equal(result.frameCount, 112);
+  assert.equal(result.assetCount, 32);
+  assert.equal(result.frameCount, 128);
   assert.equal(result.basePoseAssetCount, 24);
   assert.equal(result.basePoseFrameCount, 96);
   assert.equal(result.reviewAssetCount, 4);
   assert.equal(result.reviewFrameCount, 16);
+  assert.equal(result.drawingAssetCount, 4);
+  assert.equal(result.drawingFrameCount, 16);
   assert.equal(result.registryBindingsVerified, true);
 });
 
@@ -66,6 +68,42 @@ test("rejects silver review horizontal foot drift against actual decoded shoe pi
   assert.throws(() => verifyDrawnArtFramePixels(decoded, asset), /review foot origin/u);
 });
 
+test("verifies declared pink drawing remainders and rejects larger, opaque or undeclared pixels", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const asset = manifest.assets["pink/draw-up"];
+  const decoded = decodeDrawnArtPng(await readFile(path.join(DRAWN_ART_DIRECTORY, "player-pink-draw-up.png")));
+  verifyDrawnArtFramePixels(decoded, asset);
+  assert.deepEqual(asset.atlas.remainder, { right: 0, bottom: 1, maxAlpha: 1, nonzeroAlphaPixels: 1 });
+  const wrongSize = structuredClone(asset); wrongSize.atlas.remainder.bottom = 2;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, wrongSize), /dimensions must be zero or one/u);
+  const wrongFull = structuredClone(asset); wrongFull.atlas.height--;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, wrongFull), /full atlas dimensions/u);
+  const undeclared = structuredClone(asset); delete undeclared.atlas;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, undeclared), /explicit full atlas/u);
+  const wrongCells = structuredClone(asset); wrongCells.frameHeight += .5;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, wrongCells), /positive integers/u);
+  const lastRow = (decoded.height - 1) * decoded.width * 4;
+  const opaque = { ...decoded, rgba: Buffer.from(decoded.rgba) }; opaque.rgba[lastRow + 3] = 255;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(opaque, asset), /opaque pixel/u);
+  const multiple = { ...decoded, rgba: Buffer.from(decoded.rgba) }; multiple.rgba[lastRow + 3] = 1; multiple.rgba[lastRow + 7] = 1;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(multiple, asset), /more than one/u);
+  const changedHiddenRgb = { ...decoded, rgba: Buffer.from(decoded.rgba) }; changedHiddenRgb.rgba[lastRow] ^= 1;
+  assert.throws(() => verifyDrawnArtAtlasRemainder(changedHiddenRgb, asset), /RGBA bytes drifted/u);
+});
+
+test("keeps every pre-existing drawn sheet on the exact two-cell format without the new remainder exception", async () => {
+  const manifest = JSON.parse(await readFile(path.join(DRAWN_ART_DIRECTORY, "art-manifest.json"), "utf8"));
+  const originalAssets = Object.values(manifest.assets).filter((asset) => !asset.state.startsWith("draw-"));
+  assert.equal(originalAssets.length, 28);
+  for (const asset of originalAssets) {
+    assert.equal(asset.atlas, undefined);
+    const decoded = { width: asset.dimensions[0], height: asset.dimensions[1], rgba: Buffer.alloc(0) };
+    verifyDrawnArtAtlasRemainder(decoded, asset);
+    assert.throws(() => verifyDrawnArtAtlasRemainder({ ...decoded, height: decoded.height + 1 }, asset), /exactly two cells/u);
+    assert.throws(() => verifyDrawnArtAtlasRemainder(decoded, { ...asset, atlas: { remainder: { bottom: 1 } } }), /existing sheets cannot opt/u);
+  }
+});
+
 async function createFixture(context, { dimensions = [10, 12], sha256 } = {}) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "toonstudio-art-manifest-"));
   (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
@@ -89,9 +127,10 @@ test("verifies every current production-v2 output without claiming source revali
   const assets = new Map(result.assets.map((asset) => [asset.name, asset]));
 
   assert.equal(result.assetCount, 36);
-  assert.equal(result.drawnArt.assetCount, 28);
+  assert.equal(result.drawnArt.assetCount, 32);
   assert.equal(result.drawnArt.basePoseFrameCount, 96);
   assert.equal(result.drawnArt.reviewFrameCount, 16);
+  assert.equal(result.drawnArt.drawingFrameCount, 16);
   assert.equal(result.drawnArt.decodedPixelsVerified, true);
   assert(result.totalBytes > 0);
   assert.equal(result.outputIntegrityVerified, true);

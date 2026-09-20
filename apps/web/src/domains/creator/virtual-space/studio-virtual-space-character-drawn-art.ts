@@ -209,6 +209,177 @@ export const PINK_DRAWN_POSES = {
   }
 } satisfies Record<string, StudioCharacterPoseSheet>;
 
+export const PINK_DRAWN_DRAWS = {
+  "down": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-down.png",
+    "frameWidth": 560,
+    "frameHeight": 701,
+    "atlas": {
+      "width": 1121,
+      "height": 1403,
+      "remainder": {
+        "right": 1,
+        "bottom": 1,
+        "maxAlpha": 0,
+        "nonzeroAlphaPixels": 0
+      }
+    },
+    "frames": [
+      {
+        "originX": 0.578571,
+        "originY": 0.975749,
+        "displayHeightRatio": 0.925677
+      },
+      {
+        "originX": 0.428571,
+        "originY": 0.975749,
+        "displayHeightRatio": 0.925677
+      },
+      {
+        "originX": 0.580357,
+        "originY": 0.942939,
+        "displayHeightRatio": 0.925677
+      },
+      {
+        "originX": 0.429464,
+        "originY": 0.941512,
+        "displayHeightRatio": 0.925677
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  },
+  "right": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-right.png",
+    "frameWidth": 561,
+    "frameHeight": 701,
+    "atlas": {
+      "width": 1122,
+      "height": 1402,
+      "remainder": {
+        "right": 0,
+        "bottom": 0,
+        "maxAlpha": 0,
+        "nonzeroAlphaPixels": 0
+      }
+    },
+    "frames": [
+      {
+        "originX": 0.587344,
+        "originY": 0.96291,
+        "displayHeightRatio": 0.896771
+      },
+      {
+        "originX": 0.465241,
+        "originY": 0.965763,
+        "displayHeightRatio": 0.896771
+      },
+      {
+        "originX": 0.590018,
+        "originY": 0.955777,
+        "displayHeightRatio": 0.896771
+      },
+      {
+        "originX": 0.465241,
+        "originY": 0.955777,
+        "displayHeightRatio": 0.896771
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  },
+  "left": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-left.png",
+    "frameWidth": 536,
+    "frameHeight": 733,
+    "atlas": {
+      "width": 1072,
+      "height": 1467,
+      "remainder": {
+        "right": 0,
+        "bottom": 1,
+        "maxAlpha": 0,
+        "nonzeroAlphaPixels": 0
+      }
+    },
+    "frames": [
+      {
+        "originX": 0.54944,
+        "originY": 0.952251,
+        "displayHeightRatio": 0.942013
+      },
+      {
+        "originX": 0.472948,
+        "originY": 0.952251,
+        "displayHeightRatio": 0.942013
+      },
+      {
+        "originX": 0.551306,
+        "originY": 0.911323,
+        "displayHeightRatio": 0.942013
+      },
+      {
+        "originX": 0.472948,
+        "originY": 0.911323,
+        "displayHeightRatio": 0.942013
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  },
+  "up": {
+    "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-pink-draw-up.png",
+    "frameWidth": 536,
+    "frameHeight": 733,
+    "atlas": {
+      "width": 1072,
+      "height": 1467,
+      "remainder": {
+        "right": 0,
+        "bottom": 1,
+        "maxAlpha": 1,
+        "nonzeroAlphaPixels": 1
+      }
+    },
+    "frames": [
+      {
+        "originX": 0.57556,
+        "originY": 0.918145,
+        "displayHeightRatio": 1.014177
+      },
+      {
+        "originX": 0.440299,
+        "originY": 0.91678,
+        "displayHeightRatio": 1.014177
+      },
+      {
+        "originX": 0.580224,
+        "originY": 0.919509,
+        "displayHeightRatio": 1.014177
+      },
+      {
+        "originX": 0.442164,
+        "originY": 0.918145,
+        "displayHeightRatio": 1.014177
+      }
+    ],
+    "start": 0,
+    "end": 3,
+    "frameRate": 1.6666666666666667,
+    "repeat": -1,
+    "technique": "drawn"
+  }
+} satisfies Record<string, StudioCharacterAtlasClip>;
+
 export const SILVER_DRAWN_WALKS = {
   "walk-right": {
     "textureUrl": "/assets/virtual-studio/drawn-characters-v1/player-silver-walk-right.png",

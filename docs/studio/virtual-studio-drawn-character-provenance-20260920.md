@@ -254,3 +254,7 @@ The static contact sheets use the same source cells and runtime geometry and wer
 ## Silver continuous review addition
 
 The original24 walk/held-pose PNGs and96 drawings remain intact. A separate accepted addition now provides four silver directional review sheets (16 true stationary action frames), making the pack28 PNGs/112 drawings. Exact prompts, pixel integrity, current-direction loading and actual Phaser Canvas/WebGL acceptance are in [the silver review provenance](virtual-studio-silver-review-art-provenance-20260920.md). Other missing continuous work/action clips remain separate requirements.
+
+## Pink continuous drawing addition
+
+The original24 walk/held-pose sheets and4 silver review sheets remain intact. Four new pink directional drawing sheets add16 actual action frames, bringing the checked pack to32 PNGs/128 drawings. Their original PNG dimensions and tiny declared outer remainders are preserved and separately verified; existing28 exact-grid checks remain strict. See [pink drawing provenance and acceptance](virtual-studio-pink-drawing-art-provenance-20260920.md). Other character action loops remain separate requirements.

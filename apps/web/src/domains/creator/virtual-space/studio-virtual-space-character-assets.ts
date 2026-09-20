@@ -43,6 +43,19 @@ export function studioCharacterActionFrame(clip: StudioCharacterAtlasClip, elaps
   return clip.start + Math.floor(elapsedMs * clip.frameRate / 1_000) % (clip.end - clip.start + 1);
 }
 
+/** Never infer a different cell grid from an unexpected CDN/source image. */
+export function studioCharacterActionSheetMatches(clip: StudioCharacterAtlasClip, width: number, height: number): boolean {
+  const atlas = clip.atlas;
+  if (!atlas) return width === clip.frameWidth * 2 && height === clip.frameHeight * 2;
+  const remainder = atlas.remainder;
+  return [width, height, clip.frameWidth, clip.frameHeight].every((n) => Number.isSafeInteger(n) && n > 0)
+    && width === atlas.width && height === atlas.height
+    && (remainder.right === 0 || remainder.right === 1) && (remainder.bottom === 0 || remainder.bottom === 1)
+    && width === clip.frameWidth * 2 + remainder.right && height === clip.frameHeight * 2 + remainder.bottom
+    && (remainder.maxAlpha === 0 || remainder.maxAlpha === 1)
+    && (remainder.nonzeroAlphaPixels === 0 || remainder.nonzeroAlphaPixels === 1);
+}
+
 export function studioCharacterFrameGeometry(
   frame: StudioCharacterFramePresentation | undefined,
   frameWidth: number,

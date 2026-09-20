@@ -44,6 +44,7 @@ import {
   studioCharacterFrameGeometry,
   studioCharacterActionTextureKey,
   studioCharacterActionFrame,
+  studioCharacterActionSheetMatches,
   studioCharacterPoseTextureKey,
   studioCharacterStaticAsset,
   studioCharacterStaticTextureKey as staticTextureKey,
@@ -400,7 +401,9 @@ export function StudioVirtualSpacePhaserCanvas({
         if (sceneReady && owner) characterAssets.use(owner, studioCharacterVisualAssets(skin, nextFacing, nextState), sprite.texture.key);
         const action = studioCharacterActionClip(skin, nextFacing, nextState);
         const actionKey = action ? studioCharacterActionTextureKey(skin, nextFacing, nextState) : null;
+        const actionSource = actionKey && scene.textures.exists(actionKey) ? scene.textures.get(actionKey).source[0] : undefined;
         if (action && actionKey && scene.textures.exists(actionKey)
+          && actionSource && studioCharacterActionSheetMatches(action, actionSource.width, actionSource.height)
           && action.end < scene.textures.get(actionKey).frameTotal - 1) {
           if (sprite.anims.isPlaying) sprite.stop();
           if (sprite.getData("actionKey") !== actionKey) {
