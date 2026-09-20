@@ -1,4 +1,6 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import type { StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
+import type { StudioWorldAcousticZoneDefinition } from "./studio-virtual-space-acoustics";
 import type {
   StudioVirtualSpaceWorldManifest,
   StudioWorldInteractionDefinition,
@@ -73,9 +75,9 @@ function layerObjects(map: StudioTiledMapLike, layerName: string): readonly Tile
       }
       if (layer.type !== "objectgroup" || layer.name !== layerName) continue;
       found = true;
-      if (!active || ((layerName === "props" || layerName === "occlusion-layers") && invisible)) continue;
+      if (!active || ((layerName === "props" || layerName === "occlusion-layers" || layerName === "npc-activity-anchors") && invisible)) continue;
       for (const object of layer.objects ?? []) {
-        if (property(object, "enabled") === false || ((layerName === "props" || layerName === "occlusion-layers") && object.visible === false)) continue;
+        if (property(object, "enabled") === false || ((layerName === "props" || layerName === "occlusion-layers" || layerName === "npc-activity-anchors") && object.visible === false)) continue;
         if (layerName === "colliders" && (object.polygon || object.polyline || Number(object.rotation ?? 0) !== 0)) {
           throw new Error("Arcade collision layers require axis-aligned rectangle objects");
         }
@@ -135,7 +137,7 @@ export function studioWorldManifestFromTiled(
   map: StudioTiledMapLike,
   base: StudioVirtualSpaceWorldManifest,
 ): StudioVirtualSpaceWorldManifest {
-  const layers = new Map(["rooms", "colliders", "props", "interactions", "portals", "spawns", "npcs", "interaction-slots", "occlusion-layers"]
+  const layers = new Map(["rooms", "colliders", "props", "interactions", "portals", "spawns", "npcs", "interaction-slots", "occlusion-layers", "npc-activity-anchors", "acoustic-zones"]
     .map((name) => [name, layerObjects(map, name)] as const));
   const objects = (name: string) => layers.get(name) ?? [];
   const rooms = objects("rooms").map((object): StudioWorldRoomDefinition => ({
@@ -229,7 +231,26 @@ export function studioWorldManifestFromTiled(
     speed: optionalNumber(property(object, "speed")) ?? 72,
     behavior: String(property(object, "behavior") ?? "idle") as StudioWorldNpcDefinition["behavior"],
     patrol: parsePatrol(property(object, "patrol")),
+    ...(property(object, "activityAnchorIds") === undefined ? {} : { activityAnchorIds: String(property(object, "activityAnchorIds")).split(";") }),
   }));
+
+  const npcActivityAnchors = objects("npc-activity-anchors").map((object): StudioWorldNpcActivityAnchor => {
+    if (Number(object.rotation ?? 0) !== 0) throw new Error("NPC activity anchors require unrotated floor points");
+    const point = (prefix: string) => ({ x: Number(object.x ?? 0) + Number(property(object, `${prefix}OffsetX`)), y: Number(object.y ?? 0) + Number(property(object, `${prefix}OffsetY`)) });
+    return { id: object.name ?? `npc-activity-${object.id ?? 0}`, roomId: String(property(object, "roomId") ?? ""),
+      approachPoint: { x: Number(object.x ?? 0), y: Number(object.y ?? 0) }, anchorPoint: point("anchor"), exitPoint: point("exit"),
+      facing: String(property(object, "facing") ?? "") as StudioWorldNpcActivityAnchor["facing"],
+      activity: String(property(object, "activity") ?? "") as StudioWorldNpcActivityAnchor["activity"],
+      animation: String(property(object, "animation") ?? "") as StudioWorldNpcActivityAnchor["animation"],
+      minDurationMs: Number(property(object, "minDurationMs")), maxDurationMs: Number(property(object, "maxDurationMs")),
+      ...(property(object, "seatOffsetX") !== undefined || property(object, "seatOffsetY") !== undefined ? { seatAttachmentPoint: point("seat") } : {}) };
+  });
+  const acousticZones = objects("acoustic-zones").map((object): StudioWorldAcousticZoneDefinition => {
+    if (Number(object.rotation ?? 0) !== 0 || object.polygon || object.polyline) throw new Error("Acoustic zones require axis-aligned rectangles");
+    return { id: object.name ?? `acoustic-${object.id ?? 0}`, ...rect(object), roomId: String(property(object, "roomId") ?? ""),
+      policy: String(property(object, "policy") ?? "") as StudioWorldAcousticZoneDefinition["policy"],
+      ...(property(object, "doorId") !== undefined ? { doorId: String(property(object, "doorId")) } : {}) };
+  });
 
   const interactionSlots = objects("interaction-slots").map((object): StudioWorldInteractionSlotDefinition => ({
     id: object.name ?? `slot-${object.id ?? 0}`,
@@ -266,9 +287,13 @@ export function studioWorldManifestFromTiled(
     interactions: layers.get("interactions") !== undefined ? interactions : base.interactions,
     portals: layers.get("portals") !== undefined ? portals : base.portals,
     spawns: layers.get("spawns") !== undefined ? spawns : base.spawns,
-    npcs: layers.get("npcs") !== undefined ? npcs : base.npcs,
+    npcs: layers.get("npcs") !== undefined ? npcs : layers.get("npc-activity-anchors") === undefined
+      ? base.npcs.map((npc) => ({ ...npc, activityAnchorIds: undefined })) : base.npcs,
     interactionSlots,
     // Missing optional visual layers do not inherit a different background's furniture mask.
     occlusionLayers,
+    npcActivityAnchors,
+    // Missing geometry never inherits public-media access from another world.
+    acousticZones,
   };
 }

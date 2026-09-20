@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { StudioProjectRecord, StudioReviewRecord, StudioRevisionRecord } from "../project-graph/studio-project-graph-contract";
 import { studioProjectRecordSchema, studioReviewRecordSchema, studioRevisionRecordSchema } from "../project-graph/studio-project-graph-contract";
 import {
-  listStudioVirtualSpaceReviewSubjects, parseStudioVirtualSpaceReviewSubject,
+  listStudioVirtualSpaceReviewSubjects, listStudioVirtualSpaceReviewHistory, parseStudioVirtualSpaceReviewSubject,
   studioVirtualSpaceReviewHref, studioVirtualSpaceReviewSubjectFromLocation,
   verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewAuthority,
 } from "./studio-virtual-space-review-invitation";
@@ -123,6 +123,41 @@ describe("version-pinned shared review authority", () => {
 });
 
 describe("shared review selection and identity", () => {
+  it("offers closed history to a viewer for comparison without granting invitations or changing the pinned source", async () => {
+    const { authority, review, revision, project } = fixture();
+    project.access.edit = false;
+    const previous = { ...revision, id: "previous-snapshot", rootGraphHash: "b".repeat(64) };
+    authority.listRevisions.mockResolvedValue([revision, previous]);
+    authority.listReviews.mockResolvedValue([review, { ...review, id: "previous-review", revisionId: previous.id, status: "approved" }]);
+    const result = await listStudioVirtualSpaceReviewHistory(subject, authority);
+    expect(result).toMatchObject({ ok: true, truncated: false, choices: [{ subject: {
+      ...subject, reviewId: "previous-review", revisionId: previous.id, rootGraphHash: previous.rootGraphHash,
+    } }] });
+    expect(await listStudioVirtualSpaceReviewSubjects(subject.workId, authority)).toEqual({ ok: false, reason: "access-denied" });
+    expect(project.artifacts[0]!.headRevisionId).toBe("newer-editable-head");
+  });
+
+  it("excludes another artifact, missing snapshots and duplicate review identities from comparison history", async () => {
+    const { authority, review, revision } = fixture();
+    const previous = { ...review, id: "previous", status: "rejected" as const };
+    authority.listReviews.mockResolvedValue([review, previous, previous,
+      { ...previous, id: "foreign", artifactId: "foreign-artifact" },
+      { ...previous, id: "missing", revisionId: "missing-snapshot" }]);
+    const result = await listStudioVirtualSpaceReviewHistory(subject, authority);
+    expect(result.ok && result.choices.map((choice) => choice.subject.reviewId)).toEqual(["previous"]);
+    expect(result.ok && result.choices[0]!.subject.rootGraphHash).toBe(revision.rootGraphHash);
+  });
+
+  it("rejects revoked access or history reads that outlive the base pin's verification lease", async () => {
+    const { authority, review, advance, project } = fixture();
+    project.access.view = false;
+    expect(await listStudioVirtualSpaceReviewHistory(subject, authority)).toEqual({ ok: false, reason: "access-denied" });
+    expect(authority.listReviews).not.toHaveBeenCalled();
+    project.access.view = true;
+    authority.listReviews.mockImplementation(async () => { advance(15_000); return [review]; });
+    expect(await listStudioVirtualSpaceReviewHistory(subject, authority)).toEqual({ ok: false, reason: "unavailable" });
+  });
+
   it("discovers existing accessible review snapshots without creating server records", async () => {
     const { authority, review } = fixture();
     authority.listReviews.mockResolvedValue([review, { ...review, id: "closed-review", status: "cancelled" },

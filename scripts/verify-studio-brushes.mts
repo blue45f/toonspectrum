@@ -109,6 +109,11 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 import {
+  openStudioShapeCorrectionMenu,
+  studioShapeLiveReadinessEvidence,
+  waitForStudioRecoveredStrokeLayers,
+} from "./lib/studio-verify-shape-readiness.mjs";
+import {
   analyzeStudioLongBrushQuality,
   studioLongBrushQualityPolicyIsRecordOnly,
   classifyStudioLongBrushQualityPolicy,
@@ -675,6 +680,7 @@ async function captureBrushStageFailure(
     error: error instanceof Error ? error.stack ?? error.message : String(error),
     browserErrors,
     durableDrawElements: await persistedDrawElements(page).catch(() => []),
+    liveReadiness: await studioShapeLiveReadinessEvidence(page).catch(() => null),
     keyboardFocus: await page.evaluate(() => ({ tag: document.activeElement?.tagName, label: document.activeElement?.getAttribute("aria-label"), boundary: Boolean(document.activeElement?.closest("[data-studio-shortcut-boundary='true'], [aria-modal='true']")) })).catch(() => null),
     rendererDiagnostics: await page.evaluate(() => (globalThis as typeof globalThis & { __studioShapeGpuDiagnostics?: unknown }).__studioShapeGpuDiagnostics).catch(() => null),
     rendererReasons: await page.locator("[data-studio-canonical-vnext-dry-media-reason]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-studio-canonical-vnext-dry-media-reason"))).catch(() => []),
@@ -3854,7 +3860,7 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   const before = (await persistedDrawElements(page)).at(-1);
   invariant(before?.id, "current-stroke correction has no persisted source");
   const open = async () => {
-    await page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: /^(창작|Create)$/u }).click();
+    await openStudioShapeCorrectionMenu(page);
     await page.locator('[data-studio-menu-item-id="correct-current-stroke"]').click();
     await page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true }).waitFor({ state: "visible" });
   };
@@ -3933,11 +3939,17 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   // Compatible leaders now auto-resume. An unresolved lease still offers the manual choice.
   // Completion below also requires the exact snapshot and the live dialog's original-restore
   // command; an absent banner alone cannot make an empty or incorrectly restored document pass.
-  const recoveryNotice = page.locator("[data-studio-recovery-notice]");
-  const manualRecovery = recoveryNotice.getByRole("button", { name: "이어서 그리기", exact: true });
-  if (await manualRecovery.isVisible()) await manualRecovery.click();
-  await recoveryNotice.waitFor({ state: "detached", timeout: 8_000 });
-  await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "cold reload lost correction metadata");
+  const recoveredDraws = await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "cold reload lost correction metadata");
+  const recoveredStrokeIds = recoveredDraws.map((draw) => {
+    invariant(typeof draw.id === "string" && draw.id.length > 0, "cold reload restored a stroke without a valid ID");
+    return draw.id;
+  });
+  await waitForStudioRecoveredStrokeLayers(page, recoveredStrokeIds);
+  writeFileSync(join(SCRATCH, "studio-smart-shape-cold-recovery.json"), JSON.stringify({
+    expectedStrokeIds: recoveredStrokeIds,
+    correctedStrokeId: corrected.id,
+    ...(await studioShapeLiveReadinessEvidence(page)),
+  }, null, 2));
   await page.locator('[data-studio-command-bar-settings-trigger="true"]').click();
   await page.locator('[data-studio-command-bar-settings-panel="true"] select').nth(7).selectOption("correct-current-stroke");
   await page.keyboard.press("Escape");

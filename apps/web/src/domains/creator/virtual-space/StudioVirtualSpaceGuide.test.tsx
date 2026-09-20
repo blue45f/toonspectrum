@@ -11,6 +11,32 @@ function setup() {
   return actions;
 }
 describe("User-operated studio guide", () => {
+  it("starts a guided tour only on request, reports waiting, and cancels from the guide without opening a tool", () => {
+    const guide = manifest.npcs.find((npc) => npc.roomId === "lounge")!;
+    const actions = { onMove: vi.fn(), onOpen: vi.fn(), onStop: vi.fn(), onFocus: vi.fn(), onStartTour: vi.fn(), onCancelTour: vi.fn() };
+    const mounted = render(<StudioVirtualSpaceGuide manifest={manifest} {...actions} />);
+    fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
+    expect(actions.onStartTour).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
+    expect(actions.onStartTour).toHaveBeenCalledExactlyOnceWith(guide.id);
+    mounted.rerender(<StudioVirtualSpaceGuide manifest={manifest} {...actions} tourRequested guideTour={{
+      requestId: "tour-1", guideId: guide.id, status: "waiting-for-user", stopIndex: 0, stopCount: 4,
+    }} />);
+    expect(screen.getByText("가이드가 가까이 오기를 기다리고 있어요.")).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("region", { name: "스튜디오 시작 안내" }), { key: "Escape" });
+    expect(actions.onCancelTour).toHaveBeenCalledOnce();
+    expect(actions.onMove).not.toHaveBeenCalled(); expect(actions.onOpen).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "시작 안내 다시 보기" }));
+  });
+
+  it("does not advertise a guided tour without a guide or an enabled start action", () => {
+    const actions = { onMove: vi.fn(), onOpen: vi.fn(), onStop: vi.fn(), onFocus: vi.fn(), onStartTour: vi.fn() };
+    render(<StudioVirtualSpaceGuide manifest={{ ...manifest, npcs: [] }} {...actions} />);
+    fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
+    expect(screen.queryByRole("button", { name: "가이드와 함께 둘러보기" })).toBeNull();
+    expect(actions.onStartTour).not.toHaveBeenCalled();
+  });
+
   it("never moves or opens tools on entry, step changes or reopening, and cancels a requested walk on Escape", () => {
     const f = setup();
     fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));

@@ -1,22 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { StudioVirtualSpaceSocialController } from "./studio-virtual-space-social";
 import type { StudioSpaceSocialAction, StudioSpaceSocialRequest, StudioSpaceSocialSnapshot } from "./StudioVirtualSpaceSocialPanel";
 import { verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-invitation";
+import { StudioVirtualSpaceAcousticPolicy } from "./studio-virtual-space-acoustics";
+import type { StudioVirtualSpaceSnapshot } from "./studio-virtual-space-presence";
+import { closeStudioP2pHuddle } from "../live/huddle/studio-p2p-huddle-events";
 
 const EMPTY: StudioSpaceSocialSnapshot = { requests: [], readyPeerIds: [], reviewReadyPeerIds: [], blockedPeerIds: [], greetingReadyPeerIds: [], greetings: [], available: false };
 
-export function useStudioVirtualSpaceSocial({ participant, port, manifest, enabled, onAccepted, workId }: {
+export function useStudioVirtualSpaceSocial({ participant, port, manifest, enabled, onAccepted, workId, presence, acousticBindingAvailable = true }: {
   readonly workId?: string;
   readonly participant: StudioLiveParticipant | undefined;
   readonly port: StudioLiveDirectPort | null | undefined;
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly enabled: boolean;
   readonly onAccepted: (request: StudioSpaceSocialRequest) => void;
+  readonly presence?: StudioVirtualSpaceSnapshot;
+  readonly acousticBindingAvailable?: boolean;
 }) {
   const controller = useRef<StudioVirtualSpaceSocialController | null>(null);
+  const acoustics = useRef<StudioVirtualSpaceAcousticPolicy | null>(null);
+  const spatial = useRef({ presence, acousticBindingAvailable });
+  useLayoutEffect(() => {
+    spatial.current = { presence, acousticBindingAvailable };
+    acoustics.current?.update(presence, acousticBindingAvailable);
+  }, [presence, acousticBindingAvailable]);
   const blockedPeers = useRef(new Set<string>());
   const accepted = useRef(onAccepted);
   const [snapshot, setSnapshot] = useState<StudioSpaceSocialSnapshot>(EMPTY);
@@ -49,13 +60,19 @@ export function useStudioVirtualSpaceSocial({ participant, port, manifest, enabl
     let disposed = false;
     let unsubscribe: (() => void) | undefined;
     let owner: StudioVirtualSpaceSocialController | undefined;
+    let policy: StudioVirtualSpaceAcousticPolicy | undefined;
     // Bind consent to the complete immutable map, including colliders, art and usage points.
     // An authoring preview never participates; stale clients cannot accept a different layout.
     void crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest))).then((digest) => {
       if (disposed) return;
       const contentRevision = [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, "0")).join("");
+      policy = new StudioVirtualSpaceAcousticPolicy({ ...manifest, worldId: manifest.id, contentRevision }, participant.sessionId);
+      policy.update(spatial.current.presence, spatial.current.acousticBindingAvailable);
+      acoustics.current = policy;
       owner = new StudioVirtualSpaceSocialController(participant, port, { worldId: manifest.id, contentRevision }, {
+        acoustics: policy,
         onAccepted: (request) => { if (foregroundRef.current) accepted.current(request); },
+        onEnded: (request) => { closeStudioP2pHuddle({ conversationId: request.id }); },
         authorizeReview: async (subject, intent) => subject.workId === workId && (await verifyStudioVirtualSpaceReviewSubject(subject, intent)).ok,
       });
       controller.current = owner;
@@ -70,6 +87,7 @@ export function useStudioVirtualSpaceSocial({ participant, port, manifest, enabl
       unsubscribe?.();
       owner?.close();
       if (controller.current === owner) controller.current = null;
+      if (acoustics.current === policy) acoustics.current = null;
     };
   }, [enabled, manifest, participant, port, workId]);
   const request = useCallback((id: string, action: StudioSpaceSocialAction) => foregroundRef.current ? controller.current?.request(id, action) ?? null : null, []);

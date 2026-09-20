@@ -1,5 +1,7 @@
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
+import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
+import { validateStudioWorldAcousticZones, type StudioWorldAcousticZoneDefinition } from "./studio-virtual-space-acoustics";
 import {
   STUDIO_VIRTUAL_SPACE_HEIGHT,
   STUDIO_VIRTUAL_SPACE_WIDTH,
@@ -103,6 +105,7 @@ export interface StudioWorldNpcDefinition {
   readonly speed?: number;
   readonly behavior?: "idle" | "talk" | "draw" | "review" | "patrol";
   readonly patrol?: readonly StudioVirtualSpacePoint[];
+  readonly activityAnchorIds?: readonly string[];
 }
 
 /** One exclusive workspace position. Occupancy does not grant document permissions or imply a seated pose. */
@@ -144,6 +147,8 @@ export interface StudioVirtualSpaceWorldManifest {
   readonly npcs: readonly StudioWorldNpcDefinition[];
   readonly interactionSlots?: readonly StudioWorldInteractionSlotDefinition[];
   readonly occlusionLayers?: readonly StudioWorldOcclusionLayer[];
+  readonly npcActivityAnchors?: readonly StudioWorldNpcActivityAnchor[];
+  readonly acousticZones?: readonly StudioWorldAcousticZoneDefinition[];
 }
 
 function legacyProp(
@@ -183,9 +188,26 @@ const DEFAULT_PROPS: readonly StudioWorldPropDefinition[] = [
   legacyProp({ id: "creator-plaza", kind: "solid", x: 590, y: 365, depth: "fixed", collider: { x: 520, y: 302, width: 140, height: 118 } }),
 ] as const;
 
+const DEFAULT_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] = [
+  { id: "studio-guide", roomId: "lounge", points: [[505, 485], [455, 445], [500, 550]], facing: "down" },
+  { id: "studio-writer", roomId: "writers", points: [[435, 198], [660, 198], [475, 235]], facing: "up" },
+  { id: "studio-artist", roomId: "drawing", points: [[885, 410], [890, 310], [870, 450]], facing: "right" },
+  { id: "studio-librarian", roomId: "assets", points: [[290, 410], [285, 300], [305, 450]], facing: "left" },
+].flatMap((profile) => profile.points.map(([x, y], index): StudioWorldNpcActivityAnchor => {
+  const anchorPoint = studioVirtualSpaceScaleLegacyPoint({ x: x!, y: y! });
+  return { id: `${profile.id}-${index}`, roomId: profile.roomId,
+    approachPoint: { x: anchorPoint.x - 16, y: anchorPoint.y }, anchorPoint,
+    exitPoint: { x: anchorPoint.x + 16, y: anchorPoint.y },
+    facing: (index === 2 ? "down" : profile.facing) as StudioVirtualSpaceFacing,
+    activity: index === 0 ? "work" : index === 1 ? "inspect" : "rest",
+    // Only pink has authored drawing/review artwork. Other roles retain their own static art.
+    animation: profile.id === "studio-artist" && index < 2 ? index === 0 ? "draw" : "review" : "idle",
+    minDurationMs: index === 0 ? 20000 : 7000, maxDurationMs: index === 0 ? 38000 : 16000 };
+}));
+
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
-  version: 4,
+  version: 5,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,
   backgroundAssetKey: "studio-master-background",
@@ -202,6 +224,7 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     width: zone.width,
     height: zone.height,
   })),
+  acousticZones: STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height }) => ({ id: `public-${id}`, roomId: id, x, y, width, height, policy: "public" })),
   props: DEFAULT_PROPS,
   colliders: STUDIO_VIRTUAL_SPACE_COLLIDERS.map(({ x, y, width, height }) => ({ x, y, width, height })),
   interactions: STUDIO_VIRTUAL_SPACE_INTERACTIONS.map((interaction) => ({
@@ -237,20 +260,21 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
   ],
   // A small ambient cast. These actors are local decoration and never count as online peers.
   // The first point is a work approach; patrol points alternate reference checks and breaks.
+  npcActivityAnchors: DEFAULT_NPC_ACTIVITY_ANCHORS,
   npcs: [
-    { id: "studio-guide", skinKey: "dark", roomId: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 505, y: 485 }), facing: "down", scale: 0.68, speed: 58, behavior: "patrol", patrol: [
+    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"], skinKey: "dark", roomId: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 505, y: 485 }), facing: "down", scale: 0.68, speed: 58, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 455, y: 445 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 500, y: 550 }),
     ] },
-    { id: "studio-writer", skinKey: "silver", roomId: "writers", point: studioVirtualSpaceScaleLegacyPoint({ x: 435, y: 198 }), facing: "up", scale: 0.68, speed: 54, behavior: "patrol", patrol: [
+    { id: "studio-writer", activityAnchorIds: ["studio-writer-0", "studio-writer-1", "studio-writer-2"], skinKey: "silver", roomId: "writers", point: studioVirtualSpaceScaleLegacyPoint({ x: 435, y: 198 }), facing: "up", scale: 0.68, speed: 54, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 660, y: 198 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 475, y: 235 }),
     ] },
-    { id: "studio-artist", skinKey: "pink", roomId: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 885, y: 410 }), facing: "right", scale: 0.68, speed: 60, behavior: "patrol", patrol: [
+    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"], skinKey: "pink", roomId: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 885, y: 410 }), facing: "right", scale: 0.68, speed: 60, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 890, y: 310 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 870, y: 450 }),
     ] },
-    { id: "studio-librarian", skinKey: "purple", roomId: "assets", point: studioVirtualSpaceScaleLegacyPoint({ x: 290, y: 410 }), facing: "left", scale: 0.68, speed: 52, behavior: "patrol", patrol: [
+    { id: "studio-librarian", activityAnchorIds: ["studio-librarian-0", "studio-librarian-1", "studio-librarian-2"], skinKey: "purple", roomId: "assets", point: studioVirtualSpaceScaleLegacyPoint({ x: 290, y: 410 }), facing: "left", scale: 0.68, speed: 52, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 285, y: 300 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 305, y: 450 }),
     ] },
@@ -461,11 +485,14 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
   const count = manifest.rooms.length + manifest.props.length + manifest.colliders.length
     + manifest.interactions.length + manifest.portals.length + manifest.spawns.length + manifest.npcs.length
     + (Array.isArray(manifest.interactionSlots) ? manifest.interactionSlots.length : 0)
-    + (Array.isArray(manifest.occlusionLayers) ? manifest.occlusionLayers.length : 0);
+    + (Array.isArray(manifest.occlusionLayers) ? manifest.occlusionLayers.length : 0)
+    + (Array.isArray(manifest.npcActivityAnchors) ? manifest.npcActivityAnchors.length : 0)
+    + (Array.isArray(manifest.acousticZones) ? manifest.acousticZones.length : 0);
   if (count > STUDIO_WORLD_MAX_ENTITIES) errors.push("world entity budget exceeded");
   if (!manifest.rooms.length) errors.push("world must contain a room");
   if (!manifest.spawns.length) errors.push("world must contain a spawn");
   const roomIds = identifiers(manifest.rooms, "room");
+  errors.push(...validateStudioWorldAcousticZones(manifest.acousticZones, manifest));
   identifiers(manifest.props, "prop");
   identifiers(manifest.interactions, "interaction");
   identifiers(manifest.portals, "portal");
@@ -480,6 +507,8 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
       || !finite(layer.depth) || layer.depth < 0 || layer.depth > manifest.height + 2000) errors.push(`occlusion layer is invalid: ${layer?.id ?? "unknown"}`);
   }
   const slots = Array.isArray(manifest.interactionSlots) ? manifest.interactionSlots : [];
+  errors.push(...validateStudioNpcActivityAnchors(manifest.npcActivityAnchors, { ...manifest, interactionSlots: slots },
+    { canOccupy: actorCanOccupy, connected: (a, b) => connectivity.connected(a, b) }));
   if (manifest.interactionSlots !== undefined && !Array.isArray(manifest.interactionSlots)) errors.push("interaction slots must be an array");
   if (slots.length > 128) errors.push("interaction slot budget exceeded");
   identifiers(slots.filter((slot) => slot && typeof slot === "object"), "slot");
@@ -559,6 +588,17 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
     if (!inBounds(npc.point) || !facingValid(npc.facing) || !optionalPositive(npc.speed) || !optionalPositive(npc.scale)) errors.push(`npc is invalid: ${npc.id}`);
     else if (!actorCanOccupy(npc.point)) errors.push(`npc start is blocked: ${npc.id}`);
     if (npc.behavior && !["idle", "talk", "draw", "review", "patrol"].includes(npc.behavior)) errors.push(`npc behavior is invalid: ${npc.id}`);
+    if (npc.activityAnchorIds !== undefined) {
+      if (!Array.isArray(npc.activityAnchorIds) || npc.activityAnchorIds.length > 12 || new Set(npc.activityAnchorIds).size !== npc.activityAnchorIds.length) errors.push(`npc activity references are invalid: ${npc.id}`);
+      else for (const id of npc.activityAnchorIds) {
+        const anchor: StudioWorldNpcActivityAnchor | undefined = Array.isArray(manifest.npcActivityAnchors) ? manifest.npcActivityAnchors.find((value) => value?.id === id) : undefined;
+        if (!anchor) { errors.push(`npc references missing activity anchor: ${npc.id}`); continue; }
+        const skin = STUDIO_CHARACTER_SKINS.find((value) => value.key === npc.skinKey);
+        if (anchor.animation !== "idle" && !(anchor.animation === "sit" ? skin?.poses?.sit : skin?.state?.[anchor.animation])) errors.push(`npc activity clip is unavailable: ${npc.id}/${anchor.id}`);
+        if (inBounds(anchor.approachPoint) && actorCanOccupy(npc.point) && actorCanOccupy(anchor.approachPoint)
+          && !connectivity.connected(npc.point, anchor.approachPoint)) errors.push(`npc activity is unreachable: ${npc.id}/${anchor.id}`);
+      }
+    }
     if (npc.patrol?.some((point) => !inBounds(point))) errors.push(`npc patrol outside world: ${npc.id}`);
     if (npc.patrol?.some((point) => inBounds(point) && !actorCanOccupy(point))) errors.push(`npc patrol is blocked: ${npc.id}`);
     if (actorCanOccupy(npc.point) && npc.patrol?.length

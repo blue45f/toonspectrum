@@ -9,6 +9,7 @@ const slot: StudioWorldInteractionSlotDefinition = {
 };
 const world: StudioVirtualSpaceWorldManifest = {
   ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 200, height: 200,
+  npcActivityAnchors: [], acousticZones: [],
   rooms: [{ id: "room", x: 0, y: 0, width: 200, height: 200, labelKo: "방", labelEn: "Room" }],
   props: [], colliders: [], interactions: [], portals: [], npcs: [], occlusionLayers: [], spawns: [{ id: "main", point: { x: 30, y: 30 } }], interactionSlots: [slot],
 };

@@ -8,6 +8,8 @@ import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import { StudioVirtualSpaceSocialController, type StudioVirtualSpaceSocialAction } from "./studio-virtual-space-social";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 import { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
+import { studioVirtualSpaceState } from "./studio-virtual-space-model";
+import { STUDIO_P2P_HUDDLE_CLOSE_EVENT } from "../live/huddle/studio-p2p-huddle-events";
 
 const reviewAuthority = vi.hoisted(() => ({ verify: vi.fn(async () => ({ ok: true })) }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: reviewAuthority.verify }));
@@ -45,7 +47,10 @@ class DirectPair {
 
 async function setup() {
   const pair = new DirectPair();
-  const hash = await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(DEFAULT_STUDIO_WORLD_MANIFEST)));
+  const manifest = { ...DEFAULT_STUDIO_WORLD_MANIFEST,
+    rooms: [{ id: "qa-public", labelKo: "QA", labelEn: "QA", x: 0, y: 0, width: 850, height: 798 }],
+    acousticZones: [{ id: "qa-public", roomId: "qa-public", policy: "public" as const, x: 0, y: 0, width: 850, height: 798 }] };
+  const hash = await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(manifest)));
   const revision = [...new Uint8Array(hash)].map((value) => value.toString(16).padStart(2, "0")).join("");
   const remoteAccepted = vi.fn();
   const remote = new StudioVirtualSpaceSocialController(B, pair.b,
@@ -53,7 +58,9 @@ async function setup() {
     { onAccepted: remoteAccepted, authorizeReview: async () => true, setInterval: () => 0, clearInterval: () => undefined });
   sessions.push(remote); remote.start();
   const onAccepted = vi.fn();
-  const props: HookProps = { workId: "work-1", participant: A, port: pair.a, manifest: DEFAULT_STUDIO_WORLD_MANIFEST, enabled: true, onAccepted };
+  const props: HookProps = { workId: "work-1", participant: A, port: pair.a, manifest, enabled: true, onAccepted,
+    presence: { self: studioVirtualSpaceState({ x: 100, y: 100 }), peers: [{ participant: B, state: studioVirtualSpaceState({ x: 120, y: 100 }), lastSeen: Date.now(), sequence: 1 }],
+      nearbyPeers: [], peerReactions: [], selfReaction: null, direct: true } };
   return { pair, remote, remoteAccepted, onAccepted, props };
 }
 
@@ -122,6 +129,37 @@ describe("social hook consent and lifetime", () => {
       expect(f.pair.count(A.sessionId)).toBe(1);
     },
   );
+
+  it.each(["binding", "unknown-zone", "missing-presence"])("hard-closes exactly the consented Huddle on %s loss and requires new consent after recovery", async (cause) => {
+    const f = await setup();
+    const hook = renderHook(useStudioVirtualSpaceSocial, { initialProps: f.props });
+    await waitFor(() => expect(hook.result.current.snapshot.readyPeerIds).toContain(B.sessionId));
+    let id: string | null = null;
+    act(() => { id = hook.result.current.request(B.sessionId, "talk"); f.remote.respond(id!, "accept"); });
+    const close = vi.fn(); window.addEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, close);
+    try {
+      hook.rerender(cause === "binding" ? { ...f.props, acousticBindingAvailable: false }
+        : cause === "missing-presence" ? { ...f.props, presence: undefined }
+          : { ...f.props, presence: { ...f.props.presence!, self: { ...f.props.presence!.self, x: -1 } } });
+      expect(close).toHaveBeenCalledOnce();
+      expect((close.mock.calls[0]![0] as CustomEvent).detail).toEqual({ conversationId: id });
+      expect(hook.result.current.snapshot.requests.find((request) => request.id === id)?.status).toBe("cancelled");
+      expect(f.remote.snapshot().requests.find((request) => request.id === id)?.status).toBe("cancelled");
+      expect(hook.result.current.request(B.sessionId, "talk")).toBeNull();
+      hook.rerender(f.props);
+      await waitFor(() => expect(hook.result.current.snapshot.readyPeerIds).toContain(B.sessionId));
+      expect(f.onAccepted).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce();
+      expect(hook.result.current.respond(id!, "accept")).toBe(false);
+      expect(f.pair.count(A.sessionId)).toBe(1);
+    } finally { window.removeEventListener(STUDIO_P2P_HUDDLE_CLOSE_EVENT, close); }
+  });
+  it("never treats a direct link alone as spatial permission when presence is missing", async () => {
+    const f = await setup(); const hook = renderHook(useStudioVirtualSpaceSocial, { initialProps: { ...f.props, presence: undefined } });
+    await waitFor(() => expect(hook.result.current.snapshot.available).toBe(true));
+    expect(hook.result.current.snapshot.readyPeerIds).toEqual([]);
+    expect(hook.result.current.snapshot.greetingReadyPeerIds).toEqual([]);
+    expect(hook.result.current.request(B.sessionId, "talk")).toBeNull();
+  });
 
   it("keeps an accepted talk through a browser permission-window blur without replaying consent", async () => {
     const f = await setup();

@@ -17,6 +17,7 @@ import {
   type StudioReviewPreviewCapture, type StudioReviewPreviewComplete, type StudioReviewPreviewIntent,
 } from "./studio-review-preview-producer.contract";
 import { lockStudioReviewPreviewStorage } from "./studio-review-preview-storage";
+import { studioReviewPageRasterSchema, type StudioReviewPageRaster } from "./studio-review-source-map";
 
 export type StudioReviewPreviewCaptureStatus = { readonly status: "pending" | "cancelled" }
   | { readonly status: "completed"; readonly subject: StudioReviewPreviewSubject };
@@ -28,6 +29,9 @@ function invariant(code: string): never { throw new StudioRepositoryInvariantErr
 function artifactIdFor(workId: string): string { return `review-manuscript-${studioReviewPreviewDigest(workId)}`; }
 function prepareKey(actor: string, input: StudioReviewPreviewCapture): string {
   return studioReviewPreviewDigest({ phase: "prepare", actor, workId: input.workId, intentId: input.intentId });
+}
+function pageGeometryKey(actor: string, intent: StudioReviewPreviewIntent, ordinal: number): string {
+  return studioReviewPreviewDigest({ phase: "page-geometry", actor, workId: intent.workId, intentId: intent.intentId, ordinal });
 }
 function captureOf(intent: StudioReviewPreviewIntent): StudioReviewPreviewCapture {
   const { projectId: _project, artifactId: _artifact, expectedHeadRevisionId: _head, expectedHeadRootGraphHash: _hash, ...capture } = intent;
@@ -205,6 +209,16 @@ export class StudioReviewPreviewProducerRepository {
            AND studio_blob."malwareStatus" IN ('pending', 'clean') AND studio_blob."formatStatus" IN ('pending', 'valid')
          RETURNING hash`, [canonical.sha256, canonical.bytes.byteLength, canonicalJson(object)]);
       if (registered.rows.length !== 1) invariant("preview-blob-metadata-conflict");
+      // Persist server-decoded raster dimensions, never dimensions supplied by the browser.
+      const raster = studioReviewPageRasterSchema.parse({ ordinal, sha256: canonical.sha256, width: canonical.width, height: canonical.height });
+      const response = { intentDigest: studioReviewPreviewDigest(intent), raster };
+      const geometryKey = pageGeometryKey(actor, intent, ordinal);
+      await client.query(`INSERT INTO studio_mutation_receipt ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response)
+        VALUES ($1,$2,$3,$4,$5,$6::jsonb) ON CONFLICT ("artifactId","actorUserId","idempotencyKeyHash") DO NOTHING`,
+      [intent.artifactId, actor, geometryKey, studioReviewPreviewDigest(response), intent.expectedHeadRevisionId, JSON.stringify(response)]);
+      const geometry = await client.query<{ response: unknown }>(`SELECT response FROM studio_mutation_receipt
+        WHERE "artifactId"=$1 AND "actorUserId"=$2 AND "idempotencyKeyHash"=$3`, [intent.artifactId, actor, geometryKey]);
+      if (canonicalJson(geometry.rows[0]?.response) !== canonicalJson(response)) throw new StudioIdempotencyConflictError();
     });
   }
 
@@ -226,6 +240,7 @@ export class StudioReviewPreviewProducerRepository {
       verifySource(source, intent);
       await target(client, actor, intent, true);
       const key = studioReviewPreviewIntentKey(actor, intent);
+      const pageRasters: StudioReviewPageRaster[] = [];
       // Stable lock order matches generated-object deletion and prevents cross-work hash reuse.
       for (const page of [...pages].sort((a, b) => a.sha256.localeCompare(b.sha256))) {
         const assetId = studioReviewPreviewPageAsset(key, page.ordinal);
@@ -235,6 +250,16 @@ export class StudioReviewPreviewProducerRepository {
            AND "objectKey" = $3 AND "encryptionMetadata" IS NULL AND "malwareStatus" = 'clean' AND "formatStatus" = 'valid'`,
           [page.sha256, object.byteLength, canonicalJson(object)]);
         if (blob.rows.length !== 1) invariant("preview-blob-unready");
+        const geometry = await client.query<{ response: { intentDigest?: string; raster?: unknown } }>(`SELECT response FROM studio_mutation_receipt
+          WHERE "artifactId"=$1 AND "actorUserId"=$2 AND "idempotencyKeyHash"=$3`,
+        [intent.artifactId, actor, pageGeometryKey(actor, intent, page.ordinal)]);
+        const stored = geometry.rows[0]?.response;
+        if (stored) {
+          const raster = studioReviewPageRasterSchema.safeParse(stored.raster);
+          if (stored.intentDigest !== studioReviewPreviewDigest(intent) || !raster.success
+            || raster.data.ordinal !== page.ordinal || raster.data.sha256 !== page.sha256) invariant("preview-page-geometry-mismatch");
+          pageRasters.push(raster.data);
+        }
       }
       const checkpointId = `review-checkpoint-${key}`, submissionId = `review-submission-${key}`, revisionId = `review-snapshot-${key}`, reviewId = `review-${key}`;
       const sequenceResult = await client.query<{ next: number | string }>(
@@ -250,7 +275,8 @@ export class StudioReviewPreviewProducerRepository {
       }
       for (const page of pages) await client.query(
         `INSERT INTO studio_revision_blob ("revisionId", "blobHash", role, ordinal) VALUES ($1,$2,'preview',$3)`, [revisionId, page.sha256, page.ordinal]);
-      const payload = { intent, sourceSnapshot: source.doc, previews: pages, validation: STUDIO_REVIEW_PREVIEW_VALIDATOR };
+      const payload = { intent, sourceSnapshot: source.doc, previews: pages, validation: STUDIO_REVIEW_PREVIEW_VALIDATOR,
+        ...(pageRasters.length === pages.length ? { sourceMapVersion: 1, pageRasters: pageRasters.sort((a, b) => a.ordinal - b.ordinal) } : {}) };
       const operation = { commandId: `review-capture-${key}`, type: "review.snapshot-create", payload, patches: [], inversePatches: [], invalidations: [] };
       await client.query(
         `INSERT INTO studio_operation ("artifactId", sequence, "commandId", "baseRevisionId", "resultRevisionId", "actorUserId", "deviceId", "commandType", scope, "payloadHash", operation, "issuedAt")

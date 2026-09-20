@@ -136,6 +136,8 @@ describe("Virtual Studio editable world boundaries", () => {
     }));
     expect(next.colliders).toEqual([]);
     expect(next.props).toEqual([]);
+    expect(next.npcActivityAnchors).toEqual([]);
+    expect(next.npcs.every((npc) => npc.activityAnchorIds === undefined)).toBe(true);
   });
 });
 

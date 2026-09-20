@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { useSession } from "@/compat/auth-session-store";
 import { getAuthSessionRevision, listeners as sessionListeners, type Session } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -7,6 +8,8 @@ import type { StudioReviewCommentCreateInput } from "../project-graph/studio-pro
 import { verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";
 import { StudioPinnedReviewPreview } from "./StudioPinnedReviewPreview";
 import { StudioPinnedReviewWorkflow } from "./StudioPinnedReviewWorkflow";
+import { StudioPinnedReviewComparison } from "./StudioPinnedReviewComparison";
+import { StudioReviewAnnotationLocation, type StudioReviewAnnotationSelection } from "./StudioReviewSpatialAnnotation";
 
 /** A pinned server review. This surface never substitutes the latest editable document. */
 export function StudioPinnedReviewPanel({ subject }: { readonly subject: StudioVirtualSpaceReviewSubject | null }) {
@@ -29,14 +32,25 @@ function PinnedReviewForActor({ actorId, subject }: {
   const [severity, setSeverity] = useState<"note" | "recommended" | "required">("note");
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [annotation, setAnnotation] = useState<StudioReviewAnnotationSelection | null>(null);
+  const [needsLocation, setNeedsLocation] = useState(false);
+  const annotationRef = useRef<StudioReviewAnnotationSelection | null>(null);
+  const annotationGeneration = useRef(0);
+  const selectAnnotation = useCallback((next: StudioReviewAnnotationSelection | null) => {
+    const prior = annotationRef.current;
+    if (JSON.stringify(prior?.anchor ?? null) !== JSON.stringify(next?.anchor ?? null) || prior?.sha256 !== next?.sha256) ++annotationGeneration.current;
+    if (prior && !next) setNeedsLocation(true);
+    if (next) setNeedsLocation(false);
+    annotationRef.current = next; setAnnotation(next);
+  }, []);
   const generation = useRef(0);
   const readGeneration = useRef(0);
   const invalidate = useCallback(() => { ++generation.current; }, []);
   // The mounted view relinquishes its pending UI state immediately. Old async
   // finally blocks cannot release a newer action after this generation changes.
   const invalidateActiveView = useCallback(() => {
-    invalidate(); setBusy(false); setLoading(false);
-  }, [invalidate]);
+    invalidate(); setBusy(false); setLoading(false); selectAnnotation(null);
+  }, [invalidate, selectAnnotation]);
   // Invalidate at unmount commit, before a delayed authority promise can issue a
   // write under the next actor while passive effect cleanup is still pending.
   useLayoutEffect(() => invalidate, [invalidate]);
@@ -45,14 +59,15 @@ function PinnedReviewForActor({ actorId, subject }: {
     const own = ++readGeneration.current, scope = generation.current;
     const sessionRevision = getAuthSessionRevision();
     if (document.visibilityState === "hidden") return;
-    if (!retainCurrent) setResult(null);
+    if (!retainCurrent) { setResult(null); selectAnnotation(null); }
     setLoading(true);
     const next = !actorId ? { ok: false as const, reason: "access-denied" as const }
       : subject ? await verifyStudioVirtualSpaceReviewSubject(subject, "view") : { ok: false as const, reason: "invalid-subject" as const };
     if (scope !== generation.current || own !== readGeneration.current) return;
     if (sessionRevision !== getAuthSessionRevision()) { setResult(null); setLoading(false); return; }
+    if (!next.ok || !next.project.access.comment || !["open", "changes-requested"].includes(next.review.status)) selectAnnotation(null);
     setResult(next.ok && next.expiresAt <= Date.now() ? { ok: false, reason: "unavailable" } : next); setLoading(false);
-  }, [actorId, subject]);
+  }, [actorId, subject, selectAnnotation]);
   useEffect(() => {
     setBody(""); setSeverity("note"); setNotice(""); attempted.current = null;
     void refresh();
@@ -77,28 +92,34 @@ function PinnedReviewForActor({ actorId, subject }: {
     if (!result?.ok) return;
     const ttl = result.expiresAt - Date.now();
     const renew = setTimeout(() => { void refresh(true); }, Math.max(0, ttl - 5_000));
-    const expiry = setTimeout(() => { setResult(null); }, Math.max(0, ttl));
+    const expiry = setTimeout(() => { selectAnnotation(null); setResult(null); }, Math.max(0, ttl));
     return () => { clearTimeout(renew); clearTimeout(expiry); };
-  }, [result, refresh]);
+  }, [result, refresh, selectAnnotation]);
   const save = async () => {
-    if (!actorId || !subject || !body.trim() || busy) return;
+    if (!actorId || !subject || !body.trim() || busy || needsLocation) return;
     const own = generation.current, text = body.trim(), sessionRevision = getAuthSessionRevision();
+    const selected = annotationRef.current, selectionOwn = annotationGeneration.current;
     setBusy(true); setNotice("");
     try {
       const verified = await verifyStudioVirtualSpaceReviewSubject(subject, "view");
-      if (own !== generation.current || sessionRevision !== getAuthSessionRevision()) return;
+      if (own !== generation.current || sessionRevision !== getAuthSessionRevision() || selectionOwn !== annotationGeneration.current) return;
       if (!verified.ok || !verified.project.access.comment || !["open", "changes-requested"].includes(verified.review.status)) {
-        setResult(verified); setNotice(bt("현재 검수본에 의견을 남길 권한이 없어요.", "You cannot comment on this review now.")); return;
+        selectAnnotation(null); setResult(verified); setNotice(bt("현재 검수본에 의견을 남길 권한이 없어요.", "You cannot comment on this review now.")); return;
+      }
+      if (selected && (!annotationRef.current || annotationRef.current.expiresAt <= Date.now()
+        || !validateStudioReviewSpatialAnchor(annotationRef.current.mapping, selected.anchor))) {
+        selectAnnotation(null); setNotice(bt("의견 위치를 다시 확인해 주세요.", "Please select the note location again.")); return;
       }
       const artifact = verified.project.artifacts.find((item) => item.id === subject.artifactId)!;
-      const fingerprint = JSON.stringify([subject, text, severity]);
+      const anchor = { ...(selected?.anchor ?? { kind: "artifact" as const }), artifactId: subject.artifactId, revisionId: subject.revisionId, scope: artifact.scope };
+      const fingerprint = JSON.stringify([subject, text, severity, anchor]);
       if (attempted.current?.fingerprint !== fingerprint) attempted.current = { fingerprint, input: {
         id: newStudioProjectGraphId("review-note"), body: text, severity,
-        anchor: { kind: "artifact", artifactId: subject.artifactId, revisionId: subject.revisionId, scope: artifact.scope },
+        anchor,
       } };
       await createStudioReviewComment(subject.reviewId, attempted.current.input);
       if (own !== generation.current || sessionRevision !== getAuthSessionRevision()) return;
-      attempted.current = null; setBody("");
+      attempted.current = null; setBody(""); selectAnnotation(null); setNeedsLocation(false);
       setNotice(bt("이 검수 버전에 의견을 남겼어요.", "Your note was saved to this review version."));
       await refresh();
     } catch {
@@ -118,15 +139,27 @@ function PinnedReviewForActor({ actorId, subject }: {
       <h3 className="mt-4 font-bold">{result.review.title}</h3>
       <p className="text-xs text-fg-3 break-all">{bt("검수 버전", "Review version")} · {result.subject.revisionId}</p>
       <details className="mt-2 text-xs"><summary>{bt("버전 식별 정보", "Version identity")}</summary><code className="break-all">{result.subject.rootGraphHash}</code></details>
-      <StudioPinnedReviewPreview key={JSON.stringify(result.subject)} subject={subject ?? result.subject} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
+      <StudioPinnedReviewPreview key={JSON.stringify(result.subject)} subject={subject ?? result.subject} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }}
+        notes={result.review.comments}
+        annotation={result.project.access.comment && ["open", "changes-requested"].includes(result.review.status)
+          ? { selected: annotation, onSelect: selectAnnotation, disabled: busy, commentInputId: inputId } : undefined} />
+      <StudioPinnedReviewComparison subject={subject ?? result.subject} title={result.review.title}
+        onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
       <div className="mt-4 space-y-3" aria-label={bt("검토 의견", "Review notes")}>
         {result.review.comments.map((comment) => <article key={comment.id} className="rounded-xl border border-line p-3">
           <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
+          <p className="mt-2 text-xs text-fg-3"><StudioReviewAnnotationLocation anchor={comment.anchor ?? { kind: "artifact" }} /></p>
           <p className="mt-2 text-xs text-fg-3">{comment.severity === "required" ? bt("수정 필요", "Required") : comment.severity === "recommended" ? bt("제안", "Suggestion") : bt("메모", "Note")} · {comment.status === "resolved" ? bt("해결됨", "Resolved") : comment.status === "dismissed" ? bt("보류 처리", "Dismissed") : bt("검토 중", "Open")}</p>
         </article>)}
         {!result.review.comments.length ? <p className="text-sm">{bt("아직 검토 의견이 없어요.", "No review notes yet.")}</p> : null}
       </div>
       {result.project.access.comment && ["open", "changes-requested"].includes(result.review.status) ? <form className="mt-4" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+        <div className="mb-3 rounded-lg border border-line p-3 text-sm" aria-live="polite">
+          {needsLocation ? bt("위치를 다시 선택하거나 전체 검수본 의견으로 바꿔 주세요.", "Select a location again or choose a note on the whole review.")
+            : annotation ? <StudioReviewAnnotationLocation anchor={annotation.anchor} /> : bt("전체 검수본에 의견을 남깁니다.", "Your note will apply to the whole review.")}
+          {annotation || needsLocation ? <button type="button" className="ml-2 min-h-11 rounded-lg border border-line px-3" disabled={busy}
+            onClick={() => { selectAnnotation(null); setNeedsLocation(false); }}>{bt("전체 검수본에 의견", "Use whole review")}</button> : null}
+        </div>
         <label htmlFor={inputId} className="text-sm font-semibold">{bt("이 버전에 의견 남기기", "Leave a note on this version")}</label>
         <textarea id={inputId} className="mt-2 w-full rounded-lg border border-line bg-card p-3" rows={3} maxLength={20_000} value={body}
           onChange={(event) => setBody(event.target.value)} disabled={busy} />
@@ -135,7 +168,7 @@ function PinnedReviewForActor({ actorId, subject }: {
             <option value="note">{bt("메모", "Note")}</option><option value="recommended">{bt("제안", "Suggestion")}</option><option value="required">{bt("필수 수정", "Required change")}</option>
           </select>
         </label>
-        <button type="submit" className="mt-2 min-h-11 rounded-lg border border-line px-4" disabled={busy || !body.trim()}>{busy ? bt("저장 중…", "Saving…") : bt("의견 저장", "Save note")}</button>
+        <button type="submit" className="mt-2 min-h-11 rounded-lg border border-line px-4" disabled={busy || !body.trim() || needsLocation}>{busy ? bt("저장 중…", "Saving…") : bt("의견 저장", "Save note")}</button>
       </form> : <p className="mt-3 text-xs">{bt("검토 기록을 열람하고 있습니다.", "You are viewing the review history.")}</p>}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
     </> : null}
