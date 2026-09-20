@@ -224,6 +224,7 @@ scripts/lib/studio-3d-production-audit-policy.test.mjs
 scripts/lib/studio-inapp-sweep-harness.test.ts
 scripts/lib/studio-memory-growth-policy.test.mjs
 scripts/lib/studio-p2p-failure-diagnostics.test.ts
+scripts/lib/studio-verify-shape-readiness.test.tsx
 scripts/pigment-dependency-install-policy.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/verify-studio-3d-console.test.ts
