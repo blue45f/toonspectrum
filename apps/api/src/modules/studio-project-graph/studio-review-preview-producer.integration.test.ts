@@ -101,6 +101,17 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     if (previousAdmission === undefined) delete process.env.STUDIO_WORK_ASSET_ADMISSION; else process.env.STUDIO_WORK_ASSET_ADMISSION = previousAdmission;
   });
 
+  it.each(["studio_project_graph", "studio_artifact"] as const)("keeps capture timestamps monotonic when %s is ahead of the current clock", async (table) => {
+    const f = await capture(1), id = table === "studio_project_graph" ? f.intent.projectId : f.intent.artifactId;
+    // Model clock rollback deterministically without sleeps or weaker constraints.
+    await pool.query(`UPDATE ${table} SET "createdAt"=clock_timestamp()+interval '1 hour', "updatedAt"=clock_timestamp()+interval '2 hours' WHERE id=$1`, [id]);
+    const before = (await pool.query(`SELECT "updatedAt" FROM ${table} WHERE id=$1`, [id])).rows[0]!;
+    const result = await completeCapture(f.actor, f.intent);
+    const after = (await pool.query(`SELECT "updatedAt">=$2::timestamptz AS retained, "updatedAt">="createdAt" AS valid FROM ${table} WHERE id=$1`, [id, before.updatedAt])).rows[0]!;
+    expect(after).toEqual({ retained: true, valid: true });
+    expect((await graph.getReview(f.actor, result.subject.reviewId)).status).toBe("open");
+  });
+
   async function capture(pageCount = 2) {
     const actor = randomUUID(), workId = randomUUID(); users.push(actor);
     await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [actor, "Review capture integration"]);
@@ -172,6 +183,65 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
       return { requestId: randomUUID(), baseRevision: context.baseRevision, proofDigest: context.proofDigest, confirmedCriteria: context.criteria }; };
     return { ...f, completion, production, taskId, completionInput: input };
   }
+
+  async function handoffFixture() {
+    const f = await completionFixture(), recipient = randomUUID(); users.push(recipient);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [recipient, "Handoff recipient"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'viewer','active',$3,now())`, [f.input.workId, recipient, randomUUID()]);
+    const current = await f.production.getWorkspace(f.actor, f.input.workId);
+    await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      roleAssignments: [{ id: "handoff-role", memberId: recipient, displayName: "Line artist", roles: ["lineart"], hierarchyNodeId: "episode" }] });
+    await f.completion.complete(f.actor, f.input.workId, f.taskId, await f.completionInput());
+    const Repository = (await import("../creator/studio-handoff-envelope.repository")).StudioHandoffEnvelopeRepository;
+    const handoff = new Repository(), prepared = await handoff.prepare(f.actor, f.input.workId, f.taskId);
+    expect(prepared.recipients).toHaveLength(1);
+    const choice = prepared.recipients[0]!;
+    const envelopeInput = { envelopeId: randomUUID(), taskId: f.taskId, baseRevision: prepared.baseRevision,
+      completionFingerprint: prepared.completionFingerprint, recipient: { userId: choice.userId, roleAssignmentId: choice.roleAssignmentId },
+      recipientBindingDigest: choice.bindingDigest, usageConditions: "Use only for this saved cut", remainingNotes: "Preserve the sleeve" };
+    return { ...f, recipient, handoff, Repository, envelopeInput };
+  }
+
+  it("persists a handoff across repository instances with distinct reading and recipient acceptance", async () => {
+    const f = await handoffFixture(), sent = await f.handoff.create(f.actor, f.input.workId, f.envelopeInput);
+    const later = new f.Repository();
+    expect((await later.list(f.recipient, f.input.workId, null)).items).toEqual([expect.objectContaining({ id: sent.envelope.id, direction: "received", status: "delivered" })]);
+    const action = () => ({ requestId: randomUUID(), envelopeDigest: sent.envelopeDigest });
+    await expect(later.act(f.recipient, f.input.workId, sent.envelope.id, "accept", { ...action(), confirmed: true })).rejects.toMatchObject({ code: "not-opened" });
+    const opens = await Promise.all([later.act(f.recipient, f.input.workId, sent.envelope.id, "open", action()), f.handoff.act(f.recipient, f.input.workId, sent.envelope.id, "open", action())]);
+    expect(opens[0]!.opened).toEqual(opens[1]!.opened);
+    const accepts = await Promise.all([later.act(f.recipient, f.input.workId, sent.envelope.id, "accept", { ...action(), confirmed: true }), f.handoff.act(f.recipient, f.input.workId, sent.envelope.id, "accept", { ...action(), confirmed: true })]);
+    expect(accepts[0]!.accepted).toEqual(accepts[1]!.accepted); expect(accepts[0]!.status).toBe("accepted");
+    expect((await later.read(f.actor, f.input.workId, sent.envelope.id)).envelope).toEqual(sent.envelope);
+    const records = await pool.query(`SELECT response->>'phase' AS phase, count(*)::int AS count FROM studio_mutation_receipt WHERE response->>'contract'='studio-handoff-envelope-action-v1' AND response->>'envelopeId'=$1 GROUP BY response->>'phase'`, [sent.envelope.id]);
+    expect(records.rows).toEqual(expect.arrayContaining([{ phase: "open", count: 1 }, { phase: "accept", count: 1 }]));
+    expect((await graph.getReview(f.actor, f.original.subject.reviewId)).status).toBe("open");
+  });
+
+  it("preserves identical delivery retries and permanently invalidates changed briefs without rewriting history", async () => {
+    const f = await handoffFixture(), sent = await f.handoff.create(f.actor, f.input.workId, f.envelopeInput);
+    expect((await f.handoff.create(f.actor, f.input.workId, f.envelopeInput)).envelope).toEqual(sent.envelope);
+    await expect(f.handoff.create(f.actor, f.input.workId, { ...f.envelopeInput, usageConditions: "different" })).rejects.toMatchObject({ code: "idempotency" });
+    let current = await f.production.getWorkspace(f.actor, f.input.workId);
+    current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      roleAssignments: current.document.roleAssignments.map((role) => ({ ...role, displayName: "Label only" })) });
+    expect((await f.handoff.read(f.recipient, f.input.workId, sent.envelope.id)).status).toBe("delivered");
+    const original = current.document.handoffs[0]!.scenePurpose;
+    for (const scenePurpose of ["Changed purpose", original]) current = await f.production.saveWorkspace(f.actor, f.input.workId, current.revision, { ...current.document,
+      handoffs: current.document.handoffs.map((brief) => ({ ...brief, scenePurpose })) });
+    const changed = await f.handoff.read(f.recipient, f.input.workId, sent.envelope.id);
+    expect(changed.status).toBe("changed"); expect(changed.canAccept).toBe(false); expect(changed.envelope).toEqual(sent.envelope);
+  });
+
+  it("denies revoked recipients and keeps a regranted invitation from reviving old acceptance", async () => {
+    const f = await handoffFixture(), sent = await f.handoff.create(f.actor, f.input.workId, f.envelopeInput);
+    await pool.query(`UPDATE creator_work_collaborator SET status='declined' WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, f.recipient]);
+    await expect(f.handoff.read(f.recipient, f.input.workId, sent.envelope.id)).rejects.toMatchObject({ code: "forbidden" });
+    await pool.query(`UPDATE creator_work_collaborator SET status='active',"invitationId"=$3 WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, f.recipient, randomUUID()]);
+    expect((await f.handoff.read(f.recipient, f.input.workId, sent.envelope.id)).status).toBe("changed");
+    const cancelled = await f.handoff.act(f.actor, f.input.workId, sent.envelope.id, "cancel", { requestId: randomUUID(), envelopeDigest: sent.envelopeDigest });
+    expect(cancelled.status).toBe("cancelled"); expect(cancelled.envelope).toEqual(sent.envelope);
+  });
 
   it("records real captured review task completion atomically and replays without another workspace write", async () => {
     const f = await completionFixture(), input = await f.completionInput();

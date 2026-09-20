@@ -289,8 +289,10 @@ export class StudioReviewPreviewProducerRepository {
       // editing collaborator into a designated reviewer who can self-approve.
       await client.query(`INSERT INTO studio_review_reviewer ("reviewId","reviewerUserId") VALUES ($1,$2)`,
         [reviewId, source.ownerUserId]);
-      await client.query(`UPDATE studio_artifact SET "headRevisionId"=$2,"updatedAt"=now() WHERE id=$1`, [intent.artifactId, checkpointId]);
-      await client.query(`UPDATE studio_project_graph SET "updatedAt"=now() WHERE id=$1`, [intent.projectId]);
+      // Keep metadata monotonic across clock adjustment and legacy client-dated
+      // artifacts without relaxing either database time constraint.
+      await client.query(`UPDATE studio_artifact SET "headRevisionId"=$2,"updatedAt"=GREATEST("createdAt","updatedAt",clock_timestamp()) WHERE id=$1`, [intent.artifactId, checkpointId]);
+      await client.query(`UPDATE studio_project_graph SET "updatedAt"=GREATEST("createdAt","updatedAt",clock_timestamp()) WHERE id=$1`, [intent.projectId]);
       const result: StoredReceipt = { status: "completed", fingerprint: studioReviewPreviewDigest(intent), subject: {
         schemaVersion: 1, workId: intent.workId, projectId: intent.projectId, artifactId: intent.artifactId,
         reviewId, revisionId, rootGraphHash: intent.sourceContentDigest } };

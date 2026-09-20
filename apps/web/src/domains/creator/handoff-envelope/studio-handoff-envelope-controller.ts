@@ -34,9 +34,17 @@ export class StudioHandoffEnvelopeController {
   }
   private failure(error: unknown) { this.emit({ ...EMPTY_HANDOFF, phase: this.attempt ? "uncertain" : "failed", reason: error instanceof Error ? error.message : "unavailable" }); }
   private isRecorded(attempt: Attempt, view: StudioHandoffEnvelopeView, actorId: string | null) {
-    if (attempt.phase === "create") return view.envelope.id === attempt.input.envelopeId && view.envelope.senderUserId === actorId;
+    const envelope = view.envelope;
+    if (!actorId || envelope.workId !== this.workId) return false;
+    if (attempt.phase === "create") return envelope.id === attempt.input.envelopeId && envelope.senderUserId === actorId
+      && envelope.taskId === attempt.input.taskId && envelope.recipient.userId === attempt.input.recipient.userId
+      && envelope.recipient.roleAssignmentId === attempt.input.recipient.roleAssignmentId
+      && envelope.usageConditions === attempt.input.usageConditions && envelope.remainingNotes === attempt.input.remainingNotes;
+    if (envelope.id !== attempt.id || view.envelopeDigest !== attempt.input.envelopeDigest) return false;
     const evidence = attempt.phase === "open" ? view.opened : attempt.phase === "accept" ? view.accepted : view.cancelled;
-    return evidence?.actorUserId === actorId && evidence.requestId === attempt.input.requestId;
+    // Another tab can win the same action. Preserve its first durable receipt;
+    // convergence does not claim that the current request created that receipt.
+    return evidence?.actorUserId === actorId;
   }
   async refresh(retain = false) {
     if (this.pending) return;
@@ -51,7 +59,10 @@ export class StudioHandoffEnvelopeController {
           : { list: await this.deps.client.list(this.workId, this.cursor, op.abort.signal) };
       if (!op.valid()) return;
       if (this.deps.now() >= op.started + 15_000) throw new Error("expired");
-      if (this.attempt && result.view && this.isRecorded(this.attempt, result.view, op.owner.actorId)) this.attempt = null;
+      if (this.attempt && result.view && this.isRecorded(this.attempt, result.view, op.owner.actorId)) {
+        this.selectedId = result.view.envelope.id;
+        this.attempt = null;
+      }
       this.emit({ ...EMPTY_HANDOFF, ...result, phase: this.attempt ? "uncertain" : "ready", expiresAt: op.started + 15_000 });
     } catch (error) { if (!op || op.valid()) this.failure(error); }
     finally { if (op?.abort === this.pending) this.pending = null; }
