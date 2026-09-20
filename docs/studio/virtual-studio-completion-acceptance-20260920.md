@@ -112,8 +112,9 @@ passed 188 database tests and the marketplace database verifier. The remaining r
 failures. Both failures were reproduced with native Node: `createRequire` anchored at a pnpm
 symlink could not find the real consumer's transitive dependency. Anchoring at `realpathSync`
 resolved both dependencies, and their seven focused tests passed. The complete run was still a
-failure; these focused repairs are not relabeled as a new full-suite pass. Performance and the
-next exact-commit GitHub run remain pending. The runner, workflow and shell checks passed 88 tests.
+failure; these focused repairs are not relabeled as a new full-suite pass. The separate mandatory
+quiet performance pass then completed 21 files / 432 tests successfully. The next exact-commit
+GitHub run remains pending. The runner, workflow and shell checks passed 88 tests.
 
 The filter browser survey passed 49 filters across three repetitions (147 apply/undo checks).
 Its later direct-image failure was isolated to selection chrome and a verifier Escape action
