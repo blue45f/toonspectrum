@@ -434,7 +434,15 @@ describe("bootstrap SQL and repository contract", () => {
       "0075_membership_wallet_policy",
       "0076_creator_role_profile_v2",
       "0077_membership_operations",
+      "0078_creator_hiring_workspace",
+      "0079_creator_hiring_automation",
+      "0080_creator_career_confirmation",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
+    expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([
+      "scripts/creator-hiring-database-contract.mjs",
+      "scripts/creator-hiring-automation-database-contract.mjs",
+      "scripts/creator-career-confirmation-database-contract.mjs",
+    ]));
   });
 });

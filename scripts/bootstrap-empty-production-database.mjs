@@ -70,6 +70,9 @@ const BOOTSTRAP_CONTRACT_PATHS = Object.freeze([
   "scripts/validate-production-database-url.mjs",
   "scripts/verify-production-database-capabilities.mjs",
   "scripts/admin-database-contract.mjs",
+  "scripts/creator-hiring-database-contract.mjs",
+  "scripts/creator-hiring-automation-database-contract.mjs",
+  "scripts/creator-career-confirmation-database-contract.mjs",
   ...DRIZZLE_SCHEMA_PATHS,
 ]);
 const DRIZZLE_ERROR_PATTERN =

@@ -13,6 +13,7 @@ on:
       - 'scripts/creator-*'
       - 'scripts/production-database-migrations.manifest'
       - 'scripts/run-production-database-migrations*'
+      - 'scripts/bootstrap-empty-production-database*'
       - '.github/workflows/creator-hiring-platform.yml'
   workflow_dispatch:
 
@@ -64,5 +65,18 @@ jobs:
           scripts/creator-hiring-database-contract.test.mjs
           scripts/creator-hiring-automation-database-contract.test.mjs
           scripts/creator-career-confirmation-database-contract.test.mjs
+          scripts/bootstrap-empty-production-database.test.mjs
           scripts/run-production-database-migrations.test.mjs
           scripts/verify-production-database-capabilities.test.mjs
+      - name: Install PostgreSQL client for the empty-fixture migration gate
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Verify the complete managed migration chain on this disposable database
+        env:
+          MIGRATION_DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          BOOTSTRAP_RUNTIME_DATABASE_PASSWORD="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')"
+          export BOOTSTRAP_RUNTIME_DATABASE_PASSWORD
+          node scripts/bootstrap-empty-production-database.mjs --execute --allow-loopback \
+            --runtime-database-role creator_hiring_pipeline_runtime --release-sha "$GITHUB_SHA" \
+            --confirmation BOOTSTRAP-EMPTY-TOONSPECTRUM-DATABASE

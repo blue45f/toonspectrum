@@ -32,3 +32,11 @@ Native coverage includes worker claim contention, lost acknowledgements, repeate
 ## Explicitly not claimed by this checkpoint
 
 Production deployment, production migration, external provider credentials/rights approval, real SFU/TURN calls, hiring-to-production RoleAssignment activation, image-original exhibition and verified production-based activity awards are distinct gates. The original interview implementation remains private waiting/admission/text/device testing, not a configured video service. Career badges mean counterparty confirmation, not independently verified employment or ability. Work from other active brush/world/3D sessions is not counted as this implementation's acceptance evidence.
+
+## Final integration evidence
+
+- The ordinary root hiring/meeting/career/automation/migration/CSRF/UI portfolio passed 309 tests without skips on a fresh disposable PostgreSQL database. Fortune directories separately passed 219 tests (20 overlap with the prior selection).
+- Actual empty-database bootstrap through managed 0080, including the separated runtime role and all capability verifiers, passed on local PostgreSQL 17.10 with the already installed psql client. The new helper sources are included in the bootstrap drift fingerprint. Bootstrap/manifest/capability contract tests passed 109 tests after exact inventory updates.
+- The existing fortune browser script passed full-deck identity, calendar fallback, period selection and 320/390/768/1440px overflow checks without page errors. No external provider was enabled or called successfully as evidence.
+- A public hiring browser journey passed error recovery, next/back pages, filtering/reset and the same responsive widths. This uses intercepted synthetic API responses; it is UI integration evidence, not a production hiring E2E claim.
+- Normal pre-push on the integrated tree passed whole Web/API typecheck, architecture, source lint, secret scanning and the existing security/license audit. Current PR CI remains the merge authority; no failures are converted into success or ignored.
