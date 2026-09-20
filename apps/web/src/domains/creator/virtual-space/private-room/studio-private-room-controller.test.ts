@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type StudioAcousticSessionLease, type StudioConversationSnapshot } from "@toonspectrum/studio-project-model";
+import { type StudioAcousticSessionLease } from "@toonspectrum/studio-project-model/world-acoustic";
+import { type StudioConversationSnapshot } from "@toonspectrum/studio-project-model/world-conversation";
 
 import { fixture,ids,flush } from "./studio-private-room-controller.fixture";
 

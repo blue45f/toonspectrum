@@ -2,7 +2,7 @@ import {
   parseStudioTeamCommentLiveEvent,
   type StudioTeamCommentLiveEvent,
 } from "../studio-team-comment-live-event";
-import type { StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
+import type { StudioConversationInvalidation } from "@toonspectrum/studio-project-model/world-conversation";
 import { parseStudioLiveAcousticInvalidation, type StudioLiveAcousticCoreBinding } from "./studio-live-acoustic-control";
 
 import {

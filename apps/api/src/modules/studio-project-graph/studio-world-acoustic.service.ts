@@ -1,5 +1,7 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from "@nestjs/common";
-import { canonicalJson, studioConversationMemberSchema, type StudioAcousticDoorChange, type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticSessionRenew } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { studioConversationMemberSchema } from "@toonspectrum/studio-project-model/world-conversation";
+import { type StudioAcousticDoorChange, type StudioAcousticSessionLease, type StudioAcousticSessionOpen, type StudioAcousticSessionRenew } from "@toonspectrum/studio-project-model/world-acoustic";
 import { z } from "zod";
 import type { VerifiedSessionToken } from "../../server/session";
 import { StudioLiveAcousticBinding } from "../creator/studio-live-acoustic-binding";

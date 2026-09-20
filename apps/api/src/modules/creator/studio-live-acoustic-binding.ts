@@ -1,6 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { z } from "zod";
-import { STUDIO_ACOUSTIC_CONVERSATION_EVENT, studioConversationInvalidationSchema, studioAcousticCoreBindingSchema, type StudioAcousticCoreBinding, type StudioConversationInvalidation } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT, studioConversationInvalidationSchema, type StudioConversationInvalidation } from "@toonspectrum/studio-project-model/world-conversation";
+import { studioAcousticCoreBindingSchema, type StudioAcousticCoreBinding } from "@toonspectrum/studio-project-model/world-acoustic";
 import { studioLivePrincipalFingerprint, type VerifiedSessionToken } from "../../server/session";
 import type { StudioLiveGatewayHost } from "./studio-live-gateway-host";
 

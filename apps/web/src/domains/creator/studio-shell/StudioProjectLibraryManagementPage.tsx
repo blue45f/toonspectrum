@@ -16,12 +16,12 @@ export function StudioProjectLibraryManagementPage() {
       <Container size="wide" className="min-w-0 py-7 sm:py-11">
         <StudioProjectLibraryManagementHeader controller={controller} />
         <StudioProjectLibraryManagementContent controller={controller} />
-        {controller.view === "active" ? <details className="workspace-library-personalize">
+        {controller.view === "active" ? (<details className="workspace-library-personalize">
           <summary>{bt("작업 방식과 시작 가이드 설정", "Work preferences and getting started")}</summary>
           <StudioRoleWorkspacePanel locale={controller.locale} />
           <StudioProjectStartPanel locale={controller.locale === "ko" ? "ko" : "en"} />
           <StudioRolePersonalizationCenter locale={controller.locale} />
-        </details> : null}
+        </details>) : null}
       </Container>
       <StudioProjectLibraryManagementDialogs controller={controller} />
     </div>

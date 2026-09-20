@@ -1,4 +1,4 @@
-import type { StudioWorldPublication } from "@toonspectrum/studio-project-model";
+import type { StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
 import { StudioWorldPublicationError, studioWorldDigest } from "./studio-world-publication-client";
 
 export interface PreparedStudioWorld {

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { STUDIO_ACOUSTIC_RESOURCE_PREFIX } from "@toonspectrum/studio-project-model";
+import { STUDIO_ACOUSTIC_RESOURCE_PREFIX } from "@toonspectrum/studio-project-model/world-acoustic";
 
 import {
   STUDIO_CRDT_BINARY_HEADER_BYTES,

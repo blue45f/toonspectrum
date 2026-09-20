@@ -22,7 +22,7 @@ async function waitWorld(page) {
   await page.waitForFunction(() => document.querySelector('[data-studio-phaser-runtime]')?.hasAttribute('data-local-x'));
 }
 try {
-  for (const [width, height] of [[1440,900], [1366,768], [1024,768], [390,844], [320,740]]) {
+  for (const [width, height] of [[1440,900], [1366,768], [1024,768], [820,1180], [390,844], [320,740]]) {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
     await context.route("**/api/auth/session", (route) => route.fulfill({ json: { user: null } }));
     const page = await context.newPage(), errors = [], admissions = [];
@@ -33,6 +33,8 @@ try {
       assert.equal(await page.locator('[data-studio-personal-space="true"]').count(), 1);
       assert.equal(await page.locator('.workspace-world').count(), 0, "Home must not fall back to the old static artwork card");
       assert.equal(await page.locator('a[href*="virtual-demo"]').count(), 0, "Personal space must not link to a manufactured project");
+      const canvasBox = await page.locator('[data-studio-phaser-runtime] canvas').boundingBox();
+      assert(canvasBox && canvasBox.width >= 280 && canvasBox.height >= 320, "The actual canvas must not collapse at tablet breakpoints");
       const size = await geometry(page, `home-${width}`);
       const runtime = page.locator('[data-studio-phaser-runtime]');
       if (width === 1440) {

@@ -1,4 +1,4 @@
-import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model";
+import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
