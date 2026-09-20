@@ -1803,18 +1803,27 @@ export class StudioProjectGraphRepository {
       const existing = await client.query<{
         reviewId: string;
         body: string;
+        severity: CreateStudioReviewComment["severity"];
+        dueAtMatches: boolean;
+        assigneeIds: string[];
         anchor: Record<string, unknown>;
         createdAt: Date;
       }>(
-        `SELECT "reviewId", body, anchor, "createdAt"
-         FROM studio_review_comment WHERE id = $1`,
-        [input.id],
+        `SELECT comment."reviewId", comment.body, comment.severity, comment.anchor, comment."createdAt",
+           (comment."dueAt" IS NOT DISTINCT FROM $2::timestamptz) AS "dueAtMatches",
+           ARRAY(SELECT assignee."assigneeUserId" FROM studio_review_comment_assignee assignee
+             WHERE assignee."commentId" = comment.id ORDER BY assignee."assigneeUserId") AS "assigneeIds"
+         FROM studio_review_comment comment WHERE comment.id = $1`,
+        [input.id, input.dueAt ?? null],
       );
       const current = existing.rows[0];
       if (current) {
         if (
           current.reviewId !== reviewId
           || current.body !== input.body
+          || current.severity !== input.severity
+          || !current.dueAtMatches
+          || canonicalJson([...current.assigneeIds].sort()) !== canonicalJson([...input.assigneeIds].sort())
           || canonicalJson(current.anchor) !== canonicalJson(anchor)
         ) {
           throw new StudioIdempotencyConflictError();

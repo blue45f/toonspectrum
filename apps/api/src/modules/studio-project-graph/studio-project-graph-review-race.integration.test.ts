@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type * as DatabaseRuntime from "../../db";
 import type { CreateStudioReviewComment } from "./studio-project-graph.dto";
+import { CreateStudioReviewCommentSchema } from "./studio-project-graph.dto";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
 
 const databaseUrl = process.env.STUDIO_LIVE_POSTGRES_INTEGRATION_URL?.trim();
@@ -93,6 +94,13 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
       `SELECT count(*)::text FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock' AND query LIKE '%studio_review%'`,
       [applicationName])).rows[0]?.count ?? 0), { timeout: 5_000 }).toBe(count);
   }
+  async function member(workId: string, role: "admin" | "editor" | "commenter" | "viewer", status: "active" | "pending" | "declined" = "active") {
+    const userId = randomUUID(); users.push(userId);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [userId, `Review assignment ${role}`]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt")
+      VALUES ($1,$2,$3,$4,$5,CASE WHEN $4='pending' THEN NULL ELSE now() END)`, [workId, userId, role, status, randomUUID()]);
+    return userId;
+  }
   function observed<T>(promise: Promise<T>) {
     return promise.then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
   }
@@ -112,6 +120,91 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
       await Promise.allSettled([firstResult, secondResult].filter(Boolean));
     }
   }
+
+  it("persists normalized HTTP body, user assignees and deadline, and treats order/offset-equivalent retries as one write", async () => {
+    const f = await fixture(); const editor = await member(f.workId, "editor");
+    const raw = { ...f.input(), body: "  Correct this panel.\n ", assigneeIds: [` ${editor} `, f.actor], dueAt: "2026-10-21T14:30:00+09:00" };
+    const input = CreateStudioReviewCommentSchema.parse(raw);
+    const created = await graph.createReviewComment(f.actor, f.reviewId, input);
+    const replay = CreateStudioReviewCommentSchema.parse({ ...raw, assigneeIds: [f.actor, editor], dueAt: "2026-10-21T05:30:00.000Z" });
+    expect(await graph.createReviewComment(f.actor, f.reviewId, replay)).toEqual(created);
+    const review = await graph.getReview(f.actor, f.reviewId);
+    expect(review.comments).toHaveLength(1);
+    expect(review.comments[0]).toMatchObject({ body: "Correct this panel.", severity: "required", dueAt: "2026-10-21T05:30:00.000Z" });
+    expect([...review.comments[0]!.assigneeIds].sort()).toEqual([editor, f.actor].sort());
+  });
+
+  it.each(["severity", "assignees", "deadline", "deadline-removed"] as const)("rejects an identical comment ID with changed %s without overwriting the first note", async (field) => {
+    const f = await fixture(); const editor = await member(f.workId, "editor");
+    const input = { ...f.input(), assigneeIds: [editor], dueAt: "2026-10-21T05:30:00.000Z" };
+    await graph.createReviewComment(f.actor, f.reviewId, input);
+    const changed = { ...input, ...(field === "severity" ? { severity: "note" as const } : {}),
+      ...(field === "assignees" ? { assigneeIds: [f.actor] } : {}),
+      ...(field === "deadline" ? { dueAt: "2026-10-22T05:30:00.000Z" } : {}),
+      ...(field === "deadline-removed" ? { dueAt: undefined } : {}) };
+    await expect(graph.createReviewComment(f.actor, f.reviewId, changed)).rejects.toMatchObject({ name: "StudioIdempotencyConflictError" });
+    const stored = await graph.getReview(f.actor, f.reviewId);
+    expect(stored.comments).toHaveLength(1);
+    expect(stored.comments[0]).toMatchObject({ severity: "required", assigneeIds: [editor], dueAt: input.dueAt });
+  });
+
+  it("allows an active commenter to assign the work owner and active admin/editors but gives no new edit permission", async () => {
+    const f = await fixture(); const commenter = await member(f.workId, "commenter"), editor = await member(f.workId, "editor"), admin = await member(f.workId, "admin");
+    await graph.createReviewComment(commenter, f.reviewId, { ...f.input(), assigneeIds: [f.actor, editor, admin] });
+    expect([...(await graph.getReview(commenter, f.reviewId)).comments[0]!.assigneeIds].sort()).toEqual([f.actor, editor, admin].sort());
+    expect((await graph.getProject(commenter, f.projectId)).access).toMatchObject({ view: true, comment: true, edit: false });
+  });
+
+  it("compares timestamp instants at database precision rather than truncating sub-millisecond changes", async () => {
+    const f = await fixture(); const input = { ...f.input(), dueAt: "2026-10-21T05:30:00.123456Z" };
+    const first = await graph.createReviewComment(f.actor, f.reviewId, input);
+    expect(await graph.createReviewComment(f.actor, f.reviewId, { ...input, dueAt: "2026-10-21T14:30:00.123456+09:00" })).toEqual(first);
+    await expect(graph.createReviewComment(f.actor, f.reviewId, { ...input, dueAt: "2026-10-21T05:30:00.123457Z" }))
+      .rejects.toMatchObject({ name: "StudioIdempotencyConflictError" });
+  });
+
+  it("rejects viewer/commenter/pending/declined and other-work assignees atomically", async () => {
+    const f = await fixture(), other = await fixture();
+    const invalid = [await member(f.workId, "viewer"), await member(f.workId, "commenter"),
+      await member(f.workId, "editor", "pending"), await member(f.workId, "admin", "declined"), await member(other.workId, "editor"), other.actor];
+    for (const userId of invalid) {
+      await expect(graph.createReviewComment(f.actor, f.reviewId, { ...f.input(), assigneeIds: [f.actor, userId] }))
+        .rejects.toMatchObject({ causeCode: "assignee_edit_access_missing" });
+    }
+    expect((await graph.getReview(f.actor, f.reviewId)).comments).toHaveLength(0);
+  });
+
+  it("preserves a committed exact replay after the assignee loses access, while rejecting every new assignment", async () => {
+    const f = await fixture(); const editor = await member(f.workId, "editor");
+    const input = { ...f.input(), assigneeIds: [editor] };
+    const created = await graph.createReviewComment(f.actor, f.reviewId, input);
+    await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2', [f.workId, editor]);
+    expect(await graph.createReviewComment(f.actor, f.reviewId, input)).toEqual(created);
+    await expect(graph.createReviewComment(f.actor, f.reviewId, { ...input, id: randomUUID() }))
+      .rejects.toMatchObject({ causeCode: "assignee_edit_access_missing" });
+    expect((await graph.getReview(f.actor, f.reviewId)).comments).toHaveLength(1);
+  });
+
+  it("requires the requesting actor's current comment permission even for an exact replay", async () => {
+    const f = await fixture(); const actor = await member(f.workId, "commenter");
+    const input = { ...f.input(), assigneeIds: [f.actor] };
+    await graph.createReviewComment(actor, f.reviewId, input);
+    await pool.query('UPDATE creator_work_collaborator SET role=\'viewer\' WHERE "workId"=$1 AND "userId"=$2', [f.workId, actor]);
+    await expect(graph.createReviewComment(actor, f.reviewId, input)).rejects.toMatchObject({ name: "StudioProjectForbiddenError" });
+  });
+
+  it("serializes duplicate and conflicting assignments under the actual review row lock", async () => {
+    const f = await fixture(); const input = { ...f.input(), assigneeIds: [f.actor], dueAt: "2026-10-21T05:30:00.000Z" };
+    const [first, duplicate] = await race(f.reviewId,
+      () => graph.createReviewComment(f.actor, f.reviewId, input), () => graph.createReviewComment(f.actor, f.reviewId, input));
+    expect(first).toEqual(duplicate); expect(first.ok).toBe(true);
+    const changed = { ...input, id: randomUUID() };
+    const [accepted, conflict] = await race(f.reviewId,
+      () => graph.createReviewComment(f.actor, f.reviewId, changed),
+      () => graph.createReviewComment(f.actor, f.reviewId, { ...changed, severity: "note" }));
+    expect(accepted.ok).toBe(true); expect(conflict).toMatchObject({ ok: false, error: { name: "StudioIdempotencyConflictError" } });
+    expect((await graph.getReview(f.actor, f.reviewId)).comments).toHaveLength(2);
+  });
 
   it.each(["approved", "rejected", "cancelled"] as const)("keeps %s history immutable while allowing exact no-op resolution/comment replay", async (status) => {
     const f = await fixture(); const input = f.input();

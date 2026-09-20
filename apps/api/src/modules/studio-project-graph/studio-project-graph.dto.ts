@@ -264,7 +264,8 @@ export const CreateStudioReviewCommentSchema = z
     anchor: reviewAnchorSchema,
     body: HumanTextSchema.max(20_000),
     severity: z.enum(["required", "recommended", "note"]),
-    assigneeIds: z.array(studioEntityIdSchema).max(64).default([]),
+    assigneeIds: z.array(studioEntityIdSchema).max(64)
+      .refine((ids) => new Set(ids).size === ids.length, "assigneeIds must contain unique user IDs").default([]),
     dueAt: isoTimestampSchema.optional(),
   })
   .strict();

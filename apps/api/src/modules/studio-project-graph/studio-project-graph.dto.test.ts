@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CreateStudioExternalFileBindingSchema,
   UpdateStudioExternalFileBindingSchema,
+  CreateStudioReviewCommentSchema,
 } from "./studio-project-graph.dto";
 
 const cloudBinding = {
@@ -56,5 +57,21 @@ describe("Studio external file binding DTOs", () => {
       lastSyncedRevisionId: null,
       lastSyncedAt: "2026-09-17T00:00:00.000Z",
     }).success).toBe(false);
+  });
+});
+
+describe("Studio review comment mutation normalization", () => {
+  const input = { id: " note-1 ", body: "  Correct this panel.\n ", severity: "required", assigneeIds: [" user-editor ", "user-owner"],
+    dueAt: "2026-10-21T14:30:00+09:00", anchor: { kind: "artifact", artifactId: "artifact-a", revisionId: "snapshot-a", scope: { projectId: "graph-a" } } };
+  it("normalizes real HTTP body and user IDs without changing deadline instant or severity", () => {
+    expect(CreateStudioReviewCommentSchema.parse(input)).toEqual({ ...input, id: "note-1", body: "Correct this panel.", assigneeIds: ["user-editor", "user-owner"] });
+    const { assigneeIds: _ids, dueAt: _due, ...minimal } = input;
+    expect(CreateStudioReviewCommentSchema.parse(minimal).assigneeIds).toEqual([]);
+  });
+  it("rejects duplicate user IDs after trimming, malformed timestamps, and assignment metadata passed as a user", () => {
+    for (const assigneeIds of [["user-a", " user-a "], [{ userId: "user-a", roleAssignmentId: "role-1" }]])
+      expect(CreateStudioReviewCommentSchema.safeParse({ ...input, assigneeIds }).success).toBe(false);
+    expect(CreateStudioReviewCommentSchema.safeParse({ ...input, dueAt: "tomorrow" }).success).toBe(false);
+    expect(CreateStudioReviewCommentSchema.safeParse({ ...input, severity: "critical" }).success).toBe(false);
   });
 });
