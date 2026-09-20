@@ -1837,7 +1837,7 @@ const startPlaylistTrack = (index: number): void => {
   el.addEventListener(
     "ended",
     () => {
-      if (playlistPlaying) advancePlaylist(1);
+      if (playlistPlaying && playlistVoice === voice) advancePlaylist(1);
     },
     { once: true },
   );
