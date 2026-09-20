@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Header, Headers, Inject, Optional, Param, Patch, Post, Put } from "@nestjs/common";
+import { Body, Controller, Get, Header, Headers, Inject, Optional, Param, Patch, Post, Put, Query } from "@nestjs/common";
 
+import { candidateQuerySchema } from "./hiring-candidate-cursor";
 import { collaborationWriteGate } from "./collaboration.controller";
 import { requireCollaborationUser } from "./collaboration.service";
 import { HiringAvailabilityRepository } from "./hiring-availability.repository";
@@ -14,7 +15,7 @@ export class HiringMatchingController {
   @Put("/availability/me") @Header("Cache-Control", "private, no-store, max-age=0")
   confirm(@Body() input: unknown, @Headers("x-user-id") actor?: string) { return this.availability.save(collaborationWriteGate(actor, "availability", 30), parseHiring(availabilitySchema, input)); }
   @Get("/posts/:postId/slots/:slotId/candidates") @Header("Cache-Control", "private, no-store, max-age=0")
-  discover(@Param("postId") postId: string, @Param("slotId") slotId: string, @Headers("x-user-id") actor?: string) { return this.availability.discover(requireCollaborationUser(actor), parseHiring(hiringId, postId), parseHiring(hiringId, slotId)); }
+  discover(@Param("postId") postId: string, @Param("slotId") slotId: string, @Headers("x-user-id") actor?: string, @Query() query: unknown = {}) { return this.availability.discover(requireCollaborationUser(actor), parseHiring(hiringId, postId), parseHiring(hiringId, slotId), parseHiring(candidateQuerySchema, query)); }
   @Post("/posts/:postId/slots/:slotId/offers") @Header("Cache-Control", "private, no-store, max-age=0")
   send(@Param("postId") postId: string, @Param("slotId") slotId: string, @Body() input: unknown, @Headers("x-user-id") actor?: string) { return this.offers.send(collaborationWriteGate(actor, "offer", 30), parseHiring(hiringId, postId), parseHiring(hiringId, slotId), parseHiring(offerInputSchema, input)); }
   @Get("/offers") @Header("Cache-Control", "private, no-store, max-age=0")

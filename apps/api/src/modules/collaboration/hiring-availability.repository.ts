@@ -1,11 +1,12 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 
+import { readCandidateCursor, writeCandidateCursor } from "./hiring-candidate-cursor";
 import { expireHiringHolds } from "./hiring-expiry";
 
 import { matchingFacts, peakOverlap } from "./hiring-matching";
 import { HiringStore } from "./hiring.store";
 
-import type { HiringAvailability, HiringAvailabilityInput, HiringCandidate, HiringSlotTerms } from "../../../../../packages/contracts/src/creator-hiring";
+import type { HiringAvailability, HiringAvailabilityInput, HiringCandidate, HiringCandidatePage, HiringCandidateQuery, HiringSlotTerms } from "../../../../../packages/contracts/src/creator-hiring";
 import type { PoolClient } from "pg";
 
 export type AvailabilityRow = { user_id: string; name: string; starts_at: Date; ends_at: Date; confirmed_at: Date; expires_at: Date; roles: HiringAvailability["roles"]; tools: string[]; formats: string[]; capacity: number; min_rate: string; rate_unit: HiringAvailability["rateUnit"]; discoverable: boolean; notification_opt_in: boolean; revision: number };
@@ -65,7 +66,7 @@ export class HiringAvailabilityRepository {
       startsAt: availability.startsAt, endsAt: availability.endsAt, confirmedAt: availability.confirmedAt, expiresAt: availability.expiresAt,
       capacity: remaining, minRate: availability.minRate, rateUnit: availability.rateUnit, reasons: [...facts, `해당 기간 동시 작업 여력 ${remaining}건`] };
   }
-  async candidates(c: PoolClient, recruiter: string, terms: HiringSlotTerms, notification = false, campaignPost: string | null = null): Promise<HiringCandidate[]> {
+  async candidates(c: PoolClient, recruiter: string, terms: HiringSlotTerms, notification = false, campaignPost: string | null = null, page: { after: string | null; take: 30 | 31 } = { after: null, take: 30 }): Promise<HiringCandidate[]> {
     // One set-based read. Capacity is filtered BEFORE LIMIT, so saturated early
     // account IDs cannot hide later eligible candidates. Half-open intervals use
     // grouped end/start events at the same timestamp (adjacent work does not overlap).
@@ -75,6 +76,7 @@ export class HiringAvailabilityRepository {
       JOIN creator_hiring_capacity c ON c.user_id=a.user_id
       WHERE $6::timestamptz>statement_timestamp() AND a.discoverable AND a.expires_at>statement_timestamp() AND a.starts_at<=statement_timestamp() AND a.user_id<>$1
       AND EXISTS(SELECT 1 FROM "user" recruiter WHERE recruiter.id=$1 AND recruiter.status='active')
+      AND ($11::text IS NULL OR a.user_id COLLATE "C" > $11::text COLLATE "C")
       AND a.roles @> $2::jsonb AND a.tools @> $3::jsonb AND a.formats @> $4::jsonb
       AND a.starts_at<=$5 AND a.ends_at>=$6 AND a.min_rate<=$7 AND a.rate_unit=$8 AND (NOT $9::boolean OR a.notification_opt_in)
       AND ($10::text IS NULL OR (
@@ -99,8 +101,8 @@ export class HiringAvailabilityRepository {
     ), peaks AS (
       SELECT candidate_id,max(concurrent)::int AS peak FROM loads GROUP BY candidate_id
     ) SELECT m.*,m.capacity-COALESCE(p.peak,0) AS remaining FROM matched m LEFT JOIN peaks p ON p.candidate_id=m.user_id
-      WHERE m.capacity>COALESCE(p.peak,0) ORDER BY m.user_id LIMIT 30`,
-    [recruiter, JSON.stringify([terms.role]), JSON.stringify(terms.tools), JSON.stringify(terms.formats), terms.startsAt, terms.dueAt, terms.maxRate, terms.rateUnit, notification, campaignPost]);
+      WHERE m.capacity>COALESCE(p.peak,0) ORDER BY m.user_id COLLATE "C" LIMIT $12`,
+    [recruiter, JSON.stringify([terms.role]), JSON.stringify(terms.tools), JSON.stringify(terms.formats), terms.startsAt, terms.dueAt, terms.maxRate, terms.rateUnit, notification, campaignPost, page.after, page.take]);
     return rows.rows.map((r) => {
       const a = availabilityOf(r, r.now);
       return { userId: r.user_id, displayName: r.name || "창작자", roles: a.roles, tools: a.tools, formats: a.formats,
@@ -110,12 +112,21 @@ export class HiringAvailabilityRepository {
     });
   }
 
-  discover(actor: string, postId: string, slotId: string) {
+  discover(actor: string, postId: string, slotId: string, query: HiringCandidateQuery = {}): Promise<HiringCandidatePage> {
     return this.store.tx(async (c) => {
-      const post = await this.store.post(c, postId); await this.store.active(c, actor); this.store.owner(post, actor); this.store.open(post); await expireHiringHolds(c, postId);
-      const slot = await c.query<{ terms: HiringSlotTerms; state: string }>(`SELECT terms,state FROM creator_hiring_slot WHERE id=$1 AND post_id=$2`, [slotId, postId]);
-      if (!slot.rows[0] || !["open", "matching"].includes(slot.rows[0].state)) throw new NotFoundException("탐색 가능한 모집 자리가 없어요.");
-      return { items: await this.candidates(c, actor, slot.rows[0].terms), ordering: "account-id" as const, limit: 30 };
+      await this.store.active(c, actor);
+      const post = await this.store.post(c, postId); this.store.owner(post, actor); this.store.open(post); await expireHiringHolds(c, postId);
+      const slot = await c.query<{ terms: HiringSlotTerms; state: string; revision: number }>(`SELECT terms,state,revision FROM creator_hiring_slot WHERE id=$1 AND post_id=$2`, [slotId, postId]);
+      const current = slot.rows[0];
+      if (!current || !["open", "matching"].includes(current.state)) throw new NotFoundException("탐색 가능한 모집 자리가 없어요.");
+      if (query.expectedRevision !== undefined && current.revision !== query.expectedRevision) throw new ConflictException("모집 조건이 변경되었어요. 조건을 새로 불러온 뒤 다시 조회해 주세요.");
+      const scope = { postId, slotId, termsRevision: current.revision, postVersion: post.version };
+      const after = readCandidateCursor(query.after, scope);
+      const candidates = await this.candidates(c, actor, current.terms, false, null, { after, take: 31 });
+      const observed = await this.store.currentOpen(c, post, current.terms.dueAt);
+      const items = candidates.slice(0, 30);
+      return { items, ordering: "account-id", limit: 30, termsRevision: current.revision, observedAt: observed.toISOString(),
+        next: candidates.length > 30 ? writeCandidateCursor(items[items.length - 1].userId, scope) : null };
     });
   }
 }
