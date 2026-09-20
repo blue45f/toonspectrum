@@ -118,22 +118,58 @@ export function AuthModal({
 
   useEffect(() => {
     const controller = new AbortController();
+    let disposed = false;
+    let recoveryAvailable = false;
+    const fail = () => {
+      setProviders({});
+      setProviderStatus("error");
+      recoveryAvailable = true;
+    };
+    const retryAfterReturn = () => {
+      if (disposed || !recoveryAvailable || document.visibilityState === "hidden") return;
+      // A focus + visibility + online burst must create only one new request.
+      recoveryAvailable = false;
+      setProviderAttempt((value) => value + 1);
+    };
+    // Bound both the response and JSON body read. Some transports can settle
+    // even after abort, so every continuation also checks the request lifetime.
+    const timeout = globalThis.setTimeout(() => {
+      if (disposed || controller.signal.aborted) return;
+      fail();
+      controller.abort();
+    }, 15_000);
+    setProviders({});
     setProviderStatus("loading");
-    fetch(apiPath("/auth/providers"), { signal: controller.signal })
+    fetch(apiPath("/auth/providers"), {
+      signal: controller.signal,
+      cache: "no-store",
+      credentials: "same-origin",
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error(`provider discovery failed (${response.status})`);
         return response.json() as Promise<unknown>;
       })
       .then((payload) => {
+        if (disposed || controller.signal.aborted) return;
         setProviders(parseAuthProviderDiscovery(payload));
         setProviderStatus("ready");
       })
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setProviders({});
-        setProviderStatus("error");
-      });
-    return () => controller.abort();
+      .catch(() => {
+        if (disposed || controller.signal.aborted) return;
+        fail();
+      })
+      .finally(() => globalThis.clearTimeout(timeout));
+    globalThis.addEventListener("online", retryAfterReturn);
+    globalThis.addEventListener("focus", retryAfterReturn);
+    document.addEventListener("visibilitychange", retryAfterReturn);
+    return () => {
+      disposed = true;
+      globalThis.clearTimeout(timeout);
+      controller.abort();
+      globalThis.removeEventListener("online", retryAfterReturn);
+      globalThis.removeEventListener("focus", retryAfterReturn);
+      document.removeEventListener("visibilitychange", retryAfterReturn);
+    };
   }, [providerAttempt]);
 
   // Escape 로 닫기 (키보드 접근성)
@@ -553,7 +589,7 @@ export function AuthModal({
                 {providerStatus === "error" && (
                   <div className="rounded-xl border border-line bg-card p-3 text-center">
                     <p className="text-xs leading-relaxed text-fg-3" role="status">
-                      {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "소셜 로그인 정보를 불러오지 못했어요. 이메일 로그인은 계속 사용할 수 있어요.")}</p>
+                      {translateCurrentStaticSourceText("domains.auth.components.auth.modal", "ko", "로그인 서비스를 확인하지 못했어요. 일시적인 연결 문제나 서비스 점검 중일 수 있어요. 잠시 후 다시 확인해 주세요.")}</p>
                     <button
                       type="button"
                       onClick={() => setProviderAttempt((value) => value + 1)}
