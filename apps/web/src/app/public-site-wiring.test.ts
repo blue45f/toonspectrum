@@ -16,6 +16,9 @@ describe("public shell integration", () => {
     expect(app).toContain("const SiteBackgroundMusicPlayer = lazy(");
     expect(app).not.toContain('import { SiteBackgroundMusicPlayer }');
     expect(app).toContain("<SiteBackgroundMusicPlayer suspended={isolatedChrome} />");
+    // Virtual home suppresses chromeOverlay: the soundtrack must not live inside it.
+    expect(app.indexOf("<SiteBackgroundMusicPlayer suspended={isolatedChrome} />")).toBeLessThan(app.indexOf("<AppShell"));
+    expect(app.match(/<SiteBackgroundMusicPlayer suspended=/gu)).toHaveLength(1);
     expect(app.indexOf("<SiteBackgroundMusicPlayer suspended={isolatedChrome} />")).toBeLessThan(app.indexOf("{!isolatedChrome ? ("));
   });
 

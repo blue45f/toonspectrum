@@ -123,3 +123,11 @@
   html:has(.workspace-shell){scroll-padding-block-end:calc(84px + env(safe-area-inset-bottom))}
   .workspace-main :is(a,button,input,select),.workspace-statusbar :is(a,button){scroll-margin-block:16px calc(84px + env(safe-area-inset-bottom))}
 }
+
+/* Reserve a soundtrack dock instead of covering workspace actions and navigation. */
+@media(min-width:761px){
+ body:has([data-site-ost="mounted"]) .workspace-shell[data-workspace-surface="home"] .workspace-statusbar{padding-bottom:80px}
+}
+@media(max-width:760px){
+ body:has([data-site-ost="mounted"]) .workspace-shell[data-workspace-surface="home"]{padding-bottom:calc(144px + env(safe-area-inset-bottom))}
+}

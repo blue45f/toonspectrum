@@ -128,4 +128,10 @@
 /audio/*
   Access-Control-Allow-Origin: *
   Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+
+/audio/original/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/audio/playlist.json
+  Cache-Control: no-store
+  CDN-Cache-Control: no-store

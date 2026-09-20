@@ -99,6 +99,8 @@ describe("classifyStudioServiceWorkerRequest", () => {
       ["/assets/index-r07BZoLj.css", "immutable-asset"],
       ["/vrm/Vivi.vrm", "static-media"],
       ["/audio/theme.mp3", "static-media"],
+      ["/audio/playlist.json", "passthrough"],
+      ["/audio/playlist.json?catalog=prism-awakening-20260921", "passthrough"],
       ["/images/hero.png", "static-media"],
       ["/data/catalog.json", "catalog-data"],
       ["/i18n/studio/mainMenu/ko.json", "catalog-data"],
