@@ -1,5 +1,7 @@
 name: Full Test Diagnostic
 
+# Canonical root + PostgreSQL + performance suite. Do not add another PR copy.
+
 on:
   pull_request:
     branches: [main]
