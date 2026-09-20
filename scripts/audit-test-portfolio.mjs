@@ -57,9 +57,15 @@ export function inspectTestSource(file, text) {
     ts.forEachChild(node, visit);
   };
   visit(source);
+  const forwarding = source.statements.length === 1 ? source.statements[0] : null;
+  const forwardedTestModule = forwarding && ts.isExportDeclaration(forwarding)
+    && !forwarding.isTypeOnly && !forwarding.exportClause
+    && forwarding.moduleSpecifier && ts.isStringLiteral(forwarding.moduleSpecifier)
+    && /\.(?:test|spec)(?:\.[cm]?[jt]sx?)?$/u.test(forwarding.moduleSpecifier.text)
+    ? forwarding.moduleSpecifier.text : null;
   const localImports = imports.filter((name) => name.startsWith(".") || name.startsWith("@/") || name.startsWith("@toonspectrum/"));
   return { file, lines: text.split("\n").length, bytes: Buffer.byteLength(text),
-    fileHash: sha256(text), imports, localImports, caseDeclarations: cases.length,
+    fileHash: sha256(text), imports, localImports, forwardedTestModule, caseDeclarations: cases.length,
     skippedDeclarations, exclusiveDeclarations, conditionalDeclarations, sourceReads, matchers: [...matchers].sort(), cases,
     environment: /@(?:vitest|jest)-environment\s+(\S+)/u.exec(text)?.[1] ?? "node",
     sourceContractCandidate: sourceReads > 0 &&
@@ -108,6 +114,8 @@ export function auditPortfolio(root = ROOT) {
       exclusiveDeclarations: inspected.reduce((total, entry) => total + entry.exclusiveDeclarations, 0),
       conditionalDeclarations: inspected.reduce((total, entry) => total + entry.conditionalDeclarations, 0),
       parseErrors: inspected.reduce((total, entry) => total + entry.parseErrors, 0), domains },
+    forwardingTestEntries: inspected.filter((entry) => entry.forwardedTestModule)
+      .map(({ file, forwardedTestModule }) => ({ file, target: forwardedTestModule })),
     exactFileDuplicates: duplicates(inspected, "fileHash").map((group) => group.map((entry) => entry.file)),
     bodySimilarityCandidates: bodyCandidates, files: inspected };
 }
@@ -122,6 +130,7 @@ export function renderAudit(report) {
     "", "## Limitations", ...report.limitations.map((item) => `- ${item}`), "",
     "## Largest files", ...[...report.files].sort((a, b) => b.lines - a.lines).slice(0, 20)
       .map((entry) => `- ${entry.file}: ${entry.lines} lines / ${entry.caseDeclarations} declarations`), "",
+    `Pure forwarding test entries: ${report.forwardingTestEntries.length}; review these for double collection.`,
     "Full per-file evidence, skips and candidate locations are in the adjacent JSON report.", ""].join("\n");
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

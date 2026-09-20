@@ -89,3 +89,33 @@ not by increasing budgets or accepting a larger baseline.
 - Whole-repository Actionlint still reports inherited issues in untouched workflows; no full-clean claim.
 
 Runtime deployment, database migration and secret changes are not performed by these audit commands.
+
+## 2026-09-21 추가 검토 및 중복 실행 정리
+
+추가 전수 스캔은 파일 해시뿐 아니라 테스트 진입점의 재수출 구조도 검토했다.
+`apps/web/src/shared/lib/*.test.ts` 중 11개는 원본 테스트를 `export *`로 다시 불러오는
+이전 경로의 연결 파일이었다. 원본은 `domains/creator/contracts`에서 별도로 수집되므로
+바이트가 같은 파일이 없어도 동일한 검증이 두 번 실행되고 있었다.
+삭제 전 22개 파일/156개 테스트를 실행한 후, 각 연결 파일과 원본의 전체 assertion 이름을
+비교해 모두 일치함을 확인했다. 연결 파일만 제거한 뒤 원본 11개 파일/78개 테스트를
+재실행하여 전부 통과했고, 원본의 assertion 이름/개수가 하나도 달라지지 않았음을 검증했다.
+이는 78개의 고유 검증을 없앤 것이 아니라 78회의 중복 등록을 제거한 것이다.
+감사 도구에도 순수 테스트 재수출 탐지와 일반 export/추가 동작의 오분류 방지 검증을 추가했다.
+
+최종 작업 트리 정적 스냅샷은 JS/TS 테스트 4,790개, 1,102,714줄, 정적 선언 41,466개다.
+정적 선언 수는 매개변수 확장/간접 등록을 포함하는 실행 테스트 수와 다르다.
+선언 파일·명시적 fixtures/generated 경로를 제외한 비테스트 JS/TS는 6,603개/2,214,653줄이다.
+이 비교에는 운영 애플리케이션뿐 아니라 도구·설정도 포함되므로 운영 소스 비율이나 커버리지로
+해석하지 않는다. 절대 개수만으로 테스트가 과다하거나 충분하다고 결론 내리지 않는다.
+
+3개 이하 정적 case를 가진 파일은 1,279개다. 공통 setup이 파일마다 반복되므로 같은 책임의
+작은 테스트는 통합 후보지만, 파일 개수를 줄이기 위한 무차별 병합은 하지 않는다.
+소스 문자열 검사 후보 352개/38,373줄은 추가 설계 검토 대상이다. 권한·네트워크 경계·지연 로딩
+검사는 유지하고, 구현 문구/함수 호출 순서에 의존하는 검사는 작은 행동 계약/AST 검사로 전환한다.
+기본 Node 환경 파일 3,999개와 jsdom 지정 파일 791개를 구분했다. 전역 번역 카탈로그 등록은
+Node 테스트에도 비용이 발생하지만 순수 함수 여부를 검증하지 않은 채 번역이나 격리를 끄지 않았다.
+
+로컬 검증 증거는 `/tmp/ci-test-forwarders-before-20260921.json`,
+`/tmp/ci-test-forwarders-after-20260921.json` 및 기존 `artifacts/ci-test-audit/portfolio.json`이다.
+전체 코드의 정적 구조와 중복 후보를 조사했으며 모든 assertion의 수동 의미 검토나 mutation 점수,
+전체 E2E 성공을 주장하지 않는다. CI 반영/운영 배포 성공은 별도 실행 영수증으로 확인한다.

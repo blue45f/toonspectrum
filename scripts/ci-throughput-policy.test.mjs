@@ -95,3 +95,12 @@ test("closed-PR cleanup is not misclassified as stale and security/manual runs r
   assert.deepEqual(selectSupersededActionsRuns([mainRun(1),
     { ...mainRun(2), event: "workflow_dispatch" }, { ...mainRun(3), event: "merge_group" }]), []);
 });
+
+
+test("related-source validation retains documentation evidence without restoring heavy assets", () => {
+  const text = workflows["toonstudio-session-goals.yml"];
+  assert.ok(!text.includes("!/docs/"), "related content tests need their tracked evidence");
+  assert.ok(text.includes("!/apps/web/public/assets/"));
+  assert.ok(text.includes("!/artifacts/"));
+  assert.ok(text.includes("pnpm exec vitest related"), "retain the real related tests");
+});

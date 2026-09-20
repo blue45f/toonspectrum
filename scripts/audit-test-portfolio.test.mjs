@@ -28,3 +28,19 @@ test("body fingerprints preserve assertion values and ignore comments or titles"
   assert.equal(get("first", 1), get("second", 1, "// explanation"));
   assert.notEqual(get("first", 1), get("first", 2));
 });
+
+test("portfolio detects forwarding-only test entries rather than reporting empty coverage", () => {
+  for (const target of ["./contract.test", "./contract.spec.ts"]) {
+    const result = inspectTestSource("legacy.test.ts", `export * from "${target}";`);
+    assert.equal(result.forwardedTestModule, target);
+    assert.equal(result.caseDeclarations, 0);
+  }
+});
+test("forwarding classification preserves behavioral additions and ordinary export barrels", () => {
+  for (const code of [
+    'export * from "./contract";',
+    'export type * from "./contract.test";',
+    'export { helper } from "./contract.test";',
+    'export * from "./contract.test"; test("extra", () => {});',
+  ]) assert.equal(inspectTestSource("mixed.test.ts", code).forwardedTestModule, null);
+});
