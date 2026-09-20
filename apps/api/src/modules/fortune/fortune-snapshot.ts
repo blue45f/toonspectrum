@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { FORTUNE_SPECIAL_DAY_CATEGORIES, FORTUNE_ZODIAC_IDS, fortuneKstDate, fortuneMonthDays, fortunePeriodWindow, validateFortuneSpecialDays,
   type FortuneCalendarEnrichment, type FortuneHoroscopeEnrichment, type FortuneSpecialDaysEnrichment } from "../../../../../packages/core/src/fortune";
@@ -21,8 +22,15 @@ const horoscope = z.object({ ...base, kind: z.literal("horoscope"), source: z.li
 const special = z.object({ ...base, kind: z.literal("special-days"), source: z.literal("kasi"), month, category: z.enum(FORTUNE_SPECIAL_DAY_CATEGORIES),
   items: z.array(z.object({ date: z.string(), sequence: z.number().int(), name: z.string().max(50), isHoliday: z.boolean() }).strict()).max(100) }).strict();
 const snapshot = z.discriminatedUnion("kind", [calendar, horoscope, special]);
+/** Invalidate verification snapshots whenever the relevant local calendar output changes. */
+export function fortuneCalendarSnapshotKey(month: string, policyRevision: string): string {
+  const baseline = fortuneMonthDays(month).map(({ date, weekday, lunar }) => [date, weekday, lunar.year, lunar.month, lunar.day, lunar.intercalation]);
+  const digest = createHash("sha256").update(JSON.stringify(baseline)).digest("hex");
+  return `v3:calendar:${month}:${digest}:${policyRevision}`;
+}
 export function fortuneSnapshotKey(value: FortunePublicResult): string {
-  const context = value.kind === "calendar" ? value.month : value.kind === "special-days" ? `${value.month}:${value.category}` : `${value.sign}:${value.period}:${value.referenceDate}`;
+  if (value.kind === "calendar") return fortuneCalendarSnapshotKey(value.month, value.policyRevision);
+  const context = value.kind === "special-days" ? `${value.month}:${value.category}` : `${value.sign}:${value.period}:${value.referenceDate}`;
   return `v2:${value.kind}:${context}:${value.policyRevision}`;
 }
 export function parseFortuneSnapshot(input: unknown, key: string, now: Date): FortunePublicSnapshot {

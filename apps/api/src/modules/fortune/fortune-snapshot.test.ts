@@ -1,4 +1,6 @@
 import "reflect-metadata";
+import { fortuneMonthDays } from "../../../../../packages/core/src/fortune";
+import { KASI_POLICY_REVISION } from "./fortune-enrichment.provider";
 import { describe, expect, it, vi } from "vitest";
 import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { FixtureSnapshots, followupConfig, followupCoordination, followupNow, specialXml } from "../../../test/fortune-followup-fixtures";
@@ -57,4 +59,18 @@ describe("public fortune snapshots", () => {
     expect(query.mock.calls[1][0]).toContain("fortune_public_snapshot.checked_at < EXCLUDED.checked_at");
     expect(query.mock.calls[2][0]).toContain("LIMIT 1000"); expect(query.mock.calls[1][1][0]).toBe(fortuneSnapshotKey(snapshot()));
   });
+});
+it("isolates calendar verification caches by current public calculation output", async () => {
+  const { snapshots, coordination, fetcher } = setup();
+  const data: FortunePublicSnapshot = { kind: "calendar", month: "2024-09", status: "external", source: "kasi", policyRevision: KASI_POLICY_REVISION,
+    checks: fortuneMonthDays("2024-09").map((day) => ({ date: day.date, matches: true, fields: [] })),
+    checkedAt: followupNow().toISOString(), expiresAt: "2026-09-21T01:00:00.000Z" };
+  const create = () => new FortuneEnrichmentService({ ...followupConfig, snapshotsEnabled: true, kasiEnabled: true, kasiServiceKey: "fixture" },
+    { fetch: fetcher, now: followupNow }, coordination as unknown as UpstashCoordinationPort, snapshots);
+  snapshots.rows.set(`v2:calendar:2024-09:${KASI_POLICY_REVISION}`, data);
+  expect((await create().calendar("2024-09")).status).toBe("local-fallback");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(fortuneSnapshotKey(data)).toMatch(/^v3:calendar:2024-09:[a-f0-9]{64}:/u);
+  await snapshots.put(data); fetcher.mockClear();
+  expect((await create().calendar("2024-09")).status).toBe("external-cache"); expect(fetcher).not.toHaveBeenCalled();
 });

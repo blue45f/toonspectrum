@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { FortunePublicCache } from "./fortune-public-cache";
-import { FORTUNE_SNAPSHOT_PORT, type FortuneSnapshotPort } from "./fortune-snapshot";
+import { FORTUNE_SNAPSHOT_PORT, fortuneCalendarSnapshotKey, type FortuneSnapshotPort } from "./fortune-snapshot";
 import { kasiSpecialDaysUrl, parseKasiSpecialDaysPage, KASI_SPECIAL_POLICY_REVISION } from "./fortune-special-days.provider";
 import { validateFortuneSpecialDays, type FortuneSpecialDay, type FortuneSpecialDayCategory, type FortuneSpecialDaysEnrichment, fortuneKstDate, fortuneMonthDays, localFortuneHoroscope,
   type FortuneCalendarEnrichment, type FortuneHoroscopeEnrichment, type FortuneUnavailableReason,
@@ -68,7 +68,7 @@ export class FortuneEnrichmentService {
     const fallback = (reason: FortuneUnavailableReason): FortuneCalendarEnrichment => ({ kind: "calendar", month, status: "local-fallback", reason, source: "local", checks: [], policyRevision: KASI_POLICY_REVISION });
     const unavailable = this.blocked("kasi");
     if (unavailable) return fallback(unavailable);
-    return this.cache.get(`v2:calendar:${month}:${KASI_POLICY_REVISION}`, "fortune-kasi", async () => {
+    return this.cache.get(fortuneCalendarSnapshotKey(month, KASI_POLICY_REVISION), "fortune-kasi", async () => {
       const blocked = this.blocked("kasi");
       if (blocked) return fallback(blocked);
       try {
