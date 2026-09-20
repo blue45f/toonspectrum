@@ -78,7 +78,8 @@ describe("ProductionLandingPage portfolio", () => {
     render(<MemoryRouter><ProductionLandingPage /></MemoryRouter>);
 
     expect(await screen.findByRole("heading", { name: "내 제작 포트폴리오" })).toBeTruthy();
-    expect(screen.getByText("위험한 연재작")).toBeTruthy();
+    // The heading belongs to the loading shell; both API results settle before cards appear.
+    expect(await screen.findByText("위험한 연재작")).toBeTruthy();
     expect(screen.getByText("내 통합 작업함")).toBeTruthy();
     expect(screen.getByText("18화 선화 마무리")).toBeTruthy();
     expect(screen.getByRole("link", { name: /운영 열기/u }).getAttribute("href"))
