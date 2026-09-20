@@ -14,6 +14,8 @@
  * Run: pnpm run build && pnpm exec tsx scripts/verify-studio-filter-dialog.mts
  * Expects production build in dist/ (vite preview) — see studio-verify skill §2.
  * TOONSPECTRUM_VERIFY_ORIGIN reuses an existing production preview and its configured API origin.
+ * TOONSPECTRUM_VERIFY_WS_ENDPOINT uses a version-matched Playwright server (for example, Linux
+ * Docker on macOS). Only loopback preview requests are forwarded to the local test runner.
  *
  * Exit codes: 0 = every filter case applied, visibly changed pixels and undid cleanly
  *             1 = dialog, preview, apply, pixel-diff or browser-diagnostic failure
@@ -26,6 +28,9 @@ import { deflateSync } from "node:zlib";
 
 import { chromium, type Browser, type Page } from "playwright";
 
+import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+
+import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
 import {
@@ -114,6 +119,7 @@ interface FilterCaseResult {
   target: string | null;
   diff: PixelDiff | null;
   undoDiff: PixelDiff | null;
+  persistedUndoRestored?: boolean;
   failure?: string;
 }
 
@@ -124,6 +130,7 @@ interface FilterDialogReport {
   startedAt: string;
   finishedAt: string;
   cases: FilterCaseResult[];
+  committedBaseline: { livePresentationDiff: PixelDiff; originalDrawCount: number; persistedHistoryUnchanged: boolean } | null;
   consoleErrorCount: number;
   failedResponses: string[];
 }
@@ -223,7 +230,23 @@ async function screenshotClipped(
   page: Page,
   clip: { x: number; y: number; width: number; height: number },
 ): Promise<Buffer> {
+  await page.mouse.move(8, 8);
   return page.screenshot({ clip, animations: "disabled" });
+}
+
+/** Read the shipped recovery authorities, and reject stale pre-operation snapshots. */
+async function waitForSavedPages(
+  page: Page,
+  accepts: (document: StudioDurableAutosaveDocument) => boolean,
+  description: string,
+): Promise<StudioDurableAutosaveDocument> {
+  const deadline = Date.now() + 15_000;
+  do {
+    const document = await readDurableStudioAutosaveDocument(page, studioAutosaveKey({}));
+    if (document && accepts(document)) return document;
+    await page.waitForTimeout(150);
+  } while (Date.now() < deadline);
+  throw new Error(description);
 }
 
 async function compareScreenshotPixels(
@@ -422,6 +445,7 @@ async function main(): Promise<void> {
   let browser: Browser | null = null;
 
   const results: FilterCaseResult[] = [];
+  let committedBaseline: NonNullable<FilterDialogReport["committedBaseline"]>;
   const browserErrors: { messages: string[]; failedResponses: string[] } = {
     messages: [],
     failedResponses: [],
@@ -439,7 +463,10 @@ async function main(): Promise<void> {
     });
     log(`preview ready @ ${url}`);
 
-    browser = await chromium.launch({ headless: true });
+    const browserEndpoint = process.env.TOONSPECTRUM_VERIFY_WS_ENDPOINT;
+    browser = browserEndpoint
+      ? await chromium.connect(browserEndpoint, { exposeNetwork: "<loopback>" })
+      : await chromium.launch({ headless: true });
     const context = await browser.newContext({
       viewport: { width: 1440, height: 1100 },
       locale: "ko-KR",
@@ -477,8 +504,28 @@ async function main(): Promise<void> {
     await dismissTransientChrome(page);
 
     await activatePenAndDraw(page);
+    const originalDocument = await waitForSavedPages(page, (document) =>
+      document.pagesList.flatMap((item) => item.elements ?? []).filter((item) =>
+        item && typeof item === "object" && "type" in item && item.type === "draw").length === 2,
+    "The two original pen strokes were not saved");
+    const originalPages = JSON.stringify(originalDocument.pagesList);
     const clip = await canvasEvidenceClip(page);
+    const liveBaseline = await screenshotClipped(page, clip);
+    writeFileSync(join(SCRATCH, "studio-filter-dialog-live-baseline.png"), liveBaseline);
+    // Compare committed-history rendering on both sides of the filter operation.
+    // The immediate pen presentation may still use the retained live-ink surface.
+    await (await enabledStudioHistoryControl(page, "undo", 10_000)).click();
+    await page.waitForTimeout(600);
+    await (await enabledStudioHistoryControl(page, "redo", 10_000)).click();
+    await page.waitForTimeout(900);
+    await waitForSavedPages(page, (document) => document.savedAt > originalDocument.savedAt
+      && JSON.stringify(document.pagesList) === originalPages,
+    "History traversal changed the original saved strokes");
     const baseline = await screenshotClipped(page, clip);
+    committedBaseline = { livePresentationDiff: await compareScreenshotPixels(page, liveBaseline, baseline),
+      originalDrawCount: 2, persistedHistoryUnchanged: true };
+    writeFileSync(join(SCRATCH, "studio-filter-dialog-baseline.png"), baseline);
+    log(`live-to-history presentation difference: ${JSON.stringify(committedBaseline.livePresentationDiff)}; saved strokes unchanged`);
     log(`baseline evidence captured (${clip.width}x${clip.height})`);
 
     const cases = SURVEY_MODE
@@ -549,10 +596,18 @@ async function main(): Promise<void> {
           );
         }
 
+        const appliedDocument = await waitForSavedPages(page,
+          (document) => JSON.stringify(document.pagesList) !== originalPages,
+          `${filterCase.label}: applied filter did not reach durable storage`);
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
         await page.waitForTimeout(900);
         const restored = await screenshotClipped(page, clip);
+        if (index === 0) writeFileSync(join(SCRATCH, "studio-filter-dialog-first-restored.png"), restored);
+        await waitForSavedPages(page, (document) => document.savedAt > appliedDocument.savedAt
+          && JSON.stringify(document.pagesList) === originalPages,
+        `${filterCase.label}: undo changed the original saved page data`);
+        result.persistedUndoRestored = true;
         result.undoDiff = await compareScreenshotPixels(page, baseline, restored);
         invariant(
           result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
@@ -804,6 +859,7 @@ async function main(): Promise<void> {
     startedAt,
     finishedAt: new Date().toISOString(),
     cases: results,
+    committedBaseline,
     consoleErrorCount: browserErrors.messages.length,
     failedResponses: browserErrors.failedResponses,
   };

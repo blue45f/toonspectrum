@@ -131,6 +131,30 @@ recognizes the current automatic restore and the existing explicit fallback, and
 requires the at-risk stroke to repaint all three measured route segments. Its real run preserved
 both strokes and their metadata, with automatic recovery, three visible segments and zero errors.
 
+The subsequent GitHub run at `ee7ff19f0b117329f0dd67968fb70c6b23595116` passed both complete
+test workflows, every core/verify lane and the desktop, mobile, shapes, long-stroke, source and
+durability browser lanes. Filters and non-Studio quality remained failures at that exact head;
+their repairs require a new head's checks before merge.
+
+Linux reproduction isolated the filter failure to comparing the retained live-pen surface with
+the committed history rendering after undo. Switching tools did not correct it. A real undo/redo
+of the two original strokes establishes a committed baseline; the shipped durable OPFS/SQLite
+reader independently requires the original page data to remain exactly unchanged. Every filter
+must then visibly apply, reach durable storage and restore both the same pixels and exact original
+pages after undo. Pixel thresholds and the full evidence crop are unchanged.
+
+The complete repaired survey passed **149 cases** in Playwright 1.62.1's official Linux Noble
+ARM64 container against the owned local production preview: 49 filters × three repetitions plus
+comparison controls and direct-image application. All 147 page-filter cases restored the exact
+durable pages, every undo pixel difference was zero, and browser/response errors were zero. The
+initial live/history surfaces differed at 914 of 177,485 pixels (maximum channel delta 71); this
+test correction does not establish visual identity between those two renderers. The run lasted
+from `2026-09-20T01:25:53.093Z` to `2026-09-20T01:44:15.914Z`. Local evidence is
+`/tmp/virtual-studio-filter-linux-full-history/studio-filter-dialog-report.json`. The optional
+`TOONSPECTRUM_VERIFY_WS_ENDPOINT` supports this version-matched Linux reproduction; regular CI
+continues using its locally launched browser. This local pass does not replace the repaired
+commit's GitHub Linux x64 gate.
+
 Useful commands, with an explicitly owned dev origin and disposable database variables:
 
 ```sh
@@ -143,6 +167,10 @@ pnpm exec vitest run --no-file-parallelism apps/api/src/modules/studio-project-g
 ```
 
 ## Remaining completion ledger
+
+The original attachment's exact [VS-01–VS-30 backlog](virtual-studio-original-backlog-20260920.md)
+was subsequently recovered in the shared-chat UI. Its criteria and correspondence to the B/E
+ledger remain requirements, not a claim that all 30 functions have been completed.
 
 This batch materially advances B02/B03/B06/B07/B09/B10/B13/B14/B15/B18/B20 and the review portions
 of E01/E04/E19/E23. Those identifiers are not all marked complete: furniture movement/publish,
