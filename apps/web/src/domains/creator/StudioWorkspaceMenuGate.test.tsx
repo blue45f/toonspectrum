@@ -35,7 +35,7 @@ describe("StudioWorkspaceMenuGate", () => {
     expect(html).toContain('data-testid="studio-workspace-toggle"');
     expect(html).toContain('aria-haspopup="dialog"');
     expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain("작업공간: 스토리보드, 이 기기 저장 확인됨");
+    expect(html).toContain("작업공간: 선화, 이 기기 저장 확인됨");
     expect(html).not.toContain('data-testid="studio-workspace-dialog"');
     expect(html).not.toContain('data-testid="studio-workspace-menu"');
   });
@@ -99,7 +99,7 @@ describe("StudioWorkspaceMenuGate", () => {
     expect(html).toContain("max-[359px]:justify-center");
     expect(html).toContain("max-[359px]:sr-only");
     expect(html.match(/max-\[359px\]:hidden/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(html).toContain("작업공간: 스토리보드 세션, 변경은 이 세션에서만 유지");
+    expect(html).toContain("작업공간: 선화 세션, 변경은 이 세션에서만 유지");
   });
 
   it("uses one analyzable lazy import and all three intent preload signals", () => {

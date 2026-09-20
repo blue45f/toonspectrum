@@ -16,7 +16,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import {
   formatStudioShortcutChord,
@@ -117,6 +117,7 @@ export function StudioQuickStartPanel({
   onCollabFocus,
   onOpenTutorials,
   shortcuts,
+  startCollapsed = false,
 }: {
   onDismiss: () => void;
   onQuickComic: () => void;
@@ -131,7 +132,9 @@ export function StudioQuickStartPanel({
   onCollabFocus: () => void;
   onOpenTutorials: () => void;
   shortcuts: StudioQuickStartShortcuts;
+  startCollapsed?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(!startCollapsed);
   const translate = useT();
   const language = useI18n((state) => state.lang);
   const korean = language.toLocaleLowerCase().startsWith("ko");
@@ -340,6 +343,7 @@ export function StudioQuickStartPanel({
             </p>
             <p
               id="studio-quick-start-description"
+              hidden={!expanded}
               className="mt-0.5 max-w-[48ch] text-[0.7rem] leading-snug text-fg-3"
             >
               {localizeText(
@@ -349,6 +353,11 @@ export function StudioQuickStartPanel({
               )}
             </p>
           </div>
+          {startCollapsed ? <button type="button" aria-expanded={expanded} aria-controls="studio-quickstart-content"
+            onClick={() => setExpanded((value) => !value)}
+            className="min-h-11 shrink-0 rounded-lg border border-line px-2 text-xs text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+            {expanded ? "접기" : "사용법"}
+          </button> : null}
           <button
             type="button"
             data-studio-quickstart-dismiss="true"
@@ -367,6 +376,8 @@ export function StudioQuickStartPanel({
         </header>
 
         <div
+          id="studio-quickstart-content"
+          hidden={!expanded}
           data-studio-quickstart-scroll="true"
           className="min-h-0 overflow-y-auto overscroll-contain p-3 [scrollbar-gutter:stable]"
         >

@@ -16,6 +16,7 @@ import {
   MessageSquareText,
   Minus,
   MousePointer2,
+  Maximize2,
   PaintBucket,
   Palette,
   Pencil,
@@ -345,10 +346,11 @@ export interface StudioBrushCatalogHandlers {
   ) => void;
   toggleFavorite: (brushId: string) => void;
   /** Records where the artist left the catalogue so the next visit reopens there. */
-  rememberView?: (view: StudioBrushCatalogRestoredView) => void;
+  rememberView?: (view: StudioBrushCatalogRestoredView, operation?: "paint" | "erase", ownerScope?: string) => void;
 }
 
 export interface StudioMobileEditingDockHandlers {
+  openSelectionTransform?: () => void;
   activateCanvasTool: (
     tool: "select" | "draw",
     drawMode?: DrawMode
@@ -634,6 +636,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     editSelectionText,
     fitCanvasToWidth,
     openBrushManager,
+    openSelectionTransform,
     openInspectorRoute,
     openStudioFilter,
     queueBrushDelete,
@@ -836,6 +839,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           <div
             role="toolbar"
             aria-label="선택 항목 빠른 작업"
+            data-studio-mobile-selection-actions="true"
             className="fixed inset-x-2 z-[53] mx-auto flex max-w-[34rem] items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panel/95 p-1.5 shadow-2xl backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden"
             style={{
               bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.35rem + ${safeMobileKeyboardInset}px)`,
@@ -852,6 +856,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <p className="text-[0.58rem] font-medium uppercase tracking-wide text-fg-3">빠른 작업</p>
             </div>
             <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
+            {openSelectionTransform ? <StudioContextActionButton
+              icon={Maximize2} label="변형" disabled={selectionLocked}
+              title={selectionLocked ? "잠긴 선택 항목은 변형할 수 없어요" : "선택한 레이어의 위치·크기·회전"}
+              data-studio-mobile-transform="true" onClick={openSelectionTransform}
+            /> : null}
             <StudioContextActionButton
               icon={SlidersHorizontal}
               label="속성"

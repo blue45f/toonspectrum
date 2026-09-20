@@ -1,5 +1,7 @@
 import { memo, Suspense } from "react";
 
+import { StudioDrawingWorkbenchControls } from "./StudioDrawingWorkbenchControls";
+
 import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
 import {
   StudioDrawOptionsBar,
@@ -33,6 +35,10 @@ export interface StudioOptionsBarsDrawModel {
   activeCatalogBrushName?: string;
   brushCatalogItems?: readonly StudioBrushTrayItem[];
   brushCatalogOpen: boolean;
+  workbenchVisible?: boolean;
+  workspaceOwnerScope?: string;
+  libraryDockOpen?: boolean;
+  layoutRestoreAvailable?: boolean;
   brushDefaultRestore: Readonly<{
     sourceName: string;
     modifiedCount: number;
@@ -95,6 +101,10 @@ export interface StudioOptionsBarsSelectionModel {
 }
 
 export interface StudioOptionsBarsHandlers {
+  toggleBrushDock?: () => void;
+  restoreDrawingLayout?: () => void;
+  undoDrawingLayoutRestore?: () => void;
+  transformSelection?: () => void;
   assignBrushSlot: (index: number) => void;
   cycleStabilizer: () => void;
   deleteSelection: () => void;
@@ -153,16 +163,21 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
   const isMobile = useIsMobile();
   const selectionVisible = selection.visible && selection.count > 0;
   const drawVisible = draw.visible && !selectionVisible;
+  // Handheld sessions already have their own thumb dock.
+  if (isMobile || (!drawVisible && !selectionVisible && !draw.workbenchVisible)) return null;
 
   return (
-    <>
+    <div className="relative z-[40] flex min-h-16 min-w-0 shrink-0 border-b border-line bg-panel" data-studio-workbench-options="true">
+      <StudioDrawingWorkbenchControls libraryOpen={draw.libraryDockOpen === true}
+        undoAvailable={draw.layoutRestoreAvailable === true} handlers={stableHandlers} />
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
       {drawVisible ? (
         // One persistent context surface at a time. Selection replaces drawing instead of stacking
         // a second strip over the canvas.
         <Suspense fallback={null}>
           <StudioDrawOptionsBar
             key={draw.drawMode}
-            docked
+            docked={false}
             brushCatalogOpen={draw.brushCatalogOpen}
             onToggleBrushCatalog={stableHandlers.toggleBrushCatalog}
             dockInsets={draw.dockInsets}
@@ -242,11 +257,12 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
       {selectionVisible ? (
         <Suspense fallback={null}>
           <StudioSelectOptionsBar
-            docked
+            docked={false}
             dockInsets={draw.dockInsets}
             selectionCount={selection.count}
             selectionLabel={selection.label}
             locked={selection.locked}
+            onTransform={stableHandlers.transformSelection}
             onDuplicate={stableHandlers.duplicateSelection}
             onDelete={stableHandlers.deleteSelection}
             onBringFront={() => stableHandlers.reorderSelection("front")}
@@ -258,6 +274,7 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
           />
         </Suspense>
       ) : null}
-    </>
+      </div>
+    </div>
   );
 });

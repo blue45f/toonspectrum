@@ -5,7 +5,7 @@
 // React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
-import { Suspense, useLayoutEffect, useState } from "react";
+import { lazy, Suspense, useLayoutEffect, useState } from "react";
 import { createStudioLeftToolRailRuntime } from "../editor-client/studio-left-tool-rail-client";
 import { LazyStudioLeftToolRail, LazyStudioPageListPane } from "../studio-page-modal-lazy-boundaries";
 import { StudioWorkspaceArrangementToolbar } from "../StudioWorkspaceArrangementToolbar";
@@ -16,6 +16,8 @@ import { StudioCuttoonEditorInspectorColumn } from "./StudioCuttoonEditorInspect
 import { StudioCuttoonEditorPanels } from "./StudioCuttoonEditorPanels";
 import { StudioCuttoonEditorSessionDialogs } from "./StudioCuttoonEditorSessionDialogs";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
+
+const LazyStudioBrushWorkbenchDock = lazy(() => import("../brush/StudioBrushWorkbenchDock").then((module) => ({ default: module.StudioBrushWorkbenchDock })));
 
 const TOOL_RAIL_LAYOUT = { version: 2, xRatio: 0.02, yRatio: 0.1, width: 96, height: 720, dock: "free", positionLocked: false, sizeLocked: false } as const;
 
@@ -259,6 +261,26 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
         </Suspense>
         </StudioWorkspaceRegion>
 
+        {!isMobile && !canvasOnlyMode && !mobileImmersive && !presentationPanelsHidden
+          && s.studioOptionsBarsDrawModel.libraryDockOpen ? (
+          <Suspense fallback={<div role="status" className="hidden w-64 shrink-0 border-r border-line bg-panel p-3 text-sm text-fg-2 lg:block xl:w-[17rem]">브러시 라이브러리를 여는 중…</div>}>
+            <LazyStudioBrushWorkbenchDock
+              key={`${s.studioOptionsBarsDrawModel.workspaceOwnerScope}:${drawMode === "eraser" ? "erase" : "paint"}`}
+              activeBrushId={s.activeCatalogBrush.id}
+              operation={drawMode === "eraser" ? "erase" : "paint"}
+              favoriteIds={s.proDrawPrefs.favoriteBrushIds}
+              recentIds={s.proDrawPrefs.recentBrushIds}
+              restoredView={s.proDrawPrefs.brushLibraryView[drawMode === "eraser" ? "erase" : "paint"]}
+              onViewStateChange={(view) => s.studioBrushCatalogHandlers.rememberView?.(view, drawMode === "eraser" ? "erase" : "paint", s.studioOptionsBarsDrawModel.workspaceOwnerScope)}
+              onSelect={s.applyStudioBrushCatalogSelection}
+              onToggleFavorite={s.studioBrushCatalogHandlers.toggleFavorite}
+              onCollapse={s.studioOptionsBarsHandlers.toggleBrushDock}
+              onOpenBrushStudio={s.studioOptionsBarsHandlers.openBrushStudio}
+              expanded={s.brushCatalogSession?.placement === "desktop-dock"}
+              onExpandCatalog={(trigger) => s.studioBrushCatalogHandlers.toggle("desktop-dock", trigger)}
+            />
+          </Suspense>
+        ) : null}
         {/* 중앙: 캔버스 + 우측 인스펙터 — 데스크톱에서는 한 행으로 남은 높이를 공유한다. */}
         <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
           <StudioCuttoonEditorCanvasColumn {...s} />

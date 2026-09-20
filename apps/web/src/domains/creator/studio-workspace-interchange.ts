@@ -530,8 +530,11 @@ function parseDrawingPalettes(value: unknown): StudioDrawingPaletteLayout {
   const layout = ownDataFields(
     value,
     ["order", "collapsed", "sizes"],
-    ["locks"],
+    ["locks", "libraryDockOpen"],
   );
+  if (Object.hasOwn(layout, "libraryDockOpen") && typeof layout.libraryDockOpen !== "boolean") {
+    boundaryFailure("invalid-shape");
+  }
   const order = ownArrayValues(layout.order, 2);
   if (
     order.length !== 2 ||
@@ -583,6 +586,7 @@ function parseDrawingPalettes(value: unknown): StudioDrawingPaletteLayout {
     });
   };
   return Object.freeze({
+    ...(typeof layout.libraryDockOpen === "boolean" ? { libraryDockOpen: layout.libraryDockOpen } : {}),
     order: Object.freeze([
       order[0] as "sub-tools" | "tool-properties",
       order[1] as "sub-tools" | "tool-properties",

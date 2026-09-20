@@ -11,6 +11,7 @@ import {
   LockOpen,
   MessageSquareText,
   MousePointer2,
+  Maximize2,
   ScanText,
   Trash2,
   type LucideIcon,
@@ -36,6 +37,7 @@ export interface StudioSelectOptionsBarProps {
   selectionLabel: string | null;
   selectionCount: number;
   locked?: boolean;
+  onTransform?: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onBringFront: () => void;
@@ -112,6 +114,7 @@ export function StudioSelectOptionsBar({
   selectionLabel,
   selectionCount,
   locked = false,
+  onTransform,
   onDuplicate,
   onDelete,
   onBringFront,
@@ -175,6 +178,13 @@ export function StudioSelectOptionsBar({
         )}
       </span>
 
+      {onTransform ? (
+        <button type="button" onClick={onTransform} disabled={locked}
+          title={locked ? "잠긴 선택 항목은 변형할 수 없습니다" : "선택한 레이어 또는 픽셀 영역 변형"}
+          className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-line px-3 text-xs font-semibold text-fg-2 hover:bg-raised disabled:opacity-50 pointer-coarse:min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+          <Maximize2 size={15} aria-hidden />변형
+        </button>
+      ) : null}
       {textEditLabel && onEditText ? (
         <Action
           id="edit-text"

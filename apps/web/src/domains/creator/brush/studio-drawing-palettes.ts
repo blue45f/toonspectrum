@@ -28,6 +28,8 @@ export type StudioDrawingPaletteLocks = Readonly<
 >;
 
 export interface StudioDrawingPaletteLayout {
+  /** Desktop catalogue dock. Missing in older workspaces means closed. */
+  readonly libraryDockOpen?: boolean;
   readonly order: readonly StudioDrawingPaletteId[];
   readonly collapsed: Readonly<Record<StudioDrawingPaletteId, boolean>>;
   readonly sizes: Readonly<Record<StudioDrawingPaletteId, number>>;
@@ -55,6 +57,7 @@ function registerCanonicalLayout(
 
 export const DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT: StudioCanonicalDrawingPaletteLayout =
   registerCanonicalLayout(Object.freeze({
+    libraryDockOpen: false,
     order: Object.freeze([...STUDIO_DRAWING_PALETTE_IDS]),
     collapsed: Object.freeze({
       "sub-tools": false,
@@ -200,6 +203,7 @@ export function normalizeStudioDrawingPaletteLayout(
     : {};
 
   return registerCanonicalLayout(Object.freeze({
+    libraryDockOpen: candidate.libraryDockOpen === true,
     order: normalizeOrder(candidate.order, fallback),
     collapsed: Object.freeze({
       "sub-tools":

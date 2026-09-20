@@ -183,6 +183,7 @@ export function StudioCanvasViewportHudOverlays({
           {showQuickStart ? (
             <Suspense fallback={null}>
               <QuickStartPanel
+              startCollapsed
               onDismiss={dismissQuickStart}
               onQuickComic={openQuickComicWizard}
               onExample={() => void startFromExample()}

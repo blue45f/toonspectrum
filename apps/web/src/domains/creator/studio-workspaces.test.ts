@@ -147,15 +147,14 @@ const WIDTH_TUNED_WORKSPACE_IDS = new Set<string>([
 ]);
 
 describe("built-in Studio workspaces", () => {
-  it("starts in the storyboard workspace with Page routed to navigator/minimap", () => {
-    expect(DEFAULT_STUDIO_WORKSPACE_STATE.activeWorkspaceId).toBe("storyboard");
+  it("starts new sessions in the drawing workspace with brushes beside the canvas", () => {
+    expect(DEFAULT_STUDIO_WORKSPACE_STATE.activeWorkspaceId).toBe("lineart");
     expect(DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.inspector).toEqual({
-      primary: "document",
-      image: "quick",
-      document: "navigator",
+      primary: "properties", image: "fill", document: "canvas",
     });
+    expect(DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.drawingPalettes.libraryDockOpen).toBe(true);
     expect(
-      STUDIO_DEFAULT_WORKSPACES.find((workspace) => workspace.id === "storyboard")
+      STUDIO_DEFAULT_WORKSPACES.find((workspace) => workspace.id === "lineart")
         ?.layout.inspector,
     ).toEqual(DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout.inspector);
   });
@@ -198,9 +197,10 @@ describe("built-in Studio workspaces", () => {
       expect(Object.isFrozen(workspace.layout.drawingPalettes.sizes)).toBe(true);
       expect(Object.isFrozen(workspace.layout.quickActions.slots)).toBe(true);
       expect(Object.keys(workspace.layout.quickActions.slots)).toHaveLength(6);
-      expect(workspace.layout.drawingPalettes).toEqual(
-        DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT
-      );
+      expect(workspace.layout.drawingPalettes).toEqual({
+        ...DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT,
+        libraryDockOpen: workspace.id === "lineart",
+      });
       if (!WIDTH_TUNED_WORKSPACE_IDS.has(workspace.id)) {
         expect(workspace.layout.desktop.leftPanelWidth).toBe(
           STUDIO_WORKSPACE_LEFT_PANEL_WIDTH.default

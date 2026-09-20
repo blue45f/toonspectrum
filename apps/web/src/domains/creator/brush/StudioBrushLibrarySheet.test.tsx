@@ -1182,3 +1182,45 @@ describe("StudioBrushLibrarySheet restored view", () => {
     expect(onViewStateChange.mock.calls[0]?.[0]).toMatchObject({ query: "\uc218\ucc44\ud654" });
   });
 });
+
+it("keeps a persistent drawing dock non-modal without stealing canvas focus or Escape", async () => {
+  const onClose = vi.fn();
+  const onSelect = vi.fn();
+  const view = render(<>
+    <button type="button">캔버스 입력 대상</button>
+    <StudioBrushLibrarySheet open embedded workbench activeBrushId="pen"
+      autoFocusSearch={false} dismissOnEscape={false}
+      dismissOnOutsidePointer={false} closeOnSelection={false}
+      onClose={onClose} onSelect={onSelect} />
+  </>);
+  const canvas = screen.getByRole("button", { name: "캔버스 입력 대상" });
+  canvas.focus();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+  expect(document.activeElement).toBe(canvas);
+  const escape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+  window.dispatchEvent(escape);
+  expect(escape.defaultPrevented).toBe(false);
+  fireEvent.pointerDown(canvas);
+  expect(onClose).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText("브러시 엔진 계열 필터")).toBeNull();
+  const preset = view.container.querySelector<HTMLButtonElement>("[data-studio-brush-select]");
+  expect(preset).not.toBeNull();
+  fireEvent.click(preset!);
+  await waitFor(() => expect(onSelect).toHaveBeenCalledOnce());
+  expect(onClose).not.toHaveBeenCalled();
+  expect(screen.getByRole("region", { name: "브러시 전체 라이브러리" })).toBeTruthy();
+});
+
+it("hydrates an untouched dock's saved search but never replaces an artist's in-session search", async () => {
+  const props = { open: true, embedded: true, autoFocusSearch: false,
+    activeBrushId: "pen", onClose: vi.fn(), onSelect: vi.fn() };
+  const view = render(<StudioBrushLibrarySheet {...props} />);
+  view.rerender(<StudioBrushLibrarySheet {...props}
+    restoredView={{ tab: "all", query: "gpen", viewMode: "text" }} />);
+  const search = screen.getByRole("searchbox") as HTMLInputElement;
+  await waitFor(() => expect(search.value).toBe("gpen"));
+  fireEvent.change(search, { target: { value: "내 검색" } });
+  view.rerender(<StudioBrushLibrarySheet {...props}
+    restoredView={{ tab: "all", query: "marker", viewMode: "stroke" }} />);
+  expect(search.value).toBe("내 검색");
+});
