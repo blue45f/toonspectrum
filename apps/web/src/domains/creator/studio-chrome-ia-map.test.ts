@@ -257,7 +257,8 @@ describe("studio chrome IA map", () => {
     const transform = DEFAULT_STUDIO_RAIL_TOOL_ORDER.indexOf("transform");
     const vrm = DEFAULT_STUDIO_RAIL_TOOL_ORDER.indexOf("vrm3d");
     expect(select).toBeLessThan(pen);
-    expect(pen).toBeLessThan(transform);
+    expect(select).toBeLessThan(transform);
+    expect(transform).toBeLessThan(pen);
     expect(transform).toBeLessThan(vrm);
   });
 

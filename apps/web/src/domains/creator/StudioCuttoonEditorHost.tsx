@@ -1437,6 +1437,7 @@ import type { PendingStudioWillV1Import } from "./studio-will-v1-import-bridge";
 import type { StudioWorkspacePersistenceRuntime } from "./studio-workspace-sqlite-runtime";
 import type { StudioAssetShareOptions, StudioAssetSortOrder, StudioAssetTab } from "./StudioAssetMenuPanel";
 import type { StudioInspectorAsideHandlers } from "./StudioInspectorAside";
+import { backupStudioDrawingWorkbenchLayout, restoreStudioDrawingWorkbenchLayout } from "./studio-drawing-workbench";
 import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
 import type { StudioBrushCatalogHandlers, StudioMobileEditingDockHandlers, StudioMobileSheet } from "./StudioMobileEditingDock";
@@ -3214,6 +3215,10 @@ export function StudioCuttoonEditor({
   const [workspaceSyncNotice, setWorkspaceSyncNotice] = useState<string | null>(null);
   const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
   const workspaceState = workspacePersistence.state;
+  const [drawingLayoutRestorePoint, setDrawingLayoutRestorePoint] = useState<{
+    ownerScope: string;
+    layout: StudioWorkspaceLayout;
+  } | null>(null);
   // Device adaptation is *applied* only when a workspace is applied, never continuously: docks that
   // re-arrange because the artist reached for the keyboard mid-drawing would be worse than docks
   // that stay where the profile put them. A pointer press writes a ref and, on the rare press that
@@ -3941,6 +3946,36 @@ export function StudioCuttoonEditor({
     workspaceSyncRetryEpoch,
     workspaceSyncSequenceRef,
   });
+  function restoreDrawingWorkbench() {
+    if (workspacePersistenceRef.current.ownerScope !== currentWorkspaceOwnerScope) return;
+    let nextState = workspacePersistenceRef.current.state;
+    if (drawingLayoutRestorePoint?.ownerScope !== currentWorkspaceOwnerScope) {
+      try {
+        nextState = backupStudioDrawingWorkbenchLayout(nextState, liveWorkspaceLayoutRef.current, "드로잉 복원 전 " + new Date().toLocaleString("ko-KR"));
+      } catch {
+        announceDrawingShortcut("이전 배치를 보관하지 못했어요. 저장된 작업공간을 정리한 뒤 다시 복원해 주세요.");
+        return;
+      }
+    }
+    setDrawingLayoutRestorePoint((previous) =>
+      previous?.ownerScope === currentWorkspaceOwnerScope ? previous : {
+        ownerScope: currentWorkspaceOwnerScope, layout: liveWorkspaceLayoutRef.current,
+      });
+    if (uiDensityMode === "focus") setStudioUiDensity("simple");
+    const layout = restoreStudioDrawingWorkbenchLayout(liveWorkspaceLayoutRef.current);
+    persistStudioWorkspaceState(updateStudioWorkspaceLiveLayout(nextState, layout));
+    applyStudioWorkspaceLayout(layout);
+    announceDrawingShortcut("드로잉 배치를 복원했어요 · 원고와 브러시 설정은 유지됩니다");
+  }
+  function undoDrawingWorkbenchRestore() {
+    if (!drawingLayoutRestorePoint || drawingLayoutRestorePoint.ownerScope !== currentWorkspaceOwnerScope
+      || workspacePersistenceRef.current.ownerScope !== currentWorkspaceOwnerScope) return;
+    const { layout } = drawingLayoutRestorePoint;
+    persistStudioWorkspaceState(updateStudioWorkspaceLiveLayout(workspacePersistenceRef.current.state, layout));
+    applyStudioWorkspaceLayout(layout);
+    setDrawingLayoutRestorePoint(null);
+    announceDrawingShortcut("이전 작업 배치로 돌아왔어요");
+  }
   const persistStudioWorkspaceStateFromEffect = useEffectEvent(
     persistStudioWorkspaceState,
   );
@@ -5564,8 +5599,10 @@ export function StudioCuttoonEditor({
    */
   function rememberBuiltInBrushCatalogView(
     view: import( "./brush/StudioBrushLibrarySheet").StudioBrushCatalogRestoredView,
+    lane: "paint" | "erase" = drawMode === "eraser" ? "erase" : "paint",
+    ownerScope?: string,
   ) {
-    const lane = drawMode === "eraser" ? "erase" : "paint";
+    if (ownerScope && ownerScope !== currentWorkspaceOwnerScope) return;
     commitProDrawPrefsMutation((latest) =>
       rememberStudioBrushLibraryView(latest, lane, view));
   }
@@ -24871,8 +24908,26 @@ function clearSelectionForEdit() {
    * - other objects → select tool (Konva handles already attached)
    */
   function openPixelSelectionTransform() {
+    const transformTargets = marqueeIds.length > 0 ? elements.filter((element) => marqueeIds.includes(element.id)) : selected ? [selected] : [];
+    if (collaborationDocumentLocked || transformTargets.some((element) => isEffectivelyLocked(element, groups))) {
+      setError("잠긴 선택 항목은 변형할 수 없어요. 잠금을 해제한 뒤 다시 시도하세요.");
+      return;
+    }
     if (activeSurfaceReviewLocked) {
       setError("현재 작업면의 검토 잠금을 먼저 해제하세요.");
+      return;
+    }
+    if (marqueeIds.length > 1) {
+      if (transformTargets.length !== marqueeIds.length) {
+        setError("선택 항목이 변경되었어요. 다시 선택한 뒤 변형해 주세요.");
+        return;
+      }
+      disarmAllPixelTools();
+      setTool("select");
+      setMenu(null);
+      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
+      requestStudioInspectorFocus("selection.geometry");
+      announceDrawingShortcut("선택한 레이어를 함께 변형합니다 · 원래 레이어 구조 유지");
       return;
     }
     // Vector stroke / freehand: object free-scale handles (not pixel marquee).
@@ -24885,6 +24940,8 @@ function clearSelectionForEdit() {
       setTool("select");
       setMenu(null);
       setError(null);
+      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
+      requestStudioInspectorFocus("selection.geometry");
       announceDrawingShortcut("모서리 핸들을 끌어 선택 선화 레이어의 크기·위치를 조절하세요");
       return;
     }
@@ -24902,6 +24959,8 @@ function clearSelectionForEdit() {
       setTool("select");
       setMenu(null);
       setError(null);
+      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
+      requestStudioInspectorFocus("selection.geometry");
       announceDrawingShortcut("모서리·회전 핸들로 선택 이미지 레이어를 변형하세요");
       return;
     }
@@ -24915,6 +24974,8 @@ function clearSelectionForEdit() {
       setTool("select");
       setMenu(null);
       setError(null);
+      openInspectorRoute({ primary: "properties", image: "transform" }, isMobile ? "props" : null);
+      requestStudioInspectorFocus("selection.geometry");
       announceDrawingShortcut("모서리·회전 핸들로 선택 레이어를 변형하세요");
       return;
     }
@@ -27773,6 +27834,7 @@ function clearSelectionForEdit() {
   }
 
   const studioMobileEditingDockHandlers = useStudioStableHandlers<StudioMobileEditingDockHandlers>({
+    openSelectionTransform: openPixelSelectionTransform,
       activateCanvasTool: activatePrimaryCanvasTool,
       applyBuiltInBrushPreset,
       applyBrushDefaultRestoreTransaction,
@@ -28011,7 +28073,16 @@ function clearSelectionForEdit() {
     void applyStudioLivingInkAction("clear");
   }
 
+  function toggleDrawingBrushDock() {
+    if (uiDensityMode === "focus") setStudioUiDensity("simple");
+    setBrushCatalogSession(null);
+    setDrawingPaletteLayout((previous) => ({ ...previous, libraryDockOpen: uiDensityMode === "focus" || !previous.libraryDockOpen }));
+  }
   const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
+    toggleBrushDock: toggleDrawingBrushDock,
+    restoreDrawingLayout: restoreDrawingWorkbench,
+    undoDrawingLayoutRestore: undoDrawingWorkbenchRestore,
+    transformSelection: openPixelSelectionTransform,
     assignBrushSlot: (index) => {
       commitStudioBrushSlotsMutation(
         (prev) => assignStudioBrushSlot(prev, index, {
@@ -28048,7 +28119,9 @@ function clearSelectionForEdit() {
     },
     openBrushStudio: () => {
       void STUDIO_MOBILE_EDITING_DOCK_UI.loadStudioBrushStudio();
+      activatePrimaryCanvasTool("draw", drawMode === "eraser" ? "eraser" : "pen");
       openInspectorRoute({ primary: "properties" }, isMobile ? "draw" : null);
+      requestStudioInspectorFocus("tool.brush-studio");
     },
     recallBrushSlot: (index) => {
       const slot = studioBrushSlotAt(brushSlotsState, index);
@@ -28094,8 +28167,7 @@ function clearSelectionForEdit() {
       setSecondaryColor(color);
       announceDrawingShortcut("색 교체");
     },
-    toggleBrushCatalog: (trigger) =>
-      studioBrushCatalogHandlers.toggle("desktop-dock", trigger),
+    toggleBrushCatalog: () => toggleDrawingBrushDock(),
     toggleCanvasFlip: toggleHorizontalCanvasView,
     toggleFavoriteBrush: studioBrushCatalogHandlers.toggleFavorite,
     toggleOpacityLock: () => {
@@ -28144,7 +28216,11 @@ function clearSelectionForEdit() {
       activeCatalogBrushId: activeCatalogBrush.id,
       activeCatalogBrushName: activeCatalogBrush.name,
       brushId: brush,
-      brushCatalogOpen: brushCatalogSession?.placement === "desktop-dock",
+      workbenchVisible: !canvasOnlyMode,
+      workspaceOwnerScope: currentWorkspaceOwnerScope,
+      libraryDockOpen: drawingPaletteLayout.libraryDockOpen === true && uiDensityMode !== "focus",
+      layoutRestoreAvailable: drawingLayoutRestorePoint?.ownerScope === currentWorkspaceOwnerScope,
+      brushCatalogOpen: (drawingPaletteLayout.libraryDockOpen === true && uiDensityMode !== "focus") || brushCatalogSession?.placement === "desktop-dock",
       brushDefaultRestore: {
         available: brushBaselineController.restoreState.available,
         loading: brushBaselineController.restoreState.loading,
@@ -28210,6 +28286,9 @@ function clearSelectionForEdit() {
       activeCatalogBrush.name,
       brush,
       brushCatalogSession?.placement,
+      currentWorkspaceOwnerScope,
+      drawingLayoutRestorePoint,
+      drawingPaletteLayout.libraryDockOpen,
       brushBaselineController.restoreState.available,
       brushBaselineController.restoreState.loading,
       brushBaselineController.restoreState.modifiedCount,
@@ -28249,6 +28328,7 @@ function clearSelectionForEdit() {
       strokeWidth,
       symmetryType,
       tool,
+      uiDensityMode,
       compactCanvasDockLeft,
       compactCanvasDockRight,
     ]
@@ -28276,7 +28356,9 @@ function clearSelectionForEdit() {
       visible: selectOptionsStripArmed && count > 0 && selectionLaneMounted,
       count,
       label: selected ? elementLabel(selected) : null,
-      locked: Boolean(selected?.locked),
+      locked: activeSurfaceReviewLocked || (marqueeIds.length > 0
+        ? elements.filter((element) => marqueeIds.includes(element.id)).some((element) => isEffectivelyLocked(element, groups))
+        : Boolean(selected && isEffectivelyLocked(selected, groups))),
       canToggleLock: Boolean(selected),
       textEditLabel:
         selected && !activeSurfaceReviewLocked && !isEffectivelyLocked(selected, groups)
@@ -28293,8 +28375,9 @@ function clearSelectionForEdit() {
     };
   }, [
     activeSurfaceReviewLocked,
+    elements,
     groups,
-    marqueeIds.length,
+    marqueeIds,
     selectionLaneMounted,
     selectOptionsStripArmed,
     selected,

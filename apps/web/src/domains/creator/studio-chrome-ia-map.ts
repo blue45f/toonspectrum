@@ -209,8 +209,8 @@ export const STUDIO_CHROME_FILE_MENU_ITEM_ORDER = [
 export const STUDIO_CHROME_RAIL_TOOL_GROUPS = [
   {
     id: "navigate-select",
-    labelKo: "선택·이동",
-    toolIds: ["select", "hand"] as const satisfies readonly StudioRailToolId[],
+    labelKo: "선택·변형·이동",
+    toolIds: ["select", "transform", "hand"] as const satisfies readonly StudioRailToolId[],
   },
   {
     id: "draw",
@@ -241,8 +241,8 @@ export const STUDIO_CHROME_RAIL_TOOL_GROUPS = [
   },
   {
     id: "transform",
-    labelKo: "변형",
-    toolIds: ["transform", "crop"] as const satisfies readonly StudioRailToolId[],
+    labelKo: "자르기",
+    toolIds: ["crop"] as const satisfies readonly StudioRailToolId[],
   },
   {
     id: "objects",

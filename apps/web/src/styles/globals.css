@@ -1156,6 +1156,11 @@ body[data-studio-app="true"] .route-stage::before,
     --studio-canvas-bottom-inset: var(--studio-mobile-dock-compact-height);
   }
 
+  /* Keep workspace appearance controls above, not on top of, the selection action lane. */
+  body:has([data-studio-mobile-selection-actions="true"]) [data-studio-shell-view-options="true"] {
+    bottom: calc(var(--studio-canvas-bottom-inset, 7rem) + 4.75rem);
+  }
+
   /* Mobile sheets own the foreground interaction layer. Keep the global view-options launcher
      from covering inspector/page/draw sheet controls while a sheet is open. */
   body:has([data-studio-mobile-sheet="true"]) [data-studio-shell-view-options="true"] {
