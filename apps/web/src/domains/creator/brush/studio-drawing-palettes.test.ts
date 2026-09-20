@@ -15,6 +15,7 @@ import {
 describe("Studio drawing palette layout", () => {
   it("provides a deeply frozen 36/64 default with both palettes expanded and unlocked", () => {
     expect(DEFAULT_STUDIO_DRAWING_PALETTE_LAYOUT).toEqual({
+      libraryDockOpen: false,
       order: ["sub-tools", "tool-properties"],
       collapsed: {
         "sub-tools": false,
@@ -104,7 +105,7 @@ describe("Studio drawing palette layout", () => {
     expect(normalizeStudioDrawingPaletteLayout(normalized)).toBe(normalized);
     const sanitizedExternal =
       normalizeStudioDrawingPaletteLayout(externallyRestored);
-    expect(sanitizedExternal).toEqual(externallyRestored);
+    expect(sanitizedExternal).toEqual({ ...externallyRestored, libraryDockOpen: false });
     expect(sanitizedExternal).not.toBe(externallyRestored);
 
     const mutable = {
@@ -128,7 +129,7 @@ describe("Studio drawing palette layout", () => {
     const sanitizedUnknown = normalizeStudioDrawingPaletteLayout(
       frozenWithUnknownField,
     );
-    expect(sanitizedUnknown).toEqual(externallyRestored);
+    expect(sanitizedUnknown).toEqual({ ...externallyRestored, libraryDockOpen: false });
     expect(sanitizedUnknown).not.toBe(frozenWithUnknownField);
     expect(JSON.stringify(sanitizedUnknown)).not.toContain("documentPayload");
 
@@ -142,9 +143,10 @@ describe("Studio drawing palette layout", () => {
     );
     const sanitizedHiddenRoot =
       normalizeStudioDrawingPaletteLayout(hiddenRoot);
-    expect(sanitizedHiddenRoot).toEqual(externallyRestored);
+    expect(sanitizedHiddenRoot).toEqual({ ...externallyRestored, libraryDockOpen: false });
     expect(sanitizedHiddenRoot).not.toBe(hiddenRoot);
     expect(Object.keys(sanitizedHiddenRoot)).toEqual([
+      "libraryDockOpen",
       "order",
       "collapsed",
       "sizes",
@@ -173,6 +175,7 @@ describe("Studio drawing palette layout", () => {
     });
 
     expect(normalized).toEqual({
+      libraryDockOpen: false,
       order: ["tool-properties", "sub-tools"],
       collapsed: {
         "sub-tools": true,

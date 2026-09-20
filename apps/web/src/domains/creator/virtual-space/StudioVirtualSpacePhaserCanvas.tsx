@@ -368,6 +368,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastPublishedMoving = moving;
       let lastFollowPathAt = -Infinity;
       let gamepadInteractHeld = false;
+      const heldKeys = new Set<string>();
       let keyboardInteractQueued = false;
       let wasInputBlocked = false;
       let modalInputBlocked = studioWorldHasModalBlocker(document);
@@ -867,7 +868,7 @@ export function StudioVirtualSpacePhaserCanvas({
         camera.setDeadzone(150, 100);
         const resizeCamera = (gameSize: { width: number; height: number }) => {
           const cover = Math.max(gameSize.width / manifest.width, gameSize.height / manifest.height);
-          camera.setZoom(Math.max(0.72 * viewport.ratio, Math.min(1.28 * viewport.ratio, cover)));
+          camera.setZoom(Math.max(0.72 * viewport.ratio, cover));
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });
         this.scale.on("resize", (gameSize: { width: number; height: number }) => resizeCamera(gameSize));
@@ -882,13 +883,14 @@ export function StudioVirtualSpacePhaserCanvas({
             keyboardInteractQueued = true;
           }
         };
-        this.input.keyboard?.on("keydown-E", queueKeyboardInteraction);
+
         const stopMovement = () => {
           bridge.clearMovement();
           path = [];
           motion = { velocity: { x: 0, y: 0 } };
           keyboardInteractQueued = false;
           localBodyPhysics?.setVelocity(0, 0);
+          heldKeys.clear();
           this.input.keyboard?.resetKeys();
           gamepadInteractHeld = true;
           if (moving && localBody && !cancelled) {
@@ -898,11 +900,18 @@ export function StudioVirtualSpacePhaserCanvas({
           }
           callbacksRef.current.onCancelFollow();
         };
+        // Capture only canvas-owned keys before preventing browser scrolling. Phaser's
+        // window keyboard handler ignores defaultPrevented events from focused elements.
         const preventGameScrolling = (event: KeyboardEvent) => {
-          if (event.target === canvas && event.key === "Escape") { npcDirector.cancelGuideTour(); stopMovement(); }
-          if (event.target === canvas && !event.metaKey && !event.ctrlKey && !event.altKey
-            && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(event.code)) event.preventDefault();
+          if (event.target !== canvas) return;
+          if (event.key === "Escape") { npcDirector.cancelGuideTour(); stopMovement(); return; }
+          if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || studioWorldInputBlocked(document)) return;
+          if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyE"].includes(event.code)) return;
+          heldKeys.add(event.code);
+          if (event.code === "KeyE" && !event.repeat) queueKeyboardInteraction();
+          event.preventDefault();
         };
+        const releaseKey = (event: KeyboardEvent) => { heldKeys.delete(event.code); };
         const refocus = () => {
           if (this.input.keyboard) this.input.keyboard.enabled = document.activeElement === canvas;
           if (document.activeElement !== canvas) stopMovement();
@@ -911,6 +920,7 @@ export function StudioVirtualSpacePhaserCanvas({
         const reduceMotionChanged = () => camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
         canvas.addEventListener("pointerdown", focusCanvas);
         canvas.addEventListener("keydown", preventGameScrolling);
+        globalThis.addEventListener("keyup", releaseKey);
         document.addEventListener("focusin", refocus);
         document.addEventListener("visibilitychange", visibility);
         globalThis.addEventListener("blur", stopMovement);
@@ -925,9 +935,9 @@ export function StudioVirtualSpacePhaserCanvas({
           attributeFilter: ["open", "role", "aria-modal", "aria-hidden", "hidden", "data-state", "data-studio-input-blocker"],
         });
         cleanup.push(() => {
-          this.input.keyboard?.off("keydown-E", queueKeyboardInteraction);
           canvas.removeEventListener("pointerdown", focusCanvas);
           canvas.removeEventListener("keydown", preventGameScrolling);
+          globalThis.removeEventListener("keyup", releaseKey);
           document.removeEventListener("focusin", refocus);
           document.removeEventListener("visibilitychange", visibility);
           globalThis.removeEventListener("blur", stopMovement);
@@ -957,6 +967,7 @@ export function StudioVirtualSpacePhaserCanvas({
         fixedStepClock.reconcile(this.game.loop.time);
         const blocked = studioWorldInputBlocked(document, modalInputBlocked);
         if (blocked && !wasInputBlocked) {
+          heldKeys.clear();
           bridge.clearMovement();
           path = [];
           motion = { velocity: { x: 0, y: 0 } };
@@ -976,10 +987,10 @@ export function StudioVirtualSpacePhaserCanvas({
         let ix = blocked ? 0 : bridge.getJoystick().x;
         let iy = blocked ? 0 : bridge.getJoystick().y;
         if (!typing) {
-          if (keys?.left?.isDown || keys?.a?.isDown) ix -= 1;
-          if (keys?.right?.isDown || keys?.d?.isDown) ix += 1;
-          if (keys?.up?.isDown || keys?.w?.isDown) iy -= 1;
-          if (keys?.down?.isDown || keys?.s?.isDown) iy += 1;
+          if (heldKeys.has("ArrowLeft") || heldKeys.has("KeyA") || keys?.left?.isDown || keys?.a?.isDown) ix -= 1;
+          if (heldKeys.has("ArrowRight") || heldKeys.has("KeyD") || keys?.right?.isDown || keys?.d?.isDown) ix += 1;
+          if (heldKeys.has("ArrowUp") || heldKeys.has("KeyW") || keys?.up?.isDown || keys?.w?.isDown) iy -= 1;
+          if (heldKeys.has("ArrowDown") || heldKeys.has("KeyS") || keys?.down?.isDown || keys?.s?.isDown) iy += 1;
         }
 
         const pads = typeof navigator !== "undefined" && typeof navigator.getGamepads === "function"
@@ -988,7 +999,7 @@ export function StudioVirtualSpacePhaserCanvas({
         const gamepad = readStudioVirtualSpaceGamepadsInput(pads);
         if (!typing) { ix += gamepad.x; iy += gamepad.y; }
 
-        const sprint = !typing && Boolean(keys?.shift?.isDown || gamepad.sprint);
+        const sprint = !typing && Boolean(heldKeys.has("ShiftLeft") || heldKeys.has("ShiftRight") || keys?.shift?.isDown || gamepad.sprint);
         const config = {
           ...DEFAULT_STUDIO_MOTION_CONFIG,
           maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1),

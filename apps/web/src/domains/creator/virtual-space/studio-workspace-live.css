@@ -39,3 +39,8 @@
 .studio-space-commandbar :is(a,button):focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
 .workspace-inspector[data-presentation=nonmodal]{z-index:70;inset-block-start:132px;max-height:calc(100dvh - 152px)}
 @media(max-width:760px){.studio-space-commandbar{padding:10px 12px}.studio-space-work-context{flex-basis:100%;justify-content:space-between}.studio-space-work-context strong{max-width:22ch}.studio-space-command-actions{width:100%}.studio-space-command-actions>button{flex:1}.studio-space-command-actions kbd{display:none}.vs2-shell--project .vs2-world-wrap--live{height:calc(100dvh - 390px)}}
+/* Accent actions must retain their theme-specific foreground inside the live shell. */
+.vs2-shell--project :is(a,button).bg-accent{color:var(--color-on-accent)}
+.workspace-runtime-recovery{min-height:100dvh;background:var(--color-canvas);color:var(--color-fg)}
+.workspace-runtime-recovery>section{display:grid;place-content:center;gap:16px;min-height:60dvh;padding:24px}
+.workspace-runtime-recovery>section button{min-height:44px;padding:12px 20px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-panel);color:var(--color-fg)}

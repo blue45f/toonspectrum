@@ -467,7 +467,7 @@
 .studio-vspace-atmosphere summary{min-height:32px;align-content:center;cursor:pointer}
 .vs2-shell--project .vs2-rightbar--live{overflow-y:auto;scrollbar-color:var(--color-line-strong) var(--color-panel)}
 .vs2-shell--project .vs2-live-chat-button,.vs2-shell--project .vs2-live-huddle button{min-height:44px}
-.vs2-shell--project [data-space-interactive=true] button{min-width:36px;min-height:36px}
+.vs2-shell--project [data-space-interactive=true] button{min-width:44px;min-height:44px}
 @media(max-width:900px){.vs2-shell--project .vs2-rightbar--live{overflow:visible}.vs2-shell--project [data-space-interactive=true] button{min-height:44px;min-width:44px}.studio-vspace-social,.studio-vspace-atmosphere{min-width:0}.studio-vspace-social{grid-column:1/-1}}
 @media(prefers-reduced-motion:reduce){.studio-vspace-social button,.studio-vspace-atmosphere button{transition:none}}
 .vs2-shell--project .vs2-rightbar--live>.vs2-panel{flex-shrink:0;overflow:visible}

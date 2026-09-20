@@ -33,6 +33,7 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
       if (index < 0 || !buttons.length) return;
       event.preventDefault();
       buttons[(index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+
   };
   return <section className="vs2-panel studio-vspace-directory" aria-label={bt("작업실 찾기", "Studio directory")} data-space-interactive="true">
     <h2><Search size={16} aria-hidden />{bt("작업실 찾기", "Find a place or teammate")}</h2>

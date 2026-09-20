@@ -548,7 +548,7 @@ describe("published world Page transition", () => {
     const room = DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
     f.worldLoad = Promise.resolve({...DEFAULT_STUDIO_WORLD_MANIFEST,colliders:[],props:[],
       acousticZones:[{id:"private-zone",roomId:room.id,x:100,y:100,width:80,height:80,policy:"private",doorId:"door"}]});
-    await mount();
+    await mount("space");
     expect(screen.getByRole("option",{name:room.labelKo})).toBeTruthy();
     const before = {...f.engine!.snapshot.self};
     fireEvent.click(screen.getByRole("button",{name:"이 방으로 걸어가기"}));

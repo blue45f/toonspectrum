@@ -31,8 +31,8 @@ const wire=(value:RTCDataChannel)=>{channel=value;value.onmessage=event=>{if(typ
 pc.ondatachannel=event=>wire(event.channel);
 const iceComplete=()=>pc.iceGatheringState==="complete"?Promise.resolve():new Promise<void>(resolve=>{const listener=()=>{if(pc.iceGatheringState==="complete"){pc.removeEventListener("icegatheringstatechange",listener);resolve();}};pc.addEventListener("icegatheringstatechange",listener);});
 const direct={getPeers:()=>channel?.readyState==="open"?[peer]:[],send(target:string,raw:string){if(target!==peer.sessionId||channel?.readyState!=="open")return false;channel.send(raw);return true;},subscribe(fn:(sender:StudioLiveParticipant,raw:string)=>void){receivers.add(fn);return()=>receivers.delete(fn);}};
-const room={workId:"private-qa",participant:self,get ready(){return channel?.readyState==="open";},get direct(){return channel?.readyState==="open"?direct:null;},
-  get acousticCoreBinding(){return channel?.readyState==="open"?{connectionId:`socket-${index}`,clientInstanceId:self.sessionId}:null;},
+const room={workId:"private-qa",participant:self,get ready(){return channel?.readyState==="open";},get direct(){return (channel?.readyState==="open")?direct:null;},
+  get acousticCoreBinding(){return (channel?.readyState==="open")?{connectionId:`socket-${index}`,clientInstanceId:self.sessionId}:null;},
   subscribe(fn:(event:unknown)=>void){roomListeners.add(fn);return()=>roomListeners.delete(fn);},subscribeVoice:()=>()=>{}} as unknown as StudioLiveRoom;
 const zones=[{id:"private-zone",roomId:"review",x:0,y:0,width:200,height:200,policy:"private" as const,doorId:"review-door"}];
 const world={worldId:"private-world",revisionId:"published-1",contentHash:"a".repeat(64)};

@@ -1,3 +1,4 @@
+import { isStudioDrawingCoreTool, studioDrawingVisibleTools } from "./studio-drawing-core-tools";
 /**
  * Application Settings modal — tabs:
  * General · Shortcuts · Mouse · Touch · Toolbar · Grids · Other
@@ -209,7 +210,7 @@ export function StudioAppSettingsPanel({
   if (!open || typeof document === "undefined") return null;
 
   const patch = (partial: Partial<StudioAppSettings>) => onChange({ ...settings, ...partial });
-  const visible = settings.toolbar.visibleIds;
+  const visible = studioDrawingVisibleTools(settings.toolbar.visibleIds);
   const hidden = studioRailHiddenIds(visible);
   const normalizedToolbarQuery = toolbarQuery.trim().normalize("NFKC").toLocaleLowerCase();
   const matchesToolbarQuery = (id: StudioRailToolId) =>
@@ -671,7 +672,8 @@ export function StudioAppSettingsPanel({
                               "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                             )}
                                 aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.hide")}`}
-                            disabled={visible.length <= 1}
+                            disabled={visible.length <= 1 || isStudioDrawingCoreTool(id)}
+                            title={isStudioDrawingCoreTool(id) ? "기본 드로잉 도구는 항상 표시됩니다" : undefined}
                             onClick={() =>
                               patch({ toolbar: { visibleIds: hideStudioRailTool(visible, id) } })
                             }

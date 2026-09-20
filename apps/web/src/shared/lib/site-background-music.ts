@@ -314,10 +314,11 @@ export function resolveSiteOstTrackIndex(
 }
 
 export async function loadSiteOstManifest(signal?: AbortSignal): Promise<readonly SiteOstTrack[]> {
-  const response = await fetch("/audio/playlist.json", {
+  const response = await fetch("/audio/playlist.json?catalog=prism-awakening-20260921", {
     signal,
     headers: { Accept: "application/json" },
-    cache: "force-cache",
+    // Revalidate mutable catalogues so a cached empty release cannot hide new masters.
+    cache: "no-cache",
   });
   if (!response.ok) throw new Error("사이트 OST 목록을 불러오지 못했습니다.");
   return parseSiteBgmManifest(await response.json());

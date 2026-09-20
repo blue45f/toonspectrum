@@ -4,9 +4,9 @@
 
 The site-wide soundtrack accepts **ToonSpectrum original productions only**. The previous Pixabay reference tracks were removed on 2026-09-18, and the player never substitutes licensed demo songs or browser-procedural placeholder music for a missing master.
 
-## Published original OST
+## Repository release-ready original OST
 
-The launch album contains nine primary masters (32:05 total) based on the original production briefs and Korean lyrics in `config/site-original-ost.production.json`. The release uses one recurring four-note creation motif instead of unrelated page jingles.
+The original production plan defines nine primary compositions. Six legacy masters are present in this repository; `midnight-storyboard`, `neon-scroll`, and `publish-the-sky` remain planned, not published media. The Prism Awakening expansion adds six new masters (19:45), producing a twelve-master repository catalogue (41:00). This describes repository artifacts, not a confirmed live deployment. A recurring four-note creation motif is a production intention rather than a verified transcription of every generated output.
 
 | ID | Role | Primary form | Runtime | Purpose |
 | --- | --- | --- | ---: | --- |
@@ -22,9 +22,17 @@ The launch album contains nine primary masters (32:05 total) based on the origin
 
 Vocal titles still declare instrumental variants in the production config so focused-work derivatives can be generated later without changing the album identity.
 
+## Prism Awakening expansion
+
+The six new compositions and full original Korean lyrics are documented in `docs/ost/prism-awakening/README.md` and its adjacent track files. Four tracks use vocal generation and two are strictly instrumental requests. The sonic brief emphasizes symphonic anime-opening rock, awakening and finale themes, an intimate orchestral ending, fantasy exploration and final-battle scoring; no named artist, franchise or source recording was supplied.
+
+The new delivery format is 48 kHz stereo MP3 at 320 kbps. The original FLACs are retained outside Git in the operator's music archive. New masters use measured two-pass loudness normalization, targeting -14 LUFS and -1.5 dBTP while requesting linear normalization and an 11 LU loudness-range target. Sidecars record the actual normalization mode, first-pass measurements and post-encode QC. This does not assert that a 320 kbps encoding, loudness test or release flag certifies subjective musical quality.
+
+`python3 scripts/generate-site-original-ost-acestep.py --track spectrum-breaker --keep-source` keeps an archival FLAC; the raw directory is configured through `ACESTEP_RAW_DIR`. No paid provider is called by this local generator. Production deployment still requires the separate approval specified in `AGENTS.md`.
+
 ## ACE-Step 1.5 production record
 
-The initial public masters were generated locally with the official ACE-Step 1.5 repository at Git revision `ca1e85fe9430179831e6bc6be790c332190a3866`, model `acestep-v15-turbo`, native MLX DiT and MLX VAE on Apple Silicon. ACE-Step's checked-out software license is MIT. No source audio, commercial recording, artist reference, franchise reference or celebrity voice reference was supplied; prompts explicitly require original melody/harmony and prohibit imitation.
+The existing masters were generated locally with the official ACE-Step 1.5 repository at Git revision `ca1e85fe9430179831e6bc6be790c332190a3866`, model `acestep-v15-turbo`, native MLX DiT and MLX VAE on Apple Silicon. ACE-Step's checked-out software license is MIT. No source audio, commercial recording, artist reference, franchise reference or celebrity voice reference was supplied; prompts explicitly require original melody/harmony and prohibit imitation.
 
 Pinned model artifacts used for this release:
 
@@ -32,7 +40,7 @@ Pinned model artifacts used for this release:
 - VAE SHA-256: `da17edb604c40deaf09e9b24974e590d1ca83a374070e5d0884cfa4bed9a99b0`
 - Qwen3 embedding SHA-256: `0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd`
 
-Generation uses deterministic per-track seeds. ACE-Step produces a 48 kHz FLAC intermediate; FFmpeg then creates a 48 kHz stereo 192 kbps MP3 with `loudnorm=I=-14:TP=-1:LRA=7`. The FLAC is not committed, but its SHA-256 is retained in the adjacent JSON sidecar. Each public MP3 must pass automated checks for codec, sample rate, stereo layout, expected duration, delivery bitrate, integrated loudness, true peak and final SHA-256.
+Generation uses deterministic per-track seeds. ACE-Step produces a 48 kHz FLAC intermediate; FFmpeg then creates a 48 kHz stereo 192 kbps MP3 with `loudnorm=I=-14:TP=-1:LRA=7`. The FLAC is not committed, but its SHA-256 is retained in the adjacent JSON sidecar. The legacy masters use this original 192 kbps/single-pass path; the expansion uses the 320 kbps/two-pass settings above. Each public MP3 must pass automated checks for codec, sample rate, stereo layout, expected duration, delivery bitrate, integrated loudness, true peak and final SHA-256.
 
 ACE-Step does not provide the Eleven Music C2PA request contract. The runtime therefore treats its provenance separately: an ACE-Step entry is accepted only with `provenance: "local-generation-recorded"`, a pinned 40-character generator revision, a valid SHA-256 and `status: "published"`. Eleven Music entries continue to require `provenance: "c2pa-requested"` plus `c2paRequested: true`; this gate was not weakened.
 

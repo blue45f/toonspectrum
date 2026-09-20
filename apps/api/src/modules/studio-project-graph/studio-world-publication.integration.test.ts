@@ -289,7 +289,7 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
   });
   it.each(["expired","replaced","closed"] as const)("cannot resurrect an uncertain %s session via read-open-intent",async(reason)=>{
     const f=await acousticFixture(),key=randomUUID(),first=await acoustic.open(f.principal,f.workId,f.sessionInput,f.binding,key);
-    if(reason==="expired")await pool.query('UPDATE creator_work_live_lock SET "expiresAt"=statement_timestamp()-interval \'1 second\' WHERE "workId"=$1 AND "leaseId"=$2',[f.workId,first.sessionEpoch]);
+    if(reason==="expired")await pool.query('UPDATE creator_work_live_lock SET "createdAt"=statement_timestamp()-interval \'2 seconds\', "expiresAt"=statement_timestamp()-interval \'1 second\' WHERE "workId"=$1 AND "leaseId"=$2',[f.workId,first.sessionEpoch]);
     if(reason==="replaced")await acoustic.open(f.principal,f.workId,{...f.sessionInput,connectionId:"new-connection",expectedSessionEpoch:first.sessionEpoch},{...f.binding,connectionId:"new-connection"},randomUUID());
     if(reason==="closed")await acoustic.changeDoor(f.principal,f.workId,{...f.doorInput,expectedDoorEpoch:f.door.epoch,open:false},randomUUID());
     await expect(acoustic.readOpenIntent(f.principal,f.workId,f.sessionInput,key)).rejects.toMatchObject({reason:reason==="closed"?"closed":"stale"});

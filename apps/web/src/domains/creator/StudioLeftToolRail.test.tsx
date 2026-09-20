@@ -459,7 +459,7 @@ describe("StudioLeftToolRail", () => {
 
     // No raster target: transform arms object select ("선택 후 변형"), not pixel marquee.
     const transformPickRecovery = screen.getByRole<HTMLButtonElement>("button", {
-      name: "선택 후 변형",
+      name: "변형 (⇧T)",
     });
     const imageRecovery = screen.getByRole<HTMLButtonElement>("button", {
       name: "이미지 선택하기",
@@ -486,7 +486,7 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     const selectionRecovery = screen.getByRole<HTMLButtonElement>("button", {
-      name: "선택 시작하기",
+      name: "변형 (⇧T)",
     });
     expect(selectionRecovery.disabled).toBe(false);
     fireEvent.click(selectionRecovery);
@@ -883,7 +883,7 @@ describe("StudioLeftToolRail", () => {
 
     render(<StudioLeftToolRail {...props} />);
 
-    expect(screen.getByText("선택·이동")).toBeTruthy();
+    expect(screen.getByText("선택·변형·이동")).toBeTruthy();
     expect(screen.getByText(new RegExp(`도구막대 ${appSettings.toolbar.visibleIds.length}개 표시`, "u"))).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
 
@@ -952,7 +952,7 @@ describe("StudioLeftToolRail", () => {
     expect(liveIds).toEqual([...STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER]);
     // Draw tools before marquee/transform; view tools after 3D/reference.
     expect(liveIds.indexOf("pen")).toBeLessThan(liveIds.indexOf("marquee-rect"));
-    expect(liveIds.indexOf("marquee-rect")).toBeLessThan(liveIds.indexOf("transform"));
+    expect(liveIds.indexOf("transform")).toBeLessThan(liveIds.indexOf("pen"));
     expect(liveIds.indexOf("vrm3d")).toBeLessThan(liveIds.indexOf("zoom"));
   });
 
@@ -1030,11 +1030,23 @@ describe("StudioLeftToolRail", () => {
       rasterRetouchTargetAvailable: false,
     });
     render(<StudioLeftToolRail {...props} />);
-    const transform = screen.getByRole("button", { name: "선택 후 변형" });
+    const transform = screen.getByRole("button", { name: "변형 (⇧T)" });
     fireEvent.click(transform);
     expect(props.stableHandlers.returnToSelectTool).toHaveBeenCalledOnce();
     expect(props.stableHandlers.announceDrawingShortcut).toHaveBeenCalled();
     expect(props.stableHandlers.onRequestPixelSelection).not.toHaveBeenCalled();
     expect(props.stableHandlers.openPixelSelectionTransform).not.toHaveBeenCalled();
   });
+});
+
+it("retains named core drawing and transform tools even in an old minimal toolbar", () => {
+  const view = render(<StudioLeftToolRail {...createProps({ isRailToolVisible: () => false })} />);
+  for (const id of ["select", "transform", "pen", "eraser", "fill", "marquee-rect", "lasso"]) {
+    expect(view.container.querySelector(`[data-studio-rail-tool-id="${id}"]`)).not.toBeNull();
+  }
+  expect(screen.getByRole("button", { name: "변형 (⇧T)" })).toBeTruthy();
+  expect(view.container.querySelector('[data-studio-rail-tool-id="bg3d"]')).toBeNull();
+  const ids = Array.from(view.container.querySelectorAll("[data-studio-rail-tool-id]"))
+    .map((node) => node.getAttribute("data-studio-rail-tool-id"));
+  expect(ids.indexOf("transform")).toBeLessThan(ids.indexOf("pen"));
 });

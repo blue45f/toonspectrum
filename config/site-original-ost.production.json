@@ -30,8 +30,15 @@
       "title": "Draw Your World",
       "role": "opening",
       "primaryVariant": "vocal",
-      "variants": ["vocal", "instrumental"],
-      "profiles": ["animation", "webtoon", "cinematic"],
+      "variants": [
+        "vocal",
+        "instrumental"
+      ],
+      "profiles": [
+        "animation",
+        "webtoon",
+        "cinematic"
+      ],
       "intensity": "epic",
       "language": "ko",
       "bpm": 154,
@@ -39,14 +46,83 @@
       "summary": "사이트 전체를 대표하는 대형 애니메이션 오프닝. 작은 선 하나가 거대한 세계로 확장되는 창작의 에너지를 노래한다.",
       "direction": "grand modern animation opening, orchestral pop rock, driving live-feeling drums, emotional strings, bright piano, electric guitars, selective heroic brass, huge but clean final chorus, clear youthful female lead vocal, recurring four-note creation motif",
       "sections": [
-        {"name":"Intro","durationMs":12000,"styles":["piano spark and four-note creation motif", "strings rising into full band"]},
-        {"name":"Verse 1","durationMs":33000,"lyrics":["하얀 화면 위에 떨리던 첫 번째 선","아무도 모르는 문을 조용히 열어","작은 숨결 하나 색이 되어 번지면","어제 없던 세상이 눈앞에 깨어나"]},
-        {"name":"Pre-Chorus","durationMs":22000,"lyrics":["틀린 선도 괜찮아 우리만의 지도니까","지워진 밤을 넘어 다음 장면으로"]},
-        {"name":"Chorus","durationMs":38000,"lyrics":["Draw your world 끝없는 페이지 너머","손끝에서 별들이 이름을 얻어","멈추지 마 아직 그려지지 않은","우리의 이야기가 빛을 기다려","Draw your world 이 순간 시작해"]},
-        {"name":"Verse 2","durationMs":30000,"lyrics":["말풍선 사이에 숨겨 둔 작은 약속","서로 다른 꿈들이 한 장면에 만나","넘어진 주인공도 다시 일어서는 건","다음 컷의 하늘을 우리가 아니까"]},
-        {"name":"Bridge","durationMs":26000,"lyrics":["검은 밤이 화면을 전부 덮어도","한 줄의 빛이면 충분해","너의 상상이 나의 용기가 되어","새로운 세계를 이어 가"]},
-        {"name":"Final Chorus","durationMs":39000,"lyrics":["Draw your world 끝없는 페이지 너머","수천 개의 마음이 하나로 번져","두려움도 오늘의 색이 될 테니","아직 없는 내일을 직접 그려 가","Draw your world 우리의 Spectrum","지금 여기서 살아나"]},
-        {"name":"Outro","durationMs":10000,"styles":["four-note creation motif on piano and strings", "decisive clean ending"]}
+        {
+          "name": "Intro",
+          "durationMs": 12000,
+          "styles": [
+            "piano spark and four-note creation motif",
+            "strings rising into full band"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 33000,
+          "lyrics": [
+            "하얀 화면 위에 떨리던 첫 번째 선",
+            "아무도 모르는 문을 조용히 열어",
+            "작은 숨결 하나 색이 되어 번지면",
+            "어제 없던 세상이 눈앞에 깨어나"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 22000,
+          "lyrics": [
+            "틀린 선도 괜찮아 우리만의 지도니까",
+            "지워진 밤을 넘어 다음 장면으로"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 38000,
+          "lyrics": [
+            "Draw your world 끝없는 페이지 너머",
+            "손끝에서 별들이 이름을 얻어",
+            "멈추지 마 아직 그려지지 않은",
+            "우리의 이야기가 빛을 기다려",
+            "Draw your world 이 순간 시작해"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 30000,
+          "lyrics": [
+            "말풍선 사이에 숨겨 둔 작은 약속",
+            "서로 다른 꿈들이 한 장면에 만나",
+            "넘어진 주인공도 다시 일어서는 건",
+            "다음 컷의 하늘을 우리가 아니까"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 26000,
+          "lyrics": [
+            "검은 밤이 화면을 전부 덮어도",
+            "한 줄의 빛이면 충분해",
+            "너의 상상이 나의 용기가 되어",
+            "새로운 세계를 이어 가"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 39000,
+          "lyrics": [
+            "Draw your world 끝없는 페이지 너머",
+            "수천 개의 마음이 하나로 번져",
+            "두려움도 오늘의 색이 될 테니",
+            "아직 없는 내일을 직접 그려 가",
+            "Draw your world 우리의 Spectrum",
+            "지금 여기서 살아나"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 10000,
+          "styles": [
+            "four-note creation motif on piano and strings",
+            "decisive clean ending"
+          ]
+        }
       ]
     },
     {
@@ -54,8 +130,15 @@
       "title": "After the Last Panel",
       "role": "ending",
       "primaryVariant": "vocal",
-      "variants": ["vocal", "instrumental"],
-      "profiles": ["webtoon", "cinematic", "lofi"],
+      "variants": [
+        "vocal",
+        "instrumental"
+      ],
+      "profiles": [
+        "webtoon",
+        "cinematic",
+        "lofi"
+      ],
       "intensity": "chill",
       "language": "ko",
       "bpm": 76,
@@ -63,13 +146,76 @@
       "summary": "마지막 컷 이후에도 인물과 독자의 감정이 남는 엔딩 테마. 피아노와 현악 중심의 긴 여운을 만든다.",
       "direction": "emotional animation ending theme, intimate felt piano, warm strings, restrained acoustic guitar, subtle drums, spacious mix, expressive female lead vocal, bittersweet verses opening into a hopeful final chorus, recurring creation motif slowed into a lullaby",
       "sections": [
-        {"name":"Intro","durationMs":15000,"styles":["solo felt piano", "slow creation motif"]},
-        {"name":"Verse 1","durationMs":36000,"lyrics":["마지막 칸을 넘긴 뒤에도","손끝엔 아직 온기가 남아","말하지 못한 마음 한 줄이","늦은 별처럼 조용히 떠올라"]},
-        {"name":"Chorus","durationMs":39000,"lyrics":["끝난 이야기는 없는 거야","기억 속에서 다시 걷는 너","오늘의 눈물이 잉크가 되어","내일의 장면을 채워 갈 테니","페이지를 닫아도 곁에 있어"]},
-        {"name":"Verse 2","durationMs":35000,"lyrics":["서툰 대사와 비어 있던 칸","그마저 우리다운 계절이었어","멀어지는 배경 너머에서도","함께 웃던 목소리를 기억해"]},
-        {"name":"Bridge","durationMs":30000,"lyrics":["언젠가 새로운 첫 장을 열 때","조금 달라진 우리가 만나면","긴 밤을 건너온 이 마음으로","다시 이름을 불러 줄게"]},
-        {"name":"Final Chorus","durationMs":50000,"lyrics":["끝난 이야기는 없는 거야","기억 속에서 다시 피는 너","오늘의 이별도 색이 되어서","아직 모르는 아침을 비출 테니","마지막 페이지 그 너머에서","우리 다시 시작해"]},
-        {"name":"Outro","durationMs":20000,"styles":["piano and solo cello", "long natural tail", "no vocal ad-libs"]}
+        {
+          "name": "Intro",
+          "durationMs": 15000,
+          "styles": [
+            "solo felt piano",
+            "slow creation motif"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 36000,
+          "lyrics": [
+            "마지막 칸을 넘긴 뒤에도",
+            "손끝엔 아직 온기가 남아",
+            "말하지 못한 마음 한 줄이",
+            "늦은 별처럼 조용히 떠올라"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 39000,
+          "lyrics": [
+            "끝난 이야기는 없는 거야",
+            "기억 속에서 다시 걷는 너",
+            "오늘의 눈물이 잉크가 되어",
+            "내일의 장면을 채워 갈 테니",
+            "페이지를 닫아도 곁에 있어"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 35000,
+          "lyrics": [
+            "서툰 대사와 비어 있던 칸",
+            "그마저 우리다운 계절이었어",
+            "멀어지는 배경 너머에서도",
+            "함께 웃던 목소리를 기억해"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 30000,
+          "lyrics": [
+            "언젠가 새로운 첫 장을 열 때",
+            "조금 달라진 우리가 만나면",
+            "긴 밤을 건너온 이 마음으로",
+            "다시 이름을 불러 줄게"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 50000,
+          "lyrics": [
+            "끝난 이야기는 없는 거야",
+            "기억 속에서 다시 피는 너",
+            "오늘의 이별도 색이 되어서",
+            "아직 모르는 아침을 비출 테니",
+            "마지막 페이지 그 너머에서",
+            "우리 다시 시작해"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 20000,
+          "styles": [
+            "piano and solo cello",
+            "long natural tail",
+            "no vocal ad-libs"
+          ]
+        }
       ]
     },
     {
@@ -77,8 +223,15 @@
       "title": "Lines Become Worlds",
       "role": "creator",
       "primaryVariant": "vocal",
-      "variants": ["vocal", "instrumental"],
-      "profiles": ["animation", "webtoon", "cinematic"],
+      "variants": [
+        "vocal",
+        "instrumental"
+      ],
+      "profiles": [
+        "animation",
+        "webtoon",
+        "cinematic"
+      ],
       "intensity": "normal",
       "language": "ko",
       "bpm": 132,
@@ -86,14 +239,82 @@
       "summary": "창작자에게 직접 말을 거는 Creator Anthem. 긴 작업과 실패를 지나 작품이 세상에 나오는 순간을 밀어 올린다.",
       "direction": "uplifting creator anthem, modern pop rock with cinematic strings, tactile piano, clean electric guitar, punchy acoustic drums, warm synth support, mixed-gender gang harmonies only in final chorus, confident youthful male lead vocal, inspirational without corporate jingle feeling",
       "sections": [
-        {"name":"Intro","durationMs":12000,"styles":["muted guitar pulse", "piano creation motif"]},
-        {"name":"Verse 1","durationMs":32000,"lyrics":["새벽 네 시 멈춘 커서 앞에서","수백 번 같은 장면을 고쳐도","마음속 인물은 먼저 달려가","아직 없는 길의 끝을 보여 줘"]},
-        {"name":"Pre-Chorus","durationMs":22000,"lyrics":["완벽하지 않아도 좋아","오늘의 한 칸이 길이 되니까"]},
-        {"name":"Chorus","durationMs":37000,"lyrics":["선은 세계가 되고","한마디는 누군가의 하루가 돼","포기했던 장면까지 안고","우리의 이야기를 세상에 보내","끝까지 그려 가"]},
-        {"name":"Verse 2","durationMs":30000,"lyrics":["지워진 레이어 쌓여 간 시간","아무도 모를 작은 선택들도","마침내 한 사람 마음에 닿으면","긴 밤의 이유가 선명해져 가"]},
-        {"name":"Bridge","durationMs":26000,"lyrics":["조회수보다 먼저 기억해","처음 이 이야길 사랑한 마음","혼자였던 책상 위의 빛들이","이제 서로의 별이 돼"]},
-        {"name":"Final Chorus","durationMs":36000,"lyrics":["선은 세계가 되고","우리 이름은 새로운 길이 돼","끝나지 않은 꿈을 펼쳐 들고","다음 페이지를 함께 넘겨 가","끝까지 만들어 가"]},
-        {"name":"Outro","durationMs":10000,"styles":["band stop then piano motif", "confident resolved cadence"]}
+        {
+          "name": "Intro",
+          "durationMs": 12000,
+          "styles": [
+            "muted guitar pulse",
+            "piano creation motif"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 32000,
+          "lyrics": [
+            "새벽 네 시 멈춘 커서 앞에서",
+            "수백 번 같은 장면을 고쳐도",
+            "마음속 인물은 먼저 달려가",
+            "아직 없는 길의 끝을 보여 줘"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 22000,
+          "lyrics": [
+            "완벽하지 않아도 좋아",
+            "오늘의 한 칸이 길이 되니까"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 37000,
+          "lyrics": [
+            "선은 세계가 되고",
+            "한마디는 누군가의 하루가 돼",
+            "포기했던 장면까지 안고",
+            "우리의 이야기를 세상에 보내",
+            "끝까지 그려 가"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 30000,
+          "lyrics": [
+            "지워진 레이어 쌓여 간 시간",
+            "아무도 모를 작은 선택들도",
+            "마침내 한 사람 마음에 닿으면",
+            "긴 밤의 이유가 선명해져 가"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 26000,
+          "lyrics": [
+            "조회수보다 먼저 기억해",
+            "처음 이 이야길 사랑한 마음",
+            "혼자였던 책상 위의 빛들이",
+            "이제 서로의 별이 돼"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 36000,
+          "lyrics": [
+            "선은 세계가 되고",
+            "우리 이름은 새로운 길이 돼",
+            "끝나지 않은 꿈을 펼쳐 들고",
+            "다음 페이지를 함께 넘겨 가",
+            "끝까지 만들어 가"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 10000,
+          "styles": [
+            "band stop then piano motif",
+            "confident resolved cadence"
+          ]
+        }
       ]
     },
     {
@@ -101,8 +322,14 @@
       "title": "Ink & Starlight",
       "role": "story",
       "primaryVariant": "instrumental",
-      "variants": ["instrumental"],
-      "profiles": ["webtoon", "fantasy", "cinematic"],
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "webtoon",
+        "fantasy",
+        "cinematic"
+      ],
       "intensity": "normal",
       "language": "none",
       "bpm": 94,
@@ -115,8 +342,14 @@
       "title": "Beyond the Panel",
       "role": "action",
       "primaryVariant": "instrumental",
-      "variants": ["instrumental"],
-      "profiles": ["animation", "cinematic", "fantasy"],
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "animation",
+        "cinematic",
+        "fantasy"
+      ],
       "intensity": "epic",
       "language": "none",
       "bpm": 148,
@@ -129,8 +362,15 @@
       "title": "Between Two Speech Bubbles",
       "role": "romance",
       "primaryVariant": "vocal",
-      "variants": ["vocal", "instrumental"],
-      "profiles": ["webtoon", "citypop", "animation"],
+      "variants": [
+        "vocal",
+        "instrumental"
+      ],
+      "profiles": [
+        "webtoon",
+        "citypop",
+        "animation"
+      ],
       "intensity": "normal",
       "language": "ko",
       "bpm": 106,
@@ -138,14 +378,82 @@
       "summary": "캐릭터·로맨스·커뮤니티 공간의 따뜻한 캐릭터 송. 말풍선 사이의 망설임을 도시적인 밴드 사운드로 풀어낸다.",
       "direction": "warm original character song, modern city pop and animation pop, electric piano, clean guitar, melodic bass, live drums, small string accents, bright intimate female vocal, conversational verses and addictive but tasteful chorus, no retro parody",
       "sections": [
-        {"name":"Intro","durationMs":12000,"styles":["electric piano hook", "clean guitar answer"]},
-        {"name":"Verse 1","durationMs":32000,"lyrics":["보내지 못한 한 줄을 또 지우고","괜히 다른 얘기로 웃어 넘기고","네 말풍선 끝에 남은 작은 점 세 개","왜 오늘따라 오래 바라보게 돼"]},
-        {"name":"Pre-Chorus","durationMs":22000,"lyrics":["한 칸만 더 가까이","마음도 스크롤할 수 있다면"]},
-        {"name":"Chorus","durationMs":37000,"lyrics":["우리 둘 말풍선 사이","아직 이름 없는 마음이 있어","조금 느려도 괜찮아","같은 장면에 머물러 준다면","오늘은 먼저 웃어 볼게"]},
-        {"name":"Verse 2","durationMs":30000,"lyrics":["익숙한 골목 배경은 그대로인데","네가 옆에 있으면 색이 달라지고","우연을 핑계 삼아 맞춘 발걸음에","조용한 박자가 하나 더 생겨나"]},
-        {"name":"Bridge","durationMs":25000,"lyrics":["결말을 미리 정하지 말자","서툰 대사도 우리답게","다음 장면은 천천히","같이 골라 가면 돼"]},
-        {"name":"Final Chorus","durationMs":32000,"lyrics":["우리 둘 말풍선 사이","이제 선명해진 마음이 있어","조금 떨려도 괜찮아","같은 페이지를 걷고 있으니까","오늘은 내가 먼저 말할게"]},
-        {"name":"Outro","durationMs":10000,"styles":["electric piano creation motif", "warm band ending"]}
+        {
+          "name": "Intro",
+          "durationMs": 12000,
+          "styles": [
+            "electric piano hook",
+            "clean guitar answer"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 32000,
+          "lyrics": [
+            "보내지 못한 한 줄을 또 지우고",
+            "괜히 다른 얘기로 웃어 넘기고",
+            "네 말풍선 끝에 남은 작은 점 세 개",
+            "왜 오늘따라 오래 바라보게 돼"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 22000,
+          "lyrics": [
+            "한 칸만 더 가까이",
+            "마음도 스크롤할 수 있다면"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 37000,
+          "lyrics": [
+            "우리 둘 말풍선 사이",
+            "아직 이름 없는 마음이 있어",
+            "조금 느려도 괜찮아",
+            "같은 장면에 머물러 준다면",
+            "오늘은 먼저 웃어 볼게"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 30000,
+          "lyrics": [
+            "익숙한 골목 배경은 그대로인데",
+            "네가 옆에 있으면 색이 달라지고",
+            "우연을 핑계 삼아 맞춘 발걸음에",
+            "조용한 박자가 하나 더 생겨나"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 25000,
+          "lyrics": [
+            "결말을 미리 정하지 말자",
+            "서툰 대사도 우리답게",
+            "다음 장면은 천천히",
+            "같이 골라 가면 돼"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 32000,
+          "lyrics": [
+            "우리 둘 말풍선 사이",
+            "이제 선명해진 마음이 있어",
+            "조금 떨려도 괜찮아",
+            "같은 페이지를 걷고 있으니까",
+            "오늘은 내가 먼저 말할게"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 10000,
+          "styles": [
+            "electric piano creation motif",
+            "warm band ending"
+          ]
+        }
       ]
     },
     {
@@ -153,8 +461,13 @@
       "title": "Midnight Storyboard",
       "role": "creator",
       "primaryVariant": "instrumental",
-      "variants": ["instrumental"],
-      "profiles": ["lofi", "webtoon"],
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "lofi",
+        "webtoon"
+      ],
       "intensity": "chill",
       "language": "none",
       "bpm": 82,
@@ -167,8 +480,13 @@
       "title": "Neon Scroll",
       "role": "story",
       "primaryVariant": "instrumental",
-      "variants": ["instrumental"],
-      "profiles": ["citypop", "animation"],
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "citypop",
+        "animation"
+      ],
       "intensity": "normal",
       "language": "none",
       "bpm": 112,
@@ -181,14 +499,704 @@
       "title": "Publish the Sky",
       "role": "ending",
       "primaryVariant": "instrumental",
-      "variants": ["instrumental"],
-      "profiles": ["animation", "cinematic", "webtoon"],
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "animation",
+        "cinematic",
+        "webtoon"
+      ],
       "intensity": "epic",
       "language": "none",
       "bpm": 126,
       "durationMs": 120000,
       "summary": "작품 게시·완료·쇼케이스의 성취감을 위한 승리 테마. 과장된 팬페어보다 창작의 완주감을 강조한다.",
       "direction": "emotional victory and publication theme, piano creation motif growing into strings, live drums, electric guitar and restrained brass, soaring final minute, hopeful earned triumph, clean logo-like ending cadence, no vocals, no generic corporate fanfare"
+    },
+    {
+      "id": "spectrum-breaker",
+      "title": "SPECTRUM BREAKER — 빛의 경계선",
+      "role": "opening",
+      "primaryVariant": "vocal",
+      "variants": [
+        "vocal"
+      ],
+      "profiles": [
+        "animation",
+        "cinematic",
+        "webtoon"
+      ],
+      "intensity": "epic",
+      "language": "ko",
+      "bpm": 164,
+      "durationMs": 210000,
+      "keyScale": "D minor",
+      "deliveryBitrateKbps": 320,
+      "summary": "여성 리드 보컬과 질주하는 심포닉 록이 만나는 메인 오프닝. 지워진 세계에 자신의 색으로 길을 여는 이야기.",
+      "direction": "Epic Japanese anime opening aesthetic, original Korean female lead vocal with clear youthful powerful belt, symphonic J-rock, 164 BPM in D minor, urgent live drums, double-tracked rhythm guitars, nimble staccato violins, lyrical piano, heroic French horns, restrained timpani, verse with breathing room, soaring melodic chorus, half-time vulnerable bridge then triumphant final chorus, hook contour D F A G, expansive cinematic depth, organic band performance, not a trailer montage",
+      "sections": [
+        {
+          "name": "Intro",
+          "durationMs": 10000,
+          "styles": [
+            "piano D F A G motif",
+            "string pickup and live drum fill"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 26000,
+          "lyrics": [
+            "창문 너머 멈춰 버린 푸른 신호등",
+            "아무도 걷지 않는 길에 서 있어",
+            "주머니 속 구겨 놓은 작은 밑그림",
+            "펼치는 순간 바람이 달라져",
+            "정답처럼 굳어 버린 회색 하늘에",
+            "떨리는 손으로 첫 선을 그어"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 18000,
+          "lyrics": [
+            "지워져도 사라지지 않는 마음",
+            "어둠보다 먼저 너를 찾아가",
+            "닫힌 문이 아니라 아직 없는 문",
+            "우리 손으로 열어"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 32000,
+          "lyrics": [
+            "선을 넘어 빛을 열어",
+            "끝이 없는 하늘에 이름을 새겨",
+            "깨진 꿈의 조각마저",
+            "새로운 별자리로 이어 갈 거야",
+            "Spectrum breaker 날아올라",
+            "정해진 내일보다 멀리",
+            "세상이 색을 잃어도",
+            "우리의 이야기는 빛나"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 24000,
+          "lyrics": [
+            "거울 속엔 어제보다 지친 얼굴",
+            "눈빛은 이상하게 선명해지고",
+            "넘어진 자리에 남겨 놓은 흔적",
+            "누군가에겐 길이 되고 있었어",
+            "혼자라고 믿어 왔던 긴 터널 끝",
+            "너의 발소리가 나를 일으켜"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 16000,
+          "lyrics": [
+            "상처마다 다른 빛을 품고 있어",
+            "불완전한 우리가 만나는 순간",
+            "멀어 보이던 그 아침의 윤곽이",
+            "조금씩 가까워져"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 30000,
+          "lyrics": [
+            "선을 넘어 빛을 열어",
+            "끝이 없는 하늘에 이름을 새겨",
+            "깨진 꿈의 조각마저",
+            "새로운 별자리로 이어 갈 거야",
+            "Spectrum breaker 날아올라",
+            "두려운 마음까지 데려가",
+            "세상이 색을 잃어도",
+            "우리의 이야기는 빛나"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 20000,
+          "lyrics": [
+            "아무 소리 없는 밤",
+            "너의 숨을 듣고 있어",
+            "단 한 줄로 시작해도",
+            "우린 세계가 될 수 있어"
+          ],
+          "styles": [
+            "half-time piano and exposed voice",
+            "strings grow without percussion"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 26000,
+          "lyrics": [
+            "선을 넘어 빛을 열어",
+            "아직 없는 하늘을 함께 그려",
+            "흩어진 우리 빛을 모아",
+            "누구도 지울 수 없는 아침으로",
+            "Spectrum breaker 기억해 줘",
+            "이 모든 시작은 작은 선 하나",
+            "마지막 어둠을 넘어",
+            "우리의 이야기는 빛나"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 8000,
+          "styles": [
+            "resolved D major color",
+            "four-note piano answer",
+            "clean natural tail"
+          ]
+        }
+      ],
+      "volume": "Prism Awakening",
+      "compositionIntent": {
+        "creationMotifDegrees": [
+          "1",
+          "minor-third-or-major-third",
+          "5",
+          "4"
+        ],
+        "timeSignature": "4/4",
+        "voiceReference": "none",
+        "sourceAudio": "none",
+        "listeningReviewRequired": true
+      }
+    },
+    {
+      "id": "wings-of-the-unwritten",
+      "title": "이름 없는 날개 — Wings of the Unwritten",
+      "role": "creator",
+      "primaryVariant": "vocal",
+      "variants": [
+        "vocal"
+      ],
+      "profiles": [
+        "animation",
+        "fantasy",
+        "cinematic"
+      ],
+      "intensity": "epic",
+      "language": "ko",
+      "bpm": 152,
+      "durationMs": 195000,
+      "keyScale": "E minor",
+      "deliveryBitrateKbps": 320,
+      "summary": "남성 테너 보컬 중심의 각성 테마. 실패의 흔적을 날개로 바꾸며 다시 일어서는 순간의 에너지를 담는다.",
+      "direction": "Original Japanese anime awakening insert-song aesthetic, passionate Korean male tenor lead, emotional cinematic alternative rock, 152 BPM E minor, resonant low piano, tight bass guitar, palm-muted verse guitars opening into broad sustained chorus chords, expressive real-feeling drums, soaring live string ensemble and horn countermelody, memorable original singable hook E G B A, underdog resolve rather than aggression, restrained verse, powerful clean high-register chorus, dramatic stop before final chorus",
+      "sections": [
+        {
+          "name": "Intro",
+          "durationMs": 9000,
+          "styles": [
+            "low piano heartbeat",
+            "muted guitar pulse"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 25000,
+          "lyrics": [
+            "발밑에 쌓인 종이들은",
+            "끝내지 못한 날들의 무게",
+            "다시 처음으로 돌아오면",
+            "세상은 나만 두고 달려가",
+            "이름조차 붙이지 못한 꿈",
+            "접어 둔 채 눈을 감았어"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 17000,
+          "lyrics": [
+            "그때 들려온 작은 목소리",
+            "아직 너의 장면은 끝나지 않아",
+            "비어 있는 마지막 한 칸에",
+            "다시 나를 세워"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 30000,
+          "lyrics": [
+            "날개는 처음부터 없었어",
+            "떨어진 날들로 만들어 갈 뿐",
+            "백 번의 밤을 지나온 내가",
+            "백한 번째 하늘을 열어",
+            "이름 없는 이 날개로",
+            "아직 쓰지 않은 내일에 닿아",
+            "나를 멈춘 모든 선을",
+            "지금 넘어가"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 25000,
+          "lyrics": [
+            "흐릿한 발자국을 따라",
+            "기억은 멀리 되감겨 오고",
+            "길을 잃은 줄 알았던 날도",
+            "여기까지 나를 데려왔어",
+            "완벽한 영웅이 아니라도",
+            "지킬 마음 하나면 충분해"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 30000,
+          "lyrics": [
+            "날개는 처음부터 없었어",
+            "떨어진 날들로 만들어 갈 뿐",
+            "백 번의 밤을 지나온 내가",
+            "백한 번째 하늘을 열어",
+            "이름 없는 이 날개로",
+            "아직 쓰지 않은 내일에 닿아",
+            "나를 멈춘 모든 선을",
+            "지금 넘어가"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 20000,
+          "lyrics": [
+            "무너진 곳에서만 보이는",
+            "작고 선명한 빛이 있어",
+            "남겨진 상처를 펼쳐 보면",
+            "나의 지도가 되어"
+          ],
+          "styles": [
+            "drop to solo voice and piano",
+            "one-bar silence before lift"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 31000,
+          "lyrics": [
+            "날개는 처음부터 없었어",
+            "너와 나의 밤을 이어 만든 빛",
+            "떨리는 손을 놓지 않을게",
+            "우리가 다음 하늘을 열어",
+            "이름 없는 이 날개로",
+            "누구도 쓰지 못한 내일을 그려",
+            "나를 멈춘 모든 선을",
+            "함께 넘어가"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 8000,
+          "styles": [
+            "sustained guitar and string release",
+            "resolved ending"
+          ]
+        }
+      ],
+      "volume": "Prism Awakening",
+      "compositionIntent": {
+        "creationMotifDegrees": [
+          "1",
+          "minor-third-or-major-third",
+          "5",
+          "4"
+        ],
+        "timeSignature": "4/4",
+        "voiceReference": "none",
+        "sourceAudio": "none",
+        "listeningReviewRequired": true
+      }
+    },
+    {
+      "id": "oath-of-a-thousand-lights",
+      "title": "천 개의 빛, 하나의 약속",
+      "role": "action",
+      "primaryVariant": "vocal",
+      "variants": [
+        "vocal"
+      ],
+      "profiles": [
+        "animation",
+        "cinematic",
+        "fantasy"
+      ],
+      "intensity": "epic",
+      "language": "ko",
+      "bpm": 144,
+      "durationMs": 210000,
+      "keyScale": "B minor",
+      "deliveryBitrateKbps": 320,
+      "summary": "결전을 향한 시네마틱 보컬 테마. 남녀 보컬의 교차와 마지막 후렴의 화음을 목표로, 서로의 빛을 지키는 약속을 노래한다.",
+      "direction": "Grand original anime finale insert song, Korean male and female duet if supported, alternating intimate male tenor and luminous female lead verses with joined octave and third harmonies in chorus, cinematic symphonic rock, 144 BPM B minor, pulsing low strings, organic large drums and taiko-like percussion, broad French horns, electric guitar, clear piano, dignified mixed backing choir only behind final chorus, B D F-sharp E creation motif, hope earned through sacrifice, huge but intelligible climactic chorus, keep lead words clear, no spoken narration",
+      "sections": [
+        {
+          "name": "Intro",
+          "durationMs": 12000,
+          "styles": [
+            "distant low strings",
+            "piano motif",
+            "gradual drum entrance"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 26000,
+          "lyrics": [
+            "끝을 알 수 없는 바람 속에서",
+            "꺼져 가는 불빛 하나 안고",
+            "다시 돌아오겠다는 그 말만",
+            "부서진 손바닥에 남아 있어",
+            "너는 저편에서 나를 부르고",
+            "나는 이편에서 길을 찾는다"
+          ],
+          "styles": [
+            "male lead intention",
+            "spacious arrangement"
+          ]
+        },
+        {
+          "name": "Pre-Chorus",
+          "durationMs": 18000,
+          "lyrics": [
+            "서로 다른 밤을 걸어왔지만",
+            "같은 아침을 보고 있었다면",
+            "먼지처럼 흩어진 이 순간도",
+            "별이 될 수 있어"
+          ],
+          "styles": [
+            "female lead intention",
+            "rising string counterline"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 34000,
+          "lyrics": [
+            "천 개의 빛이 흩어져도",
+            "하나의 약속은 꺼지지 않아",
+            "너를 지키겠다는 그 마음이",
+            "무너지는 세계를 붙잡아",
+            "더는 혼자 아프지 않게",
+            "너의 밤에 내가 서 있을게",
+            "마지막 문이 닫히기 전에",
+            "우리의 아침을 되찾아"
+          ],
+          "styles": [
+            "joined harmony intention",
+            "wide orchestra but clear lead"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 26000,
+          "lyrics": [
+            "기억 속에 남겨 놓은 웃음들",
+            "다시 불러 보고 싶은 이름",
+            "지키지 못한 날들을 세어도",
+            "지킬 내일은 아직 남아 있어",
+            "내가 흔들릴 때 네가 빛나고",
+            "네가 지칠 때는 내가 걸을게"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 32000,
+          "lyrics": [
+            "천 개의 빛이 흩어져도",
+            "하나의 약속은 꺼지지 않아",
+            "너를 지키겠다는 그 마음이",
+            "무너지는 세계를 붙잡아",
+            "더는 혼자 아프지 않게",
+            "너의 밤에 내가 서 있을게",
+            "마지막 문이 닫히기 전에",
+            "우리의 아침을 되찾아"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 24000,
+          "lyrics": [
+            "돌아갈 길이 사라진대도",
+            "돌아갈 이유는 남아 있으니",
+            "잊지 마 우리가 부른 이름",
+            "그 안에서 다시 시작해"
+          ],
+          "styles": [
+            "piano and solo cello breakdown",
+            "slow tom build"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 30000,
+          "lyrics": [
+            "천 개의 빛을 이어 붙여",
+            "하나의 하늘을 다시 그리자",
+            "너와 나를 지켜 온 그 마음",
+            "이제 모든 어둠을 지나가",
+            "더는 혼자 울지 않도록",
+            "같은 아침 안에 서 있을게",
+            "마지막 별이 눈을 뜰 때",
+            "우리의 약속은 살아 있어"
+          ],
+          "styles": [
+            "full strings and horns",
+            "restrained backing choir",
+            "largest emotional lift"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 8000,
+          "styles": [
+            "piano motif over sustained strings",
+            "resolved ending"
+          ]
+        }
+      ],
+      "volume": "Prism Awakening",
+      "compositionIntent": {
+        "creationMotifDegrees": [
+          "1",
+          "minor-third-or-major-third",
+          "5",
+          "4"
+        ],
+        "timeSignature": "4/4",
+        "voiceReference": "none",
+        "sourceAudio": "none",
+        "listeningReviewRequired": true
+      }
+    },
+    {
+      "id": "where-the-stars-return",
+      "title": "별이 돌아오는 자리",
+      "role": "ending",
+      "primaryVariant": "vocal",
+      "variants": [
+        "vocal"
+      ],
+      "profiles": [
+        "webtoon",
+        "cinematic",
+        "animation"
+      ],
+      "intensity": "chill",
+      "language": "ko",
+      "bpm": 78,
+      "durationMs": 210000,
+      "keyScale": "F major",
+      "deliveryBitrateKbps": 320,
+      "summary": "전투가 끝난 뒤의 온기를 남기는 여성 보컬 엔딩. 피아노·첼로에서 시작해 마지막 후렴에서 오케스트라로 넓어진다.",
+      "direction": "Original emotional Japanese animation ending ballad with natural Korean female alto-to-soprano lead, intimate vulnerable unprocessed-feeling diction, 78 BPM F major with D minor verse colors, felt piano and lyrical solo cello, delicate acoustic guitar, warm legato string ensemble, very restrained brushed drums after first chorus, radiant full strings only in final chorus, slowed creation motif F A C B-flat, bittersweet reunion and healing, emotional scale without belting every line, spacious natural studio ambience, no spoken word",
+      "sections": [
+        {
+          "name": "Intro",
+          "durationMs": 14000,
+          "styles": [
+            "felt piano",
+            "solo cello answers"
+          ]
+        },
+        {
+          "name": "Verse 1",
+          "durationMs": 30000,
+          "lyrics": [
+            "불이 꺼진 창가에 앉아",
+            "너의 하루를 가만히 생각해",
+            "말하지 못했던 마음들이",
+            "따뜻한 찻잔 위로 떠올라",
+            "괜찮다는 짧은 한마디 뒤에",
+            "얼마나 긴 밤을 숨겨 두었니"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 34000,
+          "lyrics": [
+            "별이 돌아오는 자리에",
+            "너를 위한 불을 켜 둘게",
+            "아무 말도 하지 않아도 돼",
+            "오늘은 그저 쉬어 가",
+            "끝나 버린 줄 알았던 꿈도",
+            "천천히 다시 숨을 쉴 테니",
+            "너의 가장 조용한 이름을",
+            "잊지 않고 부를게"
+          ]
+        },
+        {
+          "name": "Verse 2",
+          "durationMs": 30000,
+          "lyrics": [
+            "다 채우지 못한 페이지",
+            "그 여백도 우리의 계절이야",
+            "조금 늦게 피어난 꽃처럼",
+            "너의 속도로 걸어도 괜찮아",
+            "돌아보면 울기만 했던 날도",
+            "작은 빛으로 곁에 남아 있어"
+          ]
+        },
+        {
+          "name": "Chorus",
+          "durationMs": 32000,
+          "lyrics": [
+            "별이 돌아오는 자리에",
+            "너를 위한 불을 켜 둘게",
+            "아무 말도 하지 않아도 돼",
+            "오늘은 그저 쉬어 가",
+            "끝나 버린 줄 알았던 꿈도",
+            "천천히 다시 숨을 쉴 테니",
+            "너의 가장 조용한 이름을",
+            "잊지 않고 부를게"
+          ]
+        },
+        {
+          "name": "Bridge",
+          "durationMs": 22000,
+          "lyrics": [
+            "멀리 가지 않아도 좋아",
+            "곁에 있는 빛을 바라봐",
+            "내일이라는 작은 문을",
+            "우리 함께 열어 보자"
+          ],
+          "styles": [
+            "exposed lead and cello",
+            "no drum fill"
+          ]
+        },
+        {
+          "name": "Final Chorus",
+          "durationMs": 32000,
+          "lyrics": [
+            "별이 돌아오는 자리에",
+            "우리 위한 아침이 오면",
+            "말 대신 맞잡은 손끝으로",
+            "새로운 장을 넘기자",
+            "끝나 버린 줄 알았던 꿈이",
+            "너의 눈 안에서 다시 빛나",
+            "긴 밤을 건너온 그 이름",
+            "언제까지나 기억할게"
+          ],
+          "styles": [
+            "orchestral bloom",
+            "gentle backing harmonies",
+            "no aggressive limiting"
+          ]
+        },
+        {
+          "name": "Outro",
+          "durationMs": 16000,
+          "styles": [
+            "solo piano",
+            "natural cello release",
+            "complete quiet ending"
+          ]
+        }
+      ],
+      "volume": "Prism Awakening",
+      "compositionIntent": {
+        "creationMotifDegrees": [
+          "1",
+          "minor-third-or-major-third",
+          "5",
+          "4"
+        ],
+        "timeSignature": "4/4",
+        "voiceReference": "none",
+        "sourceAudio": "none",
+        "listeningReviewRequired": true
+      }
+    },
+    {
+      "id": "atlas-of-starlight",
+      "title": "별빛의 아틀라스",
+      "role": "story",
+      "primaryVariant": "instrumental",
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "fantasy",
+        "cinematic",
+        "webtoon"
+      ],
+      "intensity": "normal",
+      "language": "none",
+      "bpm": 96,
+      "durationMs": 180000,
+      "keyScale": "D major",
+      "deliveryBitrateKbps": 320,
+      "summary": "세계관·가상 스튜디오 탐험을 위한 판타지 메인 스코어. 작은 첼레스타에서 시작해 거대한 풍경이 펼쳐지는 오케스트라로 발전한다.",
+      "direction": "Entirely instrumental original Japanese animated fantasy feature world-exploration score, 96 BPM D major with occasional Lydian G-sharp color, memorable D F-sharp A G four-note motif, intimate celesta and piano opening, solo flute then warm oboe, harp ripples, layered real-feeling legato strings, lyrical French horn theme, low orchestral percussion, 0-25 seconds quiet discovery, 25-65 expanding journey, 65-95 woodwind and harp contrast, 95-150 panoramic orchestral reveal, 150-180 return to intimate piano and resolved natural ending, rich harmony and flowing original melody, wonder rather than generic trailer tension, no voices no choir no humming no chant",
+      "volume": "Prism Awakening",
+      "compositionIntent": {
+        "creationMotifDegrees": [
+          "1",
+          "minor-third-or-major-third",
+          "5",
+          "4"
+        ],
+        "timeSignature": "4/4",
+        "voiceReference": "none",
+        "sourceAudio": "none",
+        "listeningReviewRequired": true
+      }
+    },
+    {
+      "id": "dawnfall-protocol",
+      "title": "DAWNFALL — 새벽을 되찾는 전투",
+      "role": "action",
+      "primaryVariant": "instrumental",
+      "variants": [
+        "instrumental"
+      ],
+      "profiles": [
+        "animation",
+        "cinematic",
+        "fantasy"
+      ],
+      "intensity": "epic",
+      "language": "none",
+      "bpm": 156,
+      "durationMs": 180000,
+      "keyScale": "D minor",
+      "deliveryBitrateKbps": 320,
+      "summary": "최종 결전·트레일러·클라이맥스에 쓰는 순수 연주곡. 저현 오스티나토와 대형 타악, 브라스, 기타가 세 차례 상승하며 새벽에 도달한다.",
+      "direction": "Entirely instrumental high-budget original Japanese anime final-battle symphonic rock score, 156 BPM D minor resolving to D major, rhythmic D F A G motif in low strings then heroic brass, driving spiccato strings, genuine layered orchestral bass drums and taiko-like percussion, tight live rock kit, powerful horns and trombones, electric guitar supporting melody not masking orchestra, three clear waves of escalation, 0-20 tense pulse, 20-60 first thematic attack, 60-85 piano and solo violin breakdown, 85-135 stronger rhythmic development, 135-166 cathartic major-color final theme, 166-180 decisive ending and natural tail, controlled sub bass, clear percussion transients, no braams no sirens no sound effects no voices no choir no chanting",
+      "volume": "Prism Awakening",
+      "compositionIntent": {
+        "creationMotifDegrees": [
+          "1",
+          "minor-third-or-major-third",
+          "5",
+          "4"
+        ],
+        "timeSignature": "4/4",
+        "voiceReference": "none",
+        "sourceAudio": "none",
+        "listeningReviewRequired": true
+      }
+    }
+  ],
+  "releases": [
+    {
+      "id": "prism-awakening-20260921",
+      "title": "Prism Awakening",
+      "newTrackIds": [
+        "spectrum-breaker",
+        "wings-of-the-unwritten",
+        "oath-of-a-thousand-lights",
+        "where-the-stars-return",
+        "atlas-of-starlight",
+        "dawnfall-protocol"
+      ],
+      "requestedVocalCount": 4,
+      "requestedInstrumentalCount": 2,
+      "plannedDurationMs": 1185000
     }
   ]
 }

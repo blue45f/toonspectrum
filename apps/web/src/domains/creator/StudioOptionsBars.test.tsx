@@ -232,7 +232,7 @@ describe("StudioOptionsBars", () => {
     const drawProps = capturedLazyProps.draw;
     if (!drawProps) throw new Error("draw options props were not captured");
 
-    expect(drawProps.docked).toBe(true);
+    expect(drawProps.docked).toBe(false);
     expect(drawProps.brushId).toBe("gpen");
     expect(drawProps.activeCatalogBrushId).toBe("hair-fiber");
     expect(drawProps.activeCatalogBrushName).toBe("머리카락 결");
@@ -282,9 +282,9 @@ describe("StudioOptionsBars", () => {
       />,
     );
 
-    const drawProps = capturedLazyProps.draw;
-    if (!drawProps) throw new Error("draw options props were not captured");
-    expect(drawProps.livingInk).toBeUndefined();
+    expect(capturedLazyProps.draw).toBeNull();
+    expect(screen.queryByTestId("lazy-draw-options")).toBeNull();
+    expect(screen.queryByTestId("lazy-select-options")).toBeNull();
   });
 
   it("delegates draw interactions through the semantic stable handler contract", () => {
@@ -404,4 +404,28 @@ describe("StudioOptionsBars", () => {
     if (!selectionProps) throw new Error("selection options props were not recaptured");
     expect(selectionProps.onToggleLock).toBeUndefined();
   });
+});
+
+it("keeps brush discovery and reversible layout recovery available without a selection", () => {
+  const stableHandlers = { ...createHandlers(), toggleBrushDock: vi.fn(), restoreDrawingLayout: vi.fn(), undoDrawingLayoutRestore: vi.fn() };
+  render(<StudioOptionsBars {...createProps({
+    draw: { visible: false, workbenchVisible: true, libraryDockOpen: true, layoutRestoreAvailable: true }, stableHandlers,
+  })} />);
+  screen.getByRole("button", { name: "브러시 패널 접기" }).click();
+  screen.getByRole("button", { name: "드로잉 기본 배치 복원" }).click();
+  screen.getByRole("button", { name: "이전 작업 배치로 되돌리기" }).click();
+  expect(stableHandlers.toggleBrushDock).toHaveBeenCalledOnce();
+  expect(stableHandlers.restoreDrawingLayout).toHaveBeenCalledOnce();
+  expect(stableHandlers.undoDrawingLayoutRestore).toHaveBeenCalledOnce();
+  expect(capturedLazyProps.draw).toBeNull();
+  expect(capturedLazyProps.selection).toBeNull();
+});
+
+it("connects selection transform to the same caller-owned command as the rail", () => {
+  const stableHandlers = { ...createHandlers(), transformSelection: vi.fn() };
+  render(<StudioOptionsBars {...createProps({ draw: { visible: false },
+    selection: { visible: true, count: 1 }, stableHandlers })} />);
+  expect(capturedLazyProps.selection?.docked).toBe(false);
+  capturedLazyProps.selection?.onTransform?.();
+  expect(stableHandlers.transformSelection).toHaveBeenCalledOnce();
 });

@@ -242,7 +242,7 @@ describe("PostgreSQL integration test runner", () => {
     ).toBe("true");
   });
 
-  it("runs exactly the fourteen direct PostgreSQL suites without file parallelism", () => {
+  it("runs all sixteen registered PostgreSQL suites without file parallelism", () => {
     expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(16);
     expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 16);
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/db/admin-schema.integration.test.ts");

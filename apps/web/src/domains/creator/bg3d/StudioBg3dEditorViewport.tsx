@@ -10,6 +10,7 @@ import { StudioBg3dCompositionOverlay } from "./StudioBg3dCompositionOverlay";
 import { StudioBg3dEngineRecoveryActions } from "./StudioBg3dEngineRecoveryActions";
 import type { StudioBg3dCompositionGuideMode } from "./studio-bg3d-composition-guide";
 import { StudioBg3dViewFrameClear } from "./StudioBg3dViewFrameClear";
+import { createStudioBg3dPointerEvents } from "./studio-bg3d-pointer-events";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const StudioBg3dTurntableController = lazyRetry(
@@ -406,6 +407,7 @@ export function StudioBg3dEditorViewport({ h }) {
                 ) : (
                   <Canvas
                   key={`${webXrCanvasGeneration}:${engineRuntime.canvasKey}`}
+                  events={createStudioBg3dPointerEvents}
                   eventSource={viewportHostRef as unknown as React.RefObject<HTMLElement>}
                   camera={{
                     fov: sceneBaseDocument.camera.fovDegrees,
