@@ -1,4 +1,5 @@
 const OPTIONAL_PREVIEW_API_PATHS = new Set([
+  "/api/health/ready",
   "/api/auth/session",
   "/api/kmas/merge-on-access",
   "/api/studio-ai/status",

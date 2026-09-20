@@ -406,6 +406,8 @@ interface DeferredDurabilityResult {
   payloadContainsEveryStroke: boolean;
   recoveryBannerShown: boolean;
   recoveredPixelsChanged: boolean;
+  recoveryMode: "automatic" | "manual";
+  recoveredStrokeVisibleSegments: number;
   screenshot: string;
   errorCount: number;
 }
@@ -3848,11 +3850,11 @@ async function revealStudioViewTool(page: Page, mode: "zoom" | "rotate"): Promis
   await trigger.waitFor({ state: "visible" });
 }
 
-async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: number) => ScreenPoint): Promise<void> {
+async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: number) => Promise<ScreenPoint>): Promise<void> {
   const before = (await persistedDrawElements(page)).at(-1);
   invariant(before?.id, "current-stroke correction has no persisted source");
   const open = async () => {
-    await page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: /^(그리기|Draw)$/u }).click();
+    await page.locator('[data-studio-main-menu="true"]').getByRole("menuitem", { name: /^(창작|Create)$/u }).click();
     await page.locator('[data-studio-menu-item-id="correct-current-stroke"]').click();
     await page.getByRole("dialog", { name: "현재 스트로크 교정", exact: true }).waitFor({ state: "visible" });
   };
@@ -3888,7 +3890,7 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
     writeFileSync(join(SCRATCH, "studio-smart-shape-renderer-adapters.json"), JSON.stringify(adapters, null, 2));
     writeFileSync(join(SCRATCH, "studio-smart-shape-correction.json"), JSON.stringify({ before, corrected }, null, 2));
   }
-  const handle = toScreen(corrected.points[0]!, corrected.points[1]!);
+  const handle = await toScreen(corrected.points[0]!, corrected.points[1]!);
   await page.mouse.move(handle.x, handle.y);
   await page.keyboard.down("Shift");
   await page.mouse.down();
@@ -3898,6 +3900,8 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   const moved = (await waitForPersistedDrawElements(page, (draws) =>
     draws.at(-1)?.id === corrected.id && JSON.stringify(draws.at(-1)?.points) !== JSON.stringify(corrected.points),
   "canvas control-point drag did not change corrected shape")).at(-1)!;
+  invariant(moved.points[0] !== corrected.points[0] || moved.points[1] !== corrected.points[1], "control-point drag missed the intended first endpoint");
+  invariant(moved.points.every((point, index) => index < 2 || index >= moved.points.length - 2 || point === corrected.points[index]), "endpoint drag changed an unrelated control point");
   const angle = Math.atan2(moved.points[1]! - corrected.points[3]!, moved.points[0]! - corrected.points[2]!) / (Math.PI / 12);
   invariant(Math.abs(angle - Math.round(angle)) < 0.00001, "Shift control-point drag did not snap to 15 degrees");
   invariant(moved.points[0] === moved.points.at(-2) && moved.points[1] === moved.points.at(-1), "node drag broke closed-shape endpoints");
@@ -3926,9 +3930,13 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible" });
   await dismissTransientChrome(page, false);
-  // Local guest documents offer an explicit recovery choice on a cold visit.
-  await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-  await page.locator("[data-studio-recovery-notice]").waitFor({ state: "detached" });
+  // Compatible leaders now auto-resume. An unresolved lease still offers the manual choice.
+  // Completion below also requires the exact snapshot and the live dialog's original-restore
+  // command; an absent banner alone cannot make an empty or incorrectly restored document pass.
+  const recoveryNotice = page.locator("[data-studio-recovery-notice]");
+  const manualRecovery = recoveryNotice.getByRole("button", { name: "이어서 그리기", exact: true });
+  if (await manualRecovery.isVisible()) await manualRecovery.click();
+  await recoveryNotice.waitFor({ state: "detached", timeout: 8_000 });
   await waitForPersistedDrawElements(page, (draws) => JSON.stringify(draws.at(-1)) === JSON.stringify(corrected), "cold reload lost correction metadata");
   await page.locator('[data-studio-command-bar-settings-trigger="true"]').click();
   await page.locator('[data-studio-command-bar-settings-panel="true"] select').nth(7).selectOption("correct-current-stroke");
@@ -4233,7 +4241,16 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     const docLeft = Math.min(...xs), docTop = Math.min(...ys);
     const scaleX = (box.right - box.left) / (Math.max(...xs) - docLeft);
     const scaleY = (box.bottom - box.top) / (Math.max(...ys) - docTop);
-    await runCurrentStrokeCorrection(page, (x, y) => ({ x: box.left + (x - docLeft) * scaleX, y: box.top + (y - docTop) * scaleY }));
+    await runCurrentStrokeCorrection(page, async (x, y) => {
+      const liveStageBox = await stage.boundingBox();
+      invariant(liveStageBox, "corrected-shape canvas has no live coordinate frame");
+      // Node-edit chrome can move or resize the stage after the pen fixture calibrated it.
+      // Reproject its normalized stage position before hit testing the actual first endpoint.
+      return {
+        x: liveStageBox.x + (box.left + (x - docLeft) * scaleX - stageBox.x) * liveStageBox.width / stageBox.width,
+        y: liveStageBox.y + (box.top + (y - docTop) * scaleY - stageBox.y) * liveStageBox.height / stageBox.height,
+      };
+    });
     await page.screenshot({ path: screenshot, animations: "disabled" });
     reportBrowserErrors(errors);
     invariant(errors.messages.length === 0, "Smart Shape browser emitted console/page errors");
@@ -4479,6 +4496,15 @@ async function runDeferredDurabilityAudit(
     const receiptLane = { x: safeLeft, y: safeTop + (safeBottom - safeTop) * 0.3 };
     const navigationLane = { x: safeLeft, y: safeTop + (safeBottom - safeTop) * 0.6 };
     const endX = Math.min(safeRight, safeLeft + 240);
+    // This crop owns only the second, at-risk stroke. Whole-stage screenshots also include
+    // changing chrome and cannot alone prove the released stroke repainted after recovery.
+    const navigationEvidenceClip = {
+      x: safeLeft - 12, y: navigationLane.y - 12,
+      width: endX - safeLeft + 24, height: 70,
+    };
+    const emptyNavigationLane = await page.screenshot({
+      animations: "disabled", clip: navigationEvidenceClip,
+    });
     // A gesture that never reaches Konva paints nothing, so it would fail this audit as a missing
     // emergency autosave. Prove both routes hit canvas first and fail with the real reason.
     const canvasReceivesStrokes = await page.evaluate(
@@ -4650,14 +4676,46 @@ async function runDeferredDurabilityAudit(
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
     await dismissTransientChrome(page, false);
     const recoveryText = page.locator("[data-studio-recovery-notice]");
-    await recoveryText.waitFor({ state: "visible", timeout: 8_000 });
-    const recoveryBannerShown = true;
-    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-    await recoveryText.waitFor({ state: "detached", timeout: 8_000 });
+    let recoveryBannerShown = false;
+    let recoveryMode: "automatic" | "manual" = "automatic";
+    let recoveredStrokeVisibleSegments = 0;
+    let recoveredStrokeChangedPixels = 0;
     const restoredStage = page.locator(".konvajs-content").first();
     await restoredStage.waitFor({ state: "visible" });
-    await page.waitForTimeout(180);
     await page.mouse.move(4, 4);
+    const recoveryDeadline = performance.now() + 8_000;
+    while (performance.now() < recoveryDeadline) {
+      const noticeVisible = await recoveryText.isVisible();
+      recoveryBannerShown ||= noticeVisible;
+      if (noticeVisible) {
+        // Unresolved leadership requires an explicit user choice; a compatible leader restores
+        // automatically. An automatic failure is a product failure, not a reason to silently retry.
+        const manualRestore = recoveryText.getByRole("button", { name: "이어서 그리기", exact: true });
+        if (await manualRestore.isVisible() && await manualRestore.isEnabled()) {
+          invariant(recoveryMode !== "manual", "manual recovery did not restore the saved drawing");
+          recoveryMode = "manual";
+          await manualRestore.click();
+        } else if (await recoveryText.getByRole("button", { name: /^(다시 이어 열기|백업 파일 받기)$/u }).isVisible()) {
+          throw new Error(`durability recovery was blocked or automatic restore failed: ${await recoveryText.textContent()}`);
+        }
+      } else {
+        const recoveredLane = await page.screenshot({
+          animations: "disabled", clip: navigationEvidenceClip,
+        });
+        const coverage = await compareScreenshotCoverage(page, emptyNavigationLane, recoveredLane, 3, 12, {
+          start: 12, end: navigationEvidenceClip.width - 12,
+        });
+        recoveredStrokeVisibleSegments = coverage.segmentChangedPixels.filter((count) => count >= 4).length;
+        recoveredStrokeChangedPixels = coverage.changedPixels;
+        if (recoveredStrokeVisibleSegments === 3 && recoveredStrokeChangedPixels >= 24) break;
+      }
+      await page.waitForTimeout(100);
+    }
+    invariant(
+      recoveredStrokeVisibleSegments === 3 && recoveredStrokeChangedPixels >= 24,
+      `recovery did not repaint the at-risk stroke across its route (${recoveredStrokeVisibleSegments}/3 segments, ${recoveredStrokeChangedPixels} pixels)`,
+    );
+    await recoveryText.waitFor({ state: "detached", timeout: 8_000 });
     const restored = await restoredStage.screenshot({ animations: "disabled" });
     const recoveredPixelsChanged = !baseline.equals(restored);
     invariant(recoveredPixelsChanged, "restored emergency autosave did not repaint the deferred stroke");
@@ -4688,6 +4746,8 @@ async function runDeferredDurabilityAudit(
       payloadContainsEveryStroke,
       recoveryBannerShown,
       recoveredPixelsChanged,
+      recoveryMode,
+      recoveredStrokeVisibleSegments,
       screenshot,
       errorCount: errors.messages.length + errors.failedResponses.length,
     };
@@ -4812,6 +4872,8 @@ function writeBrowserEvidenceReceipt(run: {
       payloadContainsEveryStroke: durability.payloadContainsEveryStroke,
       recoveryBannerShown: durability.recoveryBannerShown,
       recoveredPixelsChanged: durability.recoveredPixelsChanged,
+      recoveryMode: durability.recoveryMode,
+      recoveredStrokeVisibleSegments: durability.recoveredStrokeVisibleSegments,
       errorCount: durability.errorCount,
     },
   };
