@@ -121,6 +121,10 @@ it("validates real GET routes without compiler-emitted parameter metadata", asyn
     await app.listen(0, "127.0.0.1"); const baseUrl = await app.getUrl();
     const capabilities = await fetch(`${baseUrl}/api/fortune/capabilities`);
     expect(await capabilities.json()).toMatchObject({ paidFallback: false, tarotDecks: ["major-22", "full-78"] });
+    const special = await fetch(`${baseUrl}/api/fortune/special-days?month=2024-02&category=holidays`);
+    expect(special.status).toBe(200); expect(special.headers.get("cache-control")).toBe("no-store");
+    expect(await special.json()).toMatchObject({ kind: "special-days", status: "local-fallback", items: [] });
+    expect((await fetch(`${baseUrl}/api/fortune/special-days?month=2024-02&category=holidays&birthDate=1990-01-01`)).status).toBe(400);
     const calendar = await fetch(`${baseUrl}/api/fortune/calendar?month=2024-02`);
     expect(calendar.status).toBe(200); expect(calendar.headers.get("cache-control")).toBe("no-store");
     expect(await calendar.json()).toMatchObject({ month: "2024-02", status: "local-fallback", reason: "not-configured" });

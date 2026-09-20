@@ -14,3 +14,4 @@ export * from "./fortune-observatory";
 
 export * from "./fortune-enrichment";
 export * from "./tarot-deck";
+export * from "./fortune-special-days";
