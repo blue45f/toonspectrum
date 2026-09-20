@@ -29,3 +29,8 @@ Base main: 2087abccd46885520138608bd4d5cf2d0b59a96d
 No production deploy, database migration, public/private permission change, package upgrade, avatar artwork replacement or new AI service. This is a presentation/navigation continuity change, not cloud synchronization or a guarantee that a local work is accessible from another device.
 
 Local review artifacts remain untracked under `.qa/studio-first-20260920/`. Reproduce with Vite on a free localhost port and `WORKSPACE_QA_URL=http://127.0.0.1:PORT node scripts/check-studio-first-workspace.mjs`.
+
+
+## CI fixture isolation follow-up
+
+The first full-suite CI attempt stopped before application tests: its PostgreSQL health command connected to `studio_full_integration` every five seconds while bootstrap requires zero other clients. The two full-suite workflows now probe the maintenance database `postgres`, leaving the application database, runtime role, NOLOGIN checks and full-suite execution unchanged. A regression contract prevents reintroducing the competing health probe. No production bootstrap SQL or database migration was changed.

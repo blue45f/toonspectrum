@@ -411,3 +411,19 @@ test("focused session checkout retains every non-brand route-purpose image", () 
   assert.ok(images.length >= 2, "route-purpose fixture must include both spatial and review artwork");
   for (const image of images) assert.ok(focused.includes(`/apps/web/public${image}`), `focused checkout omits actual route-purpose artwork: ${image}`);
 });
+
+
+test("full-suite health probes cannot race the target database's NOLOGIN bootstrap gate", () => {
+  for (const name of ["full-test-suite.yml", "full-test-diagnostic.yml"]) {
+    const workflow = readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), "utf8");
+    assert.match(workflow, /POSTGRES_DB: studio_full_integration/u);
+    assert.match(workflow, /--health-cmd "pg_isready -U studio_full_test -d postgres"/u);
+    assert.doesNotMatch(workflow, /--health-cmd [^\n]*-d studio_full_integration/u);
+    assert.match(workflow, /node scripts\/bootstrap-empty-production-database\.mjs --execute --allow-loopback/u);
+    assert.match(workflow, /node scripts\/run-full-test-ci\.mjs/u);
+    assert.doesNotMatch(workflow, /continue-on-error/u);
+  }
+  const bootstrap = readFileSync(new URL("./bootstrap-empty-production-database.mjs", import.meta.url), "utf8");
+  assert.ok(bootstrap.includes("database client raced the runtime login gate"));
+  assert.ok(bootstrap.includes("ALTER ROLE %I NOLOGIN"));
+});

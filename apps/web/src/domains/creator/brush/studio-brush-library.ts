@@ -8,6 +8,8 @@
 //
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
 
+import { BRUSH_SOURCE_ARCHIVE_KIND, BRUSH_SOURCE_ARCHIVE_MAX_CHARACTERS, BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS, requireStudioBrushOriginalSource, requireEmbeddedStudioBrushOriginalSource, type StudioBrushOriginalSource } from "./studio-brush-original-source";
+
 import { STABILIZER_MAX } from "../studio-brush";
 import { normalizeHexColor } from "../studio-color-utils";
 
@@ -108,6 +110,8 @@ export interface StudioBrushSnapshot extends StudioBrushSourcePresetMetadata {
 }
 
 export interface StudioSavedBrush extends StudioBrushSnapshot {
+  /** Original import provenance, excluded from per-stroke snapshots. */
+  originalSource?: StudioBrushOriginalSource;
   id: string;
   name: string;
   createdAt: number;
@@ -622,8 +626,13 @@ export function normalizeStoredBrush(v: unknown): StudioSavedBrush | null {
   ) {
     return null;
   }
+  let originalSource: StudioBrushOriginalSource | undefined;
+  if (Object.hasOwn(o, "originalSource")) {
+    try { originalSource = requireStudioBrushOriginalSource(o.originalSource); } catch { return null; }
+  }
   const { snapshot } = sanitizeBrushSnapshot(o);
   return {
+    ...(originalSource ? { originalSource } : {}),
     id: o.id,
     name: o.name,
     createdAt: o.createdAt,
@@ -710,6 +719,9 @@ function mutationFailureStatus(status: BrushLibraryReadStatus): BrushMutationFai
 function persist(storage: BrushLibraryStorage | null | undefined, brushes: StudioSavedBrush[]): boolean {
   if (!storage) return false;
   try {
+    for (const brush of brushes) {
+      if (Object.hasOwn(brush, "originalSource")) requireStudioBrushOriginalSource(brush.originalSource);
+    }
     storage.setItem(BRUSH_LIBRARY_KEY, JSON.stringify({
       version: BRUSH_LIBRARY_STORAGE_VERSION,
       brushes,
@@ -1096,7 +1108,14 @@ export function writeBrushJson(brush: StudioSavedBrush): string {
     stampTuning: snapshot.stampTuning,
     enginePrograms: snapshot.enginePrograms,
   };
-  return JSON.stringify(payload, null, 2);
+  const serialized = JSON.stringify(payload, null, 2);
+  if (!Object.hasOwn(brush, "originalSource")) return serialized;
+  const originalSource = requireEmbeddedStudioBrushOriginalSource(brush.originalSource);
+  if (new TextEncoder().encode(serialized).byteLength > BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS) {
+    throw new Error("브러시 설정이 보존 파일의 크기 한도를 넘었습니다. 원본을 제거하지 않았습니다.");
+  }
+  // A distinct kind makes older clients refuse rather than silently discard provenance.
+  return JSON.stringify({ kind: BRUSH_SOURCE_ARCHIVE_KIND, version: 1, brush: payload, originalSource }, null, 2);
 }
 
 const FILENAME_ILLEGAL_CHARS = new Set(["\\", "/", ":", "*", "?", '"', "<", ">", "|"]);
@@ -1124,16 +1143,35 @@ export function importBrushFromJson(
   if (typeof text !== "string" || text.trim().length === 0) {
     throw new Error("빈 파일이에요. 브러시 설정(.json) 파일을 선택해주세요.");
   }
+  if (text.length > BRUSH_SOURCE_ARCHIVE_MAX_CHARACTERS) throw new Error("브러시 보존 파일이 허용 크기를 초과했습니다.");
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
     throw new Error("브러시 설정 파일을 읽지 못했어요.");
   }
+  let originalSource: StudioBrushOriginalSource | undefined;
+  const envelope = parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+  if (envelope?.kind === BRUSH_SOURCE_ARCHIVE_KIND) {
+    if (envelope.version !== 1 || Object.keys(envelope).length !== 4
+      || !envelope.brush || typeof envelope.brush !== "object"
+      || new TextEncoder().encode(JSON.stringify(envelope.brush)).byteLength > BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS) {
+      throw new Error("지원하지 않거나 손상된 브러시 보존 파일입니다.");
+    }
+    originalSource = requireEmbeddedStudioBrushOriginalSource(envelope.originalSource);
+    const settings = envelope.brush as Record<string, unknown>;
+    if (settings.version !== BRUSH_EXPORT_VERSION || Object.hasOwn(settings, "originalSource")) {
+      throw new Error("브러시 보존 파일의 설정 형식을 그대로 복원할 수 없습니다.");
+    }
+    parsed = settings;
+  } else if (new TextEncoder().encode(text).byteLength > BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS) {
+    throw new Error("일반 브러시 설정은 2MB 이하 파일만 가져올 수 있어요.");
+  }
   if (!parsed || typeof parsed !== "object" || (parsed as Record<string, unknown>).kind !== BRUSH_EXPORT_KIND) {
     throw new Error("브러시 설정(.json) 파일이 아니에요.");
   }
   const obj = parsed as Record<string, unknown>;
+  if (Object.hasOwn(obj, "originalSource")) originalSource = requireEmbeddedStudioBrushOriginalSource(obj.originalSource);
   const { snapshot, adjustedFields } = sanitizeBrushSnapshot(obj);
   if (adjustedFields.includes("enginePrograms")) {
     throw new Error("브러시 엔진 설정을 그대로 복원할 수 없어 가져오지 않았어요. 최신 스튜디오에서 다시 시도하거나 원본 브러시를 다시 내보내주세요.");
@@ -1142,6 +1180,7 @@ export function importBrushFromJson(
   const now = Date.now();
   return {
     brush: {
+      ...(originalSource ? { originalSource } : {}),
       id: crypto.randomUUID(),
       name: rawName || fallbackName?.trim() || DEFAULT_BRUSH_NAME,
       createdAt: now,

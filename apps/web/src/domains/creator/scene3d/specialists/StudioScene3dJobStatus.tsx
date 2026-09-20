@@ -29,6 +29,8 @@ export function StudioScene3dJobStatus({
       "출력 크기·해시·결과 확인 중",
       "Verifying output size, hashes and results",
     ),
+    "reuse-check": t("원본·옵션이 같은 검증 결과 확인 중", "Checking verified results for the same source and options"),
+    reused: t("이 탭에서 검증한 가공 결과를 재사용했습니다", "Reused a verified result from this tab"),
     ready: t("검증된 파생본 준비 완료", "Verified derivative ready"),
     cancelled: t("작업을 취소했습니다", "Job cancelled"),
     "timed-out": t("작업 제한 시간을 초과했습니다", "Job timed out"),

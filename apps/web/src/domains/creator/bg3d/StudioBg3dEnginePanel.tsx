@@ -1,6 +1,9 @@
 import { CheckCircle2, Cpu, Loader2, TriangleAlert, Zap } from "lucide-react";
 import { useId } from "react";
 
+import type { StudioScene3dGpuDiagnostics } from "../scene3d/studio-scene3d-gpu-diagnostics";
+import { StudioBg3dGpuDiagnostics } from "./StudioBg3dGpuDiagnostics";
+
 import {
   STUDIO_BG3D_CONTROL_BUTTON as CONTROL_BUTTON,
   studioBg3dClassNames as cx,
@@ -16,6 +19,7 @@ import {
 import type { StudioBg3dInAppBrowserProfile } from "./studio-bg3d-inapp-browser";
 
 export interface StudioBg3dEnginePanelProps {
+  readonly diagnostics?: StudioScene3dGpuDiagnostics;
   readonly plan: StudioBg3dEngineSelectionPlan;
   readonly preference: StudioBg3dEnginePreference;
   readonly inApp: StudioBg3dInAppBrowserProfile;
@@ -44,6 +48,7 @@ const PREFERENCE_HINTS: Readonly<Record<StudioBg3dEnginePreference, string>> = O
  * selected, while both buttons remain manual choices; no control implies an automatic fallback.
  */
 export function StudioBg3dEnginePanel({
+  diagnostics,
   plan,
   preference,
   inApp,
@@ -194,6 +199,7 @@ export function StudioBg3dEnginePanel({
           )}
           <span>{statusText}</span>
         </div>
+        {diagnostics ? <StudioBg3dGpuDiagnostics diagnostics={diagnostics} /> : null}
       </div>
     </section>
   );

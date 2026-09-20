@@ -261,3 +261,12 @@ it("passes the completed job's original input and hash to non-destructive compar
   const source=await screen.findByTestId("review-source");expect(source.textContent).toContain("input-for-review.glb");expect(source.textContent).toContain(result.sourceSha256);expect(source.textContent).toContain("32");
   await load(file("different.glb"));expect(screen.queryByTestId("review-source")).toBeNull();
 });
+
+it("opts into bounded reuse and displays reuse as reuse, not a newly executed computation", async () => {
+  vi.mocked(runScene3dSpecialistInWorker).mockImplementation(async (_request, _signal, options) => {
+    expect(options?.reuse).toBe("memory"); options?.onProgress?.({ phase: "reused" }); return result;
+  });
+  render(<StudioScene3dAssetToolsPanel />); await load();
+  fireEvent.click(screen.getByRole("button", { name: "Meshopt 압축" }));
+  expect(await screen.findByText("검증된 가공 결과 재사용", { exact: false })).toBeDefined();
+});

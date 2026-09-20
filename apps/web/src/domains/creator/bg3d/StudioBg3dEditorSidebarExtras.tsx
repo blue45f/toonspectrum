@@ -499,6 +499,7 @@ export function StudioBg3dEditorSidebarExtras({ h }) {
                 engineInAppBrowser={engineRuntime.inApp}
                 engineProbing={engineRuntime.phase === "probing"}
                 engineDeviceLostMessage={engineRuntime.deviceLostMessage}
+                engineDiagnostics={engineRuntime.diagnostics}
                 engineFrameTimeMs={engineFrameTimeMs}
                 professionalReadiness={professionalRuntimeReadiness}
                 inplaceTools={h.inplaceTools}
