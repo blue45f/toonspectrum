@@ -1,3 +1,5 @@
+import { STUDIO_BG3D_LT_RENDER_MAX_PIXELS } from "./studio-bg3d-lt-render";
+import { isStudioBg3dTilePipelineId, STUDIO_BG3D_TILED_PNG_PROFILE } from "./studio-bg3d-tiled-batch-policy";
 import { buildStudioPackageArchiveBlob } from "../studio-package-archive";
 import { compareStudioValidationStrings } from "../studio-validation-string-order";
 
@@ -475,6 +477,9 @@ function snapshotPublicRenderPlan(
     !Number.isSafeInteger(plan.captureProfile.maxPixels) ||
     plan.captureProfile.maxPixels < 1 ||
     plan.captureProfile.maxPixels > PUBLIC_MAX_PIXELS ||
+    (plan.captureProfile.maxPixels > STUDIO_BG3D_LT_RENDER_MAX_PIXELS &&
+      (plan.implementation.engineId !== "three" || !isStudioBg3dTilePipelineId(plan.captureProfile.ltPipelineId)
+        || plan.captureProfile.pngEncodingId !== STUDIO_BG3D_TILED_PNG_PROFILE)) ||
     !Number.isSafeInteger(plan.captureProfile.maxEdge) ||
     plan.captureProfile.maxEdge < 1 ||
     plan.captureProfile.maxEdge > MAX_DIMENSION ||

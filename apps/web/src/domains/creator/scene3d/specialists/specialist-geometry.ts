@@ -4,11 +4,36 @@ import { dequantize } from "@gltf-transform/functions";
 import { SPECIALIST_LIMITS, SpecialistError } from "./specialist-contract";
 import { requireStatic } from "./specialist-gltf";
 
-/** World-space static geometry only. No cameras, documents or GPU objects escape the worker. */
+export interface StaticGeometryGroup {
+  readonly nodeName: string;
+  readonly geometries: readonly BufferGeometry[];
+}
+
+/** World-space static geometry only. The caller owns and disposes the returned geometries. */
 export async function extractStaticGeometry(
   document: Document,
   single = false,
 ): Promise<BufferGeometry[]> {
+  const groups = await extractStaticGeometryGroups(document);
+  const geometries = groups.flatMap((group) => group.geometries);
+  if (single && geometries.length !== 1) {
+    geometries.forEach((geometry) => geometry.dispose());
+    throw new SpecialistError(
+      "unsupported",
+      "BVH preview requires one mesh primitive per source. Select Manifold solid for multi-part models.",
+    );
+  }
+  return geometries;
+}
+
+/** Preserve mesh-node boundaries so split primitives can be reconstructed before solid union. */
+export async function extractStaticGeometryGroups(
+  document: Document,
+  limits: Readonly<{ triangles: number; meshNodes: number }> = {
+    triangles: SPECIALIST_LIMITS.triangles,
+    meshNodes: SPECIALIST_LIMITS.nodes,
+  },
+): Promise<StaticGeometryGroup[]> {
   requireStatic(document);
   if (
     document
@@ -23,14 +48,30 @@ export async function extractStaticGeometry(
       "Instanced meshes must be expanded before geometry-only processing.",
     );
   }
-  await document.transform(dequantize());
   const scene =
     document.getRoot().getDefaultScene() ?? document.getRoot().listScenes()[0];
   if (!scene) throw new SpecialistError("unsupported", "No default scene.");
+  // Bound the aggregate before copying accessors or dequantizing them.
+  let meshNodes = 0;
+  let triangleEstimate = 0;
+  scene.traverse((node) => {
+    const primitives = node.getMesh()?.listPrimitives() ?? [];
+    if (primitives.length) meshNodes += 1;
+    for (const primitive of primitives) {
+      triangleEstimate += (primitive.getIndices()?.getCount()
+        ?? primitive.getAttribute("POSITION")?.getCount() ?? 0) / 3;
+    }
+  });
+  if (meshNodes > limits.meshNodes || triangleEstimate > limits.triangles) {
+    throw new SpecialistError("budget", "Static geometry exceeds the mesh-node or triangle budget.");
+  }
+  await document.transform(dequantize());
   const geometries: BufferGeometry[] = [];
+  const groups: StaticGeometryGroup[] = [];
   let total = 0;
   try {
     scene.traverse((node) => {
+      const nodeGeometries: BufferGeometry[] = [];
       for (const primitive of node.getMesh()?.listPrimitives() ?? []) {
         if (primitive.getMode() !== 4)
           throw new SpecialistError("unsupported", "Triangle primitives only.");
@@ -47,7 +88,7 @@ export async function extractStaticGeometry(
         total += indices.length / 3;
         if (
           indices.length % 3 ||
-          total > SPECIALIST_LIMITS.triangles ||
+          total > limits.triangles ||
           indices.some((index) => index >= attribute.getCount())
         )
           throw new SpecialistError(
@@ -71,6 +112,7 @@ export async function extractStaticGeometry(
             ];
         const geometry = new BufferGeometry();
         geometries.push(geometry);
+        nodeGeometries.push(geometry);
         geometry.setAttribute("position", new BufferAttribute(positions, 3));
         geometry.setIndex(new BufferAttribute(indices, 1));
         geometry.applyMatrix4(matrix);
@@ -85,13 +127,14 @@ export async function extractStaticGeometry(
           );
         geometry.computeVertexNormals();
       }
+      if (nodeGeometries.length) groups.push({ nodeName: node.getName(), geometries: nodeGeometries });
     });
-    if (!geometries.length || (single && geometries.length !== 1))
+    if (!geometries.length)
       throw new SpecialistError(
         "unsupported",
-        "This operation requires exactly one mesh primitive per source GLB.",
+        "This operation requires at least one triangle mesh in the default scene.",
       );
-    return geometries;
+    return groups;
   } catch (error) {
     geometries.forEach((geometry) => geometry.dispose());
     throw error;

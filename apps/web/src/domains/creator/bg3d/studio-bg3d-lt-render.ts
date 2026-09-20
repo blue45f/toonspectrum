@@ -1,3 +1,5 @@
+import { assertStudioBg3dRasterWindow } from "./studio-bg3d-tile-plan";
+import type { StudioBg3dRasterWindow } from "./studio-bg3d-tile-plan";
 /**
  * Deterministic, browser-neutral raster stage for Studio's 3D line-and-tone (LT) output.
  *
@@ -28,6 +30,8 @@ export const STUDIO_BG3D_LT_RENDER_MAX_PIXELS = STUDIO_BG3D_LT_DEPTH_EDGE_MAX_PI
 export type { StudioBg3dLtRasterLayerRole } from "../scene-3d/studio-3d-insert-contract";
 
 export interface StudioBg3dLtRasterInput {
+  /** Optional bounded tile origin; pattern phase and scale-aware thresholds use the whole frame. */
+  readonly window?: StudioBg3dRasterWindow;
   readonly width: number;
   readonly height: number;
   readonly rgba: Uint8Array | Uint8ClampedArray;
@@ -66,6 +70,7 @@ export interface StudioBg3dLtRenderResult {
 }
 
 interface ValidatedInput {
+  readonly window?: StudioBg3dRasterWindow;
   readonly width: number;
   readonly height: number;
   readonly pixelCount: number;
@@ -157,7 +162,12 @@ function validateInput(input: StudioBg3dLtRasterInput): ValidatedInput {
   if (normalRgba !== undefined && (!depth || !isByteArray(normalRgba) || normalRgba.length !== shape.pixelCount * 4)) {
     throw new TypeError("LT normals require packed RGBA8 and matching depth.");
   }
-  return { ...shape, ...(depth ? { depth } : {}), ...(normalRgba ? { normalRgba } : {}) };
+  const window = input.window;
+  if (window !== undefined) {
+    assertStudioBg3dRasterWindow(window);
+    if (window.width !== shape.width || window.height !== shape.height) throw new RangeError("LT tile and raster dimensions differ.");
+  }
+  return { ...shape, ...(depth ? { depth } : {}), ...(normalRgba ? { normalRgba } : {}), ...(window ? { window } : {}) };
 }
 
 function validateLineSettings(line: StudioBg3dLineOutputSettings): void {
@@ -434,7 +444,7 @@ function renderMainLineResponse(
   const smoothingRadius = Math.round(line.smoothing * 2);
   const edgeField = boxBlur(luminance, input.width, input.height, smoothingRadius);
   const response = new Uint8ClampedArray(input.pixelCount);
-  const maximumDimension = Math.max(input.width, input.height);
+  const maximumDimension = Math.max(input.window?.fullWidth ?? input.width, input.window?.fullHeight ?? input.height);
   const scaleFactor = line.scaleAwareAccuracy
     ? Math.min(1.35, Math.max(0.65, Math.sqrt(640 / maximumDimension)))
     : 1;
@@ -617,7 +627,7 @@ function renderFillLayer(
 
       let coverage = 1 - gray;
       if (tone.mode === "screentone") coverage = Math.pow(coverage, 0.85);
-      const rank = patternRank(tone.pattern, x, y, period, cosine, sine);
+      const rank = patternRank(tone.pattern, x + (input.window?.x ?? 0), y + (input.window?.y ?? 0), period, cosine, sine);
       const ink = clamp01((coverage - rank) / antialiasWidth + 0.5);
       const alpha = Math.round(sourceAlpha * tone.opacity * ink);
       if (alpha < 1) continue;

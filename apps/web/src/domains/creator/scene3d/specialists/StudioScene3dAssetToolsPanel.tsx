@@ -1,3 +1,4 @@
+import type { ArtifactReviewSource } from "./artifact-review-contract";
 import { StudioScene3dJobStatus } from "./StudioScene3dJobStatus";
 import type { SpecialistJobProgress } from "./specialist-job-progress";
 import { SCENE3D_INPLACE_OPERATIONS } from "../integration/scene3d-inplace-contract";
@@ -39,6 +40,7 @@ export function StudioScene3dAssetToolsPanel({
   const [jobProgress, setJobProgress] = useState<SpecialistJobProgress | null>(null);
   const [activity, setActivity] = useState<"read-source" | "process" | "apply">("process");
   const [result, setResult] = useState<SpecialistResult | null>(null);
+  const [reviewSource, setReviewSource] = useState<ArtifactReviewSource | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [links, setLinks] = useState<readonly string[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -93,6 +95,7 @@ export function StudioScene3dAssetToolsPanel({
     active.current?.abort();
     setBusy(true);
     setResult(null);
+    setReviewSource(undefined);
     resultSource.current = null; setAppliedName(null);
     setError(null);
     if (second) {
@@ -133,7 +136,7 @@ export function StudioScene3dAssetToolsPanel({
     if (!inplaceTools || busy || disabled) return;
     setActivity("read-source");
     const ticket = ++generation.current; const controller = new AbortController();
-    active.current?.abort(); active.current = controller; setBusy(true); setError(null); setResult(null); setAppliedName(null);
+    active.current?.abort(); active.current = controller; setBusy(true); setError(null); setResult(null); setReviewSource(undefined); setAppliedName(null);
     source.current = null; selectedSource.current = null; resultSource.current = null; setName("");
     try {
       const input = await inplaceTools.captureSelection(controller.signal);
@@ -164,11 +167,13 @@ export function StudioScene3dAssetToolsPanel({
     active.current = controller;
     setBusy(true);
     setResult(null);
+    setReviewSource(undefined);
     resultSource.current = null; setAppliedName(null);
     setError(null);
     setPreviewIndex(0);
     try {
       const inputBinding = selectedSource.current;
+      const originalBytes = source.current; const originalName = name;
       const next = await runScene3dSpecialistInWorker(
         {
           version: 1,
@@ -184,6 +189,9 @@ export function StudioScene3dAssetToolsPanel({
       );
       if (ticket === generation.current) {
         setResult(next);
+        setReviewSource(SCENE3D_INPLACE_OPERATIONS.some((kind) => kind === next.operation)
+          ? { label: originalName, bytes: new Uint8Array(originalBytes), sha256: next.sourceSha256, stats: next.before }
+          : undefined);
         resultSource.current = inputBinding;
         setNodeNames(next.sourceNodeNames ?? []);
       }
@@ -388,8 +396,8 @@ export function StudioScene3dAssetToolsPanel({
         </summary>
         <p className="my-2 text-xs text-fg-3">
           {t(
-            "각 GLB는 텍스처 없는 정적 메시 1개여야 하며 두 파일 합계는 128MiB 이하입니다. 월드 좌표로 연산하며 결과는 형상 전용입니다.",
-            "Each GLB must contain one untextured static mesh; combined input must not exceed 128 MiB. Operations use world coordinates and export geometry only.",
+            "BVH 미리보기는 단일 프리미티브, Manifold는 파일당 최대 32개 메시 부품을 지원합니다. 재질별 조각은 같은 메시 안에서 닫힌 형상이어야 합니다. 두 GLB 합계는 128MiB 이하이며 텍스처·재질은 보존하지 않는 형상 전용 결과입니다.",
+            "BVH preview supports one primitive; Manifold supports up to 32 mesh nodes per file. Material partitions within each node must form a closed solid. Combined GLBs must not exceed 128 MiB. Results are geometry-only: textures and materials are not preserved.",
           )}
         </p>
         <label className="block text-xs">
@@ -577,7 +585,7 @@ export function StudioScene3dAssetToolsPanel({
                 </p>
               }
             >
-              <Preview artifact={preview} />
+              <Preview artifact={preview} source={reviewSource} active={!disabled && !busy} />
             </Suspense>
           )}
           <p className="text-xs text-fg-3">

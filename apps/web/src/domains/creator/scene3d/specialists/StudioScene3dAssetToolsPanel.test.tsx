@@ -20,7 +20,8 @@ vi.mock("./specialist-client", () => ({
   runScene3dSpecialistInWorker: vi.fn(),
 }));
 vi.mock("./StudioScene3dArtifactPreview", () => ({
-  StudioScene3dArtifactPreview: () => <div>가공 결과 렌더링</div>,
+  StudioScene3dArtifactPreview: ({source}: {source?: {sha256:string;label:string;bytes:Uint8Array}}) =>
+    <div>가공 결과 렌더링{source && <span data-testid="review-source">{source.label} · {source.sha256} · {source.bytes.length}</span>}</div>,
 }));
 const createUrl = vi.fn(() => "blob:fixture");
 const revokeUrl = vi.fn();
@@ -251,4 +252,12 @@ it("shows real queue/stage updates, without invented percentages or stale post-c
   await screen.findByRole("alert");
   act(() => observer({ phase: "processing" }));
   expect(screen.queryByText("선택한 가공·인코딩 작업 실행 중")).toBeNull();
+});
+
+
+it("passes the completed job's original input and hash to non-destructive comparison",async()=>{
+  vi.mocked(runScene3dSpecialistInWorker).mockResolvedValue(result);
+  render(<StudioScene3dAssetToolsPanel/>);await load(file("input-for-review.glb"));fireEvent.click(screen.getByRole("button",{name:"Meshopt 압축"}));
+  const source=await screen.findByTestId("review-source");expect(source.textContent).toContain("input-for-review.glb");expect(source.textContent).toContain(result.sourceSha256);expect(source.textContent).toContain("32");
+  await load(file("different.glb"));expect(screen.queryByTestId("review-source")).toBeNull();
 });

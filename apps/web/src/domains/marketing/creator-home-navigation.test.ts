@@ -250,3 +250,37 @@ test("unmount cancels delayed focus and unsubscribes exactly once", () => {
   assert.equal(h.unsubscribed, 1);
   assert.equal(h.frames.size, 0);
 });
+
+
+test("a deferred fragment never steals a newly selected keyboard control", () => {
+  const h = navigationHarness("#creator-process-title");
+  let control: object | null = null;
+  const host = Object.assign(h.host, { getFocusedControl: () => control });
+  const dispose = bindCreatorSectionNavigation(host);
+  control = { id: "user-selected-link" };
+  h.flush(1);
+  assert.deepEqual(h.calls, []);
+  h.block(true); h.block(false);
+  assert.equal(h.frames.size, 0);
+  dispose();
+});
+
+test("the originating keyboard link still permits its own fragment destination", () => {
+  const h = navigationHarness("#creator-flow");
+  const control = { id: "origin-link" };
+  const dispose = bindCreatorSectionNavigation(Object.assign(h.host, { getFocusedControl: () => control }));
+  h.flush(1);
+  assert.equal(h.calls[1][1], "creator-process-title");
+  dispose();
+});
+
+test("fresh explicit navigation remains usable after a deferred focus was superseded", () => {
+  const h = navigationHarness("#creator-flow");
+  let control: object | null = null;
+  const dispose = bindCreatorSectionNavigation(Object.assign(h.host, { getFocusedControl: () => control }));
+  control = { id: "new-link" }; h.flush(1);
+  assert.deepEqual(h.calls, []);
+  h.change("#creator-support"); h.flush(2);
+  assert.equal(h.calls[1][1], "creator-support-title");
+  dispose();
+});

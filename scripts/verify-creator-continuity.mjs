@@ -71,7 +71,7 @@ try {
     const errors = [];
     page.on("pageerror", (error) => errors.push(String(error)));
 
-    await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     const intent = page.locator(".cf-intent");
     await intent.waitFor({ state: "visible", timeout: 60_000 });
     const intentLinks = intent.locator("nav a");

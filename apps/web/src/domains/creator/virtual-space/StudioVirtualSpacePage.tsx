@@ -5,15 +5,11 @@ import {
   Brush,
   CalendarDays,
   CircleDot,
-  ClipboardCheck,
   Coffee,
   ExternalLink,
   Footprints,
-  FolderKanban,
   Gamepad2,
-  GalleryHorizontalEnd,
   Headphones,
-  Home,
   LayoutGrid,
   Map as MapIcon,
   MessageCircle,
@@ -37,6 +33,9 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
+import { WorkspaceNavigation } from "@/shared/components/workspace/WorkspaceNavigation";
+import { WorkspaceContextPanel } from "@/shared/components/workspace/WorkspaceContextPanel";
+import "@/shared/components/workspace/workspace.css";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -107,7 +106,6 @@ import {
   studioVirtualSpacePositionStorageKey,
   writeStudioVirtualSpaceSessionPoint,
 } from "./studio-virtual-space-session-position";
-import { StudioChibiSprite } from "@/shared/components/virtual-studio/StudioChibiSprite";
 
 import { StudioVirtualSpaceNpcPanel } from "./StudioVirtualSpaceNpcPanel";
 import { StudioVirtualSpaceDirectory } from "./StudioVirtualSpaceDirectory";
@@ -125,6 +123,7 @@ import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState }
 import { studioVirtualSpaceSeatedActors } from "./studio-virtual-space-seated-actors";
 import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
+import "./studio-workspace-live.css";
 
 const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
@@ -519,7 +518,7 @@ function LiveStudioTopbar({
     <header className="vs2-topbar vs2-live-topbar">
       <Link href="/" className="vs2-brand" aria-label="ToonSpectrum">
         <span className="vs2-brand-mark"><Sparkles size={17} aria-hidden /></span>
-        <span><strong>ToonSpectrum</strong><small>Together, We Create Amazing Stories</small></span>
+        <span><strong>ToonSpectrum</strong></span>
       </Link>
       <div className="vs2-project">
         <span className="vs2-project-icon"><Sparkles size={15} aria-hidden /></span>
@@ -556,118 +555,8 @@ function LiveStudioTopbar({
       <div className="vs2-top-actions">
         <Link href="/calendar" aria-label={bt("캘린더", "Calendar")}><CalendarDays size={17} /></Link>
         <Link href={`/studio/p/${encodeURIComponent(projectId)}/settings`} aria-label={bt("프로젝트 설정", "Project settings")}><Settings size={17} /></Link>
-        <span className="vs2-mascot"><StudioChibiSprite variant={10} size={45} motion="idle" /></span>
-        <span className="vs2-slogan">{bt("좋은 이야기가", "Good stories")}<br />{bt("세상을 바꿔요! ✨", "change the world! ✨")}</span>
       </div>
     </header>
-  );
-}
-
-function LiveStudioSidebar({
-  projectId,
-  localName,
-  snapshot,
-  fallbackIdentity,
-}: {
-  readonly projectId: string;
-  readonly localName: string;
-  readonly snapshot: StudioVirtualSpaceSnapshot;
-  readonly fallbackIdentity: string;
-}) {
-  const bt = useBilingual("LiveStudioSidebar");
-  const reviewHref = studioVirtualSpaceDestination(projectId, "review") ?? "/production";
-  const assetHref = studioVirtualSpaceDestination(projectId, "assets") ?? "/studio/assets";
-  const storyHref = studioVirtualSpaceDestination(projectId, "story") ?? "/story-lab";
-  const items: readonly {
-    readonly href: string;
-    readonly ko: string;
-    readonly en: string;
-    readonly icon: typeof Home;
-    readonly active?: boolean;
-  }[] = [
-    { href: "/", ko: "홈", en: "Home", icon: Home },
-    { href: `/studio/p/${encodeURIComponent(projectId)}/overview`, ko: "프로젝트", en: "Project", icon: FolderKanban },
-    { href: `/studio/p/${encodeURIComponent(projectId)}/space`, ko: "스튜디오", en: "Studio", icon: Sparkles, active: true },
-    { href: `/studio/work/${encodeURIComponent(projectId)}/canvas`, ko: "작품 관리", en: "Works", icon: GalleryHorizontalEnd },
-    { href: "/collaborate", ko: "멤버", en: "Members", icon: UsersRound },
-    { href: reviewHref, ko: "작업 보드", en: "Production", icon: ClipboardCheck },
-    { href: assetHref, ko: "에셋 라이브러리", en: "Assets", icon: Boxes },
-    { href: "/studio/ai-settings", ko: "AI 프로듀서", en: "AI Producer", icon: Bot },
-    { href: "/community", ko: "커뮤니티", en: "Community", icon: MessageCircle },
-    { href: storyHref, ko: "스토리", en: "Story", icon: BookOpen },
-  ] as readonly {
-    readonly href: string;
-    readonly ko: string;
-    readonly en: string;
-    readonly icon: typeof Home;
-    readonly active?: boolean;
-  }[];
-  return (
-    <aside className="vs2-sidebar vs2-live-sidebar">
-      <nav aria-label={bt("Virtual Studio 메뉴", "Virtual Studio navigation")}>
-        {items.map(({ href, ko, en, icon: Icon, active }) => (
-          <Link key={href + ko} href={href} className={active ? "is-active" : undefined}>
-            <Icon size={17} aria-hidden /><span>{bt(ko, en)}</span>{active ? null : <i />}
-          </Link>
-        ))}
-      </nav>
-      <Link href="/showcase" className="vs2-promo" aria-label={bt("함께 만드는 더 큰 이야기", "Together we make bigger stories")}>
-        <img src="/assets/virtual-studio/reference/ui/sidebar-promo.jpg" alt="" className="vs2-reference-promo-img" />
-      </Link>
-      <div className="vs2-self">
-        <span className="vs2-tiny-avatar">
-          <ChibiAvatar
-            identity={fallbackIdentity}
-            name={localName}
-            compact
-            activity={snapshot.self.activity}
-            avatarIndex={snapshot.self.avatarIndex}
-            appearance={snapshot.self.appearance}
-          />
-        </span>
-        <span><strong>{localName}</strong><small>● {snapshot.direct ? bt("온라인", "Online") : bt("로컬 작업", "Local work")}</small></span>
-        <Settings size={15} aria-hidden />
-      </div>
-    </aside>
-  );
-}
-
-function LiveStudioBottom({
-  projectId,
-  openAssistant,
-}: {
-  readonly projectId: string;
-  readonly openAssistant: () => void;
-}) {
-  const bt = useBilingual("LiveStudioBottom");
-  const reviewHref = studioVirtualSpaceDestination(projectId, "review") ?? "/production";
-  return (
-    <section className="vs2-bottom vs2-live-bottom" aria-label={bt("스튜디오 기능", "Studio features")}>
-      <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
-        <header><strong>{bt("실시간 드로잉 협업", "Live drawing collaboration")}</strong><small>{bt("같은 캔버스에서 함께 그려요", "Draw together on one canvas")}</small></header>
-        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-drawing.jpg" alt="" className="vs2-reference-feature-img" /></div>
-      </Link>
-      <Link href={reviewHref} className="vs2-feature">
-        <header><strong>{bt("리뷰 & 코멘트", "Review & comments")}</strong><small>{bt("정확한 위치에 피드백을 남겨요", "Pin feedback precisely")}</small></header>
-        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-review.jpg" alt="" className="vs2-reference-feature-img" /></div>
-      </Link>
-      <Link href="/production" className="vs2-feature">
-        <header><strong>{bt("작업 보드 & 진행 상황", "Production board")}</strong><small>{bt("누가, 무엇을, 언제까지", "Who, what, by when")}</small></header>
-        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-board.jpg" alt="" className="vs2-reference-feature-img" /></div>
-      </Link>
-      <button type="button" className="vs2-feature text-left" onClick={openAssistant}>
-        <header><strong>{bt("AI 프로듀서", "AI Producer")}</strong><small>{bt("요청할 때 함께하는 제작 도우미", "Production help when you ask")}</small></header>
-        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-ai.jpg" alt="" className="vs2-reference-feature-img" /></div>
-      </button>
-      <Link href={`/studio/work/${encodeURIComponent(projectId)}/canvas?live=1`} className="vs2-feature">
-        <header><strong>{bt("라이브 드로잉 이벤트", "Live drawing events")}</strong><small>{bt("작가와 함께하는 특별한 시간", "Create live together")}</small></header>
-        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-live.jpg" alt="" className="vs2-reference-feature-img" /></div>
-      </Link>
-      <Link href="/community" className="vs2-feature">
-        <header><strong>{bt("크리에이터 커뮤니티", "Creator community")}</strong><small>{bt("새로운 사람들과 더 많은 기회", "More creators, more opportunities")}</small></header>
-        <div className="vs2-feature-body"><img src="/assets/virtual-studio/reference/ui/feature-community.jpg" alt="" className="vs2-reference-feature-img" /></div>
-      </Link>
-    </section>
   );
 }
 
@@ -720,6 +609,7 @@ function VirtualSpaceExperience({
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
+  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | null>(null);
   const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
   const [openingReview, setOpeningReview] = useState(false);
   const cancelSlotsRef = useRef<() => Promise<void>>(() => Promise.resolve());
@@ -750,6 +640,7 @@ function VirtualSpaceExperience({
   const [worldLoadError, setWorldLoadError] = useState(false);
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
+  useEffect(() => { if (workspacePanel) engineBridge.clearMovement(); }, [workspacePanel, engineBridge]);
   const selfRef = useRef(snapshot.self);
   const peersRef = useRef(snapshot.peers);
   const localReactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -993,6 +884,7 @@ function VirtualSpaceExperience({
   }, [activity, worldManifest]);
 
   const activateAction = useCallback((action: StudioWorldInteractionDefinition["action"]) => {
+    setWorkspacePanel(null);
     writeStudioVirtualSpaceSessionPoint(positionScope, selfRef.current);
     if (action === "assistant") {
       openAssistant();
@@ -1074,6 +966,7 @@ function VirtualSpaceExperience({
 
   const handleEnginePeerSelect = useCallback((sessionId: string) => {
     setSelectedPeerId(sessionId);
+    setWorkspacePanel("people");
     engineBridge.clearMovement();
     setFollowingPeer(null);
   }, [engineBridge, setFollowingPeer]);
@@ -1169,6 +1062,7 @@ function VirtualSpaceExperience({
     onReady: (scope) => {
       finishSharedActivity();
       setFollowingPeer(null);
+      setWorkspacePanel(null);
       openStudioP2pHuddle({ conversationId: scope.id,
         peerIds: scope.memberIds.filter((id) => id !== live.room?.participant.sessionId), source: "virtual-space" });
     },
@@ -1185,6 +1079,7 @@ function VirtualSpaceExperience({
     setSharedActivity(request);
     setSelectedPeerId(request.peer.sessionId);
     if (request.action === "talk") {
+      setWorkspacePanel(null);
       openStudioP2pHuddle({ conversationId: request.id, peerIds: [request.peer.sessionId], source: "virtual-space" });
     } else if (request.action === "follow" && request.direction === "outgoing") {
       startFollowingPeer(request.peer.sessionId);
@@ -1315,12 +1210,9 @@ function VirtualSpaceExperience({
           fallbackIdentity={fallbackIdentity}
           localName={localName}
         />
-        <LiveStudioSidebar
-          fallbackIdentity={fallbackIdentity}
-          projectId={projectId}
-          localName={localName}
-          snapshot={snapshot}
-        />
+        <WorkspaceNavigation activeId="workspace-home"
+          studioHref={`/home?project=${encodeURIComponent(projectId)}`}
+          teamHref={`/team?project=${encodeURIComponent(projectId)}`} />
 
 
         <section className="vs2-live-layout">
@@ -1471,7 +1363,16 @@ function VirtualSpaceExperience({
               />
             ) : null}
 
-            {worldReady ? <div className="vs2-mobile-zone-cards grid gap-3 sm:grid-cols-2 lg:hidden">
+
+          </div>
+
+          <WorkspaceContextPanel open={workspacePanel !== null}
+            title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization") : bt("사람과 대화", "People and conversations")}
+            onClose={() => setWorkspacePanel(null)}>
+          <div className="vs2-live-inspector-content">
+          <div hidden={workspacePanel !== "space"}>
+            <details><summary>{bt("방별 작업 바로가기", "Room work shortcuts")}</summary>
+            {worldReady ? <div className="workspace-live-room-links">
               {worldManifest.rooms.map((room) => (
                 <MobileZoneCard
                   key={room.id}
@@ -1481,9 +1382,7 @@ function VirtualSpaceExperience({
                 />
               ))}
             </div> : null}
-          </div>
-
-          <aside className="vs2-rightbar vs2-rightbar--live">
+            </details>
             {worldReady ? <StudioVirtualSpaceGuide manifest={worldManifest} onMove={queuePathTo} onOpen={activateAction}
               onStop={() => engineBridge.clearMovement()} onFocus={() => changeAtmosphere("focus")}
               guideTour={guideTour} tourRequested={guideTourRequest !== null}
@@ -1504,6 +1403,8 @@ function VirtualSpaceExperience({
             {worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
               onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
+          </div>
+          <div hidden={workspacePanel !== "people"}>
             <StudioVirtualSpaceSocialPanel
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
@@ -1777,15 +1678,27 @@ function VirtualSpaceExperience({
                 </select>
               </label>
             </section>
-          </aside>
+          </div>
+          </div>
+          </WorkspaceContextPanel>
         </section>
 
-        <LiveStudioBottom projectId={projectId} openAssistant={openAssistant} />
-
-        <footer className="vs2-footer">
-          <strong>ToonSpectrum</strong>
-          <span>{bt("혼자가 아닌, 함께 만드는 더 큰 이야기.", "Bigger stories, made together.")}</span>
-          <em>Creators for a Brighter Tomorrow ♥</em>
+        <footer className="workspace-live-status">
+          <div className="workspace-live-state">
+            <span>{bt(currentRoom.labelKo, currentRoom.labelEn)}</span>
+            <ConnectionBadge preparing={preparing} />
+            {sharedActivity ? <span role="status">{bt("공동 작업 진행 중", "Shared activity active")}</span> : null}
+          </div>
+          <div className="workspace-live-actions" data-space-interactive="true">
+            <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("people"); }}>
+              <UsersRound size={18} aria-hidden />{bt("사람·대화", "People & conversations")}
+              {socialSnapshot.requests.some((request) => request.direction === "incoming" && request.status === "offered") ? <span>{bt("요청 있음", "Request")}</span> : null}
+            </button>
+            <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
+              <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
+            </button>
+            <Link href={`/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{bt("원고 열기", "Open artwork")}<ExternalLink size={16} aria-hidden /></Link>
+          </div>
         </footer>
       </Container>
     </div>

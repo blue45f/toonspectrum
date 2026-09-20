@@ -102,3 +102,15 @@ it("keeps both current environment packs for related tests, without admitting un
   const commands = lane.steps.map((step) => step.run ?? "").join("\n");
   expect(commands).toContain('vitest related "${files[@]}" --run');
 });
+
+
+it("keeps the real source/result comparison proof in the Scene3D CI dependency boundary", () => {
+  const scene = workflow("studio-scene3d-next.yml");
+  for (const file of ["scripts/lib/scene3d-review-browser-proof.mjs", "apps/web/src/domains/creator/scene3d/specialists/artifact-review-runtime.ts", "apps/web/src/domains/creator/scene3d/specialists/StudioScene3dArtifactPreview.test.tsx"]) {
+    expect(scene.on.pull_request.paths.some((pattern) => matchesGlob(file, pattern)), file).toBe(true);
+  }
+  const script = readFileSync(new URL("scripts/verify-studio-scene3d-specialists.mjs", repoRoot), "utf8");
+  expect(script).toContain('verifyScene3dReview(page, scratch, "lod-comparison"');
+  expect(script).toContain('verifyScene3dReview(page, scratch, "texture-comparison"');
+  expect(scene.jobs["scene3d-specialists-browser"].steps.some((step) => step.run === "pnpm run verify:studio-3d-specialists:browser")).toBe(true);
+});

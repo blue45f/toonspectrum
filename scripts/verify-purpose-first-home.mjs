@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import { chromium } from "@playwright/test";
+import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
 
 const origin = process.env.CREATOR_HOME_ORIGIN || "http://127.0.0.1:4173";
 const viewports = [
@@ -41,6 +42,8 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
 
     await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await assertStudioWorkspaceHome(page);
+    await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await page.locator("#product-intent-title").waitFor({ timeout: 60_000 });
     await page.locator('[data-creator-home="production-first"]').waitFor({ timeout: 60_000 });
     await page.evaluate(() => document.fonts.ready);

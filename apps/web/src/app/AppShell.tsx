@@ -13,7 +13,6 @@ import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteCo
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
-import { useCreatorExperienceMode } from "@/shared/lib/creator-experience-mode";
 import { recordSiteRouteVisit } from "@/shared/lib/site-route-history";
 
 import "@toonspectrum/core/fx/fx.css";
@@ -110,22 +109,21 @@ export function AppShell({
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   const { pathname } = useLocation();
-  const creatorExperience = useCreatorExperienceMode((state) => state.mode);
-  const immersiveVirtualHome = pathname === "/" && creatorExperience === "virtual-studio";
+  const immersiveVirtualHome = ["/", "/home", "/team", "/hub"].includes(pathname.replace(/\/+$/u, "") || "/");
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
   const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject;
   const publicCreativeRoute = isPublicCreativeRoute(pathname);
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname) && !immersiveVirtualExperience;
   const resolvedMainClassName = immersiveVirtualHome
-    ? "min-h-[100dvh] overflow-x-hidden bg-[#090d14] outline-none md:h-[100dvh] md:min-h-0 md:overflow-hidden"
+    ? "min-h-[100dvh] bg-canvas outline-none"
     : immersiveVirtualProject
-      ? "min-h-[100dvh] overflow-x-hidden bg-[#090d14] outline-none"
+      ? "min-h-[100dvh] bg-canvas outline-none"
       : mainClassName;
   return (
     <AuthSessionProvider>
       <Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>
       <Suspense fallback={null}><StoreSync /></Suspense>
-      {showGlobalOverlays ? (
+      {showGlobalOverlays && !immersiveVirtualExperience ? (
         <Suspense fallback={null}><CreatorAdaptiveOnboardingGate /></Suspense>
       ) : null}
       <RouteScrollRestoration />
@@ -142,7 +140,7 @@ export function AppShell({
         <main id="main-content" tabIndex={-1} className={resolvedMainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
           {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
           <AppRouter />
-          {publicCreativeRoute && pathname !== "/" ? (
+          {publicCreativeRoute && !immersiveVirtualExperience ? (
             <ErrorBoundary resetKey={pathname}>
               <Suspense fallback={<Suspense fallback={null}><PublicSiteWayfinder /></Suspense>}>
                 <PublicSiteNextSteps pathname={pathname} />

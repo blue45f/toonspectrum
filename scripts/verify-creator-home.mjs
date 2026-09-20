@@ -76,7 +76,7 @@ try {
     const videoRequests = [];
     page.on("pageerror", (error) => errors.push(String(error)));
     page.on("request", (request) => { if (/\.mp4(?:\?|$)/.test(request.url())) videoRequests.push(request.url()); });
-    await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.locator('[data-creator-home="production-first"]').waitFor({ timeout: 60000 });
     await page.evaluate(() => document.fonts.ready);
     assert.equal(await page.locator("h1").count(), 1);

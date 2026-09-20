@@ -3,7 +3,7 @@ import { webcrypto } from "node:crypto";
 import type { ComponentProps, ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioVirtualSpacePhaserCanvas } from "./StudioVirtualSpacePhaserCanvas";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualSpacePresenceState } from "./studio-virtual-space-model";
@@ -99,6 +99,26 @@ vi.mock("./studio-virtual-space-presence", async (importOriginal) => {
   },
 }; });
 
+// jsdom has no native dialog implementation; real focus/escape is exercised in browser QA.
+const originalShowModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
+const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close");
+beforeAll(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value(this: HTMLDialogElement) { this.setAttribute("open", ""); } });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value(this: HTMLDialogElement) { this.removeAttribute("open"); } });
+});
+afterAll(() => {
+  if (originalShowModal) Object.defineProperty(HTMLDialogElement.prototype, "showModal", originalShowModal);
+  else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
+  if (originalClose) Object.defineProperty(HTMLDialogElement.prototype, "close", originalClose);
+  else Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
+});
+function showPanel(panel: "people" | "space") {
+  const title = panel === "space" ? "공간과 꾸미기" : "사람과 대화";
+  if (screen.queryByRole("dialog", { name: title })) return;
+  if (screen.queryByRole("dialog")) fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
+  fireEvent.click(screen.getByRole("button", { name: panel === "space" ? "공간·꾸미기" : /^사람·대화/u }));
+}
+
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
   f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
@@ -110,12 +130,13 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
-async function mount() {
+async function mount(panel: "people" | "space" | null = "people") {
   const mounted = render(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
     <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage />} /></Routes>
   </MemoryRouter>);
   await screen.findByTestId("engine-ready");
   await waitFor(() => expect(f.engine?.snapshot.peers).toHaveLength(2));
+  if (panel) showPanel(panel);
   return mounted;
 }
 function accepted(id: string, action: StudioSpaceSocialRequest["action"], peerId = "bob"): StudioSpaceSocialRequest {
@@ -135,11 +156,23 @@ async function accept(request: StudioSpaceSocialRequest): Promise<void> {
 // The transport and renderer are boundaries; these tests execute the real Page's
 // activity ownership, UI events, engine bridge and Huddle event integration.
 describe("Virtual Studio social activity ownership", () => {
+  it("starts with one closed inspector and opening or closing it grants no social consent", async () => {
+    await mount(null);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector(".vs2-bottom")).toBeNull();
+    showPanel("people");
+    expect(screen.getByRole("dialog", { name: "사람과 대화" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.cancel).not.toHaveBeenCalled();
+  });
   it("ends the accepted outgoing follow and its visible ownership before starting an NPC tour", async () => {
     await mount();
     await accept(accepted("follow-before-tour", "follow"));
     expect(f.engine?.bridge.getFollowingPeer()).toBe("bob");
     expect(screen.getByRole("button", { name: "Bob 따라가는 중" })).toBeTruthy();
+    showPanel("space");
     fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
     fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
     expect(f.engine?.guideTourRequest).not.toBeNull();
@@ -154,6 +187,7 @@ describe("Virtual Studio social activity ownership", () => {
     f.live.room.ready = true;
     await mount();
     const slot = DEFAULT_STUDIO_WORLD_MANIFEST.interactionSlots![0]!;
+    showPanel("space");
     const useSlot = screen.getByRole("button", { name: `${slot.labelKo} 사용하기` });
     await waitFor(() => expect(useSlot.hasAttribute("disabled")).toBe(false));
     // Keep the real slots hook and its request generation. Defer only the
@@ -165,6 +199,7 @@ describe("Virtual Studio social activity ownership", () => {
     fireEvent.click(useSlot);
     expect(release).toHaveBeenCalledOnce();
     expect(move).not.toHaveBeenCalled();
+    showPanel("space");
     fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
     fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
     expect(f.engine?.guideTourRequest).not.toBeNull();
@@ -177,6 +212,7 @@ describe("Virtual Studio social activity ownership", () => {
   it("starts an NPC tour only on request and fences stale guide status after cancellation or restart", async () => {
     await mount();
     expect(f.engine?.guideTourRequest).toBeNull();
+    showPanel("space");
     fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
     expect(f.engine?.guideTourRequest).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
@@ -200,6 +236,7 @@ describe("Virtual Studio social activity ownership", () => {
 
   it.each(["escape", "blur", "hidden", "focus"])("cancels the requested guide tour on %s without resuming automatically", async (reason) => {
     await mount();
+    showPanel("space");
     fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));
     fireEvent.click(screen.getByRole("button", { name: "가이드와 함께 둘러보기" }));
     expect(f.engine?.guideTourRequest).not.toBeNull();
@@ -242,7 +279,6 @@ describe("Virtual Studio social activity ownership", () => {
     const src = (skin: string) => `/assets/virtual-studio/production-v2/player-${skin}-direction-down.png`;
     const surfaces = [
       [".vs2-stack", ["dark", "silver", "pink"]],
-      [".vs2-self", ["dark"]],
       [".vs2-live-huddle", ["silver", "pink"]],
       [".vs2-live-chat-body", ["silver", "pink"]],
       [".vs2-live-members", ["dark", "silver", "pink"]],
@@ -274,7 +310,7 @@ describe("Virtual Studio social activity ownership", () => {
     f.presenceOverrides = { alice: { avatarIndex: -1, appearance: undefined } };
     const view = await mount();
     const key = studioCharacterAppearanceForAvatarIndex(-1, "alice").skinKey;
-    for (const selector of [".vs2-stack", ".vs2-self", ".vs2-live-members"]) {
+    for (const selector of [".vs2-stack", ".vs2-live-members"]) {
       expect(view.container.querySelector(`${selector} img.studio-vspace-reference-compact-player`)?.getAttribute("src"), selector)
         .toBe(`/assets/virtual-studio/production-v2/player-${key}-direction-down.png`);
     }
@@ -294,6 +330,7 @@ describe("Virtual Studio social activity ownership", () => {
     if (first?.kind !== "presence") throw new Error("Page did not advertise spatial presence");
     expect(first.state.appearance).toEqual(studioCharacterAppearanceForAvatarIndex(first.state.avatarIndex, "alice"));
 
+    showPanel("people");
     fireEvent.click(screen.getByRole("button", { name: "시나 캐릭터 선택" }));
     await waitFor(() => {
       const advertised = send.mock.calls.map(([, raw]) => parseStudioVirtualSpacePacket(raw));
@@ -334,12 +371,13 @@ describe("Virtual Studio social activity ownership", () => {
     expect(screen.queryByRole("region", { name: "스튜디오 도우미 NPC" })).toBeNull();
     expect(screen.queryByRole("button", { name: "E · 방 열기" })).toBeNull();
     expect(document.querySelector(".studio-vspace-minimap")).toBeNull();
-    expect(document.querySelector(".vs2-mobile-zone-cards")).toBeNull();
+    expect(document.querySelector(".workspace-live-room-links")).toBeNull();
     expect(f.socialOptions?.enabled).toBe(false);
     await act(async () => { finishLoad(DEFAULT_STUDIO_WORLD_MANIFEST); });
     await screen.findByTestId("engine-ready");
+    showPanel("space");
     expect(screen.getByRole("region", { name: "스튜디오 도우미 NPC" })).toBeTruthy();
-    expect(document.querySelector(".vs2-mobile-zone-cards")).not.toBeNull();
+    expect(document.querySelector(".workspace-live-room-links")).not.toBeNull();
   });
 
   it("opens a scoped talk only on the accepted callback and never from peer selection or rerender", async () => {
@@ -347,6 +385,7 @@ describe("Virtual Studio social activity ownership", () => {
     const open = vi.fn();
     globalThis.addEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, open);
     try {
+      showPanel("people");
       fireEvent.click(screen.getByRole("button", { name: "Bob" }));
       fireEvent.click(screen.getByRole("button", { name: "대화 요청" }));
       expect(f.request).toHaveBeenCalledWith("bob", "talk");
@@ -354,6 +393,7 @@ describe("Virtual Studio social activity ownership", () => {
       await accept(accepted("epoch:1.4", "talk"));
       expect(open).toHaveBeenCalledOnce();
       expect((open.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({ conversationId: "epoch:1.4", peerIds: ["bob"], source: "virtual-space" });
+      showPanel("people");
       fireEvent.click(screen.getByRole("button", { name: "Cleo" }));
       expect(open).toHaveBeenCalledOnce();
     } finally { globalThis.removeEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, open); }
@@ -388,10 +428,12 @@ describe("Virtual Studio social activity ownership", () => {
   it("cancels activity and disables the social hook on focus, without enabling any new interaction", async () => {
     await mount();
     await accept(accepted("follow-one", "follow"));
+    showPanel("space");
     fireEvent.click(screen.getByRole("button", { name: "집중" }));
     expect(f.cancel).toHaveBeenCalledWith("follow-one");
     expect(f.engine?.bridge.getFollowingPeer()).toBeNull();
     expect(f.socialOptions?.enabled).toBe(false);
+    showPanel("people");
     expect((screen.getByRole("button", { name: "대화 요청" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -417,6 +459,7 @@ describe("Virtual Studio social activity ownership", () => {
     await mount();
     await accept(accepted("follow-one", "follow"));
     f.snapshot = { requests: [], readyPeerIds: [], reviewReadyPeerIds: [], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: false };
+    showPanel("people");
     fireEvent.click(screen.getByRole("button", { name: "Cleo" }));
     await waitFor(() => expect(f.cancel).toHaveBeenCalledWith("follow-one"));
     expect(f.engine?.bridge.getFollowingPeer()).toBeNull();
@@ -426,11 +469,14 @@ describe("Virtual Studio social activity ownership", () => {
     await mount();
     const incoming = { ...accepted("incoming-one", "review"), status: "offered" as const, direction: "incoming" as const };
     f.snapshot = { ...f.snapshot, requests: [incoming] };
+    showPanel("people");
     fireEvent.click(screen.getByRole("button", { name: "Bob" }));
     expect(f.respond).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "수락" }));
     expect(f.respond).toHaveBeenCalledExactlyOnceWith("incoming-one", "accept");
+    showPanel("space");
     fireEvent.click(screen.getByRole("button", { name: "집중" }));
+    showPanel("people");
     expect((screen.getByRole("button", { name: "수락" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "거절" }));
     expect(f.respond).toHaveBeenLastCalledWith("incoming-one", "decline");
@@ -442,6 +488,7 @@ describe("Virtual Studio social activity ownership", () => {
       { ...accepted("new-decline", "talk", "cleo"), status: "declined" },
       { ...accepted("old-cancel", "talk"), status: "cancelled" },
     ] };
+    showPanel("people");
     fireEvent.click(screen.getByRole("button", { name: "Bob" }));
     const panel = screen.getByRole("region", { name: "팀원과 상호작용" });
     expect(within(panel).getByRole("status").textContent).toContain("Cleo");
@@ -458,11 +505,11 @@ describe("Virtual Studio atmosphere preference storage", () => {
   it.each([["focus", "집중"], ["balanced", "일상"], ["lively", "활기"]] as const)(
     "persists and reloads only the %s presentation preference", async (mode, label) => {
       const writes = vi.spyOn(Storage.prototype, "setItem");
-      const mounted = await mount();
+      const mounted = await mount("space");
       fireEvent.click(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: label }));
       expect(writes.mock.calls.filter(([writtenKey]) => writtenKey === key)).toEqual([[key, mode]]);
       mounted.unmount();
-      await mount();
+      await mount("space");
       expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: label }).getAttribute("aria-pressed")).toBe("true");
     },
   );
@@ -470,14 +517,14 @@ describe("Virtual Studio atmosphere preference storage", () => {
   it("falls back to balanced without interpreting stored JSON as document or consent state", async () => {
     localStorage.setItem(key, JSON.stringify({ mode: "focus", document: { secret: "not-a-preference" } }));
     const writes = vi.spyOn(Storage.prototype, "setItem");
-    await mount();
+    await mount("space");
     expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "일상" }).getAttribute("aria-pressed")).toBe("true");
     expect(writes.mock.calls.filter(([writtenKey]) => writtenKey === key)).toEqual([]);
     expect(f.request).not.toHaveBeenCalled();
   });
 
   it("applies focus for the session when persistence is blocked", async () => {
-    await mount();
+    await mount("space");
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("quota", "QuotaExceededError"); });
     fireEvent.click(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "집중" }));
     expect(within(screen.getByRole("group", { name: "작업실 분위기" })).getByRole("button", { name: "집중" }).getAttribute("aria-pressed")).toBe("true");

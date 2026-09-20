@@ -21,6 +21,7 @@ import {
   UserRound,
   UserRoundPen,
   Workflow,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -89,6 +90,9 @@ const primaryItem = (
 };
 
 export const SITE_NAVIGATION_ITEMS = {
+  workspaceHome: primaryItem("workspace-home", "workspace-home", Home, true),
+  workspaceTeam: primaryItem("workspace-team", "workspace-team", Users),
+  workspaceHub: primaryItem("workspace-hub", "workspace-hub", Compass),
   home: item(
     "home",
     "/",
@@ -309,10 +313,10 @@ const I = SITE_NAVIGATION_ITEMS;
 
 /** Production navigation: four durable destinations, regardless of feature count. */
 export const TOONSTUDIO_PRIMARY_NAVIGATION = [
-  I.production,
+  I.workspaceHome,
   I.studio,
-  I.research,
-  I.market,
+  I.workspaceTeam,
+  I.workspaceHub,
 ] as const;
 
 /** Reader navigation remains separate from the creation product. */
@@ -331,7 +335,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "production-flow",
     label: { ko: "제작 흐름", en: "Production flow" },
     description: { ko: "작품 전체를 계획하고 오늘 할 일을 바로 확인", en: "Plan the whole work and see what needs attention today" },
-    items: [I.production, I.studio, I.make],
+    items: [I.workspaceHome, I.studio, I.make, I.production],
   },
   {
     id: "production-resources",
@@ -349,7 +353,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "검수하고 내보내고 함께할 사람과 연결",
       en: "Review, export and connect with collaborators",
     },
-    items: [I.publish, I.collaborate, I.gallery, I.community],
+    items: [I.publish, I.workspaceTeam, I.collaborate, I.workspaceHub, I.gallery, I.community],
   },
 ];
 
@@ -396,11 +400,10 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
 export const SITE_NAVIGATION_GROUPS = TOONSPECTRUM_NAVIGATION_GROUPS;
 
 export const TOONSTUDIO_MOBILE_TABS = [
-  I.production,
+  I.workspaceHome,
   I.studio,
-  I.make,
-  I.studioAssets,
-  I.me,
+  I.workspaceTeam,
+  I.workspaceHub,
 ] as const;
 
 export const TOONSPECTRUM_MOBILE_TABS = [

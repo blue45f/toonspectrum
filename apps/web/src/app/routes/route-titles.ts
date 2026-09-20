@@ -78,7 +78,7 @@ type Translator = ReturnType<typeof useT>;
 
 export function resolveRouteTitle(pathname: string, t: Translator, productLocale?: ProductLocale): string {
   const canonicalPath = canonicalSitePath(pathname);
-  if (canonicalPath === "/") return productLocale ? PRODUCT_IDENTITY[productLocale].seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
+  if (canonicalPath === "/" || canonicalPath === "/about/studio") return productLocale ? PRODUCT_IDENTITY[productLocale].seoTitle : `${t("app.name")} · ${t("home.creatorTitle")}`;
   if (Object.hasOwn(CREATOR_RESOURCE_TITLES, canonicalPath)) return CREATOR_RESOURCE_TITLES[canonicalPath];
   const authority = resolveSiteRouteAuthority(canonicalPath);
   if (authority) return t(authority.titleKey);
@@ -103,7 +103,7 @@ export function useRouteTitle(pathname: string, search: string): string {
   const title = resolveRouteTitle(pathname, t, resolveProductLocale(language));
   useEffect(() => {
     if (!shouldAppRouterOwnDocumentTitle({ pathname, search })) return;
-    if (pathname === "/") {
+    if (["/", "/about/studio"].includes(canonicalSitePath(pathname))) {
       document.title = title;
       return;
     }

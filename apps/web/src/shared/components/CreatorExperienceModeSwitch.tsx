@@ -7,8 +7,8 @@ import {
 } from "@/shared/lib/creator-experience-mode";
 
 const OPTIONS: readonly { mode: CreatorExperienceMode; ko: string; en: string; icon: typeof Sparkles }[] = [
-  { mode: "classic", ko: "일반 메인", en: "Classic", icon: LayoutDashboard },
-  { mode: "virtual-studio", ko: "Virtual Studio", en: "Virtual Studio", icon: Sparkles },
+  { mode: "classic", ko: "목록 보기", en: "List view", icon: LayoutDashboard },
+  { mode: "virtual-studio", ko: "공간 보기", en: "Space view", icon: Sparkles },
 ];
 
 export function CreatorExperienceModeSwitch({
@@ -24,9 +24,9 @@ export function CreatorExperienceModeSwitch({
 
   return (
     <div
-      className={"inline-flex items-center gap-1 rounded-full border border-line bg-panel/90 p-1 shadow-lg backdrop-blur-xl " + className}
+      className={"inline-flex items-center gap-1 rounded-full border border-line bg-panel/90 p-1  " + className}
       role="group"
-      aria-label={korean ? "홈 경험 모드" : "Home experience mode"}
+      aria-label={korean ? "스튜디오 보기" : "Studio view"}
       data-creator-experience-switch="true"
     >
       {OPTIONS.map(({ mode: option, ko, en, icon: Icon }) => (
@@ -36,9 +36,9 @@ export function CreatorExperienceModeSwitch({
           aria-pressed={mode === option}
           onClick={() => setMode(option)}
           className={
-            "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition " +
+            "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition " +
             (mode === option
-              ? "bg-accent text-on-accent shadow-sm"
+              ? "bg-accent text-on-accent "
               : "text-fg-2 hover:bg-raised hover:text-fg")
           }
           title={korean ? ko : en}

@@ -1,3 +1,5 @@
+import { isStudioBg3dTilePipelineId, STUDIO_BG3D_TILED_PNG_PROFILE } from "./studio-bg3d-tiled-batch-policy";
+import { STUDIO_BG3D_TILED_OUTPUT_MAX_PIXELS } from "./studio-bg3d-tile-plan";
 /**
  * Engine-neutral planning contract for deterministic storyboard batch renders.
  *
@@ -44,7 +46,7 @@ export const STUDIO_BG3D_SHOT_BATCH_MAX_PASSES = STUDIO_BG3D_SHOT_BATCH_PASSES.l
 export const STUDIO_BG3D_SHOT_BATCH_MAX_FILES =
   STUDIO_BG3D_SCENE_DOCUMENT_MAX_SHOTS * STUDIO_BG3D_SHOT_BATCH_MAX_PASSES;
 export const STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION = 4_096;
-export const STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS = STUDIO_BG3D_LT_RENDER_MAX_PIXELS;
+export const STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS = STUDIO_BG3D_TILED_OUTPUT_MAX_PIXELS;
 export const STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION = 32_768;
 export const STUDIO_BG3D_SHOT_BATCH_LT_PIPELINE_V1 = "studio-lt-color-tone-line-depth-v1";
 export const STUDIO_BG3D_SHOT_BATCH_PNG_ENCODING_V1 = "png-srgb-straight-alpha-v1";
@@ -371,6 +373,8 @@ function validCaptureOwner(value: unknown): value is StudioBg3dShotBatchCaptureO
     owner.sourceHeight! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_SOURCE_DIMENSION &&
     Number.isSafeInteger(owner.maxPixels) && owner.maxPixels! >= 1 &&
     owner.maxPixels! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_PIXELS &&
+    (owner.maxPixels! <= STUDIO_BG3D_LT_RENDER_MAX_PIXELS ||
+      (owner.engineId === "three" && isStudioBg3dTilePipelineId(owner.ltPipelineId) && owner.pngEncodingId === STUDIO_BG3D_TILED_PNG_PROFILE)) &&
     Number.isSafeInteger(owner.maxEdge) && owner.maxEdge! >= 1 &&
     owner.maxEdge! <= STUDIO_BG3D_SHOT_BATCH_PLAN_MAX_DIMENSION &&
     (owner.deviceProfile === "mobile" || owner.deviceProfile === "desktop") &&

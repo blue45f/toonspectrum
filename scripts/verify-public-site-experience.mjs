@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
+import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
+import { installBetaEventDismissal } from "./lib/public-page-event-gate.mjs";
 
 const origin = process.env.PUBLIC_WEBTOON_ORIGIN || "http://127.0.0.1:5281";
 assert(['127.0.0.1', 'localhost'].includes(new URL(origin).hostname), 'Interactive fault-injection checks only run against a local candidate');
@@ -26,6 +28,7 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 960 }, locale: 'ko-KR', reducedMotion: 'reduce', serviceWorkers: 'block' });
     await context.addInitScript(() => localStorage.setItem('toonspectrum-lang', JSON.stringify({ state: { lang: 'ko' }, version: 0 })));
     const page = await context.newPage();
+    await installBetaEventDismissal(page);
     await check(`connected journey and history ${width}`, async () => {
       await page.goto(`${origin}/learn`, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('main h1')).toHaveCount(1);
@@ -35,7 +38,7 @@ try {
       await page.waitForTimeout(150);
       const position = await page.evaluate(() => window.scrollY);
       assert(position > 100, 'History test must start away from the top');
-      await page.screenshot({ path: `${output}/next-steps-${width}.png`, animations: 'disabled' });
+      await page.screenshot({ path: `${output}/next-steps-${width}.png`, animations: 'disabled', timeout: 20000 });
       await next.click();
       await expect(page).toHaveURL(/\/market\/browse$/u);
       await expect(page.locator('main h1')).toHaveCount(1);
@@ -55,7 +58,7 @@ try {
         return box.left >= rail.left - 1 && box.right <= rail.right + 1;
       });
       assert(visible, 'The selected creative step must be inside its horizontal rail');
-      await page.screenshot({ path: `${output}/community-${width}.png`, animations: 'disabled' });
+      await page.screenshot({ path: `${output}/community-${width}.png`, animations: 'disabled', timeout: 20000 });
     });
     await check(`search filter focus and 404 recovery ${width}`, async () => {
       await page.goto(`${origin}/__public-experience-not-found__`, { waitUntil: 'domcontentloaded' });
@@ -83,16 +86,16 @@ try {
     });
     await check(`home color treatment and footer availability ${width}`, async () => {
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('.cf-hero h1')).toBeVisible();
-      const background = await page.locator('.cf-hero .cf-primary').evaluate((element) => getComputedStyle(element).backgroundImage);
-      assert(background.includes('linear-gradient'), 'The scoped visual treatment must be present');
+      await assertStudioWorkspaceHome(page);
+      const background = await page.locator('.workspace-statusbar .workspace-primary').evaluate((element) => getComputedStyle(element).backgroundColor);
+      assert(background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent', 'The primary action must retain its theme surface');
       await expect(page.locator('footer')).toBeAttached({ timeout: 5000 });
-      await page.screenshot({ path: `${output}/home-${width}.png`, animations: 'disabled' });
+      await page.screenshot({ path: `${output}/home-${width}.png`, animations: 'disabled', timeout: 20000 });
       // Theme fixture verifies contrast/layout without claiming the preference UI was tested.
       await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
       await page.goto(`${origin}/research`, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('main h1')).toHaveCount(1);
-      await page.screenshot({ path: `${output}/research-${width}.png`, animations: 'disabled' });
+      await page.screenshot({ path: `${output}/research-${width}.png`, animations: 'disabled', timeout: 20000 });
     });
     await context.close();
   }
@@ -100,13 +103,14 @@ try {
     const context = await browser.newContext({ reducedMotion: 'reduce', serviceWorkers: 'block' });
     await context.route('**/assets/StudioBg3dRetainedOwnerHost-*.js', (route) => route.abort('failed'));
     const page = await context.newPage();
+    await installBetaEventDismissal(page);
     try {
       await page.goto(`${origin}/market/compare`, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('main h1')).toHaveCount(1, { timeout: 30000 });
       await page.waitForTimeout(1500);
       await expect(page.locator('main h1')).toBeVisible();
       await expect(page.locator('header').first()).toBeVisible();
-      await page.screenshot({ path: `${output}/isolated-chunk-recovery.png`, animations: 'disabled' });
+      await page.screenshot({ path: `${output}/isolated-chunk-recovery.png`, animations: 'disabled', timeout: 20000 });
     } finally { await context.close(); }
   });
 } finally {

@@ -153,6 +153,10 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
     description: { ko: "협업·교육·팬 활동과 자료실", en: "Collaboration, education, fan activity and resources" },
     items: [
       destination("/creators", "창작자", "Creators", "창작자와 활동 살펴보기", "Explore creators and their activity"),
+      destination("/home", "내 스튜디오", "My studio", "선택 작품의 공간과 목록에서 이어서 작업", "Continue your selected work in spatial or list view"),
+      destination("/team", "팀 작업실", "Team workspace", "작품 멤버와 채용·면접 작업실 연결", "Connect project members, hiring and interviews"),
+      destination("/hub", "둘러보기", "Explore hub", "작품·소재·창작자·학습 찾기", "Find works, materials, creators and learning"),
+      destination("/about/studio", "스튜디오 소개", "Studio introduction", "기존 제작 가이드와 서비스 기능 살펴보기", "Explore the preserved production guides and features"),
       destination("/collaborate/positions", "조건별 인력 모집", "Find hiring positions", "역할·도구·보수 조건으로 모집 자리 찾기", "Find positions by role, tools and compensation"),
       destination("/collaborate/workspace", "채용·협업 작업실", "Hiring workspace", "이력서·지원·팀·면접·경력을 관리", "Manage resumes, applications, teams, interviews and career records"),
       destination("/collaborate/gallery", "창작자 경력·포트폴리오", "Creator career gallery", "공개에 동의한 경력과 포트폴리오 링크 살펴보기", "Explore opted-in career records and portfolio links"),

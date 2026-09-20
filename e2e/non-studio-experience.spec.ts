@@ -131,7 +131,7 @@ test("all-in-one home keeps contrast surfaces, reduced motion and responsive bou
   });
   await page.setViewportSize({ width: 320, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
+  await page.goto("/about/studio");
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
   const heroArtwork = home.locator(".cf-home-preview img");
   await expect(home).toBeVisible();
