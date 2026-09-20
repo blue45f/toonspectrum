@@ -67,6 +67,13 @@ Page, Guide and slot-hook regressions passed 45 tests across three files, includ
 visible follow state and a deferred real slot-controller release. Integration of the existing CI
 repairs with this batch passed 25 CI routing and sparse-checkout contracts.
 
+After the guide fix and all CI repairs, `pnpm run build` completed full Web TypeScript,
+Vite production compilation, third-party notices and provider-neutral CSP validation.
+`pnpm run check:studio-bundle` passed its structural gate with 250 Studio chunks,
+6,591.2 KiB raw / 2,203.3 KiB gzip and 13 non-blocking observations. Its recorded startup
+request measurement is older than the accepted static baseline, so this is not a fresh
+runtime startup-performance claim.
+
 ## Remaining design work
 
 - Private acoustic zones and zones with doors are unavailable until authoritative door state,
