@@ -19,3 +19,6 @@ The tested `dist` came from the completed #1935 production Web build; browser so
 Evidence on the authorized Mac: `/tmp/toon-canvas-qa-before.log`, `/tmp/toon-canvas-qa-after/studio-canvas-chrome-evidence.json`, `/tmp/toon-canvas-surface-qa-after/studio-canvas-surfaces-evidence.json`, and adjacent screenshots/logs.
 
 Keep #1905 open for the backing-size observation and remaining exhaustive/WAN/device verification. Authentication in these local preview diagnostics is an explicit anonymous fixture; no production API or private team document was used.
+
+
+Latest-main follow-up: main advanced through #1936–#1938 during verification. Those changes were merged without dropping any required targets. Rebuilt the actual Web production output on integrated head `9d7c257acbc2c8a9eff80e1c1b2247aa81c8e77c`; notices/CSP and unchanged bundle budgets passed (after-shell 5956.0KiB raw / 2000.2KiB gzip). The desktop/mobile chrome verifier passed again. The complete surface verifier was rerun against this fresh output, not the old build; its latest log/report remains `/tmp/toon-canvas-surface-qa-latest/` and `/tmp/toon-canvas-surface-qa-latest.log`. It still exits nonzero, so this remains a narrow entry correction, not complete #1905 acceptance.
