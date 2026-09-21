@@ -1,3 +1,5 @@
+import { isStudioSkiaDocumentFrontierReady } from "../render/studio-skia-document-frontier";
+import { isStudioSkiaDocumentElement } from "../render/studio-skia-document-plan";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
@@ -64,7 +66,9 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     canvasRotation,
     canvasScrollViewport,
     collaborationDocumentUnavailable,
+    collaborationDocumentLocked,
     drawingRef,
+    drawMode,
     effScale,
     elements,
     frameAnimOpen,
@@ -529,11 +533,9 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     [groups, localHiddenElementIds, studioLiveGesturePreviewRenderPlan.elements],
   );
   const velloEligibleDocumentIds = useMemo(
-    () => documentIdsOwnedByVectorIslands(lowerStudioElementsToRenderScene(velloDocumentElements, {
-      width: CANVAS_W,
-      height: canvasH,
-    })),
-    [canvasH, velloDocumentElements],
+    () => velloDocumentElements.filter((element) => !element.hidden && (element.opacity ?? 1) > 0
+      && isStudioSkiaDocumentElement(element)).map((element) => element.id),
+    [velloDocumentElements],
   );
   const velloSurfaceDpr = Math.max(1, stageDevicePixelRatio);
   const velloBackingWidth = Math.ceil(stageViewLayout.width * velloSurfaceDpr);
@@ -551,7 +553,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && !timelapseCapturing
     && !sourceHydrationPending
     && !collaborationDocumentUnavailable
-    && studioCrdtOperationSyncReady
+    && isStudioSkiaDocumentFrontierReady({ operationSyncReady: studioCrdtOperationSyncReady, documentLocked: collaborationDocumentLocked })
     && !masterEditMode
     && (activePage.hideMaster || masterRenderEls.length === 0)
     && studioFilterPreview === null
@@ -567,16 +569,14 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && studioLiveGesturePreviewRenderPlan.authoritativeHandoffToken === "[]";
   const velloDocumentSurfaceEnabled =
     velloHubCapability.enabled
-    && stageViewClip === null
+    // The Skia surface lives in Stage-local coordinates and re-presents on scroll/clip changes.
     && velloSurfaceSizeAdmitted
     && velloHasExactPaintProjection
-    && tool === "select"
+    && (tool === "select" || (tool === "draw" && drawMode !== "eraser"))
     && selectedId === null
     && marqueeIds.length === 0
-    && studioDocumentAllowsKonvaHide(
-      velloDocumentElements,
-      velloEligibleDocumentIds,
-    );
+    && velloEligibleDocumentIds.length > 0
+    && velloDocumentElements.every((element) => element.hidden || (element.opacity ?? 1) <= 0 || isStudioSkiaDocumentElement(element));
   const velloSceneRevision = useMemo(
     () => Object.freeze({
       pageId: activePage.id,
