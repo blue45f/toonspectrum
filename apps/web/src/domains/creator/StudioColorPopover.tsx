@@ -1,3 +1,4 @@
+import { revealStudioColorFocusedControl } from "./color/studio-color-focus-visibility";
 import { Pin, X } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -119,6 +120,10 @@ export function StudioColorPopover({ value, onChange, recentColors, documentColo
       globalThis.visualViewport?.removeEventListener("resize", schedule); globalThis.visualViewport?.removeEventListener("scroll", schedule);
     };
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (open) revealStudioColorFocusedControl(popupRef.current);
+  }, [open, position]);
 
   useLayoutEffect(() => {
     const dialog = popupRef.current;

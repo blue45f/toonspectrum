@@ -1118,3 +1118,10 @@ it("shows disabled tools and reasons in the catalog without mutating the documen
   fireEvent.click(pen);
   expect(props.stableHandlers.activatePrimaryCanvasTool).not.toHaveBeenCalled();
 });
+
+
+// Catalog interaction tests run with the already-loaded real UI. The asynchronous slot has its own lifecycle tests.
+vi.mock("./StudioAllToolsCatalogSlot", async () => {
+  const module = await import("./StudioAllToolsCatalog");
+  return { StudioAllToolsCatalogSlot: module.StudioAllToolsCatalog };
+});

@@ -68,6 +68,28 @@ async function desktop(page, engine) {
   await catalog.getByRole("button", { name: "전체 도구 닫기", exact: true }).click();
   report.checks.push(`${engine}: exact 27 pins, SQLite reload, focus density, keyboard entry, use/pin separation, ordered 35-tool extension`);
 
+  await page.getByRole("button", { name: "설정 열기", exact: true }).click();
+  await page.getByText("작업별 구성 · 내 구성 저장", { exact: true }).click();
+  await page.getByRole("textbox", { name: "새 도구 구성 이름" }).fill("회귀 선화");
+  await page.getByRole("button", { name: "구성 저장", exact: true }).click();
+  await page.getByRole("button", { name: "회귀 선화 구성 이름 변경" }).click();
+  const profileName = page.getByRole("textbox", { name: "회귀 선화 구성 새 이름" });
+  await profileName.fill("키보드 작업"); await profileName.press("Enter");
+  await page.getByRole("button", { name: "구성 적용", exact: true }).click();
+  await saved(page); await page.reload(); await saved(page);
+  await page.getByRole("button", { name: "설정 열기", exact: true }).click();
+  await page.getByText("작업별 구성 · 내 구성 저장", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "키보드 작업", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "키보드 작업 구성 삭제" }).click();
+  await page.getByRole("button", { name: "삭제 취소", exact: true }).click();
+  await expect(page.getByRole("button", { name: "키보드 작업", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "키보드 작업 구성 삭제" }).click();
+  await page.getByRole("button", { name: "키보드 작업 구성 삭제 확인" }).click();
+  await page.getByRole("button", { name: "구성 적용", exact: true }).click();
+  await saved(page); await page.reload(); await saved(page);
+  assert.deepEqual(await pinIds(page), all);
+  report.checks.push(`${engine}: named profile rename persists, delete requires confirmation and preserves toolbar order`);
+
   let dialog = await openColor(page);
   const hex = dialog.getByRole("textbox", { name: "헥스 색상 코드", exact: true });
   await hex.fill(""); await hex.pressSequentially("#123456");
@@ -78,6 +100,7 @@ async function desktop(page, engine) {
   await expect(page.getByTestId("primary")).toHaveText("#397be5");
   dialog = await openColor(page);
   await dialog.getByRole("textbox", { name: "헥스 색상 코드", exact: true }).fill("#12gg");
+  await expect(dialog.getByRole("button", { name: "색상 코드 복사" })).toBeDisabled();
   await page.mouse.click(800, 370);
   await expect(dialog).toBeVisible(); await expect(dialog.getByRole("textbox", { name: "헥스 색상 코드", exact: true })).toHaveValue("#12gg");
   await expect(page.getByTestId("strokes")).toHaveText("0");
@@ -97,6 +120,19 @@ async function desktop(page, engine) {
   await expect(page.getByTestId("recent")).toContainText("#123456", options);
   await expect(page.getByTestId("recent")).toContainText("#abcdef", options);
   report.checks.push(`${engine}: local HEX draft, invalid-outside guard, cancel, per-target commit, real SQLite recent-color replay`);
+
+  dialog = await openColor(page);
+  const swatches = dialog.getByRole("group", { name: "최근 선택 색 목록", exact: true }).getByRole("button");
+  assert.equal(await swatches.evaluateAll((buttons) => buttons.filter((button) => button.tabIndex === 0).length), 1);
+  const originalPrimary = await page.getByTestId("primary").textContent();
+  await swatches.first().focus(); await swatches.first().press("ArrowRight");
+  await expect(swatches.nth(1)).toBeFocused();
+  await expect(page.getByTestId("primary")).toHaveText(originalPrimary);
+  await swatches.nth(1).press("Enter");
+  await expect(dialog.getByRole("textbox", { name: "헥스 색상 코드" })).toHaveValue("#123456");
+  await dialog.getByRole("button", { name: "색상 선택 취소", exact: true }).click();
+  await expect(page.getByTestId("primary")).toHaveText(originalPrimary);
+  report.checks.push(`${engine}: swatches use one Tab entry, arrows move focus, Enter previews and cancel preserves document`);
 
   dialog = await openColor(page, "원고 도형 색");
   await dialog.getByRole("textbox", { name: "헥스 색상 코드", exact: true }).fill("#cc2244");
@@ -173,6 +209,16 @@ async function handheld(browser, engine, size) {
       const input = await hex.boundingBox(); const footer = await dialog.locator("footer").boundingBox();
       return Boolean(input && footer && input.y + input.height <= footer.y + 1);
     }).toBe(true);
+    const copy = await dialog.getByRole("button", { name: "색상 코드 복사" }).boundingBox();
+    assert(copy && copy.width >= 43.5 && copy.height >= 43.5, "color copy target below 44px");
+    await hex.evaluate((input) => input.setSelectionRange(2, 4));
+    await page.setViewportSize({ width: size.width, height: 420 });
+    await expect.poll(async () => {
+      const input = await hex.boundingBox(); const body = await dialog.locator("[data-studio-color-scroll]").boundingBox();
+      return Boolean(input && body && input.y >= body.y - 1 && input.y + input.height <= body.y + body.height + 1);
+    }).toBe(true);
+    assert.deepEqual(await hex.evaluate((input) => [input.selectionStart, input.selectionEnd]), [2, 4]);
+    await page.setViewportSize(size);
     await page.screenshot({ path: path.join(output, `${engine}-mobile-${size.width}.png`) });
     const box = await dialog.boundingBox();
     assert(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= size.width + 1 && box.y + box.height <= size.height + 1, `sheet clipped: ${JSON.stringify(box)}`);
@@ -196,6 +242,7 @@ try {
       await page.context().close();
       await handheld(browser, engine, { width: 390, height: 700 });
       await handheld(browser, engine, { width: 360, height: 640 });
+      await handheld(browser, engine, { width: 320, height: 640 });
     } finally { await browser.close(); }
   }
   assert.deepEqual(report.errors, []);

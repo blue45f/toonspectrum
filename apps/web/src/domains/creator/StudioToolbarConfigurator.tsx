@@ -1,3 +1,4 @@
+import { StudioToolbarProfileManager } from "./StudioToolbarProfileManager";
 import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, GripVertical, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
@@ -94,6 +95,7 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => { event.preventDefault(); const dragged = event.dataTransfer.getData("text/plain"); if (isStudioRailToolId(dragged)) move(dragged, index); }}
                 onKeyDown={(event) => {
+                  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                   if (!event.altKey || !["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
                   event.preventDefault(); event.stopPropagation();
                   move(tool, event.key === "Home" ? 0 : event.key === "End" ? draft.visibleIds.length - 1 : index + (event.key === "ArrowUp" ? -1 : 1));
@@ -126,9 +128,9 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
       <div className="mt-2 flex flex-wrap gap-2">
         {STUDIO_TOOLBAR_PRESETS.map((preset) => <button key={preset.id} type="button" className={action}
           onClick={() => change({ ...draft, visibleIds: [...preset.ids], configured: true, activeProfileId: null })}>{preset.name} 구성</button>)}
-        {(draft.profiles ?? []).map((profile) => <button key={profile.id} type="button" className={action}
-          onClick={() => change({ ...draft, visibleIds: profile.visibleIds, view: profile.view, activeProfileId: profile.id })}>{profile.name}</button>)}
+
       </div>
+      <StudioToolbarProfileManager value={draft} onChange={change} />
       <div className="mt-2 flex gap-2">
         <input aria-label="새 도구 구성 이름" value={name} maxLength={48} onChange={(event) => setName(event.currentTarget.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm" />
         <button type="button" className={action} disabled={!name.trim() || (draft.profiles?.length ?? 0) >= 12}
