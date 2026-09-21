@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EMPTY_STUDIO_LIVE_CONTEXT, StudioLiveCollaborationContext } from "../studio-live-collaboration-context";
-import type { StudioLiveRoom } from "../studio-live-collaboration-room";
+import { EMPTY_STUDIO_LIVE_CONTEXT, StudioLiveCollaborationContext, type StudioLiveCollaborationContextValue } from "../studio-live-collaboration-context";
+import type { StudioLiveRoom, StudioLiveRoomEvent } from "../studio-live-collaboration-room";
 import StudioP2pHuddleLauncher from "./StudioP2pHuddleLauncher";
 import { closeStudioP2pHuddle, openStudioP2pHuddle, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "./studio-p2p-huddle-events";
 import { resetStudioStrokeFocusActivityForTests, setStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
@@ -13,23 +13,129 @@ const track = { kind: "audio", stop: vi.fn(), onended: null };
 const stream = { getTracks: () => [track] };
 const getUserMedia = vi.fn(async () => stream);
 function environment() {
+  vi.stubGlobal("isSecureContext", true);
+  vi.stubGlobal("RTCPeerConnection", class {});
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
   vi.stubGlobal("MediaStream", class { constructor(private tracks: unknown[]) {} getTracks() { return this.tracks; } });
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
 }
 function fixture(workId = "work-a", supported = true) {
-  return { workId, ready: true, participant: { sessionId: "a", role: "editor", displayName: "작가" },
+  return { workId, ready: true, mode: supported ? "server" : "local", participant: { sessionId: "a", role: "editor", displayName: "작가" },
     direct: supported ? { getPeers: () => [], send: () => false, subscribe: () => () => undefined } : null,
     subscribe: () => () => undefined, subscribeVoice: () => () => undefined,
   } as unknown as StudioLiveRoom;
 }
-function view(room: StudioLiveRoom, canChat = true) {
-  return <StudioLiveCollaborationContext.Provider value={{ ...EMPTY_STUDIO_LIVE_CONTEXT, room, canChat, availability: "ready" }}>
+function view(room: StudioLiveRoom, canChat = true, overrides: Partial<StudioLiveCollaborationContextValue> = {}) {
+  return <StudioLiveCollaborationContext.Provider value={{ ...EMPTY_STUDIO_LIVE_CONTEXT, room, canChat, availability: "ready", ...overrides }}>
     <StudioP2pHuddleLauncher />
   </StudioLiveCollaborationContext.Provider>;
 }
 afterEach(() => { resetStudioStrokeFocusActivityForTests(); cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUserMedia.mockClear(); track.stop.mockClear(); });
 describe("P2P launcher consent and lifetime", () => {
+  it("allows an admitted RTC room to chat despite a non-terminal document sync warning", () => {
+    environment();
+    render(view(fixture(), true, { availability: "error", error: "원고 저장소를 사용할 수 없습니다." }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    const join = screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" });
+    expect(join.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(join);
+    expect(screen.getByRole("button", { name: "마이크 켜기" })).toBeTruthy();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+  it("keeps an active call across document-only warnings and recovery to ready", async () => {
+    environment();
+    const room = fixture();
+    const rendered = render(view(room));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
+    rendered.rerender(view(room, true, { availability: "error", error: "원고 저장 경고",
+      sync: { ...EMPTY_STUDIO_LIVE_CONTEXT.sync, phase: "durability-risk", transportReady: true } }));
+    expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy();
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(studioHuddleAudioFocusSnapshot()).toBe(true);
+    rendered.rerender(view(room));
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(getUserMedia).toHaveBeenCalledOnce();
+  });
+
+  it("supports text-only participation without camera or microphone APIs", () => {
+    environment();
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: undefined });
+    render(view(fixture()));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    for (const name of ["마이크 켜기", "카메라 켜기", "화면 공유"]) {
+      expect(screen.getByRole("button", { name }).hasAttribute("disabled")).toBe(true);
+    }
+    expect(studioHuddleAudioFocusSnapshot()).toBe(true);
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["insecure-context", "isSecureContext", false],
+    ["webrtc-unsupported", "RTCPeerConnection", undefined],
+  ] as const)("explains %s without requesting devices", (reason, key, value) => {
+    environment(); vi.stubGlobal(key, value);
+    render(view(fixture(), true, { serverAvailable: true }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(document.querySelector(`[data-studio-huddle-availability="${reason}"]`)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: "공동작업 연결 다시 확인" })).toBeNull();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it.each(["local-only", "direct-unavailable"] as const)("distinguishes %s from unsupported WebRTC and offers safe retry", (reason) => {
+    environment(); const retryServer = vi.fn();
+    const room = reason === "local-only" ? fixture("local", false)
+      : { ...fixture(), direct: null } as unknown as StudioLiveRoom;
+    render(view(room, true, { serverAvailable: true, retryServer }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(document.querySelector(`[data-studio-huddle-availability="${reason}"]`)).toBeTruthy();
+    expect(screen.getByText(/WebRTC는 지원하지만/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "공동작업 연결 다시 확인" }));
+    expect(retryServer).toHaveBeenCalledOnce(); expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it.each(["revoked", "admission-denied", "recovery-required", "unsupported-jam"] as const)("keeps %s blocked even if an old direct port is present", (phase) => {
+    environment(); render(view(fixture(), true, { serverAvailable: true,
+      sync: { ...EMPTY_STUDIO_LIVE_CONTEXT.sync, phase } }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: "공동작업 연결 다시 확인" })).toBeNull();
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+  it("updates a stable room on transport events and stops capture on real disconnect", async () => {
+    environment(); let connected = false;
+    const port = fixture().direct;
+    const listeners = new Set<(event: StudioLiveRoomEvent) => void>();
+    const room = { ...fixture(), get ready() { return connected; },
+      get direct() { return connected ? port : null; },
+      subscribe: (listener: (event: StudioLiveRoomEvent) => void) => {
+        listeners.add(listener); return () => { listeners.delete(listener); };
+      },
+    } as unknown as StudioLiveRoom;
+    render(view(room, true, { availability: "connecting" }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
+    const update = (ready: boolean) => act(() => {
+      connected = ready;
+      for (const listener of [...listeners]) listener({ type: "transport-status",
+        status: { state: ready ? "ready" : "disconnected", message: "Connection update", recoverable: true } });
+    });
+    update(true);
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }));
+    fireEvent.click(screen.getByRole("button", { name: "마이크 켜기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "마이크 끄기" })).toBeTruthy());
+    update(false);
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
+    update(true);
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(false);
+    expect(getUserMedia).toHaveBeenCalledOnce();
+  });
   it("requires a matching private capability and cancels an outstanding device prompt when it is revoked",async()=>{
     environment();render(view(fixture()));let valid=true,notify=()=>{};
     const capability=registerStudioHuddleAuthority({conversationId:"private",peerIds:["b"],valid:()=>valid,subscribe:fn=>{notify=fn;return()=>{};}});
