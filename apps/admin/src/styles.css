@@ -51,3 +51,26 @@ body {
   text-transform: uppercase;
   color: #96a0af;
 }
+.operation-policy { width: min(1080px, 100%); margin: auto; }
+.operation-policy h1 { font-size: clamp(1.8rem, 5vw, 3rem); margin: 8px 0 16px; }
+.operation-policy p { line-height: 1.7; color: #c8ced8; }
+.operation-policy h2 { margin: 0 0 18px; font-size: 1.2rem; }
+.operation-policy fieldset { border: 1px solid #353c48; border-radius: 12px; padding: 18px; margin: 18px 0; min-width: 0; }
+.operation-policy legend { padding: 0 8px; font-weight: 650; }
+.operation-policy label { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; line-height: 1.5; }
+.operation-policy input:not([type=checkbox]):not([type=radio]), .operation-policy select, .operation-policy textarea { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; color: #f6f7f9; background: #0d0f12; border: 1px solid #505969; border-radius: 8px; font: inherit; }
+.operation-policy textarea { resize: vertical; }
+.operation-policy button { min-height: 44px; padding: 10px 16px; color: #f6f7f9; background: #283d59; border: 1px solid #637b98; border-radius: 8px; cursor: pointer; font: inherit; }
+.operation-policy button:disabled { opacity: .55; cursor: not-allowed; }
+.operation-policy :focus-visible { outline: 3px solid #accdf9; outline-offset: 3px; }
+.policy-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(220px,100%),1fr)); gap: 16px; }
+.mode-options, .policy-status { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.mode-options label, .policy-checks label { flex-direction: row; align-items: center; gap: 10px; }
+.policy-status, .policy-card { padding: 24px; border: 1px solid #353c48; border-radius: 16px; background: #15181d; margin: 20px 0; }
+.policy-alert { border-left: 4px solid #ffc874; background: #302719; padding: 16px; line-height: 1.7; }
+.policy-impact { margin-top: 20px; border-top: 1px solid #505969; padding-top: 18px; }
+.policy-digest { overflow-wrap: anywhere; }
+.operation-policy details { border-bottom: 1px solid #353c48; padding: 16px 0; }
+.operation-policy summary { cursor: pointer; padding: 8px 0; }
+.operation-policy li { line-height: 1.7; margin: 10px 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .admin-shell { padding: 16px; } .policy-card { padding: 16px; } }

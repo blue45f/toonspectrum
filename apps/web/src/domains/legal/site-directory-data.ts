@@ -297,6 +297,8 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       en: "Review, version, share, present, collaborate and promote finished work",
     },
     items: [
+      destination("/production/workspaces", "팀 워크스페이스", "Team workspaces", "팀 구성원·작품·이용 한도 관리", "Manage team members, projects and usage"),
+      destination("/production/workspaces/join", "팀 초대 수락", "Accept a team invitation", "인증된 이메일로 초대받은 팀에 참여", "Join an invited team using your verified email"),
       destination("/studio/review", "리뷰·승인", "Review & approval", "작업을 검수하고 의견 반영", "Review work and resolve feedback"),
       destination("/studio/versions", "버전·복구", "Versions & recovery", "저장 이력과 복구 지점 관리", "Manage version history and recovery points"),
       destination("/studio/present", "발표 모드", "Presentation mode", "작업을 발표용 화면으로 확인", "Preview work in presentation mode"),

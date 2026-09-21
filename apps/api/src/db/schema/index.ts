@@ -21,3 +21,7 @@ export * from "./commerce.schema";
 export * from "./membership-wallet.schema";
 
 export * from "./studio-review-policy.schema";
+
+export * from "./team-workspace.schema";
+
+export * from "./operation-policy.schema";
