@@ -108,3 +108,28 @@ it("reports a failed recovery read instead of silently claiming the input can be
     expect(result.current[2]).toBe(true); expect(result.current[0]).toBe("");
   } finally { read.mockRestore(); }
 });
+
+it("applies a reviewed closing draft without closing or approving until separately confirmed", () => {
+  const f = fixture(); f.view.session = { ...f.view.session, status: "active" };
+  render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "결과를 남기고 종료" }));
+  fireEvent.click(screen.getByRole("button", { name: "기록으로 종료 초안 만들기" }));
+  expect(f.command).not.toHaveBeenCalled();
+  const expected = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "검토용 종료 초안" }).value;
+  fireEvent.click(screen.getByRole("button", { name: "검토한 초안 적용" }));
+  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: /결론·미결/u }).value).toBe(expected);
+  expect(screen.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
+  expect(f.command).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(screen.getByRole("button", { name: "확인하고 적용" }));
+  expect(f.command).toHaveBeenCalledExactlyOnceWith({ action: "close", summary: expected });
+});
+
+it("revokes an open closing form if the actor loses host permission", () => {
+  const f = fixture(); f.view.session = { ...f.view.session, status: "active" };
+  const view = render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "결과를 남기고 종료" }));
+  view.rerender(<StudioWorkSessionDetail {...f} view={{ ...f.view, capabilities: { edit: false, comment: true } }} actorId="host" busy={false} />);
+  expect(screen.queryByRole("button", { name: "확인하고 적용" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "기록으로 종료 초안 만들기" })).toBeNull();
+  expect(f.command).not.toHaveBeenCalled();
+});
