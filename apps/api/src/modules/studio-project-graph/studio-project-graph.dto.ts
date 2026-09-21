@@ -9,6 +9,7 @@ import {
   isoTimestampSchema,
   revisionKindSchema,
   reviewAnchorSchema,
+  reviewPolicyExpectationSchema,
   scopeRefSchema,
   sha256Schema,
   studioEntityIdSchema,
@@ -276,6 +277,7 @@ export class CreateStudioReviewCommentDto extends createZodDto(
 
 export const DecideStudioReviewSchema = z
   .object({
+    policyExpectation: reviewPolicyExpectationSchema.optional(),
     status: z.enum([
       "changes-requested",
       "approved",

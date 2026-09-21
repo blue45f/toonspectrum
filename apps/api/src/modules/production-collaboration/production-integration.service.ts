@@ -217,6 +217,8 @@ export class ProductionIntegrationService {
     }
     if (replay) return replay as T;
 
+    let externalResult: FencedOperationResult | null = null;
+    let runStarted = false;
     try {
       if (input.dailyLimit !== undefined) {
         const used = await this.repository.countMutationsSince({
@@ -229,7 +231,9 @@ export class ProductionIntegrationService {
           throw new Error("zero_cost_daily_limit_reached");
         }
       }
+      runStarted = true;
       const result = await input.run();
+      externalResult = result;
       await this.repository.completeMutation({
         projectId: input.projectId,
         actorUserId: input.actorUserId,
@@ -239,8 +243,11 @@ export class ProductionIntegrationService {
       });
       return result.response as T;
     } catch (error) {
-      const failure = input.classifyFailure?.(error)
-        ?? this.providerFailure(error);
+      const classified = input.classifyFailure?.(error) ?? this.providerFailure(error);
+      const preflight = error instanceof HttpException && error.getStatus() >= 400 && error.getStatus() < 500
+        || classified.code.endsWith("_not_configured") || ["toss_live_payment_disabled", "invalid_pdf_upload", "zero_cost_daily_limit_reached"].includes(classified.code);
+      const failure = externalResult ? { uncertain: true, code: "external_receipt_persistence_failed", externalId: externalResult.externalId ?? null }
+        : { ...classified, uncertain: classified.uncertain || (runStarted && !preflight && !(error instanceof ProductionExternalHttpError) && !input.classifyFailure) };
       await this.repository.failMutation({
         projectId: input.projectId,
         actorUserId: input.actorUserId,
@@ -780,6 +787,7 @@ export class ProductionIntegrationService {
       dailyLimit: this.config.dailyLimits.notifications,
       request: notification,
       run: async () => {
+        await this.project(actorUserId, projectId, "edit");
         const result = await sendProductionNotification({
           config: this.config,
           projectId,
@@ -787,7 +795,7 @@ export class ProductionIntegrationService {
           notification,
           subscriptions,
         });
-        await Promise.all(
+        const cleanup = await Promise.allSettled(
           result.removedEndpointHashes.map((endpointHash) =>
             this.repository.deletePushSubscriptionByHash(endpointHash)
           ),
@@ -796,7 +804,8 @@ export class ProductionIntegrationService {
           response: asRecord({
             channel: input.channel,
             sent: result.sent,
-            removedExpired: result.removedEndpointHashes.length,
+            removedExpired: cleanup.filter((outcome) => outcome.status === "fulfilled").length,
+            cleanupPending: cleanup.filter((outcome) => outcome.status === "rejected").length,
             providerResponse: result.providerResponse,
           }),
         };

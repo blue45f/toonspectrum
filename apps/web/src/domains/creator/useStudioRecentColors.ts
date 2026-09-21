@@ -1,6 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { pushRecentColor } from "./studio-color-utils";
+import {
+  applyStudioRecentColorChange, emptyStudioRecentColorIntents,
+  reduceStudioRecentColorIntents, replayStudioRecentColorIntents,
+  type StudioRecentColorChange,
+} from "./color/studio-recent-color-intents";
 import {
   createStudioRecentColorsOwnerToken,
   enqueueStudioRecentColorsWrite,
@@ -15,7 +19,6 @@ import {
 import type { StudioUiPreferencesRepository } from "./studio-ui-preferences-sqlite";
 
 type RecentColorRepository = Pick<StudioUiPreferencesRepository, "loadRecentColors" | "saveRecentColors">;
-type Change = (colors: string[]) => string[];
 
 async function acquireRecentColorRepository(): Promise<RecentColorRepository> {
   const module = await import("./studio-ui-preferences-sqlite");
@@ -39,8 +42,8 @@ export function useStudioRecentColors({
   const revisionRef = useRef(0);
   const loadedRef = useRef(false);
   const loadRef = useRef<Promise<void> | null>(null);
-  const pendingChangesRef = useRef<Change[]>([]);
-  const writeTailRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingChangesRef = useRef(emptyStudioRecentColorIntents());
+  const writerRef = useRef<{ token: symbol; task: Promise<void> } | null>(null);
   const mountedRef = useRef(true);
   const ownerActionsRef = useRef<StudioRecentColorsOwner | null>(null);
 
@@ -56,8 +59,8 @@ export function useStudioRecentColors({
     revisionRef.current += 1;
     loadedRef.current = false;
     loadRef.current = null;
-    pendingChangesRef.current = [];
-    writeTailRef.current = Promise.resolve();
+    pendingChangesRef.current = emptyStudioRecentColorIntents();
+    writerRef.current = null;
     setRecentColors([]);
   }, [ownerToken]);
 
@@ -81,9 +84,9 @@ export function useStudioRecentColors({
       if (!isStudioRecentColorsOwnerActive(ownerToken)) return;
       // Replay intent, not an old optimistic snapshot: clear wins over a late load,
       // while a first color selection retains previously stored recent colors.
-      const hasPendingChanges = pendingChangesRef.current.length > 0;
-      const next = pendingChangesRef.current.reduce((colors, change) => change(colors), stored);
-      pendingChangesRef.current = [];
+      const hasPendingChanges = pendingChangesRef.current.cleared || pendingChangesRef.current.colors.length > 0;
+      const next = replayStudioRecentColorIntents(stored, pendingChangesRef.current);
+      pendingChangesRef.current = emptyStudioRecentColorIntents();
       loadedRef.current = true;
       publish(next);
       publishStudioRecentColorsStatus(ownerToken, hasPendingChanges ? "saving" : "saved");
@@ -102,43 +105,46 @@ export function useStudioRecentColors({
     }
   }
 
-  /** Applies one intent optimistically, then persists it in owner and revision order. */
-  function update(change: Change): void {
+  /** One active write plus a latest-value follow-up; failures wait for a new user intent. */
+  function scheduleWrite(): void {
+    if (writerRef.current?.token === ownerToken) return;
+    const writer = { token: ownerToken, task: Promise.resolve() };
+    writerRef.current = writer;
+    writer.task = Promise.resolve().then(async () => {
+      await load();
+      while (mountedRef.current && isStudioRecentColorsOwnerActive(ownerToken)) {
+        const revision = revisionRef.current;
+        await enqueueStudioRecentColorsWrite(ownerToken, async () => {
+          if (!isStudioRecentColorsOwnerActive(ownerToken) || revision !== revisionRef.current) return;
+          const repository = await acquireRepository();
+          if (!isStudioRecentColorsOwnerActive(ownerToken) || revision !== revisionRef.current) return;
+          const colors = colorsRef.current;
+          await (ownerScope ? repository.saveRecentColors(colors, ownerScope) : repository.saveRecentColors(colors));
+          if (revision === revisionRef.current) publishStudioRecentColorsStatus(ownerToken, "saved");
+        });
+        if (revision === revisionRef.current) return;
+      }
+    }).catch(reportUnavailable).finally(() => {
+      if (writerRef.current === writer) writerRef.current = null;
+    });
+  }
+
+  /** A bounded intent summary preserves clear/remember ordering across late hydration. */
+  function update(change: StudioRecentColorChange): void {
     if (!mountedRef.current || !isStudioRecentColorsOwnerActive(ownerToken)) return;
-    const next = change(colorsRef.current);
+    const next = applyStudioRecentColorChange(colorsRef.current, change);
     if (next === colorsRef.current) return;
-    const revision = ++revisionRef.current;
-    if (!loadedRef.current) pendingChangesRef.current.push(change);
+    revisionRef.current += 1;
+    if (!loadedRef.current) pendingChangesRef.current = reduceStudioRecentColorIntents(pendingChangesRef.current, change);
     publish(next);
     publishStudioRecentColorsStatus(ownerToken, "saving");
-    const write = writeTailRef.current.then(async () => {
-      await load();
-      if (
-        !isStudioRecentColorsOwnerActive(ownerToken) ||
-        revision !== revisionRef.current
-      ) return;
-      await enqueueStudioRecentColorsWrite(ownerToken, async () => {
-        if (
-          !isStudioRecentColorsOwnerActive(ownerToken) ||
-          revision !== revisionRef.current
-        ) return;
-        const repository = await acquireRepository();
-        if (
-          !isStudioRecentColorsOwnerActive(ownerToken) ||
-          revision !== revisionRef.current
-        ) return;
-        await (ownerScope ? repository.saveRecentColors(colorsRef.current, ownerScope) : repository.saveRecentColors(colorsRef.current));
-        if (revision === revisionRef.current) publishStudioRecentColorsStatus(ownerToken, "saved");
-      });
-    });
-    writeTailRef.current = write.catch(reportUnavailable);
+    scheduleWrite();
   }
 
   const ensureRecentColorsLoaded = () => { void load().catch(reportUnavailable); };
-  const rememberColor = (color: string) =>
-    update((colors) => pushRecentColor(colors, color));
-  const clearRecentColors = () => update(() => []);
-  const retryPersistence = () => update((colors) => [...colors]);
+  const rememberColor = (color: string) => update({ type: "remember", color });
+  const clearRecentColors = () => update({ type: "clear" });
+  const retryPersistence = () => update({ type: "retry" });
 
   // Keep render pure: the registered owner observes callbacks only after their render commits.
   useLayoutEffect(() => {

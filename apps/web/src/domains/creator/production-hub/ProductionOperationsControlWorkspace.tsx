@@ -1,10 +1,12 @@
-import { AlertTriangle, BarChart3, Bell, Bot, CalendarDays, Coins, CheckCircle2, ClipboardList, Clock3, Copy, GitBranch, LayoutDashboard, Link2, LoaderCircle, Play, Rocket, Save, Scissors, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BarChart3, Bot, CalendarDays, Coins, CheckCircle2, ClipboardList, Clock3, Copy, GitBranch, LayoutDashboard, Link2, LoaderCircle, Play, Rocket, Save, Scissors, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
-import { deriveCriticalPathSchedule, derivePersonalProductionInbox, deriveProductionFinancialForecast, deriveProductionFlowAnalytics, deriveScheduleRecoveryScenarios, evaluateReleaseReadiness, type EpisodeReleasePlan, type ExternalReviewAccess, type ProductionAutomationRule, type ProductionNotification, type ProductionNotificationPolicy, type ProductionProjectAggregate, type ProductionSavedView, type ProductionTask, type ResourceCalendar, type ScheduleBaseline, type ScheduleRecoveryScenario } from "@toonspectrum/core/production";
+import { deriveCriticalPathSchedule, derivePersonalProductionInbox, deriveProductionFinancialForecast, deriveProductionFlowAnalytics, deriveScheduleRecoveryScenarios, evaluateReleaseReadiness, type EpisodeReleasePlan, type ExternalReviewAccess, type ProductionAutomationRule, type ProductionNotification, type ProductionProjectAggregate, type ProductionSavedView, type ProductionTask, type ResourceCalendar, type ScheduleBaseline, type ScheduleRecoveryScenario } from "@toonspectrum/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
-import { deriveProductionAutomationExecutionPlan } from "./production-automation-execution";
+import { ProductionNotificationDigest } from "./ProductionNotificationDigest";
+import { ProductionNotificationPolicyEditor } from "./ProductionNotificationPolicyEditor";
+import { ProductionAutomationExecutionControl } from "./ProductionAutomationExecutionControl";
 
 import { downloadBlob } from "../export/studio-export";
 
@@ -249,7 +251,7 @@ export function ProductionOperationsControlWorkspace({
   ) => execute({ type: "upsert-operations-record", record }, message);
 
   const applyScenario = (scenario: ScheduleRecoveryScenario) => run(`scenario:${scenario.id}`, async () => {
-    if (!canEdit || !selectedAssignmentId) return;
+    if (!canEdit || !selectedAssignmentId || !schedule.inputReadiness.complete) return;
     const tasks = aggregate.tasks
       .filter((task) => !CLOSED_STATUSES.has(task.status) && scenario.forecastByTaskId[task.id])
       .map((task) => ({ ...task, dueAt: scenario.forecastByTaskId[task.id]! }));
@@ -526,48 +528,6 @@ export function ProductionOperationsControlWorkspace({
     setNotice("자동화는 승인·공개·지급을 직접 수행하지 않고 조치 항목만 생성합니다.");
   });
 
-  const runAutomations = () => run("automation-run", async () => {
-    if (!canManage) return;
-    const rules = (aggregate.automationRules ?? []).filter((entry) => entry.enabled);
-    if (rules.length === 0) {
-      setNotice("실행할 활성 자동화 규칙이 없습니다.");
-      return;
-    }
-    const executionTime = new Date();
-    const plan = deriveProductionAutomationExecutionPlan(aggregate, rules, executionTime);
-    await execute({
-      type: "apply-automation-execution",
-      tasks: plan.tasks,
-      notifications: plan.notifications,
-      evaluatedRules: plan.evaluatedRules,
-    }, "자동화 업무·알림·실행 상태를 하나의 변경으로 저장했습니다.");
-    const suppressed = plan.suppressedTaskCount + plan.suppressedNotificationCount;
-    setNotice(
-      `자동화 결과: 조건 ${plan.matchedSourceCount}건 · 업무 ${plan.tasks.length}개 · 알림 ${plan.notifications.length}개`
-      + (suppressed > 0 ? ` · 중복 ${suppressed}건 억제` : ""),
-    );
-  });
-
-  const saveNotificationPolicy = () => run("notification-policy", async () => {
-    if (!canManage || !selectedAssignmentId) return;
-    const current = (aggregate.notificationPolicies ?? []).find((entry) => entry.assignmentId === selectedAssignmentId);
-    const policy: ProductionNotificationPolicy = {
-      id: current?.id ?? id("notification-policy"),
-      projectId: aggregate.projectId,
-      assignmentId: selectedAssignmentId,
-      channels: ["in-app", "email"],
-      digest: "immediate",
-      quietHoursStart: "22:00",
-      quietHoursEnd: "08:00",
-      dueSoonHours: 48,
-      escalationHours: 24,
-      enabled: true,
-      updatedAt: new Date().toISOString(),
-    };
-    await saveRecord({ kind: "notification-policy", value: policy }, "알림·에스컬레이션 정책을 저장했습니다.");
-    setNotice("마감 48시간 전 알림, 24시간 지연 시 에스컬레이션 정책이 저장됐습니다.");
-  });
-
   const markNotificationRead = (notification: ProductionNotification) => run(`notification-read:${notification.id}`, async () => {
     await saveRecord({
       kind: "notification",
@@ -602,6 +562,12 @@ export function ProductionOperationsControlWorkspace({
 
   return (
     <div className="space-y-4" data-production-operations-control>
+      {!schedule.inputReadiness.complete ? <section className="space-y-2 rounded-xl border border-warn/40 bg-warn/10 p-4" aria-label="일정 계산 입력 확인">
+        <h3 className="font-semibold">아직 확인되지 않은 일정 입력이 있습니다.</h3>
+        <p className="text-sm">예상 시간 미입력 {schedule.inputReadiness.missingEstimateIds.length}개 · 미배정·비활성 담당 업무 {schedule.inputReadiness.missingAssignmentTaskIds.length}개 · 근무 시간·시간대 확인 필요 {schedule.inputReadiness.missingCalendarAssignmentIds.length}명 · 누락 선행 작업 {schedule.inputReadiness.missingDependencyIds.length}개 · 순환 의존 업무 {schedule.inputReadiness.cycleTaskIds.length}개</p>
+        <p className="text-xs">모르는 값을 0시간이나 기본 8시간으로 확정하지 않습니다. 실제 공수·가용량을 저장하기 전에는 완료일·신뢰도를 확정 표시하거나 일정 회복안을 적용하지 않습니다.</p>
+        <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" onClick={() => setView("calendar")}>가용 시간 확인하기</button>
+      </section> : null}
       <section className="overflow-hidden rounded-3xl border border-accent/30 bg-card">
         <div className="grid gap-5 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center">
           <div>
@@ -672,9 +638,9 @@ export function ProductionOperationsControlWorkspace({
       {view === "schedule" ? (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-line bg-card p-4"><p className="text-[0.6875rem] font-bold text-fg-3">예상 완료</p><p className="mt-2 text-lg font-black text-fg">{formatDate(schedule.projectFinishAt)}</p></div>
+            <div className="rounded-2xl border border-line bg-card p-4"><p className="text-[0.6875rem] font-bold text-fg-3">예상 완료</p><p className="mt-2 text-lg font-black text-fg">{schedule.inputReadiness.complete ? formatDate(schedule.projectFinishAt) : "입력 확인 필요"}</p></div>
             <div className="rounded-2xl border border-line bg-card p-4"><p className="text-[0.6875rem] font-bold text-fg-3">게시 목표</p><p className="mt-2 text-lg font-black text-fg">{formatDate(schedule.releaseAt)}</p></div>
-            <div className="rounded-2xl border border-line bg-card p-4"><p className="text-[0.6875rem] font-bold text-fg-3">예상 공정 길이</p><p className="mt-2 text-lg font-black text-fg">{Math.round(schedule.projectDurationHours)}h</p></div>
+            <div className="rounded-2xl border border-line bg-card p-4"><p className="text-[0.6875rem] font-bold text-fg-3">예상 공정 길이</p><p className="mt-2 text-lg font-black text-fg">{schedule.inputReadiness.complete ? `${Math.round(schedule.projectDurationHours)}h` : "공수·가용량 확인 필요"}</p></div>
             <div className={cn("rounded-2xl border p-4", schedule.marginHours !== null && schedule.marginHours < 0 ? "border-bad/35 bg-bad/10" : "border-good/35 bg-good/10")}><p className="text-[0.6875rem] font-bold text-fg-3">일정 여유</p><p className="mt-2 text-lg font-black text-fg">{schedule.marginHours === null ? "—" : `${Math.round(schedule.marginHours)}h`}</p></div>
           </div>
 
@@ -683,7 +649,7 @@ export function ProductionOperationsControlWorkspace({
             description="현재 계획과 검수 병렬화·핵심 작화 분할·임계 공정 용량 추가안을 동일 기준으로 비교합니다. 적용 전 예상 완료일, 절감 시간과 부작용을 확인할 수 있습니다."
           >
             <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-4">
-              {scenarios.map((scenario) => {
+              {(schedule.inputReadiness.complete ? scenarios : []).map((scenario) => {
                 const baseline = scenario.id === "baseline";
                 const active = busyKey === `scenario:${scenario.id}`;
                 const tone: Tone = baseline
@@ -743,7 +709,7 @@ export function ProductionOperationsControlWorkspace({
             description="공수의 3점 추정값과 의존관계를 사용해 가장 긴 제작 경로, 총 여유시간과 근무 캘린더 기준 예상 완료일을 계산합니다."
             action={schedule.cycleTaskIds.length > 0 ? <Pill tone="danger">순환 의존성 해결 필요</Pill> : <Pill tone="success">의존성 정상</Pill>}
           >
-            {schedule.nodes.length > 0 ? (
+            {schedule.inputReadiness.complete && schedule.nodes.length > 0 ? (
               <div className="overflow-x-auto rounded-xl border border-line">
                 <table className="w-full min-w-[56rem] border-collapse text-left">
                   <thead className="bg-panel text-[0.6875rem] font-black uppercase tracking-[0.08em] text-fg-3">
@@ -834,7 +800,7 @@ export function ProductionOperationsControlWorkspace({
                           <span aria-hidden="true">·</span>
                           <span>{formatDate(task.dueAt)}</span>
                           <span aria-hidden="true">·</span>
-                          <span>{task.estimateHours?.likely ?? 0}h</span>
+                          <span>{task.estimateHours ? `${task.estimateHours.likely}h` : "공수 미입력"}</span>
                         </div>
                       </a>
                     ))}
@@ -1106,11 +1072,10 @@ export function ProductionOperationsControlWorkspace({
                 <label className="text-xs font-semibold text-fg-2">트리거<select className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={automationTrigger} onChange={(event) => setAutomationTrigger(event.target.value as ProductionAutomationRule["trigger"])}><option value="due-passed">마감 경과</option><option value="due-soon">마감 임박</option><option value="task-status-changed">업무 상태 변경</option><option value="review-opened">검수 시작</option><option value="capacity-exceeded">일정 용량 초과</option><option value="release-preflight-failed">연재 검사 실패</option><option value="manual">수동 실행</option></select></label>
                 <label className="text-xs font-semibold text-fg-2">알림 대상<select className="mt-1.5 min-h-10 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={selectedAssignmentId} onChange={(event) => setSelectedAssignmentId(event.target.value)}>{assignments.map((assignment) => <option key={assignment.id} value={assignment.id}>{assignmentName(aggregate, assignment.id)}</option>)}</select></label>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || busyKey !== null} onClick={() => void saveAutomation()}><Save className="size-4" aria-hidden="true" />규칙 저장</button><button type="button" className={buttonClass({ size: "sm" })} disabled={!canManage || busyKey !== null || (aggregate.automationRules ?? []).length === 0} onClick={() => void runAutomations()}><Play className="size-4" aria-hidden="true" />활성 규칙 실행</button></div>
+              <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={buttonClass({ variant: "outline", size: "sm" })} disabled={!canManage || busyKey !== null} onClick={() => void saveAutomation()}><Save className="size-4" aria-hidden="true" />규칙 저장</button><ProductionAutomationExecutionControl aggregate={aggregate} canManage={canManage} disabled={busyKey !== null} execute={execute} /></div>
             </Section>
-            <Section title="알림·에스컬레이션 정책" description="마감 임박과 지연을 묶어 보내고 방해 금지 시간을 지키는 기본 정책을 저장합니다.">
-              <div className="grid gap-2 sm:grid-cols-4"><div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">채널</p><p className="mt-1 text-xs font-bold text-fg">앱·이메일</p></div><div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">마감 알림</p><p className="mt-1 text-xs font-bold text-fg">48시간 전</p></div><div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">에스컬레이션</p><p className="mt-1 text-xs font-bold text-fg">24시간 지연</p></div><div className="rounded-xl border border-line bg-panel p-3"><p className="text-[0.6875rem] text-fg-3">방해 금지</p><p className="mt-1 text-xs font-bold text-fg">22:00–08:00</p></div></div>
-              <button type="button" className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3")} disabled={!canManage || busyKey !== null} onClick={() => void saveNotificationPolicy()}><Bell className="size-4" aria-hidden="true" />기본 정책 저장</button>
+            <Section title="알림·에스컬레이션 정책" description="담당자의 묶음 주기와 시간대를 명시적으로 저장합니다. 실제 예약 발송은 별도입니다.">
+              <ProductionNotificationPolicyEditor aggregate={aggregate} assignmentId={selectedAssignmentId} canManage={canManage} disabled={busyKey !== null} execute={execute} />
             </Section>
           </div>
 
@@ -1118,16 +1083,8 @@ export function ProductionOperationsControlWorkspace({
             <Section title="등록된 규칙" description="실행 근거와 마지막 평가 시각을 확인합니다.">
               <div className="space-y-2">{(aggregate.automationRules ?? []).map((rule) => <div key={rule.id} className="rounded-xl border border-line bg-panel p-3"><div className="flex items-center justify-between gap-2"><p className="text-xs font-black text-fg">{rule.name}</p><Pill tone={rule.enabled ? "success" : "neutral"}>{rule.enabled ? "활성" : "중지"}</Pill></div><p className="mt-1 text-[0.6875rem] text-fg-3">{rule.trigger} · 행동 {rule.actions.length}개</p><p className="mt-1 text-[0.6875rem] text-fg-3">최근 평가 {formatDate(rule.lastEvaluatedAt)}</p></div>)}{(aggregate.automationRules ?? []).length === 0 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-fg-3">등록된 규칙이 없습니다.</div> : null}</div>
             </Section>
-            <Section title="알림 받은함" description="같은 원인의 반복 알림은 sourceType·sourceId로 묶어 처리할 수 있습니다.">
-              <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
-                {unreadNotifications.slice(0, 20).map((notification) => (
-                  <article key={notification.id} className={cn("rounded-xl border p-3", notification.urgency === "critical" ? "border-bad/35 bg-bad/10" : notification.urgency === "warning" ? "border-warn/35 bg-warn/10" : "border-line bg-panel")}>
-                    <a href={notification.href} className="block"><div className="flex items-center justify-between gap-2"><p className="text-xs font-black text-fg">{notification.title}</p><Pill tone={notification.urgency === "critical" ? "danger" : notification.urgency === "warning" ? "warning" : "accent"}>{notification.urgency}</Pill></div><p className="mt-1 text-[0.6875rem] leading-5 text-fg-2">{notification.body}</p></a>
-                    <button type="button" className={cn(buttonClass({ variant: "ghost", size: "sm" }), "mt-2")} disabled={busyKey !== null} onClick={() => void markNotificationRead(notification)}>읽음 처리</button>
-                  </article>
-                ))}
-                {unreadNotifications.length === 0 ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-fg-3">읽지 않은 알림이 없습니다.</div> : null}
-              </div>
+            <Section title="알림 받은함" description="선택한 담당자의 알림을 같은 원인별로 묶고 안전한 작품 경로로 이동합니다.">
+              <ProductionNotificationDigest aggregate={aggregate} assignmentId={selectedAssignmentId} disabled={!canEdit || busyKey !== null} onRead={markNotificationRead} />
             </Section>
           </div>
         </div>
@@ -1138,7 +1095,7 @@ export function ProductionOperationsControlWorkspace({
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               ["전체 완료율", `${flowAnalytics.completionPercent}%`, `완료 ${flowAnalytics.completedTaskCount} / 전체 ${flowAnalytics.totalTaskCount}`, BarChart3, "accent"],
-              ["잔여 예상 공수", `${flowAnalytics.remainingHours}h`, `열린 업무 ${flowAnalytics.openTaskCount}개`, Clock3, "neutral"],
+              ["잔여 예상 공수", `${flowAnalytics.remainingHours}h${schedule.inputReadiness.missingEstimateIds.length ? " + 미입력" : ""}`, `열린 업무 ${flowAnalytics.openTaskCount}개 · 공수 미입력 ${schedule.inputReadiness.missingEstimateIds.length}개`, Clock3, "neutral"],
               ["차단·기한 초과", String(flowAnalytics.blockedCount + flowAnalytics.overdueCount), `차단 ${flowAnalytics.blockedCount} · 초과 ${flowAnalytics.overdueCount}`, AlertTriangle, flowAnalytics.blockedCount + flowAnalytics.overdueCount > 0 ? "danger" : "success"],
               ["연재 준비도", flowAnalytics.averageReleaseReadiness === null ? "—" : `${flowAnalytics.averageReleaseReadiness}%`, `활성 위험 ${flowAnalytics.activeRiskCount}건`, Rocket, "neutral"],
             ].map(([label, value, detail, Icon, tone]) => (

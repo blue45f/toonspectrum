@@ -463,7 +463,10 @@ export function bindStudioCuttoonStagePointersDownDraw(
       // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
       // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
       // only while the durable document is not connected.
-      if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return;
+      const leaseIntent = strokeDrawMode === "pen" || strokeDrawMode === "shape"
+        ? "append-stroke"
+        : "page-edit";
+      if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit(undefined, leaseIntent)) return;
       const pointerSession = beginStudioStrokePointerSession(pointerSample, penButtonPolicy);
       // A second contact cannot replace a live pen stroke. Barrel input remains a context action
       // unless the captured local policy explicitly routes it to momentary erase.

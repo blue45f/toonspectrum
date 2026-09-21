@@ -134,6 +134,9 @@ describe("ProductionOperationsControlWorkspace", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /자동화·알림/u }));
     fireEvent.click(screen.getByRole("button", { name: "활성 규칙 실행" }));
+    expect(execute).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "표시된 업무와 알림만 저장하는 것을 확인했습니다." }));
+    fireEvent.click(screen.getByRole("button", { name: "미리보기 확인 후 적용" }));
 
     await waitFor(() => expect(execute).toHaveBeenCalledWith(
       expect.objectContaining({

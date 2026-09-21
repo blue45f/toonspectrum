@@ -63,7 +63,9 @@ describe("Pinned review revision workflow", () => {
     fireEvent.click(screen.getByRole("button", { name: "수정 요청으로 기록" }));
     await screen.findByText("결과를 확인하지 못했어요. 다시 실행하기 전에 검토 기록을 새로 확인해 주세요."); expect(f.decide).toHaveBeenCalledOnce();
     mounted.rerender(<StudioPinnedReviewWorkflow verified={{ ...verified([comment]), review: { ...verified([comment]).review, status: "approved" } }} onRefresh={f.refresh} onRevoked={f.revoke} />);
-    expect(screen.getByText("검수 승인됨")).toBeTruthy(); expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByText("검수 승인됨")).toBeTruthy();
+    // Approved history stays read-only; the new control can only fetch group history.
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["그룹 검수 기록 확인"]);
   });
 
   it("cancels pending actor A authority and preserves actor B's independent busy state", async () => {

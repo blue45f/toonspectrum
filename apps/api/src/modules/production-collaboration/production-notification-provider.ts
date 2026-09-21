@@ -1,7 +1,9 @@
+import { sendProtectedWebhook } from "./production-webhook-network";
 import webPush from "web-push";
 
 import {
   canonicalJson,
+  sha256Digest,
 } from "./production-integration-artifacts";
 import type {
   ProductionIntegrationConfig,
@@ -26,23 +28,21 @@ export interface ProductionNotificationProviderResult {
 async function sendGenericWebhook(
   config: ProductionIntegrationConfig,
   body: Record<string, unknown>,
+  deliveryId: string,
+  post: typeof sendProtectedWebhook,
 ): Promise<ProductionNotificationProviderResult> {
   const url = config.notification.genericWebhookUrl;
   const secret = config.notification.genericWebhookSecret;
   if (!url || !secret) throw new Error("generic_webhook_not_configured");
   const serialized = canonicalJson(body);
-  const response = await externalFetchJson<Record<string, unknown>>(
-    url,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-ToonSpectrum-Signature": webhookSignature(secret, serialized),
-      },
-      body: serialized,
-    },
-    config.timeoutMs,
-  );
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const response = await post(url, {
+    "Content-Type": "application/json",
+    "X-ToonSpectrum-Signature": webhookSignature(secret, serialized),
+    "X-ToonSpectrum-Delivery-Id": deliveryId,
+    "X-ToonSpectrum-Delivery-Timestamp": timestamp,
+    "X-ToonSpectrum-Delivery-Signature": webhookSignature(secret, `${timestamp}\n${deliveryId}\n${serialized}`),
+  }, serialized, config.timeoutMs);
   return { sent: 1, removedEndpointHashes: [], providerResponse: response ?? {} };
 }
 async function sendDiscord(
@@ -162,7 +162,7 @@ export async function sendProductionNotification(input: {
   readonly projectTitle: string;
   readonly notification: ProductionIntegrationNotification;
   readonly subscriptions: readonly ProductionPushSubscriptionRecord[];
-}): Promise<ProductionNotificationProviderResult> {
+}, dependencies: { readonly webhookPost: typeof sendProtectedWebhook } = { webhookPost: sendProtectedWebhook }): Promise<ProductionNotificationProviderResult> {
   const body = {
     version: 1,
     type: "production.notification",
@@ -175,7 +175,7 @@ export async function sendProductionNotification(input: {
   };
   switch (input.notification.channel) {
     case "generic-webhook":
-      return sendGenericWebhook(input.config, body);
+      return sendGenericWebhook(input.config, body, sha256Digest(canonicalJson([input.projectId, input.notification.mutationId])), dependencies.webhookPost);
     case "discord":
       return sendDiscord(input.config, input.notification);
     case "ntfy":

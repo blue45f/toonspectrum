@@ -1,3 +1,4 @@
+import { assertReviewPolicyApproval } from "./studio-review-policy-store";
 import { createHash } from "node:crypto";
 
 import { Injectable } from "@nestjs/common";
@@ -2019,6 +2020,7 @@ export class StudioProjectGraphRepository {
         };
       }
       if (input.status === "approved") {
+        await assertReviewPolicyApproval(client, reviewId, actorUserId, input.policyExpectation);
         const blocking = await client.query<{ count: number | string }>(
           `SELECT COUNT(*)::integer AS count
            FROM studio_review_comment

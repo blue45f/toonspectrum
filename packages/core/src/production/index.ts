@@ -17,3 +17,7 @@ export * from "./operations-control";
 export * from "./studio-revision";
 export * from "./schedule-forecast";
 export * from "./risk";
+
+export * from "./automation-execution";
+export * from "./schedule-readiness";
+export * from "./notification-digest";

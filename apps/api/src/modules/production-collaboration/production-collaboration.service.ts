@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+import { verifyProductionAutomationCommand } from "./production-automation-verification";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 
 import {
@@ -31,6 +33,7 @@ import {
   evaluateReviewApproval,
   resolveDecisionAuthority,
   preflightCreditManifest,
+  productionScheduleReadiness,
   stableProductionFingerprint,
   transitionEpisodeCollaboration,
   transitionHandoff,
@@ -1128,6 +1131,14 @@ function applyCommand(
       };
     }
     case "upsert-operations-record": {
+      if (command.expectedNotificationPolicy !== undefined) {
+        if (command.record.kind !== "notification-policy") throw new BadRequestException("notification_expectation_wrong_record");
+        const assignmentId = command.record.value.assignmentId;
+        const policies = (aggregate.notificationPolicies ?? []).filter((policy) => policy.assignmentId === assignmentId);
+        if (policies.length > 1 || !isDeepStrictEqual(policies[0] ?? null, command.expectedNotificationPolicy)) {
+          throw new ConflictException("notification_policy_changed");
+        }
+      }
       const record = command.record as ProductionOperationsRecord;
       const issues = validateProductionOperationsRecord(aggregate, record);
       if (issues.length > 0) {
@@ -1217,6 +1228,7 @@ function applyCommand(
       return { aggregate };
     }
     case "apply-automation-execution": {
+      verifyProductionAutomationCommand(aggregate, command, at);
       if (
         command.tasks.length === 0
         && command.notifications.length === 0
@@ -1282,6 +1294,7 @@ function applyCommand(
       };
     }
     case "apply-schedule-scenario": {
+      if (!productionScheduleReadiness(aggregate).complete) throw new BadRequestException("schedule_inputs_incomplete");
       const baselineRecord: ProductionOperationsRecord = {
         kind: "schedule-baseline",
         value: command.baseline,
@@ -1740,7 +1753,7 @@ export class ProductionCollaborationService {
       readonly processKey: string;
       readonly status: string;
       readonly dueAt: string | null;
-      readonly estimateHours: number;
+      readonly estimateHours: number | null;
       readonly episodeId: string | null;
     }>();
     for (const { aggregate } of records) {
@@ -1765,7 +1778,7 @@ export class ProductionCollaborationService {
               processKey: task.processKey,
               status: task.status,
               dueAt: task.dueAt,
-              estimateHours: task.estimateHours?.likely ?? 0,
+              estimateHours: task.estimateHours?.likely ?? null,
               episodeId,
             });
           }

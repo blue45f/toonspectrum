@@ -52,6 +52,7 @@ export function createStudioLiveSignalingServerTransport(
 
   return {
     mode: "server",
+    canvasLockPolicy: "append-only",
     crdtFanout: local ? "mesh" : "none",
     get ready() {
       return connected && !closed && (local ? local.ready : true);

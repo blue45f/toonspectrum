@@ -237,8 +237,13 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
     {swatches("최근 선택 색", recent)}
     {historyStatus === "loading" ? <p role="status" className="text-xs text-fg-2">최근 색을 불러오는 중…</p>
       : historyStatus === "saving" ? <p role="status" className="text-xs text-fg-2">최근 색 저장 중…</p>
-        : historyStatus === "session-only" ? <p role="status" className="text-xs text-warn">최근 색을 저장하지 못했습니다. 이 세션에서는 사용할 수 있습니다.
-          {onRetryHistory ? <button type="button" className={button} onClick={onRetryHistory}>저장 다시 시도</button> : null}</p> : null}
+        : historyStatus === "session-only" ? <div className="space-y-2 rounded-lg border border-line p-2">
+          <p role="status" aria-label="최근 색 저장 상태" className="text-xs text-warn">최근 색을 저장하지 못했습니다. 현재 세션에서만 사용할 수 있으며 창을 닫으면 사라질 수 있습니다.</p>
+          <details><summary className="min-h-9 cursor-pointer text-xs font-semibold">저장 문제 해결</summary>
+            <p className="text-xs leading-relaxed text-fg-2">다른 Studio 탭의 저장 작업, 기기 저장 공간, 브라우저의 저장 제한을 확인하세요. 제한된 창에서는 일반 창을 사용해 보세요. 중요한 색상 코드는 먼저 복사해 두세요. 사이트 데이터를 삭제하기 전에 중요한 원고를 백업하세요.</p>
+          </details>
+          {onRetryHistory ? <button type="button" className={button} onClick={onRetryHistory}>저장 다시 시도</button> : null}
+        </div> : null}
     <details className="rounded-lg border border-line p-2">
       <summary className="min-h-9 cursor-pointer text-xs font-semibold">시스템 색상 선택기</summary>
       <p className="mb-2 text-xs text-fg-2">시스템 창에서 고른 뒤 색 적용으로 확정합니다.</p>

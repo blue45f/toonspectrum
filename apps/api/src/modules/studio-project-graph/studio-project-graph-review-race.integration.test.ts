@@ -517,4 +517,108 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
       await blocker.query("ROLLBACK"); blocker.release(); await Promise.allSettled(pending);
     }
   });
+  async function policyFixture(mode: "parallel" | "sequential" = "parallel") {
+    const f = await fixture(), reviewer = await member(f.workId, "viewer");
+    await pool.query('INSERT INTO studio_review_reviewer ("reviewId","reviewerUserId") VALUES ($1,$2)', [f.reviewId, reviewer]);
+    const repository = new (await import("./studio-review-policy.repository")).StudioReviewPolicyRepository();
+    const pin = { reviewId: f.reviewId, artifactId: f.artifactId, revisionId: f.snapshotId, rootGraphHash: "a".repeat(64) };
+    const definition = { mode, groups: [
+      { id: "production", label: "Production", reviewerIds: [f.actor], requiredApprovals: 1 },
+      { id: "rights", label: "Rights", reviewerIds: [reviewer], requiredApprovals: 1 },
+    ] };
+    const configure = { id: randomUUID(), type: "configure" as const, pin, expectedPolicyVersion: 0, expectedStateVersion: 0, definition, reason: "Explicit group review" };
+    await repository.command(f.actor, f.reviewId, configure);
+    // Existing parent-review cleanup cascades child records without disabling history guards.
+    const vote = (groupId: string, expectedStateVersion: number, decision: "approve" | "request-changes" = "approve") => ({
+      id: randomUUID(), type: "vote" as const, pin, expectedPolicyVersion: 1, expectedStateVersion, groupId, decision, note: decision === "approve" ? "" : "Fix before approval",
+    });
+    return { ...f, reviewer, repository, pin, definition, configure, vote };
+  }
+  it("enforces all configured group quorums in both API and database approval", async () => {
+    const f = await policyFixture();
+    await expect(graph.decideReview(f.actor, f.reviewId, { status: "approved" })).rejects.toMatchObject({ code: "conflict" });
+    await expect(pool.query(`UPDATE studio_review SET status='approved',"decidedBy"=$2,"decidedAt"=now() WHERE id=$1`, [f.reviewId, f.actor])).rejects.toMatchObject({ code: "23514" });
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    const voted = await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 2));
+    expect(voted.policy?.satisfied).toBe(true);
+    const expectation = { ...f.pin, policyVersion: 1, stateVersion: 3 };
+    expect((await graph.decideReview(f.actor, f.reviewId, { status: "approved", policyExpectation: expectation })).status).toBe("approved");
+    await expect(f.repository.command(f.actor, f.reviewId, { ...f.configure, id: randomUUID(), expectedPolicyVersion: 1, expectedStateVersion: 3 })).rejects.toMatchObject({ code: "closed" });
+    await expect(pool.query('UPDATE studio_review_policy_event SET "actorId"=$2 WHERE "reviewId"=$1', [f.reviewId, f.reviewer])).rejects.toMatchObject({ code: "55000" });
+    await expect(pool.query('DELETE FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rejects.toMatchObject({ code: "55000" });
+  });
+  it("preserves whole-work owner deletion without allowing direct policy history deletion", async () => {
+    const f = await policyFixture();
+    const { deleteWork } = await import("../../server/creator/works");
+    await expect(deleteWork(f.reviewer, f.workId, false)).rejects.toThrow("작성자만 삭제할 수 있습니다.");
+    expect((await f.repository.current(f.actor, f.reviewId)).policy).not.toBeNull();
+    await expect(pool.query('DELETE FROM studio_review_policy WHERE "reviewId"=$1', [f.reviewId])).rejects.toMatchObject({ code: "55000" });
+    await expect(deleteWork(f.actor, f.workId, false)).resolves.toMatchObject({ deleted: true });
+    expect((await pool.query('SELECT id FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rowCount).toBe(0);
+    expect((await pool.query('SELECT "reviewId" FROM studio_review_policy WHERE "reviewId"=$1', [f.reviewId])).rowCount).toBe(0);
+    expect((await pool.query('SELECT id FROM creator_work WHERE id=$1', [f.workId])).rowCount).toBe(0);
+  });
+
+  it("removes revoked reviewers from the quorum and refuses their later reads/votes", async () => {
+    const f = await policyFixture();
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 2));
+    await pool.query(`UPDATE creator_work_collaborator SET status='declined' WHERE "workId"=$1 AND "userId"=$2`, [f.workId, f.reviewer]);
+    const current = await f.repository.current(f.actor, f.reviewId);
+    expect(current.policy?.satisfied).toBe(false);
+    expect(current.policy?.groups[1]?.staleVoterIds).toEqual([f.reviewer]);
+    await expect(graph.decideReview(f.actor, f.reviewId, { status: "approved", policyExpectation: { ...f.pin, policyVersion: 1, stateVersion: 3 } })).rejects.toMatchObject({ code: "unsatisfied" });
+    await expect(f.repository.current(f.reviewer, f.reviewId)).rejects.toThrow();
+    await expect(f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 3))).rejects.toThrow();
+  });
+  it("preserves old votes as history while resetting quorum for a new policy version", async () => {
+    const f = await policyFixture(); await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    const changed = await f.repository.command(f.actor, f.reviewId, { ...f.configure, id: randomUUID(), expectedPolicyVersion: 1, expectedStateVersion: 2, reason: "Recheck all groups" });
+    expect(changed.policy).toMatchObject({ policyVersion: 2, stateVersion: 3, votes: [], satisfied: false });
+    const history = await pool.query('SELECT kind,"policyVersion" FROM studio_review_policy_event WHERE "reviewId"=$1 ORDER BY "stateVersion"', [f.reviewId]);
+    expect(history.rows).toEqual([{ kind: "configure", policyVersion: 1 }, { kind: "vote", policyVersion: 1 }, { kind: "configure", policyVersion: 2 }]);
+    await expect(f.repository.command(f.actor, f.reviewId, f.vote("production", 3))).rejects.toMatchObject({ code: "conflict" });
+    await expect(pool.query(`UPDATE studio_review_policy SET definition=jsonb_set(definition,'{mode}','"sequential"'::jsonb),"stateVersion"="stateVersion"+1 WHERE "reviewId"=$1`, [f.reviewId])).rejects.toMatchObject({ code: "23514" });
+  });
+  it("requires downstream groups to vote again after earlier sequential decisions change", async () => {
+    const f = await policyFixture("sequential");
+    await expect(f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 1))).rejects.toMatchObject({ code: "unsatisfied" });
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 2));
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 3, "request-changes"));
+    const changed = await f.repository.command(f.actor, f.reviewId, f.vote("production", 4));
+    expect(changed.policy?.groups[1]).toMatchObject({ ready: true, satisfied: false, staleVoterIds: [f.reviewer] });
+    await expect(graph.decideReview(f.actor, f.reviewId, { status: "approved", policyExpectation: { ...f.pin, policyVersion: 1, stateVersion: 5 } })).rejects.toMatchObject({ code: "unsatisfied" });
+    const final = await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 5)); expect(final.policy?.satisfied).toBe(true);
+  });
+  it("serializes concurrent group votes and replays the same command without a second event", async () => {
+    const f = await policyFixture(), a = f.vote("production", 1), b = f.vote("rights", 1);
+    const outcomes = await Promise.allSettled([f.repository.command(f.actor, f.reviewId, a), f.repository.command(f.reviewer, f.reviewId, b)]);
+    expect(outcomes.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const winner = outcomes[0]!.status === "fulfilled" ? { actor: f.actor, input: a } : { actor: f.reviewer, input: b };
+    expect((await f.repository.command(winner.actor, f.reviewId, winner.input)).replayed).toBe(true);
+    expect((await f.repository.current(f.actor, f.reviewId)).policy?.stateVersion).toBe(2);
+    await expect(f.repository.command(winner.actor, f.reviewId, { ...winner.input, note: "different consent" })).rejects.toMatchObject({ code: "conflict" });
+    await expect(f.repository.command(winner.actor, f.reviewId, { ...winner.input, id: randomUUID(), pin: { ...f.pin, rootGraphHash: "b".repeat(64) } })).rejects.toMatchObject({ code: "conflict" });
+  });
+  it("continues enforcing required notes after all review groups have approved", async () => {
+    const f = await policyFixture(), note = f.input("required");
+    await graph.createReviewComment(f.actor, f.reviewId, note);
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 2));
+    const approval = { status: "approved" as const, policyExpectation: { ...f.pin, policyVersion: 1, stateVersion: 3 } };
+    await expect(graph.decideReview(f.actor, f.reviewId, approval)).rejects.toMatchObject({ causeCode: "required_review_comments_open" });
+    await graph.resolveReviewComment(f.actor, note.id, { status: "resolved", resolutionRevisionId: f.initialId });
+    expect((await graph.decideReview(f.actor, f.reviewId, approval)).status).toBe("approved");
+    const otherReview = randomUUID();
+    await graph.createReview(f.actor, f.artifactId, { id: otherReview, revisionId: f.snapshotId, title: "Separate review", reviewerIds: [f.actor] });
+    expect((await f.repository.current(f.actor, otherReview)).policy).toBeNull();
+  });
+  it("rejects policy configuration by a non-manager even when they can review", async () => {
+    const f = await policyFixture();
+    await expect(f.repository.command(f.reviewer, f.reviewId, { ...f.configure, id: randomUUID(), expectedPolicyVersion: 1, expectedStateVersion: 1 })).rejects.toMatchObject({ code: "forbidden" });
+    expect((await f.repository.current(f.actor, f.reviewId)).policy?.stateVersion).toBe(1);
+  });
+
 });
