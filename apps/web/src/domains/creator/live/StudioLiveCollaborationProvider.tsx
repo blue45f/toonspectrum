@@ -1,11 +1,14 @@
 import {
   lazy,
   Suspense,
+  useCallback,
   useEffect,
   useRef,
   useState,
   type ReactNode,
 } from "react";
+
+import { useStudioLiveAutoReconnect } from "./use-studio-live-auto-reconnect";
 
 import { readOrCreateStudioLiveClientInstanceId } from "./studio-live-client-identity";
 import {
@@ -78,6 +81,8 @@ export interface StudioLiveCollaborationProviderProps {
   serverRequired?: boolean;
   /** Presence/media-only session. Skips CRDT/outbox hydration for spaces that do not edit a document. */
   ephemeralOnly?: boolean;
+  /** Inline workspace chrome renders its own launcher in normal document flow. */
+  showHuddleLauncher?: boolean;
   onRoomChange?: (room: StudioLiveRoom | null) => void;
   onCrdtDocumentChange?: (
     document: StudioCrdtDocument | null,
@@ -200,6 +205,7 @@ export function StudioLiveCollaborationProvider({
   transportFactory,
   serverRequired = false,
   ephemeralOnly = false,
+  showHuddleLauncher = true,
   onRoomChange,
   onCrdtDocumentChange,
   onEditSafetyChange,
@@ -900,6 +906,23 @@ export function StudioLiveCollaborationProvider({
     globalThis.location.reload();
   };
 
+  const retryServer = useCallback(() => {
+    if (!transportFactory || terminalTransportState !== null) return;
+    setError(null);
+    setTransportPreference("server");
+    setTransportRetryKey((value) => value + 1);
+  }, [terminalTransportState, transportFactory]);
+  const connectionRecovery = useStudioLiveAutoReconnect({
+    scopeKey: recoveryBoundaryScopeKey,
+    enabled: Boolean(workId && participantName && participantRole && transportFactory
+      && transportPreference === "server" && terminalTransportState === null && !recovery),
+    // Live transports own their own reconnect loop. Only retry a failed, fully closed generation.
+    failed: availability === "error" && room === null,
+    // Reset the retry budget only after room admission and initial document synchronization.
+    connected: Boolean(room?.ready && (ephemeralOnly || scopedOperationSyncReady)),
+    retry: retryServer,
+  });
+
   const value: StudioLiveCollaborationContextValue = {
     room,
     availability,
@@ -925,12 +948,8 @@ export function StudioLiveCollaborationProvider({
     recovery,
     exportRecovery,
     reloadAuthoritative,
-    retryServer: () => {
-      if (!transportFactory || terminalTransportState !== null) return;
-      setError(null);
-      setTransportPreference("server");
-      setTransportRetryKey((value) => value + 1);
-    },
+    retryServer,
+    connectionRecovery,
     useLocalFallback: () => {
       if (
         !transportFactory ||
@@ -946,7 +965,7 @@ export function StudioLiveCollaborationProvider({
   return (
     <StudioLiveCollaborationContext.Provider value={value}>
       {children}
-      {room && <Suspense fallback={null}><StudioP2pHuddleLauncher /></Suspense>}
+      {showHuddleLauncher && workId && participant && <Suspense fallback={null}><StudioP2pHuddleLauncher /></Suspense>}
     </StudioLiveCollaborationContext.Provider>
   );
 }

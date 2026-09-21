@@ -11,7 +11,7 @@
 .vs2-shell--project .workspace-live-status{grid-area:foot;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;min-height:72px;padding:12px 18px;background:var(--color-panel);border-top:1px solid var(--color-line)}
 .workspace-live-state,.workspace-live-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px}
 .workspace-live-actions>a,.workspace-live-actions>button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;border:1px solid var(--color-line);border-radius:8px;background:var(--color-card);color:var(--color-fg);font-size:14px}
-.workspace-live-actions>a:last-child{background:var(--color-accent);border-color:var(--color-accent);color:var(--color-on-accent);font-weight:700}
+.workspace-live-actions>a[data-workspace-primary-action="true"]{background:var(--color-accent);border-color:var(--color-accent);color:var(--color-on-accent);font-weight:700}
 .workspace-live-actions>:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
 .vs2-live-inspector-content .vs2-panel{margin-bottom:16px;background:var(--color-panel);border-color:var(--color-line);color:var(--color-fg)}
 .vs2-live-inspector-content .vs2-panel h2{font-size:16px}.vs2-live-inspector-content :is(p,small,label,select){font-size:13px;line-height:1.65}.vs2-live-inspector-content .vs2-panel strong{font-size:14px}
@@ -54,3 +54,13 @@
 /* Tablet widths must not inherit the retired block-layout wrapper at <=900px. */
 .vs2-shell.vs2-shell--project .vs2-live-container,
 .vs2-shell.vs2-shell--project .vs2-live-layout{display:contents}
+
+/* Chat/call controls participate in the footer layout instead of covering work creation. */
+.workspace-live-actions>.studio-p2p-huddle-dock{min-width:0;margin-left:auto}
+.workspace-live-actions .studio-p2p-huddle-panel{max-width:calc(100vw - 2.25rem)}
+@media(max-width:760px){
+ .workspace-live-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .workspace-live-actions>a,.workspace-live-actions>button{width:100%;white-space:nowrap}
+ .workspace-live-actions>.studio-p2p-huddle-dock{width:100%;margin-left:0}
+ .workspace-live-actions>.studio-p2p-huddle-dock>button{width:100%}
+}
