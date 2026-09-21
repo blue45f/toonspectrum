@@ -47,3 +47,15 @@ describe("approved review export action", () => {
     expect((screen.getByRole("button", { name: "승인 검수본 ZIP 저장" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });
+describe("approved source preflight", () => {
+  it("shows the immutable source and explicit no-conversion boundary without starting an export", () => {
+    const value = approved(); render(<StudioReviewExport verified={value} />);
+    const details = screen.getByText("전달 기준·포함 범위 확인").closest("details")!;
+    details.open = true;
+    expect(details.textContent).toContain(value.subject.revisionId);
+    expect(details.textContent).toContain(value.subject.rootGraphHash);
+    expect(details.textContent).toContain("플랫폼 규격 변환 없음");
+    expect(details.textContent).toContain("수신자의 인수 확인이 아닙니다");
+    expect(f.prepare).not.toHaveBeenCalled(); expect(f.download).not.toHaveBeenCalled();
+  });
+});

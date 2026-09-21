@@ -1,3 +1,4 @@
+import { StudioReviewDraftShelf } from "./StudioReviewDraftShelf";
 import { StudioReviewNoteFilters } from "./StudioReviewNoteFilters";
 import { nextReviewNoteId, reviewNoteMatches, type ReviewNoteView } from "./studio-review-note-query";
 import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -164,6 +165,13 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
       if (own === generation.current && sessionRevision === getAuthSessionRevision()) setNotice(bt("저장 결과를 확인하지 못했어요. 입력은 남겨 두었습니다. 목록을 새로 확인해 주세요.", "The save could not be confirmed. Your draft is preserved. Refresh the review before trying again."));
     } finally { if (own === generation.current) setBusy(false); }
   };
+  const draftDue = studioReviewDueAt(due);
+  const draftArtifact = result?.ok ? result.project.artifacts.find((item) => item.id === subject?.artifactId) : null;
+  const draftCompose = result?.ok && result.project.access.comment && ["open", "changes-requested"].includes(result.review.status) && subject && draftArtifact && body.trim() && draftDue.ok && !needsLocation && !attempted.current
+    && (!annotation || validateStudioReviewSpatialAnchor(annotation.mapping, annotation.anchor))
+    ? { body: body.trim(), severity, assigneeIds: normalizeStudioReviewAssignees(assigneeIds),
+        anchor: { ...(annotation?.anchor ?? { kind: "artifact" as const }), artifactId: subject.artifactId, revisionId: subject.revisionId, scope: draftArtifact.scope },
+        ...(draftDue.dueAt ? { dueAt: draftDue.dueAt } : {}) } : null;
   const jumpNote = (direction: -1 | 1) => {
     const notes = result?.ok ? result.review.comments : [];
     const ids = notes.filter((note) => reviewNoteMatches(note, noteView, noteQuery, actorId)).map((note) => note.id);
@@ -234,7 +242,12 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
         {subject && actorId ? <StudioReviewCommentAssignment roster={roster} ids={assigneeIds} onChange={setAssigneeIds}
           due={due} onDueChange={setDue} disabled={busy} /> : null}
         <button type="submit" className="mt-2 min-h-11 rounded-lg border border-line px-4" disabled={busy || !body.trim() || needsLocation}>{busy ? bt("저장 중…", "Saving…") : bt("의견 저장", "Save note")}</button>
+
+        {attempted.current && !busy ? <p className="mt-2 text-xs text-fg-2">{bt("직접 저장한 의견의 결과부터 다시 확인해 주세요. 중복 발행을 막기 위해 해당 입력의 개인 초안 추가는 잠시 중지했습니다.", "Reconcile the directly submitted note first. Adding that input as a private draft is paused to avoid duplicate publication.")}</p> : null}
       </form> : <p className="mt-3 text-xs">{bt("검토 기록을 열람하고 있습니다.", "You are viewing the review history.")}</p>}
+      {actorId && subject ? <StudioReviewDraftShelf scope={{ actorId, subject }} compose={draftCompose} disabled={busy} onBusy={setBusy}
+          onStored={() => { setBody(""); setAssigneeIds([]); setDue(""); selectAnnotation(null); setNeedsLocation(false); }}
+          onPublished={() => { void refresh(true); }} /> : null}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
       {result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
     </> : null}
