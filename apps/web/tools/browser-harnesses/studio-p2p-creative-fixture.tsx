@@ -39,7 +39,7 @@ export async function mount(index: number): Promise<void> {
   await transport.connect();
   const traced = transport.direct ? traceStudioP2pDirectPort(transport.direct) : null;
   directPackets = traced?.packets ?? [];
-  const room = { ready: true, workId: "creative-qa", participant, direct: traced?.direct,
+  const room = { ready: true, mode: "server", workId: "creative-qa", participant, direct: traced?.direct,
     subscribe: () => () => undefined,
     subscribeVoice: (listener: (event: { type: string }) => void) => {
       terminalListeners.add(listener); return () => { terminalListeners.delete(listener); };
