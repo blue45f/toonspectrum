@@ -38,6 +38,7 @@ import {
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import { runStudioBg3dTextureGpuProof } from "./lib/studio-bg3d-texture-gpu-proof";
+import { isStaticPreviewReadinessUnavailable as isStudio3dStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -752,14 +753,7 @@ export function collectStudioVrmMannequinChromaFailures(
   return failures;
 }
 
-/** No Core API runs in this static-only harness. Record only its exact 502 observation. */
-export function isStudio3dStaticPreviewReadinessUnavailable(message: string, studioUrl: string): boolean {
-  let preview: URL;
-  try { preview = new URL(studioUrl); } catch { return false; }
-  if (preview.protocol !== "http:" || preview.hostname !== "127.0.0.1" || !preview.port
-    || preview.username || preview.password) return false;
-  return message === `Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ ${preview.origin}/api/health/ready`;
-}
+export { isStaticPreviewReadinessUnavailable as isStudio3dStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 
 function isExpectedStaticPreviewApiMessage(message: string): boolean {
   return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));

@@ -32,6 +32,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { DIST_DIR, REPO_ROOT } from "./lib/repo-paths.mjs";
+import { studioRecoveryReceiptIsComplete } from "./lib/studio-verify-recovery";
 import { STUDIO_LONG_BRUSH_QUALITY_REPORT_SCHEMA_VERSION } from "./studio-brush-long-matrix-quality";
 import {
   studioLifecycleVisualViolations,
@@ -81,6 +82,8 @@ export interface StudioArtistJourneyAudit {
     persistenceAuthority: "durable-reload-recovery" | "invalid";
     recoveryBannerObserved: boolean;
     restoreActionCompleted: boolean;
+    automaticRestoreCompleted: boolean;
+    recoveryMode: "automatic" | "explicit" | "invalid";
     browserCompatibilityKeysBeforeReload: number;
     browserCompatibilityKeysAtRecovery: number;
     reloadChangedPixels: number;
@@ -247,6 +250,8 @@ function auditLifecycleReport(
   const persistenceAuthority = autosave?.authority === "durable-reload-recovery";
   const recoveryBannerObserved = autosave?.recoveryBannerObserved === true;
   const restoreActionCompleted = autosave?.restoreActionCompleted === true;
+  const automaticRestoreCompleted = autosave?.automaticRestoreCompleted === true;
+  const recoveryMode = studioRecoveryReceiptIsComplete(autosave) ? (automaticRestoreCompleted ? "automatic" : "explicit") : "invalid";
   const browserCompatibilityKeysBeforeReload = nonNegativeInteger(
     autosave?.browserCompatibilityKeysBeforeReload
   );
@@ -256,7 +261,7 @@ function auditLifecycleReport(
   const save =
     persistenceAuthority
     && recoveryBannerObserved
-    && restoreActionCompleted
+    && studioRecoveryReceiptIsComplete(autosave)
     && browserCompatibilityKeysBeforeReload === 0
     && browserCompatibilityKeysAtRecovery === 0;
   if (!save) {
@@ -331,6 +336,8 @@ function auditLifecycleReport(
       : "invalid",
     recoveryBannerObserved,
     restoreActionCompleted,
+    automaticRestoreCompleted,
+    recoveryMode,
     browserCompatibilityKeysBeforeReload:
       browserCompatibilityKeysBeforeReload ?? -1,
     browserCompatibilityKeysAtRecovery:
@@ -540,6 +547,8 @@ export function auditStudioArtistJourneyReports(
       persistenceAuthority: lifecycle.persistenceAuthority,
       recoveryBannerObserved: lifecycle.recoveryBannerObserved,
       restoreActionCompleted: lifecycle.restoreActionCompleted,
+      automaticRestoreCompleted: lifecycle.automaticRestoreCompleted,
+      recoveryMode: lifecycle.recoveryMode,
       browserCompatibilityKeysBeforeReload:
         lifecycle.browserCompatibilityKeysBeforeReload,
       browserCompatibilityKeysAtRecovery:
