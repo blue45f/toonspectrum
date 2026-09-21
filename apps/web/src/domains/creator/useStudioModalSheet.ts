@@ -4,6 +4,8 @@ import {
   type RefObject,
 } from "react";
 
+import { isolateStudioModalFloatingTargets } from "./studio-modal-floating-isolation";
+
 const FOCUSABLE_SELECTOR = [
   "a[href]",
   "area[href]",
@@ -178,6 +180,7 @@ export function activateStudioModalSheet({
   if (!focusElement(target)) focusElement(dialog);
 
   const restoreBackground = isolateModalBranch(root, dialog);
+  const restoreFloatingTargets = isolateStudioModalFloatingTargets(root, dialog);
   const focusFirst = () => focusElement(focusableElements(dialog)[0]) || focusElement(dialog);
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -228,6 +231,7 @@ export function activateStudioModalSheet({
     ownerDocument.removeEventListener("keydown", onKeyDown, true);
     ownerDocument.removeEventListener("focusin", onFocusIn, true);
     restoreBackground();
+    restoreFloatingTargets();
     if (returnTarget?.isConnected && !returnTarget.closest("[inert]")) {
       if (focusElement(returnTarget)) return;
     }
