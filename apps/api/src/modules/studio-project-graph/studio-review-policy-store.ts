@@ -18,25 +18,28 @@ export async function policyCurrentAccess(client: PoolClient, reviewId: string, 
   const reviewers = await client.query<{ id: string }>(`SELECT "reviewerUserId" AS id FROM studio_review_reviewer WHERE "reviewId"=$1 ORDER BY "reviewerUserId"`, [reviewId]);
   if (reviewers.rows.length > 64) throw new StudioReviewPolicyError("capacity");
   const ids = [...new Set([actorId, ...reviewers.rows.map((row) => row.id)])].sort();
+  const users = await client.query<{ id: string; status: string }>('SELECT id,status FROM "user" WHERE id=ANY($1::text[]) ORDER BY id FOR SHARE', [ids]);
+  const activeUsers = new Set(users.rows.filter((user) => user.status === "active").map((user) => user.id));
   const members = await client.query<{ userId: string; role: string; status: string }>(
     `SELECT "userId",role,status FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=ANY($2::text[]) ORDER BY "userId" FOR SHARE`, [owner.workId, ids]);
   const access = (id: string) => resolveCreatorCollaborationAccess({ actorUserId: id, ownerUserId: owner.ownerId,
     membership: members.rows.find((member) => member.userId === id) ?? null });
   const actorAccess = access(actorId);
-  if (!actorAccess.view) throw new StudioReviewPolicyError("forbidden");
-  return { canConfigure: actorAccess.manageMembers, eligibleReviewerIds: reviewers.rows.filter((row) => access(row.id).view).map((row) => row.id), actorId };
+  if (!actorAccess.view || !activeUsers.has(actorId)) throw new StudioReviewPolicyError("forbidden");
+  return { canConfigure: actorAccess.manageMembers, eligibleReviewerIds: reviewers.rows.filter((row) => activeUsers.has(row.id) && access(row.id).view).map((row) => row.id), actorId };
 }
 export async function readReviewPolicy(client: PoolClient, reviewId: string, activeIds: readonly string[]): Promise<ReviewPolicyRecord | null> {
   const result = await client.query<{ reviewId: string; artifactId: string; revisionId: string; rootGraphHash: string; policyVersion: number; stateVersion: number; definition: unknown; configuredBy: string; configuredAt: Date }>(
     `SELECT p.*, r."artifactId" FROM studio_review_policy p JOIN studio_review r ON r.id=p."reviewId" WHERE p."reviewId"=$1`, [reviewId]);
   const policy = result.rows[0]; if (!policy) return null;
   const definition = reviewPolicyDefinitionSchema.parse(policy.definition);
-  const events = await client.query<{ actorId: string; stateVersion: number; payload: { groupId: string; decision: "approve" | "request-changes"; note: string }; createdAt: Date }>(
-    `SELECT DISTINCT ON (payload->>'groupId', "actorId") "actorId", "stateVersion", payload, "createdAt"
+  const events = await client.query<{ actorId: string; stateVersion: number; accessCurrent: boolean; payload: { groupId: string; decision: "approve" | "request-changes"; note: string }; createdAt: Date }>(
+    `SELECT DISTINCT ON (payload->>'groupId', "actorId") "actorId", "stateVersion", payload, "createdAt",
+       COALESCE("accessEpoch"=studio_review_policy_actor_epoch($1,"actorId"),false) AS "accessCurrent"
      FROM studio_review_policy_event WHERE "reviewId"=$1 AND "policyVersion"=$2 AND kind='vote'
      ORDER BY payload->>'groupId', "actorId", "stateVersion" DESC`, [reviewId, policy.policyVersion]);
   const votes: ReviewPolicyVoteRecord[] = events.rows.map((event) => ({ groupId: event.payload.groupId, actorId: event.actorId,
-    decision: event.payload.decision, note: event.payload.note, stateVersion: event.stateVersion, decidedAt: new Date(event.createdAt).toISOString() }));
+    decision: event.payload.decision, accessCurrent: event.accessCurrent, note: event.payload.note, stateVersion: event.stateVersion, decidedAt: new Date(event.createdAt).toISOString() }));
   return reviewPolicyRecordSchema.parse({ pin: { reviewId, artifactId: policy.artifactId, revisionId: policy.revisionId, rootGraphHash: policy.rootGraphHash },
     definition, policyVersion: policy.policyVersion, stateVersion: policy.stateVersion, configuredBy: policy.configuredBy,
     configuredAt: new Date(policy.configuredAt).toISOString(), votes, ...evaluateReviewPolicy(definition, votes, activeIds) });

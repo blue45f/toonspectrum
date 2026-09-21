@@ -11,3 +11,4 @@ export * from "./external-file-binding";
 export * from "./sync";
 
 export * from "./review-policy";
+export * from "./review-policy-history";

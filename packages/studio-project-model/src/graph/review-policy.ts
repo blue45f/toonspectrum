@@ -28,7 +28,7 @@ export const reviewPolicyCommandSchema = z.discriminatedUnion("type", [reviewPol
 export const reviewPolicyExpectationSchema = z.object({ ...reviewPolicyPinSchema.shape, policyVersion: version.min(1), stateVersion: version.min(1) }).strict();
 export const reviewPolicyVoteRecordSchema = z.object({
   groupId: id, actorId: id, decision: z.enum(["approve", "request-changes"]), note: z.string().max(2000),
-  stateVersion: version.min(1), decidedAt: isoTimestampSchema,
+  stateVersion: version.min(1), decidedAt: isoTimestampSchema, accessCurrent: z.boolean().optional(),
 }).strict();
 export const reviewPolicyGroupStateSchema = z.object({
   id, ready: z.boolean(), satisfied: z.boolean(), approvalCount: z.number().int().nonnegative(),
@@ -66,7 +66,7 @@ export function evaluateReviewPolicy(definition: ReviewPolicyDefinition, votes: 
     const eligibleIds = group.reviewerIds.filter((actor) => active.has(actor));
     const candidates = [...latest.values()].filter((vote) => vote.groupId === group.id && group.reviewerIds.includes(vote.actorId));
     const ready = definition.mode === "parallel" || dependenciesSatisfied;
-    const current = candidates.filter((vote) => active.has(vote.actorId)
+    const current = candidates.filter((vote) => vote.accessCurrent !== false && active.has(vote.actorId)
       && (definition.mode === "parallel" || vote.stateVersion > dependencyVersion));
     const approvalCount = current.filter((vote) => vote.decision === "approve").length;
     const changeRequestedBy = current.filter((vote) => vote.decision === "request-changes").map((vote) => vote.actorId);

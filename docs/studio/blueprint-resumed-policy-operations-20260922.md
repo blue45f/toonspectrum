@@ -56,3 +56,16 @@ The first remote run identified two issues rather than passing globally. The con
 The newly integrated main session-evidence subpath was absent from both API compiler path mappings and the emitted-runtime export map. Both are now explicit, and runtime packaging tests assert matching source mappings and actual Node subpath resolution. Standard API build passes with 774 compiled files / 2,410 checked imports, native resource loading, and unchanged legal-runtime checks. This is compiled artifact preparation, not service deployment.
 
 Latest integrated browser, Web build and static bundle ratchet pass. Product: 50 files / 687 tests; foundation: 261 files / 5,867 tests; canonical PostgreSQL: 4 files / 161 tests. Final remote CI belongs to the subsequent fix head and is recorded in PR #1936.
+
+## Resumed continuation: history and membership-bound votes
+
+The same worktree continues after PR #1935's runtime acceptance was integrated. No existing feature branch or user data was replaced.
+
+- Added a read-only, current-permission-protected policy/vote history API and actual UI: exact fixed source, original change reasons and vote notes, original actor/server time, 25-record keyset pages, bounded response validation, and explicit load/earlier-page actions. New events do not shift prior pages. Historical votes are never treated as current approval or as the separate final decision.
+- Reproduced a prior membership approval incorrectly becoming current again after a new invitation. Votes now carry a server-only exact invitation/role/database-timestamp epoch in migration 0082. Both the repository projection and database final-approval guard reject stale epochs; current active account status is checked independently. Old unbound votes do not become trusted by migration. The pending migration has not been applied in production.
+- History clears after permission/network failure, rejects mismatched sources/cursors, ignores late results from an older account/session, and resets when the displayed policy state changes.
+- Reproduced a work-session append failure when transaction/server time lagged artifact creation. Existing artifact/project timestamps now advance monotonically without changing immutable event history, relaxing a constraint, or masking the failure in tests.
+- Extended the 1440/390/320px actual-component browser acceptance to read the original policy-change reason and vote history. The browser still uses explicitly synthetic HTTP/identity; independent PostgreSQL tests cover real stored authority.
+- Additional PostgreSQL test database `studio_blueprint_final_integration` is loopback-only and newly created; no existing or production database is reset.
+
+Remaining F01–F40 scope and no-deployment boundary above remain unchanged. This continuation does not add scheduled external notifications, paid services, unrestricted webhook destinations or production migrations.

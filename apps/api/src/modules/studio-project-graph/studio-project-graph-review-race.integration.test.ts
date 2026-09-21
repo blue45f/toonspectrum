@@ -571,6 +571,61 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     await expect(f.repository.current(f.reviewer, f.reviewId)).rejects.toThrow();
     await expect(f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 3))).rejects.toThrow();
   });
+  it("excludes a suspended account from votes and denies its policy/history reads", async () => {
+    const f = await policyFixture();
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 2));
+    await pool.query(`UPDATE "user" SET status='suspended' WHERE id=$1`, [f.reviewer]);
+    const current = await f.repository.current(f.actor, f.reviewId);
+    expect(current.eligibleReviewerIds).not.toContain(f.reviewer); expect(current.policy?.satisfied).toBe(false);
+    await expect(f.repository.current(f.reviewer, f.reviewId)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(f.repository.history(f.reviewer, f.reviewId)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(pool.query(`UPDATE studio_review SET status='approved',"decidedBy"=$2,"decidedAt"=now() WHERE id=$1`, [f.reviewId, f.actor])).rejects.toMatchObject({ code: "23514" });
+  });
+
+  it("does not revive a prior membership's group approval after a new invitation grants access", async () => {
+    const f = await policyFixture();
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
+    await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 2));
+    await pool.query(`UPDATE creator_work_collaborator SET status='declined' WHERE "workId"=$1 AND "userId"=$2`, [f.workId, f.reviewer]);
+    await pool.query(`UPDATE creator_work_collaborator SET status='active', "invitationId"=$3, "updatedAt"=clock_timestamp() WHERE "workId"=$1 AND "userId"=$2`, [f.workId, f.reviewer, randomUUID()]);
+    const current = await f.repository.current(f.actor, f.reviewId);
+    expect(current.eligibleReviewerIds).toContain(f.reviewer);
+    expect(current.policy?.satisfied).toBe(false);
+    expect(current.policy?.groups[1]?.staleVoterIds).toEqual([f.reviewer]);
+    await expect(graph.decideReview(f.actor, f.reviewId, { status: "approved", policyExpectation: { ...f.pin, policyVersion: 1, stateVersion: 3 } })).rejects.toMatchObject({ code: "unsatisfied" });
+    await expect(pool.query(`UPDATE studio_review SET status='approved',"decidedBy"=$2,"decidedAt"=now() WHERE id=$1`, [f.reviewId, f.actor])).rejects.toMatchObject({ code: "23514" });
+    const voted = await f.repository.command(f.reviewer, f.reviewId, f.vote("rights", 3));
+    expect(voted.policy?.satisfied).toBe(true);
+  });
+
+  it("reads original policy reasons and votes across versions without granting current approval", async () => {
+    const f = await policyFixture();
+    await f.repository.command(f.actor, f.reviewId, { ...f.vote("production", 1), note: "Original approval note" });
+    await f.repository.command(f.actor, f.reviewId, { ...f.configure, id: randomUUID(), expectedPolicyVersion: 1, expectedStateVersion: 2, reason: "Updated review criteria" });
+    const history = await f.repository.history(f.actor, f.reviewId);
+    expect(history.pin).toEqual(f.pin);
+    expect(history.entries.map((entry) => [entry.policyVersion, entry.stateVersion])).toEqual([[2, 3], [1, 2], [1, 1]]);
+    expect(history.entries[0]?.command).toMatchObject({ type: "configure", reason: "Updated review criteria" });
+    expect(history.entries[1]?.command).toMatchObject({ type: "vote", note: "Original approval note" });
+    expect(history.nextBeforeStateVersion).toBeNull();
+    expect((await f.repository.current(f.actor, f.reviewId)).policy?.satisfied).toBe(false);
+    await pool.query(`UPDATE creator_work_collaborator SET status='declined' WHERE "workId"=$1 AND "userId"=$2`, [f.workId, f.reviewer]);
+    await expect(f.repository.history(f.reviewer, f.reviewId)).rejects.toThrow();
+  });
+  it("paginates history with a stable keyset even while new events are appended", async () => {
+    const f = await policyFixture();
+    for (let index = 0; index < 28; index++) await f.repository.command(f.actor, f.reviewId, { ...f.vote("production", index + 1), note: `Review ${index}` });
+    const first = await f.repository.history(f.actor, f.reviewId);
+    expect(first.entries).toHaveLength(25); expect(first.entries[0]?.stateVersion).toBe(29); expect(first.nextBeforeStateVersion).toBe(5);
+    await f.repository.command(f.actor, f.reviewId, f.vote("production", 29));
+    const older = await f.repository.history(f.actor, f.reviewId, { beforeStateVersion: first.nextBeforeStateVersion! });
+    expect(older.entries.map((entry) => entry.stateVersion)).toEqual([4, 3, 2, 1]); expect(older.nextBeforeStateVersion).toBeNull();
+    expect(new Set([...first.entries, ...older.entries].map((entry) => entry.id)).size).toBe(29);
+    expect((await f.repository.history(f.actor, f.reviewId)).entries[0]?.stateVersion).toBe(30);
+    await expect(f.repository.history(f.actor, f.reviewId, { beforeStateVersion: 0 })).rejects.toThrow();
+  });
+
   it("preserves old votes as history while resetting quorum for a new policy version", async () => {
     const f = await policyFixture(); await f.repository.command(f.actor, f.reviewId, f.vote("production", 1));
     const changed = await f.repository.command(f.actor, f.reviewId, { ...f.configure, id: randomUUID(), expectedPolicyVersion: 1, expectedStateVersion: 2, reason: "Recheck all groups" });

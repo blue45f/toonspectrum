@@ -13,7 +13,7 @@ try {
     const pin = { reviewId: "fixture-review", artifactId: "fixture-artifact", revisionId: "fixture-revision", rootGraphHash: "a".repeat(64) };
     let definition = { mode: "parallel", groups: [{ id: "production", label: "제작 검토", reviewerIds: ["fixture-artist"], requiredApprovals: 1 }] };
     let policyVersion = 1, stateVersion = 1, votes = [];
-    const commands = [], errors = [], unexpected = [];
+    const commands = [], errors = [], unexpected = [], history = [];
     const snapshot = () => ({ actorId: "fixture-artist", canConfigure: true, eligibleReviewerIds: ["fixture-artist"], policy: {
       pin, definition, policyVersion, stateVersion, configuredBy: "fixture-artist", configuredAt: "2026-09-21T00:00:00.000Z", votes,
       ...evaluateReviewPolicy(definition, votes, ["fixture-artist"]),
@@ -21,12 +21,16 @@ try {
     await context.route("**/api/**", async (route) => {
       const request = route.request(), path = new URL(request.url()).pathname;
       if (request.method() === "GET" && path.endsWith("/fixture-review/policy")) return route.fulfill({ json: snapshot() });
+      if (request.method() === "GET" && path.endsWith("/fixture-review/policy/history")) return route.fulfill({ json: {
+        pin, actorId: "fixture-artist", entries: [...history].reverse(), nextBeforeStateVersion: null,
+      } });
       if (request.method() === "POST" && path.endsWith("/fixture-review/policy/commands")) {
         const value = reviewPolicyCommandSchema.parse(request.postDataJSON()); commands.push(value.type);
         assert.deepEqual(value.pin, pin); assert.equal(value.expectedPolicyVersion, policyVersion); assert.equal(value.expectedStateVersion, stateVersion);
         stateVersion++;
         if (value.type === "configure") { definition = value.definition; policyVersion++; votes = []; }
         else votes = [{ groupId: value.groupId, actorId: "fixture-artist", stateVersion, decision: value.decision, note: value.note, decidedAt: new Date().toISOString() }];
+        history.push({ id: value.id, policyVersion, stateVersion, actorId: "fixture-artist", createdAt: new Date().toISOString(), command: value });
         return route.fulfill({ json: snapshot() });
       }
       if (request.method() === "POST" && path.endsWith("/fixture-review/decision")) {
@@ -56,6 +60,11 @@ try {
       await page.getByRole("checkbox", { name: /현재 고정본·정책/u }).check();
       await page.getByRole("button", { name: "그룹 검토를 확인하고 최종 승인" }).click();
       await expect(page.locator("[data-review-changes]")).toHaveAttribute("data-review-changes", "1");
+      await page.getByText("정책 변경·표결 이력", { exact: true }).click();
+      await page.getByRole("button", { name: "최신 정책·표결 이력 확인" }).click();
+      await expect(page.getByText("이 페이지 2개 기록", { exact: true })).toBeVisible();
+      await expect(page.getByText("담당 검수 기준 확인", { exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "그룹 승인 의견", exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "알림 정책 저장" })).toBeDisabled();
       await page.getByLabel("시간대", { exact: true }).fill("Asia/Seoul");
       await page.getByLabel("묶음 주기").selectOption("weekly");

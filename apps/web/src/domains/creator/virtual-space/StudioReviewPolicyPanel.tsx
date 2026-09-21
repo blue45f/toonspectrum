@@ -6,6 +6,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { decideStudioReview } from "../project-graph/studio-project-graph-client";
 import type { StudioVirtualSpaceVerifiedReview } from "./studio-virtual-space-review-invitation";
 import { applyStudioReviewPolicyCommand, getStudioReviewPolicy } from "./studio-review-policy-client";
+import { StudioReviewPolicyHistory } from "./StudioReviewPolicyHistory";
 import { StudioReviewPolicyEditor } from "./StudioReviewPolicyEditor";
 
 const button = "min-h-11 rounded-lg border border-line px-3 text-sm disabled:opacity-50";
@@ -100,6 +101,7 @@ function PolicyForActor({ verified, actor, onRefresh, onPolicyKnown }: Props & {
     {editBase ? <StudioReviewPolicyEditor initial={editBase.policy?.definition ?? null} eligibleIds={editBase.eligibleReviewerIds} disabled={busy || !!attempt}
       onCancel={() => setEditBase(null)} onSave={(definition, reason) => void run({ id: crypto.randomUUID(), type: "configure", pin,
         expectedPolicyVersion: editBase.policy?.policyVersion ?? 0, expectedStateVersion: editBase.policy?.stateVersion ?? 0, definition, reason })} /> : null}
+    <StudioReviewPolicyHistory pin={pin} stateVersion={policy?.stateVersion ?? null} />
     {notice ? <p role="status" className="mt-3 text-xs">{notice}</p> : null}
   </details>;
 }

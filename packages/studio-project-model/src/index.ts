@@ -56,3 +56,4 @@ export * from "./graph/review-task-completion";
 export * from "./graph/handoff-envelope";
 
 export * from "./graph/review-policy";
+export * from "./graph/review-policy-history";

@@ -81,6 +81,19 @@ if (process.env.CI && !connection) throw new Error("CI must provide real Postgre
     const stored = (await pool.query<{ id: string }>('SELECT id FROM studio_artifact WHERE "projectId"=$1 AND id LIKE $2', [f.projectId, "studio-work-session:%"])).rows[0]!;
     await expect(graph.listRevisions(f.uninvited, stored.id)).rejects.toMatchObject({ causeCode: "work_session_endpoint_required" });
   });
+  it("keeps artifact and project timestamps monotonic when the server clock trails existing records", async () => {
+    const f = await fixture(); await sessions.create(f.actor, f.workId, f.input);
+    const future = "2099-01-01T00:00:00.000Z";
+    await pool.query(`UPDATE studio_artifact SET "createdAt"=$2,"updatedAt"=$2 WHERE "projectId"=$1 AND id LIKE 'studio-work-session:%'`, [f.projectId, future]);
+    await pool.query('UPDATE studio_project_graph SET "createdAt"=$2,"updatedAt"=$2 WHERE id=$1', [f.projectId, future]);
+    const result = await sessions.command(f.actor, f.workId, f.input.id, { action: "ready", operationId: randomUUID(), expectedVersion: 1 });
+    expect(result.view.session).toMatchObject({ status: "ready", version: 2 });
+    const artifact = (await pool.query<{ updatedAt: Date }>(`SELECT "updatedAt" FROM studio_artifact WHERE "projectId"=$1 AND id LIKE 'studio-work-session:%'`, [f.projectId])).rows[0]!;
+    const project = (await pool.query<{ updatedAt: Date }>('SELECT "updatedAt" FROM studio_project_graph WHERE id=$1', [f.projectId])).rows[0]!;
+    expect(artifact.updatedAt.toISOString()).toBe(future); expect(project.updatedAt.toISOString()).toBe(future);
+    expect((await sessions.current(f.actor, f.workId, f.input.id)).session.version).toBe(2);
+  });
+
   it("serializes competing updates and requires a fresh explicit decision after a conflict", async () => {
     const f = await fixture(); await sessions.create(f.actor, f.workId, f.input);
     const results = await Promise.allSettled([sessions.command(f.actor, f.workId, f.input.id, { action: "ready", operationId: randomUUID(), expectedVersion: 1 }),

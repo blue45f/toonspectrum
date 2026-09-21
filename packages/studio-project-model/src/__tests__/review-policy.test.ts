@@ -34,6 +34,14 @@ describe("fixed-review group policy", () => {
     const result = evaluateReviewPolicy(definition("sequential"), [vote("rights", "owner", 2), vote("production", "artist", 3)], ["artist", "owner"]);
     expect(result.satisfied).toBe(false); expect(result.groups[1]).toMatchObject({ ready: false, satisfied: false });
   });
+  it("keeps a previous membership vote stale even if the user is currently eligible again", () => {
+    const original = [vote("production", "artist", 2), { ...vote("production", "pd", 3), accessCurrent: false }, vote("rights", "owner", 4)];
+    const result = evaluateReviewPolicy(definition(), original, ["artist", "pd", "owner"]);
+    expect(result.satisfied).toBe(false);
+    expect(result.groups[0]).toMatchObject({ approvalCount: 1, staleVoterIds: ["pd"] });
+    expect(evaluateReviewPolicy(definition(), [...original, { ...vote("production", "pd", 5), accessCurrent: true }], ["artist", "pd", "owner"]).satisfied).toBe(true);
+  });
+
   it("keeps group and actor identity tuples distinct when IDs contain colons", () => {
     const policy: ReviewPolicyDefinition = { mode: "parallel", groups: [
       { id: "a:b", label: "One", reviewerIds: ["c"], requiredApprovals: 1 },
