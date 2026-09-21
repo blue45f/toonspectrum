@@ -102,7 +102,12 @@ export class StudioReviewTaskCompletionRepository {
       }
       if (context.baseRevision !== input.baseRevision || context.proofDigest !== input.proofDigest) return fail("conflict");
       if (canonicalJson(context.criteria) !== canonicalJson(input.confirmedCriteria)) return fail("criteria");
-      const now = (await client.query<{ now: string }>(`SELECT to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS now`)).rows[0]!.now;
+      // The clock may move behind already saved timestamps. Use one monotonic server
+      // value for the workspace document, row and receipt; keep every existing check.
+      const clock = (await client.query<{ now: string }>(`SELECT to_char(GREATEST(clock_timestamp(),"createdAt","updatedAt") AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS now
+        FROM creator_work_production_workspace WHERE "workId"=$1 AND revision=$2`, [workId, context.baseRevision])).rows[0];
+      if (!clock) return fail("conflict");
+      const now = clock.now;
       const nextRevision = context.baseRevision + 1;
       const next = StudioProductionWorkspaceDocumentSchema.parse({ ...document, revision: nextRevision, updatedAt: now,
         tasks: document.tasks.map((task) => task.id === taskId ? { ...task, status: "done", progress: 100 } : task) });

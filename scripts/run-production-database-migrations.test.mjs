@@ -1725,6 +1725,7 @@ test("review policy metadata has only current-state column grants and vote histo
   expect(violation).toContain("'studio_review_policy'::text");
   expect(violation).toContain("'studio_review_policy_event'::text");
   expect(loadMigrationManifest().at(-1).id).toBe("0083_studio_review_vote_epoch");
+  expect(loadMigrationManifest().some((migration) => migration.id === "0082_studio_review_policy")).toBe(true);
 });
 
 

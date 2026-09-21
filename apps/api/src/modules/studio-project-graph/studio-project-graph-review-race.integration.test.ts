@@ -720,7 +720,7 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     await pool.query(`CREATE ROLE "${role}" NOLOGIN`);
     try {
       await pool.query(buildStudioProjectGraphRuntimeAclSql(role));
-      await pool.query(`GRANT SELECT ON creator_work,creator_work_collaborator,"user" TO "${role}"`);
+      await pool.query(`GRANT SELECT ON TABLE public."user",public.creator_work,public.creator_work_collaborator TO "${role}"`);
       expect((await pool.query(`SELECT ${buildStudioProjectGraphRuntimeAclViolationSql(role)} AS invalid`)).rows[0].invalid).toBe(false);
       const client = await pool.connect();
       const asRuntime = async (action: () => Promise<void>) => {
