@@ -31,3 +31,11 @@ An actual `/studio/canvas` local probe was also attempted without production cre
 ## Deliberate remaining boundaries
 
 The editor still uses Konva input/selection and the committed-stroke handoff. Complex visible text/image/frame/mask/filter/natural-media scenes and active eraser editing keep their pre-existing compatibility path. Export, 30/120-minute physical-device testing and complete input/brush ownership migration are not claimed by this change. No production deployment, DB, user data, package-version or CI limit change is included.
+
+## Measured continuation evidence
+
+- Integrated engine and renderer registry suite: 415 passed; four pre-existing capability-gated tests skipped. No test was disabled by this change.
+- On actual Chromium (new headless, ANGLE Metal Apple M2 Max) and Firefox, 14 kernel scenarios passed, including 10,000 short synthetic strokes, resize/DPR/rotation/reflection, bounded view caches and explicit real WebGL context-loss recovery. There were no page errors in that run.
+- The 10,001st append compiled one item and one bounded composite batch and submitted in 5.7ms (Chromium) / 6ms (Firefox). These are individual CPU submission observations under the test workload, not full-editor or physical-device P95 guarantees. Driver-reported GPU cache usage was unavailable.
+- The headless-shell attempt stalled during the 10,000-stroke sequence. The reproducible command now uses Playwright's documented `channel: chromium` new-headless browser path; there is no runtime renderer downgrade or relaxed pixel gate.
+- A local production build, CSP and unchanged static bundle ratchet passed. Exact post-follow-up commit checks are recorded separately in the PR.

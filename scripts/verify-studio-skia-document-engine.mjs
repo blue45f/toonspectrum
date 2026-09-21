@@ -26,7 +26,7 @@ async function pixelComparison(page) {
   });
 }
 async function verify(type, name) {
-  const browser = await type.launch({ headless: true });
+  const browser = await type.launch({ headless: true, ...(name === 'chromium' ? { channel: 'chromium' } : {}) });
   try {
     const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
     const evaluate = page.evaluate.bind(page);

@@ -1,5 +1,5 @@
 import type { StudioSkiaCameraSource } from "./studio-skia-camera-source";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { SkiaDocumentRenderer } from "@toonspectrum/studio-engine-skia";
 import { createStudioSkiaDocumentProjector } from "./studio-skia-document-plan";
 import type { StudioRenderSurfaceAuthority, StudioRenderSurfaceProps } from "./StudioRenderSurface";
@@ -19,14 +19,33 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   const generation = useRef(0); const revision = useRef(0);
   const submitted = useRef<((cameraOnly?: boolean) => void) | null>(null);
   const receipt = useRef<object | null>(null);
+  const [completedRevision, setCompletedRevision] = useState<object | null>(null);
   const report = (status: StudioRenderSurfaceAuthority["status"], frame: object, ids: readonly string[], reason: string | null = null) => {
     sink.current?.({ status, backendId: status === "disabled" || status === "legacy" ? null : STUDIO_SKIA_DOCUMENT_BACKEND, decision: null,
       sceneRevision: frame, ownedDocumentIds: ids, reason, visibleCanvasCount: status === "active" ? 1 : 0 });
   };
   useLayoutEffect(() => {
     const current = canvasRef.current;
-    if (current) current.style.visibility = enabled && visible && receipt.current === sceneRevision ? "visible" : "hidden";
-  });
+    if (!current) return;
+    if (!enabled || !visible || receipt.current !== sceneRevision) { current.style.visibility = "hidden"; return; }
+    if (current.style.visibility === "visible") return;
+    const publish = latest.current.beforePublish;
+    if (!publish) { current.style.visibility = "visible"; return; }
+    // Parent opacity is committed, but the old canvas bitmap is not transparent until its
+    // next draw. Wait for that paint before revealing GPU pixels to avoid double compositing.
+    const controller = new AbortController();
+    void Promise.resolve().then(() => publish(controller.signal)).then(() => {
+      if (!controller.signal.aborted && canvasRef.current === current && latest.current.visible
+        && latest.current.sceneRevision === sceneRevision && receipt.current === sceneRevision) {
+        current.style.visibility = "visible";
+      }
+    }).catch((cause: unknown) => {
+      if (controller.signal.aborted || canvasRef.current !== current) return;
+      receipt.current = null; current.style.visibility = "hidden";
+      report("unavailable", sceneRevision, [], cause instanceof Error ? cause.message : String(cause));
+    });
+    return () => controller.abort();
+  }, [enabled, visible, sceneRevision, mountParent, completedRevision]);
   useLayoutEffect(() => {
     if (!enabled) { report("disabled", latest.current.sceneRevision, []); return; }
     if (!mountParent) { report("starting", latest.current.sceneRevision, [], "awaiting-host"); return; }
@@ -72,6 +91,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         }
         if (result.status === "presented") {
           receipt.current = state.sceneRevision;
+          setCompletedRevision(state.sceneRevision);
           canvas.dataset.studioSkiaCompiledItems = String(result.stats.compiledItems);
           canvas.dataset.studioSkiaCachedItems = String(result.stats.cachedItems);
           canvas.dataset.studioSkiaCompiledBatches = String(result.stats.compiledBatches);

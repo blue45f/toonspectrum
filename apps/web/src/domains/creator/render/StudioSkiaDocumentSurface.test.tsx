@@ -106,9 +106,26 @@ it("coalesces imperative camera movement and does not rebuild the React display 
     expect(requests).toHaveLength(2);
     expect(requests[1]!.frame.camera).toMatchObject({ offsetX: -100, offsetY: -200 });
     await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
-    expect(beforePublish).toHaveBeenCalledOnce();
+    expect(beforePublish).toHaveBeenCalledTimes(2);
     expect(h.report).toHaveBeenCalledTimes(count);
     expect(h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!.style.visibility).toBe("visible");
     view.unmount(); expect(unsubscribe).toHaveBeenCalledOnce();
   } finally { animation.mockRestore(); cancel.mockRestore(); }
+});
+
+it("waits for the parent's hidden-document paint before revealing the completed GPU frame", async () => {
+  const h = setup(); const fences: Array<() => void> = [];
+  const beforePublish = vi.fn(() => new Promise<void>((resolve) => { fences.push(resolve); }));
+  const view = render(<StudioSkiaDocumentSurface {...h.props} beforePublish={beforePublish} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await waitFor(() => expect(fences).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); fences[0]!(); });
+  expect(h.report).toHaveBeenLastCalledWith(expect.objectContaining({ status: "active" }));
+  view.rerender(<StudioSkiaDocumentSurface {...h.props} visible beforePublish={beforePublish} />);
+  await waitFor(() => expect(fences).toHaveLength(2));
+  const canvas = h.parent.querySelector<HTMLCanvasElement>('[data-studio-skia-document-surface]')!;
+  expect(canvas.style.visibility).toBe("hidden");
+  await act(async () => { fences[1]!(); });
+  expect(canvas.style.visibility).toBe("visible");
+  view.unmount();
 });
