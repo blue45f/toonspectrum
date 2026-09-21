@@ -1,3 +1,4 @@
+import { StudioReviewExportPreflight } from "./StudioReviewExportPreflight";
 import { useLayoutEffect, useRef, useState } from "react";
 import { getAuthSessionRevision, getAuthUserId, listeners as sessionListeners } from "@/compat/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
@@ -40,6 +41,7 @@ export function StudioReviewExport({ verified }: { readonly verified: StudioVirt
   };
   return <section className="mt-4 space-y-2 rounded-xl border border-line p-3" aria-label={bt("승인된 검수본 저장", "Save approved review images")}>
     <p className="text-sm text-fg-2">{bt("이 검수본에 저장된 원본 이미지와 페이지별 확인 정보를 ZIP으로 저장합니다. 원고를 다시 렌더링하거나 게시하지 않아요.", "Save this review's original stored images and page checksums as a ZIP. This does not re-render or publish the document.")}</p>
+    <StudioReviewExportPreflight verified={verified} />
     <div className="flex flex-wrap gap-2">
       <button type="button" className="min-h-11 max-w-full rounded-lg border border-line px-3 text-sm disabled:opacity-50" disabled={Boolean(progress)} onClick={() => { void start(); }}>
         {bt("승인 검수본 ZIP 저장", "Save approved review ZIP")}</button>
