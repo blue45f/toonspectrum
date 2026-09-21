@@ -56,6 +56,11 @@ try {
       await editor.getByRole("checkbox", { name: "시험 소품 A", exact: true }).check(); await editor.getByRole("checkbox", { name: "시험 소품 B", exact: true }).check();
       await editor.getByRole("button", { name: "왼쪽 맞춤", exact: true }).click(); assert.equal((await snapshot()).props[1].x, 176);
       await undo.click(); assert.equal((await snapshot()).props[1].x, 420);
+      // Undo may replace the parent's geometry arrays; old index-based selection is cleared.
+      await expect(editor.getByRole("checkbox", { name: "시험 소품 A", exact: true })).not.toBeChecked();
+      await expect(editor.getByRole("checkbox", { name: "시험 소품 B", exact: true })).not.toBeChecked();
+      await editor.getByRole("checkbox", { name: "시험 소품 A", exact: true }).check();
+      await editor.getByRole("checkbox", { name: "시험 소품 B", exact: true }).check();
       await editor.getByRole("button", { name: "편집 잠금 전환", exact: true }).click(); await expect(editor.getByRole("button", { name: "선택 오른쪽 이동", exact: true })).toBeDisabled();
       await editor.getByRole("button", { name: "편집 잠금 전환", exact: true }).click();
       await editor.getByRole("button", { name: "선택 해제", exact: true }).click();

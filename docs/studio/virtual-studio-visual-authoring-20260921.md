@@ -18,7 +18,7 @@ No-code rules run only after an explicit tool-anchor action and a separate confi
 
 ## Evidence
 
-New model/component tests cover 54 cases, included in the larger virtual-space regression: 72 files / 737 tests passed before the final lazy-mount optimization. Web/API type checks passed. Final exact-head checks are attached to the PR.
+New model/component tests cover 56 cases, included in the larger virtual-space regression: 72 files / 737 tests passed before the final lazy-mount optimization. Web/API type checks passed. Final exact-head checks are attached to the PR.
 
 A fresh PostgreSQL16 container, toonstudio-world-authoring-test-20260921, binds only to 127.0.0.1:32773. The existing guarded initializer installed 12 real graph invariants. World/session authority: 2 files / 68 tests passed, including legacy receipt preservation, new-field persistence/replay and invalid-schema rejection before writes. No production database is used.
 
@@ -29,3 +29,5 @@ Actual UI and repository image bytes at 1440/390/320px passed mouse/native-touch
 User requested main merge, not deployment. No migration, production credentials/configuration, infrastructure or paid provider change. Future deployment must update API readers before Web can publish the optional assetIntegrity/interactionRules fields. Legacy fields remain absent and hashes are not rewritten. Older API versions reject new manifests; coordinate any rollback.
 
 This is not a declaration that all original 30 design items are complete. External pinned guest permissions, recording retention, native 3D scene/camera synchronization, verified AI execution evidence, approved public showcases, new all-skin action art and full device/WAN/scale certification remain separate. Arbitrary structural-rig rotation and a hosted package marketplace are also not claimed. Issue #1905 stays open for exhaustive verification not established by these focused results.
+
+Continuation review also clears index-addressed selections when an external world or Undo replaces geometry, avoiding edits against a newly indexed entity. The browser workflow explicitly reselects after Undo; all previous movement and lock assertions remain. Final CI and merge identifiers are recorded in the pull request.
