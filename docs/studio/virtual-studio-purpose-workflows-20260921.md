@@ -61,3 +61,12 @@ The runner checks the target policy, admits only its generated fixture identitie
 This closes the persisted discussion agenda/reading-turn/decision-candidate portions of VS03/VS06/VS20/VS22 and improves VS01/VS02/VS29. It does not turn those partial original requirements into a blanket completion of all 30 features.
 
 Still separate: native storyboard authoring/reorder acceptance; high-frequency presenter streaming; version-pinned external guest reviews and mentoring-only access; recorded explanation upload/retention/deletion; native 3D scene/camera review integration; structured verified AI execution evidence/cost/diffs; approved public release and revocation; visual world editor/package/template/rule expansion; all-skin original animation coverage; multi-client offline world adoption and WAN/scale certification; remaining exhaustive #1905 lanes. Existing #1918 saved views/calendar and #1919 private review draft publication are preserved on main, not reimplemented here.
+
+
+## Production world diagnostic repaired in this continuation
+
+The outstanding `qa-studio-main-release.mjs` failure is repaired without restoring development-only `data-local-x/y` attributes. The checker opens the real public minimap and reads the player's actual painted percentage position. It still verifies that keyboard input moves the avatar and that search owns its keys without moving the avatar; absent, malformed and non-finite positions are rejected rather than converted to zero. The six viewport, private-session admission, canvas-size, navigation, list-mode and accessibility assertions remain intact.
+
+Executed on the fresh integrated production build: all six viewport journeys and the keyboard/search/accessibility branch passed, with zero page errors, private admissions, horizontal overflow and accessibility violations. Evidence: `/tmp/toon-purpose-public-world/report.json`. The minimap parser's 11 focused tests passed. This closes that specific helper failure, not the other #1905 exhaustive lanes.
+
+Final integrated runtime checks also passed: foundation 242 files / 5,717 tests; editing 186 files / 2,712 tests; four canonical PostgreSQL suites / 151 tests; and the API-owned real-DB browser command at 1440/390/320px. The full production bundle, notices, CSP and bundle structural/ratchet checks passed with no static regression. These scopes overlap the focused results above and are not added together as a single total.
