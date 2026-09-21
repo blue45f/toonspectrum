@@ -547,6 +547,41 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     await expect(pool.query('UPDATE studio_review_policy_event SET "actorId"=$2 WHERE "reviewId"=$1', [f.reviewId, f.reviewer])).rejects.toMatchObject({ code: "55000" });
     await expect(pool.query('DELETE FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rejects.toMatchObject({ code: "55000" });
   });
+  it("uses only scoped policy grants for runtime votes and forbids immutable history/DDL writes", async () => {
+    const f = await policyFixture();
+    const { buildStudioProjectGraphRuntimeAclSql, buildStudioProjectGraphRuntimeAclViolationSql } = await import("../../../../../scripts/run-production-database-migrations.mjs");
+    const { policyCommandHash } = await import("./studio-review-policy-store");
+    const client = await pool.connect(), role = `review_policy_test_${randomUUID().replaceAll("-", "")}`;
+    try {
+      await client.query("BEGIN");
+      // Transaction-local disposable role/grants; ROLLBACK removes both, including PUBLIC changes.
+      await client.query(`CREATE ROLE "${role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+      await client.query(`GRANT USAGE ON SCHEMA public TO "${role}"`);
+      await client.query(buildStudioProjectGraphRuntimeAclSql(role));
+      await client.query(`GRANT SELECT ON creator_work,creator_work_collaborator,"user" TO "${role}"`);
+      const violation = await client.query<{ invalid: boolean }>(`SELECT ${buildStudioProjectGraphRuntimeAclViolationSql(role)} AS invalid`);
+      expect(violation.rows[0]?.invalid).toBe(false);
+      await client.query(`SET LOCAL ROLE "${role}"`);
+      expect((await client.query('SELECT id FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rowCount).toBe(1);
+      await client.query('UPDATE studio_review_policy SET "stateVersion"=2 WHERE "reviewId"=$1', [f.reviewId]);
+      const input = f.vote("production", 1);
+      await client.query(`INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload,"accessEpoch")
+        VALUES ($1,$2,1,2,'vote',$3,$4,$5::jsonb,studio_review_policy_actor_epoch($2,$3))`, [input.id, f.reviewId, f.actor, policyCommandHash(input), JSON.stringify(input)]);
+      expect((await client.query('SELECT id FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rowCount).toBe(2);
+      for (const forbidden of [
+        `UPDATE studio_review_policy_event SET "actorId"='forged'`,
+        'DELETE FROM studio_review_policy_event', 'DELETE FROM studio_review_policy',
+        `UPDATE studio_review_policy SET "rootGraphHash"=repeat('b',64)`,
+        'TRUNCATE studio_review_policy_event', 'CREATE TABLE public.review_policy_forbidden(id text)',
+      ]) {
+        await client.query('SAVEPOINT forbidden_operation');
+        await expect(client.query(forbidden)).rejects.toMatchObject({ code: "42501" });
+        await client.query('ROLLBACK TO SAVEPOINT forbidden_operation');
+      }
+    } finally { await client.query("ROLLBACK"); client.release(); }
+    expect((await f.repository.current(f.actor, f.reviewId)).policy?.stateVersion).toBe(1);
+  });
+
   it("preserves whole-work owner deletion without allowing direct policy history deletion", async () => {
     const f = await policyFixture();
     const { deleteWork } = await import("../../server/creator/works");
@@ -679,7 +714,7 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
   it("uses the declared non-owning runtime grants without rewriting review identity or policy events", async () => {
     const f = await fixture(), role = `review_policy_test_${randomUUID().replaceAll("-", "")}`;
     const { buildStudioProjectGraphRuntimeAclSql, buildStudioProjectGraphRuntimeAclViolationSql } = await import("../../../../../scripts/run-production-database-migrations.mjs");
-    const definition = { mode: "parallel", groups: [{ id: "reviewers", title: "Reviewers", reviewerIds: [f.actor], requiredApprovals: 1 }] };
+    const definition = { mode: "parallel", groups: [{ id: "reviewers", label: "Reviewers", reviewerIds: [f.actor], requiredApprovals: 1 }] };
     await pool.query(`INSERT INTO studio_review_policy ("reviewId","revisionId","rootGraphHash","policyVersion","stateVersion",definition,"configuredBy")
       VALUES ($1,$2,$3,1,1,$4::jsonb,$5)`, [f.reviewId, f.snapshotId, "a".repeat(64), JSON.stringify(definition), f.actor]);
     await pool.query(`CREATE ROLE "${role}" NOLOGIN`);
@@ -696,8 +731,11 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
         await asRuntime(async () => {
           expect((await client.query('SELECT "reviewId" FROM studio_review_policy WHERE "reviewId"=$1', [f.reviewId])).rows).toHaveLength(1);
           await client.query('UPDATE studio_review_policy SET "stateVersion"=2 WHERE "reviewId"=$1', [f.reviewId]);
+          const { policyCommandHash } = await import("./studio-review-policy-store");
+          const vote = { id: randomUUID(), type: "vote", pin: { reviewId: f.reviewId, artifactId: f.artifactId, revisionId: f.snapshotId, rootGraphHash: "a".repeat(64) },
+            expectedPolicyVersion: 1, expectedStateVersion: 1, groupId: "reviewers", decision: "approve", note: "" };
           await client.query(`INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload,"accessEpoch")
-            VALUES ($1,$2,1,2,'vote',$3,$4,$5::jsonb,studio_review_policy_actor_epoch($2,$3))`, [randomUUID(), f.reviewId, f.actor, "c".repeat(64), JSON.stringify({ groupId: "reviewers", decision: "approve" })]);
+            VALUES ($1,$2,1,2,'vote',$3,$4,$5::jsonb,studio_review_policy_actor_epoch($2,$3))`, [vote.id, f.reviewId, f.actor, policyCommandHash(vote), JSON.stringify(vote)]);
         });
         await expect(asRuntime(async () => { await client.query('UPDATE studio_review_policy SET "revisionId"=$2 WHERE "reviewId"=$1', [f.reviewId, f.snapshotId]); })).rejects.toThrow(/permission denied/u);
         await expect(asRuntime(async () => { await client.query('UPDATE studio_review_policy_event SET payload=$2::jsonb WHERE "reviewId"=$1', [f.reviewId, '{}']); })).rejects.toThrow(/permission denied/u);
