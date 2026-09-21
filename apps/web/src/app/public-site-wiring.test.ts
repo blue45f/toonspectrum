@@ -71,8 +71,10 @@ describe("public shell integration", () => {
     expect(shell).toContain("const PublicSiteWayfinder = lazy(");
     expect(shell).not.toContain('import { PublicSiteWayfinder }');
     expect(shell).toContain('publicCreativeRoute && !immersiveVirtualExperience');
+    expect(shell.match(/<WorkspaceTaskFrame route=/gu)).toHaveLength(1);
+    expect(shell).toContain('immersiveVirtualHome || immersiveVirtualProject ? null : chromeOverlay');
     expect(shell).toContain('["/", "/home", "/team", "/hub", "/studio"].includes(');
-    expect(shell).toContain('const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject;');
+    expect(shell).toContain('const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null;');
     expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{<Suspense fallback=\{null\}><PublicSiteWayfinder \/><\/Suspense>\}>\s*<PublicSiteNextSteps pathname=\{pathname\}\s*\/>/u);
   });
 });

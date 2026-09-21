@@ -105,7 +105,8 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   useEffect(() => {
     if (!dock || !expanded) return;
     const close = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.isComposing) return;
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented
+        || !(event.target instanceof Node) || !dock.contains(event.target)) return;
       event.stopPropagation();
       setExpanded(false);
       writeSiteBgmExpanded(false);

@@ -1,4 +1,4 @@
-import { workspaceTaskRoute } from "../workspace/workspace-task-route";
+import { workspaceTaskRoute } from "../workspace/workspace-task-route.ts";
 
 export type ExperienceMode = "vivid" | "calm";
 export type ExperienceLocale = string;export const EXPERIENCE_MODE_KEY = "toonstudio:site-experience:v1";

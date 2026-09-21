@@ -265,9 +265,11 @@ describe("task workspace audio dock", () => {
     expect(toggle.closest("#workspace-audio-dock")).not.toBeNull();
     fireEvent.click(toggle);
     expect(screen.getByRole("slider", { name: "OST 음량" })).toBeTruthy();
-    fireEvent.keyDown(document, { key: "Escape", isComposing: true });
+    fireEvent.keyDown(toggle, { key: "Escape", isComposing: true });
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.keyDown(toggle, { key: "Escape" });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(toggle);
     expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);

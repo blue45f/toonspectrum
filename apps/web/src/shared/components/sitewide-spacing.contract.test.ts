@@ -54,8 +54,9 @@ describe("install prompt and creator home spacing contracts", () => {
 
   it("does not stack a generic route card above the visual home hero", () => {
     expect(supportsRoutePurposeScene("/")).toBe(false);
-    expect(supportsRoutePurposeScene("/discover")).toBe(true);
-    expect(supportsRoutePurposeScene("/studio/new")).toBe(true);
+    expect(supportsRoutePurposeScene("/discover")).toBe(false);
+    expect(supportsRoutePurposeScene("/market/browse")).toBe(true);
+    expect(supportsRoutePurposeScene("/studio/new")).toBe(false);
     expect(supportsRoutePurposeScene("/studio/canvas")).toBe(false);
   });
 });
