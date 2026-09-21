@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioVirtualSpaceWorldAuthoringPanel } from "./StudioVirtualSpaceWorldAuthoringPanel";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 
@@ -99,5 +99,55 @@ describe("world authoring editing continuity", () => {
     view.rerender(<Editor projectId="work-b" />);
     await act(async () => complete(JSON.stringify({ ...initial(), version: 78 })));
     expect(current().version).toBe(initial().version); expect(undo().matches(":disabled")).toBe(true);
+  });
+  it("explains that anchor-only props cannot move the painted background", () => {
+    render(<Editor />); fireEvent.click(screen.getByRole("button", { name: /^소품/u }));
+    expect(screen.getByRole("note").textContent).toContain("배경 그림은 이동하지 않습니다");
+    fireEvent.change(screen.getByLabelText("Asset URL"), { target: { value: "/assets/independent-desk.png" } });
+    expect(screen.queryByRole("note")).toBeNull();
+    fireEvent.click(undo());
+    expect(screen.getByRole("note").textContent).toContain("배경 그림은 이동하지 않습니다");
+  });
+  it.each(["publication", "disabled"])("rejects a late import after %s changes", async (scope) => {
+    let complete!: (value: string) => void;
+    const file = { text: () => new Promise<string>((resolve) => { complete = resolve; }) };
+    const view = render(<Editor />);
+    fireEvent.change(view.container.querySelector("input[type=file]")!, { target: { files: [file] } });
+    view.rerender(<Editor revision={scope === "publication" ? "revision-b" : "revision-a"} disabled={scope === "disabled"} />);
+    await act(async () => complete(JSON.stringify({ ...initial(), version: 78 })));
+    expect(current().version).toBe(initial().version);
+    expect(undo().matches(":disabled")).toBe(true);
+  });
+  it("keeps the last selected import when file reads finish out of order", async () => {
+    let completeFirst!: (value: string) => void;
+    const first = { text: () => new Promise<string>((resolve) => { completeFirst = resolve; }) };
+    const second = { text: async () => JSON.stringify({ ...initial(), version: 79 }) };
+    const view = render(<Editor />);
+    const input = view.container.querySelector("input[type=file]")!;
+    fireEvent.change(input, { target: { files: [first] } });
+    await act(async () => { fireEvent.change(input, { target: { files: [second] } }); });
+    await act(async () => completeFirst(JSON.stringify({ ...initial(), version: 78 })));
+    expect(current().version).toBe(79);
+    fireEvent.click(undo()); expect(current().version).toBe(initial().version);
+  });
+  it("does not call the draft owner after an importing editor unmounts", async () => {
+    let complete!: (value: string) => void;
+    const onChange = vi.fn();
+    const view = render(<StudioVirtualSpaceWorldAuthoringPanel projectId="work-a" manifest={initial()} onChange={onChange} onReset={vi.fn()} />);
+    fireEvent.change(view.container.querySelector("input[type=file]")!, {
+      target: { files: [{ text: () => new Promise<string>((resolve) => { complete = resolve; }) }] },
+    });
+    view.unmount();
+    await act(async () => complete(JSON.stringify({ ...initial(), version: 78 })));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it("preserves the original draft and reports invalid JSON without adding history", async () => {
+    const view = render(<Editor />);
+    await act(async () => {
+      fireEvent.change(view.container.querySelector("input[type=file]")!, { target: { files: [{ text: async () => "{" }] } });
+    });
+    expect(current()).toEqual(initial());
+    expect(view.container.querySelector(".studio-vspace-authoring-message[role=status]")?.textContent).toBeTruthy();
+    expect(undo().matches(":disabled")).toBe(true);
   });
 });
