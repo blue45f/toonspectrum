@@ -36,7 +36,7 @@ describe("private draft storage", () => {
     const f = fixture(); await f.repository.add(scope, input(), () => true);
     const edited = await f.repository.reviseBody(scope, "draft-a", "수정한 초안", () => true);
     expect(edited[0]?.input).toEqual({ ...input(), body: "수정한 초안" });
-    await f.repository.markAttempt(scope, "draft-a", () => true);
+    await f.repository.markAttempt(scope, edited[0]!.input, () => true);
     await expect(f.repository.reviseBody(scope, "draft-a", "변경", () => true)).rejects.toThrow();
     await expect(f.repository.remove(scope, "draft-a", () => true)).rejects.toThrow();
   });
@@ -68,23 +68,23 @@ describe("explicit per-note publication", () => {
       expect((await f.repository.list(scope))[0]?.state).toBe("attempted");
       return create(reviewId, note);
     });
-    expect(await publishReviewDrafts(scope, ["draft-a"], f.repository, () => true, f.dependencies)).toEqual({ confirmed: ["draft-a"], stopped: null });
+    expect(await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies)).toEqual({ confirmed: ["draft-a"], stopped: null });
     expect(await f.repository.list(scope)).toEqual([]); expect(f.comments).toHaveLength(1);
   });
   it("reconciles a lost response using the same ID without sending a duplicate", async () => {
     const f = fixture(); await f.repository.add(scope, input(), () => true);
     const create = f.dependencies.create.getMockImplementation()!;
     f.dependencies.create.mockImplementationOnce(async (reviewId, note) => { await create(reviewId, note); throw new Error("response lost"); });
-    expect(await publishReviewDrafts(scope, ["draft-a"], f.repository, () => true, f.dependencies)).toEqual({ confirmed: [], stopped: "draft-a" });
+    expect(await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies)).toEqual({ confirmed: [], stopped: "draft-a" });
     expect((await f.repository.list(scope))[0]?.state).toBe("attempted");
-    expect(await publishReviewDrafts(scope, ["draft-a"], f.repository, () => true, f.dependencies)).toEqual({ confirmed: ["draft-a"], stopped: null });
+    expect(await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies)).toEqual({ confirmed: ["draft-a"], stopped: null });
     expect(f.dependencies.create).toHaveBeenCalledTimes(1); expect(await f.repository.list(scope)).toEqual([]);
   });
   it("reports partial publication and preserves the remaining original IDs", async () => {
     const f = fixture(); for (const id of ["draft-a", "draft-b", "draft-c"]) await f.repository.add(scope, input(id), () => true);
     const create = f.dependencies.create.getMockImplementation()!;
     f.dependencies.create.mockImplementation(async (reviewId, note) => { if (note.id === "draft-b") throw new Error("unavailable"); return create(reviewId, note); });
-    expect(await publishReviewDrafts(scope, ["draft-a", "draft-b", "draft-c"], f.repository, () => true, f.dependencies)).toEqual({ confirmed: ["draft-a"], stopped: "draft-b" });
+    expect(await publishReviewDrafts(scope, ["draft-a", "draft-b", "draft-c"].map((id) => input(id)), f.repository, () => true, f.dependencies)).toEqual({ confirmed: ["draft-a"], stopped: "draft-b" });
     expect((await f.repository.list(scope)).map((entry) => [entry.input.id, entry.state])).toEqual([["draft-b", "attempted"], ["draft-c", "draft"]]);
     expect(f.dependencies.create).toHaveBeenCalledTimes(2);
   });
@@ -95,21 +95,21 @@ describe("explicit per-note publication", () => {
       : mode === "expired" ? { ...original, expiresAt: 0 }
         : mode === "different-source" ? { ...original, revision: { ...original.revision, rootGraphHash: "b".repeat(64) } }
           : { ...original, review: { ...original.review, status: "approved" } });
-    const outcome = await publishReviewDrafts(scope, ["draft-a"], f.repository, () => true, f.dependencies);
+    const outcome = await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies);
     expect(outcome.confirmed).toEqual([]); expect(f.dependencies.create).not.toHaveBeenCalled();
     expect((await f.repository.list(scope))[0]?.state).toBe("draft");
   });
   it("does not send when durable attempt storage fails", async () => {
     const f = fixture(); await f.repository.add(scope, input(), () => true);
     f.store.set.mockRejectedValueOnce(new Error("quota"));
-    expect((await publishReviewDrafts(scope, ["draft-a"], f.repository, () => true, f.dependencies)).confirmed).toEqual([]);
+    expect((await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies)).confirmed).toEqual([]);
     expect(f.dependencies.create).not.toHaveBeenCalled();
   });
   it("does not accept another actor's matching note as this draft's receipt", async () => {
     const f = fixture(); await f.repository.add(scope, input(), () => true);
     await f.dependencies.create("review", input()); f.comments[0] = { ...f.comments[0]!, authorUserId: "someone-else" };
     f.dependencies.create.mockClear();
-    const outcome = await publishReviewDrafts(scope, ["draft-a"], f.repository, () => true, f.dependencies);
+    const outcome = await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies);
     expect(outcome.confirmed).toEqual([]); expect(await f.repository.list(scope)).toHaveLength(1);
     expect(f.dependencies.create).not.toHaveBeenCalled();
   });
@@ -117,8 +117,49 @@ describe("explicit per-note publication", () => {
     const f = fixture(); await f.repository.add(scope, input(), () => true);
     let active = true; const original = await f.dependencies.verify();
     f.dependencies.verify.mockImplementation(async () => { active = false; return original; });
-    expect(await publishReviewDrafts(scope, ["draft-a"], f.repository, () => active, f.dependencies)).toEqual({ confirmed: [], stopped: "cancelled" });
+    expect(await publishReviewDrafts(scope, ["draft-a"].map((id) => input(id)), f.repository, () => active, f.dependencies)).toEqual({ confirmed: [], stopped: "cancelled" });
     expect(f.dependencies.create).not.toHaveBeenCalled();
-    await expect(publishReviewDrafts(scope, ["draft-a", "draft-a"], f.repository, () => true, f.dependencies)).rejects.toThrow();
+    await expect(publishReviewDrafts(scope, ["draft-a", "draft-a"].map((id) => input(id)), f.repository, () => true, f.dependencies)).rejects.toThrow();
+  });
+});
+
+describe("publication consent under cross-tab changes", () => {
+  it("rejects a draft changed after the user selected its previous content", async () => {
+    const f = fixture(); await f.repository.add(scope, input(), () => true);
+    await f.repository.reviseBody(scope, "draft-a", "Changed in another tab", () => true);
+    const outcome = await publishReviewDrafts(scope, [input()], f.repository, () => true, f.dependencies);
+    expect(outcome).toEqual({ confirmed: [], stopped: "draft-a" });
+    expect(f.dependencies.create).not.toHaveBeenCalled();
+    expect((await f.repository.list(scope))[0]?.input.body).toBe("Changed in another tab");
+  });
+  it("rechecks consent in the storage lock after a slow access verification", async () => {
+    const f = fixture(); await f.repository.add(scope, input(), () => true);
+    const verified = await f.dependencies.verify();
+    f.dependencies.verify.mockImplementationOnce(async () => {
+      await f.repository.reviseBody(scope, "draft-a", "Edited while verifying", () => true);
+      return verified;
+    });
+    const outcome = await publishReviewDrafts(scope, [input()], f.repository, () => true, f.dependencies);
+    expect(outcome.confirmed).toEqual([]); expect(f.dependencies.create).not.toHaveBeenCalled();
+    expect((await f.repository.list(scope))[0]?.state).toBe("draft");
+  });
+  it("does not remove newer local text while reconciling an older server receipt", async () => {
+    const f = fixture(); await f.repository.add(scope, input(), () => true);
+    await f.dependencies.create("review", input()); f.dependencies.create.mockClear();
+    const verified = await f.dependencies.verify();
+    f.dependencies.verify.mockImplementationOnce(async () => {
+      await f.repository.reviseBody(scope, "draft-a", "Keep this newer local edit", () => true);
+      return verified;
+    });
+    const result = await publishReviewDrafts(scope, [input()], f.repository, () => true, f.dependencies);
+    expect(result.confirmed).toEqual([]); expect(f.dependencies.create).not.toHaveBeenCalled();
+    expect((await f.repository.list(scope))[0]?.input.body).toBe("Keep this newer local edit");
+  });
+  it("snapshots the confirmed input before waiting for the publication lock", async () => {
+    const f = fixture(); const selected = input(); await f.repository.add(scope, selected, () => true);
+    const result = publishReviewDrafts(scope, [selected], f.repository, () => true, f.dependencies);
+    selected.body = "Mutation after confirmation";
+    expect(await result).toEqual({ confirmed: ["draft-a"], stopped: null });
+    expect(f.dependencies.create.mock.calls[0]?.[1].body).toBe(input().body);
   });
 });

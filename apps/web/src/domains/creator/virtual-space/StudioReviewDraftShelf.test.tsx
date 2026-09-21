@@ -77,3 +77,27 @@ describe("private draft UI", () => {
     expect(screen.queryByText("저장한 개인 의견")).toBeNull(); expect(f.publish).not.toHaveBeenCalled();
   });
 });
+
+function BusyLifecycleHarness() {
+  const [shown, setShown] = useState(true), [busy, setBusy] = useState(false);
+  return <><button onClick={() => setShown((value) => !value)}>Toggle shelf</button><output aria-label="parent busy">{busy ? "busy" : "idle"}</output>
+    {shown ? <StudioReviewDraftShelf scope={scope} compose={entry.input} disabled={busy} onBusy={setBusy} onStored={f.stored} onPublished={f.published} /> : null}</>;
+}
+describe("draft shelf lifecycle ownership", () => {
+  it("releases its parent's busy state at unmount and ignores the old request on remount", async () => {
+    let first!: (value: ReviewPrivateDraft[]) => void, second!: (value: ReviewPrivateDraft[]) => void;
+    f.add.mockReturnValueOnce(new Promise((resolve) => { first = resolve; }))
+      .mockReturnValueOnce(new Promise((resolve) => { second = resolve; }));
+    render(<BusyLifecycleHarness />); open();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "초안에 담고 입력 비우기" })); });
+    expect(screen.getByLabelText("parent busy").textContent).toBe("busy");
+    fireEvent.click(screen.getByRole("button", { name: "Toggle shelf" }));
+    expect(screen.getByLabelText("parent busy").textContent).toBe("idle");
+    fireEvent.click(screen.getByRole("button", { name: "Toggle shelf" })); open();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "초안에 담고 입력 비우기" })); });
+    await act(async () => { first([entry]); });
+    expect(screen.getByLabelText("parent busy").textContent).toBe("busy"); expect(f.stored).not.toHaveBeenCalled();
+    await act(async () => { second([entry]); });
+    expect(screen.getByLabelText("parent busy").textContent).toBe("idle"); expect(f.stored).toHaveBeenCalledTimes(1);
+  });
+});

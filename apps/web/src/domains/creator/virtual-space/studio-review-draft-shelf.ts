@@ -38,8 +38,8 @@ export interface ReviewDraftRepository {
   list(scope: ReviewDraftScope): Promise<ReviewPrivateDraft[]>;
   add(scope: ReviewDraftScope, input: ReviewDraftInput, current: () => boolean): Promise<ReviewPrivateDraft[]>;
   reviseBody(scope: ReviewDraftScope, id: string, body: string, current: () => boolean): Promise<ReviewPrivateDraft[]>;
-  markAttempt(scope: ReviewDraftScope, id: string, current: () => boolean): Promise<ReviewPrivateDraft>;
-  remove(scope: ReviewDraftScope, id: string, current: () => boolean, confirmed?: boolean): Promise<ReviewPrivateDraft[]>;
+  markAttempt(scope: ReviewDraftScope, expected: ReviewDraftInput, current: () => boolean): Promise<ReviewPrivateDraft>;
+  remove(scope: ReviewDraftScope, id: string, current: () => boolean, confirmed?: ReviewDraftInput): Promise<ReviewPrivateDraft[]>;
   publishLock: ReviewDraftLock;
 }
 export function createReviewDraftRepository(store: StudioAsyncKeyValueStore, lock: ReviewDraftLock): ReviewDraftRepository {
@@ -66,14 +66,17 @@ export function createReviewDraftRepository(store: StudioAsyncKeyValueStore, loc
       const input = draftNoteInputSchema.parse({ ...entry.input, body });
       return entries.map((item) => item.input.id === id ? { ...item, input } : item);
     }),
-    markAttempt: async (scope, id, current) => {
+    markAttempt: async (scope, expected, current) => {
+      const id = expected.id;
       const next = await update(scope, current, (entries) => {
-        if (!entries.some((entry) => entry.input.id === id)) throw new Error("Draft no longer exists");
+        const entry = entries.find((item) => item.input.id === id);
+        if (!entry || canonicalJson(entry.input) !== canonicalJson(expected)) throw new Error("Draft changed after confirmation");
         return entries.map((entry) => entry.input.id === id ? { ...entry, state: "attempted" } : entry);
       });
       return next.find((entry) => entry.input.id === id)!;
     },
-    remove: (scope, id, current, confirmed = false) => update(scope, current, (entries) => {
+    remove: (scope, id, current, confirmed) => update(scope, current, (entries) => {
+      if (confirmed && entries.some((entry) => entry.input.id === id && canonicalJson(entry.input) !== canonicalJson(confirmed))) throw new Error("Draft changed before reconciliation");
       if (!confirmed && entries.some((entry) => entry.input.id === id && entry.state === "attempted")) throw new Error("Reconcile the publication result before deleting this draft");
       return entries.filter((entry) => entry.input.id !== id);
     }),

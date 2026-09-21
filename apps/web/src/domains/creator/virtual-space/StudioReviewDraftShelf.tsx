@@ -20,7 +20,10 @@ function ReviewDraftShelfForScope({ scope, compose, disabled, onBusy, onStored, 
   const [selected, setSelected] = useState<string[]>([]), [confirm, setConfirm] = useState(false);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const generation = useRef(0), pending = useRef(false);
-  const invalidate = useCallback(() => { ++generation.current; }, []);
+  const invalidate = useCallback(() => {
+    ++generation.current;
+    if (pending.current) { pending.current = false; onBusy(false); }
+  }, [onBusy]);
   useLayoutEffect(() => invalidate, [invalidate]);
   const run = async (action: "load" | "add" | "remove" | "publish" | "revise", id?: string) => {
     if (disabled || pending.current || getAuthUserId() !== scope.actorId) return;
@@ -32,7 +35,12 @@ function ReviewDraftShelfForScope({ scope, compose, disabled, onBusy, onStored, 
     try {
       const repository = await acquireReviewDraftRepository(); if (!current()) return;
       if (action === "publish") {
-        const outcome = await publishReviewDrafts(scope, [...selected], repository, current); if (!current()) return;
+        const consent = selected.map((id) => {
+          const entry = entries?.find((candidate) => candidate.input.id === id);
+          if (!entry) throw new Error("Draft selection is stale");
+          return entry.input;
+        });
+        const outcome = await publishReviewDrafts(scope, consent, repository, current); if (!current()) return;
         const latest = await repository.list(scope); if (!current()) return;
         setEntries(latest); setSelected([]); setConfirm(false);
         setNotice(outcome.stopped

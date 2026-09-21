@@ -1,9 +1,9 @@
 # Competitive blueprint continuation — 2026-09-21
 
-Status: implemented increment; final main/production receipts are recorded in its PR.
+Status: implemented increment; exact-head checks and main merge receipts are recorded in its PR. Deployment is out of scope.
 Original blueprint: ToonStudio_Competitive_Blueprint_2026-09-21, F01–F40.
 Initial source baseline: `abd60158f17f84a59afa73d7a328eaf4de86d866`.
-User explicitly requested continuing the implementation, merging main and deploying production. This does not authorize database migrations, secrets/environment changes, paid plans, domain changes or automatic deployment.
+Latest explicit user instruction: finish the improvements and merge main only; deployment is being handled elsewhere. This task does not execute production deployment, Cloudflare promotion, Render restart, database migrations, environment/secret changes, paid plans, domain changes or automatic deployment.
 
 ## Implemented and connected in this release
 
@@ -58,4 +58,13 @@ Reproduce local browser check: run `pnpm exec vite --host 127.0.0.1 --port 4472 
 - `pnpm run typecheck`: Web and API passed after new testing-library query options were corrected without changing assertion semantics.
 - `node scripts/verify-blueprint-mcp-workflow.mjs`: both 1440px and 390px passed using actual SQLite/OPFS save/reload and zero API writes.
 - Screenshots were inspected. Focused/component test counts overlap the shard and are not added into a misleading unique-test total.
-- GitHub exact-head checks and manual deployment identity must be recorded from provider results, not inferred from local gates.
+- GitHub exact-head checks and merge identity must be recorded from GitHub results, not inferred from local gates. No deployment is requested by the latest instruction.
+
+### Pre-merge consent and lifecycle hardening
+
+- Publication accepts the exact selected input snapshots, not just mutable draft IDs. Inputs are copied before waiting for the publication lock.
+- The selected payload is checked against storage before access verification and again under the storage lock when recording an attempt. Another tab cannot substitute new text after confirmation.
+- Receipt cleanup compares the same input before removing the local entry; a newer local edit is retained rather than deleted by reconciliation of an older receipt.
+- Unmounting a shelf releases only its own pending parent-busy state. Late results cannot clear a new shelf's pending operation or composer.
+- Added five regression cases for stale selection, changes during access verification, changed local content during receipt reconciliation, mutation of the caller's selection object, and unmount/remount ownership.
+- Targeted draft and pinned-review regressions: 4 files / 49 tests passed. Existing counts overlap this scope and must not be summed.
