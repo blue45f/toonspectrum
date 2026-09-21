@@ -1,3 +1,4 @@
+import { studioToolbarProfileMatches, studioToolbarProfileNameError } from "./studio-toolbar-profile-names";
 import { StudioToolbarProfileManager } from "./StudioToolbarProfileManager";
 import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, GripVertical, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -37,7 +38,12 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
     setDraft(configuredStudioToolbar(value));
   }, [value, dirty]);
   const label = (tool: StudioRailToolId) => studioRailToolLabel(tool, t);
-  const change = (next: StudioToolbarPreferences) => { setDraft(next); setDirty(true); };
+  const change = (next: StudioToolbarPreferences) => {
+    const active = next.profiles?.find((profile) => profile.id === next.activeProfileId);
+    setDraft(active && !studioToolbarProfileMatches(active, next) ? { ...next, activeProfileId: null } : next);
+    setDirty(true);
+  };
+  const nameProblem = studioToolbarProfileNameError(draft.profiles ?? [], name);
   const move = (tool: StudioRailToolId, index: number) => {
     change(moveStudioToolbarTool(draft, tool, index));
     setAnnouncement(`${label(tool)} · ${Math.max(1, Math.min(draft.visibleIds.length, index + 1))}번째로 이동`);
@@ -132,10 +138,11 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
       </div>
       <StudioToolbarProfileManager value={draft} onChange={change} />
       <div className="mt-2 flex gap-2">
-        <input aria-label="새 도구 구성 이름" value={name} maxLength={48} onChange={(event) => setName(event.currentTarget.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm" />
-        <button type="button" className={action} disabled={!name.trim() || (draft.profiles?.length ?? 0) >= 12}
-          onClick={() => { const profileId = crypto.randomUUID(); change({ ...draft, activeProfileId: profileId, profiles: [...(draft.profiles ?? []), { id: profileId, name: name.trim(), visibleIds: [...draft.visibleIds], view: draft.view ?? "single" }] }); setName(""); }}>구성 저장</button>
+        <input aria-label="새 도구 구성 이름" aria-invalid={Boolean(name.trim() && nameProblem) || undefined} aria-describedby={name.trim() && nameProblem ? `${id}-name-error` : undefined} value={name} maxLength={48} onChange={(event) => setName(event.currentTarget.value)} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 text-sm" />
+        <button type="button" className={action} disabled={Boolean(nameProblem) || (draft.profiles?.length ?? 0) >= 12}
+          onClick={() => { if (nameProblem || (draft.profiles?.length ?? 0) >= 12) return; const profileId = crypto.randomUUID(); change({ ...draft, activeProfileId: profileId, profiles: [...(draft.profiles ?? []), { id: profileId, name: name.trim(), visibleIds: [...draft.visibleIds], view: draft.view ?? "single" }] }); setName(""); }}>구성 저장</button>
       </div>
+      {name.trim() && nameProblem ? <p id={`${id}-name-error`} role="status" className="mt-2 text-xs text-warn">{nameProblem}</p> : null}
     </details>
     {draft.archivedIds?.length ? <p className="text-xs text-fg-2">이 버전에서 알 수 없는 도구 {draft.archivedIds.length}개의 설정은 보관했으며 실행하지 않습니다.</p> : null}
     <p role="status" aria-live="polite" className="text-xs text-fg-2">{announcement || (dirty ? "아직 적용하지 않은 구성입니다." : "이동 버튼 또는 Alt+방향키로 정렬할 수 있습니다.")}</p>
