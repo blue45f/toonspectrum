@@ -37,10 +37,9 @@ import {
   type CspToolFileImportResult,
 } from "../../../../../../packages/studio-format-gateway/src/csp-sut";
 import { parseKppPreset, KppParseError } from "../../../../../../packages/studio-format-gateway/src/kpp";
-import {
-  importKritaBundle,
-  KritaBundleError,
-  type KritaBundleImportResult,
+import type {
+  KritaBundleImportOptions,
+  KritaBundleImportResult,
 } from "../../../../../../packages/studio-format-gateway/src/krita-bundle";
 import { importMybBrush, MybParseError } from "../../../../../../packages/studio-format-gateway/src/myb";
 import { STABILIZER_MAX } from "../studio-brush";
@@ -535,8 +534,12 @@ export async function importStudioCspToolBytes(
 /** Krita `.bundle` KPP/MYB resources → one candidate per verified program. */
 export async function importStudioKritaBundleBytes(
   bytes: Uint8Array,
-  options: Parameters<typeof importKritaBundle>[1] = {},
+  options: KritaBundleImportOptions = {},
 ): Promise<StudioBrushPackImportResult> {
+  // Load the archive parser only after the user explicitly imports a Krita bundle.
+  const { importKritaBundle, KritaBundleError } = await import(
+    "../../../../../../packages/studio-format-gateway/src/krita-bundle"
+  );
   let parsed: KritaBundleImportResult;
   try {
     parsed = await importKritaBundle(bytes, options);
@@ -692,7 +695,7 @@ export function importStudioBrushJsonText(
 export interface StudioBrushProgramFileOptions {
   readonly signal?: AbortSignal;
   readonly cspSqliteReader?: CspSutSqliteReader;
-  readonly kritaBundleOptions?: Parameters<typeof importKritaBundle>[1];
+  readonly kritaBundleOptions?: KritaBundleImportOptions;
 }
 
 /** Reads every engine-neutral program lane; ABR/JSON retain their dedicated owners. */
