@@ -6,6 +6,7 @@ import { studioBrushPresetUsesIntentionalDiscreteCarrier } from "../apps/web/src
 import { STUDIO_ALL_BRUSH_CATALOG_ITEMS } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 import { studioBrushPackDescriptorById } from "../apps/web/src/domains/creator/brush/studio-brush-pack-index";
 import { classifyStudioDryMediaCatalogIdV1 } from "../apps/web/src/domains/creator/brush/studio-dry-media-anisotropic-grain-v1";
+import { STUDIO_MATERIAL_BRUSH_DEFINITIONS } from "../apps/web/src/domains/creator/brush/studio-material-brush-catalog";
 import { studioWetInkBrushDepositsPigment } from "../apps/web/src/domains/creator/brush/studio-wet-ink-brush-runtime";
 
 import {
@@ -144,6 +145,21 @@ describe("Studio exhaustive long-brush quality policy", () => {
       STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(({ source }) => source === "core").length,
     );
     expect(policies.filter(({ source }) => source === "pro")).toHaveLength(200);
+  });
+
+  it("uses declared material stamp/scatter modes without exempting continuous or ribbon media", () => {
+    for (const material of STUDIO_MATERIAL_BRUSH_DEFINITIONS) {
+      const policy = classifyStudioLongBrushQualityPolicy({
+        id: `material-${material.program}`, source: "pro", runtimeBrushId: material.runtime,
+        mediaGroup: "line", previewStyle: "line", intentionalDiscrete: false,
+      });
+      const discrete = material.mode === "stamp" || material.mode === "scatter";
+      expect(policy.kind === "record-only-discrete", material.program).toBe(discrete);
+    }
+    expect(classifyStudioLongBrushQualityPolicy({
+      id: "web-soft-cloud", source: "core", runtimeBrushId: "airbrush",
+      mediaGroup: "airbrush", previewStyle: "soft", intentionalDiscrete: false,
+    }).kind).toBe("soft-wet-continuous");
   });
 
   it("accepts a stable continuous carrier and reports exact transition metrics", () => {
