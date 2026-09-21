@@ -440,6 +440,9 @@ describe("bootstrap SQL and repository contract", () => {
       "0081_fortune_public_snapshot",
       "0082_studio_review_policy",
       "0083_studio_review_vote_epoch",
+      "0084_production_model_v2_compatibility",
+      "0085_production_team_workspace",
+      "0086_production_operation_policy",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
     expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([

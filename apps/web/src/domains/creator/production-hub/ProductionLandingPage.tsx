@@ -102,6 +102,7 @@ export function ProductionLandingPage() {
                 기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
+                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/production/workspaces">팀 워크스페이스</Link>
                 <Link className={buttonClass({ size: "lg" })} to="/production/projects/sample-project/overview">
                   기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>

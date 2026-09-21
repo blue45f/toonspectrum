@@ -1,5 +1,8 @@
 import type { ColorIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
 
+export const SKIA_DOCUMENT_MAX_BACKING_DIMENSION = 8192;
+export const SKIA_DOCUMENT_MAX_BACKING_PIXELS = 16_777_216;
+
 export interface SkiaDocumentInk {
   /** Immutable document-space x, y, radius triples. */
   readonly dabs: Float32Array;

@@ -15,9 +15,16 @@ async function compiledPackage(root, path, source) {
   return filename;
 }
 
+async function compiledProductionContracts(root) {
+  for (const name of ["production-workspace", "operation-policy"]) {
+    await compiledPackage(root, `packages/contracts/src/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
+  }
+}
+
 test("stages workspace packages inside the emitted API boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-"));
   try {
+    await compiledProductionContracts(root);
     await compiledPackage(
       root,
       "packages/contracts/src/security/csrf.js",
@@ -71,6 +78,9 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     ]);
 
     const requireFromApi = createRequire(caller);
+    for (const name of ["production-workspace", "operation-policy"]) {
+      assert.deepEqual(requireFromApi(`@toonspectrum/contracts/${name}`), { contract: name });
+    }
     assert.deepEqual(requireFromApi("@toonspectrum/contracts/security/csrf"), {
       csrf: "ready",
     });
@@ -125,6 +135,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
 test("fails when an exported workspace subpath was not compiled", async () => {
   const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-subpath-missing-"));
   try {
+    await compiledProductionContracts(root);
     await compiledPackage(
       root,
       "packages/contracts/src/security/csrf.js",
@@ -184,4 +195,12 @@ test("API graph subpaths compile from workspace sources instead of type-only pac
     ]);
     assert.equal(manifest.exports[`./${name}`].types, `./src/graph/${name}.ts`);
   }
+});
+
+test("fails when a production operating contract was not emitted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-policy-missing-"));
+  try {
+    await compiledPackage(root, "packages/contracts/src/security/csrf.js", "module.exports = {};\n");
+    await assert.rejects(stageApiWorkspaceRuntime(root), /packages\/contracts\/src\/production-workspace\.js/u);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

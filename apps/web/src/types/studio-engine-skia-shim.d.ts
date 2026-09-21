@@ -46,3 +46,5 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement, options?: 
   readonly maxPictureBytes?: number;
   readonly onContextLost?: () => void;
 }): import("../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentRenderer;
+
+export { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "../../../../packages/studio-engine-skia/src/document-contract";

@@ -151,3 +151,15 @@ it("recreates an externally resized backing store even when the source revision 
   expect(h.surface.flush).toHaveBeenCalledTimes(2);
   renderer.dispose();
 });
+
+
+it("does not restore viewport textures from a previous backing-store generation", async () => {
+  const h = harness(); const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck });
+  await renderer.present(h.frame);
+  await renderer.present({ ...h.frame, revision: {}, camera: { ...h.frame.camera, offsetX: 10 } });
+  await renderer.present({ ...h.frame, revision: {}, width: 400, height: 300, dpr: 2 });
+  h.output.drawImage.mockClear();
+  expect(await renderer.present({ ...h.frame, revision: {} })).toMatchObject({ status: "presented", stats: { presentation: "full", compiledItems: 0 } });
+  expect(h.output.drawImage).not.toHaveBeenCalled();
+  renderer.dispose();
+});

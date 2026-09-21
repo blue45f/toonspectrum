@@ -1,3 +1,4 @@
+import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "./document-contract";
 import { renderSceneNodesToCanvas } from "./render";
 
 import type { SkiaDocumentInk, SkiaDocumentItem, SkiaDocumentFrame, SkiaDocumentReceipt, SkiaDocumentRenderer } from "./document-contract";
@@ -49,8 +50,8 @@ function drawInk(ck: CanvasKit, canvas: Canvas, ink: SkiaDocumentInk): void {
 function validateFrame(frame: SkiaDocumentFrame): void {
   const dimensions = [frame.width, frame.height, frame.documentWidth, frame.documentHeight, frame.dpr];
   if (dimensions.some((value) => !Number.isFinite(value) || value <= 0)
-    || frame.width * frame.dpr > 8192 || frame.height * frame.dpr > 8192
-    || Math.ceil(frame.width * frame.dpr) * Math.ceil(frame.height * frame.dpr) > 16_777_216
+    || frame.width * frame.dpr > SKIA_DOCUMENT_MAX_BACKING_DIMENSION || frame.height * frame.dpr > SKIA_DOCUMENT_MAX_BACKING_DIMENSION
+    || Math.ceil(frame.width * frame.dpr) * Math.ceil(frame.height * frame.dpr) > SKIA_DOCUMENT_MAX_BACKING_PIXELS
     || frame.items.length > 50_000 || Object.values(frame.camera).some((value) => !Number.isFinite(value))
     || frame.camera.scaleX === 0 || frame.camera.scaleY === 0) throw new Error("Invalid or over-budget GPU document frame");
   const ids = new Set<string>();
@@ -201,7 +202,9 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
     const unchanged = backingValid && presentedLayout === layout && sameItems(presentedItems, frame.items);
     const appended = backingValid && presentedLayout === layout && frame.items.length > presentedItems.length
       && presentedItems.every((item, index) => item.id === frame.items[index]?.id && item.revision === frame.items[index]?.revision);
-    const restoreIndex = snapshots.findIndex((snapshot) => snapshot.layout === layout && snapshotMatches(snapshot.keys, frame.items));
+    const canRestoreSnapshot = backingValid && surfaceWidth === Math.ceil(frame.width * frame.dpr)
+      && surfaceHeight === Math.ceil(frame.height * frame.dpr);
+    const restoreIndex = canRestoreSnapshot ? snapshots.findIndex((snapshot) => snapshot.layout === layout && snapshotMatches(snapshot.keys, frame.items)) : -1;
     const restore = restoreIndex < 0 ? undefined : snapshots.splice(restoreIndex, 1)[0];
     try {
     const snapshotBytes = canvas.width * canvas.height * 4;

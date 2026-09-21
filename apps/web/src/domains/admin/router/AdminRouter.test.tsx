@@ -27,6 +27,7 @@ vi.mock("../components/AdminReports", () => ({ AdminReports: ({ userId }: { user
 vi.mock("../components/AdminSecurity", () => ({ AdminSecurity: ({ userId }: { userId: string }) => <p>security:{userId}</p> }));
 vi.mock("../components/AdminAuditLogs", () => ({ AdminAuditLogs: ({ userId }: { userId: string }) => <p>audit:{userId}</p> }));
 vi.mock("../components/AdminCampaigns", () => ({ AdminCampaigns: ({ uid }: { uid: string }) => <p>campaigns:{uid}</p> }));
+vi.mock("../components/AdminOperatingMode", () => ({ AdminOperatingMode: ({ uid }: { uid: string }) => <p>operation-policy:{uid}</p> }));
 vi.mock("../components/AdminOps", () => ({ AdminOps: ({ uid }: { uid: string }) => <p>ops:{uid}</p> }));
 vi.mock("../AdminMembersPage", () => ({ AdminMembersPage: () => { const gate = useAdminGate(); return <p>members:{gate.uid}:{gate.gate.kind}</p>; } }));
 vi.mock("../AdminCommunityPage", () => ({ AdminCommunityPage: () => { const gate = useAdminGate(); return <p>community:{gate.uid}:{gate.gate.kind}</p>; } }));
@@ -77,6 +78,12 @@ describe("AdminRouter access and real route transitions", () => {
   ])("routes %s to the correct feature with the verified actor", async (path, content) => {
     open(path); expect(await screen.findByText(content)).toBeTruthy();
     expect(screen.getByLabelText("Current location").textContent).toBe(path);
+  });
+  it("renders operating policy in the canonical operations route and its legacy redirect", async () => {
+    open("/admin?tab=ops");
+    expect(await screen.findByText("operation-policy:actor-a")).toBeTruthy();
+    expect(screen.getByText("ops:actor-a")).toBeTruthy();
+    expect(screen.getByLabelText("Current location").textContent).toBe("/admin/platform/operations");
   });
   it("redirects legacy URLs without losing unrelated search and anchor", async () => {
     open("/admin?tab=reports&source=shortcut#latest");

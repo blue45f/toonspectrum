@@ -1,3 +1,4 @@
+import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "@toonspectrum/studio-engine-skia";
 import { isStudioSkiaDocumentFrontierReady } from "../render/studio-skia-document-frontier";
 import { isStudioSkiaDocumentElement } from "../render/studio-skia-document-plan";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -543,10 +544,10 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
   const velloSurfaceSizeAdmitted =
     stageViewLayout.width > 0
     && stageViewLayout.height > 0
-    && velloBackingWidth <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingDimension
-    && velloBackingHeight <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingDimension
+    && velloBackingWidth <= SKIA_DOCUMENT_MAX_BACKING_DIMENSION
+    && velloBackingHeight <= SKIA_DOCUMENT_MAX_BACKING_DIMENSION
     && velloBackingWidth * velloBackingHeight
-      <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingPixelArea;
+      <= SKIA_DOCUMENT_MAX_BACKING_PIXELS;
   const velloHasExactPaintProjection =
     !isExporting
     && !saving

@@ -14,7 +14,7 @@ Immutable per-element SkPictures preserve the existing causal dab/pressure/paint
 - Existing document, Yjs, Undo, original strokes, asset references and SQLite/OPFS storage remain unchanged.
 - An authorized local draft may display while optional CRDT startup is pending. Joined/saved work still consumes the existing document-lock projection. This display admission grants no edit, lease, ACK or save permission.
 - Imperative Stage camera changes use a scoped event adapter, coalesce into one animation frame and read the actual current transform, including scrolled viewport offsets.
-- The owning Stage hides its document pixels only for an exact matching source-revision receipt. The GPU canvas is revealed only after that acknowledgement.
+- The owning Stage hides its document pixels only for an exact matching source-revision receipt. The GPU canvas is revealed only after the hidden-source layer paint has actually completed, not merely after a React opacity update.
 - The initial migration still waits for the existing committed-stroke display fence so pending native live overlays are retired correctly. This bridge is intentionally not described as zero Konva input/commit cost.
 - One surface owns the admitted document pixels. Specialised brush previews and input/selection still use their existing owners.
 - Loading requests retain only the latest pending visual frame and settle superseded requests. No accepted canonical input is dropped.

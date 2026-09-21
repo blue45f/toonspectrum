@@ -36,3 +36,5 @@ export type { RenderOptions } from "./render";
 
 export { createSkiaDocumentRenderer, SKIA_DOCUMENT_RENDERER_ID } from "./document-renderer";
 export type { SkiaDocumentRenderer, SkiaDocumentRendererOptions, SkiaDocumentFrame, SkiaDocumentItem, SkiaDocumentInk, SkiaDocumentReceipt, SkiaDocumentStats } from "./document-renderer";
+
+export { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "./document-contract";

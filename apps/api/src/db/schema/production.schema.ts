@@ -54,7 +54,7 @@ export const productionProjects = pgTable(
         'adaptation', 'studio-production', 'anthology', 'replacement'
       )`,
     ),
-    check("production_project_model_version_check", sql`${table.modelVersion} = 1`),
+    check("production_project_model_version_check", sql`${table.modelVersion} in (1, 2)`),
     check("production_project_revision_check", sql`${table.revision} between 0 and 2147483647`),
     check(
       "production_project_aggregate_check",

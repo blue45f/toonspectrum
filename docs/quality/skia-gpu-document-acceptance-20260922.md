@@ -4,7 +4,7 @@ Status: implemented bounded migration; not a complete editor-engine replacement.
 
 ## Continuation and scope
 
-The interrupted `feat/skia-primary-renderer-20260922` work was recovered, including its original stroke planner, persistent WebGL2 renderer, receipt-gated Stage handoff, and in-progress camera adapter. Concurrent changes in that worktree were preserved. An independent snapshot is validated on `fix/skia-gpu-acceptance-20260922`; no original worktree or unrelated process is overwritten.
+The interrupted `feat/skia-primary-renderer-20260922` work was recovered, including its original stroke planner, persistent WebGL2 renderer, receipt-gated Stage handoff, and in-progress camera adapter. Concurrent changes in that worktree were preserved. An independent snapshot is validated on `fix/skia-gpu-acceptance-20260922`; no original worktree or unrelated process is overwritten. The additional hidden-source paint fence and backing-generation guard from PR #1949 are integrated; this branch is a follow-up to that PR, not a third competing full-engine merge.
 
 Automerge is deferred. Yjs, immutable source strokes, editor commands, Undo and SQLite/OPFS remain authoritative. CanvasKit 0.41.1 uses WebGL2 for this surface; this is not a completed WebGPU conversion.
 
@@ -12,6 +12,7 @@ Automerge is deferred. Yjs, immutable source strokes, editor commands, Undo and 
 
 - Retained element SkPictures and 128-item composite batches. Append recompiles one affected batch and paints the new item rather than re-recording a document-wide picture. Metadata comparisons still scale with the document; this is not an O(1) whole-editor claim.
 - Explicit GPU/resource cleanup, at most three/32MiB logical viewport snapshots, 128MiB picture admission and a requested 64MiB GPU resource-cache limit. Actual driver memory can be unknown; these are not a measured total-process peak.
+- Both the completed source paint and the subsequent hidden-source paint are acknowledged before exposing GPU pixels; the parent opacity change alone is not considered proof that old pixels are gone.
 - Exact requested-revision validation and cancellation of pending publication on device loss. A stale success cannot re-enable a lost surface.
 - Snapshot descriptors retain stable revision tokens instead of entire historical source objects. Resizing clears incompatible snapshots and invalidates an externally resized backing buffer.
 - Scoped imperative camera events read the actual Stage transform, including viewport scroll offsets, and coalesce into one animation frame.
@@ -19,6 +20,8 @@ Automerge is deferred. Yjs, immutable source strokes, editor commands, Undo and 
 - Canonical pen/marker/eraser source and paint semantics are preserved. Visible unsupported content is not omitted or approximated to pass the GPU gate.
 
 ## Verified behavior
+
+After integrating PR #1949, the focused suite passed 16 files / 130 tests and the real product three-stroke/zoom/rotation/Undo scenario passed again. Exact remote CI and build results are recorded on the follow-up PR head.
 
 - Unit coverage includes retained batches, changed-item compilation, bounded image lifetime, dispose, loading failure, superseded requests, exact source receipts, camera subscriptions and missing/remote/local frontier distinctions.
 - Actual Chromium 151 (ANGLE Metal / Apple M2 Max) and Firefox 153 renderer tests exercise 3,000/10,000 strokes, 100 append/undo cycles, independent GPU contexts, DPR resize, rotation/reflection, and real context loss followed by explicit same-engine recovery.
