@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
@@ -8,6 +8,7 @@ import { SiteBackgroundMusicPlayer } from "./SiteBackgroundMusicPlayer";
 
 const mocks = vi.hoisted(() => ({
   moodId: "pop",
+  enabled: false,
   setEnabled: vi.fn(),
   setMood: vi.fn(),
   setVolume: vi.fn(),
@@ -21,12 +22,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@toonspectrum/core/fx", () => ({
   registerBgmPlaylist: mocks.register,
+  isBgmEnabled: () => mocks.enabled,
   resumeAudio: mocks.resumeAudio,
   suspendBgmForContext: mocks.suspend,
   resumeBgmForContext: mocks.resumeContext,
   setMuted: mocks.setMuted,
   useAmbientBgm: () => ({
-    enabled: false,
+    enabled: mocks.enabled,
     mood: "",
     moodId: mocks.moodId,
     artist: "",
@@ -41,7 +43,7 @@ vi.mock("@toonspectrum/core/fx", () => ({
   }),
   useAudioState: () => ({
     sfxEnabled: true,
-    bgmEnabled: false,
+    bgmEnabled: mocks.enabled,
     muted: false,
     volume: 0.55,
     bgmVolume: 0.48,
@@ -109,6 +111,8 @@ describe("SiteBackgroundMusicPlayer", () => {
     localStorage.clear();
     vi.clearAllMocks();
     mocks.moodId = "pop";
+    mocks.enabled = false;
+    mocks.setEnabled.mockImplementation((value: boolean) => { mocks.enabled = value; });
     mocks.resumeAudio.mockResolvedValue(undefined);
     mockManifest();
   });
@@ -238,6 +242,60 @@ describe("SiteBackgroundMusicPlayer", () => {
     expect(await screen.findByText("음악 재생을 시작하지 못했습니다. 재생 버튼을 다시 눌러 주세요.")).toBeTruthy();
     expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);
     expect(mocks.setEnabled).toHaveBeenCalledWith(false);
+  });
+
+  it("does not undo a user's pause when an older gesture finishes unlocking", async () => {
+    mocks.enabled = true;
+    let finish!: () => void;
+    mocks.resumeAudio.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    fireEvent.pointerDown(window);
+    expect(mocks.resumeAudio).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "OST 일시정지" }));
+    expect(mocks.enabled).toBe(false);
+    await act(async () => { finish(); });
+    expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);
+    expect(mocks.enabled).toBe(false);
+  });
+
+  it.each(["suspend", "unmount"])("discards a delayed play request after %s", async (exit) => {
+    let finish!: () => void;
+    mocks.resumeAudio.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const view = renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "OST 재생" }));
+    expect(mocks.resumeAudio).toHaveBeenCalledTimes(1);
+    if (exit === "unmount") view.unmount();
+    else view.rerender(<MemoryRouter initialEntries={["/"]}><SiteBackgroundMusicPlayer suspended /></MemoryRouter>);
+    await act(async () => { finish(); });
+    expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);
+  });
+
+  it("retries a rejected restore unlock on a later gesture without changing opt-in", async () => {
+    mocks.enabled = true;
+    mocks.resumeAudio.mockRejectedValueOnce(new Error("Context temporarily unavailable"));
+    renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    await act(async () => { fireEvent.pointerDown(window); });
+    expect(mocks.setEnabled).not.toHaveBeenCalled();
+    expect(mocks.enabled).toBe(true);
+    await act(async () => { fireEvent.keyDown(window, { key: "Enter" }); });
+    expect(mocks.resumeAudio).toHaveBeenCalledTimes(2);
+    expect(mocks.setEnabled).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it("ignores a failed older play request after a newer request succeeded", async () => {
+    let fail!: (error: Error) => void;
+    mocks.resumeAudio.mockImplementationOnce(() => new Promise<void>((_, reject) => { fail = reject; }));
+    renderAt("/");
+    await waitFor(() => expect(mocks.register).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "OST 재생" }));
+    fireEvent.click(screen.getByRole("button", { name: "OST 재생" }));
+    await waitFor(() => expect(mocks.setEnabled).toHaveBeenCalledWith(true));
+    await act(async () => { fail(new Error("Expired unlock")); });
+    expect(mocks.setEnabled).not.toHaveBeenCalledWith(false);
+    expect(mocks.enabled).toBe(true);
   });
 
   it("stays out of audio-producing pages and preserves the user's opt-in", () => {

@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { workspaceTaskRoute } from "./workspace/workspace-task-route";
 import {
+  isBgmEnabled,
   registerBgmPlaylist,
   resumeAudio,
   resumeBgmForContext,
@@ -123,6 +124,10 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   const [sourceError, setSourceError] = useState("");
   const suspended = externallySuspended || experience.suspended;
   const hasPublishedOst = playlistTracks.length > 0;
+  const playbackEpoch = useRef(0);
+  // Async unlocks belong to this route and catalogue, not to a later screen or user intent.
+  useEffect(() => () => { playbackEpoch.current += 1; }, [pathname, search, suspended, hasPublishedOst]);
+
 
   useEffect(() => {
     if (suspended) suspendBgmForContext(SITE_ROUTE_SUSPENSION);
@@ -162,17 +167,26 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
 
   useEffect(() => {
     if (!bgmEnabled || suspended || !hasPublishedOst) return;
+    let active = true;
+    let pending = false;
+    const removeUnlock = () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
     const unlock = () => {
-      void resumeAudio().then(() => setBgmEnabled(true));
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
+      if (pending) return;
+      pending = true;
+      const epoch = playbackEpoch.current;
+      void resumeAudio().then(() => {
+        pending = false;
+        if (!active || playbackEpoch.current !== epoch || !isBgmEnabled()) return;
+        setBgmEnabled(true);
+        removeUnlock();
+      }, () => { pending = false; }); // A later gesture may retry; never produce an unhandled rejection.
     };
-    window.addEventListener("pointerdown", unlock, { once: true, passive: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-    };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock);
+    return () => { active = false; removeUnlock(); };
   }, [bgmEnabled, hasPublishedOst, setBgmEnabled, suspended]);
 
   if (suspended) return null;
@@ -190,6 +204,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
 
   const togglePlayback = async () => {
     if (!hasPublishedOst) return;
+    const epoch = ++playbackEpoch.current;
     if (playing) {
       setBgmEnabled(false);
       return;
@@ -198,8 +213,9 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     setSourceError("");
     try {
       await resumeAudio();
-      setBgmEnabled(true);
+      if (playbackEpoch.current === epoch) setBgmEnabled(true);
     } catch {
+      if (playbackEpoch.current !== epoch) return;
       setBgmEnabled(false);
       setSourceError(korean ? "음악 재생을 시작하지 못했습니다. 재생 버튼을 다시 눌러 주세요." : "Could not start playback. Press play to try again.");
     }
