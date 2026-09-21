@@ -38,7 +38,6 @@ import {
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import { runStudioBg3dTextureGpuProof } from "./lib/studio-bg3d-texture-gpu-proof";
-import { isStudioStaticPreviewReadinessUnavailable } from "./lib/studio-verify-preview-errors.mjs";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -753,6 +752,15 @@ export function collectStudioVrmMannequinChromaFailures(
   return failures;
 }
 
+/** No Core API runs in this static-only harness. Record only its exact 502 observation. */
+export function isStudio3dStaticPreviewReadinessUnavailable(message: string, studioUrl: string): boolean {
+  let preview: URL;
+  try { preview = new URL(studioUrl); } catch { return false; }
+  if (preview.protocol !== "http:" || preview.hostname !== "127.0.0.1" || !preview.port
+    || preview.username || preview.password) return false;
+  return message === `Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ ${preview.origin}/api/health/ready`;
+}
+
 function isExpectedStaticPreviewApiMessage(message: string): boolean {
   return OPTIONAL_STATIC_PREVIEW_API_PATHS.some((path) => message.includes(path));
 }
@@ -978,6 +986,7 @@ async function triggerObservableLiveContextLoss(dialog: Locator): Promise<{
 
 async function run(page: Page, studioUrl: string): Promise<void> {
   const issues: string[] = [];
+  const unavailableBackendObservations: string[] = [];
   const babylonSpecialistRequests: string[] = [];
   const babylonRuntimeResponses: string[] = [];
   const sharedPoseRequests: string[] = [];
@@ -995,11 +1004,10 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     const type = message.type();
     const location = message.location().url;
     const value = location ? `${message.text()} @ ${location}` : message.text();
-    if (type === "error" && isStudioStaticPreviewReadinessUnavailable(value, studioUrl)) {
-      console.log(`[static-preview] backend unavailable (not an API readiness pass): ${value}`);
-      return;
-    }
-    if (type === "log" && value.includes(R3F_CONTEXT_LOSS_DIAGNOSTIC)) {
+    if (type === "error" && isStudio3dStaticPreviewReadinessUnavailable(value, studioUrl)) {
+      unavailableBackendObservations.push(value);
+      console.log(`[verify-studio-3d-console] static preview backend unavailable (not an API readiness pass): ${value}`);
+    } else if (type === "log" && value.includes(R3F_CONTEXT_LOSS_DIAGNOSTIC)) {
       if (expectingLiveContextLoss) liveContextLossDiagnostics += 1;
       else issues.push(`unexpected planned-context-loss diagnostic: ${value}`);
     } else if (
@@ -1207,11 +1215,13 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     "opening the BG3D dialog must not request Babylon specialist code",
   );
 
-  // Engine diagnostics live in the shipped professional workspace, not its simplified labels.
-  const professionalMode = backgroundDialog.getByRole("group", { name: "3D 편집 모드" })
+  // The shipped entry defaults to the simple scene director. Choose professional controls
+  // through the visible product UI before exercising engine diagnostics and imported assets.
+  const professionalMode = backgroundDialog.getByRole("group", { name: "3D 편집 모드", exact: true })
     .getByRole("button", { name: "전문", exact: true });
   await professionalMode.click();
-  assertCondition(await professionalMode.getAttribute("aria-pressed") === "true", "professional mode did not activate");
+  assertCondition(await professionalMode.getAttribute("aria-pressed") === "true",
+    "the explicit professional-mode control did not activate");
   await backgroundDialog.getByRole("tab", { name: "보기", exact: true }).click();
   await page.waitForTimeout(300);
   assertCondition(
@@ -1352,7 +1362,8 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   });
 
   await backgroundDialog.getByRole("tab", { name: "레이어", exact: true }).click();
-  await backgroundDialog.getByRole("button", { name: `${KTX2_SMOKE_MODEL_LABEL} 1`, exact: true }).waitFor({
+  await backgroundDialog.locator('[data-studio-bg3d-outliner="dock"]')
+    .getByRole("button", { name: `${KTX2_SMOKE_MODEL_LABEL} 1`, exact: true }).waitFor({
     state: "visible",
     timeout: 30_000,
   });
@@ -1404,6 +1415,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   const overlayCount = await page.locator(VITE_ERROR_OVERLAY_SELECTOR).count();
   assertCondition(overlayCount === 0, `Vite/framework error overlay is present (${overlayCount})`);
   assertCondition(issues.length === 0, `unexpected 3D browser diagnostics:\n${issues.join("\n")}`);
+  console.log(`[verify-studio-3d-console] backendUnavailableObservations=${unavailableBackendObservations.length}; API readiness not exercised by this static-only verifier`);
 }
 
 /**

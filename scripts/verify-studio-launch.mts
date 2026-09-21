@@ -735,6 +735,11 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const exactBrushStudioLauncher = (await brushStudioLaunchers.count()) === 1;
   const brushStudioLauncher = brushStudioLaunchers.first();
   await brushStudioLauncher.scrollIntoViewIfNeeded();
+  // The compact mobile panel exposes detailed controls through a native disclosure.
+  const correctionDetails = lineCorrection.locator("details").filter({ hasText: "세부 선 보정 설정" });
+  if (await correctionDetails.getAttribute("open") === null) {
+    await correctionDetails.locator("summary").click();
+  }
   // The nested modal deliberately makes its parent inert. Check parent controls while accessible.
   const lineCorrectionReady = (await lineCorrection.count()) === 1
     && await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled();

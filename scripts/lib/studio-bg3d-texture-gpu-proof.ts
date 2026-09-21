@@ -8,7 +8,6 @@ import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, normalizeStudioBg3dSceneDocument,
 import { createStudioBg3dTextureFixture } from "./studio-bg3d-texture-fixture";
 import { resolveStudioProductionGltfLoaderExport } from "./studio-production-gltf-loader.mjs";
 
-
 import type { Page } from "playwright";
 
 /** Actual production GLTFLoader and specialist captures; no test shader or decoder substitutes. */
@@ -50,7 +49,7 @@ export async function runStudioBg3dTextureGpuProof(page: Page, rootUrl: string, 
   const result = await page.evaluate(async ({ cases, urls, profiles, loaderExport }) => {
     const three = await import(urls.three) as Record<string, unknown>;
     const loaderModule = await import(urls.gltfLoader) as Record<string, typeof import("three/examples/jsm/loaders/GLTFLoader.js").GLTFLoader>;
-    const GLTFLoader = loaderModule[loaderExport]!;
+    const ProductionGLTFLoader = loaderModule[loaderExport]!;
     const specialist = await import(urls.babylon) as typeof import("../../apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry");
     const find = (identity: string) => {
       const candidate = Object.values(three).find((value) => typeof value === "function"
@@ -76,7 +75,7 @@ export async function runStudioBg3dTextureGpuProof(page: Page, rootUrl: string, 
         const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
         const actualHash = `sha256:${Array.from(digest, (value) => value.toString(16).padStart(2, "0")).join("")}`;
         if (actualHash !== fixture.hash) throw new Error("Texture fixture SHA drift");
-        const gltf = await new GLTFLoader().parseAsync(bytes.buffer, "");
+        const gltf = await new ProductionGLTFLoader().parseAsync(bytes.buffer, "");
         const scene = new Scene();
         scene.add(gltf.scene);
         renderer.render(scene, camera);

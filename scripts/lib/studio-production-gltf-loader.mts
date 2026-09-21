@@ -1,14 +1,18 @@
-/** Resolve the shipped GLTFLoader by its public method contract, not a minified export letter. */
-export async function resolveStudioProductionGltfLoaderExport(input: string | Record<string, unknown>): Promise<string> {
-  // Keep this function self-contained: Playwright serializes it into the actual preview page.
-  const module = typeof input === "string" ? await import(input) as Record<string, unknown> : input;
-  const matches = Object.entries(module).filter(([, candidate]) => {
-    if (typeof candidate !== "function") return false;
-    const prototype = candidate.prototype as Record<string, unknown> | undefined;
-    return prototype && ["parse", "parseAsync", "setDRACOLoader", "setKTX2Loader", "setMeshoptDecoder", "register", "unregister"]
-      .every((method) => typeof prototype[method] === "function");
-  });
-  const identities = new Set(matches.map(([, value]) => value));
-  if (identities.size !== 1) throw new Error(`Expected one production GLTFLoader contract, found ${identities.size}`);
-  return matches.find(([key]) => key === "GLTFLoader")?.[0] ?? matches[0]![0];
+/** Runs inside page.evaluate: no Node closures, mock decoder or assumed minifier alias. */
+export async function resolveStudioProductionGltfLoaderExport(moduleUrl: string): Promise<string> {
+  const namespace: Record<string, unknown> = await import(/* @vite-ignore */ moduleUrl);
+  const methods = ["load", "parse", "parseAsync", "setDRACOLoader", "setKTX2Loader", "setMeshoptDecoder", "register", "unregister"];
+  const constructors = new Map<unknown, string[]>();
+  for (const [name, value] of Object.entries(namespace)) {
+    if (typeof value !== "function") continue;
+    const prototype = value.prototype as Record<string, unknown> | undefined;
+    if (!prototype || !methods.every((method) => typeof prototype[method] === "function")) continue;
+    const names = constructors.get(value) ?? [];
+    constructors.set(value, [...names, name]);
+  }
+  if (constructors.size !== 1) {
+    throw new Error(`Expected one production GLTFLoader implementation; found ${constructors.size} in ${moduleUrl}`);
+  }
+  const names = [...constructors.values()][0]!;
+  return names.includes("GLTFLoader") ? "GLTFLoader" : names[0]!;
 }

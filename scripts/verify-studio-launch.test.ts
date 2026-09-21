@@ -17,6 +17,15 @@ const EXPECTED_HANDSHAKE_CLOSE = [
 ].join("");
 
 describe("Studio launch static-preview diagnostics", () => {
+  it("opens native mobile correction disclosure before querying controls and entering the modal", () => {
+    const disclosure = launchHarness.indexOf('await correctionDetails.locator("summary").click()');
+    const controls = launchHarness.indexOf('const lineCorrectionReady =');
+    const modal = launchHarness.indexOf('await brushStudioLauncher.click()');
+    expect(disclosure).toBeGreaterThan(0);
+    expect(controls).toBeGreaterThan(disclosure);
+    expect(modal).toBeGreaterThan(controls);
+    expect(launchHarness).toContain('hasText: "세부 선 보정 설정"');
+  });
   it("uses the canonical current-brush editor name without dropping mobile pressure coverage", () => {
     expect(launchHarness).toContain("hasText: STUDIO_BRUSH_LABELS.editCurrent");
     expect(launchHarness).toContain('name: STUDIO_BRUSH_LABELS.editCurrent, exact: true');
