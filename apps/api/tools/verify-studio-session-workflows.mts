@@ -28,6 +28,7 @@ const database = await import("../src/db");
 const { StudioProjectGraphRepository } = await import("../src/modules/studio-project-graph/studio-project-graph.repository");
 const { StudioWorkSessionRepository } = await import("../src/modules/studio-project-graph/studio-work-session.repository");
 const { StudioWorkSessionService } = await import("../src/modules/studio-project-graph/studio-work-session.controller");
+const { StudioSessionEvidenceService } = await import("../src/modules/studio-project-graph/studio-session-evidence.controller");
 const { DrizzleStudioWorkAssetRepository } = await import("../src/modules/creator/studio-work-asset.repository");
 const { StudioWorkAssetService } = await import("../src/modules/creator/studio-work-asset.service");
 const { StudioReviewPreviewProducerRepository } = await import("../src/modules/studio-project-graph/studio-review-preview-producer.repository");
@@ -50,6 +51,7 @@ const storage: PrivateObjectStoragePort = {
   async deleteGeneratedObject({ object }) { objects.delete(`${object.purpose}:${object.digest}`); },
 };
 const graph = new StudioProjectGraphRepository(), sessions = new StudioWorkSessionRepository(), service = new StudioWorkSessionService(sessions);
+const evidence = new StudioSessionEvidenceService(sessions);
 const assets = new DrizzleStudioWorkAssetRepository(), assetService = new StudioWorkAssetService(assets, storage);
 const producer = new StudioReviewPreviewProducerService(new StudioReviewPreviewProducerRepository(graph), assetService);
 const token = randomUUID(), allowedActors = new Set<string>();
@@ -57,10 +59,11 @@ const server = createServer(async (req, res) => {
   try {
     assert(req.headers["x-session-test-token"] === token, "Not an authorized isolated test client");
     const actor = String(req.headers["x-session-test-actor"] ?? ""); assert(allowedActors.has(actor), "Unknown fixture actor");
-    const url = new URL(req.url!, "http://127.0.0.1"), match = url.pathname.match(/^\/api\/creator\/works\/([^/]+)\/work-sessions\/([^/]+)(?:\/(resources|commands|operations)(?:\/([^/]+))?)?$/u);
+    const url = new URL(req.url!, "http://127.0.0.1"), match = url.pathname.match(/^\/api\/creator\/works\/([^/]+)\/work-sessions\/([^/]+)(?:\/(resources|commands|operations|evidence)(?:\/([^/]+))?)?$/u);
     assert(match); const workId = decodeURIComponent(match[1]!), sessionId = decodeURIComponent(match[2]!); assert(works.includes(workId));
     let result: unknown;
     if (req.method === "GET") result = await service.run<unknown>(actor, (user, repo) => match[3] === "resources" ? repo.resources(user, workId, sessionId, Number(url.searchParams.get("offset") ?? "0"))
+      : match[3] === "evidence" ? evidence.read(user, workId, sessionId, Number(url.searchParams.get("offset") ?? "0"))
       : match[3] === "operations" ? repo.receipt(user, workId, sessionId, decodeURIComponent(match[4]!)) : repo.current(user, workId, sessionId));
     else {
       assert(req.method === "POST" && match[3] === "commands");
@@ -80,7 +83,9 @@ let failure: unknown = null;
 async function fixture() {
   const actor = randomUUID(), guest = randomUUID(), workId = randomUUID(); users.push(actor, guest); works.push(workId); allowedActors.add(actor); allowedActors.add(guest);
   for (const id of [actor, guest]) await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [id, "Isolated session browser actor"]);
-  const doc = { version: 3, width: 2, pagesList: [{ id: "saved-page-1", canvasH: 1, elements: [{ id: "saved-cut-1", type: "frame", x: 0, y: 0, width: 1, height: 1 }] }] };
+  const doc = { aiProvenance: { version: 1, operations: [{ id: "saved-ai-record", kind: "text", status: "failed", provider: "고정 제공자", model: "고정 모델", transport: "local",
+    createdAt: "2026-09-20T00:00:00.000Z", usage: { promptTokens: 0 }, prompt: { sha256: "e".repeat(64), raw: "PRIVATE PROMPT NOT EXPOSED" },
+    target: { pageId: "saved-page-1", frameId: "saved-cut-1" } }] }, version: 3, width: 2, pagesList: [{ id: "saved-page-1", canvasH: 1, elements: [{ id: "saved-cut-1", type: "frame", x: 0, y: 0, width: 1, height: 1 }] }] };
   await pool.query('INSERT INTO creator_work (id,"userId",title,doc,revision) VALUES ($1,$2,$3,$4::jsonb,7)', [workId, actor, "Browser-owned test work", JSON.stringify(doc)]);
   await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'commenter','active',$3,now())`, [workId, guest, randomUUID()]);
   const intent = await producer.prepare(actor, { intentId: randomUUID(), workId, sourceServerRevision: 7, sourceContentDigest: studioReviewPreviewDigest(doc), pageCount: 1, title: "Pinned input", deviceId: "browser-test", createdAt: new Date().toISOString() });
@@ -138,6 +143,17 @@ try {
     assert.equal(persisted.session.workflow!.agenda[0]!.outcome!.body, "대사는 별도 편집기에서 수정 후 재검토"); assert.equal(persisted.session.readerUserId, f.guest);
     assert.equal((await graph.getReview(f.actor, f.subject.reviewId)).status, "open");
     assert.equal((await pool.query('SELECT revision FROM creator_work WHERE id=$1', [f.workId])).rows[0].revision, 7);
+    await page.getByRole("button", { name: /소재 사용 · AI 기록/ }).click();
+    await expect(page.getByText("고정 제공자 / 고정 모델", { exact: true })).toBeVisible();
+    await expect(page.getByText(/전체 미확인/)).toBeVisible();
+    await page.getByRole("button", { name: "대상 고정 페이지 보기", exact: true }).click();
+    await expect(page.getByLabel("명시적으로 선택한 원본")).toContainText("saved-page-1");
+    await page.getByRole("button", { name: "검토 기록에 인용", exact: true }).click();
+    await expect.poll(async () => (await sessions.current(f.actor, f.workId, f.ids.reading)).session.notes.length).toBe(1);
+    const citation = (await sessions.current(f.actor, f.workId, f.ids.reading)).session.notes[0]!;
+    assert.equal(citation.category, "ai-evidence"); assert(citation.body.includes("saved-ai-record") && citation.body.includes("not an edit or approval"));
+    assert(!citation.body.includes("PRIVATE PROMPT"));
+    await page.screenshot({ path: `${out}/evidence-${width}.png`, fullPage: true });
     assert.deepEqual(reading.errors, []); await page.screenshot({ path: `${out}/reading-${width}.png`, fullPage: true });
     const axeReading = await new AxeBuilder({ page }).include("main").withTags(["wcag2a", "wcag2aa"]).analyze(); assert.deepEqual(axeReading.violations.map((entry) => ({ id: entry.id, nodes: entry.nodes.map((node) => node.target) })), []);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)); await reading.context.close();
@@ -166,7 +182,7 @@ try {
     assert(await host.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await host.page.screenshot({ path: `${out}/materials-${width}.png`, fullPage: true });
     await Promise.all([host.context.close(), guest.context.close()]);
-    results.push({ width, reading: "real database source/agenda/edit/read/turn/outcome", materials: "separate host and guest browsers propose/vote/decide", persisted: true, pageErrors: 0, accessibilityViolations: 0 });
+    results.push({ width, reading: "real database source/agenda/edit/read/turn/outcome", materials: "separate host and guest browsers propose/vote/decide", evidence: "attested pinned AI records and explicit database-persisted citation", persisted: true, pageErrors: 0, accessibilityViolations: 0 });
     console.log(`PASS real repository + PostgreSQL browser ${width}`);
   }
 } catch (error) {

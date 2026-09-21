@@ -84,4 +84,11 @@ describe("attested snapshot evidence projection", () => {
     const source = { ...doc, pagesList: [{ ...doc.pagesList[0]!, hideMaster: true }] };
     expect(project(source).assets).toEqual([]);
   });
+  it("does not certify uniqueness inside an oversized truncated operation history", () => {
+    const operations = Array.from({ length: 2001 }, (_, i) => ai(`record-${i}`));
+    operations[2000] = ai("record-0");
+    const result = project(fixture(undefined, operations));
+    expect(result.aiOperations).toEqual([]); expect(result.omittedAiOperations).toBe(2001);
+  });
+
 });
