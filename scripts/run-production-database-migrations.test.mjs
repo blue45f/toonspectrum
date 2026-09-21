@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(81);
+  expect(manifest).toHaveLength(82);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0081_fortune_public_snapshot");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(81);
+  expect(manifest.at(-1).id).toBe("0082_studio_review_policy");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(82);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -993,6 +993,8 @@ test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () 
     "studio_external_file_binding",
     "studio_review",
     "studio_review_reviewer",
+    "studio_review_policy",
+    "studio_review_policy_event",
     "studio_capability_ledger",
   ]) {
     expect(violation).toContain(`'${relation}'`);
@@ -1427,6 +1429,8 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_review_comment",
     "studio_review_comment_assignee",
     "studio_review_reviewer",
+    "studio_review_policy",
+    "studio_review_policy_event",
     "studio_revision",
     "studio_revision_blob",
     "studio_revision_parent",
@@ -1711,4 +1715,14 @@ test("personal cloud cutover marker is a forward-only verified repair", () => {
   expect(sql).not.toContain(
     "CREATE TABLE IF NOT EXISTS public.personal_cloud_connection",
   );
+});
+
+
+test("review policy metadata has only current-state column grants and vote history stays append-only", () => {
+  const acl = buildStudioProjectGraphRuntimeAclSql("toonspectrum_runtime"), violation = buildStudioProjectGraphRuntimeAclViolationSql("toonspectrum_runtime");
+  expect(acl).toContain('GRANT UPDATE ("policyVersion", "stateVersion", "definition", "configuredBy", "configuredAt")\n  ON TABLE public.studio_review_policy');
+  expect(acl).not.toMatch(/GRANT UPDATE[^;]+ON TABLE public\.studio_review_policy_event/u);
+  expect(violation).toContain("'studio_review_policy'::text");
+  expect(violation).toContain("'studio_review_policy_event'::text");
+  expect(loadMigrationManifest().at(-1).id).toBe("0082_studio_review_policy");
 });
