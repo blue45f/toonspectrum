@@ -46,7 +46,7 @@ export async function assertPublicSiteNavigation(page, route) {
   await expect(breadcrumb.locator('[aria-current="page"]')).toHaveCount(1);
   const returnLink = task.locator(".workspace-task-purpose").getByRole("link", { name: "가상 스튜디오", exact: true });
   await expect(returnLink).toBeVisible();
-  const search = task.locator(".workspace-search-trigger");
+  const search = task.getByRole("button", { name: "작품·도구·메뉴 검색", exact: true });
   await expect(search).toHaveCount(1);
   await expect(search).toBeVisible();
   await expect(search).toBeEnabled();

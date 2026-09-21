@@ -3,6 +3,8 @@ import { useLocation } from "react-router-dom";
 
 import { RouteScrollRestoration } from "./RouteScrollRestoration";
 import { AppRouter } from "./routes/AppRouter";
+import { WorkspaceTaskFrame } from "@/shared/components/workspace/WorkspaceTaskFrame";
+import { workspaceTaskRoute } from "@/shared/components/workspace/workspace-task-route";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
@@ -110,13 +112,14 @@ export function AppShell({
   publicExperience = false,
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const taskRoute = workspaceTaskRoute(pathname, search);
   const immersiveVirtualHome = ["/", "/home", "/team", "/hub", "/studio"].includes(pathname.replace(/\/+$/u, "") || "/");
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
-  const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject;
+  const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null;
   const publicCreativeRoute = isPublicCreativeRoute(pathname);
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname) && !immersiveVirtualExperience;
-  const resolvedMainClassName = immersiveVirtualHome
+  const resolvedMainClassName = immersiveVirtualHome || taskRoute !== null
     ? "min-h-[100dvh] bg-canvas outline-none"
     : immersiveVirtualProject
       ? "min-h-[100dvh] bg-canvas outline-none"
@@ -141,7 +144,9 @@ export function AppShell({
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}
         <main id="main-content" tabIndex={-1} className={resolvedMainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
           {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
-          <WorkspaceAccountContext.Provider value={<AuthMenuShell />}><AppRouter /></WorkspaceAccountContext.Provider>
+          <WorkspaceAccountContext.Provider value={<AuthMenuShell />}>
+            <WorkspaceTaskFrame route={taskRoute}><AppRouter /></WorkspaceTaskFrame>
+          </WorkspaceAccountContext.Provider>
           {publicCreativeRoute && !immersiveVirtualExperience ? (
             <ErrorBoundary resetKey={pathname}>
               <Suspense fallback={<Suspense fallback={null}><PublicSiteWayfinder /></Suspense>}>
@@ -159,7 +164,7 @@ export function AppShell({
         {showCommandPalette ? <CommandPaletteHost /> : null}
         {showGlobalOverlays ? <DeferredGlobalOverlays /> : null}
         {immersiveVirtualExperience ? null : floatingControls}
-        {immersiveVirtualExperience ? null : chromeOverlay}
+        {immersiveVirtualHome || immersiveVirtualProject ? null : chromeOverlay}
       </SiteExperienceFrame>
     </AuthSessionProvider>
   );

@@ -267,3 +267,24 @@ describe("production role and handoff editor", () => {
     });
   });
 });
+
+describe("production view continuity", () => {
+  it("keeps unsaved task edits through filtering and episode-matrix round trips", () => {
+    const harness = commitHarness();
+    render(<StudioProductionTaskBoard workspace={harness.current()} canEdit canApprove={false} canPublish={false} onCommit={harness.onCommit} />);
+    const article = screen.getByRole("heading", { name: "선화" }).closest("article")!;
+    const details = article.querySelector("details")!;
+    details.open = true;
+    const input = within(article).getByLabelText("작업 제목");
+    fireEvent.change(input, { target: { value: "아직 저장하지 않은 선화 수정" } });
+    fireEvent.change(screen.getByLabelText("저장된 작업 검색"), { target: { value: "없음" } });
+    fireEvent.click(screen.getByRole("button", { name: "표시 조건 초기화" }));
+    expect(input).toHaveProperty("value", "아직 저장하지 않은 선화 수정");
+    fireEvent.click(screen.getByRole("button", { name: "회차·공정 표" }));
+    const matrix = screen.getByRole("region", { name: "회차별 제작 단계" });
+    fireEvent.click(within(matrix).getByRole("button", { name: /^선화 /u }));
+    expect(input).toHaveProperty("value", "아직 저장하지 않은 선화 수정");
+    expect(details.open).toBe(true);
+    expect(harness.onCommit).not.toHaveBeenCalled();
+  });
+});

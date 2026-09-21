@@ -1,3 +1,5 @@
+import { StudioReviewNoteFilters } from "./StudioReviewNoteFilters";
+import { nextReviewNoteId, reviewNoteMatches, type ReviewNoteView } from "./studio-review-note-query";
 import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { useSession } from "@/compat/auth-session-store";
@@ -38,6 +40,9 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
 }) {
   const bt = useBilingual("StudioPinnedReviewPanel");
   const inputId = useId();
+  const [noteView, setNoteView] = useState<ReviewNoteView>("all");
+  const [noteQuery, setNoteQuery] = useState("");
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [result, setResult] = useState<StudioVirtualSpaceReviewVerification | null>(null);
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState("");
@@ -159,6 +164,16 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
       if (own === generation.current && sessionRevision === getAuthSessionRevision()) setNotice(bt("저장 결과를 확인하지 못했어요. 입력은 남겨 두었습니다. 목록을 새로 확인해 주세요.", "The save could not be confirmed. Your draft is preserved. Refresh the review before trying again."));
     } finally { if (own === generation.current) setBusy(false); }
   };
+  const jumpNote = (direction: -1 | 1) => {
+    const notes = result?.ok ? result.review.comments : [];
+    const ids = notes.filter((note) => reviewNoteMatches(note, noteView, noteQuery, actorId)).map((note) => note.id);
+    const id = nextReviewNoteId(ids, activeNoteId, direction);
+    if (!id) return;
+    setActiveNoteId(id);
+    const element = document.getElementById(`${inputId}-note-${id}`);
+    element?.focus({ preventScroll: true });
+    element?.scrollIntoView?.({ block: "nearest", behavior: "auto" });
+  };
   return <section className="rounded-2xl border border-line bg-card p-5 studio-vspace-pinned-review" aria-label={bt("고정된 검수본", "Pinned review")} data-space-interactive="true">
     <h2 className="text-lg font-bold">{bt("함께 검토하기", "Review together")}</h2>
     <p className="mt-2 text-sm text-fg-2">{bt("초대에서 지정한 검수본과 검토 기록입니다. 최신 작업본으로 자동 변경되지 않아요.", "This is the snapshot and review history specified in your invitation. It does not switch to the latest working version.")}</p>
@@ -178,8 +193,12 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
           ? { selected: annotation, onSelect: selectAnnotation, disabled: busy, commentInputId: inputId } : undefined} />
       <StudioPinnedReviewComparison subject={subject ?? result.subject} title={result.review.title}
         onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
-      <div className="mt-4 space-y-3" aria-label={bt("검토 의견", "Review notes")}>
-        {result.review.comments.map((comment) => <article key={comment.id} className="rounded-xl border border-line p-3">
+      <StudioReviewNoteFilters comments={result.review.comments} view={noteView} query={noteQuery} actorId={actorId}
+        onView={setNoteView} onQuery={setNoteQuery} onJump={jumpNote} listId={`${inputId}-notes`} />
+      <div id={`${inputId}-notes`} className="mt-4 space-y-3" aria-label={bt("검토 의견", "Review notes")}>
+        {result.review.comments.map((comment) => <article key={comment.id} id={`${inputId}-note-${comment.id}`} tabIndex={-1}
+          hidden={!reviewNoteMatches(comment, noteView, noteQuery, actorId)} aria-current={activeNoteId === comment.id ? "true" : undefined}
+          className="rounded-xl border border-line p-3 outline-none focus:ring-2 focus:ring-accent">
           <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
           <p className="mt-2 text-xs text-fg-3"><StudioReviewAnnotationLocation anchor={comment.anchor ?? { kind: "artifact" }} /></p>
           <p className="mt-2 text-xs text-fg-3">{comment.severity === "required" ? bt("수정 필요", "Required") : comment.severity === "recommended" ? bt("제안", "Suggestion") : bt("메모", "Note")} · {comment.status === "resolved" ? bt("해결됨", "Resolved") : comment.status === "dismissed" ? bt("보류 처리", "Dismissed") : bt("검토 중", "Open")}</p>

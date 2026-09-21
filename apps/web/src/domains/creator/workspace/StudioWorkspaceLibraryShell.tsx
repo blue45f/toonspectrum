@@ -16,7 +16,7 @@ export function StudioWorkspaceLibraryShell({ children }: { readonly children: R
       <WorkspaceBrand />
       <span className="workspace-library-label">{bt("작품 라이브러리", "Work library")}</span>
       <div className="workspace-utilities">
-        <OpenSearchButton className="workspace-search-trigger"><Search size={17} aria-hidden="true" /><span>{bt("작품·도구·메뉴 검색", "Search works, tools, menus")}</span><kbd aria-hidden="true">⌘ K</kbd></OpenSearchButton>
+        <OpenSearchButton className="workspace-search-trigger" aria-label={bt("작품·도구·메뉴 검색", "Search works, tools, menus")}><Search size={17} aria-hidden="true" /><span>{bt("작품·도구·메뉴 검색", "Search works, tools, menus")}</span><kbd aria-hidden="true">⌘ K</kbd></OpenSearchButton>
         <WorkspaceAccountAction />
       </div>
     </header>

@@ -240,8 +240,16 @@ describe("Studio inspector raster recovery boundary", () => {
     const transform = functionBody(pageSource, "openPixelSelectionTransform");
     const frameAnimation = functionBody(pageSource, "openFrameAnimationForSelected");
 
+    const entry = readFileSync(new URL("./studio-transform-entry.ts", import.meta.url), "utf8");
+    // The delegated controller preserves object-first routing and all existing lock boundaries.
+    expect(entry).toContain('selected?.type === "draw"');
+    expect(entry).toContain("if (selectionLocked)");
+    expect(entry).toContain("if (activeSurfaceReviewLocked)");
+    expect(entry).not.toContain("ensureOrPrepareRasterRetouchTarget");
     // Free-transform: strokes/objects first; image content transform still uses pixel target.
-    expect(transform).toContain('selected?.type === "draw"');
+    expect(transform).toContain("enterStudioSelectionTransform({");
+    expect(transform).toContain("selectionLocked: collaborationDocumentLocked");
+    expect(transform).toContain("activeSurfaceReviewLocked, selectedImageMutationLocked");
     expect(transform).toContain('ensurePixelToolTarget("내용 변형")');
     expect(transform).toContain("selectAllPixels");
     expect(transform).not.toContain("ensureOrPrepareRasterRetouchTarget");

@@ -99,7 +99,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
           <button type="button" className="workspace-icon-button workspace-project-find" onClick={() => setPanel("projects")} aria-haspopup="dialog" aria-expanded={panel === "projects"} aria-label={bt("작품 찾아 전환", "Find and switch work")}><Search size={19} aria-hidden="true" /></button>
         </div>
         <div className="workspace-utilities">
-          <OpenSearchButton className="workspace-search-trigger"><Search size={17} aria-hidden="true" /><span>{bt("작품·도구·메뉴 검색", "Search works, tools, menus")}</span><kbd aria-hidden="true">⌘ K</kbd></OpenSearchButton>
+          <OpenSearchButton className="workspace-search-trigger" aria-label={bt("작품·도구·메뉴 검색", "Search works, tools, menus")}><Search size={17} aria-hidden="true" /><span>{bt("작품·도구·메뉴 검색", "Search works, tools, menus")}</span><kbd aria-hidden="true">⌘ K</kbd></OpenSearchButton>
           <button type="button" className="workspace-work-shortcut" onClick={() => setPanel("work")} aria-haspopup="dialog" aria-expanded={panel === "work"} aria-label={bt("작업 바로가기 열기", "Open work shortcuts")}><ClipboardList size={20} aria-hidden="true" /></button>
           {surface === "home" ? <CreatorExperienceModeSwitch compact /> : null}
           <WorkspaceAccountAction />

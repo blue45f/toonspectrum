@@ -1,3 +1,5 @@
+import { workspaceTaskRoute } from "../workspace/workspace-task-route.ts";
+
 export type ExperienceMode = "vivid" | "calm";
 export type ExperienceLocale = string;export const EXPERIENCE_MODE_KEY = "toonstudio:site-experience:v1";
 
@@ -30,6 +32,7 @@ export function supportsRoutePurposeScene(pathname: string): boolean {
   // The four studio destinations own their headers. Do not prepend promotional guide cards
   // to an operational workspace or its work library.
   if (["/", "/home", "/team", "/hub", "/studio"].includes(path)) return false;
+  if (workspaceTaskRoute(path)) return false;
   if (supportsSiteExperience(path)) return true;
   if (STUDIO_ROUTE_GUIDE_PATHS.has(path) || path.startsWith("/studio/manual/")) return true;
   return /^\/studio\/p\/[^/]+\/(?:overview|story|production|assets|review|export|settings)$/u.test(path);

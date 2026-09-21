@@ -1,3 +1,4 @@
+import "./studio-asset-visual-intro.css";
 import { ArrowRight, Box, Brush, Image, Library, ShieldCheck, Store, Type, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 

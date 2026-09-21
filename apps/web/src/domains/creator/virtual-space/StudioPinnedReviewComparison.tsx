@@ -5,8 +5,8 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { listStudioVirtualSpaceReviewHistory, type StudioVirtualSpaceReviewChoice,
   type StudioVirtualSpaceReviewChoices } from "./studio-virtual-space-review-invitation";
 import type { StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";
-import type { StudioVirtualSpaceReviewPreview } from "./studio-virtual-space-review-preview";
-import { StudioReviewImage } from "./StudioPinnedReviewPreview";
+import { StudioReviewCompareDisplay } from "./StudioReviewCompareDisplay";
+import { matchReviewSourcePage, sameReviewSourcePage } from "./studio-review-comparison-model";
 import { useStudioPinnedReviewPreviews } from "./use-studio-pinned-review-previews";
 
 const control = "min-h-11 rounded-lg border border-line bg-card px-3 text-sm";
@@ -91,13 +91,6 @@ function ComparisonForActor({ actor, subject, title, onRevoked }: {
   </section>;
 }
 
-function matchingPage(left: StudioVirtualSpaceReviewPreview, right: StudioVirtualSpaceReviewPreview): boolean {
-  if (left.mapping.status !== "mapped" || right.mapping.status !== "mapped") return false;
-  const a = left.mapping.page, b = right.mapping.page;
-  return a.id === b.id && a.width === b.width && a.height === b.height
-    && a.renderWidth === b.renderWidth && a.renderHeight === b.renderHeight;
-}
-
 export function StudioPinnedReviewComparisonImages({ base, title, choice, onRevoked }: {
   readonly base: StudioVirtualSpaceReviewSubject; readonly title: string;
   readonly choice: StudioVirtualSpaceReviewChoice; readonly onRevoked: () => void;
@@ -107,15 +100,24 @@ export function StudioPinnedReviewComparisonImages({ base, title, choice, onRevo
   const right = useStudioPinnedReviewPreviews(choice.subject, onRevoked);
   const [leftOrdinal, setLeftOrdinal] = useState<number | null>(null);
   const [rightOrdinal, setRightOrdinal] = useState<number | null>(null);
-  const [mode, setMode] = useState<"side-by-side" | "overlay">("side-by-side");
-  const [opacity, setOpacity] = useState(50);
+  const [linked, setLinked] = useState(false);
+  const [matchNotice, setMatchNotice] = useState("");
   const leftPage = left.result?.ok ? left.result.previews.find((page) => page.ordinal === leftOrdinal) ?? left.result.previews[0] : null;
   const rightPage = right.result?.ok ? right.result.previews.find((page) => page.ordinal === rightOrdinal) ?? right.result.previews[0] : null;
-  const overlayAllowed = !!leftPage && !!rightPage && matchingPage(leftPage, rightPage);
-  const overlay = mode === "overlay" && overlayAllowed;
-  const sides = [{ state: left, page: leftPage, title, subject: base, setOrdinal: setLeftOrdinal,
+  const selectPage = (side: "left" | "right", ordinal: number | null, shouldLink = linked) => {
+    const source = side === "left" ? left : right, target = side === "left" ? right : left;
+    (side === "left" ? setLeftOrdinal : setRightOrdinal)(ordinal);
+    setMatchNotice("");
+    if (!shouldLink || ordinal === null || !source.result?.ok || !target.result?.ok) return;
+    const page = source.result.previews.find((item) => item.ordinal === ordinal);
+    if (!page) return;
+    const match = matchReviewSourcePage(page, target.result.previews);
+    if (match.kind === "matched") (side === "left" ? setRightOrdinal : setLeftOrdinal)(match.page.ordinal);
+    else setMatchNotice(bt("불러온 목록에서 같은 원본 페이지를 확인하지 못했습니다. 다른 페이지로 바꾸지 않았어요.", "No unique matching source page is loaded. The other selection has not changed."));
+  };
+  const sides = [{ state: left, page: leftPage, title, subject: base, setOrdinal: (ordinal: number | null) => selectPage("left", ordinal),
     label: bt("기준 검수본", "Original snapshot") },
-  { state: right, page: rightPage, title: choice.title, subject: choice.subject, setOrdinal: setRightOrdinal,
+  { state: right, page: rightPage, title: choice.title, subject: choice.subject, setOrdinal: (ordinal: number | null) => selectPage("right", ordinal),
     label: bt("비교 검수본", "Comparison snapshot") }];
   return <div className="space-y-3">
     <div className="grid gap-3 sm:grid-cols-2">
@@ -137,23 +139,15 @@ export function StudioPinnedReviewComparisonImages({ base, title, choice, onRevo
           {side.state.result ? <button type="button" className={control} onClick={side.state.refresh}>{bt("미리보기 다시 확인", "Check preview again")}</button> : null}</>}
       </div>)}
     </div>
-    <div className="flex flex-wrap gap-2" aria-label={bt("비교 표시 방식", "Comparison layout")}>
-      <button type="button" className={control} aria-pressed={!overlay} onClick={() => setMode("side-by-side")}>{bt("나란히 보기", "Side by side")}</button>
-      <button type="button" className={control} aria-pressed={overlay} disabled={!overlayAllowed} onClick={() => setMode("overlay")}>{bt("겹쳐 보기", "Overlay")}</button>
-    </div>
-    {!overlayAllowed ? <p className="text-xs text-fg-3">{bt("같은 원본 페이지와 이미지 크기가 확인된 두 검수본에서 겹쳐 볼 수 있어요. 페이지는 각각 선택할 수 있습니다.", "Overlay requires the same verified source page and image dimensions. You can select each page independently.")}</p> : null}
-    {leftPage && rightPage ? overlay ? <>
-      <label className="block text-sm">{bt("비교본 불투명도", "Comparison opacity")} · {opacity}%
-        <input type="range" className="mt-2 block min-h-11 w-full" min={0} max={100} step={5} value={opacity}
-          onChange={(event) => setOpacity(Number(event.target.value))} />
-      </label>
-      <div className="relative grid rounded-lg border border-line bg-panel">
-        <div className="col-start-1 row-start-1"><StudioReviewImage key={`left:${leftPage.sha256}`} preview={leftPage} label={bt("기준 검수본 페이지", "Original snapshot page")} /></div>
-        <div className="col-start-1 row-start-1" style={{ opacity: opacity / 100 }}><StudioReviewImage key={`right:${rightPage.sha256}`} preview={rightPage} label={bt("비교 검수본 페이지", "Comparison snapshot page")} /></div>
-      </div>
-    </> : <div className="grid gap-3 sm:grid-cols-2">
-      <StudioReviewImage key={`left:${leftPage.sha256}`} preview={leftPage} label={bt("기준 검수본 페이지", "Original snapshot page")} />
-      <StudioReviewImage key={`right:${rightPage.sha256}`} preview={rightPage} label={bt("비교 검수본 페이지", "Comparison snapshot page")} />
-    </div> : null}
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+      <input type="checkbox" className="size-5 accent-accent" checked={linked}
+        onChange={(event) => { setLinked(event.target.checked); if (leftPage) selectPage("left", leftPage.ordinal, event.target.checked); }} />
+      {bt("같은 원본 페이지 연결", "Link matching source pages")}
+    </label>
+    {matchNotice ? <p role="status" className="text-sm text-fg-2">{matchNotice}</p> : null}
+    {linked ? <p className="text-xs text-fg-2">{leftPage && rightPage && sameReviewSourcePage(leftPage, rightPage)
+      ? bt("같은 페이지의 상대 스크롤 위치를 연결합니다. 컷 위치가 바뀌면 각각 확인하세요.", "Relative scroll positions are linked within the same page. Verify moved cuts independently.")
+      : bt("페이지가 서로 달라 스크롤은 독립적으로 움직입니다. 다음 페이지 목록도 확인할 수 있어요.", "Different pages scroll independently. Check additional page lists when needed.")}</p> : null}
+    {leftPage && rightPage ? <StudioReviewCompareDisplay left={leftPage} right={rightPage} linked={linked} /> : null}
   </div>;
 }

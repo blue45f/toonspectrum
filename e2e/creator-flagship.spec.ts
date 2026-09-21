@@ -87,7 +87,7 @@ for (const width of [320, 390, 820, 1440]) {
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await page.getByRole("button", { name: "작품·도구·메뉴 검색", exact: true }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
   await search.fill("비 오는 교실 배경");
@@ -128,15 +128,17 @@ for (const width of [320, 390]) {
 
     await page.goto("/studio", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByRole("heading", { name: "지금 무엇을 가지고 있나요?", exact: true })).toBeVisible();
-    await expect(page.getByRole("link", { name: /아이디어만 있어요/u })).toBeVisible();
-    await expect(page.getByRole("link", { name: /대본이나 콘티가 있어요/u })).toBeVisible();
-    await expect(page.getByRole("link", { name: /그리던 파일이 있어요/u })).toBeVisible();
-    await expect(page.getByRole("link", { name: /팀 프로젝트를 시작해요/u })).toBeVisible();
-    await expect(page.getByRole("link", { name: /샘플로 먼저 둘러볼게요/u })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "웹툰 제작 전체 흐름" })).toBeVisible();
+    const library = page.getByRole("region", { name: "작품 관리", exact: true });
+    await expect(library).toBeVisible();
+    await expect(library.getByRole("heading", { name: "내 작업", exact: true })).toBeVisible();
+    await expect(library.getByRole("link", { name: "새 작품 만들기", exact: true }).first()).toBeVisible();
+    await expect(library.getByRole("link", { name: "파일 가져오기", exact: true }).first()).toBeVisible();
+    const views = library.getByRole("navigation", { name: "내 작업 보기", exact: true });
+    await expect(views.getByRole("link")).toHaveCount(3);
+    await expect(library.getByRole("navigation", { name: "저장과 배포", exact: true })).toBeVisible();
+    await expect(library.getByLabel("프로젝트 검색", { exact: true })).toBeVisible();
     await expect(page.getByText("클라우드와 동기화됨", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("이 기기에 저장됨", { exact: true })).toBeVisible();
+    await expect(page.getByText("보관·복구·저장은 각 작품의 실제 상태를 기준으로 확인합니다.", { exact: true })).toBeVisible();
 
     const hasNoHorizontalOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -152,10 +154,14 @@ test("new project flow explains a disabled start action and preserves the chosen
   await page.setViewportSize({ width: 320, height: 1000 });
   await page.goto("/studio/new?kind=webtoon&template=webtoon-vertical", { waitUntil: "domcontentloaded" });
 
+  await expect(page.getByRole("heading", { name: "무엇을 만들까요?", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "만들 작업 선택", exact: true })).toHaveValue("webtoon");
+  await expect(page.getByRole("combobox", { name: "시작 템플릿", exact: true })).toHaveValue("webtoon-vertical");
+  const advanced = page.getByText("제작 흐름과 고급 시작 설정", { exact: true });
+  await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeHidden();
+  await advanced.click();
   await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeVisible();
-  await expect(page.getByText("만들 작업 선택", { exact: true })).toBeVisible();
-  await expect(page.getByText("이름과 시작 형식", { exact: true })).toBeVisible();
-  await expect(page.getByText("자동 저장하며 시작", { exact: true })).toBeVisible();
+  await advanced.click();
 
   const projectName = page.getByLabel("프로젝트 이름");
   await projectName.fill("");
@@ -165,8 +171,10 @@ test("new project flow explains a disabled start action and preserves the chosen
 
   await projectName.fill("별빛 식당 1화");
   await expect(startButton).toHaveCount(0);
-  await expect(page.getByText(/별빛 식당 1화/u)).toBeVisible();
-  await expect(page.getByText("이 기기에 저장됨", { exact: true }).first()).toBeVisible();
+  await expect(projectName).toHaveValue("별빛 식당 1화");
+  await expect(page.getByRole("button", { name: /시작$/u }).last()).toBeEnabled();
+  await expect(page.getByText("이 기기에 저장됨", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("시작하면 이 기기에 저장합니다. 팀 공유와 클라우드 백업은 별도로 연결하세요.", { exact: true })).toBeVisible();
 
   const hasNoHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -244,8 +252,9 @@ test("recent work reopens the exact Studio document and restores its viewport", 
   expect(storedCheckpoint?.zoom ?? 0).toBeGreaterThan(1);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const recent = page.locator(".workspace-statusbar .workspace-primary");
-  await expect(recent).toContainText("이어서 작업");
+  const recent = page.locator('a[data-workspace-resume="true"], a[data-space-exact-resume="true"]').first();
+  await expect(recent).toBeVisible();
+  await expect(recent).toContainText(/원고 이어하기|이어서 작업/u);
   const recentHref = await recent.getAttribute("href");
   expect(recentHref).not.toBeNull();
   const recentUrl = new URL(recentHref!, "https://toonstudio.test");

@@ -250,7 +250,8 @@ function AppRuntime() {
   const isolatedChrome = studioImmersive || adminChrome;
   const publicExperience = !isStudioRoutePathname(pathname) && !adminChrome;
 
-  useKmasEntryMerge(!adminChrome);
+  // Catalog refresh is unrelated to manuscript creation, review or local recovery.
+  useKmasEntryMerge(!adminChrome && /^\/(?:discover|search|ranking|title|genre|tag|platforms|recommendations)(?:\/|$)/u.test(pathname));
 
   return (
     <>
