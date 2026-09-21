@@ -1,3 +1,4 @@
+import { StudioSessionEvidenceController, StudioSessionEvidenceService } from "./studio-session-evidence.controller";
 import { StudioWorkSessionController, StudioWorkSessionService } from "./studio-work-session.controller";
 import { StudioWorkSessionRepository } from "./studio-work-session.repository";
 import { Module } from "@nestjs/common";
@@ -27,8 +28,9 @@ const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(pr
 
 @Module({
   imports: [CreatorModule, ...(privateObjectStorageModule ? [privateObjectStorageModule] : [])],
-  controllers: [StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
+  controllers: [StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
   providers: [
+    StudioSessionEvidenceService,
     StudioWorkSessionRepository, StudioWorkSessionService,
     StudioExternalFileBindingRepository,
     StudioProjectGraphRepository,
