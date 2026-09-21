@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
 import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
+import { assertPublicSiteNavigation } from "./lib/public-navigation-browser-contract.mjs";
 import { installBetaEventDismissal } from "./lib/public-page-event-gate.mjs";
 
 const origin = process.env.PUBLIC_WEBTOON_ORIGIN || "http://127.0.0.1:5281";
@@ -27,7 +28,7 @@ try {
         await expect(page.locator("main h1")).toHaveCount(1, { timeout: 30000 });
         await expect(page.locator("main h1")).toBeVisible();
         if (route === "/") await assertStudioWorkspaceHome(page);
-        else await expect(page.locator(".public-site-journey")).toBeVisible();
+        else await assertPublicSiteNavigation(page, route);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${name}: horizontal overflow`);
         await expect.poll(() => page.locator('main img[src*="/brand/atelier-"]').evaluateAll((images) => images.filter((image) => {
           const box = image.getBoundingClientRect();
