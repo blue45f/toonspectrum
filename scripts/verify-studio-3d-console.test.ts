@@ -20,6 +20,7 @@ import {
   collectStudioVrmMannequinChromaFailures,
   formatStudio3dWebGpuDiagnosticConsoleMessage,
   isExpectedStaticPreviewSocketIoHandshakeClose,
+  isStudio3dStaticPreviewReadinessUnavailable,
   runStudio3dWebGpuConformanceWithFreshBrowserRetry,
   runStudio3dWebGpuProofShardsWithFreshBrowserRetry,
   runStudio3dWebGpuShardWithCleanup,
@@ -37,6 +38,23 @@ import {
 } from "./verify-studio-3d-console.mts";
 
 const PREVIEW_URL = "http://127.0.0.1:51758/studio";
+describe("3D entry-mode contract", () => {
+  it("checks the imported model in the visible scene dock instead of a collapsed duplicate", () => {
+    const source = readFileSync(new URL("./verify-studio-3d-console.mts", import.meta.url), "utf8");
+    expect(source).toContain('backgroundDialog.locator(\'[data-studio-bg3d-outliner="dock"]\')');
+    expect(source).not.toContain('backgroundDialog.getByText(`${KTX2_SMOKE_MODEL_LABEL} 1`');
+  });
+  it("selects professional tools through the shipped mode switch before view diagnostics", () => {
+    const source = readFileSync(new URL("./verify-studio-3d-console.mts", import.meta.url), "utf8");
+    const activate = source.indexOf("await professionalMode.click()");
+    const view = source.indexOf('backgroundDialog.getByRole("tab", { name: "보기", exact: true })');
+    expect(activate).toBeGreaterThan(0);
+    expect(view).toBeGreaterThan(activate);
+    expect(source).toContain('name: "3D 편집 모드", exact: true');
+    expect(source).toContain('professionalMode.getAttribute("aria-pressed") === "true"');
+  });
+});
+
 describe("3D PNG worker identities", () => {
   it("keeps dedicated VRM single-image proof separate from the shared BG3D layered worker", () => {
     expect(classifyStudio3dPngEncoderWorker("http://127.0.0.1/assets/studio-vrm-png.worker-Ab12.js")).toBe("vrm");
@@ -854,5 +872,31 @@ describe("3D Magic production-preview product boundary", () => {
     );
     expect(alignmentProof).not.toContain(".runIsolated(");
     expect(alignmentProof).not.toContain('kind: "artifact-capture-v2"');
+  });
+});
+
+describe("3D static-only readiness observation", () => {
+  const preview = "http://127.0.0.1:51758/studio/canvas";
+  const credentialedPreview = new URL(preview);
+  credentialedPreview.username = "fixture-user";
+  credentialedPreview.password = "fixture-password";
+  const message = "Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://127.0.0.1:51758/api/health/ready";
+  it("isolates only the absent API of the exact spawned static preview", () => {
+    expect(isStudio3dStaticPreviewReadinessUnavailable(message, preview)).toBe(true);
+  });
+  it.each([
+    [message.replace("502 (Bad Gateway)", "503 (Service Unavailable)"), preview],
+    [message.replace("502 (Bad Gateway)", "500 (Internal Server Error)"), preview],
+    [message.replace("/ready", "/ready-broken"), preview],
+    [message.replace("/ready", "/ready?debug=1"), preview],
+    [message.replace("/api/health/ready", "/assets/editor.js"), preview],
+    [message.replace(":51758/", ":51759/"), preview],
+    [message, preview.replace("127.0.0.1", "localhost")],
+    [message, "https://www.toonstudio.cloud/studio"],
+    [message, credentialedPreview.href],
+    [message + " additional error", preview],
+    ["page crashed @ http://127.0.0.1:51758/api/health/ready", preview],
+  ])("retains all other error evidence: %s", (diagnostic, origin) => {
+    expect(isStudio3dStaticPreviewReadinessUnavailable(diagnostic, origin)).toBe(false);
   });
 });
