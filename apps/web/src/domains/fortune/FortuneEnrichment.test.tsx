@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fortuneMonthDays, type FortuneReading } from "@toonspectrum/core/fortune";
 import { FortuneEnrichment } from "./FortuneEnrichment";
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+// The external fixture has a 24-hour TTL; wall-clock dates must not invalidate it.
+beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-20T01:00:01Z")); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const base: FortuneReading = { id: "almanac", title: "만세력", eyebrow: "달력", summary: "기본 로컬 결과", generatedFor: "2026-09-20", sections: [], notes: [], calendar: fortuneMonthDays("2024-02") };
 function checks() { return { kind: "calendar", month: "2024-02", status: "external", source: "kasi", checkedAt: "2026-09-20T01:00:00Z", policyRevision: "fixture-v1", checks: base.calendar!.map((day) => ({ date: day.date, matches: true, fields: [] })) }; }
 describe("optional fortune enrichment UI", () => {
@@ -17,8 +19,9 @@ describe("optional fortune enrichment UI", () => {
     expect(fetcher.mock.calls[0][1]).toMatchObject({ credentials: "omit", cache: "no-store" });
     expect(screen.getByText(/운세 예측력이나 사주 전체의 공식 인증이 아닙니다/)).toBeTruthy();
   });
-  it.each(["network", "wrong-month", "partial", "duplicate"])("retains base content after %s failure", async (mode) => {
+  it.each(["network", "wrong-month", "partial", "duplicate", "expired"])("retains base content after %s failure", async (mode) => {
     const result = checks();
+    if (mode === "expired") result.checkedAt = "2026-09-18T01:00:00Z";
     if (mode === "wrong-month") result.month = "2024-03";
     if (mode === "partial") result.checks.pop();
     if (mode === "duplicate") result.checks[1] = result.checks[0];

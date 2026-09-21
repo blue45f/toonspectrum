@@ -304,7 +304,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
           allOf: [
             "onRequestPixelSelection",
             '"선택 시작하기"',
-            '"선택 후 변형"',
+            'label="변형 (⇧T)"',
             "pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable",
           ],
         }],

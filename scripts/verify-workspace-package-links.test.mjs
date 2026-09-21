@@ -1,4 +1,5 @@
-import { afterEach, test } from "node:test";
+// Keep the standalone pre-install check and the root Vitest suite on the same tests.
+const { afterEach, test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

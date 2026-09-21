@@ -40,7 +40,7 @@ export function WorkspaceTaskFrame({ route, children }: {
         <span aria-current="page">{bt(route.titleKo, route.titleEn)}</span>
       </nav>
       <div className="workspace-utilities">
-        <OpenSearchButton className="workspace-search-trigger"><Search size={18} aria-hidden="true" />
+        <OpenSearchButton className="workspace-search-trigger" aria-label={bt("작품·도구·메뉴 검색", "Search works, tools, menus")}><Search size={18} aria-hidden="true" />
           <span>{bt("작품·도구·메뉴 검색", "Search works, tools, menus")}</span><kbd aria-hidden="true">⌘ K</kbd>
         </OpenSearchButton>
         <div id="workspace-audio-dock" className="relative flex shrink-0 items-center" />

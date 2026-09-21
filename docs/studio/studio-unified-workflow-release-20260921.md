@@ -58,3 +58,29 @@
 사용자가 이 대화에서 운영 배포를 요청했고 후속 메시지에서 main 머지를 요청했다. PR 검증 후 정확한 main SHA를 수동 배포한다. CI·보호 규칙 우회, 기존 원고/DB migration, 환경변수 변경, 플랜 변경, Vercel 배포, 자동 source rebuild 활성화는 하지 않는다. 이번 코드의 변경 배포 단위는 정적 Web이며 API/DB를 이 기능의 이름으로 불필요하게 재배포하지 않는다.
 
 PR과 배포 기록은 실제 결과가 생긴 뒤 별도로 기록한다. 이 문서 자체는 병합·배포 성공 증빙이 아니다.
+
+## main merge continuation — 2026-09-21
+
+- Continued PR #1903 in an isolated worktree and integrated main `8ad0f0d73` without changing another session's checkout.
+- Added explicit, localized accessible names to search buttons in home, work library and task chrome. The name survives narrow-screen icon-only rendering; existing text-labelled consumers are unchanged.
+- Kept one package-link test suite runnable under both Node's standalone runner and root Vitest. The preflight remains required in build/test commands.
+- Updated structural regression contracts to follow the delegated transform entry and inline drawing workbench, while retaining lock, pixel-target and no-page-composite checks.
+- Made the external-calendar fixture clock deterministic and added a stale-response rejection case. The production response expiry policy is unchanged.
+- Updated browser journeys to use the current four-item GNB, compact creation form and exact resume links. Kept real file creation, authored stroke, durable save, document identity, zoom and scroll restoration assertions.
+- Floating-layout proof uses the mounted optional arrangement control for visibility, docking and locks. During pen/mouse strokes the view launcher becomes inert and restores afterwards; the inline workbench and forced offline/save warnings remain visible. Safety overrides are verified, not bypassed.
+- Local targeted regression run: **17 files / 198 tests passed**, including the original six diagnostic failure files and the new accessibility regression.
+- Local production bundle completed with normal prebuild/postbuild, generated notices and CSP verification. To avoid duplicating large static assets on a low-space APFS volume, unchanged public files were cloned copy-on-write and Vite did not recopy/erase that local artifact directory. No repository build policy was weakened.
+- These local browser fixtures are not authenticated production, external reviewer, DB, WAN, billing or provider-success verification.
+- Current user request is to continue and merge main. This continuation does not initiate a production deployment, migration, secret change, infrastructure change or plan change.
+- The F01–F40 exclusions above remain in force; merging this increment is not a claim that every competitive feature is complete.
+
+### Verified continuation evidence
+
+- Root TypeScript `tsc --noEmit -p tsconfig.json`: passed after the accessibility test's query types were corrected.
+- Changed-file ESLint with zero warnings: passed; `git diff --check`: passed.
+- Standalone `node --test scripts/verify-workspace-package-links.test.mjs`: 4 passed, confirming the same cases also run outside Vitest.
+- Previously failing creator/non-studio browser journeys: all 6 passed across the initial targeted run and one corrected creation-selector rerun. These retain real local document creation/drawing/save and exact document/zoom/scroll recovery.
+- Public pages: **42/42 passed** (14 routes × 1440/390/320px), including actual Phaser/list home switching, artwork loading, current navigation and horizontal overflow checks.
+- Public interaction/fault-injection cases: **16/16 passed**, including history, keyboard destinations, 404 recovery, theme/primary actions and optional chunk failure isolation.
+- `verify-studio-menus.mts`: passed with 10 default tools, 9 primary menus, reference toggle, popovers, platform canvas resize/Undo, 5 input-device modes, floating hide/show and docking/locks, pen and mouse stroke focus, safety-warning visibility and export controls.
+- All browser evidence above is the local production candidate. No authenticated production, database migration, external service billing or WAN verification is implied.

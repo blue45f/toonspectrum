@@ -3,12 +3,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
 import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
+import { assertStudioTaskFrame } from "./lib/studio-task-frame-browser-contract.mjs";
 import { installBetaEventDismissal } from "./lib/public-page-event-gate.mjs";
 
 const origin = process.env.PUBLIC_WEBTOON_ORIGIN || "http://127.0.0.1:5281";
 const output = "artifacts/public-webtoon-experience";
 const routes = ["/", "/about/studio", "/research", "/research/assets", "/learn", "/market", "/market/browse", "/showcase", "/discover", "/community", "/about", "/help", "/contact", "/support"];
 const widths = [1440, 390, 320];
+const taskTitles = new Map([["/market", "소재 찾기"], ["/showcase", "창작 작품"], ["/discover", "작품 찾기"], ["/help", "도움말"]]);
 const results = [];
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -27,6 +29,7 @@ try {
         await expect(page.locator("main h1")).toHaveCount(1, { timeout: 30000 });
         await expect(page.locator("main h1")).toBeVisible();
         if (route === "/") await assertStudioWorkspaceHome(page);
+        else if (taskTitles.has(route)) await assertStudioTaskFrame(page, taskTitles.get(route));
         else await expect(page.locator(".public-site-journey")).toBeVisible();
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${name}: horizontal overflow`);
         await expect.poll(() => page.locator('main img[src*="/brand/atelier-"]').evaluateAll((images) => images.filter((image) => {
