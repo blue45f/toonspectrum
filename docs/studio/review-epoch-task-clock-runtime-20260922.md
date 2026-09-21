@@ -22,3 +22,6 @@ Use GREATEST(clock_timestamp(), createdAt, updatedAt) on the exact observed work
 - The earlier larger sharing branch was used to discover the defect, but no sharing server, guest UI or 0084 migration is included in this main fix. Other developers' policy/UI/real-time changes are preserved.
 
 No production migration, runtime role, deployment, environment, domain, price plan or CI protection was changed. Migration registration does not execute DDL or claim operational rollout. #1905's DPR2 backing-size observation and full device/WAN/exhaustive acceptance remain open; external pinned guest UI stays incomplete in Draft #1939.
+
+
+Remote follow-up: Creator hiring workflow35627547736 failed only its independent migration-inventory assertion (411 other tests passed). The count was still81 despite the two real policy migrations; update that exact assertion and test title to83 while preserving immutable0078 checksum, atomic0080 SQL and every least-privilege assertion. Add that contract to mandatory core targets as well. This is inventory synchronization, not removal of the failed test or relaxation of its source/permission protections. Final exact-head remote results remain separate.
