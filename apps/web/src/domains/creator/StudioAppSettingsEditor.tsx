@@ -212,6 +212,7 @@ export function StudioAppSettingsPanel({
     >
       <div
         ref={dialogRef}
+        data-studio-settings-editor={tab}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -741,6 +742,7 @@ export function StudioAppSettingsPanel({
           </div>
         </div>
 
+        {tab !== "toolbar" || persistenceState !== "saved" ? (
         <footer className="flex items-center gap-2 border-t border-line px-4 py-3">
           <div className="min-w-0 flex-1" aria-live="polite">
             {persistenceState === "session-only" ? (
@@ -784,6 +786,7 @@ export function StudioAppSettingsPanel({
             {t("studio.settings.state.save")}
           </button>
         </footer>
+        ) : null}
       </div>
     </div>
   );

@@ -1,0 +1,12 @@
+/* Ancillary explanations must not displace the brush results on short desktop windows. */
+.studio-brush-dock-settings[open] { max-height: min(42%, 17rem); overflow-y: auto; overscroll-behavior: contain; }
+[data-studio-brush-workbench="true"] [data-studio-brush-catalog-controls="true"] > p { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+[data-studio-brush-workbench="true"] [data-studio-brush-catalog-controls="true"] { padding-block: 4px; }
+[data-studio-brush-workbench="true"] [data-studio-brush-catalog-reset="true"] { padding-block: 4px; }
+[data-studio-brush-workbench="true"] [data-studio-brush-catalog-reset="true"] button > span > span:last-child { display: none; }
+[data-studio-brush-workbench-dock="true"] > footer { padding-block: 4px; }
+/* An overlaid brush panel still owns its strip of the screen; the HUD must not sit below it. */
+#studio-workspace:has([data-studio-brush-panel-presentation="overlay"]) [data-studio-status-bar="true"] {
+  left: calc(var(--studio-brush-overlay-width, 0px) + 0.875rem);
+  max-width: max(10rem, min(44rem, calc(100% - var(--studio-brush-overlay-width, 0px) - 11rem)));
+}

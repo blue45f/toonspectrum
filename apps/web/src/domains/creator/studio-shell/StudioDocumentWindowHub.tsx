@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { useStudioChromePortalTarget } from "./use-studio-chrome-portal-target";
 import {
   formatI18nTemplate,
   translateBilingualValueForActiveLocale,
@@ -141,6 +143,8 @@ export function StudioDocumentWindowHub({
     documentKey: resolution.documentKey,
     workspace: resolution.workspace,
   });
+  const chromeTarget = useStudioChromePortalTarget("studio-document-chrome-slot");
+  const barRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const shellRef = useRef<HTMLDivElement>(null);
@@ -247,7 +251,7 @@ export function StudioDocumentWindowHub({
   useEffect(() => {
     if (!open) return undefined;
     const handlePointerDown = (event: PointerEvent) => {
-      if (shellRef.current?.contains(event.target as Node)) return;
+      if (shellRef.current?.contains(event.target as Node) || barRef.current?.contains(event.target as Node)) return;
       setOpen(false);
     };
     document.addEventListener("pointerdown", handlePointerDown, true);
@@ -260,15 +264,13 @@ export function StudioDocumentWindowHub({
     activeWorkspaceCounts.set(peer.workspace, (activeWorkspaceCounts.get(peer.workspace) ?? 0) + 1);
   }
 
-  return (
-    <div
-      ref={shellRef}
-      data-studio-document-window-hub="true"
-      data-studio-quick-mode={quickMode}
-    >
+  const workspaceBar = (
       <div
+        ref={barRef}
+        data-studio-shell-authored-layout={chromeTarget ? "true" : undefined}
+        data-studio-document-chrome-docked={chromeTarget ? "true" : undefined}
         data-studio-document-window-hub-bar="true"
-        className="pointer-events-none fixed left-1/2 top-[3.25rem] z-[60] w-[min(94vw,42rem)] -translate-x-1/2 print:hidden"
+        className={chromeTarget ? "studio-document-chrome-bar" : "pointer-events-none fixed left-1/2 top-[3.25rem] z-[60] w-[min(94vw,42rem)] -translate-x-1/2 print:hidden"}
       >
         <div className="pointer-events-auto flex min-h-11 items-center gap-1 rounded-2xl border border-line bg-card/95 p-1.5 shadow-lg backdrop-blur-xl">
           <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
@@ -302,6 +304,7 @@ export function StudioDocumentWindowHub({
               {bi(currentWorkspace.descriptionKo, currentWorkspace.descriptionEn)}
             </p>
           </div>
+          <div id="studio-mode-chrome-slot" className="shrink-0 empty:hidden" />
           {resolution.workspace === "draw" ? (
             <button
               type="button"
@@ -363,6 +366,15 @@ export function StudioDocumentWindowHub({
           </button>
         </div>
       </div>
+  );
+
+  return (
+    <div
+      ref={shellRef}
+      data-studio-document-window-hub="true"
+      data-studio-quick-mode={quickMode}
+    >
+      {chromeTarget ? createPortal(workspaceBar, chromeTarget) : workspaceBar}
 
       {open ? (
         <section

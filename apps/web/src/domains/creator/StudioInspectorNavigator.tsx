@@ -376,7 +376,7 @@ export function StudioInspectorNavigator({
             </h2>
             <StudioContextPill tone={summaryTone}>{summary}</StudioContextPill>
           </div>
-          <p className="mt-0.5 truncate text-[0.6875rem] text-fg-3 lg:sr-only">
+          <p data-studio-inspector-description="true" className="mt-0.5 truncate text-[0.6875rem] text-fg-3 lg:sr-only">
             {copy("panelHint")}
           </p>
         </div>
@@ -614,7 +614,7 @@ export function StudioInspectorNavigator({
         </div>
       ) : null}
 
-      {(hasSelection || drawing) && layout.primary !== "properties" && !publishMode ? (
+      {(hasSelection || drawing) && layout.primary !== "properties" && layout.primary !== "layers" && !publishMode ? (
         <button
           type="button"
           onClick={() => {

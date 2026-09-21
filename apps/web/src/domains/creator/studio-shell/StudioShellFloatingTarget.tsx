@@ -263,7 +263,12 @@ export function StudioShellFloatingTarget({
     && shell.drawingAutoHideActive
     && definition.hideWhileDrawing !== false;
   const actualVisible = managedVisible && !drawingAutoHidden;
-  const positionEnabled = viewport.width >= definition.positionMinWidth;
+  const usesDefaultPosition = layout.xRatio === definition.defaultLayout.xRatio
+    && layout.yRatio === definition.defaultLayout.yRatio
+    && layout.dock === definition.defaultLayout.dock;
+  const authoredPosition = node?.dataset.studioShellAuthoredLayout === "true"
+    && usesDefaultPosition && !arranging;
+  const positionEnabled = viewport.width >= definition.positionMinWidth && !authoredPosition;
   const constraints = useMemo(
     () => actualConstraints(definition, size),
     [definition, size],

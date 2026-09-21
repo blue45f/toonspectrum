@@ -1,3 +1,4 @@
+import { StudioChromePortal } from "./StudioDocumentChromeSlot";
 import {
   ArrowRight,
   Download,
@@ -245,6 +246,7 @@ export function StudioModeExperienceBoundary({
   return (
     <div data-studio-mode-runtime={context.mode} className="contents">
       {children}
+      <StudioChromePortal targetId="studio-mode-chrome-slot">
       <details
         className="group fixed bottom-3 left-3 z-[72] max-w-[calc(100vw-1.5rem)]"
         data-studio-mode-experience="true"
@@ -378,6 +380,7 @@ export function StudioModeExperienceBoundary({
           {notice ? <p role="status" className="mt-3 rounded-lg bg-panel px-3 py-2 text-[0.68rem] text-fg-2">{notice}</p> : null}
         </div>
       </details>
+      </StudioChromePortal>
     </div>
   );
 }

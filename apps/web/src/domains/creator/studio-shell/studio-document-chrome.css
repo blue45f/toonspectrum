@@ -1,0 +1,37 @@
+/* Document controls live in the existing command lane, not above drawing controls. */
+[data-studio-document-chrome-slot="true"] { flex: 1 1 0%; min-width: 0; max-width: 40rem; margin-left: auto; }
+[data-studio-document-chrome-slot="true"]:empty { display: none; }
+.studio-document-chrome-bar { width: 100%; min-width: 0; }
+.studio-document-chrome-bar > div { min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+.studio-document-chrome-bar > div > span,
+.studio-document-chrome-bar > div > div > p { display: none; }
+.studio-document-chrome-bar select { min-height: 44px; font-size: 12px; }
+#studio-mode-chrome-slot > details { position: relative; inset: auto; z-index: auto; max-width: none; }
+#studio-mode-chrome-slot summary { min-height: 44px; padding: 0 8px; border-radius: 8px; box-shadow: none; background: transparent; }
+#studio-mode-chrome-slot summary > span:last-child { display: none; }
+#studio-mode-chrome-slot details > div { position: fixed; top: 6.5rem; left: 12px; width: min(38rem, calc(100vw - 24px)); max-height: calc(100dvh - 7.25rem); overflow-y: auto; overscroll-behavior: contain; z-index: 50; }
+@media (max-width: 75rem) {
+  #studio-mode-chrome-slot summary > span:not(:first-child) { display: none; }
+  .studio-document-chrome-bar > div > button:nth-last-child(2),
+  .studio-document-chrome-bar > div > button:nth-last-child(3) { display: none; }
+}
+@media (max-width: 63.999rem) {
+  [data-studio-document-chrome-slot="true"] { width: 100%; max-width: none; margin-left: 0; }
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"] [data-studio-app-menubar="true"]:has([data-studio-document-chrome-slot="true"]:not(:empty)) { width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 0.75rem); border-radius: 16px; }
+  .studio-document-chrome-bar > div { gap: 4px; }
+  #studio-mode-chrome-slot details > div { top: 7rem; max-height: calc(100dvh - 7.75rem); }
+}
+@media print { [data-studio-document-chrome-slot="true"] { display: none; } }
+/* The coach shares the measured top inset and collapses to a small, dismissible affordance. */
+@media (max-width: 63.999rem) {
+  [data-studio-editor="true"][data-studio-mobile-immersive="true"] [data-studio-creative-starter="true"] { top: calc(var(--studio-immersive-menubar-block, 4rem) + 0.5rem); bottom: auto; left: 8px; right: auto; margin: 0; padding: 0; max-width: calc(100% - 16px); }
+  [data-studio-creative-starter="true"][data-studio-quickstart-collapsed="true"] { width: fit-content; }
+  [data-studio-creative-starter="true"][data-studio-quickstart-collapsed="true"] header { padding: 4px; gap: 4px; }
+  [data-studio-creative-starter="true"][data-studio-quickstart-collapsed="true"] header > div { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+}
+/* Short landscape windows get one shared header row, not two stacked floating bars. */
+@media (min-width: 40rem) and (max-width: 63.999rem) and (max-height: 37.5rem) {
+  [data-studio-mobile-immersive="true"] [data-studio-menubar-rows="true"] { flex-direction: row; align-items: center; gap: 8px; }
+  [data-studio-mobile-immersive="true"] [data-studio-menubar-rows="true"] > div:first-child { flex: 0 0 auto; }
+  [data-studio-mobile-immersive="true"] [data-studio-document-chrome-slot="true"] { flex: 1 1 0%; width: auto; }
+}
