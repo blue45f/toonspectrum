@@ -1,3 +1,5 @@
+import { studioBrushCatalogIdIsIntentionallyDiscontinuous } from "../apps/web/src/domains/creator/brush/studio-brush-continuity-audit";
+
 import {
   analyzeStudioBrushMediaPixelQuality,
   type StudioBrushMediaPixelImage,
@@ -810,6 +812,8 @@ export function classifyStudioLongBrushQualityPolicy(
   }
   if (
     input.intentionalDiscrete
+    // Match the authored material mode used by the runtime and short-gesture audit.
+    || studioBrushCatalogIdIsIntentionallyDiscontinuous(input.id)
     || (input.source === "core" && CORE_DISCRETE_BRUSH_IDS.has(input.id))
     || isAuthoredHatchMotifBrushId(input.id)
     // A "tone" preview is the catalogue's own word for a halftone/screentone carrier, and the

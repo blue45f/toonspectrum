@@ -29,6 +29,7 @@ import {
   planStudioWebRoughInkSamples,
   planStudioWebScatterStampSamples,
   planStudioWebSoftCloudSamples,
+  STUDIO_WEB_CLOUD_PARTICLE_MAX,
   STUDIO_WEB_COMPETITIVE_BRUSH_IDS,
 } from "./studio-web-drawing-competitive-kit";
 
@@ -149,5 +150,23 @@ describe("studio web drawing competitive kit", () => {
 
     const viaDispatch = planStudioWebCompetitiveSamplesForBrush("web-lazy-ink", PATH);
     expect(viaDispatch.length).toBe(lazy.length);
+  });
+});
+
+
+describe("soft cloud bounded whole-path coverage", () => {
+  it.each([1, 64, 65, 96, 127, 128, 255, 1024])("retains the last station for %i input points", (count) => {
+    const points = Array.from({ length: count }, (_, index) => ({
+      x: index * 8, y: 40, pressure: count === 1 ? 0.8 : 0.2 + 0.6 * index / (count - 1),
+    }));
+    for (const particlesPerStation of [1, 7, 16]) {
+      const spec = { particlesPerStation, seed: 81 };
+      const samples = planStudioWebSoftCloudSamples(points, spec);
+      expect(samples.length).toBeLessThanOrEqual(STUDIO_WEB_CLOUD_PARTICLE_MAX * 8);
+      expect(samples.at(-1)?.pressure).toBeCloseTo(0.8);
+      expect(samples[0]?.pressure).toBeCloseTo(count === 1 ? 0.8 : 0.2);
+      expect(samples.map((sample) => sample.index)).toEqual(samples.map((_, index) => index));
+      expect(samples).toEqual(planStudioWebSoftCloudSamples(points, spec));
+    }
   });
 });

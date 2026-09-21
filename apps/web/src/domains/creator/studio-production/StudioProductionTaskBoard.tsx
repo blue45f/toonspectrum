@@ -560,7 +560,7 @@ function TaskBoardForScope({ workspace, canEdit, canApprove, canPublish, onCommi
     </div>
     <div className="flex flex-wrap items-center gap-2">
       <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" aria-pressed={layout === "calendar"} onClick={() => setLayout("calendar")}>{bt("일정 보기", "Calendar")}</button>
-      <label className="text-xs">{bt("작업 정렬", "Task order")}<select className="ml-2 min-h-11 rounded-lg border border-line bg-panel px-3" value={sort} onChange={(event) => setSort(event.target.value as ProductionSavedFilter["sort"])}><option value="original">{bt("원래 순서", "Original order")}</option><option value="due">{bt("마감일순", "Due date")}</option><option value="priority">{bt("우선순위순", "Priority")}</option></select></label>
+      <label className="text-xs">{bt("작업 정렬", "Task order")}<select aria-label={bt("작업 정렬", "Task order")} className="ml-2 min-h-11 rounded-lg border border-line bg-panel px-3" value={sort} onChange={(event) => setSort(event.target.value as ProductionSavedFilter["sort"])}><option value="original">{bt("원래 순서", "Original order")}</option><option value="due">{bt("마감일순", "Due date")}</option><option value="priority">{bt("우선순위순", "Priority")}</option></select></label>
     </div>
     <div role="group" aria-label={bt("작업 보기", "Task views")} className="flex flex-wrap gap-2">
       {PRODUCTION_SMART_VIEWS.map((id) => <button key={id} type="button" disabled={id === "mine" && !actorId}

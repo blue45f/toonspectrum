@@ -412,7 +412,8 @@ export interface StudioWebSoftCloudSpec {
 
 export const DEFAULT_STUDIO_WEB_SOFT_CLOUD_SPEC: StudioWebSoftCloudSpec = Object.freeze({
   particlesPerStation: 7,
-  cloudRadius: 22,
+  // Keep neighboring soft footprints overlapping instead of forming isolated scallops.
+  cloudRadius: 14,
   seed: 0xc1_0d_0001,
   baseSize: 14,
 });
@@ -446,12 +447,15 @@ export function planStudioWebSoftCloudSamples(
   const path = sanitizePoints(points);
   if (path.length === 0) return Object.freeze([]);
 
-  // Thin path stations to keep live frames under budget.
-  const stride = Math.max(1, Math.floor(path.length / 64));
+  // Allocate complete stations before sampling: floor-stride plus an early particle
+  // cutoff could spend the whole budget on the prefix and omit the end of the stroke.
+  // Preserve the existing work ceiling and sample both endpoints across the full path.
+  let particleBudget = STUDIO_WEB_CLOUD_PARTICLE_MAX * 8;
+  const stationCount = Math.min(path.length, 64, Math.floor(particleBudget / particlesPerStation));
   const samples: StudioWebCompetitiveSample[] = [];
   let index = 0;
-  let particleBudget = STUDIO_WEB_CLOUD_PARTICLE_MAX * 8;
-  for (let i = 0; i < path.length && particleBudget > 0; i += stride) {
+  for (let station = 0; station < stationCount; station++) {
+    const i = stationCount === 1 ? 0 : Math.round(station * (path.length - 1) / (stationCount - 1));
     const p = path[i]!;
     const pressure = clamp(finite(p.pressure, 0.5), 0.05, 1);
     for (let k = 0; k < particlesPerStation && particleBudget > 0; k++) {
