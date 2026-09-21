@@ -193,4 +193,10 @@ describe("production menu verifier follows shipped feature entry points", () => 
     fireEvent.click(preset!);
     expect(onApply).toHaveBeenCalledWith({ kind: "solid", color: "#ffffff", presetId: "s-white" });
   });
+
+  it("pins the eight saved defaults independently of rendered core tools", () => {
+    expect(defaultStudioAppSettings().toolbar.visibleIds).toEqual([
+      "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
+    ]);
+  });
 });
