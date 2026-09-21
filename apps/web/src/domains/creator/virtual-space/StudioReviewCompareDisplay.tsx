@@ -1,48 +1,45 @@
-import { useEffect, useId, useRef, useState, type UIEvent } from "react";
+import { useId, useState } from "react";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { reviewPreviewIdentity } from "./studio-review-viewport";
+import { useReviewCompareViewport } from "./use-review-compare-viewport";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioReviewImage } from "./StudioPinnedReviewPreview";
-import { linkedReviewScroll, reviewOverlayAllowed, sameReviewSourcePage } from "./studio-review-comparison-model";
+import { reviewOverlayAllowed, sameReviewSourcePage } from "./studio-review-comparison-model";
 import type { StudioVirtualSpaceReviewPreview } from "./studio-virtual-space-review-preview";
 
 const control = "min-h-11 rounded-lg border border-line bg-card px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 type Side = "left" | "right";
-
-/** Immutable leased previews only; no write or editor-selection capability. */
-export function StudioReviewCompareDisplay({ left, right, linked }: {
+type CompareMode = "side-by-side" | "single" | "overlay";
+const BACKGROUNDS = { neutral: "#777777", light: "#f7f7f7", dark: "#171717" } as const;
+interface CompareDisplayProps {
   readonly left: StudioVirtualSpaceReviewPreview;
   readonly right: StudioVirtualSpaceReviewPreview;
   readonly linked: boolean;
-}) {
+}
+
+/** Immutable leased previews only; no write or editor-selection capability. */
+export function StudioReviewCompareDisplay(props: CompareDisplayProps) {
+  // The comparison state cannot be reused for a different source page, even with identical pixels.
+  return <CompareDisplayForPages key={JSON.stringify([reviewPreviewIdentity(props.left), reviewPreviewIdentity(props.right)])} {...props} />;
+}
+
+function CompareDisplayForPages({ left, right, linked }: CompareDisplayProps) {
   const bt = useBilingual("StudioReviewCompareDisplay");
   const hint = useId();
-  const [mode, setMode] = useState<"side-by-side" | "single" | "overlay">("side-by-side");
+  const narrow = useMediaQuery("(max-width: 767px)");
+  const [preferredMode, setMode] = useState<CompareMode | null>(null);
+  const mode = preferredMode ?? (narrow ? "single" : "side-by-side");
+  const [background, setBackground] = useState<keyof typeof BACKGROUNDS>("neutral");
   const [active, setActive] = useState<Side>("left");
   const [opacity, setOpacity] = useState(50);
   const [zoom, setZoom] = useState(100);
-  const leftPane = useRef<HTMLDivElement>(null), rightPane = useRef<HTMLDivElement>(null);
-  const pending = useRef<{ side: Side; top: number } | null>(null);
+
   const allowed = reviewOverlayAllowed(left, right);
   const layout = mode === "overlay" && !allowed ? "side-by-side" : mode;
   const labels = { left: bt("기준 검수본 페이지", "Original snapshot page"), right: bt("비교 검수본 페이지", "Comparison snapshot page") };
-  useEffect(() => {
-    pending.current = null;
-    for (const pane of [leftPane.current, rightPane.current]) if (pane) { pane.scrollTop = 0; pane.scrollLeft = 0; }
-  }, [left.sha256, right.sha256, layout]);
-  const sync = (side: Side, event: UIEvent<HTMLDivElement>) => {
-    const source = event.currentTarget;
-    if (pending.current?.side === side && Math.abs(source.scrollTop - pending.current.top) < 1) {
-      pending.current = null; return;
-    }
-    pending.current = null;
-    if (!linked || !sameReviewSourcePage(left, right)) return;
-    const target = side === "left" ? rightPane.current : leftPane.current;
-    if (!target) return;
-    const top = linkedReviewScroll(source.scrollTop, source.scrollHeight - source.clientHeight,
-      target.scrollHeight - target.clientHeight);
-    if (top === null || Math.abs(target.scrollTop - top) < 1) return;
-    pending.current = { side: side === "left" ? "right" : "left", top };
-    target.scrollTop = top;
-  };
+  const viewport = useReviewCompareViewport(`${layout}:${active}:${zoom}`, linked && sameReviewSourcePage(left, right));
+  const changeMode = (next: CompareMode) => { viewport.transition(layout, next); setMode(next); };
+  const reset = () => { viewport.reset(); setZoom(100); setOpacity(50); setActive("left"); };
   const image = (side: Side) => {
     const page = side === "left" ? left : right;
     return <StudioReviewImage key={`${side}:${page.sha256}`} preview={page} label={labels[side]}
@@ -50,14 +47,21 @@ export function StudioReviewCompareDisplay({ left, right, linked }: {
   };
   return <div className="space-y-3" data-review-compare-layout={layout}>
     <div className="flex flex-wrap items-center gap-2" aria-label={bt("비교 표시 방식", "Comparison layout")}>
-      <button type="button" className={control} aria-pressed={layout === "side-by-side"} onClick={() => setMode("side-by-side")}>{bt("나란히 보기", "Side by side")}</button>
-      <button type="button" className={control} aria-pressed={layout === "single"} onClick={() => setMode("single")}>{bt("A/B 전환", "A/B view")}</button>
-      <button type="button" className={control} aria-pressed={layout === "overlay"} disabled={!allowed} onClick={() => setMode("overlay")}>{bt("겹쳐 보기", "Overlay")}</button>
+      <button type="button" className={control} aria-pressed={layout === "side-by-side"} onClick={() => changeMode("side-by-side")}>{bt("나란히 보기", "Side by side")}</button>
+      <button type="button" className={control} aria-pressed={layout === "single"} onClick={() => changeMode("single")}>{bt("A/B 전환", "A/B view")}</button>
+      <button type="button" className={control} aria-pressed={layout === "overlay"} disabled={!allowed} onClick={() => changeMode("overlay")}>{bt("겹쳐 보기", "Overlay")}</button>
       <label className="flex items-center gap-2 text-sm">{bt("확대", "Zoom")}
         <select className={control} value={zoom} onChange={(event) => setZoom(Number(event.target.value))}>
           {[75, 100, 125, 150, 200].map((value) => <option key={value} value={value}>{value}%</option>)}
         </select>
       </label>
+      <label className="flex items-center gap-2 text-sm">{bt("원고 배경", "Manuscript background")}
+        <select className={control} value={background} onChange={(event) => setBackground(event.target.value as keyof typeof BACKGROUNDS)}>
+          <option value="neutral">{bt("중립 회색", "Neutral gray")}</option>
+          <option value="light">{bt("밝게", "Light")}</option><option value="dark">{bt("어둡게", "Dark")}</option>
+        </select>
+      </label>
+      <button type="button" className={control} onClick={reset}>{bt("보기 위치 초기화", "Reset view position")}</button>
     </div>
     <p id={hint} className="text-xs leading-relaxed text-fg-2">{allowed
       ? bt("의견은 처음 연 검수본에 남습니다. A/B 전환은 좁은 화면에서 한 장씩 비교합니다.", "Notes stay on the original review. Use A/B to compare one image at a time on narrow screens.")
@@ -72,7 +76,9 @@ export function StudioReviewCompareDisplay({ left, right, linked }: {
           onChange={(event) => setOpacity(Number(event.target.value))} />
       </label>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Read-only image scroll regions require keyboard focus. */}
-      <div className="max-h-[65vh] overflow-auto rounded-lg border border-line bg-panel" tabIndex={0} role="region" aria-label={bt("겹친 원고", "Overlay manuscripts")} aria-describedby={hint}>
+      <div tabIndex={0} ref={(node) => viewport.setNode("overlay", node)} data-review-compare-pane="overlay"
+        onScroll={(event) => viewport.onScroll("overlay", event)} onLoadCapture={() => viewport.restore("overlay")}
+        style={{ backgroundColor: BACKGROUNDS[background] }} className="max-h-[65vh] overflow-auto rounded-lg border border-line" role="region" aria-label={bt("겹친 원고", "Overlay manuscripts")} aria-describedby={hint}>
         <div className="grid" style={{ width: `${zoom}%` }}>
           <div className="col-start-1 row-start-1">{image("left")}</div>
           <div className="col-start-1 row-start-1" style={{ opacity: opacity / 100 }}>{image("right")}</div>
@@ -83,7 +89,9 @@ export function StudioReviewCompareDisplay({ left, right, linked }: {
         <div key={side} className="min-w-0">
           <p className="mb-2 text-xs font-semibold text-fg-2">{side === "left" ? bt("A · 기준본", "A · Original") : bt("B · 비교본", "B · Comparison")}</p>
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Read-only image scroll regions require keyboard focus. */}
-          <div ref={side === "left" ? leftPane : rightPane} onScroll={(event) => sync(side, event)} tabIndex={0}
+          <div tabIndex={0} ref={(node) => viewport.setNode(side, node)} data-review-compare-pane={side}
+            onScroll={(event) => viewport.onScroll(side, event)} onLoadCapture={() => viewport.restore(side)}
+            style={{ backgroundColor: BACKGROUNDS[background] }}
             role="region" aria-label={labels[side]} aria-describedby={hint}
             className="max-h-[65vh] min-w-0 overflow-auto overscroll-contain rounded-lg border border-line bg-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             <div style={{ width: `${zoom}%` }}>{image(side)}</div>
