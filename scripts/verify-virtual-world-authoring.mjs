@@ -1,0 +1,115 @@
+import assert from "node:assert/strict";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chromium, expect } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+
+const origin = process.env.STUDIO_QA_BASE_URL ?? "http://127.0.0.1:5393";
+const parsedOrigin = new URL(origin);
+assert(parsedOrigin.protocol === "http:" && ["localhost", "127.0.0.1"].includes(parsedOrigin.hostname) && parsedOrigin.port && !parsedOrigin.username && !parsedOrigin.password, "Explicit local fixture origin required");
+const output = process.env.STUDIO_QA_OUT ?? "/tmp/toon-world-authoring-browser";
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true }), results = [];
+try {
+  for (const width of [1440, 390, 320]) {
+    const context = await browser.newContext({ viewport: { width, height: 1000 }, locale: "ko-KR", reducedMotion: "reduce" });
+    const requests = [], errors = [];
+    await context.route("**/api/**", async (route) => { requests.push({ method: route.request().method(), path: new URL(route.request().url()).pathname }); await route.fulfill({ status: 403, json: { error: "fixture API disabled" } }); });
+    const page = await context.newPage(); page.on("pageerror", (error) => errors.push(error.message)); page.setDefaultTimeout(20000);
+    const snapshot = async () => JSON.parse(await page.locator("#world-state").textContent());
+    try {
+      await page.goto(`${origin}/tools/browser-harnesses/virtual-world-authoring.html`);
+      await page.getByRole("heading", { name: "공간 편집 실동작 검증" }).waitFor();
+      await page.getByText("직접 배치·정렬·크기 편집", { exact: true }).click();
+      const editor = page.getByRole("region", { name: "직접 배치 편집", exact: true });
+      const map = editor.getByRole("group", { name: "공간 배치 지도", exact: true });
+      await editor.getByRole("checkbox", { name: "시험 소품 A", exact: true }).check();
+      await editor.getByRole("button", { name: "선택 오른쪽 이동", exact: true }).click();
+      assert.equal((await snapshot()).props[0].x, 196);
+      const undo = page.getByRole("button", { name: "실행 취소", exact: true });
+      await undo.click(); assert.equal((await snapshot()).props[0].x, 180);
+      await map.scrollIntoViewIfNeeded();
+      const bounds = await map.boundingBox(); assert(bounds);
+      const coord = (x, y) => ({ x: bounds.x + x / 650 * bounds.width, y: bounds.y + y / 420 * bounds.height });
+      const start = coord(180, 150), end = coord(212, 150);
+      const count = Number(await page.locator("[data-authoring-changes]").getAttribute("data-authoring-changes"));
+      await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 4 });
+      assert.equal((await snapshot()).props[0].x, 180, "Drag must remain a preview until release");
+      await page.mouse.up(); assert.equal((await snapshot()).props[0].x, 208);
+      assert.equal(Number(await page.locator("[data-authoring-changes]").getAttribute("data-authoring-changes")), count + 1);
+      await undo.click(); assert.equal((await snapshot()).props[0].x, 180);
+      await map.scrollIntoViewIfNeeded(); const box = await map.boundingBox(); assert(box);
+      await page.mouse.move(box.x + 180 / 650 * box.width, box.y + 150 / 420 * box.height); await page.mouse.down();
+      await page.mouse.move(box.x + 240 / 650 * box.width, box.y + 150 / 420 * box.height); await page.keyboard.press("Escape"); await page.mouse.up();
+      assert.equal((await snapshot()).props[0].x, 180, "Escape cancels the whole drag");
+      if (width < 500) {
+        const touchBox = await map.boundingBox(); assert(touchBox);
+        const client = await context.newCDPSession(page);
+        const startTouch = { x: touchBox.x + 180 / 650 * touchBox.width, y: touchBox.y + 150 / 420 * touchBox.height, id: 1 };
+        await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [startTouch] });
+        await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...startTouch, x: startTouch.x + 32 / 650 * touchBox.width }] });
+        assert.equal((await snapshot()).props[0].x, 180, "Touch movement remains a draft preview");
+        await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await client.detach();
+        assert.equal((await snapshot()).props[0].x, 208, "Native touch release commits snapped movement");
+        await undo.click(); assert.equal((await snapshot()).props[0].x, 180);
+      }
+      await editor.getByRole("button", { name: "선택 해제", exact: true }).click();
+      await editor.getByRole("checkbox", { name: "시험 소품 A", exact: true }).check(); await editor.getByRole("checkbox", { name: "시험 소품 B", exact: true }).check();
+      await editor.getByRole("button", { name: "왼쪽 맞춤", exact: true }).click(); assert.equal((await snapshot()).props[1].x, 176);
+      await undo.click(); assert.equal((await snapshot()).props[1].x, 420);
+      // Undo may replace the parent's geometry arrays; old index-based selection is cleared.
+      await expect(editor.getByRole("checkbox", { name: "시험 소품 A", exact: true })).not.toBeChecked();
+      await expect(editor.getByRole("checkbox", { name: "시험 소품 B", exact: true })).not.toBeChecked();
+      await editor.getByRole("checkbox", { name: "시험 소품 A", exact: true }).check();
+      await editor.getByRole("checkbox", { name: "시험 소품 B", exact: true }).check();
+      await editor.getByRole("button", { name: "편집 잠금 전환", exact: true }).click(); await expect(editor.getByRole("button", { name: "선택 오른쪽 이동", exact: true })).toBeDisabled();
+      await editor.getByRole("button", { name: "편집 잠금 전환", exact: true }).click();
+      await editor.getByRole("button", { name: "선택 해제", exact: true }).click();
+      await editor.getByRole("checkbox", { name: "배경 기준점 · 배경 고정", exact: true }).check(); await expect(editor.getByRole("button", { name: "선택 오른쪽 이동", exact: true })).toBeDisabled();
+      await page.getByText("노코드 도구 실행 규칙", { exact: true }).click();
+      const rules = page.getByRole("region", { name: "노코드 공간 동작 규칙", exact: true });
+      await rules.getByRole("button", { name: /동작 규칙 추가/u }).click();
+      await rules.getByLabel("한국어 확인 안내", { exact: true }).fill("검수 도구를 열까요?");
+      await rules.getByLabel("영어 확인 안내", { exact: true }).fill("Open the review tool?");
+      await rules.getByRole("button", { name: "검증하고 규칙 저장", exact: true }).click();
+      assert.equal((await snapshot()).interactionRules.length, 1);
+      await page.getByRole("button", { name: "시험 도구 사용", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: "공간 도구 실행 확인", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "취소", exact: true })).toBeFocused();
+      await page.keyboard.press("Escape"); assert.equal(await page.locator("[data-action-count]").getAttribute("data-action-count"), "0");
+      await page.getByRole("button", { name: "시험 도구 사용", exact: true }).click();
+      await page.getByRole("button", { name: "확인하고 도구 열기", exact: true }).click(); assert.equal(await page.locator("[data-action-count]").getAttribute("data-action-count"), "1");
+      await page.getByLabel("시험 작업 상태", { exact: true }).selectOption("focused"); await page.getByRole("button", { name: "시험 도구 사용", exact: true }).click();
+      await expect(page.getByRole("dialog")).toHaveCount(0); assert.equal(await page.locator("[data-action-count]").getAttribute("data-action-count"), "1");
+      await page.getByText("목적별 템플릿·재사용 패키지", { exact: true }).click();
+      const templates = page.getByRole("region", { name: "공간 템플릿·재사용 패키지", exact: true });
+      await templates.getByRole("button", { name: "개인 집중 구성", exact: true }).click();
+      assert.equal((await snapshot()).props[0].id, "prop-a");
+      await templates.getByRole("checkbox", { name: /^현재 공간 초안의 구성이/u }).check();
+      await templates.getByRole("button", { name: "확인한 구성 적용", exact: true }).click(); assert.equal((await snapshot()).npcs.length, 1);
+      await undo.click(); assert.equal((await snapshot()).props[0].id, "prop-a");
+      await templates.getByText("현재 공간을 패키지로 내보내기", { exact: true }).click();
+      await templates.getByLabel("패키지 이름", { exact: true }).fill("검증 시험 패키지"); await templates.getByLabel("구성 작성자", { exact: true }).fill("시험 작성자");
+      await templates.getByLabel("출처·사용 조건·제한", { exact: true }).fill("Repository fixture only; no rights granted by this test.");
+      await templates.getByRole("checkbox", { name: /^공간 이름·자산 URL/u }).check();
+      const downloadPromise = page.waitForEvent("download"); await templates.getByRole("button", { name: "자산 검증 후 패키지 내보내기", exact: true }).click();
+      const download = await downloadPromise, file = `${output}/package-${width}.json`; await download.saveAs(file);
+      const packageText = await readFile(file, "utf8"), pkg = JSON.parse(packageText);
+      assert.equal(pkg.contract, "studio-world-template-package-v1"); assert.equal(pkg.manifest.assetIntegrity.length, 2);
+      const packageInput = templates.getByLabel("템플릿 패키지 파일", { exact: true });
+      await packageInput.setInputFiles({ name: "shared.world-package.json", mimeType: "application/json", buffer: Buffer.from(packageText) });
+      await expect(templates.getByRole("button", { name: "확인한 구성 적용", exact: true })).toBeDisabled();
+      await templates.getByRole("button", { name: "표시된 위치에서 이미지 읽기·검증", exact: true }).click();
+      const confirm = templates.getByRole("checkbox", { name: /^현재 공간 초안의 구성이/u }); await expect(confirm).toBeEnabled(); await confirm.check();
+      await templates.getByRole("button", { name: "확인한 구성 적용", exact: true }).click(); assert.equal((await snapshot()).assetIntegrity.length, 2);
+      assert.equal(await page.locator("[data-validation-errors]").getAttribute("data-validation-errors"), "0");
+      assert.deepEqual(requests.filter((request) => !["GET", "HEAD", "OPTIONS"].includes(request.method)), [], "No publication, authority or document writes");
+      assert.deepEqual(errors, [], "No browser errors"); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "No horizontal viewport overflow");
+      const a11y = await new AxeBuilder({ page }).include("main").withTags(["wcag2a", "wcag2aa"]).analyze();
+      assert.deepEqual(a11y.violations.map(({ id, nodes }) => ({ id, count: nodes.length })), [], "No automated accessibility violations");
+      await page.screenshot({ path: `${output}/world-${width}.png`, fullPage: true });
+      results.push({ width, status: "passed", errors, forbiddenWrites: 0, a11yViolations: 0, scopes: ["atomic-drag", "keyboard-cancel", "undo", "multi-align", "lock", "baked-art", "no-code-confirm", "activity-block", "template-stage", "package-hash-export-import"] });
+      console.log(`PASS world authoring ${width}`);
+    } catch (error) { await page.screenshot({ path: `${output}/failed-${width}.png`, fullPage: true }).catch(() => {}); results.push({ width, status: "failed", error: String(error), errors }); throw error; }
+    finally { await context.close(); }
+  }
+} finally { await browser.close(); await writeFile(`${output}/report.json`, JSON.stringify({ origin, results, boundary: "Actual UI/asset bytes/local draft; synthetic world, no real account/server publication/WAN" }, null, 2)); }
