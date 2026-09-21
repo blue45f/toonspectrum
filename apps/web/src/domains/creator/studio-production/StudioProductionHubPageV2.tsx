@@ -1,3 +1,4 @@
+import { productionChecklistState } from "./studio-production-checklist";
 import { StudioWorkSessionEntry } from "../work-session/StudioWorkSessionEntry";
 import {
   formatI18nTemplate,
@@ -537,10 +538,15 @@ function StudioProductionHubWorkspace({
     }
   }, [capabilities.canPersistLocally, reloadWorkspace, scope.key]);
 
+  const mutationPending = useRef(false);
   const commit = useCallback(async (
     update: (current: ProductionWorkspace) => ProductionWorkspace,
     message: string,
   ) => {
+    if (persistence === "loading" || mutationPending.current) {
+      setNotice("저장 상태 확인 또는 이전 변경 저장이 끝난 뒤 다시 시도해 주세요.");
+      return;
+    }
     if (!capabilities.canEdit || loadError) {
       setNotice(loadError ?? "현재 모드에서는 변경할 수 없습니다.");
       return;
@@ -555,6 +561,7 @@ function StudioProductionHubWorkspace({
       setNotice(`${message} 데모 변경은 저장되지 않습니다.`);
       return;
     }
+    mutationPending.current = true;
     setPersistence("saving");
     try {
       if (mode === "server-work" && serverWorkId) {
@@ -595,8 +602,11 @@ function StudioProductionHubWorkspace({
       setNotice(cause instanceof Error
         ? cause.message
         : "제작 운영 데이터를 저장하지 못했습니다.");
+    } finally {
+      mutationPending.current = false;
     }
   }, [
+    persistence,
     adoptWorkspace,
     capabilities.canEdit,
     capabilities.canPersistLocally,
@@ -644,7 +654,9 @@ function StudioProductionHubWorkspace({
     (issue) => issue.status === "open" && issue.severity === "major",
   ).length;
   const configured = productionWorkspaceHasContent(workspace);
-  const releaseReady = configured && openBlockers === 0 && openMajor === 0 && blocked === 0;
+  const workspaceVerified = (persistence === "saved" || persistence === "demo") && !loadError;
+  const checklist = productionChecklistState(workspace, workspaceVerified);
+  const releaseReady = checklist.state === "clear";
   const progress = workspace.tasks.length === 0
     ? 0
     : Math.round(
@@ -756,7 +768,7 @@ function StudioProductionHubWorkspace({
                 {SURFACE_META[surface].label}
               </p>
               <Pill tone={releaseReady ? "success" : configured ? "warning" : "neutral"}>
-                {releaseReady ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보낼 준비 완료") : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 내용 있음") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "시작 전")}
+                {releaseReady ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 체크리스트 확인됨") : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 내용 있음") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "시작 전")}
               </Pill>
               <Pill>{translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "변경 ")}{workspace.revision}</Pill>
             </div>
@@ -764,7 +776,7 @@ function StudioProductionHubWorkspace({
               key={`${workspace.scopeKey}:${workspace.title}`}
               defaultValue={workspace.title}
               aria-label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "프로젝트 제목")}
-              disabled={!capabilities.canEdit || Boolean(loadError)}
+              disabled={!capabilities.canEdit || Boolean(loadError) || persistence === "loading" || persistence === "saving"}
               className="mt-0.5 min-h-11 w-full max-w-3xl bg-transparent text-base font-black tracking-tight outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:text-lg"
               onBlur={(event) => {
                 const title = event.currentTarget.value.trim();
@@ -862,29 +874,29 @@ function StudioProductionHubWorkspace({
         )}>
           <Metric
             label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행률")}
-            value={`${progress}%`}
-            detail={workspace.tasks.length === 0
+            value={workspaceVerified ? `${progress}%` : "—"}
+            detail={!workspaceVerified ? "저장 상태 확인이 필요합니다." : workspace.tasks.length === 0
               ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 작업을 추가해 진행률을 관리하세요.")
               : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}/{v1} 작업 완료"), { v0: String(completed), v1: String(workspace.tasks.length) })}
-            tone={workspace.tasks.length > 0 && completed === workspace.tasks.length ? "success" : "neutral"}
+            tone={workspaceVerified && workspace.tasks.length > 0 && completed === workspace.tasks.length ? "success" : "neutral"}
           />
           <Metric
             label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "먼저 해결할 항목")}
-            value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(blocked) })}
-            detail={blocked > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "다음 단계 전에 확인해 주세요") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행을 막는 항목이 없습니다")}
-            tone={blocked > 0 ? "danger" : "success"}
+            value={workspaceVerified ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(blocked) }) : "—"}
+            detail={!workspaceVerified ? "저장 상태 확인이 필요합니다." : blocked > 0 ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "다음 단계 전에 확인해 주세요") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "진행을 막는 항목이 없습니다")}
+            tone={!workspaceVerified ? "neutral" : blocked > 0 ? "danger" : "success"}
           />
           <Metric
             label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 의견")}
-            value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(openBlockers + openMajor) })}
-            detail={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "중요 {v0} · 일반 {v1}"), { v0: String(openBlockers), v1: String(openMajor) })}
-            tone={openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
+            value={workspaceVerified ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}건"), { v0: String(openBlockers + openMajor) }) : "—"}
+            detail={!workspaceVerified ? "저장 상태 확인이 필요합니다." : formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "중요 {v0} · 일반 {v1}"), { v0: String(openBlockers), v1: String(openMajor) })}
+            tone={!workspaceVerified ? "neutral" : openBlockers > 0 ? "danger" : openMajor > 0 ? "warning" : "success"}
           />
           {showCollaborationUi ? (
             <Metric
               label={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "참여자")}
-              value={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}명"), { v0: String(workspace.members.length) })}
-              detail={capabilities.serverAuthoritative ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀 권한에 따라 표시") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기의 프로젝트 정보")}
+              value={workspaceVerified ? formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "{v0}명"), { v0: String(workspace.members.length) }) : "—"}
+              detail={!workspaceVerified ? "저장 상태 확인이 필요합니다." : capabilities.serverAuthoritative ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "팀 권한에 따라 표시") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "이 기기의 프로젝트 정보")}
             />
           ) : null}
         </div>
@@ -902,7 +914,7 @@ function StudioProductionHubWorkspace({
                   type="button"
                   className={buttonClass({ size: "sm" })}
                   onClick={addTask}
-                  disabled={!capabilities.canEdit || Boolean(loadError)}
+                  disabled={!capabilities.canEdit || Boolean(loadError) || persistence === "loading" || persistence === "saving"}
                 >
                   <Plus className="size-4" aria-hidden="true" />
                   {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "작업 추가")}</button>
@@ -910,7 +922,7 @@ function StudioProductionHubWorkspace({
             >
               <StudioProductionTaskBoard
                 workspace={workspace}
-                canEdit={capabilities.canEdit && !loadError}
+                canEdit={capabilities.canEdit && !loadError && persistence !== "loading" && persistence !== "saving"}
                 canApprove={capabilities.canApprove}
                 canPublish={capabilities.canPublish}
                 onCommit={(update, message) => { void commit(update, message); }}
@@ -919,8 +931,8 @@ function StudioProductionHubWorkspace({
             <Card
               title={translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보내기 전 확인")}
               description={mode === "server-work"
-                ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "남은 할 일과 검토 의견을 확인한 뒤 내보내기를 준비하세요.")
-                : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "현재 기기의 할 일과 검토 의견을 기준으로 준비 상태를 보여드립니다.")}
+                ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "남은 작업·필수 검토를 확인하세요. 최종 원고 승인과 전달본 생성은 별도 검증합니다.")
+                : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "현재 기기의 체크리스트입니다. 원고의 최종 승인이나 팀 전달 완료를 뜻하지 않습니다.")}
             >
               <div className={cn(
                 "rounded-2xl border p-4 text-center",
@@ -935,7 +947,7 @@ function StudioProductionHubWorkspace({
                 )}
                 <p className="mt-2 text-sm font-black">
                   {releaseReady
-                    ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "내보낼 준비가 됐어요")
+                    ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "제작 체크리스트를 확인했어요")
                     : configured ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "확인할 내용이 있어요") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "할 일을 먼저 추가하세요")}
                 </p>
                 <p className="mt-1 text-xs text-fg-2">
@@ -946,7 +958,7 @@ function StudioProductionHubWorkspace({
             </div>
             <StudioProductionOperationsPanel
               workspace={workspace}
-              canEdit={capabilities.canEdit && !loadError}
+              canEdit={capabilities.canEdit && !loadError && persistence !== "loading" && persistence !== "saving"}
               canManageRoles={capabilities.canManageRoles && !loadError}
               roleCandidates={roleCandidates}
               onCommit={(update, message) => { void commit(update, message); }}
@@ -965,7 +977,7 @@ function StudioProductionHubWorkspace({
                 type="button"
                 className={buttonClass({ size: "sm" })}
                 onClick={addReview}
-                disabled={!capabilities.canEdit || Boolean(loadError)}
+                disabled={!capabilities.canEdit || Boolean(loadError) || persistence === "loading" || persistence === "saving"}
               >
                 <Plus className="size-4" aria-hidden="true" />
                 {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "의견 추가")}</button>
@@ -973,7 +985,7 @@ function StudioProductionHubWorkspace({
           >
             <StudioProductionReviewBoard
               workspace={workspace}
-              canEdit={capabilities.canEdit && !loadError}
+              canEdit={capabilities.canEdit && !loadError && persistence !== "loading" && persistence !== "saving"}
               canApprove={capabilities.canApprove}
               onCommit={(update, message) => { void commit(update, message); }}
             />
@@ -992,7 +1004,7 @@ function StudioProductionHubWorkspace({
                   type="button"
                   className={buttonClass({ size: "sm" })}
                   onClick={createSnapshot}
-                  disabled={!capabilities.canEdit || Boolean(loadError)}
+                  disabled={!capabilities.canEdit || Boolean(loadError) || persistence === "loading" || persistence === "saving"}
                 >
                   <FileClock className="size-4" aria-hidden="true" />
                   {translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "체크포인트 만들기")}</button>
@@ -1020,7 +1032,7 @@ function StudioProductionHubWorkspace({
                         type="button"
                         className={buttonClass({ variant: "outline", size: "sm" })}
                         onClick={() => restoreSnapshot(version)}
-                        disabled={!capabilities.canEdit || Boolean(loadError)}
+                        disabled={!capabilities.canEdit || Boolean(loadError) || persistence === "loading" || persistence === "saving"}
                       >
                         <RotateCcw className="size-4" aria-hidden="true" />
                         {mode === "server-work" ? translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "운영 상태 복원") : translateCurrentStaticSourceText("domains.creator.studio.production.StudioProductionHubPageV2", "ko", "로컬 복원")}

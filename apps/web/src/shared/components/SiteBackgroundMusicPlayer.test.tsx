@@ -254,3 +254,22 @@ describe("SiteBackgroundMusicPlayer", () => {
     expect(mocks.setEnabled).not.toHaveBeenCalled();
   });
 });
+
+describe("task workspace audio dock", () => {
+  it("keeps OST controls in the header and returns focus after Escape", async () => {
+    mockManifest();
+    render(<MemoryRouter initialEntries={["/studio/new"]}>
+      <div id="workspace-audio-dock" /><SiteBackgroundMusicPlayer />
+    </MemoryRouter>);
+    const toggle = await screen.findByRole("button", { name: "OST 설정" });
+    expect(toggle.closest("#workspace-audio-dock")).not.toBeNull();
+    fireEvent.click(toggle);
+    expect(screen.getByRole("slider", { name: "OST 음량" })).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape", isComposing: true });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle);
+    expect(mocks.setEnabled).not.toHaveBeenCalledWith(true);
+  });
+});

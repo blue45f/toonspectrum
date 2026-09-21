@@ -150,3 +150,29 @@ describe("immutable review comparison", () => {
     expect(within(screen.getByRole("region", { name: "검수 버전 비교" })).queryByRole("slider")).toBeNull();
   });
 });
+
+describe("comparison workbench controls", () => {
+  it("offers one-image A/B comparison and zoom without changing or refetching the pinned input", async () => {
+    mount(); await openComparison(); await choose();
+    fireEvent.click(screen.getByRole("button", { name: "A/B 전환" }));
+    expect(screen.getAllByRole("img")).toHaveLength(1);
+    expect(screen.getByRole("img").getAttribute("src")).toContain(base.reviewId);
+    fireEvent.click(screen.getByRole("button", { name: "B · 비교본" }));
+    expect(screen.getByRole("img").getAttribute("src")).toContain(prior.reviewId);
+    fireEvent.change(screen.getByRole("combobox", { name: "확대" }), { target: { value: "150" } });
+    expect(screen.getByRole("img").closest("div")?.style.width).toBe("150%");
+    expect(f.read).toHaveBeenCalledTimes(2);
+  });
+  it("links an inserted page list by stable source ID rather than ordinal", async () => {
+    const inserted = preview(prior, 0), target = preview(prior, 3);
+    if (inserted.mapping.status !== "mapped" || target.mapping.status !== "mapped") throw new Error("fixture");
+    inserted.mapping.page.id = "inserted";
+    target.mapping.page.id = "page-0";
+    f.read.mockImplementation(async (subject) => ready(subject, subject === prior ? [inserted, target] : undefined));
+    mount(); await openComparison(); await choose();
+    fireEvent.click(screen.getByRole("checkbox", { name: "같은 원본 페이지 연결" }));
+    expect(screen.getByRole("combobox", { name: "비교 검수본 페이지" })).toHaveProperty("value", "3");
+    expect(screen.getByRole("img", { name: "비교 검수본 페이지" }).getAttribute("src")).toContain("/3");
+    expect(f.read).toHaveBeenCalledTimes(2);
+  });
+});
