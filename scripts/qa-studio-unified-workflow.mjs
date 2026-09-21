@@ -59,10 +59,15 @@ try {
     await context.close();
   }
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'ko-KR' });
-  const writes = [];
+  const writes = [], telemetry = [];
   await context.route('**/api/**', route => {
     const request = route.request();
     if (new URL(request.url()).pathname.endsWith('/auth/session')) return route.fulfill({json:{user:null}});
+    // A production build reports page views. Keep telemetry isolated from manuscript writes.
+    if (new URL(request.url()).pathname === '/api/analytics/traffic/page-view' && request.method() === 'POST') {
+      telemetry.push('/api/analytics/traffic/page-view');
+      return route.fulfill({ status: 204 });
+    }
     if (!['GET','HEAD','OPTIONS'].includes(request.method())) { writes.push(new URL(request.url()).pathname); return route.abort(); }
     return route.continue();
   });
@@ -78,7 +83,7 @@ try {
     await page.getByText('QA-로컬-작품-재개', {exact:true}).first().waitFor({timeout:60000});
     await page.screenshot({path:path.join(output,'created-work-library.png')});
     assert.deepEqual(writes, [], 'Anonymous creation uses local storage, not server writes');
-    cases.push({name:'create-and-find-local-work',createdPath:new URL(created).pathname,writes});
+    cases.push({name:'create-and-find-local-work',createdPath:new URL(created).pathname,writes,interceptedTelemetry:telemetry.length});
   } catch (error) { failures.push({name:'create-and-find-local-work',message:String(error)}); }
   finally { await context.close(); }
 } finally {
