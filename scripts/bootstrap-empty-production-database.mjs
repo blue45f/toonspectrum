@@ -60,12 +60,15 @@ const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
   "apps/api/src/db/studio-raster-asset.schema.ts",
   "apps/api/src/db/schema/production.schema.ts",
+  "apps/api/src/db/schema/team-workspace.schema.ts",
+  "apps/api/src/db/schema/operation-policy.schema.ts",
 ]);
 const BOOTSTRAP_CONTRACT_PATHS = Object.freeze([
   "package.json",
   "pnpm-lock.yaml",
   "scripts/bootstrap-empty-production-database.mjs",
   "scripts/production-database-migrations.manifest",
+  "scripts/production-operations-database-contract.mjs",
   "scripts/run-production-database-migrations.mjs",
   "scripts/validate-production-database-url.mjs",
   "scripts/verify-production-database-capabilities.mjs",
