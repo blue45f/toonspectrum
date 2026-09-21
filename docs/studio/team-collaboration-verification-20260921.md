@@ -50,3 +50,7 @@ P2P_QA_PROFILE=chromium-desktop P2P_QA_AUDIO_FILE=/path/to/generated-test.wav \
 ```
 
 QA screenshots and JSON remain in local `/tmp/toon-team-collaboration-*` directories, not committed as source. A server configuration correction and an authorized two-account real-network acceptance are still required before claiming production team chat/voice works.
+
+## Final production recheck — 21:37 KST
+
+The public entry changed during this verification from `index-CG8WLlsf.js` to `index-kPd0MW-6.js`. A fresh browser loaded the newer `use-studio-live-transport-auth-CFrpYEG8.js`; it still compiled `explicitOrigin:void 0` and the exported runtime endpoint still returned **null**. The demo route continued to display local-only presence. PR #1924 was independently merged at 21:17:15 KST (merge `8662a2001461b39bbc3143aa87745949457d5c19`); that merge is not evidence of operational realtime readiness.
