@@ -48,3 +48,11 @@ The latest user scope is implementation and main merge only. No production deplo
 - Required product shard: 49 files / 667 tests passed. Required studio-foundation shard: 260 files / 5,844 tests passed. These scopes overlap earlier targeted checks.
 - New browser fixture: all 1440/390/320px journeys passed; inspected the mobile screenshot.
 - Changed-file ESLint with zero warnings passed. The test-only deferred resolver typing was corrected; normal commit/push hooks recheck Web/API typing.
+
+## Exact-CI follow-up
+
+The first remote run identified two issues rather than passing globally. The consent-change test assumed a non-UTC machine; its initial persisted policy is now explicitly Asia/Seoul and the unchanged assertion passes with `TZ=UTC`. Product consent semantics were not weakened.
+
+The newly integrated main session-evidence subpath was absent from both API compiler path mappings and the emitted-runtime export map. Both are now explicit, and runtime packaging tests assert matching source mappings and actual Node subpath resolution. Standard API build passes with 774 compiled files / 2,410 checked imports, native resource loading, and unchanged legal-runtime checks. This is compiled artifact preparation, not service deployment.
+
+Latest integrated browser, Web build and static bundle ratchet pass. Product: 50 files / 687 tests; foundation: 261 files / 5,867 tests; canonical PostgreSQL: 4 files / 161 tests. Final remote CI belongs to the subsequent fix head and is recorded in PR #1936.

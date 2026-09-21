@@ -54,9 +54,13 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       '"use strict";\n',
     );
 
-    const optionalModelEntries = ["work-session", "world-publication", "world-acoustic", "world-conversation"];
+    const optionalModelEntries = ["work-session", "work-session-evidence", "world-publication", "world-acoustic", "world-conversation"];
     for (const name of optionalModelEntries) {
       await compiledPackage(root, `packages/studio-project-model/src/graph/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
+    }
+    const compiler = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
+    for (const name of optionalModelEntries) {
+      assert.deepEqual(compiler.compilerOptions.paths[`@toonspectrum/studio-project-model/${name}`], [`../../packages/studio-project-model/src/graph/${name}.ts`]);
     }
     const staged = await stageApiWorkspaceRuntime(root);
     assert.deepEqual(staged.map((entry) => entry.name), [

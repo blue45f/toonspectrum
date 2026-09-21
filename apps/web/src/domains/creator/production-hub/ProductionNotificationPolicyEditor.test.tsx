@@ -34,7 +34,7 @@ describe("notification preferences", () => {
     expect(screen.getByRole("status").textContent).toContain("외부 발송");
   });
   it("invalidates consent when an input changes", () => {
-    const { execute } = fixture(); confirm(); fireEvent.change(screen.getByLabelText("시간대"), { target: { value: "UTC" } }); save();
+    const { execute } = fixture(policy()); confirm(); fireEvent.change(screen.getByLabelText("시간대"), { target: { value: "UTC" } }); save();
     expect(execute).not.toHaveBeenCalled();
   });
   it("retains failed inputs and blocks a duplicate pending save", async () => {
