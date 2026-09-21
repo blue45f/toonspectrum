@@ -7,12 +7,16 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
     name: "@toonspectrum/contracts",
     exports: {
       "./security/csrf": "./security/csrf.js",
+      "./production-workspace": "./production-workspace.js",
+      "./operation-policy": "./operation-policy.js",
     },
     subpathEntries: [
       {
         target: "security/csrf.js",
         compiledEntry: "packages/contracts/src/security/csrf.js",
       },
+      { target: "production-workspace.js", compiledEntry: "packages/contracts/src/production-workspace.js" },
+      { target: "operation-policy.js", compiledEntry: "packages/contracts/src/operation-policy.js" },
     ],
   },
   {

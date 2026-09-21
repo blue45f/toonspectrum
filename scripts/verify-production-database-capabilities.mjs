@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { buildProductionOperationsRuntimeAclViolationSql } from "./production-operations-database-contract.mjs";
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -6,6 +7,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { buildProductionOperationCapabilitySql } from "./production-operation-database-contract.mjs";
 import { buildHiringCapabilitySql } from "./creator-hiring-database-contract.mjs";
 import { buildHiringAutomationCapabilitySql } from "./creator-hiring-automation-database-contract.mjs";
 import { buildCareerConfirmationCapabilitySql } from "./creator-career-confirmation-database-contract.mjs";
@@ -385,6 +387,7 @@ export function buildProductionCapabilityVerificationSql(
     .join(",\n          ");
 
   return `
+${buildProductionOperationCapabilitySql(runtimeDatabaseRole)}
 ${buildHiringCapabilitySql(runtimeDatabaseRole)}
 ${buildHiringAutomationCapabilitySql(runtimeDatabaseRole)}
 ${buildCareerConfirmationCapabilitySql(runtimeDatabaseRole)}
@@ -468,6 +471,9 @@ BEGIN
       'runtime role lacks the exact Studio ProjectGraph privileges';
   END IF;
 
+  IF ${buildProductionOperationsRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
+    RAISE EXCEPTION 'runtime role lacks exact team workspace and operation-policy privileges';
+  END IF;
   IF ${buildStudioProductionRuntimeAclViolationSql(runtimeDatabaseRole)} THEN
     RAISE EXCEPTION
       'runtime role lacks the exact Studio production privileges';

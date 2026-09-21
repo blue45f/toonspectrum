@@ -21,6 +21,16 @@
       "types": "./src/security/csrf.ts",
       "import": "./src/security/csrf.ts",
       "default": "./src/security/csrf.ts"
+    },
+    "./production-workspace": {
+      "types": "./src/production-workspace.ts",
+      "import": "./src/production-workspace.ts",
+      "default": "./src/production-workspace.ts"
+    },
+    "./operation-policy": {
+      "types": "./src/operation-policy.ts",
+      "import": "./src/operation-policy.ts",
+      "default": "./src/operation-policy.ts"
     }
   }
 }

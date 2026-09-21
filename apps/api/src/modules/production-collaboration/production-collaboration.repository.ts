@@ -377,6 +377,7 @@ export class ProductionCollaborationRepository {
           title: aggregate.title,
           organizationId: aggregate.organizationId,
           collaborationModel: aggregate.collaborationModel,
+          modelVersion: aggregate.modelVersion,
           revision: aggregate.revision,
           aggregate,
           updatedAt: new Date(aggregate.updatedAt),

@@ -27,3 +27,12 @@ export const ProductionExternalReviewPage = lazyRetry(
   })),
   "ProductionExternalReviewPage",
 );
+
+export const TeamWorkspacePage = lazyRetry(
+  () => import("@/domains/creator/production-hub/TeamWorkspacePage").then((module) => ({ default: module.TeamWorkspacePage })),
+  "TeamWorkspacePage",
+);
+export const TeamWorkspaceJoinPage = lazyRetry(
+  () => import("@/domains/creator/production-hub/TeamWorkspacePage").then((module) => ({ default: module.TeamWorkspaceJoinPage })),
+  "TeamWorkspaceJoinPage",
+);

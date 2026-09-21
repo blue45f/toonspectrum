@@ -6,9 +6,15 @@ import {
   ProductionExternalReviewPage,
   ProductionLandingPage,
   ProductionProjectPage,
+  TeamWorkspacePage,
+  TeamWorkspaceJoinPage,
 } from "./production-route-pages";
 
 export const productionRoutes = defineAppRoutes([
+  { id: "production-workspaces", path: "/production/workspaces", element: <TeamWorkspacePage /> },
+  { id: "production-workspace-join", path: "/production/workspaces/join", element: <TeamWorkspaceJoinPage /> },
+  { id: "production-workspace-detail", path: "/production/workspaces/:workspaceId", element: <TeamWorkspacePage /> },
+  { id: "production-workspace-usage", path: "/production/workspaces/:workspaceId/usage", element: <TeamWorkspacePage /> },
   { id: "production-home", path: "/production", element: <ProductionLandingPage /> },
   { id: "production-external-review", path: "/production/review/:projectId/:reviewId", element: <ProductionExternalReviewPage /> },
   { id: "production-projects", path: "/production/projects", element: <ProductionLandingPage /> },
