@@ -176,3 +176,89 @@ describe("comparison workbench controls", () => {
     expect(f.read).toHaveBeenCalledTimes(2);
   });
 });
+
+function prepareScrollPane(name: string, width = 400, height = 1400) {
+  const pane = screen.getByRole("region", { name });
+  Object.defineProperties(pane, {
+    clientWidth: { configurable: true, value: 200 }, clientHeight: { configurable: true, value: 400 },
+    scrollWidth: { configurable: true, value: width }, scrollHeight: { configurable: true, value: height },
+  });
+  const images = within(pane).getAllByRole("img");
+  for (const image of images) Object.defineProperties(image, {
+    complete: { configurable: true, value: true }, naturalWidth: { configurable: true, value: 800 },
+  });
+  for (const image of images) fireEvent.load(image);
+  return pane;
+}
+function scrollPane(pane: HTMLElement, left: number, top: number) {
+  pane.scrollLeft = left; pane.scrollTop = top; fireEvent.scroll(pane);
+}
+
+describe("comparison viewport continuity", () => {
+  it("keeps each independent page position through A/B switching and zoom", async () => {
+    mount(); await openComparison(); await choose();
+    const left = prepareScrollPane("기준 검수본 페이지"), right = prepareScrollPane("비교 검수본 페이지");
+    scrollPane(left, 50, 250); scrollPane(right, 140, 700);
+    fireEvent.click(screen.getByRole("button", { name: "A/B 전환" }));
+    expect(prepareScrollPane("기준 검수본 페이지").scrollTop).toBe(250);
+    fireEvent.click(screen.getByRole("button", { name: "B · 비교본" }));
+    expect(prepareScrollPane("비교 검수본 페이지").scrollTop).toBe(700);
+    fireEvent.change(screen.getByRole("combobox", { name: "확대" }), { target: { value: "200" } });
+    const zoomed = prepareScrollPane("비교 검수본 페이지", 600, 2400);
+    expect(zoomed.scrollLeft).toBe(280); expect(zoomed.scrollTop).toBe(1400);
+    fireEvent.click(screen.getByRole("button", { name: "A · 기준본" }));
+    expect(prepareScrollPane("기준 검수본 페이지", 600, 2400).scrollTop).toBe(500);
+    expect(f.read).toHaveBeenCalledTimes(2);
+  });
+  it("carries a linked position to the hidden A/B side, overlay and explicit reset", async () => {
+    mount(); await openComparison(); await choose();
+    fireEvent.click(screen.getByRole("checkbox", { name: "같은 원본 페이지 연결" }));
+    const left = prepareScrollPane("기준 검수본 페이지"); prepareScrollPane("비교 검수본 페이지");
+    scrollPane(left, 60, 600);
+    fireEvent.click(screen.getByRole("button", { name: "A/B 전환" }));
+    fireEvent.click(screen.getByRole("button", { name: "B · 비교본" }));
+    expect(prepareScrollPane("비교 검수본 페이지").scrollTop).toBe(600);
+    fireEvent.click(screen.getByRole("button", { name: "겹쳐 보기" }));
+    const overlay = prepareScrollPane("겹친 원고"); expect(overlay.scrollTop).toBe(600);
+    scrollPane(overlay, 80, 800);
+    fireEvent.click(screen.getByRole("button", { name: "나란히 보기" }));
+    expect(prepareScrollPane("기준 검수본 페이지").scrollTop).toBe(800);
+    expect(prepareScrollPane("비교 검수본 페이지").scrollTop).toBe(800);
+    fireEvent.click(screen.getByRole("button", { name: "보기 위치 초기화" }));
+    expect(prepareScrollPane("기준 검수본 페이지").scrollTop).toBe(0);
+    expect(prepareScrollPane("비교 검수본 페이지").scrollTop).toBe(0);
+  });
+  it("changes only the preview background and defaults narrow screens to A/B", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(max-width: 767px)",
+      media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    try {
+      mount(); await openComparison(); await choose();
+      expect(screen.getByRole("button", { name: "A/B 전환" }).getAttribute("aria-pressed")).toBe("true");
+      expect(screen.getAllByRole("img")).toHaveLength(1);
+      fireEvent.change(screen.getByRole("combobox", { name: "원고 배경" }), { target: { value: "light" } });
+      expect(screen.getByRole("region", { name: "기준 검수본 페이지" }).style.backgroundColor).toBe("rgb(247, 247, 247)");
+      expect(f.read).toHaveBeenCalledTimes(2);
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it("keeps decoded image and view state when only the preview lease renews", async () => {
+    mount(); await openComparison(); await choose();
+    const left = prepareScrollPane("기준 검수본 페이지"); prepareScrollPane("비교 검수본 페이지");
+    scrollPane(left, 40, 400);
+    fireEvent.change(screen.getByRole("combobox", { name: "확대" }), { target: { value: "150" } });
+    f.read.mockImplementation(async (subject) => ready(subject, [{ ...preview(subject), url: `${preview(subject).url}?renewed=1` }]));
+    await act(async () => { vi.advanceTimersByTime(25_000); });
+    expect(screen.getByRole("combobox", { name: "확대" })).toHaveProperty("value", "150");
+    expect(screen.getByRole("img", { name: "기준 검수본 페이지" }).getAttribute("src")).not.toContain("renewed");
+    expect(prepareScrollPane("기준 검수본 페이지").scrollTop).toBe(400);
+  });
+  it("does not reuse the prior page's view when identical pixels refer to a different source", async () => {
+    const next = preview(base, 1); next.sha256 = preview(base).sha256;
+    f.read.mockImplementation(async (subject) => ready(subject, subject === base ? [preview(base), next] : undefined));
+    mount(); await openComparison(); await choose();
+    scrollPane(prepareScrollPane("기준 검수본 페이지"), 50, 750);
+    fireEvent.change(screen.getByRole("combobox", { name: "확대" }), { target: { value: "200" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "기준 검수본 페이지" }), { target: { value: "1" } });
+    expect(screen.getByRole("combobox", { name: "확대" })).toHaveProperty("value", "100");
+    expect(prepareScrollPane("기준 검수본 페이지").scrollTop).toBe(0);
+  });
+});

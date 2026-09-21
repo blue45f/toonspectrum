@@ -375,7 +375,7 @@ function presentedTitleFor(catalogueGroupId: string): string {
 
 /** Pin the shipped first-run contract independently of the settings implementation. */
 export const FIRST_RUN_RAIL_TOOL_IDS = [
-  "select", "transform", "pen", "eraser", "fill", "marquee-rect", "lasso", "smart-shape", "text", "image",
+  "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image", "transform", "lasso",
 ] as const satisfies readonly StudioRailToolId[];
 
 /** Every first-run tool and the specialized tools added below must remain reachable. */
