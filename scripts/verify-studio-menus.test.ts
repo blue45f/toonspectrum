@@ -51,12 +51,10 @@ afterEach(() => {
 });
 
 describe("production menu verifier follows shipped feature entry points", () => {
-  it("preserves eight saved defaults while projecting ten first-run and fifteen expanded tools", () => {
+  it("preserves eight stored defaults and verifies ten rendered tools plus More additions", () => {
     let visibleIds = defaultStudioAppSettings().toolbar.visibleIds;
-    expect(visibleIds).toEqual([
-      "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
-    ]);
-    expect(new Set(studioDrawingVisibleTools(visibleIds))).toEqual(new Set(FIRST_RUN_RAIL_TOOL_IDS));
+    expect(visibleIds).toHaveLength(8);
+    expect(studioDrawingVisibleTools(visibleIds)).toEqual(FIRST_RUN_RAIL_TOOL_IDS);
     expect(FIRST_RUN_RAIL_TOOL_IDS).toHaveLength(10);
     expect(visibleIds).not.toContain("eyedropper");
     expect(visibleIds).not.toContain("bubble");
@@ -71,9 +69,8 @@ describe("production menu verifier follows shipped feature entry points", () => 
       expect(new Set(visibleIds).size).toBe(visibleIds.length);
     }
     expect(visibleIds).toHaveLength(13);
-    const displayedIds = studioDrawingVisibleTools(visibleIds);
-    expect(displayedIds).toHaveLength(15);
-    expect(displayedIds).toEqual(expect.arrayContaining([...FIRST_RUN_RAIL_TOOL_IDS]));
+    expect(studioDrawingVisibleTools(visibleIds)).toHaveLength(15);
+    expect(studioDrawingVisibleTools(visibleIds)).toEqual(expect.arrayContaining([...FIRST_RUN_RAIL_TOOL_IDS]));
   });
 
   it("uses catalogue picker names and the actual localized shortcut-bearing rail names", () => {
@@ -195,5 +192,11 @@ describe("production menu verifier follows shipped feature entry points", () => 
     expect(preset).not.toBeNull();
     fireEvent.click(preset!);
     expect(onApply).toHaveBeenCalledWith({ kind: "solid", color: "#ffffff", presetId: "s-white" });
+  });
+
+  it("pins the eight saved defaults independently of rendered core tools", () => {
+    expect(defaultStudioAppSettings().toolbar.visibleIds).toEqual([
+      "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
+    ]);
   });
 });
