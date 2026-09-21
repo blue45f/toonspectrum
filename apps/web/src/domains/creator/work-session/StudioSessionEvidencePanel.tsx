@@ -59,7 +59,7 @@ export function StudioSessionEvidencePanel({ view, actorId, controller, busy, on
           <div className="mt-2 flex flex-wrap gap-2">
             {op.target ? <button type="button" className={control} disabled={busy} onClick={() => inspectPage(op.target!)}>{bt("대상 고정 페이지 보기", "View pinned target page")}</button>
               : <span className="text-xs">{op.targetStatus === "outside-page-window" ? bt("대상은 다른 페이지 범위에 있습니다.", "The target is outside this page window.") : bt("대상 위치 미확인", "Target location unavailable")}</span>}
-            <button type="button" className={control} disabled={!canCite} onClick={() => { void controller.command({ action: "note", category: "ai-evidence", body: studioSessionEvidenceNote(evidence, op) }); }}>{bt("검토 기록에 인용", "Cite in session notes")}</button>
+            <button type="button" className={control} disabled={!canCite} onClick={() => { if (!canCite) return; if (!resource.value || Date.parse(resource.value.expiresAt) <= Date.now()) { resource.refresh(); return; } void controller.command({ action: "note", category: "ai-evidence", body: studioSessionEvidenceNote(evidence, op) }); }}>{bt("검토 기록에 인용", "Cite in session notes")}</button>
           </div>
         </li>)}</ul> : <p className="text-sm">{bt("이 제출본에 확인 가능한 AI 실행 기록이 없습니다. AI 미사용을 뜻하지는 않습니다.", "No readable AI records in this snapshot. This does not establish that no AI was used.")}</p>}
         {evidence.omittedAssets || evidence.omittedAiOperations || evidence.invalidEntries ? <p role="status" className="text-xs">{bt("표시 한도 또는 형식 문제로 제외된 기록", "Records omitted due to limits or invalid format")}: {evidence.omittedAssets + evidence.omittedAiOperations + evidence.invalidEntries}</p> : null}

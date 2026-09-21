@@ -41,16 +41,13 @@ export function projectStudioSessionEvidence(snapshot: unknown, mappings: Readon
     }
   }
   const provenance = record(doc?.aiProvenance), operations = provenance?.version === 1 ? rows(provenance.operations) : [];
-  const inspectedOperations = operations.slice(0, 2000);
-  // Count identities before projecting: no ambiguous first record may survive the output cap.
-  const identityCounts = new Map<string, number>();
-  for (const raw of inspectedOperations) {
-    const id = record(raw)?.id;
-    if (typeof id === "string") identityCounts.set(id, (identityCounts.get(id) ?? 0) + 1);
-  }
-  for (const raw of inspectedOperations) {
+  // Reject every ambiguous identity, not merely the second occurrence. An oversized
+  // source cannot establish uniqueness within a truncated prefix, so expose no AI rows.
+  const candidates = operations.length <= 2000 ? operations : [];
+  const operationIndex = indexElements(candidates);
+  for (const raw of candidates) {
     const op = record(raw);
-    if (!op || typeof op.id !== "string" || identityCounts.get(op.id) !== 1) { invalidEntries++; continue; }
+    if (!op || typeof op.id !== "string" || operationIndex.get(op.id) !== op) { invalidEntries++; continue; }
     const rawTarget = record(op.target);
     let target: StudioReviewSourceReference | null = null;
     let targetStatus: StudioSessionEvidence["aiOperations"][number]["targetStatus"] = rawTarget ? "unmapped" : "missing";
@@ -78,6 +75,6 @@ export function projectStudioSessionEvidence(snapshot: unknown, mappings: Readon
     if (aiOperations.length >= 100) { omittedAiOperations++; continue; }
     aiOperations.push(parsed.data);
   }
-  if (operations.length > 2000) omittedAiOperations += operations.length - 2000;
+  if (operations.length > 2000) omittedAiOperations += operations.length;
   return studioSessionEvidenceSchema.parse({ version: 1, ...pin, assets, aiOperations, omittedAssets, omittedAiOperations, invalidEntries });
 }
