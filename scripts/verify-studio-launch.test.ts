@@ -17,6 +17,21 @@ const EXPECTED_HANDSHAKE_CLOSE = [
 ].join("");
 
 describe("Studio launch static-preview diagnostics", () => {
+  it("opens native mobile correction disclosure before querying controls and entering the modal", () => {
+    const disclosure = launchHarness.indexOf('await correctionDetails.locator("summary").click()');
+    const controls = launchHarness.indexOf('const lineCorrectionReady =');
+    const modal = launchHarness.indexOf('await brushStudioLauncher.click()');
+    expect(disclosure).toBeGreaterThan(0);
+    expect(controls).toBeGreaterThan(disclosure);
+    expect(modal).toBeGreaterThan(controls);
+    expect(launchHarness).toContain('hasText: "세부 선 보정 설정"');
+  });
+  it("uses the canonical current-brush editor name without dropping mobile pressure coverage", () => {
+    expect(launchHarness).toContain("hasText: STUDIO_BRUSH_LABELS.editCurrent");
+    expect(launchHarness).toContain('name: STUDIO_BRUSH_LABELS.editCurrent, exact: true');
+    expect(launchHarness).toContain('name: "전역 입력 보정"');
+    expect(launchHarness).toContain('name: "필압 반응 강도"');
+  });
   it("requires the shipped live-collaboration host on the Studio work session", () => {
     expect(launchHarness).toContain("data-studio-presence-dock='true'");
     expect(launchHarness).toContain("liveHostMounted");

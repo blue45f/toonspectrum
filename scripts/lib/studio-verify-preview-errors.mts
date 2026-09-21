@@ -34,3 +34,14 @@ export function isOptionalStudioPreviewApiError(message: string, previewUrl: str
   }
   return false;
 }
+
+/** A static-only preview has no Nest backend. Keep this exact observation visible in logs. */
+export function isStudioStaticPreviewReadinessUnavailable(message: string, previewUrl: string): boolean {
+  let preview: URL;
+  try { preview = new URL(previewUrl); } catch { return false; }
+  if (preview.protocol !== "http:" || preview.hostname !== "127.0.0.1" || !preview.port
+    || preview.username || preview.password) return false;
+  const resource = `${preview.origin}/api/health/ready`;
+  return message === `502 ${resource}`
+    || message === `Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ ${resource}`;
+}
