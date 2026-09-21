@@ -925,7 +925,7 @@ function StudioProductionHubWorkspace({
                 canEdit={capabilities.canEdit && !loadError && persistence !== "loading" && persistence !== "saving"}
                 canApprove={capabilities.canApprove}
                 canPublish={capabilities.canPublish}
-                onCommit={(update, message) => { void commit(update, message); }}
+                onCommit={commit}
               />
             </Card>
             <Card

@@ -1,14 +1,21 @@
+import { StudioProductionCalendar } from "./StudioProductionCalendar";
+import { StudioProductionSavedViews } from "./StudioProductionSavedViews";
+import { StudioProductionDependencyImpact } from "./StudioProductionDependencyImpact";
+import { sortProductionTasks } from "./studio-production-calendar";
+import type { ProductionSavedFilter } from "./studio-production-saved-views";
 import { StudioProductionMatrix } from "./StudioProductionMatrix";
+import { newTaskEdit, taskEditDirty, taskEditConflict, reconcileTaskEdit, taskIdentity, guardTaskEdit, type TaskDraft } from "./studio-production-task-editing";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { getAuthSessionRevision } from "@/compat/auth-session-state";
 import { useSession } from "@/compat/auth-session-store";
-import { PRODUCTION_SMART_VIEWS, productionLocalDay, productionSmartMatches, type ProductionSmartView } from "./studio-production-smart-views";
+import { PRODUCTION_SMART_VIEWS, productionDueDay, productionLocalDay, productionSmartMatches, type ProductionSmartView } from "./studio-production-smart-views";
 import {
   CheckCircle2,
   RotateCcw,
   Save,
   Trash2,
 } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   STUDIO_PRODUCTION_PRIORITIES,
@@ -33,23 +40,7 @@ interface StudioProductionTaskBoardProps {
   readonly onCommit: (
     update: (current: ProductionWorkspace) => ProductionWorkspace,
     message: string,
-  ) => void;
-}
-
-interface TaskDraft {
-  readonly title: string;
-  readonly owner: string;
-  readonly due: string;
-  readonly progress: number;
-  readonly status: ProductionTaskStatus;
-  readonly stage: ProductionStage;
-  readonly priority: ProductionPriority;
-  readonly role: ProductionRole | null;
-  readonly hierarchyNodeId: string | null;
-  readonly dependencyIds: readonly string[];
-  readonly assigneeIds: readonly string[];
-  readonly reviewerIds: readonly string[];
-  readonly blockedReason: string;
+  ) => void | Promise<void>;
 }
 
 const STATUS_LABELS: Readonly<Record<ProductionTaskStatus, string>> = {
@@ -90,24 +81,6 @@ const ROLE_LABELS: Readonly<Record<ProductionRole, string>> = {
   publisher: "게시",
 };
 
-function taskDraft(task: ProductionTask): TaskDraft {
-  return {
-    title: task.title,
-    owner: task.owner,
-    due: task.due,
-    progress: Math.round(task.progress),
-    status: task.status,
-    stage: task.stage ?? "planning",
-    priority: task.priority ?? "normal",
-    role: task.role ?? null,
-    hierarchyNodeId: task.hierarchyNodeId ?? null,
-    dependencyIds: task.dependencyIds ?? [],
-    assigneeIds: task.assigneeIds ?? [],
-    reviewerIds: task.reviewerIds ?? [],
-    blockedReason: task.blockedReason ?? "",
-  };
-}
-
 function selectedValues(target: HTMLSelectElement): readonly string[] {
   return Array.from(target.selectedOptions, (option) => option.value);
 }
@@ -134,30 +107,57 @@ function TaskEditor({
   readonly canPublish: boolean;
   readonly onCommit: StudioProductionTaskBoardProps["onCommit"];
 }) {
-  const [draft, setDraft] = useState<TaskDraft>(() => taskDraft(task));
+  const bt = useBilingual("StudioProductionTaskEditor");
+  const [editing, setEditing] = useState(() => newTaskEdit(task));
+  const effective = reconcileTaskEdit(editing, task);
+  const draft = effective.draft, dirty = taskEditDirty(effective), conflicted = taskEditConflict(effective, task);
+  const generation = useRef(0), pendingRef = useRef(false);
+  const [pending, setPending] = useState(false);
+  const invalidate = useCallback(() => { ++generation.current; }, []);
+  useLayoutEffect(() => { invalidate(); return invalidate; }, [invalidate]);
   const [error, setError] = useState<string | null>(null);
   const updateDraft = (patch: Partial<TaskDraft>) => {
-    setDraft((current) => ({ ...current, ...patch }));
+    setEditing((current) => ({ ...reconcileTaskEdit(current, task), draft: { ...reconcileTaskEdit(current, task).draft, ...patch }, expectedAck: null }));
   };
   useEffect(() => {
-    setDraft(taskDraft(task));
-    setError(null);
+    setEditing((current) => reconcileTaskEdit(current, task));
   }, [task]);
 
   const taskById = useMemo(
     () => new Map(workspace.tasks.map((candidate) => [candidate.id, candidate] as const)),
     [workspace.tasks],
   );
+  const commitUpdate = (update: (current: ProductionWorkspace) => ProductionWorkspace, message: string) => {
+    if (!canEdit || pendingRef.current) return;
+    const own = generation.current, session = getAuthSessionRevision();
+    const current = () => own === generation.current && session === getAuthSessionRevision();
+    pendingRef.current = true; setPending(true); setError(null);
+    const finish = () => { pendingRef.current = false; if (own === generation.current) setPending(false); };
+    try {
+      const result = onCommit((workspaceNow) => {
+        if (!current()) throw new Error("작업 화면이나 계정이 변경되어 요청을 중지했습니다.");
+        guardTaskEdit(workspaceNow, workspace.scopeKey, task);
+        return update(workspaceNow);
+      }, message);
+      void Promise.resolve(result).catch((cause: unknown) => {
+        if (current()) setError(cause instanceof Error ? cause.message : "작업 정보를 저장하지 못했습니다. 입력은 유지됩니다.");
+      }).finally(finish);
+    } catch (cause) {
+      if (current()) setError(cause instanceof Error ? cause.message : "작업 정보를 저장하지 못했습니다. 입력은 유지됩니다.");
+      finish();
+    }
+  };
   const protectedStage = draft.stage === "approved" || draft.stage === "publishing";
   const canChangeProtectedStage = draft.stage === "publishing" ? canPublish : canApprove;
 
   const save = () => {
+    if (!canEdit || conflicted || pendingRef.current) return;
     const title = draft.title.trim();
     if (!title) {
       setError("작업 제목을 입력해 주세요.");
       return;
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/u.test(draft.due)) {
+    if (!productionDueDay(draft.due)) {
       setError("마감일을 올바르게 입력해 주세요.");
       return;
     }
@@ -168,7 +168,9 @@ function TaskEditor({
         : draft.stage;
     const status = draft.status;
     const progress = status === "done" ? 100 : Math.max(0, Math.min(99, Math.round(draft.progress)));
-    onCommit((current) => ({
+    setEditing((current) => ({ ...current, expectedAck: taskIdentity({ ...task, ...draft, title, owner: draft.owner.trim(), progress, stage: nextStage, blockedReason: status === "blocked" ? draft.blockedReason.trim() : "" }) }));
+    commitUpdate((current) => {
+      return {
       ...current,
       tasks: current.tasks.map((candidate) => candidate.id === task.id
         ? {
@@ -188,13 +190,14 @@ function TaskEditor({
             blockedReason: status === "blocked" ? draft.blockedReason.trim() : "",
           }
         : candidate),
-    }), `“${title}” 작업 정보를 저장했습니다.`);
-    setError(null);
+    }; }, `“${title}” 작업 정보를 저장했습니다.`);
   };
 
   const toggleDone = () => {
+    if (!canEdit || dirty || conflicted || pendingRef.current) return;
     const done = task.status === "done";
-    onCommit((current) => ({
+    commitUpdate((current) => {
+      return {
       ...current,
       tasks: current.tasks.map((candidate) => candidate.id === task.id
         ? {
@@ -203,11 +206,13 @@ function TaskEditor({
             progress: done ? Math.min(candidate.progress, 90) : 100,
           }
         : candidate),
-    }), done ? "작업을 다시 시작했습니다." : "작업을 완료했습니다.");
+    }; }, done ? "작업을 다시 시작했습니다." : "작업을 완료했습니다.");
   };
 
   const remove = () => {
-    onCommit((current) => ({
+    if (!canEdit || dirty || conflicted || pendingRef.current) return;
+    commitUpdate((current) => {
+      return {
       ...current,
       tasks: current.tasks
         .filter((candidate) => candidate.id !== task.id)
@@ -216,7 +221,7 @@ function TaskEditor({
           dependencyIds: (candidate.dependencyIds ?? []).filter((id) => id !== task.id),
         })),
       versions: current.versions,
-    }), `“${task.title}” 작업을 삭제했습니다.`);
+    }; }, `“${task.title}” 작업을 삭제했습니다.`);
   };
 
   return (
@@ -246,7 +251,7 @@ function TaskEditor({
           type="button"
           className={buttonClass({ variant: "outline", size: "sm" })}
           onClick={toggleDone}
-          disabled={!canEdit}
+          disabled={pending || !canEdit || dirty || conflicted}
         >
           {task.status === "done" ? (
             <RotateCcw className="size-4" aria-hidden="true" />
@@ -267,6 +272,13 @@ function TaskEditor({
         <div className="h-full rounded-full bg-accent" style={{ width: `${task.progress}%` }} />
       </div>
 
+      {conflicted ? <div className="mt-3 rounded-lg border border-amber-500/40 p-3 text-sm" role="alert">
+        <p>{bt("다른 곳에서 이 작업이 변경되었습니다. 작성 중인 입력은 유지했으며 저장·완료·삭제는 중지했습니다.", "This task changed elsewhere. Your input is preserved; save, complete and delete are blocked.")}</p>
+        <button type="button" className="mt-2 min-h-11 rounded-lg border border-line px-3" disabled={pending} onClick={() => { setEditing(newTaskEdit(task)); setError(null); }}>{bt("입력 대신 최신 작업 불러오기", "Discard input and load latest task")}</button>
+      </div> : dirty ? <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-fg-2">
+        <span role="status">{bt("저장하지 않은 작업 정보가 있습니다.", "Task changes are not saved yet.")}</span>
+        <button type="button" className="min-h-11 rounded-lg border border-line px-3" disabled={pending} onClick={() => { setEditing(newTaskEdit(task)); setError(null); }}>{bt("편집 취소", "Cancel edits")}</button>
+      </div> : null}
       <details className="mt-3 rounded-xl border border-line bg-card">
         <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-bold">
           단계·담당·의존성 편집
@@ -280,7 +292,7 @@ function TaskEditor({
                 value={draft.title}
                 onChange={(event) => updateDraft({ title: event.currentTarget.value })}
                 maxLength={240}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
@@ -291,7 +303,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   status: event.currentTarget.value as ProductionTaskStatus,
                 })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 {(Object.keys(STATUS_LABELS) as ProductionTaskStatus[]).map((status) => (
                   <option key={status} value={status}>{STATUS_LABELS[status]}</option>
@@ -306,7 +318,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   priority: event.currentTarget.value as ProductionPriority,
                 })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 {STUDIO_PRODUCTION_PRIORITIES.map((priority) => (
                   <option key={priority} value={priority}>{PRIORITY_LABELS[priority]}</option>
@@ -321,7 +333,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   stage: event.currentTarget.value as ProductionStage,
                 })}
-                disabled={!canEdit || (protectedStage && !canChangeProtectedStage)}
+                disabled={pending || !canEdit || (protectedStage && !canChangeProtectedStage)}
               >
                 {STUDIO_PRODUCTION_STAGES.map((stage) => (
                   <option
@@ -343,7 +355,7 @@ function TaskEditor({
                   const value = event.currentTarget.value;
                   updateDraft({ role: value ? value as ProductionRole : null });
                 }}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 <option value="">역할 미정</option>
                 {STUDIO_PRODUCTION_ROLES.map((role) => (
@@ -359,7 +371,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   hierarchyNodeId: event.currentTarget.value || null,
                 })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 <option value="">프로젝트 전체</option>
                 {workspace.hierarchy.map((node) => (
@@ -374,7 +386,7 @@ function TaskEditor({
                 value={draft.owner}
                 onChange={(event) => updateDraft({ owner: event.currentTarget.value })}
                 maxLength={240}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2">
@@ -384,7 +396,7 @@ function TaskEditor({
                 className="min-h-11 rounded-xl border border-line bg-panel px-3 text-sm text-fg"
                 value={draft.due}
                 onChange={(event) => updateDraft({ due: event.currentTarget.value })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
@@ -395,7 +407,7 @@ function TaskEditor({
                 max={100}
                 value={draft.progress}
                 onChange={(event) => updateDraft({ progress: Number(event.currentTarget.value) })}
-                disabled={!canEdit || draft.status === "done"}
+                disabled={pending || !canEdit || draft.status === "done"}
               />
             </label>
             <label className="grid gap-1 text-xs font-semibold text-fg-2 md:col-span-2">
@@ -407,7 +419,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   dependencyIds: selectedValues(event.currentTarget),
                 })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 {workspace.tasks.filter((candidate) => candidate.id !== task.id).map((candidate) => (
                   <option key={candidate.id} value={candidate.id}>
@@ -425,7 +437,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   assigneeIds: selectedValues(event.currentTarget),
                 })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 {workspace.roleAssignments.map((assignment) => (
                   <option key={assignment.id} value={assignment.id}>
@@ -443,7 +455,7 @@ function TaskEditor({
                 onChange={(event) => updateDraft({
                   reviewerIds: selectedValues(event.currentTarget),
                 })}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               >
                 {workspace.roleAssignments.map((assignment) => (
                   <option key={assignment.id} value={assignment.id}>
@@ -461,7 +473,7 @@ function TaskEditor({
                 value={draft.blockedReason}
                 onChange={(event) => updateDraft({ blockedReason: event.currentTarget.value })}
                 maxLength={4_000}
-                disabled={!canEdit}
+                disabled={pending || !canEdit}
               />
             </label>
           ) : null}
@@ -475,7 +487,7 @@ function TaskEditor({
                 className: "border-red-500/40 text-red-600 hover:border-red-500 hover:bg-red-500/10",
               })}
               onClick={remove}
-              disabled={!canEdit}
+              disabled={pending || !canEdit || dirty || conflicted}
             >
               <Trash2 className="size-4" aria-hidden="true" />
               작업 삭제
@@ -484,7 +496,7 @@ function TaskEditor({
               type="button"
               className={buttonClass({ size: "sm" })}
               onClick={save}
-              disabled={!canEdit || !draft.title.trim() || (protectedStage && !canChangeProtectedStage)}
+              disabled={pending || !canEdit || conflicted || !draft.title.trim() || (protectedStage && !canChangeProtectedStage)}
             >
               <Save className="size-4" aria-hidden="true" />
               작업 정보 저장
@@ -497,15 +509,20 @@ function TaskEditor({
           ) : null}
         </div>
       </details>
+      <StudioProductionDependencyImpact tasks={workspace.tasks} taskId={task.id} />
     </article>
   );
 }
 
-export function StudioProductionTaskBoard({ workspace, canEdit, canApprove, canPublish, onCommit }: StudioProductionTaskBoardProps) {
+export function StudioProductionTaskBoard(props: StudioProductionTaskBoardProps) {
+  const actorId = useSession().data?.user.id ?? null;
+  return <TaskBoardForScope key={JSON.stringify([actorId, props.workspace.scopeKey])} {...props} />;
+}
+function TaskBoardForScope({ workspace, canEdit, canApprove, canPublish, onCommit }: StudioProductionTaskBoardProps) {
   const bt = useBilingual("StudioProductionTaskBoard.filters");
   const actorId = useSession().data?.user.id ?? null;
   const groupId = useId();
-  const [layout, setLayout] = useState<"list" | "matrix">("list");
+  const [layout, setLayout] = useState<ProductionSavedFilter["layout"]>("list");
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
   useEffect(() => {
     if (layout !== "list" || !selectedTask) return;
@@ -517,12 +534,14 @@ export function StudioProductionTaskBoard({ workspace, canEdit, canApprove, canP
   }, [layout, selectedTask, groupId]);
   const [view, setView] = useState<ProductionSmartView>("all");
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<ProductionSavedFilter["sort"]>("original");
   const [stage, setStage] = useState<ProductionStage | "all">("all");
   const [today, setToday] = useState(() => productionLocalDay(new Date()));
   useEffect(() => { const timer = setInterval(() => setToday(productionLocalDay(new Date())), 60_000); return () => clearInterval(timer); }, []);
   const taskById = useMemo(() => new Map(workspace.tasks.map((task) => [task.id, task])), [workspace.tasks]);
   const filter = { view, query, stage, actorId, today };
-  const matches = workspace.tasks.filter((task) => productionSmartMatches(task, filter, taskById, workspace.roleAssignments));
+  const orderedTasks = sortProductionTasks(workspace.tasks, sort);
+  const matches = orderedTasks.filter((task) => productionSmartMatches(task, filter, taskById, workspace.roleAssignments));
   const visible = new Set(matches.map((task) => task.id));
   const names = {
     all: bt("전체", "All"), mine: bt("내 할 일", "Assigned to me"), due: bt("오늘까지", "Due by today"),
@@ -532,10 +551,16 @@ export function StudioProductionTaskBoard({ workspace, canEdit, canApprove, canP
     <p className="text-sm font-bold">{bt("등록된 제작 작업이 없습니다", "No production tasks yet")}</p>
     <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-fg-2">{bt("필요한 작업을 추가한 뒤 제작 단계·담당 역할·선행 작업·검수자를 지정하세요.", "Add work, then choose its stage, assignees, dependencies and reviewers.")}</p>
   </div>;
+  const openTask = (id: string) => { setLayout("list"); setView("all"); setStage("all"); setQuery(""); setSelectedTask(id); };
   return <div className="space-y-3" data-production-smart-views="true">
+    <StudioProductionSavedViews actorId={actorId} scopeKey={workspace.scopeKey} filter={{ view, query, stage, layout, sort }} onApply={(saved) => { setView(saved.view); setQuery(saved.query); setStage(saved.stage); setLayout(saved.layout); setSort(saved.sort); }} />
     <div className="flex flex-wrap gap-2" role="group" aria-label={bt("작업 배치", "Task layout")}>
       <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" aria-pressed={layout === "list"} onClick={() => setLayout("list")}>{bt("작업 목록", "Task list")}</button>
       <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" aria-pressed={layout === "matrix"} onClick={() => setLayout("matrix")}>{bt("회차·공정 표", "Episode matrix")}</button>
+    </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" aria-pressed={layout === "calendar"} onClick={() => setLayout("calendar")}>{bt("일정 보기", "Calendar")}</button>
+      <label className="text-xs">{bt("작업 정렬", "Task order")}<select aria-label={bt("작업 정렬", "Task order")} className="ml-2 min-h-11 rounded-lg border border-line bg-panel px-3" value={sort} onChange={(event) => setSort(event.target.value as ProductionSavedFilter["sort"])}><option value="original">{bt("원래 순서", "Original order")}</option><option value="due">{bt("마감일순", "Due date")}</option><option value="priority">{bt("우선순위순", "Priority")}</option></select></label>
     </div>
     <div role="group" aria-label={bt("작업 보기", "Task views")} className="flex flex-wrap gap-2">
       {PRODUCTION_SMART_VIEWS.map((id) => <button key={id} type="button" disabled={id === "mine" && !actorId}
@@ -563,9 +588,10 @@ export function StudioProductionTaskBoard({ workspace, canEdit, canApprove, canP
       <p>{bt("이 조건에 맞는 작업이 없습니다. 원래 작업은 그대로 보관됩니다.", "No tasks match these filters. Existing tasks are unchanged.")}</p>
       <button type="button" className="mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => { setView("all"); setQuery(""); setStage("all"); }}>{bt("표시 조건 초기화", "Clear filters")}</button>
     </div> : null}
-    {layout === "matrix" ? <StudioProductionMatrix workspace={workspace} tasks={matches} labels={STAGE_LABELS} onOpen={(id) => { setLayout("list"); setView("all"); setStage("all"); setQuery(""); setSelectedTask(id); }} /> : null}
+    {layout === "matrix" ? <StudioProductionMatrix workspace={workspace} tasks={matches} labels={STAGE_LABELS} onOpen={openTask} /> : null}
+    {layout === "calendar" ? <StudioProductionCalendar tasks={matches} today={today} onOpen={openTask} /> : null}
     {/* Keep each editor mounted so changing a view cannot discard its unsaved input. */}
-    {workspace.tasks.map((task) => <div key={task.id} id={`${groupId}-${task.id}`} tabIndex={-1} hidden={layout !== "list" || !visible.has(task.id)} className="outline-none focus:ring-2 focus:ring-accent">
+    {orderedTasks.map((task) => <div key={task.id} id={`${groupId}-${task.id}`} tabIndex={-1} hidden={layout !== "list" || !visible.has(task.id)} className="outline-none focus:ring-2 focus:ring-accent">
       <TaskEditor task={task} workspace={workspace} canEdit={canEdit} canApprove={canApprove} canPublish={canPublish} onCommit={onCommit} />
     </div>)}
   </div>;
