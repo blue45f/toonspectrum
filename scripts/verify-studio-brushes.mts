@@ -3850,13 +3850,14 @@ async function enableSmartShape(page: Page): Promise<void> {
 async function revealStudioViewTool(page: Page, mode: "zoom" | "rotate"): Promise<void> {
   const trigger = page.locator(`[data-studio-view-tool-trigger="${mode}"]`);
   const more = page.locator('[data-studio-tool-rail-settings="true"] button[aria-haspopup="dialog"]');
-  const picker = page.getByRole("dialog", { name: "숨긴 도구", exact: true });
+  const picker = page.getByRole("dialog", { name: "전체 도구", exact: true });
   if (!(await trigger.isVisible())) {
     if (await more.getAttribute("aria-expanded") !== "true") await more.click();
     const toolId = mode === "zoom" ? "zoom" : "rotate-view";
-    await page.locator(`[data-studio-hidden-tool-id="${toolId}"]`).click();
+    const row = picker.locator(`[data-studio-catalog-tool-id="${toolId}"]`).locator("..");
+    await row.getByRole("button", { name: / 고정$/u }).click();
   }
-  if (await more.getAttribute("aria-expanded") === "true") await more.click();
+  if (await picker.isVisible()) await picker.getByRole("button", { name: "전체 도구 닫기", exact: true }).click();
   await picker.waitFor({ state: "hidden" });
   await trigger.waitFor({ state: "visible" });
 }

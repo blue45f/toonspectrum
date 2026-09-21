@@ -130,7 +130,8 @@ describe("quick and task-specific studio workspaces", () => {
     expect(next.general.densityMode).toBe("full");
     expect(projectStudioTaskAppSettings(next, "draw", "full")).toBe(next);
     const customized = { ...presented, toolbar: { ...presented.toolbar, visibleIds: ["pen" as const] } };
-    expect(preserveStudioTaskToolbarPreference(stored, presented, customized)).toBe(customized);
+    expect(preserveStudioTaskToolbarPreference(stored, presented, customized)).toEqual({ ...customized, toolbar: { ...customized.toolbar, configured: true, version: 2 } });
+    expect(customized.toolbar.configured).toBe(false);
   });
   it("distinguishes quick, standard and complete launch modes", () => {
     expect(readStudioLaunchDensity("?uiMode=focus")).toBe("focus");

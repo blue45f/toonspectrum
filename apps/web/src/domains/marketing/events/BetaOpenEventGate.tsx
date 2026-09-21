@@ -110,9 +110,10 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        data-stable-contrast="true"
         aria-labelledby="beta-open-gate-title"
         aria-describedby="beta-open-gate-description"
-        className="relative mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-white/15 bg-[oklch(0.15_0.03_270)] text-white shadow-2xl shadow-black/50 outline-none motion-safe:animate-[fade-up_0.28s_var(--ease-out-expo)_both] motion-reduce:animate-none sm:min-h-[calc(100dvh-3rem)]"
+        className="relative mx-auto flex min-h-[calc(100dvh-1.5rem)] max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-white/15 bg-[oklch(0.15_0.03_270)] text-white shadow-2xl shadow-black/50 outline-none motion-safe:animate-[beta-gate-enter_0.28s_var(--ease-out-expo)_both] motion-reduce:animate-none sm:min-h-[calc(100dvh-3rem)]"
       >
         <div
           aria-hidden

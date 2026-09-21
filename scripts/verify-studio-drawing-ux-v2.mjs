@@ -144,6 +144,15 @@ async function handheld(browser, engine, size) {
       const box = await target.boundingBox();
       assert(box && box.width >= 43.5 && box.height >= 43.5 && box.x >= 0 && box.x + box.width <= size.width + 1, `${name}: ${JSON.stringify(box)}`);
     }
+    const dock = page.locator('[data-studio-mobile-editing-dock="true"]');
+    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])').click();
+    const sheet = page.getByRole("dialog", { name: "브러시 설정", exact: true });
+    await expect(sheet).toBeVisible();
+    const sheetBounds = await sheet.boundingBox(); const dockBounds = await dock.boundingBox();
+    assert(sheetBounds && dockBounds && sheetBounds.y + sheetBounds.height <= dockBounds.y + 1, "brush sheet overlaps the dock");
+    await sheet.locator('[data-studio-open-brush-library="true"]').click();
+    await expect(page.getByTestId("action")).toHaveText("brush-library");
+    await sheet.getByRole("button", { name: "브러시 설정 닫기", exact: true }).click();
     await controls.getByRole("button", { name: "전체 도구 열기", exact: true }).click();
     let catalog = page.getByRole("dialog", { name: "전체 도구", exact: true });
     await expect(catalog).toBeVisible();
@@ -170,7 +179,7 @@ async function handheld(browser, engine, size) {
     await apply(page);
     await expect(page.getByTestId("primary")).toHaveText("#abcdef");
     await expect(page.getByTestId("undo")).toHaveText("0");
-    report.checks.push(`${engine}: actual mobile dock ${size.width}x${size.height}, touch targets, canvas-only catalog, shared modal color commit`);
+    report.checks.push(`${engine}: actual mobile dock ${size.width}x${size.height}, brush-sheet target clearance, touch targets, canvas-only catalog, shared modal color commit`);
   } finally { await context.close(); }
 }
 

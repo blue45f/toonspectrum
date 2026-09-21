@@ -136,6 +136,8 @@ import "./studio-virtual-space.css";
 import "@/shared/components/virtual-studio/virtual-studio-shell.css";
 import "./studio-workspace-live.css";
 
+const StudioP2pHuddleLauncher = lazy(() => import("../live/huddle/StudioP2pHuddleLauncher"));
+
 const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
   readonly id: StudioVirtualSpaceReaction;
@@ -1648,7 +1650,8 @@ export function VirtualSpaceExperience({
             <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
               <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
             </button>
-            <Link href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
+            <Link data-workspace-primary-action="true" href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
+            <Suspense fallback={null}><StudioP2pHuddleLauncher placement="inline" /></Suspense>
           </div>
         </footer>
       </Container>
@@ -1703,6 +1706,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
       transportFactory={transportFactory}
       serverRequired
       ephemeralOnly
+      showHuddleLauncher={false}
     >
       <VirtualSpaceExperience
         key={JSON.stringify([decodedProjectId, userId, publication.snapshot.active?.scope ?? "bundled"])}

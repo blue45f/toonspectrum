@@ -1,3 +1,4 @@
+import { useStudioMobileDockMetrics } from "./useStudioMobileDockMetrics";
 import {
   ArrowDownToLine,
   ArrowUpToLine,
@@ -230,7 +231,7 @@ function studioDrawSheetSizeStyle(
   // the physical dock and let the draw sheet cover its top edge. Keep a pixel floor that reflects
   // the real one-row dock while retaining the larger expanded/safe-area CSS variable.
   const reservedBottom =
-    `calc(max(var(--studio-canvas-bottom-inset, 7rem), calc(72px + env(safe-area-inset-bottom))) + ${keyboardInset}px)`;
+    `calc(max(var(--studio-canvas-bottom-inset, 7rem), var(--studio-mobile-dock-measured-height, 0px), calc(120px + env(safe-area-inset-bottom))) + ${keyboardInset}px)`;
   const height = `min(${String(baseSize.height)}, calc(100dvh - env(safe-area-inset-top) - 0.75rem - ${reservedBottom}))`;
   return {
     "--studio-draw-sheet-height": height,
@@ -238,6 +239,8 @@ function studioDrawSheetSizeStyle(
     bottom: "var(--studio-draw-sheet-reserved-bottom)",
     height: "var(--studio-draw-sheet-height)",
     maxHeight: "var(--studio-draw-sheet-height)",
+    scrollPaddingTop: "calc(var(--studio-mobile-draw-header-height, 5rem) + 0.75rem)",
+    scrollPaddingBottom: "0.75rem",
   };
 }
 
@@ -652,6 +655,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     undo,
     handleDownload,
   } = stableHandlers;
+  const measuredDockRef = useRef<HTMLElement>(null);
+  useStudioMobileDockMetrics(isMobile, measuredDockRef, drawSheetRef);
   const t = useT();
   const localizedWorkspaceToggle = localizeStudioText(
     t,
@@ -1055,7 +1060,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             data-studio-mobile-sheet={mobileSheet === "draw" ? "draw" : undefined}
             data-studio-sheet-snap={drawSheetSnap}
             className={cn(
-              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] scroll-pt-14 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity,height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden",
+              "fixed inset-x-0 z-[54] mx-auto max-w-[34rem] flex flex-col overflow-hidden overscroll-contain rounded-2xl border border-line bg-panel/95 p-3 shadow-2xl backdrop-blur transition-[transform,opacity,height,max-height] duration-300 ease-out motion-reduce:transition-none lg:hidden",
               drawSettingsVisible
                 ? "pointer-events-auto translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-3 opacity-0"
@@ -1066,7 +1071,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               safeMobileKeyboardInset,
             )}
           >
-            <div className="sticky -top-3 z-10 -mx-3 -mt-3 mb-2 border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
+            <div data-studio-mobile-draw-header="true" className="relative z-10 shrink-0 -mx-3 -mt-3 mb-2 border-b border-line/70 bg-panel/95 px-3 backdrop-blur">
               <StudioMobileSheetHandle
                 active={mobileSheet === "draw"}
                 kind="draw"
@@ -1098,6 +1103,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               </div>
             </div>
 
+            <div data-studio-mobile-draw-scroll="true" className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
             {/* 굵기·색이 시트의 첫 화면에 오도록 유지한다. 이 둘은 캔버스를 보면서 조절하는 값이라
                 프리셋·선 보정보다 먼저 와야 compact 스냅에서도 스크롤 없이 손이 닿는다. */}
             {/* 굵기 + 투명도 — 큰 터치 슬라이더 */}
@@ -1540,6 +1546,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 </button>
               </div>
             )}
+            </div>
           </div>
         )}
 
@@ -1586,6 +1593,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           <nav
             aria-label={label.dock}
             data-studio-mobile-editing-dock="true"
+            ref={measuredDockRef}
             data-studio-mobile-dock-expanded={workspaceDockExpanded ? "true" : "false"}
             onFocusCapture={(event) => {
               if (!suppressBrushHintOnReturnFocusRef.current) return;

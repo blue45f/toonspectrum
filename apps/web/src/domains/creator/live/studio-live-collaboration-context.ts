@@ -43,6 +43,7 @@ export interface StudioLiveCollaborationContextValue {
   exportRecovery: () => Promise<void>;
   reloadAuthoritative: () => void;
   retryServer: () => void;
+  connectionRecovery?: "idle" | "waiting" | "retrying" | "paused" | "exhausted";
   useLocalFallback: () => void;
 }
 

@@ -25,13 +25,42 @@ function fixture(workId = "work-a", supported = true) {
     subscribe: () => () => undefined, subscribeVoice: () => () => undefined,
   } as unknown as StudioLiveRoom;
 }
-function view(room: StudioLiveRoom, canChat = true, overrides: Partial<StudioLiveCollaborationContextValue> = {}) {
+function view(room: StudioLiveRoom | null, canChat = true, overrides: Partial<StudioLiveCollaborationContextValue> = {}, placement: "floating" | "inline" = "floating") {
   return <StudioLiveCollaborationContext.Provider value={{ ...EMPTY_STUDIO_LIVE_CONTEXT, room, canChat, availability: "ready", ...overrides }}>
-    <StudioP2pHuddleLauncher />
+    <StudioP2pHuddleLauncher placement={placement} />
   </StudioLiveCollaborationContext.Provider>;
 }
 afterEach(() => { resetStudioStrokeFocusActivityForTests(); cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); getUserMedia.mockClear(); track.stop.mockClear(); });
 describe("P2P launcher consent and lifetime", () => {
+  it("keeps inline controls in normal flow instead of covering the create action", () => {
+    environment(); render(view(fixture(), true, {}, "inline"));
+    const dock = screen.getByRole("complementary", { name: "협업 대화" });
+    expect(dock.dataset.studioHuddlePlacement).toBe("inline");
+    expect(dock.classList.contains("fixed")).toBe(false);
+    expect(dock.hasAttribute("data-studio-shell-floating-target")).toBe(false);
+    const trigger = screen.getByRole("button", { name: "채팅·통화" });
+    fireEvent.click(trigger);
+    expect(document.getElementById(trigger.getAttribute("aria-controls")!)?.hidden).toBe(false);
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+  it("keeps a failed room visible and offers retry for a transient connection failure", () => {
+    environment(); const retryServer = vi.fn();
+    render(view(null, true, { availability: "error", mode: "server", serverAvailable: true, retryServer }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByRole("button", { name: "공동작업 연결 다시 확인" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(retryServer).toHaveBeenCalledOnce(); expect(getUserMedia).not.toHaveBeenCalled();
+  });
+  it("shows automatic recovery rather than asking users to check service configuration", () => {
+    environment(); const retryServer = vi.fn();
+    render(view(null, true, { availability: "error", mode: "server", serverAvailable: true, retryServer, connectionRecovery: "waiting" }));
+    fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
+    expect(screen.getByText("채팅·통화 연결을 자동으로 복구하고 있습니다.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
+    expect(retryServer).not.toHaveBeenCalled(); expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
   it("allows an admitted RTC room to chat despite a non-terminal document sync warning", () => {
     environment();
     render(view(fixture(), true, { availability: "error", error: "원고 저장소를 사용할 수 없습니다." }));
@@ -85,17 +114,18 @@ describe("P2P launcher consent and lifetime", () => {
     expect(getUserMedia).not.toHaveBeenCalled();
   });
 
-  it.each(["local-only", "direct-unavailable"] as const)("distinguishes %s from unsupported WebRTC and offers safe retry", (reason) => {
+  it.each(["local-only", "direct-unavailable"] as const)("keeps service-owned %s setup out of user actions", (reason) => {
     environment(); const retryServer = vi.fn();
     const room = reason === "local-only" ? fixture("local", false)
       : { ...fixture(), direct: null } as unknown as StudioLiveRoom;
     render(view(room, true, { serverAvailable: true, retryServer }));
     fireEvent.click(screen.getByRole("button", { name: "채팅·통화" }));
     expect(document.querySelector(`[data-studio-huddle-availability="${reason}"]`)).toBeTruthy();
-    expect(screen.getByText(/WebRTC는 지원하지만/)).toBeTruthy();
+    expect(screen.getByText(/사용자 설정은 필요하지 않습니다/)).toBeTruthy();
+    expect(screen.queryByText(/P2P 운영 설정/)).toBeNull();
     expect(screen.getByRole("button", { name: "동의하고 P2P 채팅 참여" }).hasAttribute("disabled")).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "공동작업 연결 다시 확인" }));
-    expect(retryServer).toHaveBeenCalledOnce(); expect(getUserMedia).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
+    expect(retryServer).not.toHaveBeenCalled(); expect(getUserMedia).not.toHaveBeenCalled();
   });
 
   it.each(["revoked", "admission-denied", "recovery-required", "unsupported-jam"] as const)("keeps %s blocked even if an old direct port is present", (phase) => {
