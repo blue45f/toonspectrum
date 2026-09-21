@@ -24,6 +24,8 @@ apps/api/src/modules/studio-project-graph/studio-project-graph.module.di.test.ts
 apps/api/src/modules/studio-project-graph/studio-review-preview-canonicalizer.test.ts
 apps/api/src/modules/studio-project-graph/studio-review-preview-producer.service.test.ts
 apps/api/src/modules/studio-project-graph/studio-review-preview.test.ts
+apps/api/src/modules/studio-project-graph/studio-session-evidence-projection.test.ts
+apps/api/src/modules/studio-project-graph/studio-session-evidence.service.test.ts
 apps/api/src/runtime/runtime-boundary.test.ts
 apps/api/src/session-middleware.test.ts
 apps/web/src/app/app-floating-controls-startup.test.ts
@@ -233,6 +235,9 @@ apps/web/src/domains/creator/vrm/studio-vrm-wardrobe.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt-attachment-boundary.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-xpbd-skirt.test.ts
 apps/web/src/domains/creator/work-session
+apps/web/src/domains/creator/work-session/StudioSessionEvidencePanel.test.tsx
+apps/web/src/domains/creator/work-session/studio-session-evidence-client.test.ts
+apps/web/src/domains/creator/work-session/use-session-evidence.test.tsx
 apps/web/src/domains/creator/workspace
 apps/web/src/domains/creator/workspace/StudioWorkspacePage.continuity.test.tsx
 apps/web/src/domains/creator/workspace/StudioWorkspaceProjectPicker.test.tsx

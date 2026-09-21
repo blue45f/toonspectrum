@@ -168,3 +168,9 @@ test("fails instead of staging a missing compiled package", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("session evidence is an explicitly emitted API contract, not an external type-only resolution", async () => {
+  const apiConfig = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
+  const source = "../../packages/studio-project-model/src/graph/work-session-evidence.ts";
+  assert.deepEqual(apiConfig.compilerOptions.paths["@toonspectrum/studio-project-model/work-session-evidence"], [source]);
+});
