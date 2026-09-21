@@ -73,9 +73,9 @@ export function StudioAssetVisualIntro({ locale }: { readonly locale: string }) 
           <h2 id="studio-asset-visual-title">{copy.title}</h2>
           <p>{copy.body}</p>
           <div className="studio-asset-visual-intro__actions">
-            <Link href="/studio/assets?view=essentials"><Library size={16} aria-hidden="true" />{copy.essentials}<ArrowRight size={15} aria-hidden="true" /></Link>
-            <Link href="/studio/assets?view=market"><Store size={16} aria-hidden="true" />{copy.market}</Link>
-            <Link href="/studio/assets?view=library">{copy.library}</Link>
+            <Link href="/studio/assets?view=essentials"><Library size={16} aria-hidden="true" /><span>{copy.essentials}</span><ArrowRight size={15} aria-hidden="true" /></Link>
+            <Link href="/studio/assets?view=market"><Store size={16} aria-hidden="true" /><span>{copy.market}</span></Link>
+            <Link href="/studio/assets?view=library"><span>{copy.library}</span></Link>
           </div>
         </div>
       </div>
