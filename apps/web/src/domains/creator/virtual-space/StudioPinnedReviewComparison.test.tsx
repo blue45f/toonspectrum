@@ -262,3 +262,107 @@ describe("comparison viewport continuity", () => {
     expect(prepareScrollPane("기준 검수본 페이지").scrollTop).toBe(0);
   });
 });
+
+function sourceCutPreview(subject: StudioVirtualSpaceReviewSubject, id = "page-0") {
+  const p = preview(subject);
+  if (p.mapping.status !== "mapped") throw new Error("fixture");
+  p.mapping.page.id = id;
+  p.mapping.page.frames = [{ id: "cut-a", bounds: { x: 100, y: subject === base ? 100 : 500, width: subject === base ? 400 : 200, height: 200 } },
+    { id: subject === base ? "only-a" : "only-b", bounds: { x: 50, y: 50, width: 100, height: 100 } }];
+  p.mapping.page.elements = p.mapping.page.frames.map((cut) => ({ id: cut.id, type: "frame", origin: "page" }));
+  return p;
+}
+async function openCuts() {
+  await openComparison(); await choose();
+  fireEvent.click(screen.getByRole("button", { name: "컷 단위로 비교" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "비교할 원본 컷" }), { target: { value: "cut-a" } });
+}
+describe("source-cut comparison in the actual pinned workbench", () => {
+  beforeEach(() => { f.read.mockImplementation(async (subject) => ready(subject, [sourceCutPreview(subject)])); });
+  it("opens only on request, uses each cut's geometry and issues no new metadata request", async () => {
+    mount(); await openComparison(); await choose();
+    expect(screen.queryByRole("combobox", { name: "비교할 원본 컷" })).toBeNull();
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "컷 단위로 비교" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "비교할 원본 컷" }), { target: { value: "cut-a" } });
+    const a = screen.getByRole("img", { name: "기준본 컷 영역" }), b = screen.getByRole("img", { name: "비교본 컷 영역" });
+    expect(a.closest("div")?.style.width).toBe("200%");
+    expect(b.closest("div")?.style.width).toBe("400%");
+    expect(a.closest("div")?.style.top).toBe("-50%");
+    expect(b.closest("div")?.style.top).toBe("-250%");
+    expect(screen.getAllByRole("img").every((image) => image.getAttribute("referrerpolicy") === "no-referrer")).toBe(true);
+    expect(f.read).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("button", { name: /승인/u })).toBeNull();
+  });
+  it("does not retain a previous target crop for a missing or different-page cut", async () => {
+    mount(); await openCuts();
+    fireEvent.change(screen.getByRole("combobox", { name: "비교할 원본 컷" }), { target: { value: "only-a" } });
+    expect(screen.queryByRole("img", { name: "비교본 컷 영역" })).toBeNull();
+    expect(screen.getByText(/삭제 여부는 단정하지 않습니다/u)).toBeTruthy();
+    expect(screen.getByRole("img", { name: "기준본 컷 영역" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "컷을 고를 검수본" }), { target: { value: "right" } });
+    expect(screen.queryByRole("img", { name: "기준본 컷 영역" })).toBeNull();
+    fireEvent.change(screen.getByRole("combobox", { name: "비교할 원본 컷" }), { target: { value: "only-b" } });
+    expect(screen.getByRole("img", { name: "비교본 컷 영역" })).toBeTruthy();
+    expect(screen.queryByRole("img", { name: "기준본 컷 영역" })).toBeNull();
+  });
+  it("refuses matching cut IDs on unrelated selected pages", async () => {
+    f.read.mockImplementation(async (subject) => ready(subject, [sourceCutPreview(subject, subject === base ? "one" : "two")]));
+    mount(); await openCuts();
+    expect(screen.queryByRole("img", { name: "비교본 컷 영역" })).toBeNull();
+    expect(screen.getByText(/원본 페이지가 다릅니다/u)).toBeTruthy();
+  });
+  it("keeps the selected ID through URL-only renewal but clears it for a different source", async () => {
+    mount(); await openCuts();
+    f.read.mockImplementation(async (subject) => ready(subject, [{ ...sourceCutPreview(subject), url: `${preview(subject).url}?renewed=1` }]));
+    await act(async () => { vi.advanceTimersByTime(25_000); });
+    expect(screen.getByRole("combobox", { name: "비교할 원본 컷" })).toHaveProperty("value", "cut-a");
+    f.read.mockImplementation(async (subject) => ready(subject, [sourceCutPreview(subject, subject === base ? "new-source" : "page-0")]));
+    await act(async () => { vi.advanceTimersByTime(25_000); });
+    expect(screen.queryByRole("img", { name: "기준본 컷 영역" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "비교할 원본 컷" })).toBeNull();
+  });
+  it("shows image failure outside the clipped area and clears it after loading", async () => {
+    mount(); await openCuts();
+    const image = screen.getByRole("img", { name: "비교본 컷 영역" });
+    fireEvent.error(image);
+    expect(screen.getByText("비교본 컷 영역 이미지를 불러오지 못했습니다. 미리보기를 다시 확인하세요.")).toBeTruthy();
+    fireEvent.load(image);
+    expect(screen.queryByText("비교본 컷 영역 이미지를 불러오지 못했습니다. 미리보기를 다시 확인하세요.")).toBeNull();
+  });
+  it("removes both crops along with full previews when permission is revoked", async () => {
+    const revoked = vi.fn(); mount(revoked); await openCuts();
+    expect(screen.getAllByRole("img")).toHaveLength(4);
+    f.read.mockImplementation(async (subject) => subject === prior ? { ok: false, reason: "access-denied" } : ready(base, [sourceCutPreview(base)]));
+    await act(async () => { vi.advanceTimersByTime(25_000); });
+    expect(revoked).toHaveBeenCalledOnce(); expect(screen.queryAllByRole("img")).toHaveLength(0);
+    expect(screen.queryByRole("combobox", { name: "비교할 원본 컷" })).toBeNull();
+  });
+  it("clears crops on actor change and restores the closed form", async () => {
+    const view = mount(); await openCuts();
+    f.actor = "actor-b"; persistSession({ user: { id: f.actor }, token: null });
+    view.rerender(<StudioPinnedReviewComparison subject={base} title="현재 검수본" onRevoked={vi.fn()} />);
+    expect(screen.queryAllByRole("img")).toHaveLength(0);
+    expect(screen.queryByRole("combobox", { name: "비교할 원본 컷" })).toBeNull();
+  });
+  it("clears selection on search and makes large source-ID lists bounded and searchable", async () => {
+    f.read.mockImplementation(async (subject) => {
+      const p = sourceCutPreview(subject);
+      if (p.mapping.status !== "mapped") throw new Error("fixture");
+      p.mapping.page.frames = Array.from({ length: 251 }, (_, i) => ({ id: `cut-${String(i).padStart(3, "0")}`, bounds: { x: 0, y: 0, width: 100, height: 100 } }));
+      return ready(subject, [p]);
+    });
+    mount(); await openComparison(); await choose();
+    fireEvent.click(screen.getByRole("button", { name: "컷 단위로 비교" }));
+    const selector = screen.getByRole("combobox", { name: "비교할 원본 컷" });
+    expect(within(selector).getAllByRole("option")).toHaveLength(101);
+    fireEvent.click(screen.getByRole("button", { name: "다음 컷 목록" }));
+    expect(within(selector).getByRole("option", { name: "101번째 컷 · cut-100" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "원본 컷 ID 검색" }), { target: { value: "cut-250" } });
+    expect(within(selector).getAllByRole("option")).toHaveLength(2);
+    fireEvent.change(selector, { target: { value: "cut-250" } });
+    expect(screen.getByRole("img", { name: "비교본 컷 영역" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("textbox", { name: "원본 컷 ID 검색" }), { target: { value: "absent" } });
+    expect(screen.queryByRole("img", { name: "비교본 컷 영역" })).toBeNull();
+  });
+});

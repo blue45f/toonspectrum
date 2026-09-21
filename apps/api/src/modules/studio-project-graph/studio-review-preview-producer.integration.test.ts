@@ -663,4 +663,22 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     expect(value.evidence).toBeNull(); expect(value.nextOffset).toBeNull();
   });
 
+  it.each(["createdAt", "updatedAt"] as const)("keeps task completion timestamps monotonic when saved %s is ahead of the server clock", async (field) => {
+    const f = await completionFixture();
+    await pool.query(`UPDATE creator_work_production_workspace SET
+      "createdAt"=CASE WHEN $2::boolean THEN clock_timestamp()+interval '1 hour' ELSE "createdAt" END,
+      "updatedAt"=clock_timestamp()+interval '2 hours' WHERE "workId"=$1`, [f.input.workId, field === "createdAt"]);
+    const before = (await pool.query('SELECT "createdAt","updatedAt" FROM creator_work_production_workspace WHERE "workId"=$1', [f.input.workId])).rows[0]!;
+    const input = await f.completionInput();
+    const completed = await f.completion.complete(f.actor, f.input.workId, f.taskId, input);
+    expect(completed.evidence?.current).toBe(true);
+    const after = (await pool.query(`SELECT "updatedAt">=$2::timestamptz AS monotonic,"updatedAt">="createdAt" AS valid,
+      document->>'updatedAt' AS "documentAt",revision FROM creator_work_production_workspace WHERE "workId"=$1`, [f.input.workId, before.updatedAt])).rows[0]!;
+    expect(after).toMatchObject({ monotonic: true, valid: true, revision: completed.baseRevision });
+    expect(after.documentAt).toBe(completed.evidence!.receipt.completedAt);
+    const replay = await f.completion.complete(f.actor, f.input.workId, f.taskId, input);
+    expect(replay.evidence?.receipt).toEqual(completed.evidence?.receipt);
+    expect((await graph.getReview(f.actor, f.original.subject.reviewId)).status).toBe("open");
+  });
+
 });

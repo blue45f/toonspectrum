@@ -1,3 +1,4 @@
+import { StudioReviewFrameComparison } from "./StudioReviewFrameComparison";
 import { useId, useState } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { reviewPreviewIdentity } from "./studio-review-viewport";
@@ -46,6 +47,7 @@ function CompareDisplayForPages({ left, right, linked }: CompareDisplayProps) {
       className="block h-auto w-full max-h-none rounded-lg" figureClassName="" />;
   };
   return <div className="space-y-3" data-review-compare-layout={layout}>
+    <StudioReviewFrameComparison left={left} right={right} />
     <div className="flex flex-wrap items-center gap-2" aria-label={bt("비교 표시 방식", "Comparison layout")}>
       <button type="button" className={control} aria-pressed={layout === "side-by-side"} onClick={() => changeMode("side-by-side")}>{bt("나란히 보기", "Side by side")}</button>
       <button type="button" className={control} aria-pressed={layout === "single"} onClick={() => changeMode("single")}>{bt("A/B 전환", "A/B view")}</button>

@@ -9,11 +9,15 @@ import "../../src/styles/globals.css";
 // Local layout fixture, not authentication, server approval or a production document.
 const image = (label: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="6000"><rect width="800" height="6000" fill="white"/>${Array.from({ length: 12 }, (_, i) => `<rect x="30" y="${i * 500 + 40}" width="740" height="400" rx="12" fill="${i % 2 ? "#dddddd" : "#eeeeee"}" stroke="black"/><text x="70" y="${i * 500 + 110}" font-size="40">${label} / ${i + 1}</text>`).join("")}</svg>`)}`;
 function preview(side: "left" | "right", pageId: string, renewal: number): StudioVirtualSpaceReviewPreview {
+  const frames = Array.from({ length: 12 }, (_, index) => ({
+    id: index === (side === "left" ? 2 : 7) ? "shared-cut" : `${side}-cut-${index}`,
+    bounds: { x: 30, y: index * 500 + 40, width: 740, height: 400 },
+  }));
   return { ordinal: 0, sha256: (side === "left" ? "a" : "b").repeat(64), byteLength: 2048,
     mediaType: "image/png", url: image(side) + `#renewal-${renewal}`, expiresAt: Date.now() + 30_000,
     mapping: { status: "mapped", version: 1, sourceServerRevision: side === "left" ? 2 : 1,
       sourceContentDigest: (side === "left" ? "c" : "d").repeat(64),
-      page: { id: pageId, ordinal: 0, width: 800, height: 6000, renderWidth: 800, renderHeight: 6000, frames: [], elements: [] } } };
+      page: { id: pageId, ordinal: 0, width: 800, height: 6000, renderWidth: 800, renderHeight: 6000, frames, elements: frames.map((frame) => ({ id: frame.id, type: "frame", origin: "page" })) } } };
 }
 function Fixture() {
   const [linked, setLinked] = useState(false);

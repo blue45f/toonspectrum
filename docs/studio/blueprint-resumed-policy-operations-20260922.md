@@ -73,3 +73,9 @@ Remaining F01–F40 scope and no-deployment boundary above remain unchanged. Thi
 ### Concurrent main merge handoff
 
 PR #1936 was merged by another concurrent workflow while this continuation was running. Its original migration `0082_studio_review_policy.sql` is preserved byte-for-byte against main. The vote-epoch column and functions are isolated in new additive `0083_studio_review_vote_epoch.sql`; apply 0082 then 0083 before the corresponding API. Existing completed decisions are unchanged and unbound legacy votes remain history, not fabricated current permission evidence. No production migration was executed. New changes are reviewed in a separate follow-up PR from this same worktree.
+
+### Managed migration inventory and runtime grants
+
+The separate full diagnostic/hiring gates exposed missing managed inventory registration for 0082, followed by the new 0083. Both are now listed exactly once in the canonical ordered manifest; exact count/tail/checksum and bootstrap tests are advanced to the complete 83-migration inventory without relaxing historical checksum assertions. The existing ProjectGraph runtime grant builder/verifier now includes policy state columns and insert-only event history, plus non-PUBLIC/non-delegable invoker-only epoch-helper execution. No DELETE/UPDATE event privilege, immutable pin update, DDL, or grant option is introduced.
+
+A real PostgreSQL test creates a transaction-scoped NOLOGIN/NOSUPERUSER role, applies the generated least-privilege grants, writes and reads a valid vote, and verifies event mutation, direct deletion, immutable pin writes, TRUNCATE, and DDL are rejected. The enclosing rollback removes the role and all test grant changes. This is local test verification, not production ACL application.
