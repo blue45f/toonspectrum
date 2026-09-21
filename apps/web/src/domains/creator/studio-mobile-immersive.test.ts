@@ -109,7 +109,7 @@ describe("Studio mobile immersive preference", () => {
       preferencesSource.indexOf("const setStudioUiDensity ="),
       preferencesSource.indexOf("const commitAppSettings ="),
     );
-    expect(densitySetter).toContain('if (mode === "focus") closeRightPanelForFocusModeRef.current();');
+    expect(densitySetter).toContain('if (mode === "focus" && !appSettingsRef.current.general.colorPanelPinned) closeRightPanelForFocusModeRef.current();');
     // The host owns the panel state the runtime hook closes over.
     const hostCloser = studioPageSource.slice(
       studioPageSource.indexOf("const closeStudioRightPanelForFocusMode ="),
@@ -148,9 +148,9 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain("outline-offset: -2px");
   });
 
-  it("overlays one dock row by default and keeps its final canvas pixels scroll-reachable", () => {
-    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(4rem");
-    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(7.5rem");
+  it("measures the primary-action and drawing rows while keeping final canvas pixels scroll-reachable", () => {
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(7rem");
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(10.5rem");
     expect(studioGlobalsSource).toContain(":root,");
     expect(studioGlobalsSource).toContain(":root:has(");
     expect(studioGlobalsSource).toContain(
