@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { PoolClient } from "pg";
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { STUDIO_WORK_SESSION_ARTIFACT_PREFIX, createStudioWorkSession, reduceStudioWorkSession, studioWorkSessionCreateSchema, studioWorkSessionCommandSchema, studioWorkSessionReceiptSchema, type StudioWorkSession, type StudioWorkSessionActor, type StudioWorkSessionCreate, type StudioWorkSessionCommand, type StudioWorkSessionView, type StudioWorkSessionReceipt, type StudioWorkSessionResult } from "@toonspectrum/studio-project-model/work-session";
+import { readStudioSessionResources, verifyStudioSessionWorkflowTarget } from "./studio-work-session-resources";
 import { dbPool } from "../../db";
 import { resolveCreatorCollaborationAccess } from "../creator/creator-collaboration.policy";
 import { studioRequestHash as hash } from "./studio-project-graph.repository";
@@ -153,6 +154,15 @@ async function prior(client: PoolClient, actor: string, workId: string, sessionI
 
 @Injectable()
 export class StudioWorkSessionRepository {
+  resources(actorId: string, workId: string, sessionId: string, offset: number) {
+    return transaction(async (client) => {
+      const { actor } = await access(client, actorId, workId);
+      const { session } = await load(client, workId, sessionId);
+      view(session, actor);
+      await verifyPin(client, workId, session.input);
+      return readStudioSessionResources(client, session, offset);
+    });
+  }
   current(actorId: string, workId: string, sessionId: string) {
     return transaction(async (client) => {
       const { actor } = await access(client, actorId, workId);
@@ -222,6 +232,7 @@ export class StudioWorkSessionRepository {
       if (replay) return { view: view(replay.current.session, actor), receipt: replay.receipt };
       const at = new Date().toISOString(), state = reduceStudioWorkSession(current.session, input, actor, at);
       if (input.action === "attach-result") await verifyResult(client, actorId, workId, input.result);
+      await verifyStudioSessionWorkflowTarget(client, current.session, input, fail);
       const event: Event = { contract: EVENT, type: "command", workId, sessionId, actor, at, input,
         idempotencyKeyHash: keyFor(workId, sessionId, actorId, input.operationId) };
       return { view: view(state, actor), receipt: await append(client, state, current.meta.headRevisionId, event) };

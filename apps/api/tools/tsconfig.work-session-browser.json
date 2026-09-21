@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "allowJs": true
+  },
+  "include": [
+    "verify-studio-session-workflows.mts"
+  ],
+  "exclude": []
+}

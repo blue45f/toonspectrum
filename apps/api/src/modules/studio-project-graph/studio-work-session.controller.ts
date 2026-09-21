@@ -8,6 +8,7 @@ import { StudioWorkSessionRepository, StudioWorkSessionRepositoryError } from ".
 class WorkParams extends createZodDto(z.object({ workId: id }).strict()) {}
 class SessionParams extends createZodDto(z.object({ workId: id, sessionId: id }).strict()) {}
 class ReceiptParams extends createZodDto(z.object({ workId: id, sessionId: id, operationId: id }).strict()) {}
+class ResourceQuery extends createZodDto(z.object({ offset: z.coerce.number().int().min(0).max(99999).optional() }).strict()) {}
 class ListQuery extends createZodDto(z.object({ cursor: id.optional() }).strict()) {}
 class CreateDto extends createZodDto(studioWorkSessionCreateSchema) {}
 const CommandDto = createZodDto(studioWorkSessionCommandSchema);
@@ -51,6 +52,12 @@ export class StudioWorkSessionController {
   @HttpCode(200)
   command(@Param(new ZodValidationPipe(SessionParams)) p: SessionParams, @Body(new ZodValidationPipe(CommandDto)) input: StudioWorkSessionCommand, @Headers("x-user-id") actor?: string) {
     return this.service.run(actor, (user, repository) => repository.command(user, p.workId, p.sessionId, input));
+  }
+  @Get(":sessionId/resources")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  resources(@Param(new ZodValidationPipe(SessionParams)) p: SessionParams,
+    @Query(new ZodValidationPipe(ResourceQuery)) query: ResourceQuery, @Headers("x-user-id") actor?: string) {
+    return this.service.run(actor, (user, repository) => repository.resources(user, p.workId, p.sessionId, query.offset ?? 0));
   }
   @Get(":sessionId/operations/:operationId")
   @Header("Cache-Control", "private, no-store, max-age=0")

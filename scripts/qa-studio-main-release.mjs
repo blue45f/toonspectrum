@@ -1,3 +1,4 @@
+import { parseStudioMinimapPosition } from "./lib/studio-minimap-position.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -19,7 +20,7 @@ async function geometry(page, name) {
 }
 async function waitWorld(page) {
   await page.locator('[data-studio-engine-status="ready"]').waitFor({ timeout: 60000 });
-  await page.waitForFunction(() => document.querySelector('[data-studio-phaser-runtime]')?.hasAttribute('data-local-x'));
+  await page.locator('[data-studio-phaser-runtime] canvas').waitFor({ state: 'visible' });
 }
 try {
   for (const [width, height] of [[1440,900], [1366,768], [1024,768], [820,1180], [390,844], [320,740]]) {
@@ -38,7 +39,16 @@ try {
       const size = await geometry(page, `home-${width}`);
       const runtime = page.locator('[data-studio-phaser-runtime]');
       if (width === 1440) {
-        const readPoint = () => runtime.evaluate((element) => [Number(element.getAttribute('data-local-x')), Number(element.getAttribute('data-local-y'))]);
+        // The native rendered minimap follows the same actual player snapshot in production.
+        // data-local-x/y are intentionally DEV-only and must not gate a production candidate.
+        await page.getByRole('button', { name: '미니맵 펼치기', exact: true }).click();
+        const marker = page.locator('.studio-vspace-minimap-stage .studio-vspace-minimap-self');
+        await marker.waitFor({ state: 'visible' });
+        assert.equal(await marker.count(), 1);
+        const readPoint = async () => {
+          const style = await marker.evaluate((element) => [element.style.left, element.style.top]);
+          return parseStudioMinimapPosition(style[0], style[1]);
+        };
         const initial = await readPoint();
         await runtime.locator('canvas').focus(); await page.keyboard.down('ArrowRight'); await page.waitForTimeout(350); await page.keyboard.up('ArrowRight');
         const moved = await readPoint(); assert.notDeepEqual(moved, initial, "Keyboard must move the actual avatar");

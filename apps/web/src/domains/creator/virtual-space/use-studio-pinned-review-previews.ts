@@ -3,10 +3,10 @@ import { getStudioVirtualSpaceReviewPreview, type StudioVirtualSpaceReviewPrevie
 import type { StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";
 
 /** Signed URLs and decoded-image visibility share the same bounded, renewable read lease. */
-export function useStudioPinnedReviewPreviews(subject: StudioVirtualSpaceReviewSubject | null, onRevoked: () => void) {
+export function useStudioPinnedReviewPreviews(subject: StudioVirtualSpaceReviewSubject | null, onRevoked: () => void, initialCursor: string | null = null) {
   const revoked = useRef(onRevoked);
   const [result, setResult] = useState<StudioVirtualSpaceReviewPreviews | null>(null);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | null>(initialCursor);
   const [reload, setReload] = useState(0);
   useEffect(() => { revoked.current = onRevoked; }, [onRevoked]);
   useEffect(() => {

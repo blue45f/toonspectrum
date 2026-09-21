@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 import { studioReviewTaskReferenceSchema } from "./review-task-reference";
+import { studioSessionWorkflowSchema, studioSessionWorkflowCommandOptions, isStudioSessionWorkflowCommand, reduceStudioSessionWorkflow } from "./work-session-workflows";
+
+export * from "./work-session-workflows";
 
 export const STUDIO_WORK_SESSION_ARTIFACT_PREFIX = "studio-work-session:";
 export const studioWorkSessionId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u);
@@ -22,6 +25,7 @@ export const studioWorkSessionSchema = z.object({
   invitedUserIds: identities, participantUserIds: identities, readerUserId: studioWorkSessionId.nullable(), presenter: presenter.nullable(),
   notes: z.array(z.object({ id: studioWorkSessionId, authorUserId: studioWorkSessionId, at: timestamp,
     category: z.enum(["note", "decision", "unresolved", "material-choice", "ai-evidence"]), body: z.string().trim().min(1).max(2000) }).strict()).max(100),
+  workflow: studioSessionWorkflowSchema.optional(),
   results: z.array(studioWorkSessionResultSchema).max(64), closeSummary: z.string().trim().min(1).max(4000).nullable(),
 }).strict().superRefine((value, ctx) => {
   if (value.input.workId !== value.workId || value.results.some((result) => result.type === "review" && result.subject.workId !== value.workId)) ctx.addIssue({ code: "custom", message: "Cross-work session reference" });
@@ -29,6 +33,7 @@ export const studioWorkSessionSchema = z.object({
   if (value.readerUserId && !value.participantUserIds.includes(value.readerUserId)) ctx.addIssue({ code: "custom", message: "Reader has not joined" });
   if (value.status === "closed" && !value.closeSummary) ctx.addIssue({ code: "custom", message: "A closed session needs an explicit outcome" });
   if (new Set(value.notes.map((note) => note.id)).size !== value.notes.length) ctx.addIssue({ code: "custom", message: "Duplicate note" });
+  if (value.workflow?.agenda.some((item) => item.source.sourceContentDigest !== value.input.rootGraphHash)) ctx.addIssue({ code: "custom", message: "Agenda source does not match pinned input" });
   if (JSON.stringify(value).length > 256_000) ctx.addIssue({ code: "custom", message: "Session exceeds storage budget" });
 });
 export type StudioWorkSession = z.infer<typeof studioWorkSessionSchema>;
@@ -40,6 +45,7 @@ export const studioWorkSessionCreateSchema = z.object({
 export type StudioWorkSessionCreate = z.infer<typeof studioWorkSessionCreateSchema>;
 const base = { operationId: studioWorkSessionId, expectedVersion: z.number().int().min(1).max(1_000_000) };
 export const studioWorkSessionCommandSchema = z.discriminatedUnion("action", [
+  ...studioSessionWorkflowCommandOptions,
   z.object({ ...base, action: z.enum(["join", "leave", "ready", "start", "pause", "resume", "cancel"]) }).strict(),
   z.object({ ...base, action: z.literal("close"), summary: z.string().trim().min(1).max(4000) }).strict(),
   z.object({ ...base, action: z.literal("note"), category: z.enum(["note", "decision", "unresolved", "material-choice", "ai-evidence"]), body: z.string().trim().min(1).max(2000) }).strict(),
@@ -70,6 +76,7 @@ export function reduceStudioWorkSession(current: StudioWorkSession, raw: StudioW
   if (!invited) return fail("forbidden");
   if (current.status === "closed" || current.status === "cancelled") return fail("closed");
   if (current.version >= 128 && command.action !== "close" && command.action !== "cancel") return fail("capacity");
+  if (isStudioSessionWorkflowCommand(command)) return studioWorkSessionSchema.parse(reduceStudioSessionWorkflow(current, command, actor, at, fail));
   let next: StudioWorkSession = { ...current, version: current.version + 1, updatedBy: actor.userId, updatedAt: at };
   switch (command.action) {
     case "join":
