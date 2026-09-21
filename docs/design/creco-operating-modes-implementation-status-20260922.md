@@ -27,6 +27,8 @@
 - 실제 비소유자 DB 역할은 감사·receipt 수정과 마지막 소유자 삭제를 거절한다. 공개 권한 오염을 탐지하고 선언된 계약으로 정규화하는 검사도 포함한다.
 - Chromium 관리자 화면 **4개 시나리오 통과**: 무료 기본값, 미검토 유료 전환 차단, 검토 fixture의 양방향 전환/새로고침, 390px 표시, 비관리자 차단. 브라우저 테스트는 API fixture를 사용하며 실제 DB 검증은 별도 위 통합 테스트에서 수행했다.
 - 독립 Admin production build, Admin/공용 계약 typecheck, architecture boundary 검증 통과.
+- CI에서 발견한 API 계약 subpath의 배포 export 누락을 수정했다. 실제 API build, 런타임 import 검사(788 compiled files / 2451 imports), 배포 경계 27개·법적 문서 경계 7개 테스트를 추가로 통과했다.
+- Admin 브라우저 테스트는 `apps/admin/tests/operation-policy.e2e.ts`와 전용 설정으로 분리해 기본 Studio E2E/단위 테스트 수집을 오염시키지 않는다.
 - 기존 production-collaboration 모듈 추가 회귀: 77개 통과. 이 추가 실행에서 환경변수 없이 생략된 DB 12개는 위 PostgreSQL 실행에서 모두 별도로 통과했다.
 - 코드 lint와 Git hooks/CI를 유지한다. main 병합은 운영 배포나 유료 전환 승인이 아니다.
 

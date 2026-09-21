@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 /** Local administrator UI fixtures. Actual SQL behavior has a separate Postgres suite. */
 export default defineConfig({
-  testDir: "e2e", testMatch: "operation-policy.spec.ts", workers: 1,
+  testDir: "apps/admin/tests", testMatch: "operation-policy.e2e.ts", workers: 1,
   use: { baseURL: "http://127.0.0.1:4184", browserName: "chromium", headless: true, trace: "retain-on-failure" },
   outputDir: "artifacts/operation-policy-browser",
   webServer: {

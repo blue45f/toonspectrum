@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { initialOperationPolicy, operationTransitionBlockers, resolveOperationPolicy, type OperationPolicyDraft } from "../packages/contracts/src/operation-policy";
+import { initialOperationPolicy, operationTransitionBlockers, resolveOperationPolicy, type OperationPolicyDraft } from "../../../packages/contracts/src/operation-policy";
 
 async function policyFixture(page: Page, options: { denied?: boolean; commerciallyReviewed?: boolean } = {}) {
   let draft = initialOperationPolicy();
