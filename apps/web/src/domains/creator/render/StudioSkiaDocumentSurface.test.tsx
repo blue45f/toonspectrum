@@ -96,6 +96,7 @@ it("coalesces imperative camera movement and does not rebuild the React display 
   await waitFor(() => expect(requests).toHaveLength(1));
   await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
   view.rerender(<StudioSkiaDocumentSurface {...h.props} visible beforePublish={beforePublish} cameraSource={cameraSource} />);
+  await waitFor(() => expect(h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!.style.visibility).toBe("visible"));
   const animation = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { scheduled = callback; return 1; });
   const cancel = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => undefined);
   const count = h.report.mock.calls.length;
@@ -128,4 +129,26 @@ it("waits for the parent's hidden-document paint before revealing the completed 
   await act(async () => { fences[1]!(); });
   expect(canvas.style.visibility).toBe("visible");
   view.unmount();
+});
+
+it("invalidates a pending source-hide acknowledgement when the live camera moves", async () => {
+  const h = setup(); const fences: Array<() => void> = []; let notify!: () => void;
+  let scheduled!: FrameRequestCallback;
+  const beforePublish = vi.fn(() => new Promise<void>((resolve) => { fences.push(resolve); }));
+  const cameraSource = { read: () => null, subscribe: (callback: () => void) => { notify = callback; return () => undefined; } };
+  const view = render(<StudioSkiaDocumentSurface {...h.props} beforePublish={beforePublish} cameraSource={cameraSource} />);
+  await waitFor(() => expect(fences).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); fences[0]!(); });
+  view.rerender(<StudioSkiaDocumentSurface {...h.props} visible beforePublish={beforePublish} cameraSource={cameraSource} />);
+  await waitFor(() => expect(fences).toHaveLength(2));
+  const animation = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { scheduled = callback; return 1; });
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => undefined);
+  try {
+    act(() => notify());
+    await act(async () => { fences[1]!(); });
+    expect(h.parent.querySelector<HTMLCanvasElement>('[data-studio-skia-document-surface]')!.style.visibility).toBe("hidden");
+    await act(async () => { scheduled(0); });
+    expect(beforePublish).toHaveBeenCalledTimes(3);
+    expect(requests).toHaveLength(2);
+  } finally { view.unmount(); animation.mockRestore(); cancel.mockRestore(); }
 });

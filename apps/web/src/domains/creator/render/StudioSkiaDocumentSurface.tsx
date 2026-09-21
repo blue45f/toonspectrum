@@ -19,6 +19,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   const generation = useRef(0); const revision = useRef(0);
   const submitted = useRef<((cameraOnly?: boolean) => void) | null>(null);
   const receipt = useRef<object | null>(null);
+  const sourceHiddenReceipt = useRef<object | null>(null);
   const [completedRevision, setCompletedRevision] = useState<object | null>(null);
   const report = (status: StudioRenderSurfaceAuthority["status"], frame: object, ids: readonly string[], reason: string | null = null) => {
     sink.current?.({ status, backendId: status === "disabled" || status === "legacy" ? null : STUDIO_SKIA_DOCUMENT_BACKEND, decision: null,
@@ -27,16 +28,18 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   useLayoutEffect(() => {
     const current = canvasRef.current;
     if (!current) return;
-    if (!enabled || !visible || receipt.current !== sceneRevision) { current.style.visibility = "hidden"; return; }
+    if (!enabled || !visible || receipt.current !== sceneRevision) { sourceHiddenReceipt.current = null; current.style.visibility = "hidden"; return; }
     if (current.style.visibility === "visible") return;
     const publish = latest.current.beforePublish;
-    if (!publish) { current.style.visibility = "visible"; return; }
+    if (!publish) { sourceHiddenReceipt.current = sceneRevision; current.style.visibility = "visible"; return; }
     // Parent opacity is committed, but the old canvas bitmap is not transparent until its
     // next draw. Wait for that paint before revealing GPU pixels to avoid double compositing.
     const controller = new AbortController();
+    const expectedRequest = revision.current;
     void Promise.resolve().then(() => publish(controller.signal)).then(() => {
-      if (!controller.signal.aborted && canvasRef.current === current && latest.current.visible
+      if (!controller.signal.aborted && expectedRequest === revision.current && canvasRef.current === current && latest.current.visible
         && latest.current.sceneRevision === sceneRevision && receipt.current === sceneRevision) {
+        sourceHiddenReceipt.current = sceneRevision;
         current.style.visibility = "visible";
       }
     }).catch((cause: unknown) => {
@@ -68,7 +71,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       pendingFence?.abort();
       const controller = new AbortController(); pendingFence = controller;
       const state = latest.current; const request = ++revision.current;
-      const continuing = cameraOnly && receipt.current === state.sceneRevision && state.visible;
+      const continuing = cameraOnly && receipt.current === state.sceneRevision && sourceHiddenReceipt.current === state.sceneRevision && state.visible;
       let plan;
       try { plan = projector.project(state.elements); }
       catch (cause) { report("unavailable", state.sceneRevision, [], cause instanceof Error ? cause.message : String(cause)); return; }
@@ -132,7 +135,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       if (alive && generation.current === scope) report("unavailable", latest.current.sceneRevision, [], cause instanceof Error ? cause.message : String(cause));
     });
     return () => {
-      alive = false; unsubscribeCamera?.(); cancelAnimationFrame(cameraFrame); pendingFence?.abort(); submitted.current = null; receipt.current = null;
+      alive = false; unsubscribeCamera?.(); cancelAnimationFrame(cameraFrame); pendingFence?.abort(); submitted.current = null; receipt.current = null; sourceHiddenReceipt.current = null;
       runtime?.dispose(); rendererRef.current = null;
       canvas.remove(); if (canvasRef.current === canvas) canvasRef.current = null;
       projector.clear();
