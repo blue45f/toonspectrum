@@ -93,6 +93,10 @@ export function installGeneratedMedia(): void {
   if (!navigator.mediaDevices) throw new Error("MediaDevices is unavailable in the WebKit QA harness.");
   const mediaDevices = navigator.mediaDevices;
   const mediaDevicesPrototype = Object.getPrototypeOf(mediaDevices) as MediaDevices;
+  // Synthetic display capture exercises the product share controls without reading a real screen.
+  Object.defineProperty(mediaDevices, "getDisplayMedia", { configurable: true, writable: true,
+    value: () => getGeneratedUserMedia({ video: true, audio: false }),
+  });
   Object.defineProperty(mediaDevicesPrototype, "getUserMedia", {
     configurable: true,
     writable: true,
