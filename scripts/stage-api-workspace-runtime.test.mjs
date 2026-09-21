@@ -54,7 +54,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       '"use strict";\n',
     );
 
-    const optionalModelEntries = ["work-session", "world-publication", "world-acoustic", "world-conversation"];
+    const optionalModelEntries = ["work-session", "work-session-evidence", "world-publication", "world-acoustic", "world-conversation"];
     for (const name of optionalModelEntries) {
       await compiledPackage(root, `packages/studio-project-model/src/graph/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
     }
@@ -162,5 +162,15 @@ test("fails instead of staging a missing compiled package", async () => {
     await assert.rejects(stageApiWorkspaceRuntime(root), /ENOENT/u);
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+test("API graph subpaths compile from workspace sources instead of type-only package resolution", async () => {
+  const config = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
+  const manifest = JSON.parse(await readFile(new URL("../packages/studio-project-model/package.json", import.meta.url), "utf8"));
+  for (const name of ["work-session", "work-session-evidence", "world-publication", "world-acoustic", "world-conversation"]) {
+    assert.deepEqual(config.compilerOptions.paths[`@toonspectrum/studio-project-model/${name}`], [
+      `../../packages/studio-project-model/src/graph/${name}.ts`,
+    ]);
+    assert.equal(manifest.exports[`./${name}`].types, `./src/graph/${name}.ts`);
   }
 });

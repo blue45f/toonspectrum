@@ -274,3 +274,31 @@ it("reports a failed write as session-only and retries through the current owner
   await waitFor(() => expect(getStudioRecentColorsStatus()).toBe("saved"));
   expect(save).toHaveBeenLastCalledWith(["#aabbcc"], "artist"); expect(failure).toHaveBeenCalledOnce();
 });
+
+it("coalesces a long in-flight burst into one latest follow-up write", async () => {
+  const f = fixture(); const hook = f.render();
+  act(() => hook.result.current.ensureRecentColorsLoaded());
+  await waitFor(() => expect(hook.result.current.recentColors).toEqual(["#112233"]));
+  const blocked = deferred<void>(); const started = deferred<void>();
+  vi.mocked(f.store.set).mockImplementationOnce(async (key, value) => { started.resolve(); await blocked.promise; f.values.set(key, value); });
+  act(() => hook.result.current.rememberColor("#abcdef"));
+  await started.promise;
+  act(() => { for (let i = 0; i < 1000; i++) hook.result.current.rememberColor(`#${i.toString(16).padStart(6, "0")}`); });
+  expect(f.store.set).toHaveBeenCalledTimes(1);
+  expect(hook.result.current.recentColors).toHaveLength(12);
+  await act(async () => { blocked.resolve(); });
+  await waitFor(() => expect(getStudioRecentColorsStatus()).toBe("saved"));
+  expect(f.store.set).toHaveBeenCalledTimes(2);
+  expect(JSON.parse(f.values.get("recent-colors")!)).toEqual(hook.result.current.recentColors);
+});
+it("retains the latest bounded intents after repeated unavailable loads and recovers explicitly", async () => {
+  const f = fixture(); const hook = f.render();
+  f.acquireRepository.mockRejectedValueOnce(new Error("OPFS unavailable"));
+  act(() => { for (let i = 0; i < 1000; i++) hook.result.current.rememberColor(`#${i.toString(16).padStart(6, "0")}`); });
+  await waitFor(() => expect(getStudioRecentColorsStatus()).toBe("session-only"));
+  expect(f.acquireRepository).toHaveBeenCalledOnce(); expect(f.store.set).not.toHaveBeenCalled();
+  act(() => retrySharedStudioRecentColorsPersistence());
+  await waitFor(() => expect(getStudioRecentColorsStatus()).toBe("saved"));
+  expect(f.store.set).toHaveBeenCalledOnce();
+  expect(JSON.parse(f.values.get("recent-colors")!)).toEqual(hook.result.current.recentColors);
+});

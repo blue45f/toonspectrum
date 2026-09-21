@@ -36,6 +36,9 @@
       "@toonspectrum/contracts/*": [
         "../../packages/contracts/src/*"
       ],
+      "@toonspectrum/studio-project-model/work-session-evidence": [
+        "../../packages/studio-project-model/src/graph/work-session-evidence.ts"
+      ],
       "@toonspectrum/studio-project-model/work-session": [
         "../../packages/studio-project-model/src/graph/work-session.ts"
       ],

@@ -57,9 +57,9 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
     <div className="sticky -top-4 z-10 space-y-3 border-b border-line bg-panel pb-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">도구막대 구성</h3>
-        <span className="text-xs tabular-nums text-fg-2">고정 {draft.visibleIds.length} · 전체 {DEFAULT_STUDIO_RAIL_TOOL_ORDER.length}</span>
+        <span className="text-xs tabular-nums text-fg">고정 {draft.visibleIds.length} · 전체 {DEFAULT_STUDIO_RAIL_TOOL_ORDER.length}</span>
       </div>
-      <p className="text-xs leading-relaxed text-fg-2">사용자 순서와 개수를 유지합니다. 전체 도구는 고정하지 않아도 사용할 수 있습니다.</p>
+      <p className="text-xs leading-relaxed text-fg">사용자 순서와 개수를 유지합니다. 전체 도구는 고정하지 않아도 사용할 수 있습니다.</p>
       <label className="relative block"><Search size={16} aria-hidden className="absolute left-3 top-3.5" />
         <input type="search" aria-label="도구막대에서 도구 찾기" value={query}
           onChange={(event) => setQuery(event.currentTarget.value.slice(0, 80))}
