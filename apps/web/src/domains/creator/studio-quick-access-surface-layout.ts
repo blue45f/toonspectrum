@@ -1,5 +1,6 @@
 import {
   loadStudioFloatingSurfaceLayout,
+  createStudioFloatingSurfaceLayout,
   saveStudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceLayout,
   type StudioFloatingSurfaceStorage,
@@ -51,5 +52,20 @@ export function saveStudioQuickAccessFloatingLayout(
     storage,
     STUDIO_QUICK_ACCESS_FLOATING_LAYOUT_SESSION_KEY,
     layout,
+  );
+}
+
+/** Cursor launch placement is transient; only an explicit drag persists new geometry. */
+export function positionStudioQuickAccessNearPoint(
+  layout: StudioFloatingSurfaceLayout,
+  point: { x: number; y: number } | null | undefined,
+  viewport: { width: number; height: number },
+): StudioFloatingSurfaceLayout {
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return layout;
+  return createStudioFloatingSurfaceLayout(
+    { x: point.x + 12, y: point.y + 12, width: layout.width, height: Math.min(layout.height, 480) },
+    { ...viewport, insetTop: 76, insetRight: 12, insetBottom: 12, insetLeft: 12 },
+    { minWidth: 280, minHeight: 320, maxWidth: 560, maxHeight: 900 },
+    { dock: "free" },
   );
 }

@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ensureSharedStudioRecentColorsLoaded,
   getStudioRecentColorsSnapshot,
+  getStudioRecentColorsStatus,
+  retrySharedStudioRecentColorsPersistence,
   rememberSharedStudioRecentColor,
   resetStudioRecentColorsBridgeForTests,
 } from "./studio-recent-colors-bridge";
@@ -237,4 +239,38 @@ describe("SQLite recent-color owner", () => {
     expect(f.values.get("recent-colors")).toBe('["#112233"]');
     expect(f.unavailable).not.toHaveBeenCalled();
   });
+});
+
+
+it("switches owner scopes without accepting a late load or a stale callback", async () => {
+  const late = deferred<string[]>();
+  const save = vi.fn(async () => undefined);
+  const repository = { loadRecentColors: vi.fn((scope?: string) => scope === "user-a" ? late.promise : Promise.resolve(["#445566"])), saveRecentColors: save };
+  const { result, rerender } = renderHook(({ ownerScope }) => useStudioRecentColors({ ownerScope,
+    acquireRepository: async () => repository, onPersistenceUnavailable: vi.fn() }), { initialProps: { ownerScope: "user-a" } });
+  act(() => result.current.ensureRecentColorsLoaded());
+  await waitFor(() => expect(repository.loadRecentColors).toHaveBeenCalledWith("user-a"));
+  const old = result.current;
+  rerender({ ownerScope: "user-b" });
+  act(() => result.current.ensureRecentColorsLoaded());
+  await waitFor(() => expect(result.current.recentColors).toEqual(["#445566"]));
+  await act(async () => { late.resolve(["#ff0000"]); await late.promise; });
+  act(() => old.rememberColor("#abcdef"));
+  expect(result.current.recentColors).toEqual(["#445566"]);
+  expect(save).not.toHaveBeenCalled();
+  act(() => result.current.rememberColor("#123456"));
+  await waitFor(() => expect(save).toHaveBeenCalledExactlyOnceWith(["#123456", "#445566"], "user-b"));
+});
+
+it("reports a failed write as session-only and retries through the current owner", async () => {
+  const failure = vi.fn();
+  const save = vi.fn().mockRejectedValueOnce(new Error("quota")).mockResolvedValue(undefined);
+  const repository = { loadRecentColors: vi.fn(async () => []), saveRecentColors: save };
+  const { result } = renderHook(() => useStudioRecentColors({ ownerScope: "artist", acquireRepository: async () => repository, onPersistenceUnavailable: failure }));
+  act(() => result.current.rememberColor("#abc"));
+  await waitFor(() => expect(getStudioRecentColorsStatus()).toBe("session-only"));
+  expect(result.current.recentColors).toEqual(["#aabbcc"]);
+  act(() => retrySharedStudioRecentColorsPersistence());
+  await waitFor(() => expect(getStudioRecentColorsStatus()).toBe("saved"));
+  expect(save).toHaveBeenLastCalledWith(["#aabbcc"], "artist"); expect(failure).toHaveBeenCalledOnce();
 });

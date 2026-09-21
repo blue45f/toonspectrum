@@ -4,10 +4,13 @@ import {
   pushRecentColor,
 } from "./studio-color-utils";
 
+export type StudioRecentColorsStatus = "loading" | "saving" | "saved" | "session-only";
+
 export interface StudioRecentColorsOwner {
   readonly ensureRecentColorsLoaded: () => void;
   readonly rememberColor: (color: string) => void;
   readonly clearRecentColors: () => void;
+  readonly retryPersistence?: () => void;
 }
 
 export type StudioRecentColorsOwnerToken = symbol;
@@ -20,6 +23,7 @@ type StudioRecentColorsIntent =
 const EMPTY_RECENT_COLORS: readonly string[] = Object.freeze([]);
 const listeners = new Set<() => void>();
 let snapshot: readonly string[] = EMPTY_RECENT_COLORS;
+let persistenceStatus: StudioRecentColorsStatus = "loading";
 let owner: Readonly<{
   token: StudioRecentColorsOwnerToken;
   value: StudioRecentColorsOwner;
@@ -38,6 +42,22 @@ function setSnapshot(colors: readonly string[]): void {
   for (const listener of listeners) listener();
 }
 
+function setPersistenceStatus(status: StudioRecentColorsStatus): void {
+  if (status === persistenceStatus) return;
+  persistenceStatus = status;
+  for (const listener of listeners) listener();
+}
+
+export function getStudioRecentColorsStatus(): StudioRecentColorsStatus { return persistenceStatus; }
+export function getStudioRecentColorsServerStatus(): StudioRecentColorsStatus { return "loading"; }
+export function publishStudioRecentColorsStatus(token: StudioRecentColorsOwnerToken, status: StudioRecentColorsStatus): void {
+  if (isStudioRecentColorsOwnerActive(token)) setPersistenceStatus(status);
+}
+export function retrySharedStudioRecentColorsPersistence(): void {
+  if (owner?.value.retryPersistence) owner.value.retryPersistence();
+  else ensureSharedStudioRecentColorsLoaded();
+}
+
 function dispatchIntent(
   target: StudioRecentColorsOwner,
   intent: StudioRecentColorsIntent,
@@ -48,7 +68,7 @@ function dispatchIntent(
 }
 
 /** Creates a stable generation token for one mounted recent-colors owner. */
-export function createStudioRecentColorsOwnerToken(): StudioRecentColorsOwnerToken {
+export function createStudioRecentColorsOwnerToken(_scope?: string): StudioRecentColorsOwnerToken {
   return Symbol("studio-recent-colors-owner");
 }
 
@@ -68,11 +88,13 @@ export function registerStudioRecentColorsOwner(
   value: StudioRecentColorsOwner,
 ): () => void {
   owner = Object.freeze({ token, value });
+  setSnapshot(EMPTY_RECENT_COLORS);
+  setPersistenceStatus("loading");
   const queued = pendingIntents;
   pendingIntents = [];
   for (const intent of queued) dispatchIntent(value, intent);
   return () => {
-    if (owner?.token === token) owner = null;
+    if (owner?.token === token) { owner = null; setSnapshot(EMPTY_RECENT_COLORS); setPersistenceStatus("loading"); }
   };
 }
 
@@ -158,6 +180,7 @@ export function clearSharedStudioRecentColors(): void {
 /** Test-only isolation for shared module state and queued persistence. */
 export function resetStudioRecentColorsBridgeForTests(): void {
   snapshot = EMPTY_RECENT_COLORS;
+  persistenceStatus = "loading";
   owner = null;
   pendingIntents = [];
   persistenceTail = Promise.resolve();

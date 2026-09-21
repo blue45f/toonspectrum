@@ -257,9 +257,9 @@ describe("Studio inspector raster recovery boundary", () => {
   });
 
   it("keeps active retouch buttons available as explicit exit controls", () => {
-    expect(railSource).toContain("disabled={!smudgeActive && !rasterRetouchCanStart}");
-    expect(railSource).toContain("disabled={!wetMixActive && !rasterRetouchCanStart}");
-    expect(railSource).toContain("disabled={!dodgeBurnActive && !rasterRetouchCanStart}");
-    expect(railSource).toContain("disabled={!liquifyActive && !rasterRetouchCanStart}");
+    expect(railSource).toContain('"disabled": !smudgeActive && !rasterRetouchCanStart');
+    expect(railSource).toContain('"disabled": !wetMixActive && !rasterRetouchCanStart');
+    expect(railSource).toContain('"disabled": !dodgeBurnActive && !rasterRetouchCanStart');
+    expect(railSource).toContain('"disabled": !liquifyActive && !rasterRetouchCanStart');
   });
 });

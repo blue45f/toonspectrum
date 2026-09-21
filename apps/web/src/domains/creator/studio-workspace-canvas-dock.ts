@@ -1,3 +1,5 @@
+import type { StudioToolbarView } from "./studio-app-settings";
+import { toolbarViewWidth } from "./studio-toolbar-configuration";
 import { studioUiDensityAllows, type StudioUiDensityMode } from "./studio-ui-density";
 import {
   STUDIO_CANVAS_DOCK_GAP_OPEN,
@@ -15,13 +17,14 @@ export interface StudioWorkspaceCanvasDockInsetsInput {
   readonly visibleLeftPanelOpen: boolean;
   readonly visibleRightPanelOpen: boolean;
   readonly uiDensityMode: StudioUiDensityMode;
+  readonly toolbarView?: StudioToolbarView;
 }
 
 export function resolveStudioWorkspaceCanvasDockInsets(
   input: StudioWorkspaceCanvasDockInsetsInput,
 ): StudioWorkspaceCanvasDockInsets {
   const toolRailInset = studioUiDensityAllows(input.uiDensityMode, "tool-rail")
-    ? STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH
+    ? input.toolbarView ? toolbarViewWidth(input.toolbarView) : STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH
     : 0;
 
   return {

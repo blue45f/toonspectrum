@@ -3363,6 +3363,7 @@ export function StudioCuttoonEditor({
   // CLIP STUDIO식 빠른 액세스는 방사형 퀵 메뉴와 목적이 다르다. 팔레트를 처음 열 때만
   // 모델·명령 카탈로그를 읽고, 사용자별 로컬 키에 명령 ID/보기 설정만 저장한다.
   const [quickAccessPaletteOpen, setQuickAccessPaletteOpen] = useState(false);
+  const [quickAccessLaunchPoint, setQuickAccessLaunchPoint] = useState<{ x: number; y: number } | null>(null);
   const [quickAccessPaletteLoading, setQuickAccessPaletteLoading] = useState(false);
   const [quickAccessState, setQuickAccessState] =
     useState<StudioQuickAccessState | null>(null);
@@ -3824,6 +3825,7 @@ export function StudioCuttoonEditor({
       leftPanelWidth: leftResize.width,
       rightPanelWidth: rightResize.width,
       uiDensityMode,
+      toolbarView: appSettings.toolbar.view,
       visibleLeftPanelOpen,
       visibleRightPanelOpen,
     });
@@ -4872,6 +4874,7 @@ export function StudioCuttoonEditor({
     );
   }
   const { recentColors, ensureRecentColorsLoaded, rememberColor, clearRecentColors } = useStudioRecentColors({
+    ownerScope: currentWorkspaceOwnerScope,
     onPersistenceUnavailable: () => setAppSettingsPersistenceState("session-only"),
   });
   // 저장된 클립 복원 — 클립 메뉴를 열 때만 V12 SQLite repository를 로드해 초기 진입을 가볍게
@@ -27998,6 +28001,7 @@ function clearSelectionForEdit() {
     setDrawingPaletteLayout((previous) => ({ ...previous, libraryDockOpen: uiDensityMode === "focus" || !previous.libraryDockOpen }));
   }
   const studioOptionsBarsHandlers = useStudioStableHandlers<StudioOptionsBarsHandlers>({
+    openQuickAccess: (point) => { setQuickAccessLaunchPoint(point ?? null); void openStudioQuickAccessPalette(); },
     toggleBrushDock: toggleDrawingBrushDock,
     restoreDrawingLayout: restoreDrawingWorkbench,
     undoDrawingLayoutRestore: undoDrawingWorkbenchRestore,
@@ -29037,6 +29041,7 @@ function clearSelectionForEdit() {
       puppetWarpPins={puppetWarpPins}
       quickAccessCatalog={quickAccessCatalog}
       quickAccessIntegration={quickAccessIntegration}
+      quickAccessLaunchPoint={quickAccessLaunchPoint}
       quickAccessPaletteOpen={quickAccessPaletteOpen}
       quickAccessState={quickAccessState}
       quickActionsAnchor={quickActionsAnchor}

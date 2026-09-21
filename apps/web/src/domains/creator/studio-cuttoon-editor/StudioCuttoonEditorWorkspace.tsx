@@ -181,7 +181,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
           // Edge-dock workspace: the mobile dock overlays the scrollport instead of shrinking this
           // flex lane. StudioCanvasViewport owns the matching scroll-safe inset, so the final canvas
           // pixels remain reachable while the full dynamic viewport stays available for drawing.
-          "flex min-h-0 flex-1 flex-col gap-0 pb-0 lg:flex-row lg:overflow-hidden",
+          "relative flex min-h-0 flex-1 flex-col gap-0 pb-0 lg:flex-row lg:overflow-hidden",
           canvasOnlyMode && "overflow-hidden",
           mobileImmersive && "overflow-hidden"
         )}
@@ -266,6 +266,13 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
           <Suspense fallback={<div role="status" className="hidden w-64 shrink-0 border-r border-line bg-panel p-3 text-sm text-fg-2 lg:block xl:w-[17rem]">브러시 라이브러리를 여는 중…</div>}>
             <LazyStudioBrushWorkbenchDock
               key={`${s.studioOptionsBarsDrawModel.workspaceOwnerScope}:${drawMode === "eraser" ? "erase" : "paint"}`}
+              width={s.appSettings.general.brushPanelWidth ?? 240}
+              onWidthChange={(width) => s.studioLeftToolRailHandlers.commitAppSettings({ ...s.appSettings, general: { ...s.appSettings.general, brushPanelWidth: width } })}
+              sizeLocked={s.proDrawPrefs.sizeLocked} opacityLocked={s.proDrawPrefs.opacityLocked}
+              onToggleSizeLock={s.studioOptionsBarsHandlers.toggleSizeLock}
+              onToggleOpacityLock={s.studioOptionsBarsHandlers.toggleOpacityLock}
+              modifiedCount={s.studioOptionsBarsDrawModel.brushDefaultRestore?.modifiedCount ?? 0}
+              onRestoreDefaults={s.studioOptionsBarsHandlers.restoreBrushDefaults}
               activeBrushId={s.activeCatalogBrush.id}
               operation={drawMode === "eraser" ? "erase" : "paint"}
               favoriteIds={s.proDrawPrefs.favoriteBrushIds}

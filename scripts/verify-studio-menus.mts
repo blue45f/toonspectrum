@@ -889,9 +889,10 @@ async function assertRailTools(page: Page): Promise<string[]> {
     const tool = rail.locator(`[data-studio-rail-tool-id="${id}"]`);
     try {
       if (!(await tool.isVisible().catch(() => false))) {
-        await page.getByRole("button", { name: "더보기 · 툴바 설정", exact: true }).click();
-        const hiddenTools = page.getByRole("dialog", { name: "추가 도구", exact: true });
-        await hiddenTools.getByRole("button", { name: moreLabel, exact: true }).click();
+        await page.getByRole("button", { name: "전체 도구", exact: true }).click();
+        const hiddenTools = page.getByRole("dialog", { name: "전체 도구", exact: true });
+        await hiddenTools.getByRole("button", { name: `${moreLabel} 고정`, exact: true }).click();
+        await hiddenTools.getByRole("button", { name: "전체 도구 닫기", exact: true }).click();
         await hiddenTools.waitFor({ state: "hidden", timeout: 5_000 });
         await tool.waitFor({ state: "visible", timeout: 5_000 });
       }

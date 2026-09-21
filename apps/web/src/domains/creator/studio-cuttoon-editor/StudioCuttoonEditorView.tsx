@@ -5,6 +5,7 @@
 // React Compiler 옵트아웃: 가변 호스트 백(h) 을 렌더마다 재대입해 공유하는 추출 패턴이라,
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
+import { StudioColorWorkspaceProvider } from "../color/StudioColorWorkspaceContext";
 import { Maximize2 } from "lucide-react";
 import { StudioLiveCollaborationProvider } from "../live/StudioLiveCollaborationProvider";
 import { STUDIO_ICON_SIZE, STUDIO_ICON_STROKE, studioChromeIconClass } from "../studio-chrome-ui";
@@ -74,6 +75,18 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       onEditSafetyChange={handleStudioLiveEditSafetyChange}
       onAuthoritativeSaveBarrierChange={handleStudioCrdtAuthoritativeSaveBarrierChange}
     >
+    <StudioColorWorkspaceProvider value={{
+      ownerKey: JSON.stringify([s.studioAuthUserId, s.effectiveWorkId, s.saveIntentScope, s.currentPageId]),
+      selectionKey: JSON.stringify([s.selectedId, s.marqueeIds, s.tool, s.layerMaskPaintActive]),
+      primary: s.color, secondary: s.studioOptionsBarsDrawModel.secondaryColor,
+      elements: s.elements, pinned: s.appSettings.general.colorPanelPinned === true, isMobile: s.isMobile,
+      onPrimaryChange: s.studioOptionsBarsHandlers.setColor,
+      onSecondaryChange: s.studioOptionsBarsHandlers.setSecondaryColor,
+      onPinnedChange: (pinned) => s.studioLeftToolRailHandlers.commitAppSettings({ ...s.appSettings, general: { ...s.appSettings.general, colorPanelPinned: pinned } }),
+      onRevealDock: () => s.setRightPanelOpenWithOverride(true),
+      onBeforePopupOpen: () => { if (s.isMobile) { s.setMobileSheet(null); s.setMenu(null); } },
+      onRequestSample: s.studioInspectorAsideHandlers.requestInspectorColorSample,
+    }}>
     <StudioToolHintPreferencesProvider
       mode={appSettings.general.toolHintMode}
       touchHoldDelayMs={appSettings.touch.toolHintHoldMs}
@@ -202,6 +215,7 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
     <StudioHelpCenterHost />
     </div>
     </StudioToolHintPreferencesProvider>
+    </StudioColorWorkspaceProvider>
     </StudioLiveCollaborationProvider>
   );
 }

@@ -386,12 +386,12 @@ describe("studio chrome UI", () => {
     expect(html).toContain('data-studio-color-stack="true"');
     expect(html).toContain('data-studio-color-swap="true"');
     expect(html).toContain('role="group"');
-    expect(html).toContain("주 색 선택 · 현재 #c45c26");
-    expect(html).toContain("보조 색 선택 · 현재 #2a2118");
-    expect(html).toContain("최근 색 1 #c45c26 · 현재 주 색");
+    expect(html).toContain('aria-label="주 색"');
+    expect(html).toContain('aria-label="보조 색"');
+    expect(html).toContain("최근 선택 색 #c45c26 적용");
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-keyshortcuts="X"');
-    expect(html.match(/data-studio-tool-hint-target="true"/gu)).toHaveLength(4);
+    expect(html.match(/data-studio-tool-hint-target="true"/gu)).toHaveLength(3);
     expect(html).not.toContain("title=");
   });
 
@@ -427,24 +427,23 @@ describe("studio chrome UI", () => {
     );
 
     const activeRecent = screen.getByRole("button", {
-      name: "최근 색 1 #c45c26 · 현재 주 색",
+      name: "최근 선택 색 #c45c26 적용",
     });
     const nextRecent = screen.getByRole("button", {
-      name: "최근 색 2 #1a1410 · 주 색으로 적용",
+      name: "최근 선택 색 #1a1410 적용",
     });
     expect(activeRecent.getAttribute("aria-pressed")).toBe("true");
     expect(nextRecent.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(nextRecent);
     expect(onPrimaryChange).toHaveBeenCalledWith("#1a1410");
 
-    fireEvent.change(screen.getByLabelText("주 색 선택 · 현재 #c45c26"), {
-      target: { value: "#334455" },
-    });
-    fireEvent.change(screen.getByLabelText("보조 색 선택 · 현재 #2a2118"), {
-      target: { value: "#556677" },
-    });
-    expect(onPrimaryChange).toHaveBeenLastCalledWith("#334455");
-    expect(onSecondaryChange).toHaveBeenCalledWith("#556677");
+    const primary = screen.getByRole("button", { name: "주 색" });
+    const secondary = screen.getByRole("button", { name: "보조 색" });
+    expect(primary.tabIndex).toBe(0);
+    expect(secondary.tabIndex).toBe(0);
+    expect(primary.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(secondary.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(onSecondaryChange).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "주 색과 보조 색 교체" }));
     expect(onSwap).toHaveBeenCalledOnce();

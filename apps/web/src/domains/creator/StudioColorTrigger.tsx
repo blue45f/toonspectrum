@@ -78,7 +78,7 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
           onFocus={onFocus}
           onMouseEnter={onMouseEnter}
           className={cn(
-            "group flex min-h-9 min-w-[7.25rem] items-center gap-2 rounded-xl border border-line/75 bg-card/75 px-1.5 pr-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[border-color,background-color,box-shadow,transform]",
+            "group flex min-h-10 min-w-[7.25rem] items-center gap-2 rounded-xl border border-line/75 bg-card/75 px-1.5 pr-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-[border-color,background-color,box-shadow,transform]",
             "hover:border-line-strong hover:bg-raised active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             expanded && "border-accent/55 bg-accent-soft/25 ring-1 ring-accent/20",
@@ -102,10 +102,10 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-mono text-[0.68rem] font-semibold tabular-nums text-fg-1">
+            <span className="block truncate font-mono text-[13px] font-semibold tabular-nums text-fg-1">
               {variant === "labeled" ? label : displayValue}
             </span>
-            <span className="block truncate text-[0.56rem] font-medium text-fg-3">
+            <span className="block truncate text-xs font-medium text-fg-3">
               {variant === "labeled" ? displayValue : mixed ? "여러 색" : isNone ? "적용 안 함" : "색상 편집"}
             </span>
           </span>
@@ -138,7 +138,7 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
         onFocus={onFocus}
         onMouseEnter={onMouseEnter}
         className={cn(
-          "relative size-7 cursor-pointer overflow-hidden rounded-lg border border-white/20 shadow-sm transition-transform hover:scale-105 active:scale-95 pointer-coarse:size-11",
+          "relative size-10 cursor-pointer overflow-hidden rounded-lg border border-white/20 shadow-sm transition-transform hover:scale-105 active:scale-95 pointer-coarse:size-11",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50",
           expanded && "ring-2 ring-accent ring-offset-1 ring-offset-panel",
           className,

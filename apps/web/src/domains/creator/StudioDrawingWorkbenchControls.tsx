@@ -6,7 +6,7 @@ export interface StudioDrawingWorkbenchControlsProps {
   libraryOpen: boolean;
   undoAvailable: boolean;
   handlers: Pick<StudioOptionsBarsHandlers,
-    "toggleBrushDock" | "restoreDrawingLayout" | "undoDrawingLayoutRestore">;
+    "toggleBrushDock" | "restoreDrawingLayout" | "undoDrawingLayoutRestore" | "openQuickAccess">;
 }
 
 const button = "inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -18,6 +18,8 @@ export function StudioDrawingWorkbenchControls({
   return (
     <div role="group" aria-label="드로잉 작업 배치"
       className="flex shrink-0 items-center gap-1 border-r border-line px-1">
+      {handlers.openQuickAccess ? <button type="button" className={button} aria-label="빠른 실행 열기"
+        onClick={(event) => handlers.openQuickAccess?.({ x: event.clientX, y: event.clientY })}><PanelsTopLeft size={16} aria-hidden /><span className="hidden xl:inline">빠른 실행</span></button> : null}
       {handlers.toggleBrushDock ? (
         <button type="button" className={button} onClick={handlers.toggleBrushDock}
           aria-label={libraryOpen ? "브러시 패널 접기" : "브러시 패널 열기"}

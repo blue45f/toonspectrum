@@ -228,7 +228,7 @@ export function StudioDrawOptionsBar({
   onStampTuningChange,
   color,
   secondaryColor = "#ffffff",
-  recentSwatches = [],
+  recentSwatches,
   brushSlots = [],
   materialBrush = false,
   symmetryType = "none",

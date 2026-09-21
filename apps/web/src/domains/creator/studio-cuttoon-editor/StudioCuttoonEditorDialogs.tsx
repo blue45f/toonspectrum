@@ -119,6 +119,7 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
         )}
       >
         <LazyStudioQuickAccessSurface
+          launchPoint={s.quickAccessLaunchPoint}
           state={quickAccessState}
           catalog={quickAccessCatalog}
           isMobile={isMobile}

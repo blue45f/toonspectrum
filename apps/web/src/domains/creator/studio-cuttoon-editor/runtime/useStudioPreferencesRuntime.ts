@@ -107,7 +107,7 @@ export function useStudioPreferencesRuntime({
             appSettingsRef.current = hydrated;
             setAppSettings(hydrated);
             setUiDensityMode(hydrated.general.densityMode);
-            if (hydrated.general.densityMode === "focus") {
+            if (hydrated.general.densityMode === "focus" && !hydrated.general.colorPanelPinned) {
               closeRightPanelForFocusModeRef.current();
             }
             applyMirroredSettingsRef.current(hydrated);
@@ -190,7 +190,7 @@ export function useStudioPreferencesRuntime({
   }, []);
 
   const setStudioUiDensity = useCallback((mode: StudioUiDensityMode): void => {
-    if (mode === "focus") closeRightPanelForFocusModeRef.current();
+    if (mode === "focus" && !appSettingsRef.current.general.colorPanelPinned) closeRightPanelForFocusModeRef.current();
     setUiDensityMode(mode);
     const current = appSettingsRef.current;
     const next = current.general.densityMode === mode

@@ -35,13 +35,16 @@ export function StudioColorDiscPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingHueRef = useRef(false);
   const isDraggingSvRef = useRef(false);
+  const activePointerRef = useRef<number | null>(null);
+  const dragStartRef = useRef({ hsv, color: value });
 
   // Sync internal HSV when external value changes
   useEffect(() => {
     const nextHsv = hexToHsv(value);
     setHsv((prev) => {
       // Avoid resetting hue if color is greyscale (where hue becomes 0)
-      if (nextHsv.s === 0 && nextHsv.v === prev.v) {
+      if (nextHsv.v === 0) return { ...nextHsv, h: prev.h, s: prev.s };
+      if (nextHsv.s === 0) {
         return { ...nextHsv, h: prev.h };
       }
       return nextHsv;
@@ -87,6 +90,7 @@ export function StudioColorDiscPicker({
       const box = containerRef.current?.querySelector<HTMLDivElement>("[data-sv-box]");
       if (!box) return;
       const rect = box.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
       const clampedX = Math.max(0, Math.min(rect.width, clientX - rect.left));
       const clampedY = Math.max(0, Math.min(rect.height, clientY - rect.top));
 
@@ -101,6 +105,7 @@ export function StudioColorDiscPicker({
   );
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || activePointerRef.current !== null) return;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     const dx = event.clientX - (rect.left + radius);
@@ -109,34 +114,40 @@ export function StudioColorDiscPicker({
 
     // If clicked on the outer ring
     if (dist >= innerRadius - 4 && dist <= radius + 6) {
+      activePointerRef.current = event.pointerId;
+      dragStartRef.current = { hsv, color: value };
       isDraggingHueRef.current = true;
-      event.currentTarget.setPointerCapture(event.pointerId);
+      try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* Detached or limited WebView. */ }
       updateHueFromPointer(event.clientX, event.clientY);
     }
   };
 
   const handleSvPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     event.stopPropagation();
+    if (event.button !== 0 || activePointerRef.current !== null) return;
+    activePointerRef.current = event.pointerId;
+    dragStartRef.current = { hsv, color: value };
     isDraggingSvRef.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); } catch { /* Detached or limited WebView. */ }
     updateSvFromPointer(event.clientX, event.clientY);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (isDraggingHueRef.current) {
+    if (isDraggingHueRef.current && activePointerRef.current === event.pointerId) {
       updateHueFromPointer(event.clientX, event.clientY);
     }
   };
 
   const handleSvPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (isDraggingSvRef.current) {
+    if (isDraggingSvRef.current && activePointerRef.current === event.pointerId) {
       updateSvFromPointer(event.clientX, event.clientY);
     }
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (isDraggingHueRef.current) {
+    if (isDraggingHueRef.current && activePointerRef.current === event.pointerId) {
       isDraggingHueRef.current = false;
+      activePointerRef.current = null;
       try {
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
@@ -146,8 +157,9 @@ export function StudioColorDiscPicker({
   };
 
   const handleSvPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (isDraggingSvRef.current) {
+    if (isDraggingSvRef.current && activePointerRef.current === event.pointerId) {
       isDraggingSvRef.current = false;
+      activePointerRef.current = null;
       try {
         event.currentTarget.releasePointerCapture(event.pointerId);
       } catch {
@@ -156,12 +168,21 @@ export function StudioColorDiscPicker({
     }
   };
 
+  const cancelPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerRef.current !== event.pointerId) return;
+    activePointerRef.current = null;
+    isDraggingHueRef.current = false; isDraggingSvRef.current = false;
+    setHsv(dragStartRef.current.hsv); onChange(dragStartRef.current.color);
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); } catch { /* Capture already released. */ }
+  };
+
   const handleHueKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
     let delta = 0;
     if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = e.shiftKey ? 15 : 2;
     if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = e.shiftKey ? -15 : -2;
     if (delta !== 0) {
       e.preventDefault();
+      e.stopPropagation();
       const nextH = (hsv.h + delta + 360) % 360;
       const nextHsv = { ...hsv, h: nextH };
       setHsv(nextHsv);
@@ -180,6 +201,7 @@ export function StudioColorDiscPicker({
 
     if (ds !== 0 || dv !== 0) {
       e.preventDefault();
+      e.stopPropagation();
       const nextS = Math.max(0, Math.min(100, hsv.s + ds));
       const nextV = Math.max(0, Math.min(100, hsv.v + dv));
       const nextHsv = { ...hsv, s: nextS, v: nextV };
@@ -197,7 +219,8 @@ export function StudioColorDiscPicker({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={cancelPointer}
+        onLostPointerCapture={cancelPointer}
         data-studio-color-disc="true"
         className={`relative mx-auto select-none touch-none ${className ?? ""}`}
         style={{
@@ -210,7 +233,7 @@ export function StudioColorDiscPicker({
           className="absolute inset-0 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.2)]"
           style={{
             background:
-              "conic-gradient(from 0deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+              "conic-gradient(from 90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
             WebkitMask: `radial-gradient(circle at center, transparent ${innerRadius - 1}px, black ${innerRadius}px)`,
             mask: `radial-gradient(circle at center, transparent ${innerRadius - 1}px, black ${innerRadius}px)`,
           }}
@@ -256,7 +279,8 @@ export function StudioColorDiscPicker({
           onPointerDown={handleSvPointerDown}
           onPointerMove={handleSvPointerMove}
           onPointerUp={handleSvPointerUp}
-          onPointerCancel={handleSvPointerUp}
+          onPointerCancel={cancelPointer}
+          onLostPointerCapture={cancelPointer}
           className="absolute cursor-crosshair overflow-hidden rounded-xl border border-white/20 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15),0_6px_16px_rgba(0,0,0,0.55)] transition-shadow hover:shadow-[0_8px_20px_rgba(0,0,0,0.65)]"
           style={{
             width: svBoxSize,
@@ -309,7 +333,7 @@ export function StudioColorDiscPicker({
           className="size-2.5 rounded-full border border-black/20 shadow-sm"
           style={{ backgroundColor: value }}
         />
-        <span className="font-mono text-[0.62rem] font-medium text-fg-2">
+        <span className="font-mono text-xs font-medium text-fg-2">
           H <span className="font-semibold text-fg-1">{hsv.h}°</span> · S <span className="font-semibold text-fg-1">{hsv.s}%</span> · V <span className="font-semibold text-fg-1">{hsv.v}%</span>
         </span>
       </div>

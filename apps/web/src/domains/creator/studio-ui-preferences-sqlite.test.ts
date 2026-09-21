@@ -62,7 +62,10 @@ describe("Studio SQLite UI preferences", () => {
     });
     const repository = createStudioUiPreferencesRepository(fixture.store);
 
-    await expect(repository.loadAppSettings()).resolves.toEqual(defaultStudioAppSettings());
+    const defaults = defaultStudioAppSettings();
+    await expect(repository.loadAppSettings()).resolves.toEqual({
+      ...defaults, toolbar: { ...defaults.toolbar, configured: true, archivedIds: ["not-a-tool"] },
+    });
   });
 
   it("round-trips advanced fill settings and normalizes unsafe values", async () => {

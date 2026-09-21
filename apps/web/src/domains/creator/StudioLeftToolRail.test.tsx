@@ -1,3 +1,4 @@
+import { pinAllStudioToolbarTools, pinStudioToolbarTools } from "./studio-toolbar-configuration";
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -836,7 +837,7 @@ describe("StudioLeftToolRail", () => {
     const rail = screen.getByRole("toolbar", { name: "그리기 도구" });
     const scrollRegion = rail.querySelector('[data-studio-tool-rail-scroll="true"]');
     const footer = rail.querySelector('[data-studio-tool-rail-footer="true"]');
-    const settings = screen.getByRole("button", { name: "더보기 · 툴바 설정" });
+    const settings = screen.getByRole("button", { name: "전체 도구" });
 
     expect(scrollRegion).not.toBeNull();
     expect(footer).not.toBeNull();
@@ -854,21 +855,19 @@ describe("StudioLeftToolRail", () => {
 
     render(<StudioLeftToolRail {...props} />);
 
-    const dialog = screen.getByRole("dialog", { name: "추가 도구" });
+    const dialog = screen.getByRole("dialog", { name: "전체 도구" });
     expect(dialog.parentElement).toBe(document.body);
     expect(dialog.getAttribute("aria-modal")).toBe("false");
     expect(dialog.className).toContain("fixed");
-    expect(dialog.className).toContain("overflow-y-auto");
+    expect(dialog.querySelector(".overflow-y-auto")).not.toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
+    fireEvent.click(screen.getByRole("button", { name: "화면 이동 사용" }));
 
-    expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
-      ...props.appSettings,
-      toolbar: { visibleIds: ["select", "hand"] },
-    });
+    expect(props.stableHandlers.commitAppSettings).not.toHaveBeenCalled();
+    expect(props.stableHandlers.toggleHandTool).toHaveBeenCalledOnce();
     expect(props.setRailMoreOpen).toHaveBeenCalledWith(false);
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "더보기 · 툴바 설정" })
+      screen.getByRole("button", { name: "전체 도구" })
     );
   });
 
@@ -885,14 +884,12 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     expect(screen.getByText("선택·변형·이동")).toBeTruthy();
-    expect(screen.getByText(new RegExp(`도구막대 ${studioDrawingVisibleTools(appSettings.toolbar.visibleIds).length}개 표시`, "u"))).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
+    expect(screen.getByText(`고정 ${studioDrawingVisibleTools(appSettings.toolbar.visibleIds).length} · 전체 35`)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "화면 이동 고정" }));
 
     expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
       ...appSettings,
-      toolbar: {
-        visibleIds: [...appSettings.toolbar.visibleIds, "hand"],
-      },
+      toolbar: pinStudioToolbarTools(appSettings.toolbar, ["hand"]),
     });
   });
 
@@ -905,13 +902,13 @@ describe("StudioLeftToolRail", () => {
     });
 
     render(<StudioLeftToolRail {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "애플리케이션 설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "구성 편집" }));
 
     expect(props.setRailMoreOpen).toHaveBeenCalledWith(false);
     expect(props.setAppSettingsInitialTab).toHaveBeenCalledWith("toolbar");
     expect(props.setAppSettingsOpen).toHaveBeenCalledWith(true);
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "더보기 · 툴바 설정" })
+      screen.getByRole("button", { name: "전체 도구" })
     );
   });
 
@@ -924,10 +921,10 @@ describe("StudioLeftToolRail", () => {
     });
     const view = render(<StudioLeftToolRail {...escapeProps} />);
 
-    fireEvent.keyDown(screen.getByRole("dialog", { name: "추가 도구" }), { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "전체 도구" }), { key: "Escape" });
     expect(escapeProps.setRailMoreOpen).toHaveBeenCalledWith(false);
     expect(document.activeElement).toBe(
-      screen.getByRole("button", { name: "더보기 · 툴바 설정" })
+      screen.getByRole("button", { name: "전체 도구" })
     );
 
     const outsideProps = createProps({
@@ -1076,11 +1073,11 @@ it("restores all 35 tools in a single settings update without changing other pre
   const props = createProps({ appSettings, isRailToolVisible: (id) => id === "select", railMoreOpen: true });
   render(<StudioLeftToolRail {...props} />);
   expect(screen.getByText("구성")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "전체 35개 표시" }));
+  fireEvent.click(screen.getByRole("button", { name: "모든 도구 고정" }));
   expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledExactlyOnceWith({
-    ...appSettings, toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] },
+    ...appSettings, toolbar: pinAllStudioToolbarTools(appSettings.toolbar),
   });
-  expect(props.setRailMoreOpen).toHaveBeenCalledWith(false);
+  expect(props.setRailMoreOpen).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "이전 구성" }));
   expect(props.stableHandlers.commitAppSettings).toHaveBeenLastCalledWith(appSettings);
 });
@@ -1088,9 +1085,36 @@ it("restores all 35 tools in a single settings update without changing other pre
 it("finds hidden tools by familiar aliases and reports an empty result", () => {
   stubAnimationFrame();
   render(<StudioLeftToolRail {...createProps({ appSettings: hiddenToolSettings(), isRailToolVisible: (id) => id === "select", railMoreOpen: true })} />);
-  fireEvent.change(screen.getByRole("searchbox", { name: "추가 도구 검색" }), { target: { value: "스포이드" } });
-  expect(screen.getByRole("button", { name: "색 가져오기" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "화면 이동" })).toBeNull();
-  fireEvent.change(screen.getByRole("searchbox", { name: "추가 도구 검색" }), { target: { value: "존재하지않는도구" } });
-  expect(screen.getByRole("status").textContent).toContain("일치하는 숨긴 도구가 없습니다");
+  fireEvent.change(screen.getByRole("searchbox", { name: "전체 도구 검색" }), { target: { value: "스포이드" } });
+  expect(screen.getByRole("button", { name: "색 가져오기 사용" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "화면 이동 사용" })).toBeNull();
+  fireEvent.change(screen.getByRole("searchbox", { name: "전체 도구 검색" }), { target: { value: "존재하지않는도구" } });
+  expect(screen.getByRole("status").textContent).toContain("일치하는 도구가 없습니다");
+});
+
+
+it.each([1, 27, 35])("retains exactly %i configured pins and still permits unpinned tool execution", (count) => {
+  stubAnimationFrame();
+  const appSettings = defaultStudioAppSettings();
+  appSettings.toolbar = { ...appSettings.toolbar, configured: true, visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER].reverse().slice(0, count) };
+  const props = createProps({ appSettings, isRailToolVisible: () => true, eyedropperActive: true, railMoreOpen: true });
+  const view = render(<StudioLeftToolRail {...props} />);
+  const pinned = Array.from(view.container.querySelectorAll("[data-studio-rail-tool-id]"))
+    .map((item) => item.getAttribute("data-studio-rail-tool-id"));
+  expect(pinned).toEqual(appSettings.toolbar.visibleIds);
+  expect(pinned).toHaveLength(count);
+  fireEvent.click(screen.getByRole("button", { name: "색 가져오기 사용" }));
+  expect(props.setEyedropperActive).toHaveBeenCalled();
+  expect(props.stableHandlers.commitAppSettings).not.toHaveBeenCalled();
+});
+
+it("shows disabled tools and reasons in the catalog without mutating the document", () => {
+  stubAnimationFrame();
+  const props = createProps({ railMoreOpen: true, activeSurfaceReviewLocked: true });
+  render(<StudioLeftToolRail {...props} />);
+  const pen = screen.getByRole("button", { name: "펜 사용" });
+  expect(pen.getAttribute("aria-disabled")).toBe("true");
+  expect(pen.getAttribute("aria-describedby")).toBeTruthy();
+  fireEvent.click(pen);
+  expect(props.stableHandlers.activatePrimaryCanvasTool).not.toHaveBeenCalled();
 });
