@@ -1,5 +1,5 @@
 import { ArrowLeft, ChevronRight, Search } from "lucide-react";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import Link from "@/compat/router-link";
 import { OpenSearchButton } from "@/shared/components/open-search-button";
@@ -18,6 +18,16 @@ export function WorkspaceTaskFrame({ route, children }: {
 }) {
   const bt = useBilingual("WorkspaceTaskFrame");
   const { pathname, search } = useLocation();
+  const previousPath = useRef(pathname);
+  const content = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    // This frame owns only its nested scroller, never the window or editor canvas.
+    if (route && previousPath.current !== pathname && content.current) {
+      content.current.scrollTop = 0;
+      content.current.scrollLeft = 0;
+    }
+    previousPath.current = pathname;
+  }, [pathname, route]);
   const context = workspaceNavigationContext(pathname, search);
   const homeHref = workspaceNavigationHref("/home", context);
   return <div className={route ? "workspace-shell workspace-task-shell" : "workspace-task-passthrough"}
@@ -38,7 +48,7 @@ export function WorkspaceTaskFrame({ route, children }: {
       </div>
     </header> : null}
     {route ? <WorkspaceSidebar context={context} key="navigation" /> : null}
-    <div key="content" className={route ? "workspace-main workspace-task-content" : "workspace-task-passthrough"}>
+    <div ref={content} key="content" className={route ? "workspace-main workspace-task-content" : "workspace-task-passthrough"}>
       {route ? <div className="workspace-task-purpose" key="purpose">
         <p>{bt(route.hintKo, route.hintEn)}</p>
         <Link href={homeHref}><ArrowLeft size={16} aria-hidden="true" />{bt("가상 스튜디오", "Virtual studio")}</Link>
