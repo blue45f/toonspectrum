@@ -93,6 +93,47 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     });
     return { actor, workId, projectId, artifactId, initialId, snapshotId, reviewId, input };
   }
+  it("keeps comment resolution and reopening monotonic against exact stored PostgreSQL time", async () => {
+    const f = await fixture(), input = f.input();
+    await graph.createReviewComment(f.actor, f.reviewId, input);
+    const ahead = await pool.query<{ updatedAt: string }>(
+      `UPDATE studio_review_comment SET "createdAt"=statement_timestamp()+interval '1 minute',
+       "updatedAt"=statement_timestamp()+interval '2 minutes' WHERE id=$1 RETURNING "updatedAt"::text`, [input.id]);
+    const resolution = { status: "resolved" as const, resolutionRevisionId: f.initialId };
+    const resolved = await graph.resolveReviewComment(f.actor, input.id, resolution);
+    expect(resolved.status).toBe("resolved");
+    expect(await graph.resolveReviewComment(f.actor, input.id, resolution)).toEqual(resolved);
+    expect((await pool.query<{ monotonic: boolean }>(
+      'SELECT "updatedAt">=$2::timestamptz AS monotonic FROM studio_review_comment WHERE id=$1',
+      [input.id, ahead.rows[0]!.updatedAt])).rows[0]?.monotonic).toBe(true);
+    const later = await pool.query<{ updatedAt: string }>(
+      `UPDATE studio_review_comment SET "updatedAt"="updatedAt"+interval '1 minute'
+       WHERE id=$1 RETURNING "updatedAt"::text`, [input.id]);
+    const reopened = await graph.reopenReviewComment(f.actor, input.id);
+    expect(reopened.status).toBe("reopened");
+    expect(await graph.reopenReviewComment(f.actor, input.id)).toEqual(reopened);
+    expect((await pool.query<{ monotonic: boolean }>(
+      'SELECT "updatedAt">=$2::timestamptz AS monotonic FROM studio_review_comment WHERE id=$1',
+      [input.id, later.rows[0]!.updatedAt])).rows[0]?.monotonic).toBe(true);
+  });
+
+  it.each(["approved", "rejected", "cancelled", "changes-requested"] as const)(
+    "keeps %s decisions monotonic when stored PostgreSQL timestamps are ahead", async (status) => {
+      const f = await fixture();
+      const ahead = await pool.query<{ updatedAt: string }>(
+        `UPDATE studio_review SET "createdAt"=statement_timestamp()+interval '1 minute',
+         "updatedAt"=statement_timestamp()+interval '2 minutes' WHERE id=$1 RETURNING "updatedAt"::text`, [f.reviewId]);
+      const result = await graph.decideReview(f.actor, f.reviewId, { status });
+      expect(result.status).toBe(status);
+      const persisted = (await pool.query<{ monotonic: boolean; decisionAligned: boolean }>(
+        `SELECT "updatedAt">=$2::timestamptz AS monotonic,
+         (CASE WHEN $3 THEN "decidedAt"="updatedAt" ELSE "decidedAt" IS NULL END) AS "decisionAligned"
+         FROM studio_review WHERE id=$1`, [f.reviewId, ahead.rows[0]!.updatedAt, status !== "changes-requested"])).rows[0];
+      expect(persisted).toEqual({ monotonic: true, decisionAligned: true });
+      if (status !== "changes-requested") expect(await graph.decideReview(f.actor, f.reviewId, { status })).toEqual(result);
+    },
+  );
+
   async function waitBlocked(count: number) {
     await expect.poll(async () => Number((await pool.query<{ count: string }>(
       `SELECT count(*)::text FROM pg_stat_activity WHERE application_name=$1 AND wait_event_type='Lock' AND query LIKE '%studio_review%'`,
@@ -134,6 +175,19 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     return { ...f, editor, comment, current, reference, linked };
   }
 
+  it("preserves comment and review metadata when their stored clocks are ahead", async () => {
+    const f = await fixture(), comment = f.input();
+    await graph.createReviewComment(f.actor, f.reviewId, comment);
+    const future = (await pool.query<{ future: Date }>("SELECT now() + interval '1 day' AS future")).rows[0]!.future.toISOString();
+    await pool.query('UPDATE studio_review_comment SET "createdAt"=$2,"updatedAt"=$2 WHERE id=$1', [comment.id, future]);
+    const resolve = { status: "resolved" as const, resolutionRevisionId: f.initialId };
+    expect((await graph.resolveReviewComment(f.actor, comment.id, resolve)).updatedAt).toBe(future);
+    expect((await graph.reopenReviewComment(f.actor, comment.id)).updatedAt).toBe(future);
+    expect((await graph.resolveReviewComment(f.actor, comment.id, resolve)).updatedAt).toBe(future);
+    await pool.query('UPDATE studio_review SET "createdAt"=$2,"updatedAt"=$2 WHERE id=$1', [f.reviewId, future]);
+    const decided = await graph.decideReview(f.actor, f.reviewId, { status: "approved" });
+    expect(decided.updatedAt).toBe(future);
+  });
   it("binds a production task to the actual pinned comment, retaining existing extra roles and exact read permissions", async () => {
     const f = await productionFixture(); const next = f.linked(); next.tasks[0]!.assigneeIds.push("role-owner");
     const saved = await production.saveWorkspace(f.editor, f.workId, f.current.revision, next);

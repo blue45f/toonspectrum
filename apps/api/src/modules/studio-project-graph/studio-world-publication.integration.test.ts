@@ -471,6 +471,32 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     const real = await repository.publish(f.actor, f.workId, input(), randomUUID());
     expect(real.publication.projectId).toBe(projectId); expect(real.publication.artifactId).not.toBe(artifactId);
   });
+  it("commits and restores client-authored future revisions without reversing artifact metadata", async () => {
+    const f = await fixture(), projectId = randomUUID(), artifactId = randomUUID(), initialId = randomUUID();
+    const createdAt = (await pool.query<{ future: Date }>("SELECT now() + interval '1 day' AS future")).rows[0]!.future.toISOString();
+    await graph.createProject(f.actor, { workId: f.workId, projectId, workspaceId: randomUUID(),
+      artifact: { id: artifactId, kind: "asset", title: "Clock-skewed document", scope: { projectId } },
+      initialRevision: { id: initialId, rootGraphHash: "a".repeat(64), deviceId: "ahead-client", createdAt, blobRefs: [] } }, randomUUID());
+    const body = CommitStudioRevisionSchema.parse({ revisionId: randomUUID(), kind: "checkpoint", parentIds: [initialId],
+      rootGraphHash: "b".repeat(64), deviceId: "ahead-client", createdAt, blobRefs: [],
+      command: { id: randomUUID(), type: "test.edit", scope: { projectId }, payloadHash: "b".repeat(64),
+        payload: {}, issuedAt: createdAt, deterministicSeed: 1, patches: [], inversePatches: [], invalidations: [] } });
+    const committed = await graph.commitRevision(f.actor, artifactId, initialId, randomUUID(), body);
+    expect(committed.headRevisionId).toBe(body.revisionId);
+    const stored = await pool.query<{ createdAt: Date; updatedAt: Date }>('SELECT "createdAt", "updatedAt" FROM studio_artifact WHERE id=$1', [artifactId]);
+    expect(stored.rows[0]!.createdAt.toISOString()).toBe(createdAt);
+    expect(stored.rows[0]!.updatedAt.getTime()).toBeGreaterThanOrEqual(new Date(createdAt).getTime());
+    const later = new Date(new Date(createdAt).getTime() + 5000).toISOString();
+    await pool.query('UPDATE studio_artifact SET "updatedAt"=$2 WHERE id=$1', [artifactId, later]);
+    const restore = RestoreStudioRevisionSchema.parse({ revisionId: randomUUID(), deviceId: "ahead-client", createdAt, commandId: randomUUID() });
+    const restored = await graph.restoreRevision(f.actor, artifactId, initialId, body.revisionId, randomUUID(), restore);
+    expect(restored.headRevisionId).toBe(restore.revisionId);
+    const final = await pool.query<{ updatedAt: Date }>('SELECT "updatedAt" FROM studio_artifact WHERE id=$1', [artifactId]);
+    expect(final.rows[0]!.updatedAt.toISOString()).toBe(later);
+    const authored = await pool.query<{ createdAt: Date }>('SELECT "createdAt" FROM studio_revision WHERE id=ANY($1::text[])', [[initialId, body.revisionId, restore.revisionId]]);
+    expect(authored.rows).toHaveLength(3);
+    expect(authored.rows.every((row) => row.createdAt.toISOString() === createdAt)).toBe(true);
+  });
   it("missing latest receipt fails closed instead of falling back to an older published layout", async () => {
     const f = await fixture(), first = await repository.publish(f.actor, f.workId, input(), randomUUID());
     const next = await repository.publish(f.actor, f.workId, input(first.publication.revisionId, "New"), randomUUID());
