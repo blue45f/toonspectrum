@@ -277,6 +277,7 @@ packages/studio-project-model/src/__tests__/world-acoustic.test.ts
 packages/studio-project-model/src/__tests__/world-conversation.test.ts
 packages/studio-project-model/src/__tests__/world-publication.test.ts
 scripts/browser-core-entry-isolation.test.ts
+scripts/creator-career-confirmation-database-contract.test.mjs
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs
 scripts/lib/character-psd-reference-compositor.test.mjs
