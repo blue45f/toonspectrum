@@ -1,80 +1,71 @@
-name: CI throughput repair validation
+name: CI throughput validation
 
+# The former branch-only repair downloaded historical scripts and expected PR #1883
+# to remain open. Validate the reviewed selected main revision instead; never publish code.
 on:
-  push:
-    branches: [ci/throughput-validation-20260920]
-    paths: [.github/workflows/ci-throughput-validation.yml]
+  workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: read
+  contents: read
 
 concurrency:
-  group: ci-throughput-repair-1883
+  group: ci-throughput-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   validate:
-    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/ci/throughput-validation-20260920'
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     env:
       CI: '1'
       NODE_OPTIONS: --max-old-space-size=12288
-      SOURCE_SHA: ba5baabe4922c69861502e250e4d66edb74971da
-      PATCH_SHA: 3e38ca0e5bb733218f8c4e6116fec700ef5c17b1
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ba5baabe4922c69861502e250e4d66edb74971da
           persist-credentials: false
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
-      
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Load immutable reviewed validation steps
-        shell: bash
+      - name: Record exact checked-out source
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/throughput"
-          curl --fail --silent --show-error --location https://raw.githubusercontent.com/blue45f/toonspectrum/341c6b0c15429816f44d2638b0f9cb3087a47db3/.github/workflows/ci-throughput-validation.yml --output "$RUNNER_TEMP/throughput/reviewed-workflow.yml"
-          node --input-type=module <<'JS'
-          import fs from 'node:fs';
-          import { parse } from 'yaml';
-          const root=process.env.RUNNER_TEMP;
-          const w=parse(fs.readFileSync(`${root}/throughput/reviewed-workflow.yml`,'utf8'));
-          const names={
-            patch:'Apply immutable reviewed patch and remove obsolete comparator imports',
-            test:'Validate source, contracts and type safety',
-            build:'Require real production build and unchanged bundle gate',
-            publish:'Publish only tested Git object and receipt, never move a branch',
-            report:'Summarize validation evidence',
-          };
-          for(const [file,name] of Object.entries(names)){
-            const steps=w.jobs.validate.steps.filter(s=>s.name===name);
-            if(steps.length!==1 || typeof steps[0].run!=='string')throw new Error(`Unexpected step: ${name}`);
-            fs.writeFileSync(`${root}/${file}.sh`,steps[0].run);
-          }
-          JS
-      - name: Apply reviewed behavior-preserving repair
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash "$RUNNER_TEMP/patch.sh"
-      - name: Require affected tests, full typecheck, preflight, lint and architecture
-        run: bash "$RUNNER_TEMP/test.sh"
-      - name: Require unchanged bundle gate and real production build
-        run: bash "$RUNNER_TEMP/build.sh"
-      - name: Publish tested candidate object only, without updating any branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash "$RUNNER_TEMP/publish.sh"
-      - name: Preserve exact failure or success evidence
-        if: always()
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git rev-parse HEAD > "$RUNNER_TEMP/throughput/source-sha.txt"
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Require affected tests and throughput contracts
         run: |
-          if test -f "$RUNNER_TEMP/report.sh"; then bash "$RUNNER_TEMP/report.sh"; fi
+          set -euo pipefail
+          pnpm exec vitest run apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-client.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-p5-brush-real-runtime.test.ts scripts/studio-bg3d-runtime-release-wiring.test.ts scripts/cleanup-superseded-actions-runs.test.mjs scripts/integration-test-runner-ci-policy.test.mjs scripts/run-full-test-ci.test.mjs | tee "$RUNNER_TEMP/throughput/tests.log"
+          node --test scripts/ci-core-gate.test.mjs scripts/ci-core-regression-shards.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs scripts/ci-throughput-policy.test.mjs scripts/ci-throughput-validation.test.mjs | tee "$RUNNER_TEMP/throughput/preflight.log"
+      - name: Require type safety and architecture
+        run: |
+          set -euo pipefail
+          pnpm run typecheck | tee "$RUNNER_TEMP/throughput/typecheck.log"
+          pnpm run validate:architecture | tee "$RUNNER_TEMP/throughput/architecture.log"
+          python3 scripts/verify-pr-workflow-fanout.py
+          pnpm exec eslint --max-warnings=0 scripts/ci-throughput-validation.test.mjs apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-plan.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.test.ts
+      - name: Require production build and unchanged bundle gate
+        run: |
+          set -euo pipefail
+          pnpm run build:bundle | tee "$RUNNER_TEMP/throughput/build.log"
+          node scripts/check-studio-bundle.mjs | tee "$RUNNER_TEMP/throughput/bundle-gate.log"
+          pnpm run test:studio-virtual-art | tee "$RUNNER_TEMP/throughput/art-tests.log"
+          pnpm run verify:studio-virtual-art | tee "$RUNNER_TEMP/throughput/art-integrity.log"
+          git diff --exit-code
+      - name: Preserve outcome without claiming a deployment
+        if: always()
+        env:
+          VALIDATION_OUTCOME: ${{ job.status }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/throughput"
+          printf 'source=%s\nresult=%s\nbranch_updated=false\ndeployed=false\n' "$GITHUB_SHA" "$VALIDATION_OUTCOME" | tee "$RUNNER_TEMP/throughput/outcome.txt" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
