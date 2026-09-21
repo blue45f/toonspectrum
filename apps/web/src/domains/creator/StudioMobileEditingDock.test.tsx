@@ -832,7 +832,9 @@ describe("StudioMobileEditingDock", () => {
     );
 
     const sheet = screen.getByRole("dialog", { name: "브러시 설정" });
-    expect(sheet.className).toContain("scroll-pt-14");
+    expect(sheet.className).toContain("overflow-hidden");
+    expect(sheet.querySelector("[data-studio-mobile-draw-scroll]")?.className).toContain("overflow-y-auto");
+    expect(sheet.querySelector("[data-studio-mobile-draw-header]")?.className).toContain("shrink-0");
     const livingInk = within(sheet).getByRole("region", {
       name: "수채 번짐 빠른 도구",
     });
@@ -1214,7 +1216,7 @@ describe("StudioMobileEditingDock", () => {
     ).toContain("20px");
     expect(
       drawSheet.style.getPropertyValue("--studio-draw-sheet-reserved-bottom"),
-    ).toContain("72px");
+    ).toContain("120px");
     // Opens compact so the canvas under it stays judgeable; the grabber promotes from there.
     expect(handle.getAttribute("aria-valuenow")).toBe("0");
     expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("compact");

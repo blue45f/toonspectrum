@@ -167,3 +167,30 @@ describe("ProductionRecoveryScenarioPanel", () => {
   });
 
 });
+
+
+it("keeps recovery undo available after derived risk links refresh, while sending the full current CAS snapshot", async () => {
+  const aggregate = createProductionDemoProject();
+  const execute = vi.fn().mockResolvedValue(undefined);
+  const panel = (value: typeof aggregate) => <MemoryRouter><ProductionRecoveryScenarioPanel
+    aggregate={value} intelligence={deriveProductionManagementOverview(value, { now: NOW }).riskIntelligence}
+    execute={execute} canEdit now={NOW} /></MemoryRouter>;
+  const view = render(panel(aggregate));
+  fireEvent.change(screen.getByLabelText("시나리오를 비교할 위험"), { target: { value: "blocker:task-episode-12-background" } });
+  fireEvent.click(await screen.findByRole("button", { name: "마감 2일 재조정 복구 시나리오 적용" }));
+  await waitFor(() => expect(execute).toHaveBeenCalledOnce());
+  const command = execute.mock.calls[0]![0] as Extract<ProductionClientCommand, { type: "upsert-task-batch" }>;
+  const expected = command.tasks[0]!;
+  const acknowledged = { ...aggregate, revision: aggregate.revision + 1,
+    tasks: aggregate.tasks.map((task) => task.id === expected.id ? { ...expected, linkedRiskIds: ["derived-current-risk"] } : task) };
+  view.rerender(panel(acknowledged));
+  const undo = screen.getByRole<HTMLButtonElement>("button", { name: "마감 2일 재조정 복구 시나리오 되돌리기" });
+  expect(undo.disabled).toBe(false);
+  fireEvent.click(undo);
+  await waitFor(() => expect(execute).toHaveBeenCalledTimes(2));
+  const original = aggregate.tasks.find((task) => task.id === expected.id)!;
+  expect(execute.mock.calls[1]![0]).toMatchObject({
+    type: "upsert-task-batch", expectedTasks: [acknowledged.tasks.find((task) => task.id === expected.id)],
+    tasks: [ { ...original, linkedRiskIds: ["derived-current-risk"] } ],
+  });
+});

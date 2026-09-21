@@ -1,3 +1,4 @@
+import { stableProductionFingerprint } from "@toonspectrum/core/production";
 import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
@@ -81,7 +82,12 @@ function taskById(
 }
 
 function taskMatchesSnapshot(current: ProductionTask | null, expected: ProductionTask): boolean {
-  return current !== null && JSON.stringify(current) === JSON.stringify(expected);
+  if (current === null) return false;
+  // Risk evaluation derives these links after a successful command. Undo still CAS-checks
+  // the full current snapshot, so authored collaborator changes remain protected.
+  const { linkedRiskIds: _currentRiskIds, ...currentAuthored } = current;
+  const { linkedRiskIds: _expectedRiskIds, ...expectedAuthored } = expected;
+  return stableProductionFingerprint(currentAuthored) === stableProductionFingerprint(expectedAuthored);
 }
 
 function metricTone(before: number, after: number): string {
@@ -208,8 +214,13 @@ export function ProductionRecoveryScenarioPanel({
     try {
       await execute({
         type: "upsert-task-batch",
-        tasks: lastApplied.originalTasks,
-        expectedTasks: lastApplied.appliedTasks,
+        tasks: lastApplied.originalTasks.map((original) => {
+          const current = taskById(aggregate, original.id);
+          return current ? { ...original, linkedRiskIds: current.linkedRiskIds } : original;
+        }),
+        expectedTasks: aggregate.revision > lastApplied.baseRevision
+          ? lastApplied.appliedTasks.map((expected) => taskById(aggregate, expected.id) ?? expected)
+          : lastApplied.appliedTasks,
       }, `${lastApplied.title} 복구 시나리오를 원자적으로 되돌렸습니다.`);
       setLastApplied(null);
     } catch (cause) {

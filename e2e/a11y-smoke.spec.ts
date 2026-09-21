@@ -37,6 +37,14 @@ for (const route of PUBLIC_A11Y_ROUTES) {
     await page.goto(route, { waitUntil: "domcontentloaded" });
     await expect(page.locator("main").first()).toBeVisible();
 
+    // Freeze opt-in readable modal motion near its first frame. Contrast must not depend on
+    // waiting for an entrance fade to finish before a control becomes readable.
+    const readableOpacity = await page.locator('[data-stable-contrast="true"]').evaluateAll((dialogs) => dialogs.map((dialog) => {
+      for (const animation of dialog.getAnimations()) { animation.pause(); animation.currentTime = 20; }
+      return Number(getComputedStyle(dialog).opacity);
+    }));
+    for (const opacity of readableOpacity) expect(opacity).toBe(1);
+
     const result = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
       .analyze();
