@@ -123,7 +123,8 @@ async function main(): Promise<void> {
   const origin = externalOrigin
     ? `${externalOrigin.replace(/\/+$/u, "")}/`
     : `http://127.0.0.1:${port ?? 0}/`;
-  const studioUrl = `${origin}studio`;
+  // The Studio front door is the workspace home. This gate measures the actual drawing editor.
+  const studioUrl = `${origin}studio/canvas`;
   const server: ChildProcess | null =
     port === null ? null : spawnVitePreview({ port, runner: "pnpm-exec" });
 

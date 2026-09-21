@@ -993,6 +993,8 @@ test("Studio ProjectGraph runtime ACL keeps immutable evidence append-only", () 
     "studio_external_file_binding",
     "studio_review",
     "studio_review_reviewer",
+    "studio_review_policy",
+    "studio_review_policy_event",
     "studio_capability_ledger",
   ]) {
     expect(violation).toContain(`'${relation}'`);
@@ -1427,6 +1429,8 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_review_comment",
     "studio_review_comment_assignee",
     "studio_review_reviewer",
+    "studio_review_policy",
+    "studio_review_policy_event",
     "studio_revision",
     "studio_revision_blob",
     "studio_revision_parent",
@@ -1711,6 +1715,16 @@ test("personal cloud cutover marker is a forward-only verified repair", () => {
   expect(sql).not.toContain(
     "CREATE TABLE IF NOT EXISTS public.personal_cloud_connection",
   );
+});
+
+
+test("review policy metadata has only current-state column grants and vote history stays append-only", () => {
+  const acl = buildStudioProjectGraphRuntimeAclSql("toonspectrum_runtime"), violation = buildStudioProjectGraphRuntimeAclViolationSql("toonspectrum_runtime");
+  expect(acl).toContain('GRANT UPDATE ("policyVersion", "stateVersion", "definition", "configuredBy", "configuredAt")\n  ON TABLE public.studio_review_policy');
+  expect(acl).not.toMatch(/GRANT UPDATE[^;]+ON TABLE public\.studio_review_policy_event/u);
+  expect(violation).toContain("'studio_review_policy'::text");
+  expect(violation).toContain("'studio_review_policy_event'::text");
+  expect(loadMigrationManifest().at(-1).id).toBe("0083_studio_review_vote_epoch");
 });
 
 
