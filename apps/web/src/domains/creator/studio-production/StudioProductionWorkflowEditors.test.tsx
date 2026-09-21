@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { StudioProductionOperationsPanel } from "./StudioProductionOperationsPanel";
@@ -286,5 +286,83 @@ describe("production view continuity", () => {
     expect(input).toHaveProperty("value", "아직 저장하지 않은 선화 수정");
     expect(details.open).toBe(true);
     expect(harness.onCommit).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("production editor refresh and mutation safety", () => {
+  function view(initial = workspace(), onCommit = vi.fn()) {
+    const props = { workspace: initial, canEdit: true, canApprove: false, canPublish: false, onCommit };
+    const component = render(<StudioProductionTaskBoard {...props} />);
+    const article = screen.getByRole("heading", { name: "선화" }).closest("article")!;
+    article.querySelector("details")!.open = true;
+    return { component, props, article, title: within(article).getByLabelText("작업 제목") };
+  }
+  it("preserves dirty input on an unrelated refresh and prevents overwriting a changed task", () => {
+    const v = view();
+    fireEvent.change(v.title, { target: { value: "내가 작성 중인 선화" } });
+    v.component.rerender(<StudioProductionTaskBoard {...v.props} workspace={{...workspace(), revision: 2, tasks: workspace().tasks.map((t) => ({...t}))}} />);
+    expect(v.title).toHaveProperty("value", "내가 작성 중인 선화");
+    expect(within(v.article).queryByRole("alert")).toBeNull();
+    const changed = {...workspace(), revision: 3, tasks: workspace().tasks.map((t) => t.id === "task-lineart" ? {...t, owner: "새 담당"} : t)};
+    v.component.rerender(<StudioProductionTaskBoard {...v.props} workspace={changed} />);
+    expect(within(v.article).getByRole("alert").textContent).toContain("다른 곳에서");
+    expect(v.title).toHaveProperty("value", "내가 작성 중인 선화");
+    expect(within(v.article).getByRole("button", {name: "작업 정보 저장"})).toHaveProperty("disabled", true);
+    expect(within(v.article).getByRole("button", {name: "작업 삭제"})).toHaveProperty("disabled", true);
+    fireEvent.click(within(v.article).getByRole("button", {name: "입력 대신 최신 작업 불러오기"}));
+    expect(v.title).toHaveProperty("value", "선화");
+    expect(within(v.article).getByLabelText("담당자 표시")).toHaveProperty("value", "새 담당");
+    expect(v.props.onCommit).not.toHaveBeenCalled();
+  });
+  it("keeps pending input until the exact committed task is returned", async () => {
+    const commit = vi.fn(), v = view(workspace(), commit);
+    fireEvent.change(v.title, { target: { value: "  수정한 선화  " } });
+    await act(async () => { fireEvent.click(within(v.article).getByRole("button", {name: "작업 정보 저장"})); });
+    const update = commit.mock.calls[0]![0] as (w: ProductionWorkspace) => ProductionWorkspace;
+    const acknowledged = update(workspace());
+    v.component.rerender(<StudioProductionTaskBoard {...v.props} workspace={acknowledged} />);
+    expect(v.title).toHaveProperty("value", "수정한 선화");
+    expect(within(v.article).queryByText("저장하지 않은 작업 정보가 있습니다.")).toBeNull();
+  });
+  it("rejects a queued closure after concurrent task changes or scope switch", async () => {
+    const commit = vi.fn(), v = view(workspace(), commit);
+    fireEvent.change(v.title, { target: { value: "수정" } });
+    await act(async () => { fireEvent.click(within(v.article).getByRole("button", {name: "작업 정보 저장"})); });
+    const update = commit.mock.calls[0]![0] as (w: ProductionWorkspace) => ProductionWorkspace;
+    expect(() => update({...workspace(), tasks: workspace().tasks.map((t) => t.id === "task-lineart" ? {...t, progress: 90} : t)})).toThrow();
+    v.component.rerender(<StudioProductionTaskBoard {...v.props} workspace={{...workspace(), scopeKey: "work:another"}} />);
+    expect(() => update(workspace())).toThrow(/화면이나 계정/u);
+    expect(screen.getByRole("heading", {name:"선화"}).closest("article")!.textContent).not.toContain("저장하지 않은");
+  });
+  it("blocks duplicate submission while saving and preserves the draft on failure", async () => {
+    let reject!: (error: Error) => void;
+    const commit = vi.fn(() => new Promise<void>((_, fail) => { reject = fail; })), v = view(workspace(), commit);
+    fireEvent.change(v.title, { target: { value: "재시도할 선화" } });
+    const button = within(v.article).getByRole("button", {name: "작업 정보 저장"});
+    fireEvent.click(button); fireEvent.click(button);
+    expect(commit).toHaveBeenCalledTimes(1); expect(button).toHaveProperty("disabled", true);
+    await act(async () => { reject(new Error("connection lost")); });
+    expect(v.title).toHaveProperty("value", "재시도할 선화");
+    expect(within(v.article).getByRole("alert").textContent).toContain("connection lost");
+    expect(button).toHaveProperty("disabled", false);
+  });
+  it("keeps draft through the calendar and sort views, with no state mutation", () => {
+    const v = view();
+    fireEvent.change(v.title, { target: { value: "캘린더 왕복 입력" } });
+    fireEvent.click(screen.getByRole("button", {name: "일정 보기"}));
+    const calendar = screen.getByRole("region", {name: "제작 일정"});
+    fireEvent.change(within(calendar).getByLabelText("표시할 달"), {target:{value:"2026-09"}});
+    fireEvent.click(within(calendar).getByRole("button", {name:/선화/u}));
+    fireEvent.change(screen.getByLabelText("작업 정렬"), {target:{value:"priority"}});
+    expect(v.title).toHaveProperty("value", "캘린더 왕복 입력");
+    expect(v.article.querySelector("details")!.open).toBe(true);
+    expect(v.props.onCommit).not.toHaveBeenCalled();
+  });
+  it("cannot change completion or delete while editing, but explicitly cancelling permits it", () => {
+    const v = view(); fireEvent.change(v.title, {target:{value:"작성 중"}});
+    expect(within(v.article).getByRole("button", {name:"완료"})).toHaveProperty("disabled",true);
+    fireEvent.click(within(v.article).getByRole("button", {name:"편집 취소"}));
+    expect(within(v.article).getByRole("button", {name:"완료"})).toHaveProperty("disabled",false);
   });
 });

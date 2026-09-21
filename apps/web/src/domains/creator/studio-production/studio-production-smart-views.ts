@@ -12,7 +12,7 @@ export interface ProductionSmartFilter {
 export function productionLocalDay(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-function dueDate(value: string): string | null {
+export function productionDueDay(value: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return null;
   const date = new Date(`${value}T00:00:00.000Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : null;
@@ -33,7 +33,7 @@ export function productionSmartMatches(task: ProductionTask, filter: ProductionS
     if (roles.length) return roles.length === 1 && roles[0]!.memberId === filter.actorId;
     return id === filter.actorId;
   });
-  if (filter.view === "due") { const due = dueDate(task.due); return due !== null && due <= filter.today; }
+  if (filter.view === "due") { const due = productionDueDay(task.due); return due !== null && due <= filter.today; }
   if (filter.view === "blocked") return task.status === "blocked" || (task.dependencyIds ?? []).some((id) => byId.get(id)?.status !== "done");
   return !task.assigneeIds?.length && (!task.owner.trim() || task.owner.trim() === "미배정");
 }
