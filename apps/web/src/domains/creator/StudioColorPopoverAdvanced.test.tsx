@@ -207,3 +207,47 @@ describe("StudioColorPopover Advanced Benchmarked Features", () => {
     expect(onChange).toHaveBeenCalledWith("#112233");
   });
 });
+
+
+it("keeps typed HEX text intact in a controlled color picker and Escape restores the opening color", async () => {
+  const changed = vi.fn();
+  function Controlled() {
+    const [value, setValue] = useState("#ffffff");
+    return <StudioColorPopover value={value} recentColors={[]} label="HEX 입력 검증" initialOpen initialTab="quick"
+      onChange={(color) => { changed(color); setValue(color); }} />;
+  }
+  render(<Controlled />);
+  const input = await screen.findByRole("textbox", { name: "헥스 색상 코드" }) as HTMLInputElement;
+  for (const draft of ["#1", "#12", "#123", "#1234", "#12345", "#123456"]) {
+    fireEvent.change(input, { target: { value: draft } });
+    expect(input.value).toBe(draft);
+  }
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(changed).toHaveBeenLastCalledWith("#123456");
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(changed).toHaveBeenLastCalledWith("#ffffff");
+});
+
+
+it("keeps the mobile color sheet inside a reduced visual viewport with keyboard offsets", () => {
+  const viewport = { width: 390, height: 320, offsetLeft: 0, offsetTop: 100,
+    addEventListener: vi.fn(), removeEventListener: vi.fn() };
+  const height = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(600);
+  vi.stubGlobal("visualViewport", viewport);
+  let view: ReturnType<typeof render> | undefined;
+  try {
+    view = render(<StudioColorPopover value="#123456" onChange={vi.fn()} recentColors={[]}
+      label="키보드 영역 검증" initialOpen />);
+    const dialog = screen.getByRole("dialog", { name: "키보드 영역 검증 선택" });
+    expect(dialog.getAttribute("data-layout")).toBe("sheet");
+    expect(parseFloat(dialog.style.top)).toBeGreaterThanOrEqual(108);
+    expect(parseFloat(dialog.style.top) + parseFloat(dialog.style.maxHeight)).toBeLessThanOrEqual(412);
+    expect(parseFloat(dialog.style.width)).toBe(374);
+    expect(viewport.addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+  } finally {
+    view?.unmount();
+    height.mockRestore();
+    vi.unstubAllGlobals();
+  }
+  expect(viewport.removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+});

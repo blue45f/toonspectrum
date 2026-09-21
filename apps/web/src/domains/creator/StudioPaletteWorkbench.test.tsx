@@ -7,7 +7,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import type { ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioPaletteWorkbench } from "./StudioPaletteWorkbench";
@@ -159,4 +159,36 @@ describe("StudioPaletteWorkbench", () => {
       colors: ["#1122aa", "#ffee00"],
     });
   });
+});
+
+
+it("preserves a six-digit HEX draft through controlled short-hex previews and commits once", () => {
+  const commit = vi.fn();
+  function ControlledWorkbench() {
+    const [value, setValue] = useState("#ffffff");
+    return <StudioPaletteWorkbench value={value} recentColors={[]} onPreviewColor={setValue}
+      onCommitColor={commit} libraryContent={null} />;
+  }
+  render(<ControlledWorkbench />);
+  const input = screen.getByRole("textbox", { name: "현재 색상 코드" }) as HTMLInputElement;
+  for (const draft of ["#1", "#12", "#123", "#1234", "#12345", "#123456"]) {
+    fireEvent.change(input, { target: { value: draft } });
+    expect(input.value).toBe(draft);
+  }
+  fireEvent.keyDown(input, { key: "Enter" });
+  fireEvent.blur(input);
+  expect(commit).toHaveBeenCalledExactlyOnceWith("#123456");
+});
+
+
+it("rolls back only a pending HEX edit, without undoing unrelated colors on Escape", () => {
+  const { onPreviewColor, onCommitColor } = renderWorkbench();
+  const input = screen.getByRole("textbox", { name: "현재 색상 코드" });
+  fireEvent.keyDown(input, { key: "Escape" });
+  expect(onPreviewColor).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: "#ABC" } });
+  fireEvent.keyDown(input, { key: "Escape" });
+  expect(onPreviewColor).toHaveBeenLastCalledWith("#112233");
+  fireEvent.blur(input);
+  expect(onCommitColor).not.toHaveBeenCalled();
 });

@@ -30,15 +30,22 @@ export function StudioColorQuickPicker({
 }: StudioColorQuickPickerProps) {
   const [hsv, setHsv] = useState<HsvColor>(() => hexToHsv(value));
   const svRef = useRef<HTMLButtonElement>(null);
-  const draggingSvRef = useRef(false);
+  const hsvRef = useRef(hsv);
+  type Drag = { pointerId: number; hsv: HsvColor; hex: string };
+  const svDragRef = useRef<Drag | null>(null);
+  const hueDragRef = useRef<Drag | null>(null);
+  const pendingHueRef = useRef(false);
   const latestHexRef = useRef(value);
 
   useEffect(() => {
     const next = hexToHsv(value);
     latestHexRef.current = value;
-    setHsv((current) =>
-      next.s === 0 ? { ...next, h: current.h } : next,
-    );
+    const current = hsvRef.current;
+    const resolved = next.v === 0
+      ? { ...next, h: current.h, s: current.s }
+      : next.s === 0 ? { ...next, h: current.h } : next;
+    hsvRef.current = resolved;
+    setHsv(resolved);
   }, [value]);
 
   const publish = useCallback(
@@ -50,6 +57,7 @@ export function StudioColorQuickPicker({
       };
       const hex = hsvToHex(normalized.h, normalized.s, normalized.v);
       latestHexRef.current = hex;
+      hsvRef.current = normalized;
       setHsv(normalized);
       onPreview(hex);
       if (commit) onCommit?.(hex);
@@ -64,25 +72,60 @@ export function StudioColorQuickPicker({
       const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
       const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
       publish({
-        ...hsv,
+        ...hsvRef.current,
         s: (x / rect.width) * 100,
         v: (1 - y / rect.height) * 100,
       });
     },
-    [hsv, publish],
+    [publish],
   );
 
-  const finishSv = (event: PointerEvent<HTMLButtonElement>) => {
-    if (!draggingSvRef.current) return;
-    updateSvFromPointer(event.clientX, event.clientY);
-    draggingSvRef.current = false;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // Pointer capture may already have been released by the browser.
+  function restoreDrag(drag: Drag): void {
+    hsvRef.current = drag.hsv;
+    latestHexRef.current = drag.hex;
+    setHsv(drag.hsv);
+    onPreview(drag.hex);
+  }
+
+  function capturePointer(event: PointerEvent<HTMLElement>): void {
+    try { event.currentTarget.setPointerCapture?.(event.pointerId); }
+    catch { /* A detached element or WebView may not support capture. */ }
+  }
+
+  function releasePointer(event: PointerEvent<HTMLElement>): void {
+    try { event.currentTarget.releasePointerCapture?.(event.pointerId); }
+    catch { /* Capture may already have been released by the browser. */ }
+  }
+
+  const finishSv = (event: PointerEvent<HTMLButtonElement>, cancelled = false) => {
+    const drag = svDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    // Clear before release: lostpointercapture is not a second cancellation.
+    svDragRef.current = null;
+    if (cancelled) restoreDrag(drag);
+    else {
+      updateSvFromPointer(event.clientX, event.clientY);
+      onCommit?.(latestHexRef.current);
     }
-    onCommit?.(latestHexRef.current);
+    releasePointer(event);
   };
+
+  function commitHue(): void {
+    if (!pendingHueRef.current) return;
+    pendingHueRef.current = false;
+    onCommit?.(latestHexRef.current);
+  }
+
+  function finishHue(event: PointerEvent<HTMLInputElement>, cancelled = false): void {
+    const drag = hueDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    hueDragRef.current = null;
+    if (cancelled) {
+      pendingHueRef.current = false;
+      restoreDrag(drag);
+    } else commitHue();
+    releasePointer(event);
+  }
 
   const handleSvKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const step = event.shiftKey ? 10 : 2;
@@ -94,13 +137,14 @@ export function StudioColorQuickPicker({
     else if (event.key === "ArrowUp") brightness += step;
     else return;
     event.preventDefault();
+    event.stopPropagation();
     publish({ ...hsv, s: saturation, v: brightness }, true);
   };
 
   const pureHue = `hsl(${hsv.h} 100% 50%)`;
 
   return (
-    <div className="space-y-2" data-studio-quick-color-picker="true">
+    <div className="space-y-2" data-studio-quick-color-picker="true" data-studio-shortcut-boundary="true">
       <button
         ref={svRef}
         type="button"
@@ -111,15 +155,17 @@ export function StudioColorQuickPicker({
         aria-valuenow={Math.round(hsv.v)}
         aria-valuetext={`채도 ${Math.round(hsv.s)}%, 명도 ${Math.round(hsv.v)}%`}
         onPointerDown={(event) => {
-          draggingSvRef.current = true;
-          event.currentTarget.setPointerCapture(event.pointerId);
+          if (event.button !== 0 || svDragRef.current || hueDragRef.current) return;
+          svDragRef.current = { pointerId: event.pointerId, hsv: { ...hsvRef.current }, hex: latestHexRef.current };
+          capturePointer(event);
           updateSvFromPointer(event.clientX, event.clientY);
         }}
         onPointerMove={(event) => {
-          if (draggingSvRef.current) updateSvFromPointer(event.clientX, event.clientY);
+          if (svDragRef.current?.pointerId === event.pointerId) updateSvFromPointer(event.clientX, event.clientY);
         }}
-        onPointerUp={finishSv}
-        onPointerCancel={finishSv}
+        onPointerUp={(event) => finishSv(event)}
+        onPointerCancel={(event) => finishSv(event, true)}
+        onLostPointerCapture={(event) => finishSv(event, true)}
         onKeyDown={handleSvKeyDown}
         className="relative h-36 w-full touch-none overflow-hidden rounded-xl border border-white/15 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.14),0_8px_20px_rgba(0,0,0,0.18)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         style={{ backgroundColor: pureHue }}
@@ -153,19 +199,35 @@ export function StudioColorQuickPicker({
           step={1}
           value={Math.round(hsv.h)}
           aria-label="빠른 색조"
-          onChange={(event) => publish({ ...hsv, h: Number(event.currentTarget.value) })}
-          onPointerUp={() => onCommit?.(latestHexRef.current)}
-          onPointerCancel={() => onCommit?.(latestHexRef.current)}
+          onPointerDown={(event) => {
+            if (event.button !== 0 || svDragRef.current || hueDragRef.current) return;
+            hueDragRef.current = { pointerId: event.pointerId, hsv: { ...hsvRef.current }, hex: latestHexRef.current };
+            capturePointer(event);
+          }}
+          onChange={(event) => {
+            pendingHueRef.current = true;
+            publish({ ...hsvRef.current, h: Number(event.currentTarget.value) });
+          }}
+          onPointerUp={(event) => finishHue(event)}
+          onPointerCancel={(event) => finishHue(event, true)}
+          onLostPointerCapture={(event) => finishHue(event, true)}
+          onKeyDown={(event) => {
+            if (event.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(event.key)) event.stopPropagation();
+          }}
           onKeyUp={(event) => {
-            if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End") {
-              onCommit?.(latestHexRef.current);
+            if (event.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(event.key)) {
+              event.stopPropagation();
+              commitHue();
             }
           }}
-          onBlur={() => onCommit?.(latestHexRef.current)}
-          className="h-3 w-full cursor-pointer appearance-none rounded-full border border-white/15 bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-transparent [&::-webkit-slider-thumb]:shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+          onBlur={() => { if (!hueDragRef.current) commitHue(); }}
+          className="h-6 w-full touch-none cursor-pointer appearance-none rounded-full bg-transparent pointer-coarse:h-11 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-transparent [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-transparent [&::-webkit-slider-thumb]:shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
           style={{
-            background:
+            backgroundImage:
               "linear-gradient(to right,#f00 0%,#ff0 16.66%,#0f0 33.33%,#0ff 50%,#00f 66.66%,#f0f 83.33%,#f00 100%)",
+            backgroundSize: "100% 12px",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
           }}
         />
       </div>

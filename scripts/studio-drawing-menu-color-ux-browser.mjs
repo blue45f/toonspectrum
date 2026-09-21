@@ -1,0 +1,81 @@
+// Run against the local integration fixture, never a production account or document.
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { chromium } from "@playwright/test";
+
+const origin = process.argv[2] ?? "http://127.0.0.1:5197";
+if (!["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname)) {
+  throw new Error("This fixture runner accepts a loopback server only.");
+}
+const output = path.resolve("artifacts/drawing-menu-color-ux");
+await fs.mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true });
+const errors = [];
+const checks = [];
+try {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(new URL("/tools/browser-harnesses/drawing-menu-color-ux.html", origin).href);
+  await page.getByText("드로잉 도구·색상 UX 검증", { exact: true }).waitFor();
+  assert.equal(await page.locator("[data-studio-rail-tool-id]").count(), 10);
+  const more = page.getByRole("button", { name: "더보기 · 툴바 설정" });
+  await more.click();
+  const dialog = page.getByRole("dialog", { name: "추가 도구" });
+  await dialog.waitFor();
+  assert.match(await dialog.innerText(), /10개 표시.*전체 35개/u);
+  await page.getByRole("searchbox", { name: "추가 도구 검색" }).fill("스포이드");
+  assert.equal(await page.getByRole("button", { name: "색 가져오기", exact: true }).count(), 1);
+  await page.screenshot({ path: path.join(output, "tool-search.png") });
+  await page.getByRole("button", { name: "전체 35개 표시", exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll("[data-studio-rail-tool-id]").length === 35);
+  const first = await page.locator("[data-studio-rail-tool-id]").first().getAttribute("data-studio-rail-tool-id");
+  assert.equal(first, "select");
+  await more.click();
+  await page.getByRole("button", { name: "이전 구성", exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll("[data-studio-rail-tool-id]").length === 10);
+  checks.push("show all 35 tools and undo; aliases; effective count");
+  await more.click();
+  await page.getByRole("button", { name: "전체 35개 표시", exact: true }).click();
+  await page.getByRole("button", { name: "도구막대 상세 설정", exact: true }).click();
+  await page.getByRole("button", { name: "선택 아래로", exact: true }).click();
+  await page.getByRole("button", { name: "설정 닫기", exact: true }).click();
+  assert.equal(await page.locator("[data-studio-rail-tool-id]").first().getAttribute("data-studio-rail-tool-id"), "transform");
+  await page.reload();
+  await page.getByText("드로잉 도구·색상 UX 검증", { exact: true }).waitFor();
+  assert.equal(await page.locator("[data-studio-rail-tool-id]").first().getAttribute("data-studio-rail-tool-id"), "transform");
+  checks.push("configuration order survives reload and changes actual DOM order");
+  await page.getByRole("button", { name: "다른 색상", exact: true }).click();
+  await page.getByRole("dialog", { name: "다른 색상 선택", exact: true }).waitFor();
+  const hex = page.getByRole("textbox", { name: "헥스 색상 코드", exact: true });
+  await hex.fill("");
+  await hex.pressSequentially("#123456");
+  assert.equal(await hex.inputValue(), "#123456");
+  await hex.press("Enter");
+  assert.equal(await page.getByTestId("current-color").innerText(), "#123456");
+  await page.screenshot({ path: path.join(output, "color-picker-desktop.png") });
+  await page.keyboard.press("Escape");
+  assert.equal(await page.getByTestId("current-color").innerText(), "#397be5");
+  checks.push("lazy custom picker; six-digit HEX typing; Escape rollback");
+  const mobile = await browser.newPage({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true });
+  mobile.on("pageerror", (error) => errors.push(error.message));
+  await mobile.goto(new URL("/tools/browser-harnesses/drawing-menu-color-ux.html", origin).href);
+  await mobile.getByText("드로잉 도구·색상 UX 검증", { exact: true }).waitFor();
+  await mobile.getByRole("button", { name: "다른 색상", exact: true }).click();
+  const mobileDialog = mobile.getByRole("dialog", { name: "다른 색상 선택", exact: true });
+  const bounds = await mobileDialog.boundingBox();
+  assert(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 390 && bounds.y + bounds.height <= 700);
+  const hueBounds = await mobileDialog.getByRole("slider", { name: "빠른 색조", exact: true }).boundingBox();
+  assert(hueBounds && hueBounds.height >= 44);
+  const recentBounds = await mobile.locator("[data-studio-recent-color]").first().boundingBox();
+  assert(recentBounds && recentBounds.width >= 44 && recentBounds.height >= 44);
+  await mobile.screenshot({ path: path.join(output, "color-picker-mobile.png") });
+  await mobile.getByRole("button", { name: "캔버스에서 정밀 색 가져오기", exact: true }).click();
+  assert.equal(await mobile.getByTestId("last-action").innerText(), "eyedropper");
+  checks.push("390px touch bottom sheet remains in viewport; 44px hue and recent-color targets; canvas eyedropper works");
+  assert.deepEqual(errors, []);
+  await fs.writeFile(path.join(output, "report.json"), JSON.stringify({ checks, errors }, null, 2));
+  console.log(JSON.stringify({ checks, errors, output }, null, 2));
+} finally {
+  await browser.close();
+}

@@ -5,7 +5,7 @@ import { normalizeHexColor } from "./studio-color-utils";
 
 import { cn } from "@/shared/lib/utils";
 
-export type StudioColorTriggerVariant = "swatch" | "field";
+export type StudioColorTriggerVariant = "swatch" | "field" | "labeled";
 
 export interface StudioColorTriggerProps {
   readonly value: string;
@@ -59,7 +59,7 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
     const displayValue = mixed ? "혼합" : isNone ? "없음" : normalized.toUpperCase();
     const swatchStyle = checkerboardStyle(normalized, isNone || mixed);
 
-    if (variant === "field") {
+    if (variant === "field" || variant === "labeled") {
       return (
         <button
           ref={ref}
@@ -70,7 +70,7 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
           aria-controls={controls}
           aria-busy={busy || undefined}
           disabled={disabled}
-          data-studio-color-trigger="field"
+          data-studio-color-trigger={variant}
           data-inspector-control-id={controlId}
           data-studio-color-trigger-none={isNone || undefined}
           data-studio-color-trigger-mixed={mixed || undefined}
@@ -103,10 +103,10 @@ export const StudioColorTrigger = forwardRef<HTMLButtonElement, StudioColorTrigg
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate font-mono text-[0.68rem] font-semibold tabular-nums text-fg-1">
-              {displayValue}
+              {variant === "labeled" ? label : displayValue}
             </span>
             <span className="block truncate text-[0.56rem] font-medium text-fg-3">
-              {mixed ? "여러 색" : isNone ? "적용 안 함" : "색상 편집"}
+              {variant === "labeled" ? displayValue : mixed ? "여러 색" : isNone ? "적용 안 함" : "색상 편집"}
             </span>
           </span>
           <ChevronDown

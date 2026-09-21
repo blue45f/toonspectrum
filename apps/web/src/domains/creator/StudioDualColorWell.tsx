@@ -1,5 +1,7 @@
 import { useRef } from "react";
 
+import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
+
 import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
@@ -54,6 +56,7 @@ export function StudioDualColorWell({
   className,
   isTransparent,
   onTransparentToggle,
+  onRequestCanvasEyedropper,
 }: {
   primary: string;
   secondary?: string;
@@ -64,6 +67,7 @@ export function StudioDualColorWell({
   className?: string;
   isTransparent?: boolean;
   onTransparentToggle?: () => void;
+  onRequestCanvasEyedropper?: () => void;
 }) {
   const showSecondary = Boolean(onSecondaryChange && secondary !== undefined);
   // Native color pickers vary on whether they continuously emit `input` and/or finish with
@@ -95,6 +99,16 @@ export function StudioDualColorWell({
       role="group"
       aria-label="색상"
     >
+      <LazyStudioColorPopover
+        value={primary}
+        onChange={onPrimaryChange}
+        recentColors={recent}
+        label="다른 색상"
+        purpose="brush-shape"
+        initialTab="quick"
+        triggerVariant="labeled"
+        onRequestCanvasEyedropper={onRequestCanvasEyedropper}
+      />
       {recent.slice(0, 5).map((swatch, index) => {
         const isCurrentPrimary = primary.toLowerCase() === swatch.toLowerCase();
         return (
@@ -111,7 +125,7 @@ export function StudioDualColorWell({
             aria-pressed={isCurrentPrimary}
             onClick={() => onPrimaryChange(swatch)}
             className={cn(
-              "size-5 rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
+              "size-6 shrink-0 rounded-md border pointer-coarse:size-11 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
               index >= 3 && "max-xl:hidden",
               STUDIO_FOCUS_RING,
               isCurrentPrimary
@@ -122,15 +136,15 @@ export function StudioDualColorWell({
           />
         );
       })}
-      <div className="relative size-8 shrink-0" data-studio-color-stack="true">
+      <div className="flex shrink-0 items-center gap-1" data-studio-color-stack="true">
         {showSecondary ? (
           <StudioToolHintTarget
             preferredSide="top"
-            className="absolute bottom-0 right-0 size-[1.05rem]"
+            className="relative size-8 pointer-coarse:size-11"
             hint={STUDIO_DUAL_COLOR_WELL_HINTS.secondary}
           >
             <label
-              className="block size-full cursor-pointer overflow-hidden rounded-md border border-white/20 shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-transform hover:scale-105 active:scale-95"
+              className="block size-full cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-panel rounded-md border border-white/20 shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-transform hover:scale-105 active:scale-95"
               style={{ background: secondary }}
             >
               <span className="sr-only">보조 색 선택 · 현재 {secondary}</span>
@@ -147,11 +161,11 @@ export function StudioDualColorWell({
         ) : null}
         <StudioToolHintTarget
           preferredSide="top"
-          className="absolute left-0 top-0 size-[1.35rem]"
+          className="relative size-8 pointer-coarse:size-11"
           hint={STUDIO_DUAL_COLOR_WELL_HINTS.primary}
         >
           <label
-            className="block size-full cursor-pointer overflow-hidden rounded-lg border border-white/20 shadow-[0_2px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-black/10 transition-transform hover:scale-105 active:scale-95"
+            className="block size-full cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-panel rounded-lg border border-white/20 shadow-[0_2px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-black/10 transition-transform hover:scale-105 active:scale-95"
             style={{ background: primary }}
           >
             <span className="sr-only">주 색 선택 · 현재 {primary}</span>

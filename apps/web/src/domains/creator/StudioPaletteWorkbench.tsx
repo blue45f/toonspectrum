@@ -108,6 +108,8 @@ export function StudioPaletteWorkbench({
   const [activeView, setActiveView] = useState<PaletteWorkbenchView>("quick");
   const [studioView, setStudioView] = useState<PaletteStudioView>("harmony");
   const [hexDraft, setHexDraft] = useState(currentColor);
+  const hexDraftPendingRef = useRef(false);
+  const hexEditInitialRef = useRef(currentColor);
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [saving, setSaving] = useState(false);
@@ -125,7 +127,7 @@ export function StudioPaletteWorkbench({
   const friendlyName = getFriendlyColorName(currentColor).split(" (")[0] ?? currentColor;
 
   useEffect(() => {
-    setHexDraft(currentColor);
+    if (!hexDraftPendingRef.current) setHexDraft(currentColor);
   }, [currentColor]);
 
   useEffect(() => () => {
@@ -149,6 +151,7 @@ export function StudioPaletteWorkbench({
   }
 
   function previewColor(raw: string): void {
+    hexDraftPendingRef.current = false;
     const normalized = normalizeHexColor(raw);
     if (!normalized) return;
     setHexDraft(normalized);
@@ -156,6 +159,7 @@ export function StudioPaletteWorkbench({
   }
 
   function commitColor(raw: string): void {
+    hexDraftPendingRef.current = false;
     const normalized = normalizeHexColor(raw);
     if (!normalized) return;
     setHexDraft(normalized);
@@ -164,6 +168,8 @@ export function StudioPaletteWorkbench({
   }
 
   function commitHexDraft(): void {
+    if (!hexDraftPendingRef.current) return;
+    hexDraftPendingRef.current = false;
     const normalized = normalizeHexColor(hexDraft);
     if (!normalized) {
       setHexDraft(currentColor);
@@ -265,14 +271,26 @@ export function StudioPaletteWorkbench({
                   aria-label="현재 색상 코드"
                   onChange={(event) => {
                     const next = event.currentTarget.value;
+                    if (!hexDraftPendingRef.current) hexEditInitialRef.current = currentColor;
+                    hexDraftPendingRef.current = true;
                     setHexDraft(next);
                     const normalized = normalizeHexColor(next);
                     if (normalized) onPreviewColor(normalized);
                   }}
                   onBlur={commitHexDraft}
                   onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      if (!hexDraftPendingRef.current) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      hexDraftPendingRef.current = false;
+                      setHexDraft(hexEditInitialRef.current);
+                      onPreviewColor(hexEditInitialRef.current);
+                      return;
+                    }
                     if (event.key !== "Enter") return;
                     event.preventDefault();
+                    event.stopPropagation();
                     commitHexDraft();
                     event.currentTarget.select();
                   }}
