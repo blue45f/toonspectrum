@@ -281,6 +281,11 @@ export function studioWorldManifestFromTiled(
     height: worldHeight,
     backgroundUrl: optionalString(mapProperty(map, "backgroundUrl")) ?? base.backgroundUrl,
     backgroundAssetKey: optionalString(mapProperty(map, "backgroundAssetKey")) ?? base.backgroundAssetKey,
+    // A different image layer cannot inherit the previous draft's digest claims.
+    assetIntegrity: typeof mapProperty(map, "assetIntegrity") === "string"
+      ? JSON.parse(mapProperty(map, "assetIntegrity") as string) : undefined,
+    interactionRules: typeof mapProperty(map, "interactionRules") === "string"
+      ? JSON.parse(mapProperty(map, "interactionRules") as string) : undefined,
     rooms: layers.get("rooms") !== undefined ? rooms : base.rooms,
     colliders: layers.get("colliders") !== undefined ? colliders : base.colliders,
     props: layers.get("props") !== undefined ? props : base.props,

@@ -1,4 +1,4 @@
-import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema, type StudioWorldAssetIntegrity, type StudioWorldInteractionRule } from "@toonspectrum/studio-project-model/world-publication";
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
@@ -139,6 +139,8 @@ export interface StudioVirtualSpaceWorldManifest {
   readonly height: number;
   readonly backgroundAssetKey: string;
   readonly backgroundUrl: string;
+  readonly assetIntegrity?: readonly StudioWorldAssetIntegrity[];
+  readonly interactionRules?: readonly StudioWorldInteractionRule[];
   readonly rooms: readonly StudioWorldRoomDefinition[];
   readonly props: readonly StudioWorldPropDefinition[];
   readonly colliders: readonly StudioWorldRect[];

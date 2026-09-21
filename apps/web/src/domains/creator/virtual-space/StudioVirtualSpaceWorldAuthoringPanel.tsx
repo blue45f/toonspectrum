@@ -42,6 +42,10 @@ import {
 } from "./studio-virtual-space-world-manifest";
 import { resolveStudioWorldSpawn } from "./studio-virtual-space-world-pathfinding";
 
+import { StudioWorldVisualEditor } from "./StudioWorldVisualEditor";
+import { StudioWorldRuleEditor } from "./StudioWorldRuleEditor";
+import { StudioWorldTemplatePanel } from "./StudioWorldTemplatePanel";
+
 import { patchStudioWorldProp, useStudioWorldEditHistory } from "./studio-virtual-space-world-edit-history";
 
 type AuthoringSection =
@@ -277,6 +281,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   const [section, setSection] = useState<AuthoringSection>("rooms");
   const [selected, setSelected] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
+  const [visualOpen, setVisualOpen] = useState(false);
   const edits = useStudioWorldEditHistory({ manifest, projectId, basePublishedRevisionId, disabled, onChange });
   const importEpoch = useRef(0);
   const [moveStep, setMoveStep] = useState(8);
@@ -741,6 +746,19 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
       ) : null}
       {message ? <p className="studio-vspace-authoring-message" role="status">{message}</p> : null}
 
+      <details className="mb-3 rounded-xl border border-line p-3" onToggle={(event) => setVisualOpen(event.currentTarget.open)}>
+        <summary className="min-h-11 cursor-pointer font-semibold">{bt("직접 배치·정렬·크기 편집", "Visual layout, alignment and sizing")}</summary>
+        {visualOpen ? <StudioWorldVisualEditor world={manifest} scope={JSON.stringify([projectId, basePublishedRevisionId, disabled])} disabled={disabled}
+          onChange={setManifest} onUndo={edits.undo} onRedo={edits.redo} /> : null}
+      </details>
+      <details className="mb-3 rounded-xl border border-line p-3">
+        <summary className="min-h-11 cursor-pointer font-semibold">{bt("목적별 템플릿·재사용 패키지", "Starter templates and reusable packages")}</summary>
+        <StudioWorldTemplatePanel world={manifest} scope={JSON.stringify([projectId, basePublishedRevisionId, disabled])} disabled={disabled} onChange={setManifest} />
+      </details>
+      <details className="mb-3 rounded-xl border border-line p-3">
+        <summary className="min-h-11 cursor-pointer font-semibold">{bt("노코드 도구 실행 규칙", "No-code tool action rules")}</summary>
+        <StudioWorldRuleEditor world={manifest} scope={JSON.stringify([projectId, basePublishedRevisionId, disabled])} disabled={disabled} onChange={setManifest} />
+      </details>
       <div className="studio-vspace-authoring-body">
         <nav className="studio-vspace-authoring-sections" aria-label={bt("월드 편집 레이어", "World authoring layers")}>
           {SECTIONS.map((item) => (

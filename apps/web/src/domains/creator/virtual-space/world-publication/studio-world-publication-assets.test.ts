@@ -13,7 +13,7 @@ async function fixture() {
     revisionId: "rev-1", previousPublishedRevisionId: null, contentHash: await studioWorldDigest(manifest), sequence: 1,
     publishedBy: "alice", publishedAt: "2026-09-20T00:00:00.000Z", manifest };
   let next = 0;
-  const deps: StudioWorldAssetDependencies = { fetch: vi.fn(async () => new Response(new Blob(["pixels"], { type: "image/png" }))),
+  const deps: StudioWorldAssetDependencies = { fetch: vi.fn(async () => new Response(new Blob([Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMxkAAAAASUVORK5CYII="), (value) => value.charCodeAt(0))], { type: "image/png" }))),
     decode: vi.fn(async () => {}), createUrl: vi.fn(() => `blob:world-${++next}`), revokeUrl: vi.fn() };
   return { publication, deps };
 }
