@@ -87,7 +87,7 @@ for (const width of [320, 390, 820, 1440]) {
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await page.getByRole("button", { name: "작품·도구·메뉴 검색", exact: true }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
   await search.fill("비 오는 교실 배경");
@@ -128,6 +128,10 @@ for (const width of [320, 390]) {
 
     await page.goto("/studio", { waitUntil: "domcontentloaded" });
 
+    await expect(page.getByRole("heading", { name: "내 작업", exact: true })).toBeVisible();
+    const guide = page.getByText("작업 방식과 시작 가이드 설정", { exact: true });
+    await expect(guide).toBeVisible();
+    await guide.click();
     await expect(page.getByRole("heading", { name: "지금 무엇을 가지고 있나요?", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /아이디어만 있어요/u })).toBeVisible();
     await expect(page.getByRole("link", { name: /대본이나 콘티가 있어요/u })).toBeVisible();
@@ -152,10 +156,13 @@ test("new project flow explains a disabled start action and preserves the chosen
   await page.setViewportSize({ width: 320, height: 1000 });
   await page.goto("/studio/new?kind=webtoon&template=webtoon-vertical", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeVisible();
-  await expect(page.getByText("만들 작업 선택", { exact: true })).toBeVisible();
-  await expect(page.getByText("이름과 시작 형식", { exact: true })).toBeVisible();
-  await expect(page.getByText("자동 저장하며 시작", { exact: true })).toBeVisible();
+  const startSteps = page.getByRole("navigation", { name: "새 프로젝트 시작 단계" });
+  await expect(startSteps).toBeHidden();
+  await page.getByText("제작 흐름과 고급 시작 설정", { exact: true }).click();
+  await expect(startSteps).toBeVisible();
+  await expect(startSteps.getByText("만들 작업 선택", { exact: true })).toBeVisible();
+  await expect(startSteps.getByText("이름과 시작 형식", { exact: true })).toBeVisible();
+  await expect(startSteps.getByText("자동 저장하며 시작", { exact: true })).toBeVisible();
 
   const projectName = page.getByLabel("프로젝트 이름");
   await projectName.fill("");
@@ -165,8 +172,11 @@ test("new project flow explains a disabled start action and preserves the chosen
 
   await projectName.fill("별빛 식당 1화");
   await expect(startButton).toHaveCount(0);
-  await expect(page.getByText(/별빛 식당 1화/u)).toBeVisible();
-  await expect(page.getByText("이 기기에 저장됨", { exact: true }).first()).toBeVisible();
+  await expect(projectName).toHaveValue("별빛 식당 1화");
+  await expect(page.getByLabel("시작 템플릿")).toHaveValue("webtoon-vertical");
+  // The setup is not a saved document until the user explicitly starts it.
+  await expect(page.getByText("이 기기에 저장됨", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("시작하면 이 기기에 저장합니다. 팀 공유와 클라우드 백업은 별도로 연결하세요.", { exact: true })).toBeVisible();
 
   const hasNoHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -244,8 +254,13 @@ test("recent work reopens the exact Studio document and restores its viewport", 
   expect(storedCheckpoint?.zoom ?? 0).toBeGreaterThan(1);
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  const recent = page.locator(".workspace-statusbar .workspace-primary");
-  await expect(recent).toContainText("이어서 작업");
+  // Use the shared live/list workspace action instead of a list-only footer.
+  await page.getByRole("button", { name: "작업 바로가기 열기", exact: true }).click();
+  const workActions = page.getByRole("dialog", { name: "작업 바로가기", exact: true });
+  await expect(workActions).toBeVisible();
+  const recent = workActions.locator("a[data-workspace-resume]");
+  await expect(recent).toHaveCount(1);
+  await expect(recent).toBeVisible();
   const recentHref = await recent.getAttribute("href");
   expect(recentHref).not.toBeNull();
   const recentUrl = new URL(recentHref!, "https://toonstudio.test");

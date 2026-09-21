@@ -22,6 +22,7 @@ import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
 
+import { isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import {
   cleanScratchDir,
   findFreePort,
@@ -115,6 +116,7 @@ export function isExpectedStaticPreviewApiError(
   message: string,
   studioUrl: string,
 ): boolean {
+  if (isStaticPreviewReadinessUnavailable(message, studioUrl)) return true;
   let preview: URL;
   try {
     preview = new URL(studioUrl);

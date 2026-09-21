@@ -42,6 +42,7 @@ import { STUDIO_CANVAS_WIDTH } from "../apps/web/src/domains/creator/canvas/stud
 import { DEFAULT_CANVAS_H } from "../apps/web/src/domains/creator/studio-pages";
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
+import { isStaticPreviewReadinessResponse, isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
@@ -52,6 +53,7 @@ import {
   stopChildProcess,
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
+import { completeStudioRecovery, observeStudioRecovery, type StudioRecoveryReceipt } from "./lib/studio-verify-recovery";
 import {
   inspectPngIntegrity,
   studioLifecycleVisualViolations,
@@ -80,12 +82,11 @@ const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
 interface BrowserErrorCollector {
   messages: string[];
   failedResponses: string[];
+  optionalReadinessFailures: string[];
 }
 
-interface AutosaveEvidence {
+interface AutosaveEvidence extends StudioRecoveryReceipt {
   authority: "durable-reload-recovery";
-  recoveryBannerObserved: true;
-  restoreActionCompleted: true;
   browserCompatibilityKeysBeforeReload: number;
   browserCompatibilityKeysAtRecovery: number;
 }
@@ -198,7 +199,7 @@ function isExpectedStaticPreviewError(message: string, studioUrl: string): boole
   }
 }
 
-function collectBrowserErrors(page: Page, studioUrl: string, collector: BrowserErrorCollector = { messages: [], failedResponses: [] }): BrowserErrorCollector {
+function collectBrowserErrors(page: Page, studioUrl: string, collector: BrowserErrorCollector = { messages: [], failedResponses: [], optionalReadinessFailures: [] }): BrowserErrorCollector {
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
@@ -217,13 +218,18 @@ function collectBrowserErrors(page: Page, studioUrl: string, collector: BrowserE
       }
     }
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
-    if (!isExpectedStaticPreviewError(message, studioUrl)) collector.messages.push(message);
+    if (isStaticPreviewReadinessUnavailable(message, studioUrl)) {
+      collector.optionalReadinessFailures.push(message);
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+    } else if (!isExpectedStaticPreviewError(message, studioUrl)) collector.messages.push(message);
   });
   page.on("pageerror", (error) => collector.messages.push(String(error)));
   page.on("response", (response) => {
     if (response.status() < 500) return;
     const message = `${response.status()} ${response.url()}`;
-    if (!isExpectedStaticPreviewError(message, studioUrl)) {
+    if (isStaticPreviewReadinessResponse(response.status(), response.url(), studioUrl)) {
+      collector.optionalReadinessFailures.push(message);
+    } else if (!isExpectedStaticPreviewError(message, studioUrl)) {
       collector.failedResponses.push(message);
     }
   });
@@ -566,6 +572,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
   let context = profile
     ? await chromium.launchPersistentContext(profile, { ...contextOptions, headless: true, args: ["--no-sandbox"] })
     : await browser.newContext(contextOptions);
+  await observeStudioRecovery(context);
   let page = await context.newPage();
   const browserErrors = collectBrowserErrors(page, studioUrl);
   await installCleanStudioState(page);
@@ -692,6 +699,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       context = await chromium.launchPersistentContext(profile, {
         ...contextOptions, headless: true, args: ["--no-sandbox"], offline: true,
       });
+      await observeStudioRecovery(context);
       page = await context.newPage();
       collectBrowserErrors(page, studioUrl, browserErrors);
       // Reuse only persisted browser storage, not storageState or injected artwork.
@@ -706,16 +714,14 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     // it over the menubar, which can legitimately reopen a rich tool hint above the recovery rail.
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
-    const recoveryMessage = page.locator("[data-studio-recovery-notice]");
-    await recoveryMessage.waitFor({ state: "visible", timeout: profile ? 30_000 : 8_000 });
+    const recoveryReceipt = await completeStudioRecovery(page, profile ? 30_000 : 8_000);
     const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
     const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
     invariant(
       browserCompatibilityKeysAtRecovery === 0,
       "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
     );
-    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-    await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
+
 
     const restoredStage = page.locator(".konvajs-content").first();
     await restoredStage.waitFor({ state: "visible" });
@@ -774,8 +780,7 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       externalPreview: Boolean(process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()),
       autosave: {
         authority: "durable-reload-recovery",
-        recoveryBannerObserved: true,
-        restoreActionCompleted: true,
+        ...recoveryReceipt,
         browserCompatibilityKeysBeforeReload,
         browserCompatibilityKeysAtRecovery,
       },
