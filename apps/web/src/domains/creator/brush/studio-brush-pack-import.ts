@@ -37,11 +37,7 @@ import {
   type CspToolFileImportResult,
 } from "../../../../../../packages/studio-format-gateway/src/csp-sut";
 import { parseKppPreset, KppParseError } from "../../../../../../packages/studio-format-gateway/src/kpp";
-import {
-  importKritaBundle,
-  KritaBundleError,
-  type KritaBundleImportResult,
-} from "../../../../../../packages/studio-format-gateway/src/krita-bundle";
+import type { importKritaBundle, KritaBundleImportResult } from "../../../../../../packages/studio-format-gateway/src/krita-bundle";
 import { importMybBrush, MybParseError } from "../../../../../../packages/studio-format-gateway/src/myb";
 import { STABILIZER_MAX } from "../studio-brush";
 
@@ -537,9 +533,13 @@ export async function importStudioKritaBundleBytes(
   bytes: Uint8Array,
   options: Parameters<typeof importKritaBundle>[1] = {},
 ): Promise<StudioBrushPackImportResult> {
+  // Archive decoding is needed only after an explicit file-import request, not on editor entry.
+  if (options.signal?.aborted) throw new StudioBrushProgramImportError("브러시 가져오기가 취소되었습니다.", "bundle");
+  const { importKritaBundle: parseBundle, KritaBundleError } = await import("../../../../../../packages/studio-format-gateway/src/krita-bundle");
+  if (options.signal?.aborted) throw new StudioBrushProgramImportError("브러시 가져오기가 취소되었습니다.", "bundle");
   let parsed: KritaBundleImportResult;
   try {
-    parsed = await importKritaBundle(bytes, options);
+    parsed = await parseBundle(bytes, options);
   } catch (cause) {
     if (cause instanceof KritaBundleError) {
       throw new StudioBrushProgramImportError(
