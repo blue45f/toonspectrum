@@ -1,7 +1,7 @@
-import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Header, Headers, HttpCode, Inject, Injectable, NotFoundException, Param, Post, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Header, Headers, HttpCode, Inject, Injectable, NotFoundException, Param, Post, Query, ServiceUnavailableException } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { reviewPolicyCommandSchema, studioEntityIdSchema, type ReviewPolicyCommand } from "@toonspectrum/studio-project-model";
+import { reviewPolicyCommandSchema, reviewPolicyHistoryQuerySchema, type ReviewPolicyHistoryQuery, studioEntityIdSchema, type ReviewPolicyCommand } from "@toonspectrum/studio-project-model";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 import { StudioProjectForbiddenError, StudioProjectNotFoundError } from "./studio-project-graph.repository";
 import { StudioReviewPolicyRepository } from "./studio-review-policy.repository";
@@ -34,6 +34,12 @@ export class StudioReviewPolicyController {
   @Header("Cache-Control", "private, no-store, max-age=0")
   current(@Param(new ZodValidationPipe(Params)) params: Params, @Headers("x-user-id") actor?: string) {
     return this.service.run(actor, (actorId) => this.service.repository.current(actorId, params.reviewId));
+  }
+  @Get("history")
+  @Header("Cache-Control", "private, no-store, max-age=0")
+  history(@Param(new ZodValidationPipe(Params)) params: Params,
+    @Query(new ZodValidationPipe(createZodDto(reviewPolicyHistoryQuerySchema))) query: ReviewPolicyHistoryQuery, @Headers("x-user-id") actor?: string) {
+    return this.service.run(actor, (actorId) => this.service.repository.history(actorId, params.reviewId, query));
   }
   @Post("commands")
   @HttpCode(200)

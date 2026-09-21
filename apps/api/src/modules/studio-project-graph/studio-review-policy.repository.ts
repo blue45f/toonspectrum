@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { canonicalJson, reviewPolicyCommandSchema, type ReviewPolicyCommand, type ReviewPolicyPin, type ReviewPolicyResponse } from "@toonspectrum/studio-project-model";
+import { canonicalJson, reviewPolicyCommandSchema, reviewPolicyHistoryQuerySchema, reviewPolicyHistoryResponseSchema, type ReviewPolicyHistoryQuery, type ReviewPolicyHistoryResponse, type ReviewPolicyCommand, type ReviewPolicyPin, type ReviewPolicyResponse } from "@toonspectrum/studio-project-model";
 import type { PoolClient } from "pg";
 import { dbPool } from "../../db";
 import { loadArtifactAccess, assertAccess } from "./studio-project-graph.repository";
@@ -23,7 +23,7 @@ export class StudioReviewPolicyRepository {
       const value = await action(client, review); await client.query("COMMIT"); return value;
     } catch (error) {
       await client.query("ROLLBACK");
-      if (error && typeof error === "object" && "code" in error && error.code === "42P01") throw new StudioReviewPolicyError("unavailable");
+      if (error && typeof error === "object" && "code" in error && ["42P01", "42703", "42883"].includes(String(error.code))) throw new StudioReviewPolicyError("unavailable");
       if (error && typeof error === "object" && "code" in error && ["23505", "23514", "55000"].includes(String(error.code))) throw new StudioReviewPolicyError("conflict");
       throw error;
     } finally { client.release(); }
@@ -32,6 +32,21 @@ export class StudioReviewPolicyRepository {
     return this.transaction(actorId, reviewId, false, async (client) => {
       const access = await policyCurrentAccess(client, reviewId, actorId);
       return { ...access, policy: await readReviewPolicy(client, reviewId, access.eligibleReviewerIds) };
+    });
+  }
+  async history(actorId: string, reviewId: string, raw: ReviewPolicyHistoryQuery = {}): Promise<ReviewPolicyHistoryResponse> {
+    const query = reviewPolicyHistoryQuerySchema.parse(raw);
+    return this.transaction(actorId, reviewId, false, async (client, review) => {
+      await policyCurrentAccess(client, reviewId, actorId);
+      const result = await client.query<{ id: string; policyVersion: number; stateVersion: number; actorId: string; createdAt: Date; payload: unknown }>(
+        `SELECT id,"policyVersion","stateVersion","actorId","createdAt",payload FROM studio_review_policy_event
+         WHERE "reviewId"=$1 AND ($2::integer IS NULL OR "stateVersion"<$2)
+         ORDER BY "stateVersion" DESC LIMIT 26`, [reviewId, query.beforeStateVersion ?? null]);
+      const entries = result.rows.slice(0, 25).map((row) => ({ id: row.id, policyVersion: row.policyVersion, stateVersion: row.stateVersion,
+        actorId: row.actorId, createdAt: new Date(row.createdAt).toISOString(), command: row.payload }));
+      return reviewPolicyHistoryResponseSchema.parse({ pin: { reviewId, artifactId: review.artifactId,
+        revisionId: review.revisionId, rootGraphHash: review.rootGraphHash }, actorId, entries,
+        nextBeforeStateVersion: result.rows.length > 25 ? entries.at(-1)!.stateVersion : null });
     });
   }
   command(actorId: string, reviewId: string, raw: ReviewPolicyCommand): Promise<ReviewPolicyResponse> {
@@ -73,8 +88,8 @@ export class StudioReviewPolicyRepository {
         await client.query(`UPDATE studio_review_policy SET "stateVersion"=$2 WHERE "reviewId"=$1`, [reviewId, stateVersion]);
       }
       await client.query(
-        `INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+        `INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload,"accessEpoch")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,CASE WHEN $5='vote' THEN studio_review_policy_actor_epoch($2,$6) ELSE NULL END)`,
         [input.id, reviewId, policyVersion, stateVersion, input.type, actorId, hash, JSON.stringify(input)]);
       return { ...access, replayed: false, policy: await readReviewPolicy(client, reviewId, access.eligibleReviewerIds) };
     });

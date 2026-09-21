@@ -137,8 +137,8 @@ async function append(client: PoolClient, session: StudioWorkSession, baseRevisi
   await client.query(`INSERT INTO studio_mutation_receipt ("artifactId","actorUserId","idempotencyKeyHash","requestHash","resultRevisionId",response)
     VALUES ($1,$2,$3,$4,$5,$6::jsonb)`, [artifactId, event.actor.userId, event.idempotencyKeyHash,
     hash({ workId: session.workId, sessionId: session.id, input: event.input }), revisionId, JSON.stringify(receipt)]);
-  await client.query('UPDATE studio_artifact SET "headRevisionId"=$2,"updatedAt"=now() WHERE id=$1', [artifactId, revisionId]);
-  await client.query('UPDATE studio_project_graph SET "updatedAt"=now() WHERE id=$1', [session.input.projectId]);
+  await client.query('UPDATE studio_artifact SET "headRevisionId"=$2,"updatedAt"=GREATEST("createdAt","updatedAt",statement_timestamp()) WHERE id=$1', [artifactId, revisionId]);
+  await client.query('UPDATE studio_project_graph SET "updatedAt"=GREATEST("createdAt","updatedAt",statement_timestamp()) WHERE id=$1', [session.input.projectId]);
   return receipt;
 }
 async function prior(client: PoolClient, actor: string, workId: string, sessionId: string, input: StudioWorkSessionCreate | StudioWorkSessionCommand) {

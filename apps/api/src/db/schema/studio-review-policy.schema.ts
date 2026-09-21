@@ -17,7 +17,7 @@ export const studioReviewPolicies = pgTable("studio_review_policy", {
 export const studioReviewPolicyEvents = pgTable("studio_review_policy_event", {
   id: text("id").primaryKey(), reviewId: text("reviewId").notNull().references(() => studioReviewPolicies.reviewId, { onDelete: "cascade" }),
   policyVersion: integer("policyVersion").notNull(), stateVersion: integer("stateVersion").notNull(),
-  kind: text("kind").notNull(), actorId: text("actorId").notNull(), commandHash: text("commandHash").notNull(), payload: jsonb("payload").notNull(),
+  kind: text("kind").notNull(), actorId: text("actorId").notNull(), accessEpoch: text("accessEpoch"), commandHash: text("commandHash").notNull(), payload: jsonb("payload").notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   unique("studio_review_policy_event_order_unique").on(table.reviewId, table.stateVersion),

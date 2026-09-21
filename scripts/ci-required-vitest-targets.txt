@@ -220,6 +220,7 @@ apps/web/src/domains/creator/useStudioAdjustmentLayerCommands.test.tsx
 apps/web/src/domains/creator/useStudioOnDemandModule.test.tsx
 apps/web/src/domains/creator/vector/studio-node-edit-pointer-ownership.test.tsx
 apps/web/src/domains/creator/virtual-space
+apps/web/src/domains/creator/virtual-space/StudioReviewPolicyHistory.test.tsx
 apps/web/src/domains/creator/vrm/StudioVrmXpbdSkirtAttachment.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-garment-skinning-fixture.test.ts
 apps/web/src/domains/creator/vrm/studio-vrm-png-worker-client.test.ts
@@ -266,6 +267,7 @@ packages/core/src/production/notification-digest.test.ts
 packages/core/src/production/operations-control.test.ts
 packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
+packages/studio-project-model/src/__tests__/review-policy-history.test.ts
 packages/studio-project-model/src/__tests__/review-policy.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts
 packages/studio-project-model/src/__tests__/review-task-reference.test.ts
