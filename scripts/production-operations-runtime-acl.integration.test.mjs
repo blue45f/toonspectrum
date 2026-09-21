@@ -1,3 +1,4 @@
+import { validatePostgresIntegrationUrl } from "./run-postgres-integration-tests.mjs";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import pg from "pg";
@@ -16,8 +17,7 @@ describe.skipIf(!target)("actual non-owner runtime grants for production operati
   let roleCreated = false, schemaCreated = false;
   beforeAll(async () => {
     if (!target) throw new Error("Explicit disposable local owner connection required");
-    const url = new URL(target);
-    if (!["localhost","127.0.0.1","[::1]"].includes(url.hostname) || !url.pathname.includes("test") || url.search) throw new Error("Only a disposable loopback test database is allowed");
+    validatePostgresIntegrationUrl(target);
     owner = new pg.Pool({ connectionString: target, options: `-c search_path=${schema}`, max: 1 });
     await owner.query(`CREATE ROLE ${role} NOLOGIN`); roleCreated = true;
     await owner.query(`CREATE SCHEMA ${schema}`); schemaCreated = true;

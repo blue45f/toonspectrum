@@ -1,3 +1,4 @@
+import { validatePostgresIntegrationUrl } from "../../../../../scripts/run-postgres-integration-tests.mjs";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Pool } from "pg";
@@ -15,7 +16,7 @@ describe.skipIf(!url)("free team workspace actual Postgres", () => {
   let pool: Pool;
   let repository: TeamWorkspaceRepository;
   beforeAll(async () => {
-    if (!url || !["127.0.0.1", "localhost", "[::1]"].includes(new URL(url).hostname) || !new URL(url).pathname.includes("test") || new URL(url).search) throw new Error("A disposable loopback test database is required");
+    validatePostgresIntegrationUrl(url);
     admin = new Pool({ connectionString: url, max: 1 });
     await admin.query(`CREATE SCHEMA ${schema}`);
     pool = new Pool({ connectionString: url, max: 8, options: `-c search_path=${schema}` });

@@ -82,7 +82,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     if (input.type === "remove-member" && input.userId === userId) navigate("/production/workspaces");
   }
   const manager = detail && isWorkspaceManager(detail.workspace.role);
-  return <main data-route-ready="team-workspace" className="min-h-dvh bg-canvas px-4 py-6 text-fg">
+  return <div data-route-ready="team-workspace" className="min-h-dvh bg-canvas px-4 py-6 text-fg">
     <div className="mx-auto max-w-6xl space-y-5"><header className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-2xl font-black">팀 워크스페이스</h1><p className="mt-2 text-sm text-fg-2">{operationPolicy?.notice ?? "팀을 구성하고 기존 제작 프로젝트를 연결합니다."}</p></div>
       <nav aria-label="제작 탐색" className="flex gap-3"><Link to="/production">제작 홈</Link><Link to="/production/workspaces">전체 팀</Link><Link to="/production/workspaces/join">초대 수락</Link></nav>
@@ -134,7 +134,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     {usage && <UsageCard usage={usage} />}
     {detail.workspace.role !== "owner" && <button disabled={busy} className={buttonClass({ variant: "outline" })} onClick={() => { if (window.confirm("이 워크스페이스에서 나갈까요? 별도의 작품 접근 권한은 유지됩니다.")) void run(() => command({ type: "remove-member", userId })); }}>워크스페이스 나가기</button>}
     </>}</>}
-    </div></main>;
+    </div></div>;
 }
 export function TeamWorkspaceJoinPage() {
   const userId = useApp((state) => state.userId);
@@ -148,7 +148,7 @@ export function TeamWorkspaceJoinPage() {
     if (invitation && /^[A-Za-z0-9_-]{43}$/u.test(invitation)) setToken(invitation);
     if (invitation) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
   }, []);
-  return <main data-route-ready="team-workspace-join" className="min-h-dvh bg-canvas px-4 py-8 text-fg"><div className="mx-auto max-w-xl space-y-4">
+  return <div data-route-ready="team-workspace-join" className="min-h-dvh bg-canvas px-4 py-8 text-fg"><div className="mx-auto max-w-xl space-y-4">
     <h1 className="text-2xl font-black">워크스페이스 초대 수락</h1><p>초대받은 이메일로 로그인하고 이메일 인증을 완료해주세요. 작품별 접근 권한은 별도로 적용됩니다.</p>
     {error && <p role="alert">{error}</p>}
     {!userId && <p>로그인 후 원래 초대 링크를 다시 열거나 초대 코드를 입력해주세요. <Link to="/login" className="underline">로그인</Link></p>}
@@ -158,5 +158,5 @@ export function TeamWorkspaceJoinPage() {
       <label className="flex flex-col gap-2">초대 코드<input className={fieldClass} value={token} onChange={(event) => setToken(event.target.value)} autoComplete="off" spellCheck={false} maxLength={43} /></label>
       <button disabled={!userId || busy || !/^[A-Za-z0-9_-]{43}$/u.test(token.trim())} className={buttonClass()} type="submit">초대 수락하기</button></form>
     <Link to="/production/workspaces" className="inline-block underline">팀 목록으로</Link>
-  </div></main>;
+  </div></div>;
 }

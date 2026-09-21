@@ -30,6 +30,7 @@
 - CI에서 발견한 API 계약 subpath의 배포 export 누락을 수정했다. 실제 API build, 런타임 import 검사(788 compiled files / 2451 imports), 배포 경계 27개·법적 문서 경계 7개 테스트를 추가로 통과했다.
 - Admin 브라우저 테스트는 `apps/admin/tests/operation-policy.e2e.ts`와 전용 설정으로 분리해 기본 Studio E2E/단위 테스트 수집을 오염시키지 않는다.
 - 기존 production-collaboration 모듈 추가 회귀: 77개 통과. 이 추가 실행에서 환경변수 없이 생략된 DB 12개는 위 PostgreSQL 실행에서 모두 별도로 통과했다.
+- 추가 CI 계약 검사에서 발견한 AppShell main landmark 중복·사이트 디렉터리 경로 누락·후속 migration 수량 기대값을 수정했다. CI의 `_integration` DB 이름을 공용 안전 검증기로 검증하도록 정합성을 맞췄으며, 로컬 동일 명명 조건에서 87개 회귀 테스트를 통과했다.
 - 코드 lint와 Git hooks/CI를 유지한다. main 병합은 운영 배포나 유료 전환 승인이 아니다.
 
 ## 아직 완료가 아닌 설계 범위

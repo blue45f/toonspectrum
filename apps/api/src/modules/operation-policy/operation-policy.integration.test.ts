@@ -1,3 +1,4 @@
+import { validatePostgresIntegrationUrl } from "../../../../../scripts/run-postgres-integration-tests.mjs";
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
@@ -20,8 +21,7 @@ suite("real Postgres: workspace + operating mode", () => {
   const oldFingerprint = process.env.TOONSTUDIO_LICENSE_FINGERPRINT;
   beforeAll(async () => {
     if (!target) throw new Error("TEST_DATABASE_URL required");
-    const url = new URL(target);
-    if (!['127.0.0.1','localhost','[::1]'].includes(url.hostname) || !url.pathname.includes('test') || url.search) throw new Error("Only a disposable loopback test database without override parameters is allowed");
+    validatePostgresIntegrationUrl(target);
     root = new Pool({ connectionString: target, max: 1 });
     await root.query(`CREATE SCHEMA "${schema}"`);
     pool = new Pool({ connectionString: target, max: 8, options: `-c search_path=${schema}` });
