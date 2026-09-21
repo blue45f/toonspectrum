@@ -34,8 +34,9 @@ export async function measureDrawingColorInteraction(page, url) {
   const dialog = page.getByRole("dialog", { name: "주 색 선택", exact: true });
   await dialog.getByRole("textbox", { name: "헥스 색상 코드" }).fill("#ff0000");
   const before = Number(await fixture.getAttribute("data-history-write-count"));
-  const result = await page.evaluate(async () => {
-    const { hsvToHex } = await import('/src/domains/creator/studio-color-harmony-engine.ts');
+  const converterUrl = new URL("/src/domains/creator/studio-color-harmony-engine.ts", target).href;
+  const result = await page.evaluate(async (moduleUrl) => {
+    const { hsvToHex } = await import(moduleUrl);
     const slider = document.querySelector('[aria-label="빠른 색조"]');
     const output = document.querySelector('[aria-label="선택 중인 색상"]');
     if (!(slider instanceof HTMLInputElement) || !output) throw new Error("Missing real color controls");
@@ -55,7 +56,7 @@ export async function measureDrawingColorInteraction(page, url) {
     }
     samples.sort((a, b) => a - b);
     return { samples: samples.length, p95Ms: samples[Math.ceil(samples.length * 0.95) - 1], maxMs: samples.at(-1), documentElements: 5000, metric: "synthetic input to next matching animation frame" };
-  });
+  }, converterUrl);
   const after = Number(await fixture.getAttribute("data-history-write-count"));
   assert.equal(after - before, 0, "Preview must never call recent-color persistence");
   assert(result.p95Ms <= 50, `Color preview p95 exceeds 50ms: ${JSON.stringify(result)}`);
