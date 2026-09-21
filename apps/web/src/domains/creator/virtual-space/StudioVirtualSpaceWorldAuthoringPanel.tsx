@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -279,7 +280,7 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
   const edits = useStudioWorldEditHistory({ manifest, projectId, basePublishedRevisionId, disabled, onChange });
   const importEpoch = useRef(0);
   const [moveStep, setMoveStep] = useState(8);
-  useEffect(() => {
+  useLayoutEffect(() => {
     importEpoch.current += 1;
     return () => { importEpoch.current += 1; };
   }, [manifest, projectId, basePublishedRevisionId, disabled]);
@@ -554,6 +555,9 @@ export function StudioVirtualSpaceWorldAuthoringPanel({
             <SelectField label="Kind" value={item.kind} options={["decor", "solid", "interactive", "portal"] as const} onChange={(kind) => kind && updateProp({ kind })} />
             <SelectField label="Depth" value={item.depth} options={["fixed", "y-sort", "foreground"] as const} onChange={(depth) => updateProp({ depth })} />
           </div>
+          {!item.assetUrl ? <p role="note" data-world-prop-visual="unassigned" className="rounded-lg border border-line p-3 text-xs text-fg-2">
+            {bt("별도 이미지가 없는 항목입니다. 좌표는 상호작용·충돌 위치만 조정하며 배경 그림은 이동하지 않습니다.", "This item has no separate image. Position edits affect interaction and collision locations, not the painted background.")}
+          </p> : null}
           <GeometryFields x={item.x} y={item.y} width={item.width} height={item.height} onChange={updateProp} />
           <div role="group" aria-label={bt("소품 위치 조정", "Move prop")} className="grid grid-cols-2 gap-2">
             <Field label={bt("이동 간격", "Move increment")}>

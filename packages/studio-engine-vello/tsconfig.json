@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "../studio-engine-skia/src/canvaskit-wasm-url.d.ts"]
 }
