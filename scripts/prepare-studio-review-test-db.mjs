@@ -26,11 +26,11 @@ try {
   });
   // Drizzle can log an SQL error while exiting zero. Require its positive completion receipt.
   assert(/Changes applied/u.test(stdout) && !/\berror:/iu.test(stdout + stderr), "Drizzle did not confirm a successful test schema application");
-  for (const migration of ["0064_studio_project_graph_v3.sql", "0077_membership_operations.sql"]) {
+  for (const migration of ["0064_studio_project_graph_v3.sql", "0077_membership_operations.sql", "0082_studio_review_policy.sql"]) {
     await pool.query(await readFile(new URL(`../apps/api/src/db/migrations/${migration}`, import.meta.url), "utf8"));
   }
   const triggers = await pool.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'studio_%'");
-  for (const required of ["studio_revision_immutable_update", "studio_revision_topology_revision", "studio_revision_topology_parent", "studio_artifact_revision_pointer_check", "studio_review_snapshot_check", "studio_review_reviewer_check", "studio_review_comment_anchor_check"]) {
+  for (const required of ["studio_revision_immutable_update", "studio_revision_topology_revision", "studio_revision_topology_parent", "studio_artifact_revision_pointer_check", "studio_review_snapshot_check", "studio_review_reviewer_check", "studio_review_comment_anchor_check", "studio_review_policy_guard_trigger", "studio_review_policy_event_guard_trigger", "studio_review_group_approval_check"]) {
     assert(triggers.rows.some((row) => row.tgname === required), `Missing database invariant: ${required}`);
   }
   console.log(`Prepared fresh review test schema with ${triggers.rows.length} Studio invariant triggers.`);

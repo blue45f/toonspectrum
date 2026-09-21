@@ -117,7 +117,7 @@ export interface ProductionPersonalInboxItem {
   readonly processKey: string;
   readonly status: string;
   readonly dueAt: string | null;
-  readonly estimateHours: number;
+  readonly estimateHours: number | null;
   readonly episodeId: string | null;
 }
 
@@ -158,7 +158,7 @@ export type ProductionClientCommand =
       readonly tasks: readonly ProductionTask[];
       readonly expectedTasks?: readonly ProductionTask[];
     }
-  | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord }
+  | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord; readonly expectedNotificationPolicy?: import("@toonspectrum/core/production").ProductionNotificationPolicy | null }
   | {
       readonly type: "apply-automation-execution";
       readonly tasks: readonly ProductionTask[];

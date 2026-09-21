@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { studioReviewTaskReferenceSchema, type StudioReviewTaskReference } from "@toonspectrum/studio-project-model";
+import { studioReviewTaskReferenceSchema, type StudioReviewTaskReference, type ReviewPolicyExpectation } from "@toonspectrum/studio-project-model";
 
 import { api } from "@/infrastructure/api";
 
@@ -274,10 +274,11 @@ const reviewDecisionSchema = z
 export async function decideStudioReview(
   reviewId: string,
   status: "changes-requested" | "approved" | "rejected" | "cancelled",
+  policyExpectation?: ReviewPolicyExpectation,
 ) {
   const body = await api.post<unknown>(
     `${BASE}/reviews/${resourceId(reviewId)}/decision`,
-    { status },
+    { status, ...(policyExpectation ? { policyExpectation } : {}) },
   );
   return reviewDecisionSchema.parse(body);
 }

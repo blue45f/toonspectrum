@@ -16,14 +16,23 @@ async function boundedResponseBody(
   response: Response,
   maximumBytes = 1_048_576,
 ): Promise<unknown> {
-  const buffer = Buffer.from(await response.arrayBuffer());
-  if (buffer.byteLength > maximumBytes) {
-    throw new ProductionExternalHttpError(
-      "external_response_too_large",
-      response.status,
-      response.status >= 500,
-    );
-  }
+  if (!response.body) return null;
+  const reader = response.body.getReader(), chunks: Uint8Array[] = []; let length = 0;
+  const declared = Number(response.headers.get("content-length") ?? 0);
+  try {
+    if (!Number.isFinite(declared) || declared < 0 || declared > maximumBytes) throw new ProductionExternalHttpError("external_response_too_large", response.status, true);
+    while (true) {
+      const part = await reader.read(); if (part.done) break;
+      length += part.value.byteLength;
+      if (length > maximumBytes) throw new ProductionExternalHttpError("external_response_too_large", response.status, true);
+      chunks.push(part.value);
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    if (error instanceof ProductionExternalHttpError) throw error;
+    throw new ProductionExternalHttpError("external_response_incomplete", response.status, true);
+  } finally { reader.releaseLock(); }
+  const buffer = Buffer.concat(chunks, length);
   if (buffer.byteLength === 0) return null;
   const text = buffer.toString("utf8");
   try {
@@ -42,7 +51,8 @@ export async function externalFetchJson<T>(
   try {
     response = await fetch(url, {
       ...init,
-      signal: AbortSignal.timeout(timeoutMs),
+      redirect: "manual",
+      signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     throw new ProductionExternalHttpError(
@@ -52,6 +62,10 @@ export async function externalFetchJson<T>(
       null,
       true,
     );
+  }
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new ProductionExternalHttpError("external_redirect_blocked", response.status, true);
   }
   const body = await boundedResponseBody(response);
   if (!response.ok) {

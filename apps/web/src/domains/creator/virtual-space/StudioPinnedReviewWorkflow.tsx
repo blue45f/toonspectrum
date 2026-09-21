@@ -1,3 +1,4 @@
+import { StudioReviewPolicyPanel } from "./StudioReviewPolicyPanel";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useSession } from "@/compat/auth-session-store";
 import { getAuthSessionRevision } from "@/compat/auth-session-state";
@@ -30,6 +31,7 @@ function PinnedReviewWorkflowForActor({ verified, onRefresh, onRevoked, actorId 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [approvalConfirmation, setApprovalConfirmation] = useState(false);
+  const [hasPolicy, setHasPolicy] = useState(false);
   const generation = useRef(0);
   const invalidate = useCallback(() => { ++generation.current; }, []);
   useLayoutEffect(() => invalidate, [invalidate]);
@@ -117,12 +119,13 @@ function PinnedReviewWorkflowForActor({ verified, onRefresh, onRevoked, actorId 
     {active && canDecide ? <div className="mt-4 space-y-2">
       <p className="text-sm text-fg-2">{bt("이 검수 버전의 검토 결과를 기록합니다. 게시·배포는 별도 작업입니다.", "Record the decision for this exact review version. Publishing and deployment are separate actions.")}</p>
       <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={() => { void run("changes-requested"); }}>{bt("수정 요청으로 기록", "Request changes")}</button>
-        <button type="button" className={buttonClass} disabled={busy || blockedApproval} onClick={() => setApprovalConfirmation(true)}>{bt("이 검수본 승인", "Approve this review snapshot")}</button></div>
+        <button type="button" className={buttonClass} disabled={busy || blockedApproval || hasPolicy} onClick={() => setApprovalConfirmation(true)}>{bt("이 검수본 승인", "Approve this review snapshot")}</button></div>
       {blockedApproval ? <p className="text-sm">{bt("필수 수정 의견을 해결해야 승인할 수 있어요.", "Resolve required notes before approving.")}</p> : null}
       {approvalConfirmation ? <div className="rounded-lg border border-line p-3"><p className="text-sm">{bt("승인 후 이 검수의 결정을 바꿀 수 없습니다. 이 버전을 승인할까요?", "The decision cannot be replaced after approval. Approve this version?")}</p>
         <div className="mt-2 flex flex-wrap gap-2"><button type="button" className={buttonClass} disabled={busy} onClick={() => { void run("approved"); }}>{bt("승인 확정", "Confirm approval")}</button><button type="button" className={buttonClass} disabled={busy} onClick={() => setApprovalConfirmation(false)}>{bt("돌아가기", "Back")}</button></div>
       </div> : null}
     </div> : null}
+    <StudioReviewPolicyPanel verified={verified} onRefresh={onRefresh} onPolicyKnown={setHasPolicy} />
     {notice ? <p role="status" className="mt-3 text-sm">{notice}</p> : null}
   </div>;
 }
