@@ -1,0 +1,26 @@
+.workspace-task-passthrough,.workspace-task-passthrough>.workspace-task-route-content{display:contents}
+.workspace-task-shell{grid-template-rows:minmax(68px,auto) minmax(0,1fr);grid-template-areas:"top top" "nav main"}
+.workspace-task-shell .workspace-topbar{min-height:68px}
+.workspace-task-breadcrumb{display:flex;align-items:center;gap:10px;min-width:0;flex:1;font-size:13px}
+.workspace-task-breadcrumb a{display:inline-flex;align-items:center;min-height:44px;color:var(--color-fg-2)}
+.workspace-task-breadcrumb span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}
+.workspace-task-breadcrumb svg{flex:none;color:var(--color-fg-2)}
+.workspace-task-content{padding:16px 24px 88px;min-width:0}
+.workspace-task-purpose{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--color-line);padding-bottom:12px;margin-bottom:18px}
+.workspace-task-purpose p{margin:0;color:var(--color-fg-2);font-size:13px;line-height:1.7;max-width:65ch}
+.workspace-task-purpose a{display:inline-flex;align-items:center;gap:6px;min-height:44px;flex:none;font-size:13px;color:var(--color-accent)}
+.workspace-task-route-content{min-width:0;min-height:0}
+.workspace-task-shell :is(input,textarea):focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
+.workspace-task-shell .workspace-main :is(a,button,input,select,textarea){scroll-margin-block:20px 100px}
+@media(max-width:760px){
+ .workspace-task-shell{height:auto;padding-bottom:calc(136px + env(safe-area-inset-bottom))}
+ .workspace-task-shell .workspace-topbar{min-height:72px;gap:6px;padding:10px 14px}
+ .workspace-task-shell .workspace-brand{flex:1}
+ .workspace-task-breadcrumb{order:3;flex-basis:100%;font-size:12px;border-top:1px solid var(--color-line);margin-top:5px}
+ .workspace-task-breadcrumb a{min-height:36px}
+ .workspace-task-content{padding:12px 12px 24px;overflow:visible}
+ .workspace-task-purpose{align-items:flex-start;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+ .workspace-task-purpose p{font-size:12px;flex:1 1 190px}
+ .workspace-task-purpose a{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){.workspace-task-shell *{scroll-behavior:auto!important}}

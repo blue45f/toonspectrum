@@ -146,8 +146,11 @@ export function StudioAssetHubPage() {
         </Container>
       </div>
 
-      {view === "overview" ? <StudioAssetVisualIntro locale={legacyLocale} /> : null}
       {view === "overview" ? <StudioAssetsPage /> : null}
+      {view === "overview" ? <details className="mx-4 mb-6 rounded-xl border border-line sm:mx-6">
+        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{bt("소재 선택 가이드와 활용 예시", "Material selection guide and examples")}</summary>
+        <StudioAssetVisualIntro locale={legacyLocale} />
+      </details> : null}
       {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{bt("제작 소재 준비 중…", "Loading creator essentials…")}</p>}><CreatorEssentialsPage /></Suspense> : null}
       {view === "series-kit" && projectId ? (
         <Container size="wide" className="py-7 sm:py-10">

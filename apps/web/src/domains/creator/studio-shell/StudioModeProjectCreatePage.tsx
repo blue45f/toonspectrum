@@ -52,7 +52,6 @@ import { StudioModeWorkspacePreview } from "./StudioModeWorkspacePreview";
 import {
   DisabledReason,
   StudioTaskFlow,
-  StudioTaskSummary,
   type StudioTaskFlowStep,
 } from "./StudioTaskFlow";
 
@@ -269,18 +268,18 @@ export function StudioModeProjectCreatePage() {
 
   return (
     <div data-route-ready="studio-new" data-studio-mode-create="true" className="min-h-[calc(100vh-4rem)] bg-bg">
-      <Container size="wide" className="py-7 sm:py-12">
+      <Container size="wide" className="py-3 sm:py-4">
         <div className="mx-auto max-w-6xl">
           <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="flex items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">
+              <p className="hidden items-center gap-2 text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent sm:flex">
                 <Sparkles size={14} aria-hidden="true" /> TOONSTUDIO CREATE
               </p>
-              <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
-                {bt("무엇을 만들지 고르면 작업공간도 바뀝니다", "Choose what to make — the workspace changes with it")}
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-fg">
+                {bt("무엇을 만들까요?", "What will you create?")}
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
-                {bt("작업 종류와 시작 형식만 고르면 됩니다. 시작하는 즉시 이 기기에 복구 저장되며, 종류마다 패널·도구·AI 추천·제작 흐름과 내보내기 목표가 달라집니다.", "Choose the work type and starting format. Recovery storage begins on this device immediately, and each mode adapts panels, tools, AI, workflow and delivery.")}
+                {bt("종류·이름·시작 형식을 고르면 필요한 도구가 준비됩니다.", "Choose a type, name and format. The workspace opens after your document is created and stored.")}
               </p>
             </div>
             <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>
@@ -288,18 +287,20 @@ export function StudioModeProjectCreatePage() {
             </Link>
           </header>
 
-          <StudioTaskFlow
-            steps={steps}
-            ariaLabel={bt("새 프로젝트 시작 단계", "New project start steps")}
-            className="mt-5"
-          />
-
-          <section className="mt-7" aria-labelledby="studio-mode-kind-title">
+          <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <section className="min-w-0" aria-labelledby="studio-mode-kind-title">
             <p className="text-xs font-black text-accent">01</p>
             <h2 id="studio-mode-kind-title" className="mt-1 text-lg font-black text-fg">
               {bt("만들 작업", "What are you making?")}
             </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className="mt-3 block text-xs font-semibold text-fg-2 sm:hidden">
+              {bt("만들 작업 선택", "Choose work type")}
+              <select value={kind} className="mt-1 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-base text-fg"
+                onChange={(event) => { const option = STUDIO_PROJECT_CREATE_KINDS.find((item) => item.id === event.target.value); if (option) chooseKind(option); }}>
+                {STUDIO_PROJECT_CREATE_KINDS.map((option) => <option key={option.id} value={option.id}>{localized(option, bt)}</option>)}
+              </select>
+            </label>
+            <div className="mt-3 hidden grid-cols-2 gap-3 sm:grid">
               {visibleKinds.map((option) => {
                 const active = option.id === kind;
                 const Icon = KIND_ICONS[option.id];
@@ -310,14 +311,14 @@ export function StudioModeProjectCreatePage() {
                     aria-pressed={active}
                     onClick={() => chooseKind(option)}
                     className={cn(
-                      "min-h-36 rounded-2xl border p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+                      "min-h-28 rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
                       active ? "border-accent bg-accent-soft/50 shadow-sm" : "border-line bg-card hover:bg-raised",
                     )}
                   >
-                    <span className={cn("grid size-10 place-items-center rounded-xl", active ? "bg-accent text-on-accent" : "bg-panel text-fg-2")}>
+                    <span className={cn("grid size-8 place-items-center rounded-xl", active ? "bg-accent text-on-accent" : "bg-panel text-fg-2")}>
                       <Icon size={19} aria-hidden="true" />
                     </span>
-                    <b className="mt-3 block text-sm text-fg">{localized(option, bt)}</b>
+                    <b className="mt-2 block text-sm text-fg">{localized(option, bt)}</b>
                     <span className="mt-1 block text-xs leading-5 text-fg-3">
                       {bt(option.descriptionKo, option.descriptionEn)}
                     </span>
@@ -326,13 +327,76 @@ export function StudioModeProjectCreatePage() {
               })}
             </div>
             {!showMoreKinds ? (
-              <button type="button" onClick={() => setShowMoreKinds(true)} className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2" })}>
+              <button type="button" onClick={() => setShowMoreKinds(true)} className={buttonClass({ variant: "quiet", size: "sm", className: "mt-2 hidden sm:inline-flex" })}>
                 {bt("다른 작업 종류 보기", "Show more project types")}
               </button>
             ) : null}
           </section>
 
-          <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]">
+            <div className="min-w-0 rounded-xl border border-line bg-card p-4 sm:p-5">
+              <p className="text-xs font-black text-accent">02</p>
+              <h2 className="mt-1 text-lg font-black text-fg">{bt("시작 형식", "Starting format")}</h2>
+              <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-project-title">
+                {bt("프로젝트 이름", "Project name")}
+                <input
+                  id="studio-mode-project-title"
+                  value={title}
+                  maxLength={120}
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    setTitleEdited(true);
+                  }}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
+                />
+              </label>
+              <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-template">
+                {bt("시작 템플릿", "Starting template")}
+                <select
+                  id="studio-mode-template"
+                  value={selectedTemplate.id}
+                  onChange={(event) => setTemplateId(event.target.value)}
+                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
+                >
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {bt(template.labelKo, template.labelEn)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <p className="mt-4 text-xs leading-relaxed text-fg-2">
+                {bt("시작하면 이 기기에 저장합니다. 팀 공유와 클라우드 백업은 별도로 연결하세요.", "Starting saves to this device. Team sharing and cloud backup are separate.")}
+              </p>
+
+              <DisabledReason id={CREATE_DISABLED_REASON_ID} visible={!titleReady} className="mt-3">
+                {bt("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", "Enter a project name to start an autosaved workspace.")}
+              </DisabledReason>
+
+              <button
+                type="button"
+                disabled={creating || !titleReady}
+                aria-describedby={!titleReady ? CREATE_DISABLED_REASON_ID : undefined}
+                onClick={create}
+                className={buttonClass({ variant: "solid", size: "lg", className: "mt-5 min-h-12 w-full gap-2" })}
+              >
+                {creating ? (bt("작업공간 만드는 중…", "Creating workspace…")) : startLabel}
+                {!creating ? <ArrowRight size={16} aria-hidden="true" /> : null}
+              </button>
+              <p className="mt-2 text-center text-[0.68rem] leading-5 text-fg-3">
+                {bt("그리는 동안 이 기기에 자동 저장됩니다. 저장 위치는 작업 중 언제든 연결할 수 있습니다.", "Your work is autosaved on this device while you draw. You can connect another save destination later.")}
+              </p>
+              {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
+            </div>
+          </div>
+          <details className="mt-6 rounded-xl border border-line p-4" open={structuredWebtoon || undefined}>
+            <summary className="min-h-11 cursor-pointer content-center text-sm font-semibold">{bt("제작 흐름과 고급 시작 설정", "Workflow and advanced setup")}</summary>
+          <StudioTaskFlow
+            steps={steps}
+            ariaLabel={bt("새 프로젝트 시작 단계", "New project start steps")}
+            className="mt-5"
+          />
+
             <div className="min-w-0 space-y-4">
               <StudioModeWorkspacePreview profile={modePlan.profile} locale={locale === "ko" ? "ko" : "en"} />
 
@@ -407,75 +471,7 @@ export function StudioModeProjectCreatePage() {
               ) : null}
             </div>
 
-            <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
-              <p className="text-xs font-black text-accent">02</p>
-              <h2 className="mt-1 text-lg font-black text-fg">{bt("시작 형식", "Starting format")}</h2>
-              <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-project-title">
-                {bt("프로젝트 이름", "Project name")}
-                <input
-                  id="studio-mode-project-title"
-                  value={title}
-                  maxLength={120}
-                  onChange={(event) => {
-                    setTitle(event.target.value);
-                    setTitleEdited(true);
-                  }}
-                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
-                />
-              </label>
-              <label className="mt-4 block text-xs font-bold text-fg-2" htmlFor="studio-mode-template">
-                {bt("시작 템플릿", "Starting template")}
-                <select
-                  id="studio-mode-template"
-                  value={selectedTemplate.id}
-                  onChange={(event) => setTemplateId(event.target.value)}
-                  className="mt-2 min-h-11 w-full rounded-xl border border-line bg-panel px-3 text-sm font-bold text-fg outline-none focus:border-accent"
-                >
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {bt(template.labelKo, template.labelEn)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <StudioTaskSummary
-                eyebrow={bt("선택한 시작 설정", "Selected setup")}
-                title={title.trim() || (bt("프로젝트 이름 없음", "Untitled project"))}
-                description={`${modeName} · ${selectedTemplateLabel}`}
-                className="mt-4"
-                meta={(
-                  <>
-                    <span className="rounded-full border border-good/30 bg-good/10 px-2 py-1 text-[0.65rem] font-bold text-fg-2">
-                      {bt("이 기기에 저장됨", "Saved on this device")}
-                    </span>
-                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-bold text-fg-3">
-                      {modePlan.document.workspace} · {modePlan.document.width} × {modePlan.document.height}
-                    </span>
-                  </>
-                )}
-              />
-
-              <DisabledReason id={CREATE_DISABLED_REASON_ID} visible={!titleReady} className="mt-3">
-                {bt("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", "Enter a project name to start an autosaved workspace.")}
-              </DisabledReason>
-
-              <button
-                type="button"
-                disabled={creating || !titleReady}
-                aria-describedby={!titleReady ? CREATE_DISABLED_REASON_ID : undefined}
-                onClick={create}
-                className={buttonClass({ variant: "solid", size: "lg", className: "mt-5 min-h-12 w-full gap-2" })}
-              >
-                {creating ? (bt("작업공간 만드는 중…", "Creating workspace…")) : startLabel}
-                {!creating ? <ArrowRight size={16} aria-hidden="true" /> : null}
-              </button>
-              <p className="mt-2 text-center text-[0.68rem] leading-5 text-fg-3">
-                {bt("그리는 동안 이 기기에 자동 저장됩니다. 저장 위치는 작업 중 언제든 연결할 수 있습니다.", "Your work is autosaved on this device while you draw. You can connect another save destination later.")}
-              </p>
-              {error ? <p role="alert" className="mt-3 text-sm text-danger">{error}</p> : null}
-            </div>
-          </section>
+          </details>
         </div>
       </Container>
     </div>

@@ -150,10 +150,10 @@ describe("route visual boundary", () => {
   });
 
   it.each([
-    ["/studio/new", "create"],
-    ["/studio/p/demo/production", "production"],
-    ["/studio/manual/getting-started", "learn"],
-  ] as const)("explains non-editor Studio route %s", async (path, kind) => {
+    ["/studio/new", "create", false],
+    ["/studio/p/demo/production", "production", false],
+    ["/studio/manual/getting-started", "learn", true],
+  ] as const)("keeps metadata and respects compact task ownership at %s", async (path, kind, guided) => {
     const result = render(
       <MemoryRouter initialEntries={[path]}>
         <SiteRouteExperienceBoundary routeTitle="스튜디오 안내">
@@ -162,7 +162,10 @@ describe("route visual boundary", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(result.container.querySelector(`[data-route-visual-kind="${kind}"]`)).not.toBeNull();
+      expect(document.documentElement.dataset.routeVisualKind).toBe(kind);
+      expect(document.documentElement.dataset.routePurposeScene).toBe(String(guided));
+      expect(Boolean(result.container.querySelector(`[data-route-visual-kind="${kind}"]`))).toBe(guided);
+      expect(screen.getByText("스튜디오 내용")).not.toBeNull();
     });
   });
 });
