@@ -15,6 +15,7 @@ type EffectCleanup = (() => void) | undefined;
 type HookSlot =
   | { kind: "state"; value: unknown }
   | { kind: "ref"; value: { current: unknown } }
+  | { kind: "callback"; value: unknown; dependencies: readonly unknown[] }
   | {
       kind: "effect";
       dependencies: readonly unknown[] | undefined;
@@ -112,6 +113,15 @@ const hooks = vi.hoisted(() => {
     return slot.value as { current: T };
   }
 
+  function useCallback<T>(callback: T, dependencies: readonly unknown[]): T {
+    const index = cursor++;
+    const existing = slots[index];
+    if (existing && existing.kind !== "callback") throw new Error(`Hook ${index} changed kind.`);
+    if (existing && equalDependencies(existing.dependencies, dependencies)) return existing.value as T;
+    slots[index] = { kind: "callback", value: callback, dependencies };
+    return callback;
+  }
+
   function useEffect(
     effect: () => void | (() => void),
     dependencies?: readonly unknown[]
@@ -168,7 +178,7 @@ const hooks = vi.hoisted(() => {
     unmount();
   }
 
-  return { render, reset, unmount, useEffect, useRef, useState };
+  return { render, reset, unmount, useCallback, useEffect, useRef, useState };
 });
 
 const rooms = vi.hoisted(() => ({ instances: [] as RoomRecord[] }));
@@ -216,6 +226,7 @@ vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
     ...actual,
+    useCallback: hooks.useCallback,
     useEffect: hooks.useEffect,
     useRef: hooks.useRef,
     useState: hooks.useState,
@@ -546,6 +557,55 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
   afterEach(() => {
     hooks.reset();
     vi.unstubAllGlobals();
+  });
+
+  it("automatically recreates a failed server generation and stops retrying once connected", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("navigator", { onLine: true });
+    vi.stubGlobal("window", new EventTarget());
+    vi.stubGlobal("document", Object.assign(new EventTarget(), { visibilityState: "visible" }));
+    lifecycle.roomStart = "reject";
+    const options = { serverRequired: true };
+    try {
+      const failed = await renderProvider(options);
+      expect(failed.room).toBeNull();
+      expect(failed.availability).toBe("error");
+      expect(failed.connectionRecovery).toBe("waiting");
+      expect(rooms.instances).toHaveLength(1);
+      lifecycle.roomStart = "resolve";
+      await vi.advanceTimersByTimeAsync(2_000);
+      const connected = await renderProvider(options);
+      expect(rooms.instances).toHaveLength(2);
+      expect(rooms.instances[0]?.closeCount).toBe(1);
+      expect(connected.room?.ready).toBe(true);
+      expect(connected.connectionRecovery).toBe("idle");
+      await vi.advanceTimersByTimeAsync(60_000);
+      await renderProvider(options);
+      expect(rooms.instances).toHaveLength(2);
+    } finally { hooks.unmount(); vi.useRealTimers(); }
+  });
+
+  it("does not reset the retry budget when a ready socket fails initial document sync", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("navigator", { onLine: true });
+    vi.stubGlobal("window", new EventTarget());
+    vi.stubGlobal("document", Object.assign(new EventTarget(), { visibilityState: "visible" }));
+    lifecycle.roomStart = "resolve"; lifecycle.bindingStart = "reject";
+    const options = { serverRequired: true };
+    try {
+      let failed = await renderProvider(options);
+      for (const delay of [2000, 5000, 10000]) {
+        expect(failed.availability).toBe("error");
+        expect(failed.connectionRecovery).toBe("waiting");
+        await vi.advanceTimersByTimeAsync(delay);
+        failed = await renderProvider(options);
+      }
+      expect(failed.connectionRecovery).toBe("exhausted");
+      expect(rooms.instances).toHaveLength(4);
+      await vi.advanceTimersByTimeAsync(60000);
+      await renderProvider(options);
+      expect(rooms.instances).toHaveLength(4);
+    } finally { hooks.unmount(); vi.useRealTimers(); }
   });
 
   it("closes the previous room when the work or authorized participant changes", async () => {

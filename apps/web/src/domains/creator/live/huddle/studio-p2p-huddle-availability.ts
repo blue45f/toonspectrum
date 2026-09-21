@@ -7,7 +7,7 @@ export type StudioHuddleAvailability =
   | "connecting" | "connection-error" | "server-unavailable" | "direct-unavailable";
 
 type HuddleLiveState = Pick<StudioLiveCollaborationContextValue,
-  "room" | "mode" | "availability" | "canChat" | "usingLocalFallback" | "sync" | "recovery">;
+  "room" | "mode" | "availability" | "canChat" | "serverAvailable" | "usingLocalFallback" | "sync" | "recovery">;
 
 /** No peer connection construction or device permission request during capability checks. */
 export function resolveStudioHuddleAvailability(
@@ -23,6 +23,7 @@ export function resolveStudioHuddleAvailability(
   if (typeof globalThis.RTCPeerConnection !== "function") return "webrtc-unsupported";
   const mode = live.room?.mode ?? live.mode;
   if (mode === "local" || live.usingLocalFallback) return "local-only";
+  if (!live.room && !live.serverAvailable) return "server-unavailable";
   if (!live.room?.ready) return live.availability === "error" ? "connection-error" : "connecting";
   if (mode !== "server") return "server-unavailable";
   if (!direct) return "direct-unavailable";
@@ -34,19 +35,19 @@ export function canRetryStudioHuddleConnection(
   availability: StudioHuddleAvailability,
   serverAvailable: boolean,
 ): boolean {
-  return serverAvailable && (availability === "local-only" || availability === "connection-error"
-    || availability === "server-unavailable" || availability === "direct-unavailable");
+  // Service configuration cannot be repaired by asking users to reconnect.
+  return serverAvailable && availability === "connection-error";
 }
 
 export const STUDIO_HUDDLE_AVAILABILITY_COPY: Record<Exclude<StudioHuddleAvailability, "ready">, readonly [string, string]> = {
-  "access-denied": ["공동작업 참여 권한이 없거나 해제되었습니다. 작업실 접근 권한을 확인해 주세요.", "Collaboration access is missing or revoked. Check your workspace permissions."],
-  "recovery-required": ["원고 복구가 필요해 참여를 중지했습니다. 복구를 완료한 뒤 다시 참여해 주세요.", "Participation is paused while manuscript recovery is required. Complete recovery before rejoining."],
-  "session-unavailable": ["이 공동작업 세션은 원격 연결을 지원하지 않습니다. 서버에 연결된 공동작업 원고를 열어 주세요.", "This session does not support remote connections. Open a server-connected collaborative manuscript."],
-  "insecure-context": ["보안 연결이 필요합니다. HTTPS 주소 또는 localhost에서 작업실을 열어 주세요.", "A secure connection is required. Open the workspace over HTTPS or on localhost."],
-  "webrtc-unsupported": ["현재 브라우저에서 WebRTC를 사용할 수 없습니다. WebRTC가 활성화된 브라우저에서 같은 작업실을 열어 주세요.", "WebRTC is unavailable in this browser. Open the same workspace in a browser with WebRTC enabled."],
-  "local-only": ["현재는 이 브라우저의 로컬 탭만 연결되어 있습니다. WebRTC는 지원하지만 원격 대화를 위한 공동작업 서버 연결이 필요합니다.", "Only local browser tabs are connected. WebRTC is supported, but remote conversations require a collaboration server connection."],
-  "connecting": ["공동작업 서버 연결과 참여 승인을 확인하고 있습니다. 연결되면 참여 버튼이 활성화됩니다.", "Checking the collaboration connection and admission. Participation becomes available once connected."],
-  "connection-error": ["공동작업 서버에 연결하지 못했습니다. 네트워크와 로그인 상태를 확인한 뒤 연결을 다시 확인해 주세요.", "The collaboration server is disconnected. Check your network and sign-in, then check the connection again."],
-  "server-unavailable": ["원격 공동작업 연결이 준비되지 않았습니다. 서버에 연결된 작업실에서 참여해 주세요.", "Remote collaboration is not ready. Join from a server-connected workspace."],
-  "direct-unavailable": ["WebRTC는 지원하지만 이 작업실의 P2P 연결 기능이 준비되지 않았습니다. 연결을 다시 확인하고, 계속되면 P2P 운영 설정을 확인해 주세요.", "WebRTC is supported, but this workspace's P2P connection is unavailable. Recheck the connection and, if it persists, the P2P deployment configuration."],
+  "access-denied": ["이 작업실의 대화 참여 권한이 없습니다. 작업실 소유자에게 초대를 요청해 주세요.", "You do not have access to this conversation. Ask the workspace owner for an invitation."],
+  "recovery-required": ["원고 복구가 끝날 때까지 대화 참여를 일시 중지했습니다.", "Conversation participation is paused until manuscript recovery is complete."],
+  "session-unavailable": ["이 작업실에서는 아직 채팅·통화를 사용할 수 없습니다.", "Chat and calls are not available in this workspace yet."],
+  "insecure-context": ["현재 주소에서는 보안상 통화를 사용할 수 없습니다. 서비스의 HTTPS 주소로 접속해 주세요.", "Calls are unavailable at this address for security reasons. Open the service over HTTPS."],
+  "webrtc-unsupported": ["현재 브라우저는 실시간 대화를 지원하지 않습니다. 지원되는 최신 브라우저로 접속해 주세요.", "This browser does not support live conversations. Open the service in a supported, up-to-date browser."],
+  "local-only": ["이 작업실은 현재 기기 내 작업만 지원합니다. 채팅·통화를 제공하려면 서비스의 연결 준비가 필요합니다. 사용자 설정은 필요하지 않습니다.", "This workspace currently supports on-device work only. Chat and calls require service-side connection setup; no user configuration is needed."],
+  "connecting": ["채팅·통화에 연결 중입니다. 연결되면 참여할 수 있습니다.", "Connecting chat and calls. You can join once connected."],
+  "connection-error": ["채팅·통화에 일시적으로 연결하지 못했습니다. 연결이 복구되면 참여할 수 있습니다.", "Chat and calls are temporarily disconnected. You can join once the connection is restored."],
+  "server-unavailable": ["채팅·통화 서비스를 아직 사용할 수 없습니다. 연결 준비는 서비스에서 처리합니다.", "Chat and calls are not available yet. Connection setup is handled by the service."],
+  "direct-unavailable": ["이 작업실의 채팅·통화 연결을 아직 사용할 수 없습니다. 사용자 설정은 필요하지 않습니다.", "Chat and calls are not available in this workspace yet. No user configuration is needed."],
 };
