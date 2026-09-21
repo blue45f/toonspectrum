@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import { readStudioWorldAuthoringDraftRecord } from "../../src/domains/creator/virtual-space/studio-virtual-space-world-authoring";
 import { validateStudioWorldManifest, type StudioVirtualSpaceWorldManifest as World } from "../../src/domains/creator/virtual-space/studio-virtual-space-world-manifest";
-import { StudioVirtualSpaceWorldAuthoringPanel } from "../../src/domains/creator/virtual-space/StudioVirtualSpaceWorldAuthoringPanel";
+import { StudioWorldAuthoringEntry } from "../../src/domains/creator/virtual-space/StudioWorldAuthoringEntry";
 import { useStudioWorldRuleGate } from "../../src/domains/creator/virtual-space/StudioWorldRuleGate";
 
 import type { StudioVirtualSpaceActivity } from "../../src/domains/creator/virtual-space/studio-virtual-space-model";
@@ -20,7 +21,7 @@ function initial(): World { return { id: "authoring-fixture", version: 1, width:
   spawns: [{ id: "entry", point: { x: 30, y: 30 } }], colliders: [], portals: [], npcs: [],
   interactions: [{ id: "tool", zoneId: "lounge", point: { x: 80, y: 320 }, radius: 40, action: "review", labelKo: "시험 검수 도구", labelEn: "Fixture review tool" }] }; }
 function Fixture() {
-  const [world, setWorld] = useState(initial), [changes, setChanges] = useState(0), [disabled, setDisabled] = useState(false);
+  const [world, setWorld] = useState(() => readStudioWorldAuthoringDraftRecord("world-authoring-fixture")?.manifest ?? initial()), [changes, setChanges] = useState(0), [disabled, setDisabled] = useState(false);
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available"), [actions, setActions] = useState<string[]>([]);
   const activate = useCallback((action: string) => setActions((current) => [...current, action]), []);
   const gate = useStudioWorldRuleGate(world, activity, activate);
@@ -33,7 +34,7 @@ function Fixture() {
       <label className="text-sm">시험 작업 상태 <select aria-label="시험 작업 상태" className="min-h-11 rounded-lg border bg-card px-3" value={activity} onChange={(event) => setActivity(event.target.value as StudioVirtualSpaceActivity)}><option value="available">작업 가능</option><option value="focused">집중</option></select></label>
       <button className="min-h-11 rounded-lg border px-3" onClick={() => { const tool = world.interactions.find((entry) => entry.id === "tool"); if (tool) gate.request(tool); }}>시험 도구 사용</button>
     </div>{gate.element}
-    <StudioVirtualSpaceWorldAuthoringPanel projectId="world-authoring-fixture" manifest={world} basePublishedRevisionId="fixed-test-revision" disabled={disabled}
+    <StudioWorldAuthoringEntry projectId="world-authoring-fixture" manifest={world} basePublishedRevisionId="fixed-test-revision" disabled={disabled}
       onChange={(next) => { setWorld(next); setChanges((value) => value + 1); }} onReset={() => setWorld(initial())} />
     <output data-authoring-changes={changes} data-action-count={actions.length} data-validation-errors={validateStudioWorldManifest(world).length}
       className="block rounded-lg border border-line p-3 text-sm">편집 횟수 {changes} · 도구 실행 {actions.length}</output>

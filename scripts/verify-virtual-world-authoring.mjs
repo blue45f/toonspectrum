@@ -112,4 +112,31 @@ try {
     } catch (error) { await page.screenshot({ path: `${output}/failed-${width}.png`, fullPage: true }).catch(() => {}); results.push({ width, status: "failed", error: String(error), errors }); throw error; }
     finally { await context.close(); }
   }
+  // Real network failure, not a mocked lazy Promise: the browser may cache failed modules.
+  const recovery = await browser.newContext({ viewport: { width: 390, height: 1000 }, locale: "ko-KR" });
+  let moduleRequests = 0;
+  const writes = [];
+  try {
+    await recovery.route("**/src/domains/creator/virtual-space/StudioVirtualSpaceWorldAuthoringPanel.tsx*", (route) => {
+      moduleRequests += 1; return moduleRequests === 1 ? route.abort("failed") : route.continue();
+    });
+    await recovery.route("**/api/**", (route) => {
+      if (!["GET", "HEAD", "OPTIONS"].includes(route.request().method())) writes.push(route.request().method());
+      return route.fulfill({ status: 403, json: { error: "fixture API disabled" } });
+    });
+    const page = await recovery.newPage(); page.setDefaultTimeout(20000);
+    await page.goto(`${origin}/tools/browser-harnesses/virtual-world-authoring.html`);
+    await expect(page.getByRole("alert")).toContainText("초안은 그대로 유지됩니다");
+    const before = await page.locator("#world-state").textContent();
+    const navigation = page.waitForNavigation({ waitUntil: "load" });
+    await page.getByRole("button", { name: "공간 초안 저장 후 페이지 새로고침", exact: true }).click();
+    await navigation;
+    await expect(page.getByRole("heading", { name: "Virtual Studio 월드 편집", exact: true })).toBeVisible();
+    assert.equal(await page.locator("#world-state").textContent(), before);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("toonspectrum:virtual-studio-world-draft:v1:world-authoring-fixture")));
+    assert.equal(saved.basePublishedRevisionId, "fixed-test-revision"); assert.deepEqual(saved.manifest, JSON.parse(before));
+    assert(moduleRequests >= 2); assert.deepEqual(writes, []);
+    results.push({ name: "module-failure-safe-reload", status: "passed", failuresInjected: 1, moduleRequests, exactDraftRestored: true });
+    console.log("PASS module network failure with verified draft reload");
+  } finally { await recovery.close(); }
 } finally { await browser.close(); await writeFile(`${output}/report.json`, JSON.stringify({ origin, results, boundary: "Actual UI/asset bytes/local draft; synthetic world, no real account/server publication/WAN" }, null, 2)); }

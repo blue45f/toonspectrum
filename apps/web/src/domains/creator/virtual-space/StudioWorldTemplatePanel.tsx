@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
-import type { StudioWorldTemplatePackage } from "@toonspectrum/studio-project-model/world-publication";
+import type { StudioWorldTemplatePackage } from "./studio-world-template-contract";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { createStudioWorldStarterTemplate, createStudioWorldTemplatePackage, parseStudioWorldTemplatePackage, pinStudioWorldAssets,
