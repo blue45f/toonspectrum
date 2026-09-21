@@ -330,6 +330,14 @@ function renderNodes(ctx: RenderContext, nodes: SceneNodeIR[]): void {
   }
 }
 
+/** Records into an existing GPU canvas or SkPicture without clearing its backdrop. */
+export function renderSceneNodesToCanvas(
+  ck: CanvasKit, canvas: Canvas, nodes: readonly SceneNodeIR[], options: RenderOptions = {},
+): void {
+  const ctx: RenderContext = { ck, canvas, options, typeface: null };
+  try { renderNodes(ctx, [...nodes]); } finally { ctx.typeface?.delete(); }
+}
+
 export function renderSceneToCanvas(
   ck: CanvasKit,
   canvas: Canvas,

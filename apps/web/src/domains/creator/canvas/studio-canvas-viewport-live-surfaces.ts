@@ -1,3 +1,5 @@
+import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "@toonspectrum/studio-engine-skia";
+import { isStudioSkiaDocumentElement } from "../render/studio-skia-document-plan";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
@@ -65,6 +67,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     canvasScrollViewport,
     collaborationDocumentUnavailable,
     drawingRef,
+    drawMode,
     effScale,
     elements,
     frameAnimOpen,
@@ -529,11 +532,9 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     [groups, localHiddenElementIds, studioLiveGesturePreviewRenderPlan.elements],
   );
   const velloEligibleDocumentIds = useMemo(
-    () => documentIdsOwnedByVectorIslands(lowerStudioElementsToRenderScene(velloDocumentElements, {
-      width: CANVAS_W,
-      height: canvasH,
-    })),
-    [canvasH, velloDocumentElements],
+    () => velloDocumentElements.filter((element) => !element.hidden && (element.opacity ?? 1) > 0
+      && isStudioSkiaDocumentElement(element)).map((element) => element.id),
+    [velloDocumentElements],
   );
   const velloSurfaceDpr = Math.max(1, stageDevicePixelRatio);
   const velloBackingWidth = Math.ceil(stageViewLayout.width * velloSurfaceDpr);
@@ -541,10 +542,10 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
   const velloSurfaceSizeAdmitted =
     stageViewLayout.width > 0
     && stageViewLayout.height > 0
-    && velloBackingWidth <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingDimension
-    && velloBackingHeight <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingDimension
+    && velloBackingWidth <= SKIA_DOCUMENT_MAX_BACKING_DIMENSION
+    && velloBackingHeight <= SKIA_DOCUMENT_MAX_BACKING_DIMENSION
     && velloBackingWidth * velloBackingHeight
-      <= STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.maxBackingPixelArea;
+      <= SKIA_DOCUMENT_MAX_BACKING_PIXELS;
   const velloHasExactPaintProjection =
     !isExporting
     && !saving
@@ -567,16 +568,14 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && studioLiveGesturePreviewRenderPlan.authoritativeHandoffToken === "[]";
   const velloDocumentSurfaceEnabled =
     velloHubCapability.enabled
-    && stageViewClip === null
+    // The Skia surface lives in Stage-local coordinates and re-presents on scroll/clip changes.
     && velloSurfaceSizeAdmitted
     && velloHasExactPaintProjection
-    && tool === "select"
+    && (tool === "select" || (tool === "draw" && drawMode !== "eraser"))
     && selectedId === null
     && marqueeIds.length === 0
-    && studioDocumentAllowsKonvaHide(
-      velloDocumentElements,
-      velloEligibleDocumentIds,
-    );
+    && velloEligibleDocumentIds.length > 0
+    && velloDocumentElements.every((element) => element.hidden || (element.opacity ?? 1) <= 0 || isStudioSkiaDocumentElement(element));
   const velloSceneRevision = useMemo(
     () => Object.freeze({
       pageId: activePage.id,

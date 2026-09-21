@@ -1,6 +1,7 @@
-import { Suspense } from "react";
+import type { StudioSkiaCameraSource } from "../render/studio-skia-camera-source";
+import { Suspense, useState } from "react";
 
-import { StudioRenderSurface } from "../render/StudioRenderSurface";
+import { StudioSkiaDocumentSurface } from "../render/StudioSkiaDocumentSurface";
 import { CANVAS_W } from "../studio-assets";
 import {
   StudioCanonicalVNextDryMediaCanvas,
@@ -22,6 +23,8 @@ import type {
 } from "./StudioCanvasViewportTypes";
 
 export interface StudioCanvasViewportDomOverlaysProps {
+  skiaCameraSource: StudioSkiaCameraSource;
+  beforeSkiaPublish: (signal: AbortSignal) => Promise<void>;
   acceleratedSceneSelectedIds: StudioCanvasViewportLiveSurfaces["acceleratedSceneSelectedIds"];
   canonicalDryMediaCanvasVisible: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCanvasVisible"];
   canonicalDryMediaCandidate: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCandidate"];
@@ -65,6 +68,8 @@ export interface StudioCanvasViewportDomOverlaysProps {
 }
 
 export function StudioCanvasViewportDomOverlays({
+  beforeSkiaPublish,
+  skiaCameraSource,
   acceleratedSceneSelectedIds,
   canonicalDryMediaCanvasVisible,
   canonicalDryMediaCandidate,
@@ -106,6 +111,7 @@ export function StudioCanvasViewportDomOverlays({
   webGpuPreviewStrokes,
   webGpuViewportSurface,
 }: StudioCanvasViewportDomOverlaysProps) {
+  const [rendererAttempt, setRendererAttempt] = useState(0);
   return (
     <>
           <Suspense fallback={null}>
@@ -194,7 +200,11 @@ export function StudioCanvasViewportDomOverlays({
               />
             ) : null}
           </Suspense>
-          <StudioRenderSurface
+          <StudioSkiaDocumentSurface
+            key={rendererAttempt}
+            beforePublish={beforeSkiaPublish}
+            cameraSource={skiaCameraSource}
+            visible={velloHubAuthority.status === "active" && velloHubAuthority.sceneRevision === velloSceneRevision}
             enabled={velloDocumentSurfaceEnabled}
             mountParent={pixiMountParent}
             width={stageViewLayout.width}
@@ -214,11 +224,14 @@ export function StudioCanvasViewportDomOverlays({
               aria-live="assertive"
               aria-atomic="true"
               data-studio-vello-unavailable="true"
-              className="pointer-events-none absolute inset-x-4 top-4 z-[30] rounded-md border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm font-medium text-red-50 shadow-lg"
+              className="absolute inset-x-4 top-4 z-[30] rounded-md border border-red-400/50 bg-red-950/90 px-4 py-3 text-sm font-medium text-red-50 shadow-lg"
             >
+              <strong className="block">GPU 문서 표시를 준비하지 못했습니다.</strong>
               {velloHubAuthority.visibleCanvasCount === 1
-                ? "Vello 렌더러를 계속 사용할 수 없어 마지막 정확 프레임을 유지했습니다. 다른 렌더러로 자동 전환하지 않았습니다."
-                : "Vello 렌더러를 사용할 수 없어 가속 문서 표면으로 전환하지 않았습니다. 같은 작업을 다른 엔진으로 재실행하지 않았습니다."}
+                ? "GPU 문서 렌더러를 계속 사용할 수 없어 마지막 정확 프레임을 유지했습니다. 다른 렌더러로 자동 전환하지 않았습니다."
+                : "GPU 문서 렌더러를 사용할 수 없어 가속 문서 표면으로 전환하지 않았습니다. 같은 작업을 다른 엔진으로 재실행하지 않았습니다."}
+              <button type="button" className="mt-2 min-h-11 rounded-md border border-current px-3 focus-visible:outline focus-visible:outline-2"
+                onClick={() => setRendererAttempt((value) => value + 1)}>같은 GPU 엔진 다시 준비</button>
             </div>
           ) : null}
           <StudioPixiSceneOverlayHost
