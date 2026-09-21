@@ -23,7 +23,7 @@ export class StudioReviewPolicyRepository {
       const value = await action(client, review); await client.query("COMMIT"); return value;
     } catch (error) {
       await client.query("ROLLBACK");
-      if (error && typeof error === "object" && "code" in error && error.code === "42P01") throw new StudioReviewPolicyError("unavailable");
+      if (error && typeof error === "object" && "code" in error && ["42P01", "42703", "42883"].includes(String(error.code))) throw new StudioReviewPolicyError("unavailable");
       if (error && typeof error === "object" && "code" in error && ["23505", "23514", "55000"].includes(String(error.code))) throw new StudioReviewPolicyError("conflict");
       throw error;
     } finally { client.release(); }

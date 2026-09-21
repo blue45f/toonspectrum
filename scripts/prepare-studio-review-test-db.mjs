@@ -26,7 +26,7 @@ try {
   });
   // Drizzle can log an SQL error while exiting zero. Require its positive completion receipt.
   assert(/Changes applied/u.test(stdout) && !/\berror:/iu.test(stdout + stderr), "Drizzle did not confirm a successful test schema application");
-  for (const migration of ["0064_studio_project_graph_v3.sql", "0077_membership_operations.sql", "0082_studio_review_policy.sql"]) {
+  for (const migration of ["0064_studio_project_graph_v3.sql", "0077_membership_operations.sql", "0082_studio_review_policy.sql", "0083_studio_review_vote_epoch.sql"]) {
     await pool.query(await readFile(new URL(`../apps/api/src/db/migrations/${migration}`, import.meta.url), "utf8"));
   }
   const triggers = await pool.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'studio_%'");

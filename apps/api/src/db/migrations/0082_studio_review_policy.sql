@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS studio_review_policy_event (
   id text PRIMARY KEY,
   "reviewId" text NOT NULL REFERENCES studio_review_policy("reviewId") ON DELETE CASCADE,
   "policyVersion" integer NOT NULL, "stateVersion" integer NOT NULL,
-  kind text NOT NULL, "actorId" text NOT NULL, "accessEpoch" text, "commandHash" text NOT NULL, payload jsonb NOT NULL,
+  kind text NOT NULL, "actorId" text NOT NULL, "commandHash" text NOT NULL, payload jsonb NOT NULL,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT studio_review_policy_event_order_unique UNIQUE ("reviewId", "stateVersion"),
   CONSTRAINT studio_review_policy_event_kind_check CHECK (kind IN ('configure', 'vote')),
@@ -25,25 +25,7 @@ CREATE TABLE IF NOT EXISTS studio_review_policy_event (
   CONSTRAINT studio_review_policy_event_hash_check CHECK ("commandHash" ~ '^[a-f0-9]{64}$'),
   CONSTRAINT studio_review_policy_event_payload_check CHECK (jsonb_typeof(payload) = 'object' AND octet_length(payload::text) <= 262144)
 );
--- Additive on intentionally rematerialized test schemas; old unbound votes remain stale.
-ALTER TABLE studio_review_policy_event ADD COLUMN IF NOT EXISTS "accessEpoch" text;
 CREATE INDEX IF NOT EXISTS studio_review_policy_event_epoch_idx ON studio_review_policy_event ("reviewId", "policyVersion", "stateVersion");
--- Bind votes to the CURRENT invitation, role and exact database membership timestamp.
--- Regranting access must not restore an old membership's approval.
-CREATE OR REPLACE FUNCTION studio_review_policy_actor_epoch(review_id text, actor_id text)
-RETURNS text LANGUAGE sql STABLE AS $$
-  SELECT CASE
-    WHEN NOT EXISTS (SELECT 1 FROM "user" u WHERE u.id=actor_id AND u.status='active') THEN NULL
-    WHEN NOT EXISTS (SELECT 1 FROM studio_review_reviewer rr WHERE rr."reviewId"=r.id AND rr."reviewerUserId"=actor_id) THEN NULL
-    WHEN w."userId"=actor_id THEN 'owner:' || actor_id
-    WHEN m.status='active' AND m.role IN ('admin','editor','commenter','viewer') THEN
-      'member:' || jsonb_build_array(m."invitationId", m.role, extract(epoch FROM m."updatedAt"))::text
-    ELSE NULL END
-  FROM studio_review r JOIN studio_artifact a ON a.id=r."artifactId"
-  JOIN studio_project_graph p ON p.id=a."projectId" JOIN creator_work w ON w.id=p."workId"
-  LEFT JOIN creator_work_collaborator m ON m."workId"=w.id AND m."userId"=actor_id
-  WHERE r.id=review_id
-$$;
 CREATE OR REPLACE FUNCTION studio_review_policy_guard() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE reviewed record; item jsonb;
 BEGIN
@@ -100,9 +82,6 @@ BEGIN
     OR NEW."stateVersion" <> policy."stateVersion" THEN
     RAISE EXCEPTION 'policy event epoch is not current' USING ERRCODE = '23514';
   END IF;
-  IF NEW.kind='vote' AND (NEW."accessEpoch" IS NULL OR NEW."accessEpoch" IS DISTINCT FROM studio_review_policy_actor_epoch(NEW."reviewId", NEW."actorId")) THEN
-    RAISE EXCEPTION 'vote membership epoch is not current' USING ERRCODE = '23514';
-  END IF;
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS studio_review_policy_event_guard_trigger ON studio_review_policy_event;
@@ -116,11 +95,10 @@ BEGIN
   SELECT w.id, w."userId" INTO work_id, owner_id FROM studio_artifact a
     JOIN studio_project_graph p ON p.id = a."projectId" JOIN creator_work w ON w.id = p."workId"
     WHERE a.id = NEW."artifactId" FOR SHARE OF w;
-  PERFORM 1 FROM "user" u WHERE u.id IN (SELECT "reviewerUserId" FROM studio_review_reviewer WHERE "reviewId"=NEW.id) ORDER BY u.id FOR SHARE;
   PERFORM 1 FROM creator_work_collaborator m WHERE m."workId" = work_id ORDER BY m."userId" FOR SHARE;
   FOR group_spec IN SELECT value FROM jsonb_array_elements(policy.definition->'groups') LOOP
     WITH latest AS (
-      SELECT DISTINCT ON (e."actorId") e."actorId", e."stateVersion", e."accessEpoch", e.payload->>'decision' AS decision
+      SELECT DISTINCT ON (e."actorId") e."actorId", e."stateVersion", e.payload->>'decision' AS decision
       FROM studio_review_policy_event e WHERE e."reviewId" = NEW.id AND e."policyVersion" = policy."policyVersion"
         AND e.kind = 'vote' AND e.payload->>'groupId' = group_spec->>'id'
         AND group_spec->'reviewerIds' ? e."actorId" ORDER BY e."actorId", e."stateVersion" DESC
@@ -129,7 +107,6 @@ BEGIN
         AND (l."actorId" = owner_id OR EXISTS(SELECT 1 FROM creator_work_collaborator m
           WHERE m."workId" = work_id AND m."userId" = l."actorId" AND m.status = 'active'
             AND m.role IN ('admin','editor','commenter','viewer')))
-        AND l."accessEpoch" = studio_review_policy_actor_epoch(NEW.id, l."actorId")
         AND (policy.definition->>'mode' = 'parallel' OR l."stateVersion" > barrier) AS usable FROM latest l
     ) SELECT COUNT(*) FILTER (WHERE usable AND decision = 'approve'), COUNT(*) FILTER (WHERE usable AND decision = 'request-changes'),
         COALESCE(MAX("stateVersion"),0) INTO approvals, changes, last_vote FROM valid;

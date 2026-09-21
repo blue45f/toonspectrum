@@ -65,7 +65,7 @@ describe("Pinned review revision workflow", () => {
     mounted.rerender(<StudioPinnedReviewWorkflow verified={{ ...verified([comment]), review: { ...verified([comment]).review, status: "approved" } }} onRefresh={f.refresh} onRevoked={f.revoke} />);
     expect(screen.getByText("검수 승인됨")).toBeTruthy();
     // Approved history stays read-only; the new control can only fetch group history.
-    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["그룹 검수 기록 확인"]);
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["그룹 검수 기록 확인", "최신 정책·표결 이력 확인"]);
   });
 
   it("cancels pending actor A authority and preserves actor B's independent busy state", async () => {
