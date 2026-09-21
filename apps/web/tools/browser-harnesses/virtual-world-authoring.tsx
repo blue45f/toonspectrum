@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import { readStudioWorldAuthoringDraftRecord } from "../../src/domains/creator/virtual-space/studio-virtual-space-world-authoring";
 import { validateStudioWorldManifest, type StudioVirtualSpaceWorldManifest as World } from "../../src/domains/creator/virtual-space/studio-virtual-space-world-manifest";
 import { StudioWorldAuthoringEntry } from "../../src/domains/creator/virtual-space/StudioWorldAuthoringEntry";
 import { useStudioWorldRuleGate } from "../../src/domains/creator/virtual-space/StudioWorldRuleGate";
@@ -20,7 +21,7 @@ function initial(): World { return { id: "authoring-fixture", version: 1, width:
   spawns: [{ id: "entry", point: { x: 30, y: 30 } }], colliders: [], portals: [], npcs: [],
   interactions: [{ id: "tool", zoneId: "lounge", point: { x: 80, y: 320 }, radius: 40, action: "review", labelKo: "시험 검수 도구", labelEn: "Fixture review tool" }] }; }
 function Fixture() {
-  const [world, setWorld] = useState(initial), [changes, setChanges] = useState(0), [disabled, setDisabled] = useState(false);
+  const [world, setWorld] = useState(() => readStudioWorldAuthoringDraftRecord("world-authoring-fixture")?.manifest ?? initial()), [changes, setChanges] = useState(0), [disabled, setDisabled] = useState(false);
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available"), [actions, setActions] = useState<string[]>([]);
   const activate = useCallback((action: string) => setActions((current) => [...current, action]), []);
   const gate = useStudioWorldRuleGate(world, activity, activate);
