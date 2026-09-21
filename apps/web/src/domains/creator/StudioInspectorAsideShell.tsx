@@ -1,5 +1,5 @@
 import { StudioEditTargetSummary } from "./StudioEditTargetSummary";
-import { StudioPinnedColorPanel } from "./color/StudioPinnedColorPanel";
+import { StudioPinnedColorPanelSlot } from "./color/StudioPinnedColorPanelSlot";
 import {
   ChevronRight,
   Loader2,
@@ -417,7 +417,7 @@ export function StudioInspectorAsideShell({
           />
           <StudioInspectorDisabledReasons reasons={rightPanelDisabledReasons} />
           <StudioEditTargetSummary model={model} />
-          <StudioPinnedColorPanel />
+          <StudioPinnedColorPanelSlot />
           <StudioInspectorCanvasControls
             background={bg}
             backgroundGradient={bgGrad}

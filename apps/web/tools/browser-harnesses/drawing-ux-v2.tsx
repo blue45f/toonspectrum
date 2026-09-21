@@ -130,7 +130,8 @@ function Harness() {
       <StudioAppSettingsPanel open={settingsOpen} settings={settings} initialTab="toolbar"
         onClose={() => setSettingsOpen(false)} onChange={commitSettings} onResetAll={() => commitSettings(defaultStudioAppSettings())} />
       <StudioMobileEditingDock {...createMobileProps({ isMobile: mobile, color: primary, tool, drawMode,
-        setColor: setPrimary, setTool, setDrawMode, mobileSheet, setMobileSheet, stableHandlers: mobileHandlers })} />
+        setColor: setPrimary, setTool, setDrawMode, mobileSheet, setMobileSheet, stableHandlers: mobileHandlers,
+        brushCatalogHandlers: { close: () => undefined, selectBrushId: () => undefined, toggle: () => setAction("brush-library"), toggleFavorite: () => undefined } })} />
     </main>
   </StudioColorWorkspaceProvider>;
 }
