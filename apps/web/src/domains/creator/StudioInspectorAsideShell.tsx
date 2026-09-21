@@ -235,7 +235,7 @@ export function StudioInspectorAsideShell({
             desktopDetached && "lg:h-full lg:w-full lg:flex-1 lg:self-auto lg:border-0 lg:bg-transparent lg:p-0",
             !visibleRightPanelOpen && "lg:hidden",
             inspectorDrawing &&
-              inspectorLayout.primary === "properties" &&
+              inspectorLayout.primary === "properties" && !layersSplitWithProperties &&
               "lg:overflow-hidden"
           )}
           style={

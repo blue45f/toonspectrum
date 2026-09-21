@@ -1,3 +1,4 @@
+import { STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH } from "./studio-workspace-layout-metrics";
 import { Suspense, useId, useMemo } from "react";
 
 import { isEffectivelyHidden } from "./studio-layers";
@@ -107,7 +108,9 @@ export function StudioInspectorAsideBody(props: StudioInspectorAsideProps) {
         hidden={inspectorLayout.primary !== "properties"}
         className={
           inspectorContentMode === "drawing"
-            ? "min-h-0 lg:flex lg:flex-1 lg:flex-col"
+            ? !model.isMobile && model.rightResize.width >= STUDIO_INSPECTOR_LAYER_SPLIT_MIN_WIDTH
+              ? "min-h-64 shrink-0 lg:flex lg:flex-col"
+              : "min-h-0 lg:flex lg:flex-1 lg:flex-col"
             : "space-y-2"
         }
       >
