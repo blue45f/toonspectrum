@@ -529,4 +529,93 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
       expect((await pool.query('SELECT id FROM studio_review WHERE "artifactId"=$1', [intent.artifactId])).rows).toHaveLength(0);
     } finally { await blocker.query('ROLLBACK'); blocker.release(); }
   });
+
+  it("persists reading agenda against captured source, not a later work document, with per-item CAS", async () => {
+    const f = await capture(2), captured = await completeCapture(f.actor, f.intent);
+    const SessionRepository = (await import("./studio-work-session.repository")).StudioWorkSessionRepository;
+    const sessions = new SessionRepository(), sessionId = randomUUID();
+    const created = await sessions.create(f.actor, f.input.workId, { id: sessionId, operationId: randomUUID(),
+      title: "Pinned reading", purpose: "Discuss the actual captured cuts", kind: "reading", input: captured.subject, invitedUserIds: [] });
+    const resources = await sessions.resources(f.actor, f.input.workId, sessionId, 0);
+    expect(resources.sourceStatus).toBe("mapped"); expect(resources.pages).toHaveLength(2);
+    expect(resources.pages[0]!.source.pageId).toBe("page-0"); expect(resources.pages[0]!.frameIds).toEqual(["cut-0"]);
+    expect(resources.pages[1]!.previewCursor).toMatch(/^0\.[a-f0-9]{64}$/u);
+    // The actual saved document diverges; the session still reads the immutable captured input.
+    await pool.query('UPDATE creator_work SET doc=$2::jsonb,revision=5 WHERE id=$1', [f.input.workId, JSON.stringify({ ...f.doc, pagesList: [] })]);
+    expect((await sessions.resources(f.actor, f.input.workId, sessionId, 0)).pages).toEqual(resources.pages);
+    const item = { id: randomUUID(), source: { ...resources.pages[0]!.source, frameId: "cut-0" },
+      title: "First cut", purpose: "Gaze continuity", dialogue: "Proposed dialogue", assignedUserId: f.actor };
+    const add = { action: "agenda-add" as const, operationId: randomUUID(), expectedVersion: created.view.session.version, item };
+    const added = await sessions.command(f.actor, f.input.workId, sessionId, add);
+    expect(await sessions.command(f.actor, f.input.workId, sessionId, add)).toEqual(added);
+    const current = () => sessions.current(f.actor, f.input.workId, sessionId);
+    const edit = { action: "agenda-edit" as const, itemId: item.id, expectedItemRevision: 1, title: "Changed proposal", purpose: "Purpose", dialogue: "Revised", assignedUserId: f.actor };
+    await sessions.command(f.actor, f.input.workId, sessionId, { ...edit, operationId: randomUUID(), expectedVersion: 2 });
+    await expect(sessions.command(f.actor, f.input.workId, sessionId, { ...edit, operationId: randomUUID(), expectedVersion: 3 }))
+      .rejects.toMatchObject({ code: "conflict" });
+    expect((await current()).session.workflow!.agenda[0]!.revision).toBe(2);
+    await sessions.command(f.actor, f.input.workId, sessionId, { action: "ready", operationId: randomUUID(), expectedVersion: 3 });
+    await sessions.command(f.actor, f.input.workId, sessionId, { action: "start", operationId: randomUUID(), expectedVersion: 4 });
+    const focused = await sessions.command(f.actor, f.input.workId, sessionId, { action: "agenda-focus", itemId: item.id, operationId: randomUUID(), expectedVersion: 5 });
+    expect(focused.view.session.readerUserId).toBe(f.actor);
+    await sessions.command(f.actor, f.input.workId, sessionId, { action: "agenda-conclude", itemId: item.id, expectedItemRevision: 2,
+      body: "Revise the dialogue separately", operationId: randomUUID(), expectedVersion: 6 });
+    const later = await new SessionRepository().current(f.actor, f.input.workId, sessionId);
+    expect(later.session.workflow!.agenda[0]!.outcome!.body).toBe("Revise the dialogue separately");
+    expect((await graph.getReview(f.actor, captured.subject.reviewId)).status).toBe("open");
+    const work = await pool.query('SELECT doc,revision FROM creator_work WHERE id=$1', [f.input.workId]);
+    expect(work.rows[0].revision).toBe(5); expect(work.rows[0].doc.pagesList).toEqual([]);
+    const forged = { ...item, id: randomUUID(), source: { ...item.source, pageId: "invented-page" } };
+    await expect(sessions.command(f.actor, f.input.workId, sessionId, { action: "agenda-add", item: forged, operationId: randomUUID(), expectedVersion: 7 }))
+      .rejects.toMatchObject({ code: "invalid-target" });
+    expect((await current()).session.version).toBe(7);
+  });
+
+  it("keeps material ballots actor-owned, freezes decision evidence, and rejects deleted or substituted bytes", async () => {
+    const f = await capture(1), captured = await completeCapture(f.actor, f.intent);
+    const SessionRepository = (await import("./studio-work-session.repository")).StudioWorkSessionRepository;
+    const sessions = new SessionRepository(), sessionId = randomUUID(), member = randomUUID(), outsider = randomUUID();
+    for (const id of [member, outsider]) {
+      users.push(id); await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [id, "Material participant"]);
+      await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt")
+        VALUES ($1,$2,'commenter','active',$3,now())`, [f.input.workId, id, randomUUID()]);
+    }
+    await sessions.create(f.actor, f.input.workId, { id: sessionId, operationId: randomUUID(), title: "Material selection", purpose: "Choose bytes, not a mutable URL",
+      kind: "material-choice", input: captured.subject, invitedUserIds: [member] });
+    await expect(sessions.resources(outsider, f.input.workId, sessionId, 0)).rejects.toMatchObject({ code: "forbidden" });
+    const resources = await sessions.resources(member, f.input.workId, sessionId, 0);
+    const registered = resources.assets.find((item) => item.elementType === "image")!;
+    expect(registered).toBeTruthy();
+    const proposal = { id: randomUUID(), title: "Pinned image", rationale: "Compare this exact version", usageConditions: "Permission still needs review",
+      asset: { assetId: registered.assetId, sha256: registered.sha256, elementType: registered.elementType } };
+    await sessions.command(member, f.input.workId, sessionId, { action: "join", operationId: randomUUID(), expectedVersion: 1 });
+    await expect(sessions.command(member, f.input.workId, sessionId, { action: "material-propose", candidate: { ...proposal, asset: { ...proposal.asset, sha256: "f".repeat(64) } },
+      operationId: randomUUID(), expectedVersion: 2 })).rejects.toMatchObject({ code: "invalid-target" });
+    await sessions.command(member, f.input.workId, sessionId, { action: "material-propose", candidate: proposal, operationId: randomUUID(), expectedVersion: 2 });
+    await sessions.command(f.actor, f.input.workId, sessionId, { action: "ready", operationId: randomUUID(), expectedVersion: 3 });
+    await sessions.command(f.actor, f.input.workId, sessionId, { action: "start", operationId: randomUUID(), expectedVersion: 4 });
+    const ballot = { action: "material-vote" as const, candidateId: proposal.id, rationale: "Fits the cut", expectedVersion: 5, operationId: randomUUID() };
+    const voted = await sessions.command(member, f.input.workId, sessionId, ballot);
+    expect(await sessions.command(member, f.input.workId, sessionId, ballot)).toEqual(voted);
+    expect(voted.view.session.workflow!.materialVotes[0]!.userId).toBe(member);
+    await expect(sessions.command(member, f.input.workId, sessionId, { action: "material-decide", candidateId: proposal.id, observedVersion: 6,
+      rationale: "Cannot decide", operationId: randomUUID(), expectedVersion: 6 })).rejects.toMatchObject({ code: "forbidden" });
+    await expect(sessions.command(f.actor, f.input.workId, sessionId, { action: "material-decide", candidateId: proposal.id, observedVersion: 5,
+      rationale: "Stale ballots", operationId: randomUUID(), expectedVersion: 6 })).rejects.toMatchObject({ code: "conflict" });
+    const decided = await sessions.command(f.actor, f.input.workId, sessionId, { action: "material-decide", candidateId: proposal.id, observedVersion: 6,
+      rationale: "Record selection without insertion or rights grant", operationId: randomUUID(), expectedVersion: 6 });
+    expect(decided.view.session.workflow!.materialDecisions[0]!.votes).toEqual(voted.view.session.workflow!.materialVotes);
+    expect((await graph.getReview(f.actor, captured.subject.reviewId)).status).toBe("open");
+    await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2', [f.input.workId, member]);
+    await expect(sessions.receipt(member, f.input.workId, sessionId, ballot.operationId)).rejects.toMatchObject({ code: "forbidden" });
+    await sessions.command(f.actor, f.input.workId, sessionId, { action: "material-decide", candidateId: null, observedVersion: 7,
+      rationale: "Reevaluate", operationId: randomUUID(), expectedVersion: 7 });
+    await pool.query('DELETE FROM creator_work_asset WHERE "workId"=$1 AND "assetId"=$2', [f.input.workId, registered.assetId]);
+    await expect(sessions.command(f.actor, f.input.workId, sessionId, { action: "material-vote", candidateId: proposal.id, rationale: "Deleted file",
+      operationId: randomUUID(), expectedVersion: 8 })).rejects.toMatchObject({ code: "invalid-target" });
+    const later = await new SessionRepository().current(f.actor, f.input.workId, sessionId);
+    expect(later.session.version).toBe(8); expect(later.session.workflow!.materialDecisions).toHaveLength(2);
+    expect(later.session.workflow!.materialCandidates[0]!.asset.sha256).toBe(registered.sha256);
+  });
+
 });

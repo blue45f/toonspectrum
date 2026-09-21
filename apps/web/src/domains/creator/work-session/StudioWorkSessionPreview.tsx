@@ -1,26 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { StudioReviewSourceReference } from "@toonspectrum/studio-project-model";
 import type { StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioReviewImage } from "../virtual-space/StudioPinnedReviewPreview";
 import { useStudioPinnedReviewPreviews } from "../virtual-space/use-studio-pinned-review-previews";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";
 
+export interface StudioSessionPreviewRequest { readonly id: string; readonly source: StudioReviewSourceReference; readonly cursor: string | null }
+
 const control = "min-h-11 rounded-lg border border-line bg-card px-3 text-sm";
 /** Only the review viewport follows an explicitly shared, server-verified position; the editor is untouched. */
-export function StudioWorkSessionPreview({ view, controller, busy }: {
-  readonly view: StudioWorkSessionView; readonly controller: StudioWorkSessionController; readonly busy: boolean;
+export function StudioWorkSessionPreview({ view, controller, busy, request = null }: {
+  readonly view: StudioWorkSessionView; readonly controller: StudioWorkSessionController; readonly busy: boolean; readonly request?: StudioSessionPreviewRequest | null;
 }) {
   const bt = useBilingual("StudioWorkSessionPreview"), [input] = useState(view.session.input);
-  const [revoked, setRevoked] = useState(false), [ordinal, setOrdinal] = useState<number | null>(null);
+  const [revoked, setRevoked] = useState(false), [ordinal, setOrdinal] = useState<number | null>(request?.source.pageOrdinal ?? null);
+  const [requestedSource, setRequestedSource] = useState(request?.source ?? null);
   const [zoom, setZoom] = useState(1), [following, setFollowing] = useState(false);
   const viewport = useRef<HTMLDivElement>(null);
   const onRevoked = useCallback(() => { setRevoked(true); setFollowing(false); controller.suspend(); }, [controller]);
-  const previews = useStudioPinnedReviewPreviews(input, onRevoked);
+  const previews = useStudioPinnedReviewPreviews(input, onRevoked, request?.cursor ?? null);
   const shared = view.session.status === "active" ? view.session.presenter : null;
   const followingActive = following && Boolean(shared) && !revoked;
   const pages = previews.result?.ok ? previews.result.previews : [];
   const selectedOrdinal = followingActive ? shared!.pageOrdinal : ordinal;
-  const selected = selectedOrdinal === null ? pages[0] : pages.find((page) => page.ordinal === selectedOrdinal);
+  const candidate = selectedOrdinal === null ? pages[0] : pages.find((page) => page.ordinal === selectedOrdinal);
+  const sourceMatches = !requestedSource || (candidate?.mapping.status === "mapped"
+    && candidate.mapping.sourceContentDigest === requestedSource.sourceContentDigest
+    && candidate.mapping.sourceServerRevision === requestedSource.sourceServerRevision
+    && candidate.mapping.page.id === requestedSource.pageId && candidate.ordinal === requestedSource.pageOrdinal
+    && (!requestedSource.frameId || candidate.mapping.page.frames.some((frame) => frame.id === requestedSource.frameId)));
+  const selected = sourceMatches ? candidate : undefined;
   const shownZoom = followingActive ? shared!.zoom : zoom;
   const applyPosition = useCallback(() => {
     if (!followingActive || !shared || !selected || !viewport.current) return;
@@ -42,18 +52,27 @@ export function StudioWorkSessionPreview({ view, controller, busy }: {
     <h4 className="font-semibold">{bt("고정 입력본", "Pinned input")}</h4>
     <p className="break-all text-xs text-fg-2">{input.revisionId}</p>
     <div className="flex flex-wrap gap-2">
-      <label className="text-sm">{bt("페이지", "Page")}<select className={`${control} ml-2`} value={selected?.ordinal ?? ""} onChange={(event) => { stop(); setOrdinal(Number(event.target.value)); }}>
+      <label className="text-sm">{bt("페이지", "Page")}<select className={`${control} ml-2`} value={selected?.ordinal ?? ""} onChange={(event) => { stop(); setRequestedSource(null); setOrdinal(Number(event.target.value)); }}>
         <option value="" disabled>{bt("페이지 선택", "Select page")}</option>
         {pages.map((page) => <option key={page.ordinal} value={page.ordinal}>{page.ordinal + 1}</option>)}
       </select></label>
       <label className="text-sm">{bt("확대", "Zoom")}<select className={`${control} ml-2`} value={shownZoom} onChange={(event) => { stop(); setZoom(Number(event.target.value)); }}>
         {[0.5, 1, 1.5, 2, 3, 4].map((value) => <option key={value} value={value}>{value * 100}%</option>)}
       </select></label>
-      <button type="button" className={control} disabled={!shared} aria-pressed={followingActive} onClick={() => { if (following) stop(); else setFollowing(true); }}>{followingActive ? bt("따라보기 중지", "Stop following") : bt("공유한 위치 따라보기", "Follow the shared position")}</button>
+      <button type="button" className={control} disabled={!shared} aria-pressed={followingActive} onClick={() => { if (following) stop(); else { setRequestedSource(null); setFollowing(true); } }}>{followingActive ? bt("따라보기 중지", "Stop following") : bt("공유한 위치 따라보기", "Follow the shared position")}</button>
       {view.capabilities.edit && view.session.status === "active" ? <button type="button" className={control} disabled={busy || !selected} onClick={share}>{bt("이 페이지·위치 공유", "Share this page and position")}</button> : null}
     </div>
     <p className="text-xs text-fg-2">{bt("공유 버튼을 누른 위치를 주기적으로 확인합니다. 직접 스크롤·터치·페이지 선택하면 따라보기를 멈춥니다. 원고와 편집 도구는 변경하지 않습니다.", "The explicitly shared position refreshes periodically. Scrolling, touch or selecting a page stops following. Your manuscript and editor tools remain unchanged.")}</p>
     <div className="flex flex-wrap gap-2" role="group" aria-label={bt("미리보기 이동", "Pan preview")}>
+      <button type="button" className={control} onClick={stop} onKeyDown={(event) => {
+        const el = viewport.current;
+        if (!el || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) return;
+        event.preventDefault(); stop();
+        if (event.key === "Home") el.scrollTop = 0;
+        else if (event.key === "End") el.scrollTop = el.scrollHeight;
+        else if (event.key === "ArrowLeft" || event.key === "ArrowRight") el.scrollLeft += (event.key === "ArrowLeft" ? -1 : 1) * el.clientWidth * 0.25;
+        else el.scrollTop += (["ArrowUp", "PageUp"].includes(event.key) ? -1 : 1) * el.clientHeight * (event.key.startsWith("Arrow") ? 0.25 : 0.8);
+      }}>{bt("키보드로 미리보기 이동", "Pan preview with keyboard")}</button>
       {([[-1, 0, "왼쪽", "Left"], [0, -1, "위", "Up"], [0, 1, "아래", "Down"], [1, 0, "오른쪽", "Right"]] as const).map(([x, y, ko, en]) =>
         <button type="button" className={control} key={en} onClick={() => { stop(); const el = viewport.current; if (el) { el.scrollLeft += x * el.clientWidth * 0.5; el.scrollTop += y * el.clientHeight * 0.5; } }}>{bt(ko, en)}</button>)}
     </div>
@@ -66,8 +85,8 @@ export function StudioWorkSessionPreview({ view, controller, busy }: {
           : bt("미리보기를 불러오는 중이거나 확인할 수 없습니다.", "The preview is loading or unavailable.")}</p>}
     </div>
     <div className="flex flex-wrap gap-2">
-      {previews.cursor ? <button type="button" className={control} onClick={() => { stop(); setOrdinal(null); previews.setCursor(null); }}>{bt("처음 페이지 목록", "First page list")}</button> : null}
-      {previews.result?.ok && previews.result.nextCursor ? <button type="button" className={control} onClick={() => { stop(); setOrdinal(null); previews.setCursor(previews.result?.ok ? previews.result.nextCursor : null); }}>{bt("다음 페이지 목록", "Next page list")}</button> : null}
+      {previews.cursor ? <button type="button" className={control} onClick={() => { stop(); setRequestedSource(null); setOrdinal(null); previews.setCursor(null); }}>{bt("처음 페이지 목록", "First page list")}</button> : null}
+      {previews.result?.ok && previews.result.nextCursor ? <button type="button" className={control} onClick={() => { stop(); setRequestedSource(null); setOrdinal(null); previews.setCursor(previews.result?.ok ? previews.result.nextCursor : null); }}>{bt("다음 페이지 목록", "Next page list")}</button> : null}
       <button type="button" className={control} onClick={previews.refresh}>{bt("미리보기 다시 확인", "Refresh preview")}</button>
     </div>
   </section>;
