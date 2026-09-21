@@ -65,12 +65,14 @@
 - 관련 단위·컴포넌트·구조 테스트: 12개 파일, 97개 테스트 통과.
 - 변경된 TypeScript/JavaScript 파일의 strict ESLint 통과.
 - 웹 TypeScript 검사 통과. 최초 기본 힙 실행은 메모리 제한으로 종료되어 저장소의 12GB 힙 설정으로 다시 검사했다.
-- Chromium 개발 서버에서 20개 화면과 6개 조작 묶음 통과. 운영 배포 통과 또는 실물 기기 인증을 뜻하지 않는다.
+- Chromium 개발 서버 및 로컬 운영용 번들 미리보기에서 각각 20개 화면과 6개 조작 묶음 통과. PR 생성 전 운영용 번들에서 같은 20개 화면·6개 조작 묶음을 재실행해 통과했다. 운영 사이트 배포 또는 실물 기기 인증을 뜻하지 않는다.
+- 포털로 옮긴 제작 모드 메뉴도 1440×900·390×844에서 실제로 열고 내부 내보내기 버튼의 입력 수신을 확인했다. 검증 중 실제 내보내기·게시를 실행하지 않았다.
+- 아키텍처 경계 검사 통과. 전체 저장소 테스트 실행이나 원격 PR CI 통과와 구분한다.
 
 ```sh
 # 저장소 루트에서 로컬 서버 또는 빌드 미리보기 실행 후:
 TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:5427 \
-TOONSPECTRUM_VERIFY_DIR=qa-results/drawing-layout-remediation \
+TOONSPECTRUM_VERIFY_DIR=/tmp/toonstudio-layout-remediation-20260922 \
 node scripts/verify-studio-drawing-layout.mjs
 ```
 
@@ -83,3 +85,12 @@ node scripts/verify-studio-drawing-layout.mjs
 태블릿 전용 작업 레일과 1024px 전환 구조의 통합, 사용자가 임의로 넓힌 여러 패널의 모든 조합, 저장된 자유 배치의 자동 충돌 회피는 별도 설계 범위다. 이번 패치에서는 기존 입력/도구 권위와 사용자 설정을 보존하고, 확인한 기본 배치의 가림과 목록 접근성을 먼저 고쳤다.
 
 코드 변경·커밋·PR과 main 병합·운영 배포는 별도 상태다. 운영 배포는 별도의 사용자 승인 없이 수행하지 않는다.
+
+## 6. PR 준비 시점의 정본과 증거
+
+- 통합한 main: `fdb50d664adfeddd9293566ea3b1a3362cc96193`.
+- 구현 커밋: `33f282955`, main 통합 커밋: `07a08ebda`. 이 문서의 후속 커밋은 코드 동작을 바꾸지 않는다.
+- PR 직전 재검증: `/tmp/toonstudio-layout-remediation-20260922/pr-final/layout-verification.json`.
+- 로컬 운영용 번들 증거: `/tmp/toonstudio-layout-remediation-20260922/production-preview/`.
+- 제작 모드 메뉴 추가 확인: `/tmp/toonstudio-layout-remediation-20260922/pr-shell-review/`.
+- 사용자 요청 범위는 PR 생성까지다. main 병합, 자동 병합 설정, 운영 배포는 하지 않는다.
