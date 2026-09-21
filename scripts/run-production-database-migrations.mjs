@@ -1030,6 +1030,9 @@ GRANT DELETE ON TABLE
   TO ${quotedRole};
 
 ${updateGrants}
+REVOKE ALL ON FUNCTION public.studio_review_policy_actor_epoch(text,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.studio_review_policy_actor_epoch(text,text) FROM ${quotedRole};
+GRANT EXECUTE ON FUNCTION public.studio_review_policy_actor_epoch(text,text) TO ${quotedRole};
 `;
 }
 
@@ -1043,7 +1046,11 @@ export function buildStudioProjectGraphRuntimeAclViolationSql(runtimeDatabaseRol
           ARRAY[${mutableColumns.map((column) => sqlLiteral(column)).join(", ")}]::text[]
         )`).join(",\n        ");
   return `(
-    EXISTS (
+    NOT pg_catalog.has_function_privilege(${roleLiteral}, 'public.studio_review_policy_actor_epoch(text,text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege(0::oid, 'public.studio_review_policy_actor_epoch(text,text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege(${roleLiteral}, 'public.studio_review_policy_actor_epoch(text,text)', 'EXECUTE WITH GRANT OPTION')
+    OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc WHERE oid='public.studio_review_policy_actor_epoch(text,text)'::regprocedure AND prosecdef)
+    OR EXISTS (
       SELECT 1
       FROM (VALUES
         ${rows}
