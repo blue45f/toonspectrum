@@ -5,7 +5,8 @@ import Link from "@/compat/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { studioVirtualSpaceReviewHref } from "../virtual-space/studio-virtual-space-review-invitation";
 import { useStudioReviewRoster } from "../virtual-space/use-studio-review-roster";
-import { StudioWorkSessionPreview } from "./StudioWorkSessionPreview";
+import { StudioSessionWorkflowPanel } from "./StudioSessionWorkflowPanel";
+import { StudioWorkSessionPreview, type StudioSessionPreviewRequest } from "./StudioWorkSessionPreview";
 import { StudioWorkSessionResultPicker } from "./StudioWorkSessionResultPicker";
 import { sessionStatusLabels } from "./studio-work-session-presentation";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";
@@ -19,6 +20,7 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy, savin
   const bt = useBilingual("StudioWorkSessionDetail"), session = view.session;
   const roster = useStudioReviewRoster({ workId: session.workId, actorId, enabled: true, autoStart: true });
   const [body, setBody, bodyStorageError] = useStudioSessionFormDraft(JSON.stringify(["studio-session-note", actorId, session.workId, session.id]), 2000);
+  const [inspection, setInspection] = useState<StudioSessionPreviewRequest | null>(null);
   const [category, setCategory] = useState<StudioWorkSession["notes"][number]["category"]>("note");
   const [closing, setClosing] = useState<"close" | "cancel" | null>(null), [summary, setSummary, summaryStorageError] = useStudioSessionFormDraft(JSON.stringify(["studio-session-outcome", actorId, session.workId, session.id]), 4000), [confirmed, setConfirmed] = useState(false);
   useLayoutEffect(() => { setConfirmed(false); }, [session.version]);
@@ -58,7 +60,8 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy, savin
       </select></label> : null}
       <p className="text-xs text-fg-2">{bt("차례 지정은 마이크나 녹음을 시작하지 않습니다.", "Selecting a reader does not start a microphone or recording.")}</p>
     </section> : null}
-    <StudioWorkSessionPreview view={view} controller={controller} busy={busy} />
+    <StudioSessionWorkflowPanel saving={saving} view={view} actorId={actorId} controller={controller} busy={busy} name={name} onInspect={setInspection} />
+    <StudioWorkSessionPreview key={inspection?.id ?? session.id} view={view} controller={controller} busy={busy} request={inspection} />
     <section className="space-y-2"><h4 className="font-semibold">{bt("메모·결정·미결 기록", "Notes, decisions and unresolved issues")}</h4>
       {session.notes.length ? <ul className="space-y-2">{session.notes.map((note) => <li key={note.id} className="rounded-lg border border-line p-3">
         <p className="text-xs text-fg-2">{bt(noteLabels[note.category][0], noteLabels[note.category][1])} · {name(note.authorUserId)} · {new Date(note.at).toLocaleString()}</p><p className="whitespace-pre-wrap break-words text-sm">{note.body}</p>

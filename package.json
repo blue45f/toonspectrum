@@ -234,7 +234,8 @@
     "verify:studio-3d-tiled": "vitest run apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-camera.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-artifacts.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-client.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-plan.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-archive-verifier.test.ts",
     "verify:studio-3d-tiled:browser": "node scripts/verify-studio-scene3d-tiled-output.mjs",
     "verify:workspace-package-links": "node scripts/verify-workspace-package-links.mjs",
-    "test:workspace-package-links": "node --test scripts/verify-workspace-package-links.test.mjs"
+    "test:workspace-package-links": "node --test scripts/verify-workspace-package-links.test.mjs",
+    "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts"
   },
   "dependencies": {
     "@babylonjs/core": "9.19.0",

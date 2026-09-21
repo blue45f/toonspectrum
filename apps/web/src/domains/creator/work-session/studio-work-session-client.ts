@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { studioWorkSessionId, studioWorkSessionViewSchema, studioWorkSessionListSchema, studioWorkSessionMutationSchema, studioWorkSessionReceiptSchema, type StudioWorkSessionCreate, type StudioWorkSessionCommand, type StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
+import { studioWorkSessionId, studioSessionResourcesSchema, type StudioSessionResources, studioWorkSessionViewSchema, studioWorkSessionListSchema, studioWorkSessionMutationSchema, studioWorkSessionReceiptSchema, type StudioWorkSessionCreate, type StudioWorkSessionCommand, type StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
 import { api } from "@/infrastructure/api";
 
 export type StudioSessionList = z.infer<typeof studioWorkSessionListSchema>;
@@ -60,4 +60,20 @@ export async function studioWorkSessionRequestHash(workId: string, sessionId: st
   const bytes = new TextEncoder().encode(canonicalJson({ workId, sessionId, input }));
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
   return Array.from(digest, (value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+
+/** A fresh metadata-only view: no asset payloads or signed URLs enter recovery storage. */
+export async function getStudioSessionResources(workId: string, sessionId: string, inputDigest: string,
+  offset: number, signal: AbortSignal): Promise<StudioSessionResources> {
+  if (!Number.isSafeInteger(offset) || offset < 0 || offset > 99_999) throw new Error("Invalid session page offset");
+  const result = studioSessionResourcesSchema.parse(await api.get(`${path(workId, sessionId)}/resources?offset=${offset}`, { signal, retry: 0 }));
+  const expiresAt = Date.parse(result.expiresAt), now = Date.now();
+  if (result.workId !== workId || result.sessionId !== sessionId || result.inputDigest !== inputDigest
+    || expiresAt <= now || expiresAt > now + 30_000
+    || result.pages.some((page) => page.source.sourceContentDigest !== inputDigest || page.source.pageOrdinal < offset || page.source.pageOrdinal >= offset + 25)
+    || new Set(result.pages.map((page) => page.source.pageId)).size !== result.pages.length
+    || new Set(result.assets.map((asset) => asset.assetId)).size !== result.assets.length
+    || (result.nextPageOffset !== null && result.nextPageOffset <= offset)) throw new Error("Session resource scope mismatch");
+  return result;
 }

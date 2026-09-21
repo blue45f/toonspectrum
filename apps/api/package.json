@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "node --test ../../scripts/verify-api-runtime-imports.test.mjs ../../scripts/verify-api-calendar-runtime.test.mjs ../../scripts/stage-api-workspace-runtime.test.mjs && tsc -p tsconfig.json && node ../../scripts/stage-api-workspace-runtime.mjs && node ../../scripts/verify-api-runtime-imports.mjs && node ../../scripts/verify-legal-policy-runtime.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tools/tsconfig.work-session-browser.json --noEmit",
     "integration:generate-secrets": "node scripts/generate-production-integration-secrets.mjs",
     "start": "node dist/apps/api/src/main.js"
   },
