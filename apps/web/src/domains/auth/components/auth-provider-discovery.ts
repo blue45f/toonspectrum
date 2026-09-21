@@ -96,9 +96,10 @@ export function parseAuthProviderDiscovery(
       continue;
     }
 
-    // Disabled Kakao/Naver providers are omitted rather than rendered as an
-    // actionable redirect button.
-    if (raw.mode !== "disabled") {
+    // Kakao/Naver also need an explicit redirect capability. A partial or
+    // stale discovery response must not render a broken OAuth button.
+    // Preserve the deliberately configured non-production demo experience.
+    if (raw.mode === "demo" || (raw.mode === "oauth" && raw.redirectAvailable === true)) {
       result[id] = {
         label,
         mode: raw.mode,

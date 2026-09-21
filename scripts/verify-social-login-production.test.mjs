@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   parseSocialLoginOrigin,
+  probeGoogleAuthorizationClient,
   validateSocialLoginDiscovery,
   verifySocialLoginProduction,
 } from "./verify-social-login-production.mjs";
@@ -241,4 +242,84 @@ describe("social login production verification", () => {
   ])("rejects an unsafe production origin: %s", (origin) => {
     expect(() => parseSocialLoginOrigin(origin)).toThrow();
   });
+  it("audits configured providers while explicitly reporting intentionally disabled Apple", async () => {
+    const fetchImpl = productionFetch({ discovery: discovery({
+      apple: { label: "Apple", mode: "disabled", redirectAvailable: false, reason: "missing-credentials" },
+    }) });
+    const result = await verifySocialLoginProduction({ fetchImpl, allowDisabled: ["apple"] });
+    expect(result.discovery.apple).toMatchObject({ mode: "disabled", reason: "missing-credentials" });
+    expect(result.redirects.map(({ provider }) => provider)).toEqual(["kakao", "naver", "github"]);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not permit demos or contradictory disabled capabilities", () => {
+    for (const apple of [
+      { label: "Apple", mode: "demo", redirectAvailable: false },
+      { label: "Apple", mode: "disabled", redirectAvailable: true, reason: "missing-credentials" },
+    ]) {
+      expect(() => validateSocialLoginDiscovery(discovery({ apple }), { allowDisabled: ["apple"] })).toThrow();
+    }
+    expect(() => validateSocialLoginDiscovery(discovery(), { allowDisabled: ["typo"] })).toThrow();
+  });
+
+  it.each(["deleted_client", "invalid_client", "redirect_uri_mismatch"])(
+    "detects Google's encoded %s error without logging opaque response data",
+    async (code) => {
+      const authError = Buffer.from(`\x0a${code} private-value-do-not-log`).toString("base64url");
+      const fetchImpl = vi.fn(async () => new Response(null, { status: 302, headers: {
+        location: `https://accounts.google.com/signin/oauth/error?authError=${authError}`,
+      } }));
+      await expect(probeGoogleAuthorizationClient({
+        clientId: "123-example.apps.googleusercontent.com", fetchImpl,
+      })).rejects.toThrow(`google authorization rejected: ${code}`);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("stops at a login-required callback without sending it to the app or claiming authentication", async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 302, headers: {
+      location: `${ORIGIN}/api/auth/oauth/google/callback?error=login_required&state=opaque`,
+    } }));
+    await expect(probeGoogleAuthorizationClient({
+      clientId: "123-example.apps.googleusercontent.com", fetchImpl,
+    })).resolves.toEqual({ stage: "interaction-required", authenticated: false });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchImpl.mock.calls[0];
+    expect(new URL(url).searchParams.get("prompt")).toBe("none");
+    expect(options).toMatchObject({ redirect: "manual", credentials: "omit" });
+    expect(options.headers).not.toHaveProperty("cookie");
+  });
+
+  it.each([
+    "https://attacker.test/", "http://accounts.google.com/",
+    `${ORIGIN}/unexpected?error=login_required`,
+    `${ORIGIN}/api/auth/oauth/google/callback?code=must-not-be-consumed`,
+  ])("does not follow an unsafe or unexpected Google callback %s", async (location) => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 302, headers: { location } }));
+    await expect(probeGoogleAuthorizationClient({
+      clientId: "123-example.apps.googleusercontent.com", fetchImpl,
+    })).rejects.toThrow();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds Google redirect loops and handles authorization pages as preflight only", async () => {
+    const loop = vi.fn(async () => new Response(null, { status: 302, headers: {
+      location: "https://accounts.google.com/signin/identifier",
+    } }));
+    await expect(probeGoogleAuthorizationClient({ clientId: "123-example.apps.googleusercontent.com", fetchImpl: loop })).rejects.toThrow("redirect limit");
+    expect(loop).toHaveBeenCalledTimes(6);
+    await expect(probeGoogleAuthorizationClient({
+      clientId: "123-example.apps.googleusercontent.com", fetchImpl: async () => new Response("Sign in"),
+    })).resolves.toEqual({ stage: "authorization-page", authenticated: false });
+  });
+
+  it("runs the Google preflight when explicitly requested", async () => {
+    const base = productionFetch();
+    const fetchImpl = vi.fn(async (input, options) => new URL(input).hostname === "accounts.google.com"
+      ? new Response(null, { status: 302, headers: { location: `${ORIGIN}/api/auth/oauth/google/callback?error=login_required` } })
+      : base(input, options));
+    const result = await verifySocialLoginProduction({ fetchImpl, probeGoogleClient: true });
+    expect(result.googlePreflight).toEqual({ stage: "interaction-required", authenticated: false });
+  });
+
 });
