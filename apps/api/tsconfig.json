@@ -47,6 +47,9 @@
       ],
       "@toonspectrum/studio-project-model/world-conversation": [
         "../../packages/studio-project-model/src/graph/world-conversation.ts"
+      ],
+      "@toonspectrum/studio-project-model/work-session-evidence": [
+        "../../packages/studio-project-model/src/graph/work-session-evidence.ts"
       ]
     },
     "outDir": "dist",

@@ -112,10 +112,10 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     expect((await graph.getReview(f.actor, result.subject.reviewId)).status).toBe("open");
   });
 
-  async function capture(pageCount = 2) {
+  async function capture(pageCount = 2, extension: Record<string, unknown> = {}) {
     const actor = randomUUID(), workId = randomUUID(); users.push(actor);
     await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [actor, "Review capture integration"]);
-    const doc = { version: 3, width: 2, pagesList: Array.from({ length: pageCount }, (_, index) => ({ id: `page-${index}`, canvasH: 1,
+    const doc = { ...extension, version: 3, width: 2, pagesList: Array.from({ length: pageCount }, (_, index) => ({ id: `page-${index}`, canvasH: 1,
       elements: [{ id: `cut-${index}`, type: "frame", x: 0, y: 0, width: 1, height: 1 }] })) };
     await pool.query('INSERT INTO creator_work (id,"userId",title,doc,revision) VALUES ($1,$2,$3,$4::jsonb,4)', [workId, actor, "Review source", JSON.stringify(doc)]);
     const input: StudioReviewPreviewCapture = { intentId: randomUUID(), workId, sourceServerRevision: 4, sourceContentDigest: studioReviewPreviewDigest(doc), pageCount,
@@ -616,6 +616,51 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     const later = await new SessionRepository().current(f.actor, f.input.workId, sessionId);
     expect(later.session.version).toBe(8); expect(later.session.workflow!.materialDecisions).toHaveLength(2);
     expect(later.session.workflow!.materialCandidates[0]!.asset.sha256).toBe(registered.sha256);
+  });
+
+  it("reads only attested pinned AI evidence and persists explicit citations without approving or editing", async () => {
+    const operation = { id: "preserved-ai", kind: "text", status: "failed", provider: "Recorded provider", model: "Recorded model", transport: "local",
+      createdAt: "2026-09-20T00:00:00.000Z", prompt: { sha256: "e".repeat(64), raw: "PRIVATE PROMPT" }, requestId: "PRIVATE REQUEST", seed: "PRIVATE SEED",
+      error: { message: "PRIVATE PROVIDER ERROR" }, target: { pageId: "page-0", frameId: "cut-0" }, usage: { promptTokens: 0, totalTokens: 9 } };
+    const f = await capture(2, { aiProvenance: { version: 1, operations: [operation] } }), captured = await completeCapture(f.actor, f.intent);
+    const { StudioWorkSessionRepository } = await import("./studio-work-session.repository");
+    const { StudioSessionEvidenceService } = await import("./studio-session-evidence.controller");
+    const sessions = new StudioWorkSessionRepository(), evidence = new StudioSessionEvidenceService(sessions), id = randomUUID();
+    const invited = randomUUID(), outsider = randomUUID();
+    for (const user of [invited, outsider]) {
+      users.push(user); await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [user, "Evidence audience"]);
+      await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'commenter','active',$3,now())`, [f.input.workId, user, randomUUID()]);
+    }
+    await sessions.create(f.actor, f.input.workId, { id, operationId: randomUUID(), title: "Evidence review", purpose: "Inspect preserved records", kind: "review", input: captured.subject, invitedUserIds: [invited] });
+    const before = await evidence.read(invited, f.input.workId, id, 0);
+    expect(before.evidence!.sourceContentDigest).toBe(captured.subject.rootGraphHash);
+    expect(before.evidence!.aiOperations[0]).toMatchObject({ id: operation.id, status: "failed", usage: { promptTokens: 0, totalTokens: 9 }, targetStatus: "mapped", target: { frameId: "cut-0" } });
+    expect(JSON.stringify(before)).not.toContain("PRIVATE");
+    // Change the current manuscript after capturing it: the evidence must remain on the original pin.
+    await pool.query('UPDATE creator_work SET doc=$2::jsonb,revision=5 WHERE id=$1', [f.input.workId, JSON.stringify({ ...f.doc, aiProvenance: { version: 1, operations: [] } })]);
+    expect((await evidence.read(invited, f.input.workId, id, 0)).evidence).toEqual(before.evidence);
+    await expect(evidence.read(outsider, f.input.workId, id)).rejects.toMatchObject({ code: "forbidden" });
+    await sessions.command(invited, f.input.workId, id, { action: "join", operationId: randomUUID(), expectedVersion: 1 });
+    const note = { action: "note" as const, category: "ai-evidence" as const, body: `Preserved source ${captured.subject.rootGraphHash}; operation ${operation.id}; billing not verified.`, operationId: randomUUID(), expectedVersion: 2 };
+    const saved = await sessions.command(invited, f.input.workId, id, note);
+    expect(await sessions.command(invited, f.input.workId, id, note)).toEqual(saved);
+    expect((await sessions.current(f.actor, f.input.workId, id)).session.notes).toHaveLength(1);
+    expect((await graph.getReview(f.actor, captured.subject.reviewId)).status).toBe("open");
+    expect((await pool.query('SELECT revision FROM creator_work WHERE id=$1', [f.input.workId])).rows[0].revision).toBe(5);
+    await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2', [f.input.workId, invited]);
+    await expect(evidence.read(invited, f.input.workId, id)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(sessions.receipt(invited, f.input.workId, id, note.operationId)).rejects.toMatchObject({ code: "forbidden" });
+  });
+  it("returns no fabricated evidence for a session pin with no producer attestation", async () => {
+    const f = await capture(1), captured = await completeCapture(f.actor, f.intent);
+    const { StudioWorkSessionRepository } = await import("./studio-work-session.repository");
+    const { StudioSessionEvidenceService } = await import("./studio-session-evidence.controller");
+    const sessions = new StudioWorkSessionRepository(), id = randomUUID();
+    const duplicateReviewId = randomUUID();
+    await graph.createReview(f.actor, captured.subject.artifactId, { id: duplicateReviewId, revisionId: captured.subject.revisionId, title: "Unattested alias", reviewerIds: [f.actor] });
+    await sessions.create(f.actor, f.input.workId, { id, operationId: randomUUID(), title: "Legacy source", purpose: "No producer proof", kind: "review", input: { ...captured.subject, reviewId: duplicateReviewId }, invitedUserIds: [] });
+    const value = await new StudioSessionEvidenceService(sessions).read(f.actor, f.input.workId, id);
+    expect(value.evidence).toBeNull(); expect(value.nextOffset).toBeNull();
   });
 
 });
