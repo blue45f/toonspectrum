@@ -685,6 +685,7 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     await pool.query(`CREATE ROLE "${role}" NOLOGIN`);
     try {
       await pool.query(buildStudioProjectGraphRuntimeAclSql(role));
+      await pool.query(`GRANT SELECT ON TABLE public."user",public.creator_work,public.creator_work_collaborator TO "${role}"`);
       expect((await pool.query(`SELECT ${buildStudioProjectGraphRuntimeAclViolationSql(role)} AS invalid`)).rows[0].invalid).toBe(false);
       const client = await pool.connect();
       const asRuntime = async (action: () => Promise<void>) => {
@@ -695,8 +696,8 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
         await asRuntime(async () => {
           expect((await client.query('SELECT "reviewId" FROM studio_review_policy WHERE "reviewId"=$1', [f.reviewId])).rows).toHaveLength(1);
           await client.query('UPDATE studio_review_policy SET "stateVersion"=2 WHERE "reviewId"=$1', [f.reviewId]);
-          await client.query(`INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload)
-            VALUES ($1,$2,1,2,'vote',$3,$4,$5::jsonb)`, [randomUUID(), f.reviewId, f.actor, "c".repeat(64), JSON.stringify({ groupId: "reviewers", decision: "approve" })]);
+          await client.query(`INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload,"accessEpoch")
+            VALUES ($1,$2,1,2,'vote',$3,$4,$5::jsonb,studio_review_policy_actor_epoch($2,$3))`, [randomUUID(), f.reviewId, f.actor, "c".repeat(64), JSON.stringify({ groupId: "reviewers", decision: "approve" })]);
         });
         await expect(asRuntime(async () => { await client.query('UPDATE studio_review_policy SET "revisionId"=$2 WHERE "reviewId"=$1', [f.reviewId, f.snapshotId]); })).rejects.toThrow(/permission denied/u);
         await expect(asRuntime(async () => { await client.query('UPDATE studio_review_policy_event SET payload=$2::jsonb WHERE "reviewId"=$1', [f.reviewId, '{}']); })).rejects.toThrow(/permission denied/u);

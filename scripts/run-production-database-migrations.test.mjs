@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(82);
+  expect(manifest).toHaveLength(83);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0082_studio_review_policy");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(82);
+  expect(manifest.at(-1).id).toBe("0083_studio_review_vote_epoch");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(83);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1724,5 +1724,5 @@ test("review policy metadata has only current-state column grants and vote histo
   expect(acl).not.toMatch(/GRANT UPDATE[^;]+ON TABLE public\.studio_review_policy_event/u);
   expect(violation).toContain("'studio_review_policy'::text");
   expect(violation).toContain("'studio_review_policy_event'::text");
-  expect(loadMigrationManifest().at(-1).id).toBe("0082_studio_review_policy");
+  expect(loadMigrationManifest().some((migration) => migration.id === "0082_studio_review_policy")).toBe(true);
 });
