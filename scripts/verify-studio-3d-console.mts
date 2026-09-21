@@ -38,6 +38,7 @@ import {
 
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import { runStudioBg3dTextureGpuProof } from "./lib/studio-bg3d-texture-gpu-proof";
+import { isStudioStaticPreviewReadinessUnavailable } from "./lib/studio-verify-preview-errors.mjs";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -994,6 +995,10 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     const type = message.type();
     const location = message.location().url;
     const value = location ? `${message.text()} @ ${location}` : message.text();
+    if (type === "error" && isStudioStaticPreviewReadinessUnavailable(value, studioUrl)) {
+      console.log(`[static-preview] backend unavailable (not an API readiness pass): ${value}`);
+      return;
+    }
     if (type === "log" && value.includes(R3F_CONTEXT_LOSS_DIAGNOSTIC)) {
       if (expectingLiveContextLoss) liveContextLossDiagnostics += 1;
       else issues.push(`unexpected planned-context-loss diagnostic: ${value}`);
@@ -1202,6 +1207,11 @@ async function run(page: Page, studioUrl: string): Promise<void> {
     "opening the BG3D dialog must not request Babylon specialist code",
   );
 
+  // Engine diagnostics live in the shipped professional workspace, not its simplified labels.
+  const professionalMode = backgroundDialog.getByRole("group", { name: "3D 편집 모드" })
+    .getByRole("button", { name: "전문", exact: true });
+  await professionalMode.click();
+  assertCondition(await professionalMode.getAttribute("aria-pressed") === "true", "professional mode did not activate");
   await backgroundDialog.getByRole("tab", { name: "보기", exact: true }).click();
   await page.waitForTimeout(300);
   assertCondition(
@@ -1342,7 +1352,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   });
 
   await backgroundDialog.getByRole("tab", { name: "레이어", exact: true }).click();
-  await backgroundDialog.getByText(`${KTX2_SMOKE_MODEL_LABEL} 1`, { exact: true }).waitFor({
+  await backgroundDialog.getByRole("button", { name: `${KTX2_SMOKE_MODEL_LABEL} 1`, exact: true }).waitFor({
     state: "visible",
     timeout: 30_000,
   });

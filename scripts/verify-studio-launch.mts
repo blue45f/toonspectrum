@@ -22,6 +22,10 @@ import { pathToFileURL } from "node:url";
 
 import { chromium, type Browser, type Locator, type Page } from "playwright";
 
+
+import { STUDIO_BRUSH_LABELS } from "../apps/web/src/domains/creator/brush/studio-brush-product-model";
+
+import { isStudioStaticPreviewReadinessUnavailable } from "./lib/studio-verify-preview-errors.mjs";
 import {
   cleanScratchDir,
   findFreePort,
@@ -115,6 +119,10 @@ export function isExpectedStaticPreviewApiError(
   message: string,
   studioUrl: string,
 ): boolean {
+  if (isStudioStaticPreviewReadinessUnavailable(message, studioUrl)) {
+    console.log(`[static-preview] backend unavailable (not an API readiness pass): ${message}`);
+    return true;
+  }
   let preview: URL;
   try {
     preview = new URL(studioUrl);
@@ -723,13 +731,16 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const dynamicBrushReady = await airbrushPreset.getAttribute("aria-selected") === "true";
   const brushStudioLaunchers = sheet
     .locator('button[aria-haspopup="dialog"]')
-    .filter({ hasText: /^\s*브러시 스튜디오/ });
+    .filter({ hasText: STUDIO_BRUSH_LABELS.editCurrent });
   const exactBrushStudioLauncher = (await brushStudioLaunchers.count()) === 1;
   const brushStudioLauncher = brushStudioLaunchers.first();
   await brushStudioLauncher.scrollIntoViewIfNeeded();
+  // The nested modal deliberately makes its parent inert. Check parent controls while accessible.
+  const lineCorrectionReady = (await lineCorrection.count()) === 1
+    && await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled();
   await brushStudioLauncher.click();
 
-  const brushStudio = page.getByRole("dialog", { name: "브러시 스튜디오", exact: true });
+  const brushStudio = page.getByRole("dialog", { name: STUDIO_BRUSH_LABELS.editCurrent, exact: true });
   await brushStudio.waitFor({ state: "visible", timeout: 3000 });
   // `visible` becomes true at the first frame of the global dialog materialize animation. Measuring
   // touch targets while its scale is still below 1 would report a transient ~41.6px box for a
@@ -758,9 +769,8 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const controlsReady =
     dynamicBrushReady &&
     exactBrushStudioLauncher &&
-    (await lineCorrection.count()) === 1 &&
+    lineCorrectionReady &&
     (await pressureInput.count()) === 1 &&
-    await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled() &&
     await brushStudio.getByRole("slider", { name: "필압 반응 강도" }).isEnabled();
 
   const mobileImmersiveValue = await editorRoot.getAttribute("data-studio-mobile-immersive");
@@ -810,14 +820,16 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
 
   await page.screenshot({ path: shot, fullPage: false });
 
-  await brushStudio.getByRole("button", { name: "브러시 스튜디오 닫기", exact: true }).click();
+  await brushStudio.getByRole("button", { name: `${STUDIO_BRUSH_LABELS.editCurrent} 닫기`, exact: true }).click();
   await brushStudio.waitFor({ state: "detached", timeout: 3000 });
-  await page.waitForFunction(() => {
+  await page.waitForFunction((label) => {
     const active = document.activeElement;
     return active instanceof HTMLButtonElement &&
-      active.getAttribute("aria-haspopup") === "dialog" &&
-      active.textContent?.includes("브러시 스튜디오");
-  });
+      active.getAttribute("aria-haspopup") === "dialog" && active.textContent?.includes(label);
+  }, STUDIO_BRUSH_LABELS.editCurrent);
+  if (!await sheet.getByRole("combobox", { name: "보정 방식" }).isEnabled()) {
+    throw new Error("Parent brush controls did not become accessible after closing the modal");
+  }
   const launcherFocusRestored = await brushStudioLauncher.evaluate(
     (launcher) => document.activeElement === launcher
   );

@@ -6,6 +6,8 @@ import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT, normalizeStudioBg3dSceneDocument,
   serializeStudioBg3dSceneDocument } from "../../apps/web/src/domains/creator/bg3d/studio-bg3d-scene-document";
 
 import { createStudioBg3dTextureFixture } from "./studio-bg3d-texture-fixture";
+import { resolveStudioProductionGltfLoaderExport } from "./studio-production-gltf-loader.mjs";
+
 
 import type { Page } from "playwright";
 
@@ -44,9 +46,11 @@ export async function runStudioBg3dTextureGpuProof(page: Page, rootUrl: string, 
   });
   await page.goto(rootUrl, { waitUntil: "domcontentloaded" });
   await page.evaluate("globalThis.__name ??= (target) => target");
-  const result = await page.evaluate(async ({ cases, urls, profiles }) => {
+  const loaderExport = await page.evaluate(resolveStudioProductionGltfLoaderExport, urls.gltfLoader);
+  const result = await page.evaluate(async ({ cases, urls, profiles, loaderExport }) => {
     const three = await import(urls.three) as Record<string, unknown>;
-    const loaderModule = await import(urls.gltfLoader) as typeof import("three/examples/jsm/loaders/GLTFLoader.js");
+    const loaderModule = await import(urls.gltfLoader) as Record<string, typeof import("three/examples/jsm/loaders/GLTFLoader.js").GLTFLoader>;
+    const GLTFLoader = loaderModule[loaderExport]!;
     const specialist = await import(urls.babylon) as typeof import("../../apps/web/src/domains/creator/bg3d/studio-bg3d-babylon-specialist-entry");
     const find = (identity: string) => {
       const candidate = Object.values(three).find((value) => typeof value === "function"
@@ -72,7 +76,7 @@ export async function runStudioBg3dTextureGpuProof(page: Page, rootUrl: string, 
         const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
         const actualHash = `sha256:${Array.from(digest, (value) => value.toString(16).padStart(2, "0")).join("")}`;
         if (actualHash !== fixture.hash) throw new Error("Texture fixture SHA drift");
-        const gltf = await new loaderModule.GLTFLoader().parseAsync(bytes.buffer, "");
+        const gltf = await new GLTFLoader().parseAsync(bytes.buffer, "");
         const scene = new Scene();
         scene.add(gltf.scene);
         renderer.render(scene, camera);
@@ -179,7 +183,7 @@ export async function runStudioBg3dTextureGpuProof(page: Page, rootUrl: string, 
       }
     } finally { renderer.dispose(); renderer.forceContextLoss(); }
     return reports;
-  }, { cases, urls, profiles: { version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION, beauty: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
+  }, { cases, urls, loaderExport, profiles: { version: STUDIO_BG3D_ARTIFACT_CAPTURE_VERSION, beauty: STUDIO_BG3D_BEAUTY_RGBA8_PROFILE,
     depth: STUDIO_BG3D_DEPTH_FLOAT32_PROFILE, id: STUDIO_BG3D_STABLE_ID_PROFILE } });
   console.log(`[verify-studio-3d-console] embedded PNG texture PASS ${JSON.stringify(result)}`);
   return result;

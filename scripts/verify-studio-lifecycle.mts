@@ -45,6 +45,7 @@ import { DIST_DIR } from "./lib/repo-paths.mjs";
 import {
   enabledStudioHistoryControl,
 } from "./lib/studio-verify-history-controls.mjs";
+import { isStudioStaticPreviewReadinessUnavailable } from "./lib/studio-verify-preview-errors.mjs";
 import {
   cleanScratchDir,
   findFreePort,
@@ -52,6 +53,7 @@ import {
   stopChildProcess,
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
+import { studioRecoveryObservationInitScript, completeObservedStudioRecovery } from "./lib/studio-verify-recovery-controls.mjs";
 import {
   inspectPngIntegrity,
   studioLifecycleVisualViolations,
@@ -86,6 +88,7 @@ interface AutosaveEvidence {
   authority: "durable-reload-recovery";
   recoveryBannerObserved: true;
   restoreActionCompleted: true;
+  recoveryMode: "automatic" | "manual";
   browserCompatibilityKeysBeforeReload: number;
   browserCompatibilityKeysAtRecovery: number;
 }
@@ -157,6 +160,10 @@ function sha256(bytes: Uint8Array | string): string {
 }
 
 function isExpectedStaticPreviewError(message: string, studioUrl: string): boolean {
+  if (isStudioStaticPreviewReadinessUnavailable(message, studioUrl)) {
+    console.log(`[static-preview] backend unavailable (not an API readiness pass): ${message}`);
+    return true;
+  }
   let preview: URL;
   try {
     preview = new URL(studioUrl);
@@ -692,12 +699,14 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       context = await chromium.launchPersistentContext(profile, {
         ...contextOptions, headless: true, args: ["--no-sandbox"], offline: true,
       });
+      await context.addInitScript({ content: studioRecoveryObservationInitScript() });
       page = await context.newPage();
       collectBrowserErrors(page, studioUrl, browserErrors);
       // Reuse only persisted browser storage, not storageState or injected artwork.
       await page.goto(reopenUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
       log("OFFLINE RESTART: fresh Chromium process, same profile, no network and no injected recovery data");
     } else {
+      await page.addInitScript({ content: studioRecoveryObservationInitScript() });
       await page.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
     }
     await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
@@ -706,16 +715,15 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
     // it over the menubar, which can legitimately reopen a rich tool hint above the recovery rail.
     await page.mouse.move(1, (page.viewportSize()?.height ?? 1000) - 1);
     await page.keyboard.press("Escape");
-    const recoveryMessage = page.locator("[data-studio-recovery-notice]");
-    await recoveryMessage.waitFor({ state: "visible", timeout: profile ? 30_000 : 8_000 });
+    const recovery = await completeObservedStudioRecovery(page, profile ? 30_000 : 8_000);
+    log(`RECOVERY: observed the shipped notice, mode=${recovery.mode}; checking restored pixels and exports`);
     const recoveryReadyAfterReloadMs = performance.now() - reloadStartedAt;
     const browserCompatibilityKeysAtRecovery = await countBrowserCompatibilityAutosaveKeys(page);
     invariant(
       browserCompatibilityKeysAtRecovery === 0,
       "reload recovery was backed by a browser compatibility record instead of OPFS/SQLite",
     );
-    await page.getByRole("button", { name: "이어서 그리기", exact: true }).click();
-    await recoveryMessage.waitFor({ state: "detached", timeout: 8_000 });
+
 
     const restoredStage = page.locator(".konvajs-content").first();
     await restoredStage.waitFor({ state: "visible" });
@@ -774,8 +782,9 @@ async function runLifecycle(browser: Browser, origin: string): Promise<Lifecycle
       externalPreview: Boolean(process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()),
       autosave: {
         authority: "durable-reload-recovery",
-        recoveryBannerObserved: true,
+        recoveryBannerObserved: recovery.observed,
         restoreActionCompleted: true,
+        recoveryMode: recovery.mode,
         browserCompatibilityKeysBeforeReload,
         browserCompatibilityKeysAtRecovery,
       },

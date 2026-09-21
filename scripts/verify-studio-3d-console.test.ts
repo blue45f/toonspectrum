@@ -856,3 +856,13 @@ describe("3D Magic production-preview product boundary", () => {
     expect(alignmentProof).not.toContain('kind: "artifact-capture-v2"');
   });
 });
+
+it("drives professional mode before engine diagnostics and selects the actual imported layer control", () => {
+  expect(verifierSource).toContain('name: "3D 편집 모드"');
+  expect(verifierSource).toContain('name: "전문", exact: true');
+  expect(verifierSource.indexOf("await professionalMode.click()")).toBeLessThan(
+    verifierSource.indexOf('backgroundDialog.getByRole("tab", { name: "보기"'),
+  );
+  expect(verifierSource).toContain('getByRole("button", { name: `${KTX2_SMOKE_MODEL_LABEL} 1`, exact: true })');
+  expect(verifierSource).toContain("isStudioStaticPreviewReadinessUnavailable(value, studioUrl)");
+});
