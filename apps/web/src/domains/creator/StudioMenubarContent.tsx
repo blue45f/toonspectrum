@@ -1,3 +1,4 @@
+import { StudioDocumentChromeSlot } from "./studio-shell/StudioDocumentChromeSlot";
 import {
   Bookmark,
   Box,
@@ -522,6 +523,7 @@ function StudioMenubarCommandBar({
           <Settings2 size={14} aria-hidden />
         </button>
       </StudioToolHintTarget>
+      {!hidden ? <StudioDocumentChromeSlot /> : null}
       {settingsOpen && typeof document !== "undefined"
         ? createPortal(
             <div
@@ -2330,6 +2332,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
       {/* 2행 — §15.3 Window ▸ Action Bar. CSP 처럼 메뉴 바 **아래** 자기 줄에 놓아, 8 슬롯이
           늘어나도 상위 메뉴 18개의 가로 예산을 한 픽셀도 가져가지 않는다. 오버플로 실측기가
           재는 것은 1행의 `data-studio-menubar-primary` 뿐이라 이 줄은 계산에 아예 안 들어온다. */}
+      {mobileImmersive ? <StudioDocumentChromeSlot /> : null}
       <StudioMenubarCommandBar
         preferences={commandBarPreferences}
         bindings={commandBarBindings}

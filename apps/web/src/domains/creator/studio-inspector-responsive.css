@@ -1,0 +1,18 @@
+/* Layer commands remain 44px targets; explanatory chrome yields to the actual list. */
+@media (max-width: 63.999rem) and (max-height: 37.5rem) {
+  #studio-inspector[data-studio-inspector-primary="layers"] [data-studio-inspector-description="true"],
+  #studio-inspector[data-studio-inspector-primary="layers"] [data-studio-layer-help="idle"],
+  #studio-inspector[data-studio-inspector-primary="layers"] [data-studio-layer-keyboard-help="true"] {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  #studio-inspector[data-studio-inspector-primary="layers"] [data-studio-layer-list-header="true"] { padding: 4px 8px; }
+  #studio-inspector[data-studio-inspector-primary="layers"] [data-inspector-chrome="navigator"] { flex-shrink: 0; }
+}
+/* The modal scrim owns the foreground. Save/offline warnings stay intact behind it rather
+   than painting above the dialog's tabs. Closing the modal reveals the same safety controls. */
+@media (max-width: 63.999rem) {
+  body:has([data-studio-mobile-sheet="true"]) [data-studio-draft-save-center],
+  body:has([data-studio-mobile-sheet="true"]) [data-studio-shell-floating-target="offline-readiness"] {
+    z-index: 58 !important;
+  }
+}

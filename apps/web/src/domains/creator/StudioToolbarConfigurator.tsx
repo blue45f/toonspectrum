@@ -54,35 +54,18 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
   const available = DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((tool) => !draft.visibleIds.includes(tool));
 
   return <section aria-label="도구막대 구성 편집" data-studio-toolbar-configurator="true" className="space-y-3 text-sm">
-    <div className="sticky -top-4 z-10 space-y-3 border-b border-line bg-panel pb-3">
+    <div className="space-y-2 border-b border-line bg-panel pb-2">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">도구막대 구성</h3>
         <span className="text-xs tabular-nums text-fg">고정 {draft.visibleIds.length} · 전체 {DEFAULT_STUDIO_RAIL_TOOL_ORDER.length}</span>
       </div>
-      <p className="text-xs leading-relaxed text-fg">사용자 순서와 개수를 유지합니다. 전체 도구는 고정하지 않아도 사용할 수 있습니다.</p>
+
       <label className="relative block"><Search size={16} aria-hidden className="absolute left-3 top-3.5" />
         <input type="search" aria-label="도구막대에서 도구 찾기" value={query}
           onChange={(event) => setQuery(event.currentTarget.value.slice(0, 80))}
           placeholder="도구 이름 · 스포이드 · 단축키" className="min-h-11 w-full rounded-lg border border-line bg-card pl-9 pr-3 text-sm" />
       </label>
-      <label className="flex items-center gap-2 text-xs">보기 방식
-        <select aria-label="도구막대 보기 방식" className={action} value={draft.view ?? "single"}
-          onChange={(event) => change({ ...draft, view: event.currentTarget.value as StudioToolbarView })}>
-          <option value="single">한 열</option><option value="double">두 열</option><option value="list">이름 목록</option>
-        </select>
-      </label>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" className={action} onClick={() => change(pinAllStudioToolbarTools(draft))}>모든 도구 고정</button>
-        <button type="button" className={action} onClick={() => change({ ...draft, visibleIds: DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((tool) => draft.visibleIds.includes(tool)) })}>기본 순서로 정렬</button>
-      </div>
-    </div>
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="선택 도구 일괄 편집">
-      <button type="button" className={action} onClick={() => setSelected(draft.visibleIds.filter(matches))}>고정 목록 선택</button>
-      <button type="button" className={action} onClick={() => setSelected(available.filter(matches))}>추가 목록 선택</button>
-      <button type="button" className={action} disabled={!selected.length} onClick={() => { change(pinStudioToolbarTools(draft, selected)); setSelected([]); }}>선택 추가</button>
-      <button type="button" className={action} disabled={!selected.some((tool) => draft.visibleIds.includes(tool)) || draft.visibleIds.every((tool) => selected.includes(tool))}
-        onClick={() => { change(unpinStudioToolbarTools(draft, selected)); setSelected([]); }}>선택 제거</button>
-      <button type="button" className={action} onClick={() => setSelected([])}>선택 해제</button>
+
     </div>
     <div className="grid min-h-0 gap-3 sm:grid-cols-2">
       <section aria-labelledby={`${id}-pinned`} className="min-w-0 rounded-lg border border-line p-2">
@@ -129,6 +112,30 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
         {!available.filter(matches).length ? <p className="py-3 text-xs text-fg-2">추가할 검색 결과가 없습니다.</p> : null}
       </section>
     </div>
+      <details className="rounded-lg border border-line p-2">
+        <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold">보기 방식·일괄 편집</summary>
+        <div className="space-y-2">
+      <p className="text-xs leading-relaxed text-fg">사용자 순서와 개수를 유지합니다. 전체 도구는 고정하지 않아도 사용할 수 있습니다.</p>
+      <label className="flex items-center gap-2 text-xs">보기 방식
+        <select aria-label="도구막대 보기 방식" className={action} value={draft.view ?? "single"}
+          onChange={(event) => change({ ...draft, view: event.currentTarget.value as StudioToolbarView })}>
+          <option value="single">한 열</option><option value="double">두 열</option><option value="list">이름 목록</option>
+        </select>
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={action} onClick={() => change(pinAllStudioToolbarTools(draft))}>모든 도구 고정</button>
+        <button type="button" className={action} onClick={() => change({ ...draft, visibleIds: DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((tool) => draft.visibleIds.includes(tool)) })}>기본 순서로 정렬</button>
+      </div>
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="선택 도구 일괄 편집">
+      <button type="button" className={action} onClick={() => setSelected(draft.visibleIds.filter(matches))}>고정 목록 선택</button>
+      <button type="button" className={action} onClick={() => setSelected(available.filter(matches))}>추가 목록 선택</button>
+      <button type="button" className={action} disabled={!selected.length} onClick={() => { change(pinStudioToolbarTools(draft, selected)); setSelected([]); }}>선택 추가</button>
+      <button type="button" className={action} disabled={!selected.some((tool) => draft.visibleIds.includes(tool)) || draft.visibleIds.every((tool) => selected.includes(tool))}
+        onClick={() => { change(unpinStudioToolbarTools(draft, selected)); setSelected([]); }}>선택 제거</button>
+      <button type="button" className={action} onClick={() => setSelected([])}>선택 해제</button>
+    </div>
+        </div>
+      </details>
     <details className="rounded-lg border border-line p-3">
       <summary className="min-h-9 cursor-pointer text-sm font-semibold">작업별 구성 · 내 구성 저장</summary>
       <div className="mt-2 flex flex-wrap gap-2">
@@ -149,7 +156,7 @@ export function StudioToolbarConfigurator({ value, onApply, onCancel }: {
     {conflict ? <div role="alert" className="text-sm text-warn">다른 화면에서 구성이 바뀌었습니다. 최신 구성을 불러온 뒤 다시 편집하세요.
       <button type="button" className={action} onClick={() => { setDirty(false); setSelected([]); }}>최신 구성 불러오기</button>
     </div> : null}
-    <footer className="sticky bottom-0 flex justify-end gap-2 border-t border-line bg-panel py-3">
+    <footer className="sticky bottom-0 z-10 flex justify-end gap-2 border-t border-line bg-panel py-2">
       <button type="button" className={action} onClick={onCancel}>취소</button>
       <button type="button" className={`${action} bg-accent-soft text-accent`} disabled={conflict}
         onClick={() => onApply({ ...draft, configured: true, version: 2 })}>구성 적용</button>

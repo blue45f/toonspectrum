@@ -1,3 +1,4 @@
+import "./studio-inspector-responsive.css";
 import { StudioEditTargetSummary } from "./StudioEditTargetSummary";
 import { StudioPinnedColorPanelSlot } from "./color/StudioPinnedColorPanelSlot";
 import {
@@ -220,6 +221,7 @@ export function StudioInspectorAsideShell({
           role={isMobile ? "dialog" : "region"}
           aria-modal={isMobile && mobileSheet === "props" ? true : undefined}
           data-studio-sheet-id="props"
+          data-studio-inspector-primary={inspectorLayout.primary}
           data-studio-panel-detached={desktopDetached ? "true" : undefined}
           data-studio-mobile-sheet={isMobile && mobileSheet === "props" ? "true" : undefined}
           data-studio-sheet-snap={isMobile ? mobileInspectorSnap : undefined}
@@ -245,6 +247,7 @@ export function StudioInspectorAsideShell({
                   ...studioMobileSheetSizeStyle(
                     mobileInspectorSnap,
                     safeMobileKeyboardInset,
+                    inspectorLayout.primary === "layers" && mobileInspectorSnap !== "compact" ? "min(38rem, calc(100dvh - env(safe-area-inset-top) - 0.75rem))" : undefined,
                   ),
                 }
               : desktopDetached
@@ -416,7 +419,7 @@ export function StudioInspectorAsideShell({
             }}
           />
           <StudioInspectorDisabledReasons reasons={rightPanelDisabledReasons} />
-          <StudioEditTargetSummary model={model} />
+          {inspectorLayout.primary === "properties" ? <StudioEditTargetSummary model={model} /> : null}
           <StudioPinnedColorPanelSlot />
           <StudioInspectorCanvasControls
             background={bg}

@@ -322,6 +322,7 @@ export function StudioQuickStartPanel({
     <div
       ref={rootRef}
       data-studio-creative-starter="true"
+      data-studio-quickstart-collapsed={!expanded ? "true" : "false"}
       className="pointer-events-none absolute inset-x-2 top-16 z-[58] mx-auto max-w-[34rem] p-2 text-fg sm:inset-x-auto sm:right-4 sm:top-auto sm:bottom-[calc(var(--studio-draw-options-height,0px)+1rem)] sm:mx-0 sm:w-[min(22rem,calc(100%-2rem))] sm:max-w-none sm:p-0"
     >
       {/* 이름이 붙은 `<section>` 은 그 자체로 `region` 랜드마크다(명시 role 은 중복). 모달이

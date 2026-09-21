@@ -1273,7 +1273,7 @@ export function StudioLayerNavigator({
       {activeItemMergeDownFallbackNote ? (
         <span id={mergeDownFallbackNoteId} className="sr-only">{activeItemMergeDownFallbackNote}</span>
       ) : null}
-      <div className="border-b border-line/70 bg-panel/70 p-2.5">
+      <div data-studio-layer-list-header="true" className="border-b border-line/70 bg-panel/70 p-2.5">
         <div className="flex items-center gap-2">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent ring-1 ring-accent/15" aria-hidden>
             <Layers3 size={16} />
@@ -1447,6 +1447,7 @@ export function StudioLayerNavigator({
         ) : null}
         <p
           id={dragHelpId}
+          data-studio-layer-help={filterActive || draggingLabel ? "active" : "idle"}
           className={cn(
             "mt-1.5 flex min-h-5 items-center gap-1 text-[0.58rem] leading-relaxed",
             filterActive ? "text-warning" : draggingLabel ? "text-accent" : "text-fg-3"
@@ -1467,7 +1468,7 @@ export function StudioLayerNavigator({
         <p aria-live="polite" aria-atomic="true" className="sr-only">
           {dragAnnouncement}
         </p>
-        <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
+        <p data-studio-layer-keyboard-help="true" className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
           Shift+↑↓로 범위 선택 · 이름을 입력해 레이어로 이동
         </p>
       </div>

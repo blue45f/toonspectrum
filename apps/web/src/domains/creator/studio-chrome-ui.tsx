@@ -1217,9 +1217,9 @@ export function StudioStatusBar({
       style={style}
       onWheel={handleStudioHorizontalWheel}
       className={cn(
-        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex min-w-0 max-w-[calc(100%-1.75rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
-        "touch-pan-x scroll-px-3 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] [scrollbar-width:none] [&>*]:shrink-0 [&::-webkit-scrollbar]:hidden",
-        "sm:max-w-[min(100%,44rem)]",
+        "pointer-events-auto absolute bottom-3.5 left-3.5 z-[10] flex min-w-0 max-w-[calc(100%_-_11rem)] flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain",
+        "touch-pan-x scroll-px-3 whitespace-nowrap [word-break:keep-all] [overflow-wrap:normal] [scrollbar-width:thin] [&>*]:shrink-0",
+        "sm:max-w-[min(calc(100%_-_11rem),44rem)]",
         "rounded-2xl px-2.5 py-1.5 text-[0.68rem] font-semibold tracking-tight text-fg-2",
         className
       )}

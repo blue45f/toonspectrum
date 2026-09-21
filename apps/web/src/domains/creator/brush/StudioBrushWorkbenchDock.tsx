@@ -1,3 +1,4 @@
+import "./studio-brush-workbench.css";
 import { PanelLeftClose, SlidersHorizontal, SquareArrowOutUpRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useStudioBrushDockLayout } from "./useStudioBrushDockLayout";
@@ -40,7 +41,9 @@ export function StudioBrushWorkbenchDock({
       <button type="button" onClick={onCollapse} aria-label="브러시 패널 접기"
         className="grid size-11 shrink-0 place-items-center rounded-lg text-fg-2 hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"><PanelLeftClose size={17} aria-hidden /></button>
     </header>
-    <div className="shrink-0 space-y-1 border-b border-line px-3 py-2 text-xs text-fg-2" aria-label="브러시 교체 정책">
+    <details className="studio-brush-dock-settings shrink-0 border-b border-line text-xs text-fg-2">
+      <summary className="flex min-h-11 cursor-pointer items-center px-3">브러시 교체·패널 설정</summary>
+    <div className="space-y-1 px-3 pb-2" aria-label="브러시 교체 정책">
       <p>브러시 교체 시 주 색은 유지됩니다.</p>
       {onToggleSizeLock ? <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={sizeLocked} onChange={onToggleSizeLock} />현재 크기 유지</label> : null}
       {onToggleOpacityLock ? <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={opacityLocked} disabled={catalog.operation === "erase"} onChange={onToggleOpacityLock} />현재 불투명도 유지</label> : null}
@@ -48,17 +51,18 @@ export function StudioBrushWorkbenchDock({
       {modifiedCount > 0 ? <div className="flex items-center justify-between gap-1"><span>수정됨 · {modifiedCount}개 설정</span><button type="button" className="min-h-9 rounded px-2 text-accent" onClick={onRestoreDefaults}>프리셋 복원</button></div> : null}
       {overlay ? <p role="status">캔버스 공간을 유지하기 위해 겹쳐 보기로 표시합니다.</p> : null}
     </div>
-    <div className="min-h-0 flex-1">
-      {expanded ? <p className="p-3 text-sm leading-relaxed text-fg-2">확장 보기에서 브러시를 고르고 있어요. 닫으면 이 패널로 돌아옵니다.</p>
-        : <StudioBrushLibrarySheet {...catalog} open embedded workbench autoFocusSearch={false} dismissOnEscape={false}
-          closeOnSelection={false} dismissOnOutsidePointer={false} onClose={onCollapse} />}
-    </div>
     {onWidthChange ? <details className="shrink-0 border-t border-line p-2 text-xs text-fg-2">
       <summary className="min-h-9 cursor-pointer">패널 너비 · {draftWidth}px</summary>
       <input type="range" aria-label="브러시 패널 너비" min={200} max={360} step={8} value={draftWidth}
         onChange={(event) => { const next = Number(event.currentTarget.value); draftWidthRef.current = next; setDraftWidth(next); }}
         onPointerUp={commitWidth} onKeyUp={commitWidth} onBlur={commitWidth} className="h-11 w-full" />
     </details> : null}
+    </details>
+    <div className="min-h-0 flex-1">
+      {expanded ? <p className="p-3 text-sm leading-relaxed text-fg-2">확장 보기에서 브러시를 고르고 있어요. 닫으면 이 패널로 돌아옵니다.</p>
+        : <StudioBrushLibrarySheet {...catalog} open embedded workbench autoFocusSearch={false} dismissOnEscape={false}
+          closeOnSelection={false} dismissOnOutsidePointer={false} onClose={onCollapse} />}
+    </div>
     <footer className="flex shrink-0 flex-wrap gap-1 border-t border-line p-2">
       <button type="button" onClick={onOpenBrushStudio}
         className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-2 text-xs text-fg-2 hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent">

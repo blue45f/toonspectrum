@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, type RefObject } from "react";
 import { studioStrokeFocusActivitySnapshot, subscribeStudioStrokeFocusActivity } from "../studio-stroke-focus-activity";
 
 export function resolveStudioBrushDockPresentation(width: number, rail: number, inspector: number, brush: number) {
-  return width < 1280 || width - rail - inspector - brush < 480 ? "overlay" : "docked";
+  return width - rail - inspector - brush < 480 ? "overlay" : "docked";
 }
 
 /** Resize changes presentation only; active pointer and text gestures defer reflow. */
@@ -16,10 +16,16 @@ export function useStudioBrushDockLayout(ref: RefObject<HTMLElement | null>, wid
     const pointers = new Set<number>();
     const measure = () => {
       if (pointers.size || composing || studioStrokeFocusActivitySnapshot() !== "idle") return;
-      const rail = root.querySelector<HTMLElement>('[data-studio-tool-rail]')?.getBoundingClientRect().width ?? 56;
+      const workspace = ref.current?.closest<HTMLElement>("#studio-workspace") ?? root;
+      const railRect = root.querySelector<HTMLElement>('[data-studio-tool-rail]')?.getBoundingClientRect();
+      const rail = railRect ? Math.max(0, railRect.right - workspace.getBoundingClientRect().left) : 56;
       const inspector = root.querySelector<HTMLElement>('#studio-inspector')?.getBoundingClientRect().width ?? 320;
+      const splitterWidth = Array.from(root.querySelectorAll<HTMLElement>("[data-studio-panel-resizer]")).reduce((sum, node) => {
+        const rect = node.getBoundingClientRect();
+        return sum + (rect.left >= (railRect?.right ?? rail) ? rect.width : 0);
+      }, 0);
       const size = root.getBoundingClientRect().width || globalThis.innerWidth;
-      const overlay = resolveStudioBrushDockPresentation(size, rail, inspector, width) === "overlay";
+      const overlay = resolveStudioBrushDockPresentation(size, rail, inspector + splitterWidth, width) === "overlay";
       setLayout((current) => current.overlay === overlay && current.left === rail ? current : { overlay, left: rail });
     };
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
@@ -30,6 +36,7 @@ export function useStudioBrushDockLayout(ref: RefObject<HTMLElement | null>, wid
     const release = () => { pointers.clear(); composing = false; schedule(); };
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(schedule) : null;
     observer?.observe(root);
+    for (const panel of root.querySelectorAll("#studio-inspector, [data-studio-tool-rail]")) observer?.observe(panel);
     const unsubscribe = subscribeStudioStrokeFocusActivity(schedule);
     document.addEventListener("pointerdown", down, true);
     document.addEventListener("pointerup", up, true);
@@ -50,5 +57,16 @@ export function useStudioBrushDockLayout(ref: RefObject<HTMLElement | null>, wid
       globalThis.removeEventListener("blur", release);
     };
   }, [ref, width]);
+  useLayoutEffect(() => {
+    const workspace = ref.current?.closest<HTMLElement>("#studio-workspace");
+    if (!workspace) return;
+    const name = "--studio-brush-overlay-width";
+    const previous = workspace.style.getPropertyValue(name);
+    workspace.style.setProperty(name, layout.overlay ? `${width}px` : "0px");
+    return () => {
+      if (previous) workspace.style.setProperty(name, previous);
+      else workspace.style.removeProperty(name);
+    };
+  }, [layout.overlay, ref, width]);
   return layout;
 }
