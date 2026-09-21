@@ -277,6 +277,7 @@ scripts/pigment-dependency-install-policy.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/studio-production-realtime.test.ts
 scripts/verify-studio-3d-console.test.ts
+scripts/verify-studio-canvas-entry.test.ts
 scripts/verify-studio-engine-editor-entry.test.ts
 scripts/verify-studio-five-hour-soak-harness.test.ts
 scripts/verify-studio-hokusai-live-integration.test.ts
