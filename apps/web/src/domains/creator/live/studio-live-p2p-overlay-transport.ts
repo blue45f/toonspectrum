@@ -321,6 +321,7 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
   private readonly directListeners = new Set<(sender: StudioLiveParticipant, payload: string) => void>();
   private readonly fabricListeners = new Set<(sender: StudioPeerFabricPeer, payload: string) => void>();
   readonly mode: StudioLiveTransport["mode"];
+  readonly canvasLockPolicy: StudioLiveTransport["canvasLockPolicy"];
   readonly crdtFanout: NonNullable<StudioLiveTransport["crdtFanout"]>;
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
   readonly transportSessionId?: StudioLiveTransport["transportSessionId"];
@@ -378,6 +379,10 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     this.context = context;
     this.primary = primary;
     this.mode = primary.mode;
+    this.canvasLockPolicy = primary.canvasLockPolicy;
+    // Preserve absent optional capabilities through every wrapper.
+    if (typeof primary.acquireLock !== "function") this.acquireLock = undefined;
+    if (typeof primary.releaseLock !== "function") this.releaseLock = undefined;
     this.crdtFanout = primary.crdtFanout === "authoritative" ? "authoritative" : "mesh";
     this.createPeerConnection = createPeerConnection;
     this.now = now;

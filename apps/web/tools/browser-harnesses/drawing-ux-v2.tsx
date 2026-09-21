@@ -44,9 +44,28 @@ function Harness() {
   const [action, setAction] = useState("ready");
   const [mobile, setMobile] = useState(() => innerWidth < 1024);
   const sampleRef = useRef<((color: string) => void) | null>(null);
-  const { recentColors } = useStudioRecentColors({ ownerScope: "drawing-ux-v2-fixture", onPersistenceUnavailable: () => setStorage("session-only") });
+  const historyWriteCount = useRef(0);
+  const acquireHistory = useMemo(() => async () => {
+    const repository = await acquireProductStudioUiPreferencesRepository();
+    return {
+      loadRecentColors: repository.loadRecentColors.bind(repository),
+      saveRecentColors: (...args: Parameters<typeof repository.saveRecentColors>) => {
+        historyWriteCount.current += 1;
+        const fixture = document.querySelector<HTMLElement>('[data-testid="drawing-fixture"]');
+        if (fixture) fixture.dataset.historyWriteCount = String(historyWriteCount.current);
+        return repository.saveRecentColors(...args);
+      },
+    };
+  }, []);
+  const requestedCount = Number(new URLSearchParams(location.search).get("documentElements"));
+  const documentElements = Number.isInteger(requestedCount) && requestedCount > 0 ? Math.min(20000, requestedCount) : 1;
+  const { recentColors } = useStudioRecentColors({ acquireRepository: acquireHistory, ownerScope: "drawing-ux-v2-fixture", onPersistenceUnavailable: () => setStorage("session-only") });
   const history = useStudioSharedColorHistory();
-  const elements = useMemo(() => [{ id: "shape-1", type: "draw", kind: "rect", mode: "pen", stroke: objectColor, fill: objectColor, strokeWidth: 2, x: 20, y: 20, w: 200, h: 120, points: [20, 20, 220, 140] } as El], [objectColor]);
+  const elements = useMemo(() => Array.from({ length: documentElements }, (_, index) => ({
+    id: `shape-${index + 1}`, type: "draw", kind: "rect", mode: "pen", stroke: objectColor,
+    fill: index === 0 ? objectColor : `#${(index * 7919 % 16777216).toString(16).padStart(6, "0")}`,
+    strokeWidth: 2, x: 20, y: 20, w: 200, h: 120, points: [20, 20, 220, 140],
+  } as El)), [objectColor, documentElements]);
   useEffect(() => {
     let active = true;
     const version = settingsRevision.current;
@@ -90,7 +109,7 @@ function Harness() {
   };
   return <StudioColorWorkspaceProvider value={colorValue}>
     <main data-studio-editor="true" data-testid="drawing-fixture" data-persistence={storage}
-      data-history-persistence={history.status} className="flex h-[100dvh] min-h-0 flex-col bg-canvas text-fg">
+      data-history-persistence={history.status} data-document-elements={documentElements} data-history-write-count={historyWriteCount.current} className="flex h-[100dvh] min-h-0 flex-col bg-canvas text-fg">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line p-2 text-xs">
         <strong>드로잉 UX 통합 검증</strong>
         <button type="button" className="min-h-11 rounded border border-line px-2" onClick={() => setSettingsOpen(true)}>설정 열기</button>

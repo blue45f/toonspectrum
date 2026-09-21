@@ -104,6 +104,7 @@ class StudioAdaptiveCursorTransport implements StudioLiveTransport {
   readonly peerFabric?: StudioLiveTransport["peerFabric"];
   readonly peerBulk?: StudioLiveTransport["peerBulk"];
   readonly mode: StudioLiveTransport["mode"];
+  readonly canvasLockPolicy: StudioLiveTransport["canvasLockPolicy"];
   readonly crdtFanout?: StudioLiveTransport["crdtFanout"];
   readonly canonicalSessionId?: StudioLiveTransport["canonicalSessionId"];
   readonly transportSessionId?: StudioLiveTransport["transportSessionId"];
@@ -154,6 +155,7 @@ class StudioAdaptiveCursorTransport implements StudioLiveTransport {
     this.peerFabric = inner.peerFabric;
     this.peerBulk = inner.peerBulk;
     this.mode = inner.mode;
+    this.canvasLockPolicy = inner.canvasLockPolicy;
     this.crdtFanout = inner.crdtFanout;
     this.canonicalSessionId = inner.canonicalSessionId?.bind(inner);
     this.transportSessionId = inner.transportSessionId?.bind(inner);

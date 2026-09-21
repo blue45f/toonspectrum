@@ -185,6 +185,7 @@ export function renderStudioCanvasStickyBanners({
             />
             <Suspense fallback={null}>
               <StudioLivePresenceDockConnected
+                syncStatusSurface="save-center"
                 operationSyncReady={studioCrdtOperationSyncReady}
                 followingSessionId={followingStudioSessionId}
                 onOpenTeam={openTeam}

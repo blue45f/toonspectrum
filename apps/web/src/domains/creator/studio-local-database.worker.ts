@@ -1,8 +1,8 @@
+import { acquireStudioDatabaseWorkerHandoff } from "./studio-local-database-worker-handoff";
 /// <reference lib="webworker" />
 
 import { attachStudioLocalDatabaseWorkerHost } from "./studio-local-database-worker-host";
 import {
-  acquireStudioLocalDatabaseWorkerLock,
   type StudioLocalDatabaseWorkerLockLease,
   type StudioLocalDatabaseWorkerLockManagerLike,
 } from "./studio-local-database-worker-lock";
@@ -61,7 +61,7 @@ function leaseDatabase(
 async function openWorkerOwnedDatabase(): Promise<StudioLocalDatabaseWorkerDatabase> {
   let lease: StudioLocalDatabaseWorkerLockLease;
   try {
-    lease = await acquireStudioLocalDatabaseWorkerLock(workerLockManager());
+    lease = await acquireStudioDatabaseWorkerHandoff(workerLockManager());
   } catch (error) {
     const { SqliteUnavailableError } = await import("./studio-local-database");
     const reason =

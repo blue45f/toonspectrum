@@ -20,6 +20,11 @@ on:
       - 'apps/web/src/domains/creator/studio-toolbar*'
       - 'apps/web/tools/browser-harnesses/drawing-ux-v2*'
       - 'scripts/verify-studio-drawing-ux-v2.mjs'
+      - 'scripts/lib/studio-drawing-*'
+      - 'scripts/lib/studio-restricted-drawing-context.mjs'
+      - 'apps/web/src/domains/creator/useStudioRecentColors*'
+      - 'apps/web/src/domains/creator/studio-local-database-worker-handoff*'
+      - 'apps/web/src/domains/creator/studio-local-database.worker.ts'
       - 'scripts/verify-studio-discovery-ux.mts'
       - '.github/workflows/studio-discovery-ux.yml'
 
@@ -42,6 +47,11 @@ on:
       - 'apps/web/src/domains/creator/studio-toolbar*'
       - 'apps/web/tools/browser-harnesses/drawing-ux-v2*'
       - 'scripts/verify-studio-drawing-ux-v2.mjs'
+      - 'scripts/lib/studio-drawing-*'
+      - 'scripts/lib/studio-restricted-drawing-context.mjs'
+      - 'apps/web/src/domains/creator/useStudioRecentColors*'
+      - 'apps/web/src/domains/creator/studio-local-database-worker-handoff*'
+      - 'apps/web/src/domains/creator/studio-local-database.worker.ts'
       - 'scripts/verify-studio-discovery-ux.mts'
       - '.github/workflows/studio-discovery-ux.yml'
 
@@ -93,6 +103,11 @@ jobs:
           pnpm exec vitest run
           apps/web/src/domains/creator/brush
           apps/web/src/domains/creator/filter
+          apps/web/src/domains/creator/color
+          apps/web/src/domains/creator/useStudioRecentColors.test.tsx
+          apps/web/src/domains/creator/studio-local-database-worker-handoff.test.ts
+          scripts/lib/studio-drawing-browser-context.test.ts
+          scripts/lib/studio-drawing-isolated-origin.test.ts
           apps/web/src/domains/creator/studio-tool-search.test.ts
           apps/web/src/domains/creator/studio-basic-brush-expansion.test.ts
           apps/web/src/domains/creator/StudioUnifiedBrushPicker.test.tsx
@@ -145,17 +160,17 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Cache Playwright Chromium
+      - name: Cache drawing verification browsers
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-      - name: Install Chromium browser
+          key: ${{ runner.os }}-${{ runner.arch }}-drawing-three-engines-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install drawing browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install chromium
-      - name: Install Chromium system dependencies
-        run: pnpm exec playwright install-deps chromium
+        run: pnpm exec playwright install chromium firefox webkit
+      - name: Install drawing browser dependencies
+        run: pnpm exec playwright install-deps chromium firefox webkit
       - uses: actions/download-artifact@v6
         with:
           name: studio-discovery-dist
@@ -181,7 +196,7 @@ jobs:
             if curl --fail --silent http://127.0.0.1:5219/tools/browser-harnesses/drawing-ux-v2.html > /dev/null; then break; fi
             sleep 1
           done
-          node scripts/verify-studio-drawing-ux-v2.mjs
+          node scripts/verify-studio-drawing-ux-v2.mjs http://127.0.0.1:5219 chromium,firefox,webkit
       - name: Preserve drawing UX evidence
         if: always()
         uses: actions/upload-artifact@v6

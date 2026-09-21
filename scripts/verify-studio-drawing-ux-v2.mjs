@@ -1,3 +1,7 @@
+import { createStudioDrawingIsolatedOrigin } from "./lib/studio-drawing-isolated-origin.mjs";
+import { auditDrawingControls, measureDrawingColorInteraction } from "./lib/studio-drawing-acceptance-checks.mjs";
+import { verifyRestrictedDrawingContext } from "./lib/studio-restricted-drawing-context.mjs";
+import { openStudioDrawingContext } from "./lib/studio-drawing-browser-context.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -8,8 +12,10 @@ if (!["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname)) thr
 const engines = (process.argv[3] ?? "chromium").split(",");
 const output = path.resolve("artifacts/drawing-ux-v2");
 await fs.mkdir(output, { recursive: true });
-const report = { checks: [], errors: [], engines: [] };
-const url = new URL("/tools/browser-harnesses/drawing-ux-v2.html", origin).href;
+const report = { checks: [], errors: [], engines: [], storageModes: [], accessibility: [], performance: [], consoleErrors: [] };
+const isolated = await createStudioDrawingIsolatedOrigin(origin);
+const url = new URL("/tools/browser-harnesses/drawing-ux-v2.html", isolated.origin).href;
+report.origin = isolated.origin;
 const options = { timeout: 45000 };
 const pinIds = async (page) => JSON.parse(await page.getByTestId("pins").textContent());
 async function ready(page) {
@@ -200,7 +206,9 @@ async function desktop(page, engine) {
 }
 
 async function handheld(browser, engine, size) {
-  const context = await browser.newContext({ viewport: size, hasTouch: true, ...(engine !== "firefox" ? { isMobile: true } : {}) });
+  const session = await openStudioDrawingContext({ chromium, firefox, webkit }[engine], browser, engine,
+    { viewport: size, hasTouch: true, ...(engine !== "firefox" ? { isMobile: true } : {}) });
+  const context = session.context;
   const page = await context.newPage();
   page.on("pageerror", (error) => report.errors.push(`${engine} mobile: ${error.message}`));
   try {
@@ -269,7 +277,7 @@ async function handheld(browser, engine, size) {
     await expect(page.getByTestId("primary")).toHaveText("#abcdef");
     await expect(page.getByTestId("undo")).toHaveText("0");
     report.checks.push(`${engine}: actual mobile dock ${size.width}x${size.height}, brush-sheet target clearance, touch targets, canvas-only catalog, shared modal color commit`);
-  } finally { await context.close(); }
+  } finally { await session.close(); }
 }
 
 try {
@@ -279,20 +287,42 @@ try {
     const browser = await launcher.launch({ headless: true });
     report.engines.push({ engine, version: browser.version() });
     try {
-      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-      page.on("pageerror", (error) => report.errors.push(`${engine}: ${error.message}`));
-      await desktop(page, engine);
-      await page.context().close();
+      const session = await openStudioDrawingContext(launcher, browser, engine, { viewport: { width: 1440, height: 900 } });
+      report.storageModes.push({ engine, mode: session.mode });
+      try {
+        const page = await session.context.newPage();
+        page.on("pageerror", (error) => report.errors.push(`${engine}: ${error.message}`));
+        page.on("console", (message) => { if (message.type() === "error") report.consoleErrors.push(`${engine}: ${message.text()}`); });
+        await desktop(page, engine);
+        if (engine === "chromium") {
+          report.accessibility.push(...await auditDrawingControls(page));
+          report.performance.push(await measureDrawingColorInteraction(page, url));
+        }
+        if (session.reopen) {
+          const pins = await pinIds(page);
+          const recent = await page.getByTestId("recent").textContent();
+          const reopened = await session.reopen();
+          const restored = await reopened.newPage();
+          restored.on("pageerror", (error) => report.errors.push(`${engine} restored: ${error.message}`));
+          await ready(restored);
+          assert.deepEqual(await pinIds(restored), pins);
+          await expect(restored.getByTestId("recent")).toHaveText(recent, options);
+          report.checks.push(`${engine}: complete browser shutdown and fresh process restore real SQLite pins and recent colors`);
+        }
+      } finally { await session.close(); }
       await handheld(browser, engine, { width: 390, height: 700 });
       await handheld(browser, engine, { width: 360, height: 640 });
       await handheld(browser, engine, { width: 320, height: 640 });
+      if (engine === "webkit") report.storageModes.push({ engine, ...await verifyRestrictedDrawingContext(browser, url) });
     } finally { await browser.close(); }
   }
   assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.consoleErrors, []);
 } catch (error) {
   report.errors.push(error instanceof Error ? error.stack : String(error));
   process.exitCode = 1;
 } finally {
+  await isolated.close();
   await fs.writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report, null, 2));
 }

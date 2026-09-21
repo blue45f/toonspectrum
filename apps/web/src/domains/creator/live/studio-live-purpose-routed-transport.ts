@@ -156,6 +156,7 @@ function mergedFingerprint(envelope: StudioLiveAnyEnvelope): string {
  */
 class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
   readonly mode: StudioLiveTransport["mode"];
+  readonly canvasLockPolicy: StudioLiveTransport["canvasLockPolicy"];
   readonly crdtFanout?: StudioLiveTransport["crdtFanout"];
   private readonly context: StudioLiveTransportContext;
   private readonly roomId: string;
@@ -207,6 +208,10 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     this.primary = primary;
     this.coordinator = coordinator;
     this.mode = primary.mode;
+    this.canvasLockPolicy = primary.canvasLockPolicy;
+    // Preserve absent optional capabilities through every wrapper.
+    if (typeof primary.acquireLock !== "function") this.acquireLock = undefined;
+    if (typeof primary.releaseLock !== "function") this.releaseLock = undefined;
     this.crdtFanout = primary.crdtFanout;
     this.randomId = randomId;
     this.now = now;
@@ -356,7 +361,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
     return () => this.controlListeners.delete(listener);
   }
 
-  acquireLock = (request: Parameters<NonNullable<StudioLiveTransport["acquireLock"]>>[0]) => {
+  acquireLock: StudioLiveTransport["acquireLock"] = (request) => {
     const operation = this.primary.acquireLock;
     return operation
       ? operation
@@ -365,7 +370,7 @@ class StudioPurposeRoutedLiveTransport implements StudioLiveTransport {
       : Promise.reject(new Error("현재 연결은 서버 잠금을 지원하지 않습니다."));
   };
 
-  releaseLock = (request: Parameters<NonNullable<StudioLiveTransport["releaseLock"]>>[0]) => {
+  releaseLock: StudioLiveTransport["releaseLock"] = (request) => {
     const operation = this.primary.releaseLock;
     return operation
       ? operation.call(this.primary, request)
