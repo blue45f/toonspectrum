@@ -359,7 +359,7 @@ describe("Studio drawing palette workspace integration boundary", () => {
     );
 
     expect(inspectorShell).toContain(
-      'inspectorDrawing &&\n              inspectorLayout.primary === "properties" &&\n              "lg:overflow-hidden"',
+      'inspectorDrawing &&\n              inspectorLayout.primary === "properties" && !layersSplitWithProperties &&\n              "lg:overflow-hidden"',
     );
     expect(drawingSurface).toContain(
       'className="min-h-0 lg:flex lg:flex-1 lg:flex-col"',
