@@ -1,4 +1,5 @@
-import { StudioAllToolsCatalog } from "./StudioAllToolsCatalog";
+import { StudioAllToolsCatalogSlot as StudioAllToolsCatalog } from "./StudioAllToolsCatalogSlot";
+import { preloadStudioAllToolsCatalog } from "./studio-all-tools-catalog-loader";
 import { pinAllStudioToolbarTools, pinStudioToolbarTools, unpinStudioToolbarTools } from "./studio-toolbar-configuration";
 import { subscribeStudioAllTools } from "./studio-toolbar-channel";
 import { isStudioDrawingCoreTool, studioDrawingVisibleTools } from "./studio-drawing-core-tools";
@@ -1085,6 +1086,7 @@ zoom: { icon: Search, label: zoomViewToolLabel, description: zoomViewToolOpen ? 
   const railMoreFooter = (
     <div className="relative flex w-full flex-col items-center gap-1" data-studio-tool-rail-settings="true">
       <button type="button" id={railMoreTriggerId}
+        onMouseEnter={preloadStudioAllToolsCatalog} onFocus={preloadStudioAllToolsCatalog}
         aria-label="전체 도구" aria-controls={railMoreOpen ? railMoreDialogId : undefined}
         aria-expanded={railMoreOpen} aria-haspopup="dialog"
         className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg text-fg-2 hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"

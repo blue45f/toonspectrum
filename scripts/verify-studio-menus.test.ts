@@ -25,6 +25,9 @@ import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBac
 
 import {
   CATALOGUE_GROUPS,
+  closeFloatingUi,
+  IMAGE_RAIL_ENTRY,
+  QUICK_ACCESS_CLOSE_LABEL,
   DESKTOP_FLOATING_LAYOUT_DIALOG,
   FIRST_RUN_RAIL_TOOL_IDS,
   MENU_DRIVEN_POPOVERS,
@@ -199,4 +202,22 @@ describe("production menu verifier follows shipped feature entry points", () => 
       "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
     ]);
   });
+});
+
+
+it("pins the localized image action rather than a retired hidden caption", () => {
+  expect(STUDIO_RAIL_TOOL_CATALOG.find((tool) => tool.id === IMAGE_RAIL_ENTRY.id)?.label).toBe(IMAGE_RAIL_ENTRY.label);
+});
+
+it("closes persistent Quick Access explicitly without clicking canvas coordinates", async () => {
+  const click = vi.fn(async () => undefined);
+  const waitFor = vi.fn(async () => undefined);
+  const getByRole = vi.fn(() => ({ click }));
+  const page = { keyboard: { press: vi.fn(async () => undefined) }, waitForTimeout: vi.fn(async () => undefined),
+    mouse: { click: vi.fn() }, locator: vi.fn(() => ({ isVisible: async () => true, getByRole, waitFor })) };
+  await closeFloatingUi(page as unknown as import("playwright").Page);
+  expect(getByRole).toHaveBeenCalledWith("button", { name: QUICK_ACCESS_CLOSE_LABEL, exact: true });
+  expect(click).toHaveBeenCalledOnce();
+  expect(waitFor).toHaveBeenCalledWith({ state: "hidden", timeout: 5000 });
+  expect(page.mouse.click).not.toHaveBeenCalled();
 });
