@@ -29,7 +29,7 @@ export type StudioRenderSurfaceAuthorityStatus =
 
 export interface StudioRenderSurfaceAuthority {
   readonly status: StudioRenderSurfaceAuthorityStatus;
-  readonly backendId: StudioVelloHubBackendId | null;
+  readonly backendId: StudioVelloHubBackendId | "skia-canvaskit-document-webgl2" | null;
   readonly decision: StudioVelloHubDecision | null;
   readonly reason: string | null;
   /** Identity of the exact document + viewport projection this receipt describes. */

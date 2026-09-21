@@ -20,12 +20,12 @@ const verifierSource = readFileSync(
   "utf8",
 );
 
-describe("VelloHub /studio product wiring", () => {
-  it("mounts the hub from the real StudioCanvasViewport call site", () => {
+describe("GPU document /studio product wiring and retained Vello comparison boundaries", () => {
+  it("mounts the Skia document surface from the real StudioCanvasViewport call site", () => {
     expect(viewportSource).toContain(
-      'import { StudioRenderSurface } from "../render/StudioRenderSurface"',
+      'import { StudioSkiaDocumentSurface } from "../render/StudioSkiaDocumentSurface"',
     );
-    expect(viewportSource).toContain("<StudioRenderSurface");
+    expect(viewportSource).toContain("<StudioSkiaDocumentSurface");
     expect(viewportSource).toContain("elements={elements}");
     expect(viewportSource).toContain(
       "documentTransform={velloSceneDocumentTransform}",
