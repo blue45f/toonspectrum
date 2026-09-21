@@ -29,7 +29,7 @@ describe("studio shell floating integration", () => {
     expect(source("offline/StudioOfflinePanel.tsx"))
       .toContain('data-studio-shell-floating-target="offline-readiness"');
     expect(source("live/huddle/StudioP2pHuddleLauncher.tsx"))
-      .toContain('data-studio-shell-floating-target="collaboration"');
+      .toContain('data-studio-shell-floating-target={placement === "floating" ? "collaboration" : undefined}');
     expect(source("StudioWorkspaceArrangementToolbar.tsx"))
       .toContain('data-studio-shell-floating-target="workspace-arrangement"');
     expect(source("StudioWorkspaceArrangementControls.tsx"))
@@ -59,6 +59,14 @@ describe("studio shell floating integration", () => {
     expect(manager).toContain("var(--studio-canvas-bottom-inset,7rem)+0.75rem");
     expect(manager).toContain("보기 설정");
     expect(manager).toContain("{visibleCount}개");
+  });
+
+  it("embeds workspace chat beside work actions without duplicating the floating launcher", () => {
+    const space = source("virtual-space/StudioVirtualSpacePage.tsx");
+    expect(space).toContain('showHuddleLauncher={false}');
+    expect(space).toContain('<StudioP2pHuddleLauncher placement="inline" />');
+    expect(space).toContain('data-workspace-primary-action="true"');
+    expect(source("virtual-space/studio-workspace-live.css")).toContain('.workspace-live-actions>a[data-workspace-primary-action="true"]');
   });
 
   it("lazy-loads the durable manager inside the document lifetime boundary", () => {

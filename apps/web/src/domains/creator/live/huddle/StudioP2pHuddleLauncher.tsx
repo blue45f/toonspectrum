@@ -13,7 +13,7 @@ import { acquireStudioHuddleAudioFocus } from "./studio-p2p-huddle-audio-focus";
 import { resolveStudioHuddleAuthority, type StudioHuddleAuthority } from "./studio-p2p-huddle-authority";
 import { canRetryStudioHuddleConnection, resolveStudioHuddleAvailability, STUDIO_HUDDLE_AVAILABILITY_COPY } from "./studio-p2p-huddle-availability";
 
-export default function StudioP2pHuddleLauncher() {
+export default function StudioP2pHuddleLauncher({ placement = "floating" }: { readonly placement?: "floating" | "inline" } = {}) {
   const live = useStudioLiveCollaboration();
   const bt = useBilingual("domains.creator.live.huddle.StudioP2pHuddleLauncher");
   const strokeFocusPhase = useSyncExternalStore(
@@ -183,17 +183,18 @@ export default function StudioP2pHuddleLauncher() {
   function submit(event: FormEvent) {
     event.preventDefault();
     if (controller.current?.sendChat(draft)) { setDraft(""); setNotice(null); }
-    else setNotice("전송하지 못했습니다. 상대의 P2P 참여와 연결 상태를 확인해 주세요.");
+    else setNotice("메시지를 보내지 못했습니다. 연결이 복구되면 다시 보낼 수 있습니다.");
   }
-  if (!room || !live.canChat) return null;
+  if (!live.canChat) return null;
   const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
   return <aside
-    className="studio-p2p-huddle-dock pointer-events-none fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)] right-3 z-[65] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-5rem)] max-w-[calc(100vw-1.5rem)] flex-col items-end sm:bottom-3 sm:max-h-[calc(100dvh-1.5rem)]"
+    className={placement === "inline" ? "studio-p2p-huddle-dock pointer-events-none relative ml-auto flex shrink-0 flex-col items-end" : "studio-p2p-huddle-dock pointer-events-none fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)] right-3 z-[65] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-5rem)] max-w-[calc(100vw-1.5rem)] flex-col items-end sm:bottom-3 sm:max-h-[calc(100dvh-1.5rem)]"}
+    data-studio-huddle-placement={placement}
     aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "협업 대화")}
-    data-studio-shell-floating-target="collaboration"
+    data-studio-shell-floating-target={placement === "floating" ? "collaboration" : undefined}
     data-studio-shell-force-visible={active ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "en", "true") : undefined}
   >
-    <section hidden={!open} style={{ display: open ? "flex" : undefined }} className="studio-p2p-huddle-panel pointer-events-auto mb-2 min-h-0 w-[min(760px,calc(100vw-1.5rem))] max-w-full flex-col overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
+    <section id="studio-p2p-huddle-panel" hidden={!open} style={{ display: open ? "flex" : undefined, ...(placement === "inline" ? { position: "absolute", bottom: "100%", right: 0, zIndex: 65, maxWidth: "calc(100vw - 2.25rem)", maxHeight: "min(680px, calc(100dvh - 10rem))" } as const : {}) }} className="studio-p2p-huddle-panel pointer-events-auto mb-2 min-h-0 w-[min(760px,calc(100vw-1.5rem))] max-w-full flex-col overflow-hidden rounded-2xl border border-accent/40 bg-panel text-fg shadow-2xl"
       aria-labelledby="studio-p2p-huddle-heading" data-studio-p2p-huddle="true">
       <header className="flex shrink-0 items-center justify-between border-b border-line p-3">
         <div><h3 id="studio-p2p-huddle-heading" className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "Virtual Studio · Huddle")}</h3>
@@ -206,9 +207,9 @@ export default function StudioP2pHuddleLauncher() {
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화·통화는 브라우저 간 직접 전송하며 기록을 저장하지 않습니다. 상대에게 네트워크 주소가 노출될 수 있으니 신뢰하는 작업자와 사용해 주세요.")}</p>
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "회사망·일부 모바일망에서는 연결되지 않을 수 있습니다. 실패 시 서버 중계로 전환하지 않습니다. 상대방의 녹화·캡처까지 막지는 못합니다.")}</p>
           {availability !== "ready" && <div className="space-y-2" data-studio-huddle-availability={availability}>
-            <p id="studio-huddle-unavailable" role="status" className="text-warn">{bt(...STUDIO_HUDDLE_AVAILABILITY_COPY[availability])}</p>
-            {canRetry && <button type="button" className={controlClass} onClick={live.retryServer}>
-              {bt("공동작업 연결 다시 확인", "Recheck collaboration connection")}
+            <p id="studio-huddle-unavailable" role="status" className="text-warn">{live.connectionRecovery === "waiting" || live.connectionRecovery === "retrying" ? bt("채팅·통화 연결을 자동으로 복구하고 있습니다.", "Reconnecting chat and calls automatically.") : bt(...STUDIO_HUDDLE_AVAILABILITY_COPY[availability])}</p>
+            {canRetry && live.connectionRecovery !== "waiting" && live.connectionRecovery !== "retrying" && <button type="button" className={controlClass} onClick={live.retryServer}>
+              {bt("다시 시도", "Try again")}
             </button>}
           </div>}
           <button className={controlClass} type="button" disabled={!canJoin} aria-describedby={!canJoin ? "studio-huddle-unavailable" : undefined} onClick={join}>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "동의하고 P2P 채팅 참여")}</button>
@@ -242,7 +243,7 @@ export default function StudioP2pHuddleLauncher() {
               <Hand size={14} />{snapshot?.hand ? translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "손 내리기") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "손들기")}</button>
             <button className={controlClass} type="button" onClick={leave}><PhoneOff size={14} />{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나가기")}</button>
           </div>
-          {room.direct && !conversation.current && <StudioP2pVirtualStudio
+          {room?.direct && !conversation.current && <StudioP2pVirtualStudio
             self={room.participant}
             port={room.direct}
             proximityMedia={proximityMedia}
@@ -262,7 +263,7 @@ export default function StudioP2pHuddleLauncher() {
           <div className="flex gap-2" aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "빠른 리액션")}>{HUDDLE_REACTIONS.map((emoji) =>
             <button key={emoji} className={controlClass} type="button" aria-label={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "{v0} 리액션 보내기"), { v0: String(emoji) })}
               onClick={() => controller.current?.react(emoji)}>{emoji}</button>)}</div>
-          {!snapshot?.peers.length && <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "같은 공동작업 원고에서 상대도 P2P 채팅에 참여해야 연결됩니다. 연결되지 않으면 네트워크를 확인해 주세요.")}</p>}
+          {!snapshot?.peers.length && <p className="text-xs text-fg-3">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "아직 참여한 팀원이 없습니다. 같은 작업실에서 팀원이 채팅에 참여하면 자동으로 연결됩니다.")}</p>}
           {controller.current && <StudioP2pActivitiesPanel controller={controller.current} />}
           <div ref={log} role="log" aria-label={translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "P2P 대화 기록")} aria-live="polite" aria-relevant="additions" className="max-h-48 space-y-2 overflow-y-auto rounded-xl bg-card p-2 text-xs">
             {snapshot?.messages.map((message) => <div key={message.id} className="break-words">
@@ -283,7 +284,7 @@ export default function StudioP2pHuddleLauncher() {
         {(notice || snapshot?.error) && <p role="status" className="text-xs leading-relaxed text-warn">{notice ?? snapshot?.error}</p>}
       </div>
     </section>
-    <button type="button" aria-expanded={open} className="pointer-events-auto ml-auto flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    <button type="button" aria-controls="studio-p2p-huddle-panel" aria-expanded={open} className="pointer-events-auto ml-auto flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-accent/40 bg-panel px-4 text-xs font-bold text-fg shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
       onClick={() => {
         const nextOpen = !open;
         if (nextOpen) {
