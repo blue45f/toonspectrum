@@ -76,3 +76,35 @@ it("keeps deletion in the draft, restores capacity and publishes only on Apply",
   expect(apply).toHaveBeenCalledOnce();
   expect(apply.mock.calls[0]![0].profiles).toHaveLength(11);
 });
+
+it("updates an existing profile only after confirmation and keeps its identity", () => {
+  const changed = vi.fn(); render(<Harness changed={changed} />);
+  expect(screen.getByRole("button", { name: "선화 작업" }).getAttribute("aria-pressed")).toBe("false");
+  fireEvent.click(screen.getByRole("button", { name: "선화 작업 구성을 현재 배치로 업데이트" }));
+  expect(changed).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "업데이트 취소" }));
+  expect(changed).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "선화 작업 구성을 현재 배치로 업데이트" }));
+  fireEvent.click(screen.getByRole("button", { name: "선화 작업 구성 업데이트 확인" }));
+  expect(changed).toHaveBeenCalledExactlyOnceWith({ ...initial(), profiles: [
+    { ...initial().profiles![0]!, visibleIds: ["pen", "eraser"] }, initial().profiles![1]!,
+  ] });
+  expect(screen.getByRole("button", { name: "선화 작업" }).getAttribute("aria-pressed")).toBe("true");
+});
+it("rejects duplicate creation with the same normalized-name policy as rename", () => {
+  const value = initial(); value.profiles = [{ id: "first", name: "Art  Work", visibleIds: ["pen"], view: "single" }];
+  const apply = vi.fn();
+  render(<StudioToolbarConfigurator value={value} onApply={apply} onCancel={vi.fn()} />);
+  fireEvent.click(screen.getByText("작업별 구성 · 내 구성 저장"));
+  fireEvent.change(screen.getByRole("textbox", { name: "새 도구 구성 이름" }), { target: { value: "ＡＲＴ work" } });
+  expect((screen.getByRole("button", { name: "구성 저장" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText(/같은 이름의 구성/)).toBeTruthy(); expect(apply).not.toHaveBeenCalled();
+});
+it("clears the active profile when its saved view no longer matches the layout", () => {
+  const value = initial(); value.visibleIds = ["pen"];
+  const apply = vi.fn(); render(<StudioToolbarConfigurator value={value} onApply={apply} onCancel={vi.fn()} />);
+  fireEvent.change(screen.getByRole("combobox", { name: "도구막대 보기 방식" }), { target: { value: "double" } });
+  fireEvent.click(screen.getByRole("button", { name: "구성 적용" }));
+  expect(apply.mock.calls[0]![0].activeProfileId).toBeNull();
+  expect(apply.mock.calls[0]![0].profiles).toEqual(value.profiles);
+});

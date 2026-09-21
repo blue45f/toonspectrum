@@ -133,3 +133,27 @@ it("revokes an open closing form if the actor loses host permission", () => {
   expect(screen.queryByRole("button", { name: "기록으로 종료 초안 만들기" })).toBeNull();
   expect(f.command).not.toHaveBeenCalled();
 });
+
+it("does not reuse a previously confirmed close form after host permission returns", () => {
+  const f = fixture(); f.view.session = { ...f.view.session, status: "active" };
+  const view = render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "결과를 남기고 종료" }));
+  fireEvent.click(screen.getByRole("checkbox"));
+  view.rerender(<StudioWorkSessionDetail {...f} view={{ ...f.view, capabilities: { edit: false, comment: true } }} actorId="host" busy={false} />);
+  view.rerender(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
+  expect(screen.queryByRole("button", { name: "확인하고 적용" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "결과를 남기고 종료" }));
+  expect(screen.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
+  expect(f.command).not.toHaveBeenCalled();
+});
+
+it("requires fresh close confirmation after the summary text is edited", () => {
+  const f = fixture(); f.view.session = { ...f.view.session, status: "active" };
+  render(<StudioWorkSessionDetail {...f} actorId="host" busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "결과를 남기고 종료" }));
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.change(screen.getByRole("textbox", { name: /결론·미결/u }), { target: { value: "새로운 결론" } });
+  expect(screen.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "확인하고 적용" }).disabled).toBe(true);
+  expect(f.command).not.toHaveBeenCalled();
+});

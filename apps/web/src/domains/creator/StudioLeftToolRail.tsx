@@ -548,6 +548,9 @@ function StudioLeftToolRailConnected() {
       setRailMoreOpen(false);
     };
     updatePosition();
+    // Lazy loading and filtering change dialog height without a viewport resize.
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(schedulePosition) : null;
+    if (dialog) observer?.observe(dialog);
     dialog?.addEventListener("keydown", handleKeyDown);
     document.addEventListener("pointerdown", handlePointerDown, true);
     globalThis.addEventListener("resize", schedulePosition);
@@ -561,6 +564,7 @@ function StudioLeftToolRailConnected() {
     });
     return () => {
       cancelAnimationFrame(frame);
+      observer?.disconnect();
       if (positionFrame !== null) globalThis.cancelAnimationFrame(positionFrame);
       dialog?.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("pointerdown", handlePointerDown, true);

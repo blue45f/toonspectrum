@@ -23,3 +23,13 @@ it("preserves existing text names when no explicit label is supplied", () => {
   fireEvent.click(screen.getByRole("button", { name: "검색" }));
   expect(open).toHaveBeenCalledTimes(1);
 });
+
+// The older QA branch also covered responsive hidden text, not just an icon-only caller.
+it("retains its explicit name when responsive text is hidden", () => {
+  render(<OpenSearchButton aria-label="작품·도구·메뉴 검색"><span hidden>작품·도구·메뉴 검색</span><svg aria-hidden="true" /></OpenSearchButton>);
+  const button = screen.getByRole("button", { name: "작품·도구·메뉴 검색" });
+  button.focus();
+  expect(document.activeElement).toBe(button);
+  fireEvent.click(button);
+  expect(open).toHaveBeenCalledTimes(1);
+});

@@ -95,6 +95,12 @@ test("creative journey connects public discovery to unified materials and sharin
   await assertStudioTaskFrame(page, "창작 작품");
   await page.goBack();
   await expect(page).toHaveURL(/\/hub$/u);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/market$/u);
+  await assertStudioTaskFrame(page, "소재 찾기");
+  await page.goBack();
+  await expect(page).toHaveURL(/\/learn$/u);
+  await expect(journey.locator('[aria-current="step"]')).toContainText("기법 익히기");
 });
 
 test("footer is keyboard-discoverable without waiting for scrolling or the old timer", async ({ page }) => {

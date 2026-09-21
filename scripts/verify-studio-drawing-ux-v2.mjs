@@ -72,14 +72,26 @@ async function desktop(page, engine) {
   await page.getByText("작업별 구성 · 내 구성 저장", { exact: true }).click();
   await page.getByRole("textbox", { name: "새 도구 구성 이름" }).fill("회귀 선화");
   await page.getByRole("button", { name: "구성 저장", exact: true }).click();
+  await page.getByRole("textbox", { name: "새 도구 구성 이름" }).fill(" 회귀 선화 ");
+  await expect(page.getByRole("button", { name: "구성 저장", exact: true })).toBeDisabled();
+  await page.getByRole("textbox", { name: "새 도구 구성 이름" }).fill("");
   await page.getByRole("button", { name: "회귀 선화 구성 이름 변경" }).click();
   const profileName = page.getByRole("textbox", { name: "회귀 선화 구성 새 이름" });
   await profileName.fill("키보드 작업"); await profileName.press("Enter");
+  await page.getByRole("combobox", { name: "도구막대 보기 방식", exact: true }).selectOption("list");
+  await expect(page.getByRole("button", { name: "키보드 작업", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await page.getByRole("button", { name: "키보드 작업 구성을 현재 배치로 업데이트" }).click();
+  await page.getByRole("button", { name: "업데이트 취소", exact: true }).click();
+  await page.getByRole("button", { name: "키보드 작업 구성을 현재 배치로 업데이트" }).click();
+  await page.getByRole("button", { name: "키보드 작업 구성 업데이트 확인" }).click();
+
   await page.getByRole("button", { name: "구성 적용", exact: true }).click();
   await saved(page); await page.reload(); await saved(page);
   await page.getByRole("button", { name: "설정 열기", exact: true }).click();
   await page.getByText("작업별 구성 · 내 구성 저장", { exact: true }).click();
   await expect(page.getByRole("button", { name: "키보드 작업", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "키보드 작업", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("combobox", { name: "도구막대 보기 방식" })).toHaveValue("list");
   await page.getByRole("button", { name: "키보드 작업 구성 삭제" }).click();
   await page.getByRole("button", { name: "삭제 취소", exact: true }).click();
   await expect(page.getByRole("button", { name: "키보드 작업", exact: true })).toBeVisible();
@@ -88,7 +100,7 @@ async function desktop(page, engine) {
   await page.getByRole("button", { name: "구성 적용", exact: true }).click();
   await saved(page); await page.reload(); await saved(page);
   assert.deepEqual(await pinIds(page), all);
-  report.checks.push(`${engine}: named profile rename persists, delete requires confirmation and preserves toolbar order`);
+  report.checks.push(`${engine}: profile duplicate guard, confirmed layout update/rename persists, confirmed deletion preserves order`);
 
   let dialog = await openColor(page);
   const hex = dialog.getByRole("textbox", { name: "헥스 색상 코드", exact: true });
@@ -163,6 +175,28 @@ async function desktop(page, engine) {
   await dock.getByRole("button", { name: "색상 패널 고정 해제", exact: true }).click();
   await saved(page);
   report.checks.push(`${engine}: one pinned editor, secondary targeting, gesture commit, layers remain available`);
+  const beforePrecision = await page.getByTestId("primary").textContent();
+  dialog = await openColor(page);
+  await dialog.getByRole("textbox", { name: "헥스 색상 코드" }).fill("#ff0000");
+  await dialog.getByText("정밀 수치 · RGB / HSV / HSL", { exact: true }).click();
+  const red = dialog.getByRole("spinbutton", { name: "빨강 수치 입력", exact: true });
+  await red.fill(""); await expect(red).toHaveValue("");
+  await expect(dialog.getByRole("textbox", { name: "헥스 색상 코드" })).toHaveValue("#ff0000");
+  await red.pressSequentially("128"); await red.press("Enter");
+  await expect(red).toBeFocused(); await expect(page.getByTestId("primary")).toHaveText(beforePrecision);
+  await dialog.getByRole("tab", { name: "HSV / HSB 슬라이더" }).click();
+  await dialog.getByRole("spinbutton", { name: "HSV 명도 V 수치 입력" }).fill("0");
+  await dialog.getByRole("spinbutton", { name: "HSV 색상 H 수치 입력" }).fill("240");
+  await dialog.getByRole("spinbutton", { name: "HSV 명도 V 수치 입력" }).fill("100");
+  await expect(dialog.getByRole("textbox", { name: "헥스 색상 코드" })).toHaveValue("#0000ff");
+  await dialog.getByRole("tab", { name: "CIELAB 슬라이더" }).click();
+  const lab = dialog.getByRole("spinbutton", { name: "CIELAB 적녹 a* 수치 입력" });
+  await lab.fill("-10.5"); await expect(lab).toHaveValue("-10.5");
+  await page.screenshot({ path: path.join(output, `${engine}-precision-numbers.png`) });
+  await dialog.getByRole("button", { name: "색상 선택 취소", exact: true }).click();
+  await expect(page.getByTestId("primary")).toHaveText(beforePrecision);
+  report.checks.push(`${engine}: RGB blank/retype, local numeric Enter, HSV hue retained through black, signed CIELAB and cancellation`);
+
 }
 
 async function handheld(browser, engine, size) {
@@ -219,6 +253,15 @@ async function handheld(browser, engine, size) {
     }).toBe(true);
     assert.deepEqual(await hex.evaluate((input) => [input.selectionStart, input.selectionEnd]), [2, 4]);
     await page.setViewportSize(size);
+    await dialog.getByText("정밀 수치 · RGB / HSV / HSL", { exact: true }).click();
+    const red = dialog.getByRole("spinbutton", { name: "빨강 수치 입력", exact: true });
+    await red.fill(""); await expect(red).toHaveValue(""); await expect(hex).toHaveValue("#abcdef");
+    await red.pressSequentially("171"); await red.press("Enter");
+    const redBounds = await red.boundingBox();
+    const sliderBounds = await dialog.getByRole("slider", { name: "빨강 채널 R", exact: true }).boundingBox();
+    assert(redBounds && redBounds.height >= 43.5 && sliderBounds && sliderBounds.height >= 43.5, "precision touch target");
+    await dialog.getByText("정밀 수치 · RGB / HSV / HSL", { exact: true }).click();
+
     await page.screenshot({ path: path.join(output, `${engine}-mobile-${size.width}.png`) });
     const box = await dialog.boundingBox();
     assert(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= size.width + 1 && box.y + box.height <= size.height + 1, `sheet clipped: ${JSON.stringify(box)}`);
