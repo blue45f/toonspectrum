@@ -1,3 +1,4 @@
+import { StudioColorChannelInput } from "./color/StudioColorChannelInput";
 /**
  * StudioColorSlidersPanel.tsx
  *
@@ -36,26 +37,40 @@ export function StudioColorSlidersPanel({
   const panelId = useId();
 
   const rgb: RgbColor = hexToRgb(value);
-  const hsv: HsvColor = hexToHsv(value);
-  const lab: StudioLabColor = hexToLab(value);
+  const normalized = rgbToHex(rgb.r, rgb.g, rgb.b);
+  const [hsvDraft, setHsvDraft] = useState(() => ({ hex: normalized, channels: hexToHsv(normalized) }));
+  const [labDraft, setLabDraft] = useState(() => ({ hex: normalized, channels: hexToLab(normalized) }));
+  const currentHsv = hsvDraft.hex === normalized ? hsvDraft : { hex: normalized, channels: hexToHsv(normalized) };
+  const currentLab = labDraft.hex === normalized ? labDraft : { hex: normalized, channels: hexToLab(normalized) };
+  if (currentHsv !== hsvDraft) setHsvDraft(currentHsv);
+  if (currentLab !== labDraft) setLabDraft(currentLab);
+  const hsv: HsvColor = currentHsv.channels;
+  const lab: StudioLabColor = currentLab.channels;
 
   const handleRgbChange = (channel: keyof RgbColor, val: number) => {
+    if (!Number.isFinite(val)) return;
     const nextRgb = { ...rgb, [channel]: Math.max(0, Math.min(255, val)) };
     onChange(rgbToHex(nextRgb.r, nextRgb.g, nextRgb.b));
   };
 
   const handleHsvChange = (channel: keyof HsvColor, val: number) => {
+    if (!Number.isFinite(val)) return;
     const max = channel === "h" ? 360 : 100;
     const nextHsv = { ...hsv, [channel]: Math.max(0, Math.min(max, val)) };
-    onChange(hsvToHex(nextHsv.h, nextHsv.s, nextHsv.v));
+    const hex = hsvToHex(nextHsv.h, nextHsv.s, nextHsv.v);
+    setHsvDraft({ hex, channels: nextHsv });
+    onChange(hex);
   };
 
   const handleLabChange = (channel: keyof StudioLabColor, val: number) => {
+    if (!Number.isFinite(val)) return;
     const nextLab = { ...lab };
     if (channel === "l") nextLab.l = Math.max(0, Math.min(100, val));
     if (channel === "a") nextLab.a = Math.max(-128, Math.min(127, val));
     if (channel === "b") nextLab.b = Math.max(-128, Math.min(127, val));
-    onChange(labToHex(nextLab.l, nextLab.a, nextLab.b));
+    const hex = labToHex(nextLab.l, nextLab.a, nextLab.b);
+    setLabDraft({ hex, channels: nextLab });
+    onChange(hex);
   };
 
   return (
@@ -79,17 +94,18 @@ export function StudioColorSlidersPanel({
               aria-selected={isActive}
               tabIndex={isActive ? 0 : -1}
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                 const next = event.key === "ArrowRight" ? (index + 1) % spaces.length
                   : event.key === "ArrowLeft" ? (index + spaces.length - 1) % spaces.length
                     : event.key === "Home" ? 0 : event.key === "End" ? spaces.length - 1 : null;
                 if (next === null) return;
-                event.preventDefault();
+                event.preventDefault(); event.stopPropagation();
                 setColorSpace(spaces[next]!);
                 event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("button")[next]?.focus();
               }}
               aria-label={`${labels[space]} 슬라이더`}
               onClick={() => setColorSpace(space)}
-              className={`min-w-12 flex-1 rounded-lg px-1 py-1 text-[0.64rem] font-medium uppercase transition-all ${
+              className={`min-h-9 min-w-12 flex-1 rounded-lg px-1 py-1 text-xs pointer-coarse:min-h-11 font-medium uppercase transition-all ${
                 isActive
                   ? "bg-card text-accent font-semibold shadow-sm border border-accent/40"
                   : "text-fg-3 hover:text-fg-1"
@@ -120,20 +136,13 @@ export function StudioColorSlidersPanel({
               value={rgb.r}
               aria-label="빨강 채널 R"
               onChange={(e) => handleRgbChange("r", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
-                background: `linear-gradient(to right, rgb(0, ${rgb.g}, ${rgb.b}), rgb(255, ${rgb.g}, ${rgb.b}))`,
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: `linear-gradient(to right, rgb(0, ${rgb.g}, ${rgb.b}), rgb(255, ${rgb.g}, ${rgb.b}))`,
               }}
             />
-            <input
-              type="number"
-              min={0}
-              max={255}
-              value={rgb.r}
-              aria-label="빨강 수치 입력"
-              onChange={(e) => handleRgbChange("r", Number(e.target.value))}
-              className="h-6 w-12 rounded-lg border border-line bg-card text-center font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-sm"
-            />
+            <StudioColorChannelInput min={0} max={255} value={rgb.r} label="빨강 수치 입력" onChange={(next) => handleRgbChange("r", next)} />
           </div>
 
           {/* Green */}
@@ -148,20 +157,13 @@ export function StudioColorSlidersPanel({
               value={rgb.g}
               aria-label="초록 채널 G"
               onChange={(e) => handleRgbChange("g", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
-                background: `linear-gradient(to right, rgb(${rgb.r}, 0, ${rgb.b}), rgb(${rgb.r}, 255, ${rgb.b}))`,
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: `linear-gradient(to right, rgb(${rgb.r}, 0, ${rgb.b}), rgb(${rgb.r}, 255, ${rgb.b}))`,
               }}
             />
-            <input
-              type="number"
-              min={0}
-              max={255}
-              value={rgb.g}
-              aria-label="초록 수치 입력"
-              onChange={(e) => handleRgbChange("g", Number(e.target.value))}
-              className="h-6 w-12 rounded-lg border border-line bg-card text-center font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-sm"
-            />
+            <StudioColorChannelInput min={0} max={255} value={rgb.g} label="초록 수치 입력" onChange={(next) => handleRgbChange("g", next)} />
           </div>
 
           {/* Blue */}
@@ -176,20 +178,13 @@ export function StudioColorSlidersPanel({
               value={rgb.b}
               aria-label="파랑 채널 B"
               onChange={(e) => handleRgbChange("b", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
-                background: `linear-gradient(to right, rgb(${rgb.r}, ${rgb.g}, 0), rgb(${rgb.r}, ${rgb.g}, 255))`,
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: `linear-gradient(to right, rgb(${rgb.r}, ${rgb.g}, 0), rgb(${rgb.r}, ${rgb.g}, 255))`,
               }}
             />
-            <input
-              type="number"
-              min={0}
-              max={255}
-              value={rgb.b}
-              aria-label="파랑 수치 입력"
-              onChange={(e) => handleRgbChange("b", Number(e.target.value))}
-              className="h-6 w-12 rounded-lg border border-line bg-card text-center font-mono text-xs tabular-nums text-fg focus:border-accent focus:outline-none shadow-sm"
-            />
+            <StudioColorChannelInput min={0} max={255} value={rgb.b} label="파랑 수치 입력" onChange={(next) => handleRgbChange("b", next)} />
           </div>
         </div>
       )}
@@ -209,15 +204,14 @@ export function StudioColorSlidersPanel({
               value={hsv.h}
               aria-label="색상 H (Hue)"
               onChange={(e) => handleHsvChange("h", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
-                background:
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage:
                   "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
               }}
             />
-            <div className="flex h-6 w-12 items-center justify-center rounded-lg border border-line bg-card font-mono text-xs tabular-nums text-fg shadow-sm">
-              {hsv.h}°
-            </div>
+            <StudioColorChannelInput min={0} max={360} step={0.1} value={hsv.h} label="HSV 색상 H 수치 입력" onChange={(next) => handleHsvChange("h", next)} />
           </div>
 
           {/* Saturation */}
@@ -232,14 +226,13 @@ export function StudioColorSlidersPanel({
               value={hsv.s}
               aria-label="채도 S (Saturation)"
               onChange={(e) => handleHsvChange("s", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
-                background: `linear-gradient(to right, ${hsvToHex(hsv.h, 0, hsv.v)}, ${hsvToHex(hsv.h, 100, hsv.v)})`,
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: `linear-gradient(to right, ${hsvToHex(hsv.h, 0, hsv.v)}, ${hsvToHex(hsv.h, 100, hsv.v)})`,
               }}
             />
-            <div className="flex h-6 w-12 items-center justify-center rounded-lg border border-line bg-card font-mono text-xs tabular-nums text-fg shadow-sm">
-              {hsv.s}%
-            </div>
+            <StudioColorChannelInput min={0} max={100} step={0.1} value={hsv.s} label="HSV 채도 S 수치 입력" onChange={(next) => handleHsvChange("s", next)} />
           </div>
 
           {/* Brightness/Value */}
@@ -254,14 +247,13 @@ export function StudioColorSlidersPanel({
               value={hsv.v}
               aria-label="명도 V (Value/Brightness)"
               onChange={(e) => handleHsvChange("v", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full shadow-inner"
               style={{
-                background: `linear-gradient(to right, #000000, ${hsvToHex(hsv.h, hsv.s, 100)})`,
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: `linear-gradient(to right, #000000, ${hsvToHex(hsv.h, hsv.s, 100)})`,
               }}
             />
-            <div className="flex h-6 w-12 items-center justify-center rounded-lg border border-line bg-card font-mono text-xs tabular-nums text-fg shadow-sm">
-              {hsv.v}%
-            </div>
+            <StudioColorChannelInput min={0} max={100} step={0.1} value={hsv.v} label="HSV 명도 V 수치 입력" onChange={(next) => handleHsvChange("v", next)} />
           </div>
         </div>
       )}
@@ -286,14 +278,13 @@ export function StudioColorSlidersPanel({
               value={Math.round(lab.l)}
               aria-label="CIELAB 명도 L*"
               onChange={(e) => handleLabChange("l", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
               style={{
-                background: "linear-gradient(to right, #000000, #ffffff)",
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: "linear-gradient(to right, #000000, #ffffff)",
               }}
             />
-            <div className="flex h-6 w-12 items-center justify-center rounded-lg border border-line bg-card font-mono text-xs tabular-nums text-fg shadow-sm">
-              {Math.round(lab.l)}
-            </div>
+            <StudioColorChannelInput min={0} max={100} step={0.1} value={Number(lab.l.toFixed(1))} label="CIELAB 명도 L* 수치 입력" onChange={(next) => handleLabChange("l", next)} />
           </div>
 
           {/* a* */}
@@ -308,14 +299,13 @@ export function StudioColorSlidersPanel({
               value={Math.round(lab.a)}
               aria-label="CIELAB 적녹 a*"
               onChange={(e) => handleLabChange("a", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
               style={{
-                background: "linear-gradient(to right, #00ff00, #808080, #ff00ff)",
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: "linear-gradient(to right, #00ff00, #808080, #ff00ff)",
               }}
             />
-            <div className="flex h-6 w-12 items-center justify-center rounded-lg border border-line bg-card font-mono text-xs tabular-nums text-fg shadow-sm">
-              {Math.round(lab.a)}
-            </div>
+            <StudioColorChannelInput min={-128} max={127} step={0.1} value={Number(lab.a.toFixed(1))} label="CIELAB 적녹 a* 수치 입력" onChange={(next) => handleLabChange("a", next)} />
           </div>
 
           {/* b* */}
@@ -330,14 +320,13 @@ export function StudioColorSlidersPanel({
               value={Math.round(lab.b)}
               aria-label="CIELAB 황청 b*"
               onChange={(e) => handleLabChange("b", Number(e.target.value))}
-              className="h-2.5 flex-1 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
+              className="h-6 min-w-0 flex-1 pointer-coarse:h-11 cursor-pointer appearance-none rounded-full accent-accent shadow-inner"
               style={{
-                background: "linear-gradient(to right, #0000ff, #808080, #ffff00)",
+                backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat",
+                backgroundImage: "linear-gradient(to right, #0000ff, #808080, #ffff00)",
               }}
             />
-            <div className="flex h-6 w-12 items-center justify-center rounded-lg border border-line bg-card font-mono text-xs tabular-nums text-fg shadow-sm">
-              {Math.round(lab.b)}
-            </div>
+            <StudioColorChannelInput min={-128} max={127} step={0.1} value={Number(lab.b.toFixed(1))} label="CIELAB 황청 b* 수치 입력" onChange={(next) => handleLabChange("b", next)} />
           </div>
         </div>
       )}

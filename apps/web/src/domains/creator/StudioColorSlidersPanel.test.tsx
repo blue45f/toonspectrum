@@ -99,3 +99,24 @@ describe("StudioColorSlidersPanel product color spaces", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+it("allows clearing and retyping RGB without forcing zero or changing color", () => {
+  render(<Picker initial="#648800" />);
+  const red = input("빨강 수치 입력");
+  fireEvent.focus(red); edit("빨강 수치 입력", "");
+  expect(red.value).toBe("");
+  expect(screen.getByLabelText("선택색").textContent).toBe("#648800");
+  edit("빨강 수치 입력", "2"); edit("빨강 수치 입력", "25"); edit("빨강 수치 입력", "255");
+  expect(red.value).toBe("255"); expect(screen.getByLabelText("선택색").textContent).toBe("#ff8800");
+});
+
+it("preserves HSV hue and saturation at zero brightness until brightness is restored", () => {
+  render(<Picker initial="#ff0000" />);
+  fireEvent.click(screen.getByRole("tab", { name: "HSV / HSB 슬라이더" }));
+  edit("HSV 명도 V 수치 입력", "0");
+  edit("HSV 색상 H 수치 입력", "240");
+  expect(input("HSV 색상 H 수치 입력").value).toBe("240");
+  expect(screen.getByLabelText("선택색").textContent).toBe("#000000");
+  edit("HSV 명도 V 수치 입력", "100");
+  expect(screen.getByLabelText("선택색").textContent).toBe("#0000ff");
+});

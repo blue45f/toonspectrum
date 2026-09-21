@@ -27,6 +27,7 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy, savin
   useLayoutEffect(() => { setConfirmed(false); }, [session.version]);
   const terminal = session.status === "closed" || session.status === "cancelled", joined = session.participantUserIds.includes(actorId);
   const host = view.capabilities.edit, canWrite = joined && view.capabilities.comment && !terminal;
+  useLayoutEffect(() => { setClosing(null); setConfirmed(false); }, [actorId, session.workId, session.id, host, joined, terminal]);
   const name = (id: string) => id === actorId ? bt("나", "Me") : roster.members?.find((member) => member.userId === id)?.name ?? bt("등록된 참여자", "Registered participant");
   const lifecycle = session.status === "draft" ? ["ready", "준비 완료", "Mark ready"] as const : session.status === "ready" ? ["start", "작업 시작", "Start session"] as const
     : session.status === "active" ? ["pause", "일시정지", "Pause"] as const : session.status === "paused" ? ["resume", "작업 재개", "Resume session"] as const : null;
@@ -50,7 +51,7 @@ export function StudioWorkSessionDetail({ view, actorId, controller, busy, savin
       void controller.command(closing === "close" ? { action: "close", summary } : { action: "cancel" });
     }}><h4 className="font-semibold">{closing === "close" ? bt("종료 결과", "Closing outcome") : bt("세션 취소 확인", "Confirm cancellation")}</h4>
       {closing === "close" ? <StudioSessionClosingDraft session={session} currentSummary={summary} busy={busy} onApply={(text) => { setSummary(text); setConfirmed(false); }} /> : null}
-      {closing === "close" ? <label className="block text-sm">{bt("결론·미결·다음 행동 (결론 없음도 명시)", "Conclusion, unresolved issues and next step (or explicitly no conclusion)")}<textarea required maxLength={4000} className="mt-1 min-h-24 w-full rounded border border-line bg-card p-2" value={summary} disabled={saving} onChange={(event) => setSummary(event.target.value)} /></label> : null}
+      {closing === "close" ? <label className="block text-sm">{bt("결론·미결·다음 행동 (결론 없음도 명시)", "Conclusion, unresolved issues and next step (or explicitly no conclusion)")}<textarea required maxLength={4000} className="mt-1 min-h-24 w-full rounded border border-line bg-card p-2" value={summary} disabled={saving} onChange={(event) => { setSummary(event.target.value); setConfirmed(false); }} /></label> : null}
       <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={(event) => setConfirmed(event.target.checked)} />{bt("기록은 남고 원고 승인·작업 완료·공개 상태는 바뀌지 않음을 확인합니다.", "I understand that the record remains and manuscript approval, task completion and publication do not change.")}</label>
       <div className="flex gap-2"><button type="submit" className={control} disabled={busy || !confirmed}>{bt("확인하고 적용", "Confirm")}</button><button type="button" className={control} disabled={busy} onClick={() => setClosing(null)}>{bt("돌아가기", "Go back")}</button></div>
     </form> : null}

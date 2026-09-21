@@ -16,7 +16,7 @@ function environment() {
   vi.stubGlobal("isSecureContext", true);
   vi.stubGlobal("RTCPeerConnection", class {});
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
-  vi.stubGlobal("MediaStream", class { constructor(private tracks: unknown[]) {} getTracks() { return this.tracks; } });
+  vi.stubGlobal("MediaStream", class { constructor(private tracks: unknown[]) {} getTracks() { return this.tracks; } getAudioTracks() { return this.tracks.filter((track) => (track as { kind: string }).kind === "audio"); } getVideoTracks() { return this.tracks.filter((track) => (track as { kind: string }).kind === "video"); } });
   Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: { getUserMedia } });
 }
 function fixture(workId = "work-a", supported = true) {

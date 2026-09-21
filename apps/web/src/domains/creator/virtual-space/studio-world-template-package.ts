@@ -1,6 +1,6 @@
 import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { studioWorldManifestSchema, studioWorldTemplatePackageSchema, type StudioWorldAssetIntegrity,
-  type StudioWorldTemplatePackage } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema, type StudioWorldAssetIntegrity } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldTemplatePackageSchema, type StudioWorldTemplatePackage } from "./studio-world-template-contract";
 
 import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest, type StudioVirtualSpaceWorldManifest as World } from "./studio-virtual-space-world-manifest";
 import { resolveStudioWorldSpawn } from "./studio-virtual-space-world-pathfinding";

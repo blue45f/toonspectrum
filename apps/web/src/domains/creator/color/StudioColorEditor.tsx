@@ -1,4 +1,5 @@
-import { Check, Copy, Pipette } from "lucide-react";
+import { StudioColorSwatches } from "./StudioColorSwatches";
+import { Copy, Pipette } from "lucide-react";
 import { lazy, Suspense, useEffect, useLayoutEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { getTintsAndShades } from "../studio-color-harmony-engine";
 import { normalizeHexColor } from "../studio-color-utils";
@@ -89,17 +90,8 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
       if (aliveRef.current && ownerRef.current === key) setNotice("팔레트를 저장하지 못했습니다. 다시 시도해 주세요.");
     } finally { saveRef.current = false; if (aliveRef.current) setSaving(false); }
   };
-  const swatches = (title: string, colors: readonly string[]) => <section className="space-y-2" aria-label={title}>
-    <h4 className="text-xs font-semibold text-fg-2">{title}</h4>
-    {colors.length ? <div className="grid grid-cols-[repeat(auto-fill,minmax(36px,1fr))] gap-1.5 pointer-coarse:grid-cols-[repeat(auto-fill,minmax(44px,1fr))]" role="group" aria-label={`${title} 목록`}>
-      {colors.map((color) => <button key={color} type="button" aria-label={`${title} ${color} 적용`}
-        aria-pressed={color === session.color} onClick={() => choose(color)}
-        className="relative min-h-9 min-w-0 rounded-md border border-line-strong focus-visible:ring-2 focus-visible:ring-accent pointer-coarse:min-h-11"
-        style={{ background: color }}>
-        {color === session.color ? <Check size={16} aria-hidden className="mx-auto text-white [filter:drop-shadow(0_1px_1px_black)]" /> : null}
-      </button>)}
-    </div> : <p className="text-xs leading-relaxed text-fg-2">{title === "최근 선택 색" ? "확정한 색상이 없습니다. 색을 적용하면 이곳에 쌓입니다." : "이 원고에 지정된 색상이 없습니다. 이미지의 색상 추출 결과는 별도로 표시됩니다."}</p>}
-  </section>;
+  const swatches = (title: string, colors: readonly string[]) => <StudioColorSwatches
+    key={title} title={title} colors={colors} value={session.color} onChoose={choose} />;
 
   return <div role="presentation" data-studio-color-editor="true" data-studio-shortcut-boundary="true"
     data-studio-color-editor-compact={compact || undefined} className="space-y-3 text-[13px]"
@@ -121,6 +113,7 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
         aria-controls={`${id}-panel-${item.id}`} aria-selected={tab === item.id} tabIndex={focusedTab === item.id ? 0 : -1}
         onClick={() => { setTab(item.id); setFocusedTab(item.id); }}
         onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
           event.preventDefault(); event.stopPropagation();
           const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1
@@ -148,11 +141,18 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
           onPointerCancel={(event) => { if (gestureRef.current?.id === event.pointerId) { const original = gestureRef.current.raw; gestureRef.current = null; onChange(original); } }}
           onLostPointerCapture={(event) => { if (gestureRef.current?.id === event.pointerId && !gestureRef.current.ending) { const original = gestureRef.current.raw; gestureRef.current = null; onChange(original); } }}
           onPointerUpCapture={(event) => { if (gestureRef.current?.id === event.pointerId) gestureRef.current.ending = true; }}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+            if (event.key === "Enter" && event.target instanceof HTMLInputElement && event.target.type === "number") {
+              event.preventDefault(); event.stopPropagation(); onGestureCommit();
+            }
+          }}
           onKeyUp={(event) => {
             if (event.nativeEvent.isComposing) return;
             if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(event.key)) onGestureCommit();
           }}
           onBlur={(event) => {
+            if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-studio-color-cancel]')) return;
             if (event.target instanceof HTMLInputElement && ["number", "range"].includes(event.target.type)) onGestureCommit();
           }}>
           {picker === "wheel" ? <StudioColorDiscPicker value={session.color} onChange={onChange} size={compact ? 168 : 224} />
@@ -221,14 +221,14 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
             if (event.nativeEvent.isComposing || event.keyCode === 229) return;
             if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); setShowInvalid(!session.valid); onApplyRequest(); }
           }} className="min-h-11 min-w-0 flex-1 rounded-lg border border-line bg-card px-3 font-mono text-sm text-fg focus-visible:ring-2 focus-visible:ring-accent" />
-        <button type="button" className={`${button} px-2`} aria-label="색상 코드 복사" onClick={() => {
+        <button type="button" className={`${button} grid size-11 shrink-0 place-items-center p-0`} disabled={!session.valid} aria-label="색상 코드 복사" onClick={() => {
           const key = session.targetKey;
           if (!navigator.clipboard) { setNotice("이 브라우저에서는 복사를 사용할 수 없습니다."); return; }
           void navigator.clipboard.writeText(session.color).then(() => {
             if (aliveRef.current && ownerRef.current === key) setNotice("색상 코드를 복사했습니다.");
           }).catch(() => { if (aliveRef.current && ownerRef.current === key) setNotice("색상 코드 복사에 실패했습니다."); });
         }}><Copy size={16} aria-hidden /></button>
-        {onRequestCanvasEyedropper ? <button type="button" className={`${button} px-2`} aria-label="캔버스에서 정밀 색 가져오기"
+        {onRequestCanvasEyedropper ? <button type="button" className={`${button} grid size-11 shrink-0 place-items-center p-0`} aria-label="캔버스에서 정밀 색 가져오기"
           onClick={onRequestCanvasEyedropper}><Pipette size={16} aria-hidden /></button> : null}
       </div>
       {!session.valid ? <p id={`${id}-invalid`} role={showInvalid || error ? "alert" : undefined} className="text-xs text-warn">#RGB 또는 #RRGGBB 형식으로 입력하세요. 입력 내용은 유지됩니다.</p> : null}

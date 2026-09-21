@@ -26,8 +26,9 @@ await server.listen(); const address = server.httpServer.address();
 assert.ok(address && typeof address !== "string");
 const origin = `http://127.0.0.1:${address.port}`;
 const results = [];
-const profiles = [{ name: "chromium-desktop", type: chromium, media: true, mobile: false },
-  { name: "chromium-mobile-emulation", type: chromium, media: true, mobile: true },
+const generatedMedia = process.env.P2P_QA_GENERATED_MEDIA !== "0";
+const profiles = [{ name: "chromium-desktop", type: chromium, media: true, generatedMedia, mobile: false },
+  { name: "chromium-mobile-emulation", type: chromium, media: true, generatedMedia, mobile: true },
   { name: "webkit-mobile-emulation", type: webkit, media: true, generatedMedia: true, mobile: true }];
 try {
   for (const profile of profiles.filter((p) => !process.env.P2P_QA_PROFILE || p.name.includes(process.env.P2P_QA_PROFILE))) {
@@ -36,7 +37,7 @@ try {
       ...(process.env.P2P_QA_AUDIO_FILE ? [`--use-file-for-fake-audio-capture=${process.env.P2P_QA_AUDIO_FILE}`] : []),
     ] } : {}) });
     const row = { profile: profile.name, browserVersion: browser.version(), checks: [], errors: [],
-      nativeInAppVerified: false, physicalDevices: false, productionAuth: false, syntheticMedia: profile.media, knownNonSilentAudio: Boolean(process.env.P2P_QA_AUDIO_FILE), generatedStreams: Boolean(profile.generatedMedia) };
+      nativeInAppVerified: false, physicalDevices: false, productionAuth: false, syntheticMedia: profile.media, knownNonSilentAudio: Boolean(process.env.P2P_QA_AUDIO_FILE || profile.generatedMedia), generatedStreams: Boolean(profile.generatedMedia) };
     const pages = [];
     try {
       for (let i = 0; i < 2; i++) {
@@ -105,12 +106,12 @@ try {
           const play = page.getByRole("button", { name: "소리·영상 재생", exact: true });
           for (let index = 0; index < await play.count(); index++) await play.nth(index).click();
         }
-        if (process.env.P2P_QA_AUDIO_FILE) await expect.poll(async () => (await sampleAudio()).every(reports => reports.some(stat => stat.totalAudioEnergy > 0)), { timeout: 30_000 }).toBe(true);
+        if (process.env.P2P_QA_AUDIO_FILE || generatedMedia) await expect.poll(async () => (await sampleAudio()).every(reports => reports.some(stat => stat.totalAudioEnergy > 0)), { timeout: 30_000 }).toBe(true);
         const initialAudio = await sampleAudio();
         await new Promise(resolve => setTimeout(resolve, 1_500));
         row.audioOnly = await sampleAudio();
         assert.ok(row.audioOnly.every((reports, index) => reports.reduce((sum, stat) => sum + stat.bytesReceived, 0) > initialAudio[index].reduce((sum, stat) => sum + stat.bytesReceived, 0)), "Both browsers must continue receiving audio before mute");
-        if (process.env.P2P_QA_AUDIO_FILE) assert.ok(row.audioOnly.every(reports => reports.some(stat => stat.totalAudioEnergy > 0)), "Known non-silent audio must be decoded by both peers");
+        if (process.env.P2P_QA_AUDIO_FILE || generatedMedia) assert.ok(row.audioOnly.every(reports => reports.some(stat => stat.totalAudioEnergy > 0)), "Known non-silent audio must be decoded by both peers");
         assert.ok(row.audioOnly.every(reports => reports.some(stat => stat.bytesReceived > 0)), "Both browsers must retain inbound audio statistics before muting");
         for (const page of pages) {
           await page.getByRole("button", { name: "마이크 끄기", exact: true }).click();
@@ -152,6 +153,22 @@ try {
         assert.ok(row.media.every((r) => r.some((s) => s.kind === "audio" && s.bytesReceived > 0) && r.some((s) => s.kind === "video" && s.framesDecoded > 3)));
         row.checks.push("Real RTP audio received, bidirectional video decoded, default autoplay policy");
       }
+      if (profile.generatedMedia) {
+        const decodedFrames = () => pages[1].evaluate(async () => {
+          const reports = await Promise.all(window.qaConnections.map(pc => pc.getStats()));
+          return reports.flatMap(stats => [...stats.values()]).filter(s => s.type === "inbound-rtp" && s.kind === "video")
+            .reduce((sum, stat) => sum + (stat.framesDecoded ?? 0), 0);
+        });
+        const beforeShare = await decodedFrames();
+        await pages[0].getByRole("button", { name: "화면 공유", exact: true }).click();
+        await pages[0].getByRole("button", { name: "공유 중지", exact: true }).waitFor();
+        await expect.poll(decodedFrames, { timeout: 30_000 }).toBeGreaterThan(beforeShare + 3);
+        await pages[0].getByRole("button", { name: "공유 중지", exact: true }).click();
+        assert.equal(await pages[0].evaluate(() => window.qaTracks.filter(t => t.kind === "video").every(t => t.readyState === "ended")), true);
+        assert.equal(await pages[0].evaluate(() => window.qaTracks.some(t => t.kind === "audio" && t.readyState === "live")), true);
+        await chat("화면 공유 종료 후 채팅 유지");
+        row.checks.push("Synthetic display-share replacement decoded remotely; stopping share releases only video and preserves microphone/chat");
+      }
       for (const page of pages) await page.locator("summary").filter({ hasText: "함께 그리기·투표" }).click();
       await pages[0].getByLabel("드로잉 챌린지", { exact: true }).selectOption("gesture");
       await pages[0].getByRole("button", { name: "함께 시작", exact: true }).click();
@@ -191,7 +208,7 @@ try {
       row.audioPlayback = await Promise.all(pages.map(async page => {
         try {
           return await page.evaluate(async () => ({
-            elements: [...document.querySelectorAll("video")].map(v => ({
+            elements: [...document.querySelectorAll("audio, video")].map(v => ({
               paused: v.paused, muted: v.muted, readyState: v.readyState, currentTime: v.currentTime,
               tracks: v.srcObject?.getTracks().map(t => ({ kind: t.kind, muted: t.muted, enabled: t.enabled, readyState: t.readyState })),
             })),

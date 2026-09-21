@@ -20,7 +20,7 @@ import {
   type CompatibilityItem,
   type CompatibilityReport,
   type SourceCreativeFormat,
-} from "@toonspectrum/studio-format-gateway";
+} from "@toonspectrum/studio-format-gateway/compatibility-report";
 import { z } from "zod";
 
 export const studioProjectAccessSchema = z

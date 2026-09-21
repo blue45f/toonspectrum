@@ -1,4 +1,5 @@
-import { StudioAllToolsCatalog } from "./StudioAllToolsCatalog";
+import { StudioAllToolsCatalogSlot as StudioAllToolsCatalog } from "./StudioAllToolsCatalogSlot";
+import { preloadStudioAllToolsCatalog } from "./studio-all-tools-catalog-loader";
 import { pinAllStudioToolbarTools, pinStudioToolbarTools, unpinStudioToolbarTools } from "./studio-toolbar-configuration";
 import { subscribeStudioAllTools } from "./studio-toolbar-channel";
 import { isStudioDrawingCoreTool, studioDrawingVisibleTools } from "./studio-drawing-core-tools";
@@ -547,6 +548,9 @@ function StudioLeftToolRailConnected() {
       setRailMoreOpen(false);
     };
     updatePosition();
+    // Lazy loading and filtering change dialog height without a viewport resize.
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(schedulePosition) : null;
+    if (dialog) observer?.observe(dialog);
     dialog?.addEventListener("keydown", handleKeyDown);
     document.addEventListener("pointerdown", handlePointerDown, true);
     globalThis.addEventListener("resize", schedulePosition);
@@ -560,6 +564,7 @@ function StudioLeftToolRailConnected() {
     });
     return () => {
       cancelAnimationFrame(frame);
+      observer?.disconnect();
       if (positionFrame !== null) globalThis.cancelAnimationFrame(positionFrame);
       dialog?.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("pointerdown", handlePointerDown, true);
@@ -1085,6 +1090,7 @@ zoom: { icon: Search, label: zoomViewToolLabel, description: zoomViewToolOpen ? 
   const railMoreFooter = (
     <div className="relative flex w-full flex-col items-center gap-1" data-studio-tool-rail-settings="true">
       <button type="button" id={railMoreTriggerId}
+        onMouseEnter={preloadStudioAllToolsCatalog} onFocus={preloadStudioAllToolsCatalog}
         aria-label="전체 도구" aria-controls={railMoreOpen ? railMoreDialogId : undefined}
         aria-expanded={railMoreOpen} aria-haspopup="dialog"
         className="flex min-h-12 w-full flex-col items-center justify-center gap-1 rounded-lg text-fg-2 hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"

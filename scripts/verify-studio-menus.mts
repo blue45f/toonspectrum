@@ -378,6 +378,9 @@ export const FIRST_RUN_RAIL_TOOL_IDS = [
   "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image", "transform", "lasso",
 ] as const satisfies readonly StudioRailToolId[];
 
+export const IMAGE_RAIL_ENTRY = { id: "image", label: "이미지·소재" } as const;
+export const QUICK_ACCESS_CLOSE_LABEL = "빠른 액세스 팔레트 닫기";
+
 /** Every first-run tool and the specialized tools added below must remain reachable. */
 const PERSISTENT_RAIL_TOOLS = [
   "선택 (V)",
@@ -390,7 +393,7 @@ const PERSISTENT_RAIL_TOOLS = [
   "색 가져오기 (I / Alt+클릭)",
   "텍스트",
   "말풍선",
-  "이미지 추가",
+  IMAGE_RAIL_ENTRY.label,
 ] as const;
 
 /** More uses catalogue names; the exposed rail also preserves its shortcut suffix. */
@@ -935,10 +938,6 @@ async function assertRailTools(page: Page): Promise<string[]> {
         (await byLabel.isVisible().catch(() => false)) ||
         (await byTitle.isVisible().catch(() => false));
       if (!visible) {
-        if (entry === "이미지 추가") {
-          const img = rail.getByText("이미지 추가", { exact: true }).first();
-          if ((await img.count().catch(() => 0)) > 0) continue;
-        }
         failures.push(`좌측 레일 도구 미노출: ${entry}`);
       }
       continue;
@@ -954,14 +953,30 @@ async function assertRailTools(page: Page): Promise<string[]> {
     ).catch(() => false);
     if (!ok) failures.push(`좌측 레일 도구 미노출: ${entry.anyOf.join(" | ")}`);
   }
+  // Verify the real image action, not a hidden legacy label. An empty selection leaves the document unchanged.
+  try {
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser", { timeout: 5_000 }),
+      rail.locator(`[data-studio-rail-tool-id="${IMAGE_RAIL_ENTRY.id}"]`).click(),
+    ]);
+    await chooser.setFiles([]);
+    log("  image rail action ok: real file chooser opens without changing the document");
+  } catch (error) {
+    failures.push(`이미지 도구 실행 실패: ${error instanceof Error ? error.message : String(error)}`);
+  }
   return failures;
 }
 
-async function closeFloatingUi(page: Page) {
+export async function closeFloatingUi(page: Page) {
   await page.keyboard.press("Escape").catch(() => undefined);
   await page.waitForTimeout(80);
   await page.keyboard.press("Escape").catch(() => undefined);
-  await page.mouse.click(24, 120);
+  // Quick Access is a persistent window. Escape alone does not close it once focus leaves it.
+  const quickAccess = page.locator('[data-studio-quick-access-surface="true"]');
+  if (await quickAccess.isVisible()) {
+    await quickAccess.getByRole("button", { name: QUICK_ACCESS_CLOSE_LABEL, exact: true }).click();
+    await quickAccess.waitFor({ state: "hidden", timeout: 5_000 });
+  }
   await page.waitForTimeout(120);
 }
 
@@ -1135,6 +1150,7 @@ async function assertWorkspaceDeviceEditor(page: Page): Promise<string[]> {
 async function assertDrawOptionsBar(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
+    await closeFloatingUi(page);
     await page.getByRole("button", { name: "펜 (B)" }).click({ timeout: 4000 });
     await page.waitForTimeout(400);
     const bar =
