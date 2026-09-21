@@ -155,7 +155,7 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     ]);
 
     expectTokenOrder(onStageDown, [
-      "if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit()) return",
+      "if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit(undefined, leaseIntent)) return",
       "beginStudioStrokePointerSession(pointerSample, penButtonPolicy)",
       "drawingInputSettingsRef.current = {",
       "planStudioDrawPointerStart({",

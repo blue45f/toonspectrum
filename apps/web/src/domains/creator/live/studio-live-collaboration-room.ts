@@ -489,6 +489,15 @@ export class StudioLiveRoom {
     return this.transport?.mode ?? null;
   }
 
+  /** Support is independent of readiness; disconnection must never downgrade authority. */
+  get serverLockSupported(): boolean {
+    return typeof this.transport?.acquireLock === "function";
+  }
+
+  get canvasLockPolicy(): "required" | "append-only" {
+    return this.transport?.canvasLockPolicy ?? "required";
+  }
+
   get authoritativeLockCapability(): "fenced-v2" | null {
     return this.ready && this.transport?.mode === "server"
       ? this.transport.authoritativeLockCapability ?? null : null;

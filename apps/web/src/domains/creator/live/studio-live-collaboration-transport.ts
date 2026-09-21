@@ -92,6 +92,8 @@ export interface StudioLiveTransport {
   readonly peerFabric?: StudioPeerFabricPort;
   /** Routed bulk transfer over the same RTC fabric; never a durable storage receipt. */
   readonly peerBulk?: StudioPeerBulkExchangePort;
+  /** Static policy: peer-only append never grants a lease or a server save receipt. */
+  readonly canvasLockPolicy?: "required" | "append-only";
   readonly mode: StudioLiveTransportMode;
   readonly ready: boolean;
   /**
