@@ -29,6 +29,11 @@
       "import": "./src/graph/work-session.ts",
       "default": "./src/graph/work-session.ts"
     },
+    "./work-session-evidence": {
+      "types": "./src/graph/work-session-evidence.ts",
+      "import": "./src/graph/work-session-evidence.ts",
+      "default": "./src/graph/work-session-evidence.ts"
+    },
     "./world-publication": {
       "types": "./src/graph/world-publication.ts",
       "import": "./src/graph/world-publication.ts",
@@ -55,6 +60,9 @@
     "*": {
       "work-session": [
         "src/graph/work-session.ts"
+      ],
+      "work-session-evidence": [
+        "src/graph/work-session-evidence.ts"
       ],
       "world-publication": [
         "src/graph/world-publication.ts"

@@ -6,6 +6,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { newStudioProjectGraphId } from "../project-graph/studio-project-graph-client";
 import { StudioSessionAgenda } from "./StudioSessionAgenda";
 import { StudioSessionMaterialBoard } from "./StudioSessionMaterialBoard";
+import { StudioSessionEvidencePanel } from "./StudioSessionEvidencePanel";
 import { useSessionResourceMetadata } from "./use-session-resource-metadata";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";
 import type { StudioSessionPreviewRequest } from "./StudioWorkSessionPreview";
@@ -48,5 +49,6 @@ export function StudioSessionWorkflowPanel({ view, actorId, controller, busy, sa
         {data?.nextPageOffset !== null && data?.nextPageOffset !== undefined ? <button type="button" className={control} disabled={busy} onClick={() => resources.setOffset(data.nextPageOffset!)}>{bt("다음 페이지 목록", "Next source pages")}</button> : null}</> : null}</div>
     {view.session.kind === "material-choice" ? <StudioSessionMaterialBoard view={view} actorId={actorId} controller={controller} saving={saving} busy={busy || view.session.version >= 128} resources={data} name={name} />
       : <StudioSessionAgenda view={view} actorId={actorId} controller={controller} saving={saving} busy={busy || view.session.version >= 128} resources={data} name={name} onInspect={inspect} />}
+    <StudioSessionEvidencePanel key={JSON.stringify([actorId, view.session.workId, view.session.id, view.session.input])} view={view} actorId={actorId} controller={controller} busy={busy} onInspect={inspect} />
   </div>;
 }
