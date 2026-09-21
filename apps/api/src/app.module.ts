@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { OperationPolicyModule } from "./modules/operation-policy/operation-policy.module";
 
 import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities/backend-capabilities.module";
 import { ApiHttpInfrastructureModule } from "./runtime/api-http-infrastructure.module";
@@ -53,6 +54,7 @@ const studioRealtimeTicketModule =
     CommerceModule,
     CatalogModule,
     AdminModule,
+    OperationPolicyModule,
     TrafficAnalyticsModule,
     FeedbackModule,
     BusinessInquiryModule,

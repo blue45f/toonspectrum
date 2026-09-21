@@ -17,6 +17,7 @@ import { AdminCampaigns } from "./components/AdminCampaigns";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { AdminHeaderStats } from "./components/AdminHeaderStats";
 import { AdminOps } from "./components/AdminOps";
+import { AdminOperatingMode } from "./components/AdminOperatingMode";
 import { AdminPlans } from "./components/AdminPlans";
 import { AdminPromos } from "./components/AdminPromos";
 import { AdminQuickPalette } from "./components/AdminQuickPalette";
@@ -210,7 +211,7 @@ export function AdminPage() {
               {tab === "security" ? <AdminSecurity userId={uid} /> : null}
               {tab === "audit" ? <AdminAuditLogs userId={uid} /> : null}
               {tab === "campaigns" ? <AdminCampaigns uid={uid} /> : null}
-              {tab === "ops" ? <AdminOps uid={uid} /> : null}
+              {tab === "ops" ? <div className="space-y-6"><AdminOperatingMode uid={uid} /><AdminOps uid={uid} /></div> : null}
             </div>
           </div>
         ) : null}
