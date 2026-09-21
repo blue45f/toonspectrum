@@ -128,6 +128,7 @@ export function StudioColorQuickPicker({
   }
 
   const handleSvKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     const step = event.shiftKey ? 10 : 2;
     let saturation = hsv.s;
     let brightness = hsv.v;
@@ -215,6 +216,7 @@ export function StudioColorQuickPicker({
             if (event.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(event.key)) event.stopPropagation();
           }}
           onKeyUp={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
             if (event.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(event.key)) {
               event.stopPropagation();
               commitHue();

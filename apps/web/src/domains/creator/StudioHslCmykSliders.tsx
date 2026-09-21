@@ -1,3 +1,4 @@
+import { StudioColorChannelInput } from "./color/StudioColorChannelInput";
 import { useState } from "react";
 
 import {
@@ -86,15 +87,12 @@ export function StudioHslCmykSliders({ mode, value, onChange }: {
               type="range" min={0} max={max} step={0.1}
               value={current.channels[index]} aria-label={label}
               onChange={(event) => changeChannel(index, event.currentTarget.valueAsNumber)}
-              className="h-2.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full"
-              style={{ background: `linear-gradient(to right, ${gradient})` }}
+              className="h-6 pointer-coarse:h-11 min-w-0 flex-1 cursor-pointer appearance-none rounded-full"
+              style={{ backgroundImage: `linear-gradient(to right, ${gradient})`, backgroundSize: "100% 10px", backgroundPosition: "center", backgroundRepeat: "no-repeat" }}
             />
-            <input
-              type="number" min={0} max={max} step={0.1}
-              value={current.channels[index]} aria-label={`${label} 수치 입력`}
-              onChange={(event) => changeChannel(index, event.currentTarget.valueAsNumber)}
-              className="h-8 w-16 shrink-0 rounded-lg border border-line bg-card text-center font-mono text-xs text-fg"
-            />
+            <StudioColorChannelInput min={0} max={max} step={0.1}
+              value={current.channels[index]!} label={`${label} 수치 입력`}
+              onChange={(next) => changeChannel(index, next)} />
           </div>
         );
       })}

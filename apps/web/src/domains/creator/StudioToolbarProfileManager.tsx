@@ -1,3 +1,4 @@
+import { studioToolbarProfileMatches, studioToolbarProfileNameError } from "./studio-toolbar-profile-names";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { StudioToolbarPreferences } from "./studio-app-settings";
 
@@ -9,6 +10,7 @@ export function StudioToolbarProfileManager({ value, onChange }: {
   readonly onChange: (next: StudioToolbarPreferences) => void;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
@@ -21,10 +23,8 @@ export function StudioToolbarProfileManager({ value, onChange }: {
   const returnFocus = (id: string) => requestAnimationFrame(() => (buttons.current.get(id) ?? heading.current)?.focus());
   const rename = () => {
     const trimmed = name.trim();
-    if (!trimmed || trimmed.length > 48) { setError("구성 이름을 1~48자로 입력하세요."); return; }
-    if (profiles.some((profile) => profile.id !== editing && profile.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase())) {
-      setError("같은 이름의 구성이 있습니다. 다른 이름을 입력하세요."); return;
-    }
+    const problem = studioToolbarProfileNameError(profiles, trimmed, editing ?? undefined);
+    if (problem) { setError(problem); return; }
     if (!profiles.some((profile) => profile.id === editing)) return;
     onChange({ ...value, profiles: profiles.map((profile) => profile.id === editing ? { ...profile, name: trimmed } : profile) });
     setMessage("구성 이름을 변경했습니다. 구성 적용을 누르면 저장됩니다.");
@@ -37,13 +37,16 @@ export function StudioToolbarProfileManager({ value, onChange }: {
     <ul className="space-y-2">
       {profiles.map((profile) => <li key={profile.id} className="space-y-2 rounded-lg border border-line p-2">
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={`${action} min-w-0 break-words`} aria-pressed={value.activeProfileId === profile.id}
+          <button type="button" className={`${action} min-w-0 break-words`} aria-pressed={value.activeProfileId === profile.id && studioToolbarProfileMatches(profile, value)}
             ref={(node) => { if (node) buttons.current.set(profile.id, node); else buttons.current.delete(profile.id); }}
             onClick={() => onChange({ ...value, visibleIds: [...profile.visibleIds], view: profile.view, activeProfileId: profile.id })}>{profile.name}</button>
+          <button type="button" className={action} aria-label={`${profile.name} 구성을 현재 배치로 업데이트`}
+            disabled={studioToolbarProfileMatches(profile, value)}
+            onClick={() => { setUpdating(profile.id); setEditing(null); setDeleting(null); setError(""); }}>현재 배치 저장</button>
           <button type="button" className={action} aria-label={`${profile.name} 구성 이름 변경`}
-            onClick={() => { setEditing(profile.id); setDeleting(null); setName(profile.name); setError(""); }}>이름 변경</button>
+            onClick={() => { setEditing(profile.id); setDeleting(null); setUpdating(null); setName(profile.name); setError(""); }}>이름 변경</button>
           <button type="button" className={action} aria-label={`${profile.name} 구성 삭제`}
-            onClick={() => { setDeleting(profile.id); setEditing(null); setError(""); }}>삭제</button>
+            onClick={() => { setDeleting(profile.id); setEditing(null); setUpdating(null); setError(""); }}>삭제</button>
         </div>
         {editing === profile.id ? <div className="space-y-2">
           <label className="block text-xs">새 구성 이름
@@ -58,6 +61,16 @@ export function StudioToolbarProfileManager({ value, onChange }: {
           <button type="button" className={action} onClick={rename}>이름 변경 확인</button>
           <button type="button" className={`${action} ml-2`} onClick={() => { setEditing(null); returnFocus(profile.id); }}>이름 변경 취소</button>
           {error ? <p role="alert" className="text-xs text-warn">{error}</p> : null}
+        </div> : null}
+        {updating === profile.id ? <div className="space-y-2" role="group" aria-label={`${profile.name} 구성 업데이트 확인`}>
+          <p className="text-xs text-fg-2">현재 도구 {value.visibleIds.length}개와 보기 방식을 이 이름에 저장할까요? 구성 적용 전에는 저장되지 않습니다.</p>
+          <button type="button" className={action} aria-label={`${profile.name} 구성 업데이트 확인`}
+            onClick={() => {
+              onChange({ ...value, activeProfileId: profile.id, profiles: profiles.map((item) => item.id === profile.id
+                ? { ...item, visibleIds: [...value.visibleIds], view: value.view ?? "single" } : item) });
+              setUpdating(null); setMessage("현재 배치로 갱신했습니다. 구성 적용을 누르면 저장됩니다."); returnFocus(profile.id);
+            }}>업데이트 확인</button>
+          <button type="button" className={`${action} ml-2`} onClick={() => { setUpdating(null); returnFocus(profile.id); }}>업데이트 취소</button>
         </div> : null}
         {deleting === profile.id ? <div className="space-y-2" role="group" aria-label={`${profile.name} 구성 삭제 확인`}>
           <p className="text-xs text-fg-2">이 구성을 삭제할까요? 현재 도구 배치는 유지되며 구성 적용 전에는 저장되지 않습니다.</p>

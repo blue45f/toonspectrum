@@ -141,11 +141,18 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
           onPointerCancel={(event) => { if (gestureRef.current?.id === event.pointerId) { const original = gestureRef.current.raw; gestureRef.current = null; onChange(original); } }}
           onLostPointerCapture={(event) => { if (gestureRef.current?.id === event.pointerId && !gestureRef.current.ending) { const original = gestureRef.current.raw; gestureRef.current = null; onChange(original); } }}
           onPointerUpCapture={(event) => { if (gestureRef.current?.id === event.pointerId) gestureRef.current.ending = true; }}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+            if (event.key === "Enter" && event.target instanceof HTMLInputElement && event.target.type === "number") {
+              event.preventDefault(); event.stopPropagation(); onGestureCommit();
+            }
+          }}
           onKeyUp={(event) => {
             if (event.nativeEvent.isComposing) return;
             if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "PageUp", "PageDown"].includes(event.key)) onGestureCommit();
           }}
           onBlur={(event) => {
+            if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-studio-color-cancel]')) return;
             if (event.target instanceof HTMLInputElement && ["number", "range"].includes(event.target.type)) onGestureCommit();
           }}>
           {picker === "wheel" ? <StudioColorDiscPicker value={session.color} onChange={onChange} size={compact ? 168 : 224} />
