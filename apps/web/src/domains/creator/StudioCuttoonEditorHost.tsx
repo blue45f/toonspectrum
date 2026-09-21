@@ -916,7 +916,6 @@ import {
   useStudioUiBooleanPreferenceHydration,
   useStudioWorkspacePanelOpenOverrides,
 } from "./studio-page-workspace-persistence";
-import { createPalette } from "./studio-palette-library";
 import { studioExactResumeRequested, studioExactResumeSourceReady } from "./studio-exact-resume-context";
 import { useStudioExactResumeContext } from "./useStudioExactResumeContext";
 import {
@@ -19538,12 +19537,12 @@ const puppetWarpArmed =
   async function saveSuggestedPaletteToLibrary(suggestion: PaletteSuggestion): Promise<void> {
     const generation = ++aiPaletteSaveGenerationRef.current;
     try {
-      const palette = createPalette(
-        suggestion.name,
-        suggestion.colors.map((c) => c.hex)
-      );
-      const { getProductStudioPaletteSqliteRepository } = await import("./studio-palette-sqlite-repository"
-      );
+      // Palette codecs/storage are needed only for an explicit library save, not initial drawing.
+      const [{ createPalette }, { getProductStudioPaletteSqliteRepository }] = await Promise.all([
+        import("./studio-palette-library"), import("./studio-palette-sqlite-repository"),
+      ]);
+      if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
+      const palette = createPalette(suggestion.name, suggestion.colors.map((c) => c.hex));
       await getProductStudioPaletteSqliteRepository().save(palette);
       if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;
       setAiPaletteSuggestError(null);

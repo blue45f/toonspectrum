@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createStudioDrawingWorkbenchRestoreActions, type StudioDrawingWorkbenchRestoreInputs } from "./studio-drawing-workbench-restore";
 import { DEFAULT_STUDIO_WORKSPACE_STATE } from "./studio-workspaces";
@@ -41,4 +42,18 @@ describe("drawing workspace restoration boundary", () => {
     createStudioDrawingWorkbenchRestoreActions(input).undoDrawingWorkbenchRestore();
     expect(input.persistStudioWorkspaceState).toHaveBeenCalledOnce();
   });
+});
+
+
+it("loads named-palette codecs only for an explicit live save", () => {
+  const host = readFileSync(new URL("./StudioCuttoonEditorHost.tsx", import.meta.url), "utf8");
+  expect(host).not.toContain('import { createPalette } from "./studio-palette-library";');
+  const save = host.slice(host.indexOf("async function saveSuggestedPaletteToLibrary"), host.indexOf("  function addFrame()"));
+  expect(save).toContain('import("./studio-palette-library")');
+  const load = save.indexOf("await Promise.all");
+  const guard = save.indexOf("if (!editorMountedRef.current || generation !== aiPaletteSaveGenerationRef.current) return;", load);
+  const write = save.indexOf("await getProductStudioPaletteSqliteRepository().save(palette)");
+  expect(load).toBeGreaterThanOrEqual(0);
+  expect(guard).toBeGreaterThan(load);
+  expect(write).toBeGreaterThan(guard);
 });
