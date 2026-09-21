@@ -676,6 +676,9 @@ export function StudioDrawOptionsBar({
                 onPrimaryChange={onColorChange}
                 onSecondaryChange={onSecondaryColorChange}
                 onSwap={onSwapColors}
+                onRequestCanvasEyedropper={onToggleEyedropper
+                  ? () => { if (!eyedropperActive) onToggleEyedropper(); }
+                  : undefined}
                 isTransparent={false}
                 onTransparentToggle={
                   onSetDrawMode

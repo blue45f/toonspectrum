@@ -142,6 +142,7 @@ export function StudioColorPopover({
   const [palettes, setPalettes] = useState<StudioPalette[]>([]);
   const [paletteId, setPaletteId] = useState<string>("");
   const [hexDraft, setHexDraft] = useState(value);
+  const hexDraftEditingRef = useRef(false);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -155,7 +156,7 @@ export function StudioColorPopover({
   const popupId = `studio-color-popover-${useId().replaceAll(":", "")}`;
 
   useEffect(() => {
-    setHexDraft(value);
+    if (!open || !hexDraftEditingRef.current) setHexDraft(value);
     if (!open || !sessionChangedRef.current) sessionColorRef.current = value;
   }, [open, value]);
 
@@ -171,6 +172,7 @@ export function StudioColorPopover({
   }, []);
 
   const finishSession = useCallback((restoreFocus = true) => {
+    hexDraftEditingRef.current = false;
     const finalColor = normalizeSelection(sessionColorRef.current);
     if (sessionPendingCommitRef.current) {
       onCommitColor?.(finalColor);
@@ -184,6 +186,7 @@ export function StudioColorPopover({
   }, [onCommitColor, onInteractionEnd, onUseColor, restoreTriggerFocus]);
 
   const cancelSession = useCallback(() => {
+    hexDraftEditingRef.current = false;
     if (sessionChangedRef.current) {
       const restore = normalizeSelection(initialColor);
       sessionColorRef.current = restore;
@@ -210,11 +213,18 @@ export function StudioColorPopover({
     if (!open) return;
     let frame = 0;
     const updatePosition = () => {
-      const anchor = triggerRef.current?.getBoundingClientRect();
+      const trigger = triggerRef.current?.getBoundingClientRect();
       const popup = popupRef.current;
-      if (!anchor || !popup) return;
-      const viewportWidth = Math.max(1, globalThis.innerWidth || 320);
-      const viewportHeight = Math.max(1, globalThis.innerHeight || 320);
+      if (!trigger || !popup) return;
+      const viewport = globalThis.visualViewport;
+      const viewportLeft = viewport?.offsetLeft ?? 0;
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const viewportWidth = Math.max(1, viewport?.width ?? (globalThis.innerWidth || 320));
+      const viewportHeight = Math.max(1, viewport?.height ?? (globalThis.innerHeight || 320));
+      const anchor = {
+        left: trigger.left - viewportLeft, right: trigger.right - viewportLeft,
+        top: trigger.top - viewportTop, bottom: trigger.bottom - viewportTop, width: trigger.width,
+      };
       const bottomSheet = viewportWidth <= 640;
       const width = Math.max(
         1,
@@ -222,7 +232,7 @@ export function StudioColorPopover({
           ? viewportWidth - VIEWPORT_PADDING_PX * 2
           : Math.min(POPOVER_WIDTH_PX, viewportWidth - VIEWPORT_PADDING_PX * 2),
       );
-      const mobileHeightCap = Math.max(220, Math.floor(viewportHeight * 0.64));
+      const mobileHeightCap = Math.max(1, Math.min(viewportHeight - VIEWPORT_PADDING_PX * 2, Math.floor(viewportHeight * 0.72)));
       const naturalHeight = Math.min(
         Math.max(1, popup.scrollHeight),
         POPOVER_MAX_HEIGHT_PX,
@@ -267,17 +277,19 @@ export function StudioColorPopover({
               anchor.top - POPOVER_GAP_PX - maxHeight,
             );
       popup.dataset.layout = bottomSheet ? "sheet" : "popover";
+      const positionedLeft = left + viewportLeft;
+      const positionedTop = top + viewportTop;
       setPopupStyle((current) => {
         if (
-          current.left === left &&
-          current.top === top &&
+          current.left === positionedLeft &&
+          current.top === positionedTop &&
           current.width === width &&
           current.maxHeight === maxHeight &&
           current.visibility === "visible"
         ) {
           return current;
         }
-        return { left, top, width, maxHeight, visibility: "visible" };
+        return { left: positionedLeft, top: positionedTop, width, maxHeight, visibility: "visible" };
       });
     };
     const schedulePosition = () => {
@@ -290,11 +302,15 @@ export function StudioColorPopover({
     if (popupRef.current) observer?.observe(popupRef.current);
     globalThis.addEventListener("resize", schedulePosition);
     globalThis.addEventListener("scroll", schedulePosition, true);
+    globalThis.visualViewport?.addEventListener("resize", schedulePosition);
+    globalThis.visualViewport?.addEventListener("scroll", schedulePosition);
     return () => {
       globalThis.cancelAnimationFrame?.(frame);
       observer?.disconnect();
       globalThis.removeEventListener("resize", schedulePosition);
       globalThis.removeEventListener("scroll", schedulePosition, true);
+      globalThis.visualViewport?.removeEventListener("resize", schedulePosition);
+      globalThis.visualViewport?.removeEventListener("scroll", schedulePosition);
     };
   }, [open, paletteId, palettes.length, recentColors.length, activeTab]);
 
@@ -343,17 +359,21 @@ export function StudioColorPopover({
     return () => globalThis.cancelAnimationFrame?.(frame ?? 0);
   }, [open]);
 
-  const handlePreview = (raw: string): void => {
+  const handlePreview = (raw: string, preserveDraft = false): void => {
     const color = normalizeSelection(raw);
     sessionChangedRef.current = true;
     sessionColorRef.current = color;
     sessionPendingCommitRef.current = true;
-    setHexDraft(color);
+    if (!preserveDraft) {
+      hexDraftEditingRef.current = false;
+      setHexDraft(color);
+    }
     if (onPreviewColor) onPreviewColor(color);
     else onChange(color);
   };
 
   const handleSelect = (raw: string): void => {
+    hexDraftEditingRef.current = false;
     const color = normalizeSelection(raw);
     sessionChangedRef.current = true;
     sessionColorRef.current = color;
@@ -514,7 +534,7 @@ export function StudioColorPopover({
                   aria-label={`${tab.label} 모드`}
                   onClick={() => setActiveTab(tab.id as StudioColorPopoverTab)}
                   className={cx(
-                    "rounded-lg py-1 text-[0.62rem] font-medium transition-all",
+                    "min-h-8 rounded-lg py-1 text-[0.62rem] font-medium transition-all pointer-coarse:min-h-11",
                     isActive
                       ? "bg-card text-accent font-semibold shadow-sm border border-accent/40 scale-[1.02]"
                       : "text-fg-3 hover:text-fg-1 hover:bg-card/40"
@@ -677,11 +697,23 @@ export function StudioColorPopover({
               placeholder="#rrggbb"
               onChange={(e) => {
                 const next = e.target.value;
+                hexDraftEditingRef.current = true;
                 setHexDraft(next);
                 const norm = normalizeHexColor(next);
-                if (norm) handleSelect(norm);
+                if (norm) handlePreview(norm, true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                event.stopPropagation();
+                const norm = normalizeHexColor(event.currentTarget.value);
+                if (norm) {
+                  handleSelect(norm);
+                  event.currentTarget.select();
+                }
               }}
               onBlur={(e) => {
+                hexDraftEditingRef.current = false;
                 const norm = normalizeHexColor(e.target.value);
                 if (norm) handleSelect(norm);
                 else setHexDraft(value);
@@ -694,7 +726,7 @@ export function StudioColorPopover({
               type="button"
               aria-label="색상 코드 복사"
               onClick={handleCopyHex}
-              className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
+              className="grid size-8 shrink-0 pointer-coarse:size-11 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
             >
               {copied ? <Check className="size-3.5 text-good" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
             </button>
@@ -709,7 +741,7 @@ export function StudioColorPopover({
                     finishSession(false);
                     onRequestCanvasEyedropper();
                   }}
-                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent active:scale-95 shadow-sm transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  className="grid size-8 shrink-0 pointer-coarse:size-11 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:border-accent/50 hover:bg-accent-soft hover:text-accent active:scale-95 shadow-sm transition-transform focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <Pipette className="size-3.5" aria-hidden />
                 </button>
@@ -727,7 +759,7 @@ export function StudioColorPopover({
                       .then((r) => handleSelect(r.sRGBHex))
                       .catch(() => {});
                   }}
-                  className="grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
+                  className="grid size-8 shrink-0 pointer-coarse:size-11 place-items-center rounded-lg border border-line bg-card/80 text-fg-2 hover:bg-raised hover:text-fg active:scale-95 shadow-sm transition-transform"
                 >
                   <Pipette className="size-3.5" aria-hidden />
                 </button>

@@ -779,6 +779,20 @@ export function StudioVerticalToolRail({
       aria-orientation="vertical"
       aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       data-studio-tool-rail="true"
+      onKeyDown={(event) => {
+        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
+          || !(event.target instanceof HTMLButtonElement)
+          || event.target.closest('[role="toolbar"]') !== event.currentTarget) return;
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
+        const index = buttons.indexOf(event.target);
+        if (index < 0 || buttons.length === 0) return;
+        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+          : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+        event.preventDefault();
+        event.stopPropagation();
+        buttons[next]?.focus({ preventScroll: true });
+        buttons[next]?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      }}
       className={cn(
         "hidden min-h-0 w-12 shrink-0 flex-col overflow-hidden border-r border-line",
         "lg:flex",
@@ -790,7 +804,7 @@ export function StudioVerticalToolRail({
         className={cn(
           "flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain py-2.5",
           "xl:gap-2 xl:py-3",
-          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          "[scrollbar-width:thin] [scrollbar-color:var(--color-line)_transparent]"
         )}
       >
         {children}

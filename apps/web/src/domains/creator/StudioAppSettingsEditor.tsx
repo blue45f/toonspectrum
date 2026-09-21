@@ -1,3 +1,4 @@
+import { matchesStudioRailToolQuery } from "./studio-rail-tool-search";
 import { isStudioDrawingCoreTool, studioDrawingVisibleTools } from "./studio-drawing-core-tools";
 /**
  * Application Settings modal — tabs:
@@ -27,6 +28,7 @@ import { createPortal } from "react-dom";
 
 import {
   DEFAULT_STUDIO_RAIL_VISIBLE_IDS,
+  DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   formatStudioShortcutChord,
   hideStudioRailTool,
   listStudioShortcutConflicts,
@@ -137,6 +139,7 @@ export function StudioAppSettingsPanel({
   const [tab, setTab] = useState<StudioAppSettingsTab>(initialTab);
   const [recordingAction, setRecordingAction] = useState<StudioShortcutActionId | null>(null);
   const [toolbarQuery, setToolbarQuery] = useState("");
+  const [toolbarBeforeShowAll, setToolbarBeforeShowAll] = useState<StudioRailToolId[] | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const dismissModal = useEffectEvent(() => {
     if (recordingAction) {
@@ -213,9 +216,7 @@ export function StudioAppSettingsPanel({
   const visible = studioDrawingVisibleTools(settings.toolbar.visibleIds);
   const hidden = studioRailHiddenIds(visible);
   const normalizedToolbarQuery = toolbarQuery.trim().normalize("NFKC").toLocaleLowerCase();
-  const matchesToolbarQuery = (id: StudioRailToolId) =>
-    !normalizedToolbarQuery
-    || studioRailToolLabel(id, t).normalize("NFKC").toLocaleLowerCase().includes(normalizedToolbarQuery);
+  const matchesToolbarQuery = (id: StudioRailToolId) => matchesStudioRailToolQuery(id, toolbarQuery, t);
   const visibleMatches = visible.filter(matchesToolbarQuery);
   const hiddenMatches = hidden.filter(matchesToolbarQuery);
   const shortcutConflicts = listStudioShortcutConflicts(settings.shortcuts);
@@ -607,6 +608,20 @@ export function StudioAppSettingsPanel({
                     <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-3">
                       {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
                     </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="button" disabled={hidden.length === 0}
+                      className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-3 text-xs font-semibold text-accent disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent"
+                      onClick={() => {
+                        setToolbarBeforeShowAll([...settings.toolbar.visibleIds]);
+                        patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } });
+                      }}>전체 {DEFAULT_STUDIO_RAIL_TOOL_ORDER.length}개 표시</button>
+                    {toolbarBeforeShowAll ? <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-xs text-fg"
+                      onClick={() => {
+                        patch({ toolbar: { visibleIds: toolbarBeforeShowAll } });
+                        setToolbarBeforeShowAll(null);
+                      }}>전체 표시 이전 구성으로 복원</button> : null}
+                    <p className="text-[0.68rem] text-fg-3">27개 이상도 배치할 수 있으며, 표시 순서는 실제 도구막대에 적용됩니다.</p>
                   </div>
                   <label className="relative block">
                     <span className="sr-only">{t("studio.settings.toolbar.searchAria")}</span>

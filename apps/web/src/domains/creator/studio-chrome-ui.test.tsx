@@ -391,7 +391,7 @@ describe("studio chrome UI", () => {
     expect(html).toContain("최근 색 1 #c45c26 · 현재 주 색");
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('aria-keyshortcuts="X"');
-    expect(html.match(/data-studio-tool-hint-target="true"/gu)).toHaveLength(3);
+    expect(html.match(/data-studio-tool-hint-target="true"/gu)).toHaveLength(4);
     expect(html).not.toContain("title=");
   });
 
@@ -477,4 +477,22 @@ describe("studio chrome UI", () => {
     expect(html).toContain("whitespace-nowrap");
     expect(html).toContain("100%");
   });
+});
+
+
+it("navigates the vertical rail in DOM order without activating or focusing disabled tools", () => {
+  render(<StudioVerticalToolRail footer={<button type="button">구성</button>}>
+    <button type="button">첫 도구</button><button type="button" disabled>잠긴 도구</button>
+    <button type="button">마지막 도구</button>
+  </StudioVerticalToolRail>);
+  const first = screen.getByRole("button", { name: "첫 도구" });
+  const last = screen.getByRole("button", { name: "마지막 도구" });
+  const settings = screen.getByRole("button", { name: "구성" });
+  first.focus();
+  fireEvent.keyDown(first, { key: "ArrowDown" });
+  expect(document.activeElement).toBe(last);
+  fireEvent.keyDown(last, { key: "End" });
+  expect(document.activeElement).toBe(settings);
+  fireEvent.keyDown(settings, { key: "Home" });
+  expect(document.activeElement).toBe(first);
 });

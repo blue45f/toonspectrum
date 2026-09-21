@@ -8,7 +8,8 @@ import {
   type StudioLeftToolRailClient,
   type StudioLeftToolRailClientInput,
 } from "./editor-client/studio-left-tool-rail-client";
-import { defaultStudioAppSettings } from "./studio-app-settings";
+import { studioDrawingVisibleTools } from "./studio-drawing-core-tools";
+import { DEFAULT_STUDIO_RAIL_TOOL_ORDER, defaultStudioAppSettings } from "./studio-app-settings";
 import {
   StudioLeftToolRail,
   type StudioLeftToolRailHandlers,
@@ -884,7 +885,7 @@ describe("StudioLeftToolRail", () => {
     render(<StudioLeftToolRail {...props} />);
 
     expect(screen.getByText("선택·변형·이동")).toBeTruthy();
-    expect(screen.getByText(new RegExp(`도구막대 ${appSettings.toolbar.visibleIds.length}개 표시`, "u"))).toBeTruthy();
+    expect(screen.getByText(new RegExp(`도구막대 ${studioDrawingVisibleTools(appSettings.toolbar.visibleIds).length}개 표시`, "u"))).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "화면 이동" }));
 
     expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledWith({
@@ -942,7 +943,9 @@ describe("StudioLeftToolRail", () => {
 
   it("renders the live tool belt in STUDIO_CHROME_RAIL_TOOL_GROUPS order", async () => {
     const { STUDIO_CHROME_DEFAULT_RAIL_TOOL_ORDER } = await import("./studio-chrome-ia-map");
-    render(<StudioLeftToolRail {...createProps()} />);
+    const appSettings = defaultStudioAppSettings();
+    appSettings.toolbar.visibleIds = [...DEFAULT_STUDIO_RAIL_TOOL_ORDER];
+    render(<StudioLeftToolRail {...createProps({ appSettings })} />);
     const rail = screen.getByRole("toolbar", { name: "그리기 도구" });
     const scroll = rail.querySelector('[data-studio-tool-rail-scroll="true"]');
     expect(scroll).not.toBeNull();
@@ -1048,5 +1051,46 @@ it("retains named core drawing and transform tools even in an old minimal toolba
   expect(view.container.querySelector('[data-studio-rail-tool-id="bg3d"]')).toBeNull();
   const ids = Array.from(view.container.querySelectorAll("[data-studio-rail-tool-id]"))
     .map((node) => node.getAttribute("data-studio-rail-tool-id"));
-  expect(ids.indexOf("transform")).toBeLessThan(ids.indexOf("pen"));
+  expect(ids).toEqual(studioDrawingVisibleTools(defaultStudioAppSettings().toolbar.visibleIds)
+    .filter((id) => ["select", "transform", "pen", "eraser", "fill", "marquee-rect", "lasso"].includes(id)));
+});
+
+
+it("renders every saved tool in actual DOM order including view tools and pinned references in focus mode", () => {
+  const appSettings = defaultStudioAppSettings();
+  const first = ["rotate-view", "reference", "zoom", "pen"] as const;
+  appSettings.toolbar.visibleIds = [...first, ...DEFAULT_STUDIO_RAIL_TOOL_ORDER.filter((id) => !first.some((item) => item === id))];
+  const props = createProps({ appSettings, uiDensityMode: "focus" });
+  const view = render(<StudioLeftToolRail {...props} />);
+  const ids = Array.from(view.container.querySelectorAll("[data-studio-rail-tool-id]"))
+    .map((node) => node.getAttribute("data-studio-rail-tool-id"));
+  expect(ids).toEqual(appSettings.toolbar.visibleIds);
+  expect(ids).toHaveLength(35);
+  fireEvent.click(screen.getByRole("button", { name: "참고 이미지" }));
+  expect(props.setReferencePanelOpen).toHaveBeenCalledWith(true);
+});
+
+it("restores all 35 tools in a single settings update without changing other preferences", () => {
+  stubAnimationFrame();
+  const appSettings = hiddenToolSettings();
+  const props = createProps({ appSettings, isRailToolVisible: (id) => id === "select", railMoreOpen: true });
+  render(<StudioLeftToolRail {...props} />);
+  expect(screen.getByText("구성")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "전체 35개 표시" }));
+  expect(props.stableHandlers.commitAppSettings).toHaveBeenCalledExactlyOnceWith({
+    ...appSettings, toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] },
+  });
+  expect(props.setRailMoreOpen).toHaveBeenCalledWith(false);
+  fireEvent.click(screen.getByRole("button", { name: "이전 구성" }));
+  expect(props.stableHandlers.commitAppSettings).toHaveBeenLastCalledWith(appSettings);
+});
+
+it("finds hidden tools by familiar aliases and reports an empty result", () => {
+  stubAnimationFrame();
+  render(<StudioLeftToolRail {...createProps({ appSettings: hiddenToolSettings(), isRailToolVisible: (id) => id === "select", railMoreOpen: true })} />);
+  fireEvent.change(screen.getByRole("searchbox", { name: "추가 도구 검색" }), { target: { value: "스포이드" } });
+  expect(screen.getByRole("button", { name: "색 가져오기" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "화면 이동" })).toBeNull();
+  fireEvent.change(screen.getByRole("searchbox", { name: "추가 도구 검색" }), { target: { value: "존재하지않는도구" } });
+  expect(screen.getByRole("status").textContent).toContain("일치하는 숨긴 도구가 없습니다");
 });
