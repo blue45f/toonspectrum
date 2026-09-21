@@ -16,6 +16,7 @@ import {
 } from "./studio-live-mutation-guard";
 
 export type StudioCanvasMutationIntent =
+  | "append-stroke"
   | "select"
   | "drag"
   | "text-edit"
@@ -52,6 +53,7 @@ export type StudioCanvasMutationGateResult =
     };
 
 const MUTATING_INTENTS: ReadonlySet<StudioCanvasMutationIntent> = new Set([
+  "append-stroke",
   "drag",
   "text-edit",
   "transform",

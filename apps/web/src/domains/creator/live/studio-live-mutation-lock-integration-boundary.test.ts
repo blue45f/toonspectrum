@@ -39,7 +39,7 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
     );
   });
 
-  it("keeps non-server gestures fail-closed while allowing optimistic server lease warmup", () => {
+  it("keeps gestures fail-closed until server lease warmup succeeds", () => {
     const begin = sourceBetween(
       "const begin = (",
       "const end = (): void => {",
@@ -47,7 +47,8 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
 
     expect(begin).toContain('if (room.mode !== "server")');
     expect(begin).toContain("selfHoldsStudioLiveLock(locks, resource, room.participant.sessionId)");
-    expect(begin).toContain("void beginAsync(elementIds)");
+    expect(begin).toContain("void beginAsync(elementIds, intent)");
+    expect(begin.trimEnd().endsWith("return false;\n  };" )).toBe(true);
     expect(begin).toContain("const key = JSON.stringify(resources)");
     expect(begin).toContain("return true;");
   });

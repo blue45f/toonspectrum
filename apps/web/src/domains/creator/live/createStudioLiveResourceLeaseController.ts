@@ -79,6 +79,26 @@ export function createStudioLiveResourceLeaseController({
     return false;
   };
 
+  // Only new independent pen/shape strokes may enter the existing draft pipeline without
+  // a lease in explicitly peer-only rooms. Never fabricate locks or server acknowledgements.
+  const appendOnlyDecision = (
+    room: StudioLiveRoom,
+    elementIds: readonly string[] | null | undefined,
+    intent: StudioCanvasMutationIntent,
+  ): boolean | undefined => {
+    if (room.mode !== "server" || room.canvasLockPolicy !== "append-only") return undefined;
+    if (!room.ready || !["owner", "admin", "editor"].includes(room.participant.role)) {
+      reportError("편집 연결과 권한을 확인한 뒤 새 획을 추가해 주세요.");
+      return false;
+    }
+    if (intent !== "append-stroke" || (elementIds?.length ?? 0) > 0) {
+      reportError("현재 연결에서는 새 획을 추가할 수 있습니다. 기존 요소 수정은 편집 잠금 서버 연결이 필요합니다.");
+      return false;
+    }
+    reportError(null);
+    return true;
+  };
+
   const beginAsync = async (
     elementIds?: readonly string[] | null,
     intent: StudioCanvasMutationIntent = "transform",
@@ -86,6 +106,12 @@ export function createStudioLiveResourceLeaseController({
     const room = roomRef.current;
     if (!room) return true;
     if (!preflight(room, elementIds, intent)) return false;
+    const appendOnly = appendOnlyDecision(room, elementIds, intent);
+    if (appendOnly !== undefined) return appendOnly;
+    if (room.mode === "server" && room.serverLockSupported === false) {
+      reportError("편집 잠금 서버를 사용할 수 없습니다. 연결 설정을 확인해 주세요.");
+      return false;
+    }
     const resources = resourcesFor(elementIds);
     const key = JSON.stringify(resources);
     const pending = pendingMutationRef.current;
@@ -128,6 +154,12 @@ export function createStudioLiveResourceLeaseController({
     const room = roomRef.current;
     if (!room) return true;
     if (!preflight(room, elementIds, intent)) return false;
+    const appendOnly = appendOnlyDecision(room, elementIds, intent);
+    if (appendOnly !== undefined) return appendOnly;
+    if (room.mode === "server" && room.serverLockSupported === false) {
+      reportError("편집 잠금 서버를 사용할 수 없습니다. 연결 설정을 확인해 주세요.");
+      return false;
+    }
     const resources = resourcesFor(elementIds);
 
     // Local preview rooms can arbitrate synchronously. Server rooms may start a gesture only when
@@ -160,9 +192,10 @@ export function createStudioLiveResourceLeaseController({
     const key = JSON.stringify(resources);
     const pending = pendingMutationRef.current;
     if (!pending || pending.room !== room || pending.key !== key) {
-      void beginAsync(elementIds);
+      void beginAsync(elementIds, intent);
     }
-    return true;
+    // Pending acquisition is not permission to mutate an existing shared element.
+    return false;
   };
 
   const end = (): void => {

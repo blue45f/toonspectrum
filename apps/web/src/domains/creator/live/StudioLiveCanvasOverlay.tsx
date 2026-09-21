@@ -126,6 +126,8 @@ export interface StudioLiveCanvasOverlayProps {
 }
 
 export interface StudioLivePresenceDockProps {
+  /** The editor save-center owns status copy and live-region announcements. */
+  syncStatusSurface?: "dock" | "save-center";
   connected: boolean;
   operationSyncReady?: boolean;
   /** Always-on collab: show while connecting/ready even with zero peers. */
@@ -170,6 +172,7 @@ export interface StudioRemoteCursorOverlayProps {
 }
 
 export interface StudioLivePresenceDockConnectedProps {
+  syncStatusSurface?: "dock" | "save-center";
   operationSyncReady?: boolean;
   followingSessionId: string | null;
   onOpenTeam: () => void;
@@ -1240,6 +1243,7 @@ export function StudioRemoteCursorOverlay({
 }
 
 export function StudioLivePresenceDock({
+  syncStatusSurface = "dock",
   connected,
   operationSyncReady = false,
   alwaysOn = false,
@@ -1300,7 +1304,7 @@ export function StudioLivePresenceDock({
       data-studio-sync-phase={resolvedSync.phase}
       className="pointer-events-auto flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-1.5 rounded-xl border border-line/80 bg-panel/95 p-1.5 shadow-xl backdrop-blur-md"
     >
-      {syncPresentation.assertive ? (
+      {syncStatusSurface !== "dock" ? null : syncPresentation.assertive ? (
         <span aria-atomic="true" aria-live="assertive" className="sr-only" role="alert">
           {syncAnnouncement}
         </span>
@@ -1326,7 +1330,10 @@ export function StudioLivePresenceDock({
         aria-label="팀 작업 공간 열기"
         title="팀"
         data-studio-presence-team-action="true"
-        className="hidden size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none sm:grid"
+        className={cn(
+          "size-11 shrink-0 place-items-center rounded-lg border border-line/60 bg-card/80 text-fg-2 transition-colors duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent motion-reduce:transition-none",
+          syncStatusSurface === "dock" ? "hidden sm:grid" : "grid",
+        )}
         onClick={onOpenTeam}
       >
         <UsersRound size={16} strokeWidth={1.75} aria-hidden />
@@ -1352,7 +1359,7 @@ export function StudioLivePresenceDock({
           )}
         </button>
       ) : null}
-      <button
+      {syncStatusSurface === "dock" ? <button
         type="button"
         aria-label={`${collaborationLabel} 팀 작업 공간 열기`}
         title={`${syncPresentation.detail} · ${lastAckLabel}`}
@@ -1372,7 +1379,7 @@ export function StudioLivePresenceDock({
         <span className="hidden min-w-0 flex-1 truncate text-left tabular-nums sm:inline">
           {syncPresentation.shortLabel}
         </span>
-      </button>
+      </button> : null}
 
       {cursorQuality && cursorQualityPresentation && cursorQuality.tier !== "live" ? (
         <button
@@ -1485,6 +1492,7 @@ export function StudioLivePresenceDock({
 }
 
 export function StudioLivePresenceDockConnected({
+  syncStatusSurface = "dock",
   operationSyncReady,
   followingSessionId,
   onOpenTeam,
@@ -1532,6 +1540,7 @@ export function StudioLivePresenceDockConnected({
 
   return (
     <StudioLivePresenceDock
+      syncStatusSurface={syncStatusSurface}
       connected={availability === "ready"}
       operationSyncReady={operationSyncReady}
       alwaysOn
