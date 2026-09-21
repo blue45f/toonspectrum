@@ -7,7 +7,7 @@
 - The existing close form can generate a literal draft from recorded decisions, agenda outcomes, unresolved notes, unconcluded agenda, the latest material decision and linked results.
 - Draft generation, preview and application do not send a server command. Existing text needs explicit replacement consent. Applying the draft clears the separate close confirmation.
 - A changed session version or changed closing text invalidates an observed draft. Oversized drafts remain fully visible and cannot be silently truncated/applied past the existing 4,000-character limit.
-- An open closing form disappears when the actor loses host permission or participation. Existing server authorization/CAS remains authoritative.
+- An open closing form is cleared when actor, scope, host permission or participation changes. Editing the closing summary also revokes its previous confirmation. Existing server authorization/CAS remains authoritative.
 
 ## Boundaries
 
@@ -17,7 +17,7 @@ A fresh React resource permits another loader attempt; persistent network failur
 
 ## Validation
 
-- Work-session model-facing controller/component/client suite: 9 files / 71 tests passed locally.
+- Work-session model-facing controller/component/client suite: 9 files / 73 tests passed locally.
 - Full web/API typecheck and API-owned browser runner typecheck passed.
 - Changed source ESLint passed before the final integration rerun; normal commit/push gates remain required.
 - A local-only UI fixture is provided at `apps/web/tools/browser-harnesses/session-recovery-wrapup.html`.
