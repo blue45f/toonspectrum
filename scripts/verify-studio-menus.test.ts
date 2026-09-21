@@ -10,6 +10,7 @@ import {
   showStudioRailTool,
   STUDIO_RAIL_TOOL_CATALOG,
 } from "../apps/web/src/domains/creator/studio-app-settings";
+import { studioDrawingVisibleTools } from "../apps/web/src/domains/creator/studio-drawing-core-tools";
 import { resetStudioFloatingSurfaceStackForTest } from "../apps/web/src/domains/creator/studio-floating-surface-stack";
 import { subscribeStudioHelpHub } from "../apps/web/src/domains/creator/studio-help-hub-channel";
 import { buildStudioHelpGroupItems } from "../apps/web/src/domains/creator/studio-help-menu-items";
@@ -50,10 +51,13 @@ afterEach(() => {
 });
 
 describe("production menu verifier follows shipped feature entry points", () => {
-  it("keeps all eight first-run tools and grows the actual More selection to thirteen", () => {
+  it("preserves eight saved defaults while projecting ten first-run and fifteen expanded tools", () => {
     let visibleIds = defaultStudioAppSettings().toolbar.visibleIds;
-    expect(visibleIds).toEqual(FIRST_RUN_RAIL_TOOL_IDS);
-    expect(FIRST_RUN_RAIL_TOOL_IDS).toHaveLength(8);
+    expect(visibleIds).toEqual([
+      "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
+    ]);
+    expect(new Set(studioDrawingVisibleTools(visibleIds))).toEqual(new Set(FIRST_RUN_RAIL_TOOL_IDS));
+    expect(FIRST_RUN_RAIL_TOOL_IDS).toHaveLength(10);
     expect(visibleIds).not.toContain("eyedropper");
     expect(visibleIds).not.toContain("bubble");
     expect(OPTIONAL_RAIL_TOOLS.map(({ id }) => id)).toEqual([
@@ -67,7 +71,9 @@ describe("production menu verifier follows shipped feature entry points", () => 
       expect(new Set(visibleIds).size).toBe(visibleIds.length);
     }
     expect(visibleIds).toHaveLength(13);
-    expect(visibleIds).toEqual(expect.arrayContaining([...FIRST_RUN_RAIL_TOOL_IDS]));
+    const displayedIds = studioDrawingVisibleTools(visibleIds);
+    expect(displayedIds).toHaveLength(15);
+    expect(displayedIds).toEqual(expect.arrayContaining([...FIRST_RUN_RAIL_TOOL_IDS]));
   });
 
   it("uses catalogue picker names and the actual localized shortcut-bearing rail names", () => {
