@@ -11,6 +11,7 @@ import { StudioP2pVirtualStudio } from "./StudioP2pVirtualStudio";
 import { studioStrokeFocusActivitySnapshot, subscribeStudioStrokeFocusActivity } from "../../studio-stroke-focus-activity";
 import { acquireStudioHuddleAudioFocus } from "./studio-p2p-huddle-audio-focus";
 import { resolveStudioHuddleAuthority, type StudioHuddleAuthority } from "./studio-p2p-huddle-authority";
+import { canRetryStudioHuddleConnection, resolveStudioHuddleAvailability, STUDIO_HUDDLE_AVAILABILITY_COPY } from "./studio-p2p-huddle-availability";
 
 export default function StudioP2pHuddleLauncher() {
   const live = useStudioLiveCollaboration();
@@ -39,6 +40,16 @@ export default function StudioP2pHuddleLauncher() {
   const active = snapshot !== null && !snapshot.closed;
   useEffect(() => active ? acquireStudioHuddleAudioFocus() : undefined, [active]);
   const room = live.room;
+  // The room is mutable: subscribe to its capability rather than memoizing room.direct
+  // from context identity or the document's unrelated durability availability.
+  const subscribeRoom = useCallback((onChange: () => void) => room?.subscribe((event) => {
+    if (event.type === "transport-status") onChange();
+  }) ?? (() => undefined), [room]);
+  const readDirect = useCallback(() => room?.direct ?? null, [room]);
+  const direct = useSyncExternalStore(subscribeRoom, readDirect, () => null);
+  const availability = resolveStudioHuddleAvailability(live, direct);
+  const canJoin = availability === "ready" && direct !== null;
+  const canRetry = canRetryStudioHuddleConnection(availability, live.serverAvailable);
   const handleNearbyChange = useCallback((sessionIds: string[]) => {
     if (conversation.current) return;
     nearbyPeerIdsRef.current = sessionIds;
@@ -75,7 +86,7 @@ export default function StudioP2pHuddleLauncher() {
     proximityMediaRef.current = true;
     setSnapshot(null); setDraft(""); setBusy(false); setProximityMedia(true);
     return disposeSession;
-  }, [disposeSession, room, live.availability, live.canChat]);
+  }, [disposeSession, room, direct, canJoin, live.canChat]);
   useEffect(() => {
     if (strokeFocusPhase === "drawing") setOpen(false);
   }, [strokeFocusPhase]);
@@ -143,7 +154,7 @@ export default function StudioP2pHuddleLauncher() {
       element.scrollTop = element.scrollHeight;
   }, [snapshot?.messages.length]);
   function join() {
-    if (!room?.direct || live.availability !== "ready" || !live.canChat || controller.current || (authority.current && !authority.current.valid())) return;
+    if (!room?.direct || resolveStudioHuddleAvailability(live) !== "ready" || controller.current || (authority.current && !authority.current.valid())) return;
     const scopeAuthority = authority.current;
     const next = new StudioP2pHuddleController(room.participant, room.direct, {
       peerFilter: (peer) => proximityPeerIds.current?.has(peer.sessionId) ?? true,
@@ -165,7 +176,7 @@ export default function StudioP2pHuddleLauncher() {
     setNotice(null); next.start(); setSnapshot(next.snapshot());
   }
   async function capture(action: () => Promise<void>) {
-    if (authority.current && !authority.current.valid()) { leave(); setOpen(false); return; }
+    if (resolveStudioHuddleAvailability(live) !== "ready" || (authority.current && !authority.current.valid())) { leave(); setOpen(false); return; }
     const owner = controller.current; setBusy(true);
     try { await action(); } finally { if (controller.current === owner) setBusy(false); }
   }
@@ -175,7 +186,6 @@ export default function StudioP2pHuddleLauncher() {
     else setNotice("전송하지 못했습니다. 상대의 P2P 참여와 연결 상태를 확인해 주세요.");
   }
   if (!room || !live.canChat) return null;
-  const canJoin = Boolean(room.direct && live.availability === "ready");
   const mediaAvailable = Boolean(navigator.mediaDevices?.getUserMedia);
   return <aside
     className="studio-p2p-huddle-dock pointer-events-none fixed bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+4.25rem)] right-3 z-[65] flex max-h-[calc(100dvh-var(--studio-canvas-bottom-inset,7rem)-5rem)] max-w-[calc(100vw-1.5rem)] flex-col items-end sm:bottom-3 sm:max-h-[calc(100dvh-1.5rem)]"
@@ -195,8 +205,13 @@ export default function StudioP2pHuddleLauncher() {
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "참여하면 채팅만 시작됩니다. 마이크·카메라는 직접 켜기 전까지 사용하지 않습니다.")}</p>
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "대화·통화는 브라우저 간 직접 전송하며 기록을 저장하지 않습니다. 상대에게 네트워크 주소가 노출될 수 있으니 신뢰하는 작업자와 사용해 주세요.")}</p>
           <p>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "회사망·일부 모바일망에서는 연결되지 않을 수 있습니다. 실패 시 서버 중계로 전환하지 않습니다. 상대방의 녹화·캡처까지 막지는 못합니다.")}</p>
-          {!canJoin && <p role="status" className="text-warn">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "서버에 연결된 공동작업 원고와 WebRTC 지원 브라우저가 필요합니다. 로컬 탭 연결만으로 원격 통화를 시작하지 않습니다.")}</p>}
-          <button className={controlClass} type="button" disabled={!canJoin} onClick={join}>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "동의하고 P2P 채팅 참여")}</button>
+          {availability !== "ready" && <div className="space-y-2" data-studio-huddle-availability={availability}>
+            <p id="studio-huddle-unavailable" role="status" className="text-warn">{bt(...STUDIO_HUDDLE_AVAILABILITY_COPY[availability])}</p>
+            {canRetry && <button type="button" className={controlClass} onClick={live.retryServer}>
+              {bt("공동작업 연결 다시 확인", "Recheck collaboration connection")}
+            </button>}
+          </div>}
+          <button className={controlClass} type="button" disabled={!canJoin} aria-describedby={!canJoin ? "studio-huddle-unavailable" : undefined} onClick={join}>{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "동의하고 P2P 채팅 참여")}</button>
         </div> : <>
           <p className="text-xs text-fg-2" role="status">{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "나 포함 ")}{(snapshot?.peers.length ?? 0) + 1}{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "명 참여 · 연결 가능 ")}{snapshot?.availablePeers ?? 0}{translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "명")}</p>
           {proximityPeerIds.current ? <p className="rounded-lg bg-accent-soft px-2 py-1.5 text-[11px] font-semibold text-accent" data-studio-p2p-proximity-scope="true" data-studio-p2p-conversation={conversation.current?.id}>{conversation.current ? bt("수락한 대화 참여자에게만 연결합니다.", "Only accepted conversation members are connected.") : translateCurrentStaticSourceText("domains.creator.live.huddle.StudioP2pHuddleLauncher", "ko", "가상 스튜디오 근처 대화 · 가까운 팀원만 직접 연결")}</p> : null}

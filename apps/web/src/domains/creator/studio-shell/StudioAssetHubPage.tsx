@@ -101,24 +101,24 @@ export function StudioAssetHubPage() {
     <div data-route-ready="studio-assets" data-studio-asset-hub={view}>
       <div className="border-b border-line bg-panel/75 backdrop-blur">
         <Container size="wide" className="py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3 lg:max-w-xs">
               <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
                 <CurrentViewIcon size={18} aria-hidden="true" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">TOONSTUDIO MATERIALS</p>
                 <p className="text-sm font-bold text-fg">{currentLabel}</p>
                 {projectId ? (
-                  <p className="mt-0.5 text-xs text-fg-3">
+                  <p className="mt-0.5 truncate text-xs text-fg-3" title={projectId}>
                     {bt(`프로젝트 ${projectId}에 연결`, `Connected to project ${projectId}`)}
                   </p>
                 ) : null}
               </div>
             </div>
 
-            <nav aria-label={bt("소재 화면", "Material views")} className="overflow-x-auto">
-              <div className="flex min-w-max gap-1 rounded-2xl border border-line bg-card p-1">
+            <nav aria-label={bt("소재 화면", "Material views")} className="min-w-0 max-w-full overflow-x-auto lg:flex-1">
+              <div className="flex w-max min-w-full gap-1 rounded-2xl border border-line bg-card p-1 lg:ml-auto lg:min-w-0">
                 {visibleViews.map((candidate) => {
                   const active = candidate === view;
                   const Icon = VIEW_ICONS[candidate];
@@ -147,8 +147,8 @@ export function StudioAssetHubPage() {
       </div>
 
       {view === "overview" ? <StudioAssetsPage /> : null}
-      {view === "overview" ? <details className="mx-4 mb-6 rounded-xl border border-line sm:mx-6">
-        <summary className="min-h-11 cursor-pointer px-4 py-3 text-sm font-semibold">{bt("소재 선택 가이드와 활용 예시", "Material selection guide and examples")}</summary>
+      {view === "overview" ? <details className="mx-3 mb-6 min-w-0 rounded-2xl border border-line sm:mx-6">
+        <summary className="min-h-11 cursor-pointer rounded-2xl px-4 py-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">{bt("소재 선택 가이드와 활용 예시", "Material selection guide and examples")}</summary>
         <StudioAssetVisualIntro locale={legacyLocale} />
       </details> : null}
       {view === "essentials" ? <Suspense fallback={<p role="status" className="p-8 text-sm text-fg-2">{bt("제작 소재 준비 중…", "Loading creator essentials…")}</p>}><CreatorEssentialsPage /></Suspense> : null}

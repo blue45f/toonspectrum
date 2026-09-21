@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -79,10 +80,13 @@ function assertNoSensitiveFields(provider, value) {
   }
 }
 
-export function validateSocialLoginDiscovery(payload) {
+export function validateSocialLoginDiscovery(payload, { allowDisabled = [] } = {}) {
   if (!isRecord(payload)) throw new Error("provider discovery must be an object");
 
   const expected = ["google", "apple", "kakao", "naver", "github"];
+  if (!Array.isArray(allowDisabled) || allowDisabled.some((id) => !expected.includes(id))) {
+    throw new Error("allowDisabled must contain known provider IDs only");
+  }
   const result = {};
 
   for (const provider of expected) {
@@ -90,6 +94,17 @@ export function validateSocialLoginDiscovery(payload) {
     if (!isRecord(value)) throw new Error(`${provider} is missing from provider discovery`);
     assertNoSensitiveFields(provider, value);
 
+    if (value.mode === "disabled" && allowDisabled.includes(provider)) {
+      if (value.redirectAvailable !== false || "clientId" in value
+        || typeof value.label !== "string" || !value.label.trim()
+        || !["missing-client-id", "missing-credentials"].includes(value.reason)) {
+        throw new Error(`${provider} has an invalid disabled configuration`);
+      }
+      result[provider] = Object.freeze({
+        label: value.label, mode: "disabled", redirectAvailable: false, reason: value.reason,
+      });
+      continue;
+    }
     if (value.mode !== "oauth") {
       throw new Error(`${provider}.mode must be oauth; received ${String(value.mode)}`);
     }
@@ -263,12 +278,71 @@ async function verifyRedirectProvider(fetchImpl, origin, provider, timeoutMs) {
   });
 }
 
+/** Public, cookie-free entry probe only: never follows an application callback. */
+export async function probeGoogleAuthorizationClient({
+  clientId, origin = DEFAULT_ORIGIN, fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}) {
+  const parsed = parseSocialLoginOrigin(String(origin));
+  if (typeof clientId !== "string" || clientId.length > 512
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]*\.apps\.googleusercontent\.com$/u.test(clientId)) {
+    throw new Error("google.clientId is missing or malformed");
+  }
+  const callback = new URL("/api/auth/oauth/google/callback", parsed);
+  let target = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  target.search = new URLSearchParams({
+    client_id: clientId, redirect_uri: callback.href, response_type: "code",
+    scope: "openid email profile", prompt: "none", state: randomBytes(24).toString("base64url"),
+  }).toString();
+  const signal = AbortSignal.timeout(timeoutMs);
+  for (let hop = 0; hop < 6; hop += 1) {
+    const response = await fetchImpl(target, {
+      method: "GET", redirect: "manual", credentials: "omit",
+      headers: { accept: "text/html", "user-agent": "toonstudio-social-login-verifier/2" },
+      signal,
+    });
+    const location = response.headers.get("location");
+    await response.body?.cancel();
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      if (response.status !== 200) throw new Error(`google entry probe returned ${response.status}`);
+      return Object.freeze({ stage: "authorization-page", authenticated: false });
+    }
+    if (!location || location.length > 16_384) throw new Error("google entry probe has an invalid redirect");
+    const next = new URL(location, target);
+    if (next.protocol !== "https:" || next.username || next.password || next.port) {
+      throw new Error("google entry probe has an unsafe redirect");
+    }
+    if (next.origin !== "https://accounts.google.com" && next.origin !== parsed.origin) {
+      throw new Error("google entry probe redirected to an unexpected host");
+    }
+    const encoded = next.searchParams.get("authError") ?? "";
+    const payload = Buffer.from(encoded, "base64url").toString("utf8");
+    const error = next.searchParams.get("error") ?? "";
+    const knownError = `${error} ${payload}`.match(
+      /\b(deleted_client|invalid_client|redirect_uri_mismatch|unauthorized_client|access_denied|invalid_request)\b/u,
+    )?.[1];
+    if (knownError) throw new Error(`google authorization rejected: ${knownError}`);
+    if (next.pathname.includes("/oauth/error")) throw new Error("google authorization rejected: provider_error");
+    if (next.origin === parsed.origin) {
+      if (next.pathname !== callback.pathname) throw new Error("google entry probe has an unexpected callback");
+      if (!["login_required", "interaction_required", "consent_required", "account_selection_required"].includes(error)) {
+        throw new Error("google entry probe returned an unexpected callback result");
+      }
+      return Object.freeze({ stage: "interaction-required", authenticated: false });
+    }
+    target = next;
+  }
+  throw new Error("google entry probe exceeded its redirect limit");
+}
+
 export async function verifySocialLoginProduction({
   origin = DEFAULT_ORIGIN,
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  allowDisabled = [],
+  probeGoogleClient = false,
 } = {}) {
-  const parsed = origin instanceof URL ? origin : parseSocialLoginOrigin(origin);
+  const parsed = parseSocialLoginOrigin(String(origin));
   if (typeof fetchImpl !== "function") throw new Error("fetch implementation is required");
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000) {
     throw new Error("timeoutMs must be an integer between 1000 and 120000");
@@ -296,12 +370,17 @@ export async function verifySocialLoginProduction({
     throw new Error(`${discoveryPath} must return application/json`);
   }
 
-  const discovery = validateSocialLoginDiscovery(
-    await readBoundedJson(discoveryResponse, discoveryPath),
-  );
+  const payload = await readBoundedJson(discoveryResponse, discoveryPath);
+  const discovery = validateSocialLoginDiscovery(payload, { allowDisabled });
+  const googlePreflight = probeGoogleClient && discovery.google.mode === "oauth"
+    ? await probeGoogleAuthorizationClient({
+        clientId: payload.google.clientId, origin: parsed.origin, fetchImpl, timeoutMs,
+      })
+    : null;
 
   const redirects = [];
   for (const provider of Object.keys(REDIRECT_PROVIDERS)) {
+    if (discovery[provider].mode === "disabled") continue;
     redirects.push(await verifyRedirectProvider(
       fetchImpl,
       parsed,
@@ -313,6 +392,7 @@ export async function verifySocialLoginProduction({
   return Object.freeze({
     origin: parsed.origin,
     discovery,
+    googlePreflight,
     redirects: Object.freeze(redirects),
   });
 }
@@ -320,18 +400,21 @@ export async function verifySocialLoginProduction({
 async function main() {
   const originArgument = process.argv.find((argument) => argument.startsWith("--origin="));
   const timeoutArgument = process.argv.find((argument) => argument.startsWith("--timeout-ms="));
+  const disabledArgument = process.argv.find((argument) => argument.startsWith("--allow-disabled="));
   const timeoutMs = timeoutArgument
     ? Number(timeoutArgument.slice("--timeout-ms=".length))
     : DEFAULT_TIMEOUT_MS;
   const result = await verifySocialLoginProduction({
     origin: originArgument?.slice("--origin=".length) ?? DEFAULT_ORIGIN,
     timeoutMs,
+    allowDisabled: disabledArgument?.slice("--allow-disabled=".length).split(",") ?? [],
+    probeGoogleClient: process.argv.includes("--probe-google-client"),
   });
-  const providers = Object.keys(result.discovery).join(", ");
+  const providers = Object.entries(result.discovery).map(([id, value]) => `${id}=${value.mode}`).join(", ");
   const redirects = result.redirects
     .map(({ provider, status, authorizationHost }) => `${provider}=${status}@${authorizationHost}`)
     .join(", ");
-  console.log(`Social login production verified: ${result.origin} (${providers}; ${redirects})`);
+  console.log(`Social login entry points verified (not a completed sign-in): ${result.origin} (${providers}; ${redirects})`);
 }
 
 const invoked = process.argv[1]

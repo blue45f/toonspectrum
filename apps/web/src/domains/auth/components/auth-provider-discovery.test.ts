@@ -132,4 +132,21 @@ describe("auth provider discovery", () => {
       }),
     ).toEqual({});
   });
+  it.each(["kakao", "naver"] as const)(
+    "requires a confirmed redirect capability for %s while preserving explicit demos",
+    (provider) => {
+      for (const redirectAvailable of [undefined, false, "true", 1]) {
+        expect(parseAuthProviderDiscovery({
+          [provider]: { mode: "oauth", redirectAvailable },
+        })).toEqual({});
+      }
+      expect(parseAuthProviderDiscovery({
+        [provider]: { mode: "oauth", redirectAvailable: true },
+      })[provider]).toMatchObject({ mode: "oauth", redirectAvailable: true });
+      expect(parseAuthProviderDiscovery({
+        [provider]: { mode: "demo", redirectAvailable: false },
+      })[provider]).toMatchObject({ mode: "demo", redirectAvailable: false });
+    },
+  );
+
 });

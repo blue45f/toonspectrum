@@ -158,21 +158,28 @@ export function GoogleIdentityButton({
       }
       inFlight = true;
       setState({ status: "submitting" });
-      const result = submitCredential
-        ? await submitCredential(credential, { signal: requestController.signal })
-        : await signInWithGoogleIdToken(credential, {
-            signal: requestController.signal,
-          });
-      inFlight = false;
-      if (!active) return;
-      if (result.ok) {
-        onSuccess();
-        return;
+      try {
+        const result = submitCredential
+          ? await submitCredential(credential, { signal: requestController.signal })
+          : await signInWithGoogleIdToken(credential, {
+              signal: requestController.signal,
+            });
+        if (!active) return;
+        if (result.ok) {
+          onSuccess();
+          return;
+        }
+        fail(
+          "signin",
+          result.error ?? "Google 계정을 확인하지 못했어요. 다시 시도해 주세요.",
+        );
+      } catch {
+        // Transport and custom account-link adapters may reject. Do not leave
+        // the button submitting forever or expose credentials from raw errors.
+        fail("signin", "Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      } finally {
+        inFlight = false;
       }
-      fail(
-        "signin",
-        result.error ?? "Google 계정을 확인하지 못했어요. 다시 시도해 주세요.",
-      );
     };
 
     const renderButton = () => {

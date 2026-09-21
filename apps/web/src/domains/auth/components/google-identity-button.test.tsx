@@ -172,4 +172,46 @@ describe("Google Identity Services 로그인 버튼", () => {
     fireEvent.click(fallback);
     expect(onRedirectFallback).toHaveBeenCalledTimes(1);
   });
+  it.each([false, true])("recovers from a rejected credential adapter (custom=%s) without replaying credentials", async (custom) => {
+    const onSuccess = vi.fn();
+    const adapter = custom ? vi.fn() : signInWithGoogleIdToken;
+    adapter.mockRejectedValueOnce(new Error("private-provider-token-do-not-display"))
+      .mockResolvedValueOnce({ ok: true });
+    render(<GoogleIdentityButton
+      clientId="client.apps.googleusercontent.com"
+      onSuccess={onSuccess}
+      submitCredential={custom ? adapter : undefined}
+    />);
+    await waitFor(() => expect(renderButton).toHaveBeenCalledTimes(1));
+    await act(async () => { credentialCallback?.({ credential: "first.token.signature" }); });
+    expect((await screen.findByRole("alert")).textContent).toContain("Google 로그인을 완료하지 못했어요.");
+    expect(screen.queryByText("Google 계정 확인 중…")).toBeNull();
+    expect(screen.queryByText("private-provider-token-do-not-display")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Google로 다시 시도" }));
+    await waitFor(() => expect(renderButton).toHaveBeenCalledTimes(2));
+    expect(adapter).toHaveBeenCalledTimes(1);
+    await act(async () => { credentialCallback?.({ credential: "fresh.token.signature" }); });
+    await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+    expect(adapter).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores a late rejected credential after unmount", async () => {
+    const onSuccess = vi.fn();
+    let rejectCredential!: (reason: Error) => void;
+    const submitCredential = vi.fn(() => new Promise<{ ok: boolean }>((_resolve, reject) => {
+      rejectCredential = reject;
+    }));
+    const view = render(<GoogleIdentityButton
+      clientId="client.apps.googleusercontent.com"
+      onSuccess={onSuccess}
+      submitCredential={submitCredential}
+    />);
+    await waitFor(() => expect(renderButton).toHaveBeenCalledTimes(1));
+    await act(async () => { credentialCallback?.({ credential: "pending.token.signature" }); });
+    view.unmount();
+    await act(async () => { rejectCredential(new Error("aborted")); });
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
 });
