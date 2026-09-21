@@ -13,6 +13,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./compatibility-report": {
+      "types": "./src/compatibility-report.ts",
+      "import": "./src/compatibility-report.ts",
+      "default": "./src/compatibility-report.ts"
     }
   },
   "scripts": {

@@ -177,6 +177,7 @@ export function StudioColorDiscPicker({
   };
 
   const handleHueKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     let delta = 0;
     if (e.key === "ArrowRight" || e.key === "ArrowUp") delta = e.shiftKey ? 15 : 2;
     if (e.key === "ArrowLeft" || e.key === "ArrowDown") delta = e.shiftKey ? -15 : -2;
@@ -191,6 +192,7 @@ export function StudioColorDiscPicker({
   };
 
   const handleSvKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     let ds = 0;
     let dv = 0;
     const step = e.shiftKey ? 10 : 2;

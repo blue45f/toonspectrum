@@ -98,7 +98,7 @@ import {
   readStudioWorldAuthoringDraftRecord,
   writeStudioWorldAuthoringDraft,
 } from "./studio-virtual-space-world-authoring";
-import { StudioVirtualSpaceWorldAuthoringPanel } from "./StudioVirtualSpaceWorldAuthoringPanel";
+import { StudioWorldAuthoringEntry } from "./StudioWorldAuthoringEntry";
 import { useStudioWorldPublication } from "./world-publication/use-studio-world-publication";
 import { StudioWorldPublicationPanel } from "./world-publication/StudioWorldPublicationPanel";
 import {
@@ -1404,7 +1404,7 @@ export function VirtualSpaceExperience({
             </div>
 
             {authoringMode && worldReady ? (
-              <StudioVirtualSpaceWorldAuthoringPanel
+              <StudioWorldAuthoringEntry
                 projectId={projectId}
                 basePublishedRevisionId={draftBaseRevision}
                 disabled={publication.enabled && (["reading", "publishing", "preparing"].includes(publication.snapshot.phase) || !publication.snapshot.viewVerified)}

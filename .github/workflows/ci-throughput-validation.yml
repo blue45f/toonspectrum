@@ -1,0 +1,75 @@
+name: CI throughput validation
+
+# The former branch-only repair downloaded historical scripts and expected PR #1883
+# to remain open. Validate the reviewed selected main revision instead; never publish code.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-throughput-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.repository == 'blue45f/toonspectrum' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CI: '1'
+      NODE_OPTIONS: --max-old-space-size=12288
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Record exact checked-out source
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/throughput"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git rev-parse HEAD > "$RUNNER_TEMP/throughput/source-sha.txt"
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Require affected tests and throughput contracts
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch apps/web/src/domains/creator/bg3d/studio-bg3d-tiled-client.test.ts scripts/verify-studio-engine-editor-entry.test.ts scripts/verify-studio-p5-brush-real-runtime.test.ts scripts/studio-bg3d-runtime-release-wiring.test.ts scripts/cleanup-superseded-actions-runs.test.mjs scripts/integration-test-runner-ci-policy.test.mjs scripts/run-full-test-ci.test.mjs | tee "$RUNNER_TEMP/throughput/tests.log"
+          node --test scripts/ci-core-gate.test.mjs scripts/ci-core-regression-shards.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs scripts/ci-throughput-policy.test.mjs scripts/ci-throughput-validation.test.mjs | tee "$RUNNER_TEMP/throughput/preflight.log"
+      - name: Require type safety and architecture
+        run: |
+          set -euo pipefail
+          pnpm run typecheck | tee "$RUNNER_TEMP/throughput/typecheck.log"
+          pnpm run validate:architecture | tee "$RUNNER_TEMP/throughput/architecture.log"
+          python3 scripts/verify-pr-workflow-fanout.py
+          pnpm exec eslint --max-warnings=0 scripts/ci-throughput-validation.test.mjs apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-plan.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.ts apps/web/src/domains/creator/bg3d/studio-bg3d-shot-batch-limits.test.ts
+      - name: Require production build and unchanged bundle gate
+        run: |
+          set -euo pipefail
+          pnpm run build:bundle | tee "$RUNNER_TEMP/throughput/build.log"
+          node scripts/check-studio-bundle.mjs | tee "$RUNNER_TEMP/throughput/bundle-gate.log"
+          pnpm run test:studio-virtual-art | tee "$RUNNER_TEMP/throughput/art-tests.log"
+          pnpm run verify:studio-virtual-art | tee "$RUNNER_TEMP/throughput/art-integrity.log"
+          git diff --exit-code
+      - name: Preserve outcome without claiming a deployment
+        if: always()
+        env:
+          VALIDATION_OUTCOME: ${{ job.status }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/throughput"
+          printf 'source=%s\nresult=%s\nbranch_updated=false\ndeployed=false\n' "$GITHUB_SHA" "$VALIDATION_OUTCOME" | tee "$RUNNER_TEMP/throughput/outcome.txt" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ci-throughput-validation-${{ github.run_id }}
+          path: ${{ runner.temp }}/throughput
+          retention-days: 3
+          if-no-files-found: warn

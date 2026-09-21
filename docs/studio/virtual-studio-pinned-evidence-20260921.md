@@ -38,3 +38,13 @@ The new evidence source test remains failing on ambiguous AI identity; do not mi
 Before main integration: exclude every duplicate operation ID, rerun all evidence tests, add rendered-panel and auth/visibility/late-response hook tests, run actual disposable PostgreSQL capture-to-session authority tests, validate the final production bundle and exact-head CI.
 VS-09 audio recording/retention, VS-13/26 isolated external pinned reviewers, VS-21 native scene/camera review, VS-23 complete release rights lineage, VS-24 authoritative provider receipts/input-output change records and VS-27 independent approved publication are not completed by this draft.
 No production deployment, database changes, environment configuration changes or protection/CI weakening were performed.
+
+## Requested merge follow-up — 2026-09-21
+
+- Reproduced the original duplicate-identity regression: 16 passed / 1 failed.
+- Count operation identities before projection within the existing 2,000-record inspection budget; exclude every occurrence of duplicate identities rather than retaining the first.
+- Added coverage for interleaved duplicates, malformed first records and duplicates after the 100-record output cap. No existing assertion or budget was relaxed.
+- Integrated current main, including PRs #1933 and #1934, without source conflicts.
+- Related local verification: 11 files / 114 tests passed (projection and existing WorkSession client/component/controller suites).
+- This follow-up does not complete the previously listed rendered-panel, authentication/late-response hook, disposable PostgreSQL, full browser or production verification. Remote CI is not awaited under the user's latest merge request.
+- No production deployment or protection/CI setting change.

@@ -1,7 +1,7 @@
 import { pinAllStudioToolbarTools, pinStudioToolbarTools } from "./studio-toolbar-configuration";
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -1117,4 +1117,37 @@ it("shows disabled tools and reasons in the catalog without mutating the documen
   expect(pen.getAttribute("aria-describedby")).toBeTruthy();
   fireEvent.click(pen);
   expect(props.stableHandlers.activatePrimaryCanvasTool).not.toHaveBeenCalled();
+});
+
+
+// Catalog interaction tests run with the already-loaded real UI. The asynchronous slot has its own lifecycle tests.
+vi.mock("./StudioAllToolsCatalogSlot", async () => {
+  const module = await import("./StudioAllToolsCatalog");
+  return { StudioAllToolsCatalogSlot: module.StudioAllToolsCatalog };
+});
+
+it("repositions the tool dialog after lazy results change its height", () => {
+  let resize: (() => void) | undefined;
+  let frame: FrameRequestCallback | undefined;
+  const observe = vi.fn(); const disconnect = vi.fn();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { frame = callback; return 1; });
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { resize = callback; }
+    observe = observe; disconnect = disconnect;
+  });
+  const view = render(<StudioLeftToolRail {...createProps({ railMoreOpen: true })} />);
+  const dialog = screen.getByRole("dialog", { name: "전체 도구" });
+  const trigger = screen.getByRole("button", { name: "전체 도구" });
+  vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({ left: 0, right: 56, bottom: 700 } as DOMRect);
+  let height = 120;
+  vi.spyOn(dialog, "getBoundingClientRect").mockImplementation(() => ({ height, width: 352 } as DOMRect));
+  act(() => { resize?.(); frame?.(0); });
+  const smallTop = parseFloat(dialog.style.top);
+  height = 448;
+  act(() => { resize?.(); frame?.(1); });
+  expect(observe).toHaveBeenCalledWith(dialog);
+  expect(parseFloat(dialog.style.top)).toBeLessThan(smallTop);
+  expect(parseFloat(dialog.style.top) + height).toBeLessThanOrEqual(innerHeight - 8);
+  view.unmount(); expect(disconnect).toHaveBeenCalled();
 });

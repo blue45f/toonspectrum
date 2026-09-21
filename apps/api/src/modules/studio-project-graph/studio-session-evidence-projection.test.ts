@@ -59,6 +59,21 @@ describe("attested snapshot evidence projection", () => {
     const result = project(fixture(undefined, [ai("duplicate"), ai("duplicate", { model: "Another model" })]));
     expect(result.aiOperations).toEqual([]); expect(result.invalidEntries).toBe(2);
   });
+  it("excludes all repeated identities while preserving interleaved unique records", () => {
+    const result = project(fixture(undefined, [ai("duplicate"), ai("unique"), ai("duplicate"), ai("duplicate")]));
+    expect(result.aiOperations.map((op) => op.id)).toEqual(["unique"]);
+    expect(result.invalidEntries).toBe(3);
+  });
+  it("rejects duplicate identity even when its first record is malformed", () => {
+    const result = project(fixture(undefined, [ai("duplicate", { status: "invalid" }), ai("duplicate")]));
+    expect(result.aiOperations).toEqual([]); expect(result.invalidEntries).toBe(2);
+  });
+  it("checks inspected identities beyond the output cap before emitting any record", () => {
+    const unique = Array.from({ length: 100 }, (_, i) => ai(`unique-${i}`, { target: undefined }));
+    const result = project(fixture(undefined, [ai("duplicate"), ...unique, ai("duplicate")]));
+    expect(result.aiOperations.map((op) => op.id)).toEqual(unique.map((op) => op.id));
+    expect(result.invalidEntries).toBe(2); expect(result.omittedAiOperations).toBe(0);
+  });
   it("does not claim page usage for duplicate elements or a different capture digest", () => {
     expect(project(fixture([image("same"), image("same")], [])).assets).toEqual([]);
     const doc = fixture(); const mapping = deriveStudioReviewPageMapping(doc, { ...pin, ordinal: 0, renderWidth: 100, renderHeight: 100 });

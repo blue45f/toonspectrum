@@ -41,11 +41,16 @@ export function projectStudioSessionEvidence(snapshot: unknown, mappings: Readon
     }
   }
   const provenance = record(doc?.aiProvenance), operations = provenance?.version === 1 ? rows(provenance.operations) : [];
-  const seen = new Set<string>();
-  for (const raw of operations.slice(0, 2000)) {
+  const inspectedOperations = operations.slice(0, 2000);
+  // Count identities before projecting: no ambiguous first record may survive the output cap.
+  const identityCounts = new Map<string, number>();
+  for (const raw of inspectedOperations) {
+    const id = record(raw)?.id;
+    if (typeof id === "string") identityCounts.set(id, (identityCounts.get(id) ?? 0) + 1);
+  }
+  for (const raw of inspectedOperations) {
     const op = record(raw);
-    if (!op || typeof op.id !== "string" || seen.has(op.id)) { invalidEntries++; continue; }
-    seen.add(op.id);
+    if (!op || typeof op.id !== "string" || identityCounts.get(op.id) !== 1) { invalidEntries++; continue; }
     const rawTarget = record(op.target);
     let target: StudioReviewSourceReference | null = null;
     let targetStatus: StudioSessionEvidence["aiOperations"][number]["targetStatus"] = rawTarget ? "unmapped" : "missing";
