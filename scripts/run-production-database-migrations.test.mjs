@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(81);
+  expect(manifest).toHaveLength(83);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0081_fortune_public_snapshot");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(81);
+  expect(manifest.at(-1).id).toBe("0083_studio_review_vote_epoch");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(83);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1711,4 +1711,17 @@ test("personal cloud cutover marker is a forward-only verified repair", () => {
   expect(sql).not.toContain(
     "CREATE TABLE IF NOT EXISTS public.personal_cloud_connection",
   );
+});
+
+
+test("group review runtime ACL keeps source identity and event history immutable", () => {
+  const sql = buildStudioProjectGraphRuntimeAclSql("toonspectrum_runtime");
+  const violation = buildStudioProjectGraphRuntimeAclViolationSql("toonspectrum_runtime");
+  expect(sql).toContain('GRANT UPDATE ("policyVersion", "stateVersion", "definition", "configuredBy", "configuredAt")');
+  expect(sql).not.toMatch(/GRANT (?:DELETE|UPDATE)[^;]*public\.studio_review_policy_event/u);
+  expect(sql).not.toMatch(/GRANT UPDATE[^;]*"(?:rootGraphHash|revisionId|reviewId)"[^;]*public\.studio_review_policy/u);
+  expect(sql).toContain('REVOKE ALL ON FUNCTION public.studio_review_policy_actor_epoch(text,text) FROM PUBLIC');
+  expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.studio_review_policy_actor_epoch(text,text)');
+  expect(violation).toContain('EXECUTE WITH GRANT OPTION');
+  expect(violation).toContain('prosecdef');
 });

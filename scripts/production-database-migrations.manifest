@@ -79,3 +79,5 @@ apps/api/src/db/migrations/0078_creator_hiring_workspace.sql
 apps/api/src/db/migrations/0079_creator_hiring_automation.sql
 apps/api/src/db/migrations/0080_creator_career_confirmation.sql
 apps/api/src/db/migrations/0081_fortune_public_snapshot.sql
+apps/api/src/db/migrations/0082_studio_review_policy.sql
+apps/api/src/db/migrations/0083_studio_review_vote_epoch.sql

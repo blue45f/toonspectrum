@@ -547,6 +547,41 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     await expect(pool.query('UPDATE studio_review_policy_event SET "actorId"=$2 WHERE "reviewId"=$1', [f.reviewId, f.reviewer])).rejects.toMatchObject({ code: "55000" });
     await expect(pool.query('DELETE FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rejects.toMatchObject({ code: "55000" });
   });
+  it("uses only scoped policy grants for runtime votes and forbids immutable history/DDL writes", async () => {
+    const f = await policyFixture();
+    const { buildStudioProjectGraphRuntimeAclSql, buildStudioProjectGraphRuntimeAclViolationSql } = await import("../../../../../scripts/run-production-database-migrations.mjs");
+    const { policyCommandHash } = await import("./studio-review-policy-store");
+    const client = await pool.connect(), role = `review_policy_test_${randomUUID().replaceAll("-", "")}`;
+    try {
+      await client.query("BEGIN");
+      // Transaction-local disposable role/grants; ROLLBACK removes both, including PUBLIC changes.
+      await client.query(`CREATE ROLE "${role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+      await client.query(`GRANT USAGE ON SCHEMA public TO "${role}"`);
+      await client.query(buildStudioProjectGraphRuntimeAclSql(role));
+      await client.query(`GRANT SELECT ON creator_work,creator_work_collaborator,"user" TO "${role}"`);
+      const violation = await client.query<{ invalid: boolean }>(`SELECT ${buildStudioProjectGraphRuntimeAclViolationSql(role)} AS invalid`);
+      expect(violation.rows[0]?.invalid).toBe(false);
+      await client.query(`SET LOCAL ROLE "${role}"`);
+      expect((await client.query('SELECT id FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rowCount).toBe(1);
+      await client.query('UPDATE studio_review_policy SET "stateVersion"=2 WHERE "reviewId"=$1', [f.reviewId]);
+      const input = f.vote("production", 1);
+      await client.query(`INSERT INTO studio_review_policy_event (id,"reviewId","policyVersion","stateVersion",kind,"actorId","commandHash",payload,"accessEpoch")
+        VALUES ($1,$2,1,2,'vote',$3,$4,$5::jsonb,studio_review_policy_actor_epoch($2,$3))`, [input.id, f.reviewId, f.actor, policyCommandHash(input), JSON.stringify(input)]);
+      expect((await client.query('SELECT id FROM studio_review_policy_event WHERE "reviewId"=$1', [f.reviewId])).rowCount).toBe(2);
+      for (const forbidden of [
+        `UPDATE studio_review_policy_event SET "actorId"='forged'`,
+        'DELETE FROM studio_review_policy_event', 'DELETE FROM studio_review_policy',
+        `UPDATE studio_review_policy SET "rootGraphHash"=repeat('b',64)`,
+        'TRUNCATE studio_review_policy_event', 'CREATE TABLE public.review_policy_forbidden(id text)',
+      ]) {
+        await client.query('SAVEPOINT forbidden_operation');
+        await expect(client.query(forbidden)).rejects.toMatchObject({ code: "42501" });
+        await client.query('ROLLBACK TO SAVEPOINT forbidden_operation');
+      }
+    } finally { await client.query("ROLLBACK"); client.release(); }
+    expect((await f.repository.current(f.actor, f.reviewId)).policy?.stateVersion).toBe(1);
+  });
+
   it("preserves whole-work owner deletion without allowing direct policy history deletion", async () => {
     const f = await policyFixture();
     const { deleteWork } = await import("../../server/creator/works");

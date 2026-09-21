@@ -276,7 +276,10 @@ packages/studio-project-model/src/__tests__/work-session.test.ts
 packages/studio-project-model/src/__tests__/world-acoustic.test.ts
 packages/studio-project-model/src/__tests__/world-conversation.test.ts
 packages/studio-project-model/src/__tests__/world-publication.test.ts
+scripts/bootstrap-empty-production-database.test.mjs
 scripts/browser-core-entry-isolation.test.ts
+scripts/creator-career-confirmation-database-contract.test.mjs
+scripts/creator-hiring-automation-database-contract.test.mjs
 scripts/deploy-cloudflare-static.test.mjs
 scripts/free-infrastructure-policy.test.mjs
 scripts/lib/character-psd-reference-compositor.test.mjs
@@ -287,6 +290,7 @@ scripts/lib/studio-p2p-failure-diagnostics.test.ts
 scripts/lib/studio-verify-shape-readiness.test.tsx
 scripts/pigment-dependency-install-policy.test.mjs
 scripts/release-static-chunk-boundary.test.ts
+scripts/run-production-database-migrations.test.mjs
 scripts/studio-production-realtime.test.ts
 scripts/verify-studio-3d-console.test.ts
 scripts/verify-studio-engine-editor-entry.test.ts
