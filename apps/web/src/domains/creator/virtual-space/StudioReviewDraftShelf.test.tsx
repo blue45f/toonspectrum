@@ -77,3 +77,27 @@ describe("private draft UI", () => {
     expect(screen.queryByText("저장한 개인 의견")).toBeNull(); expect(f.publish).not.toHaveBeenCalled();
   });
 });
+describe("private draft action cleanup", () => {
+  it("releases the parent action when the shelf disappears during a pending read", async () => {
+    let resolve!: (entries: ReviewPrivateDraft[]) => void;
+    f.list.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const onBusy = vi.fn();
+    const view = render(<StudioReviewDraftShelf scope={scope} compose={entry.input} disabled={false}
+      onBusy={onBusy} onStored={f.stored} onPublished={f.published} />);
+    open(); await load();
+    expect(onBusy).toHaveBeenLastCalledWith(true);
+    view.unmount();
+    expect(onBusy).toHaveBeenLastCalledWith(false);
+    const calls = onBusy.mock.calls.length;
+    await act(async () => { resolve([entry]); });
+    expect(onBusy).toHaveBeenCalledTimes(calls);
+    expect(f.stored).not.toHaveBeenCalled(); expect(f.published).not.toHaveBeenCalled();
+  });
+});
+it("does not release a parent action owned by the direct comment form", () => {
+  const onBusy = vi.fn();
+  const view = render(<StudioReviewDraftShelf scope={scope} compose={entry.input} disabled
+    onBusy={onBusy} onStored={f.stored} onPublished={f.published} />);
+  view.unmount();
+  expect(onBusy).not.toHaveBeenCalled();
+});

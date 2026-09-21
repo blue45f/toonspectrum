@@ -21,7 +21,11 @@ function ReviewDraftShelfForScope({ scope, compose, disabled, onBusy, onStored, 
   const [edits, setEdits] = useState<Record<string, string>>({});
   const generation = useRef(0), pending = useRef(false);
   const invalidate = useCallback(() => { ++generation.current; }, []);
-  useLayoutEffect(() => invalidate, [invalidate]);
+  const releaseOwnAction = useCallback(() => {
+    invalidate();
+    if (pending.current) { pending.current = false; onBusy(false); }
+  }, [invalidate, onBusy]);
+  useLayoutEffect(() => releaseOwnAction, [releaseOwnAction]);
   const run = async (action: "load" | "add" | "remove" | "publish" | "revise", id?: string) => {
     if (disabled || pending.current || getAuthUserId() !== scope.actorId) return;
     if (action === "add" && !compose) return;
