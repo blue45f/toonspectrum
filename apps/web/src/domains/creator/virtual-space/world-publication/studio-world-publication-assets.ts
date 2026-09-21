@@ -1,3 +1,5 @@
+import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { readStudioWorldAssetBytes } from "./studio-world-asset-bytes";
 import type { StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
 import { StudioWorldPublicationError, studioWorldDigest } from "./studio-world-publication-client";
 
@@ -14,7 +16,7 @@ export interface StudioWorldAssetDependencies {
   createUrl(blob: Blob): string;
   revokeUrl(url: string): void;
 }
-const BROWSER: StudioWorldAssetDependencies = {
+export const STUDIO_WORLD_BROWSER_ASSETS: StudioWorldAssetDependencies = {
   fetch: (...args) => fetch(...args), createUrl: (blob) => URL.createObjectURL(blob), revokeUrl: (url) => URL.revokeObjectURL(url),
   decode: (url, signal) => new Promise<void>((resolve, reject) => {
     const image = new Image();
@@ -35,19 +37,21 @@ const BROWSER: StudioWorldAssetDependencies = {
 
 /** Preload exact bytes once. Phaser consumes these URLs, avoiding a second mutable network read. */
 export async function prepareStudioWorldAssets(publication: StudioWorldPublication, signal: AbortSignal,
-  deps: StudioWorldAssetDependencies = BROWSER): Promise<PreparedStudioWorld> {
+  deps: StudioWorldAssetDependencies = STUDIO_WORLD_BROWSER_ASSETS): Promise<PreparedStudioWorld> {
   const urls = new Map<string, string>(); let disposed = false;
+  const budget = { bytes: 0 };
   const dispose = () => { if (!disposed) { disposed = true; for (const url of urls.values()) deps.revokeUrl(url); } };
   const queue = [...new Set([publication.manifest.backgroundUrl, ...publication.manifest.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : [])])];
   try {
+    if (!studioWorldManifestSchema.safeParse(publication.manifest).success) throw new StudioWorldPublicationError("invalid-world");
     // Bound concurrent decoders, without lowering source resolution or skipping props.
     await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
       while (queue.length && !signal.aborted && !disposed) {
         const source = queue.shift()!;
         const response = await deps.fetch(source, { signal, credentials: "omit", referrerPolicy: "no-referrer" });
         if (!response.ok) throw new StudioWorldPublicationError("assets");
-        const blob = await response.blob();
-        if (!blob.size || !blob.type.startsWith("image/")) throw new StudioWorldPublicationError("assets");
+        const expected = publication.manifest.assetIntegrity?.find((item) => item.url === source);
+        const { blob } = await readStudioWorldAssetBytes(response, signal, budget, expected);
         if (signal.aborted || disposed) throw new StudioWorldPublicationError("context-changed");
         const url = deps.createUrl(blob); urls.set(source, url); await deps.decode(url, signal);
         if (disposed) throw new StudioWorldPublicationError("context-changed");

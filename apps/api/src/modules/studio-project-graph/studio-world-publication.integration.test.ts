@@ -66,6 +66,31 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
     const actor = await user();
     await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,$3,$4,$5,CASE WHEN $4='pending' THEN NULL ELSE now() END)`, [workId, actor, role, status, randomUUID()]); return actor;
   }
+  it("persists optional asset pins and registered rules without rewriting legacy world receipts", async () => {
+    const f = await fixture(), oldKey = randomUUID(), legacy = input();
+    const old = await repository.publish(f.actor, f.workId, legacy, oldKey);
+    const change = studioWorldPublishSchema.parse({ expectedPublishedRevisionId: old.publication.revisionId,
+      manifest: { ...legacy.manifest,
+        assetIntegrity: [{ url: legacy.manifest.backgroundUrl, sha256: "a".repeat(64), bytes: 12, mediaType: "image/png" }],
+        interactions: [{ id: "review-anchor", zoneId: "room", point: { x: 70, y: 70 }, radius: 20, action: "review", labelKo: "검수", labelEn: "Review" }],
+        interactionRules: [{ id: "review-rule", interactionId: "review-anchor", trigger: "explicit-use", activities: ["available"], action: "review", messageKo: "검수 열기", messageEn: "Open review" }] } });
+    const key = randomUUID(), next = await repository.publish(f.actor, f.workId, change, key);
+    expect((await repository.current(f.actor, f.workId))?.manifest).toEqual(change.manifest);
+    expect((await repository.publish(f.actor, f.workId, change, key)).publication).toEqual(next.publication);
+    const historical = await repository.publish(f.actor, f.workId, legacy, oldKey);
+    expect(historical.publication).toEqual(old.publication);
+    expect(Object.hasOwn(historical.publication.manifest, "assetIntegrity")).toBe(false);
+    expect(Object.hasOwn(historical.publication.manifest, "interactionRules")).toBe(false);
+    expect(next.publication.manifest.acousticZones).toEqual(legacy.manifest.acousticZones);
+    expect(next.publication.contentHash).not.toBe(old.publication.contentHash);
+  });
+  it("rejects unregistered rules and incomplete pin claims before writing a publication", async () => {
+    const f = await fixture(), legacy = input();
+    await expect(repository.publish(f.actor, f.workId, { ...legacy, manifest: { ...legacy.manifest, assetIntegrity: [] } }, randomUUID())).rejects.toThrow();
+    await expect(repository.publish(f.actor, f.workId, { ...legacy, manifest: { ...legacy.manifest,
+      interactionRules: [{ id: "rule", interactionId: "absent", trigger: "explicit-use", activities: ["available"], action: "review", messageKo: "검수", messageEn: "Review" }] } }, randomUUID())).rejects.toThrow();
+    expect(await repository.current(f.actor, f.workId)).toBeNull();
+  });
   async function acousticFixture() {
     const f=await fixture(), principal={userId:f.actor,sessionVersion:1,expiresAt:Date.now()+600000};
     const publication=(await repository.publish(f.actor,f.workId,input(),randomUUID())).publication;

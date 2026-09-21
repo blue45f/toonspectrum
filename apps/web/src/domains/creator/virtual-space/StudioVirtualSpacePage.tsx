@@ -1,3 +1,4 @@
+import { useStudioWorldRuleGate } from "./StudioWorldRuleGate";
 import {
   Bot,
   BookOpen,
@@ -935,9 +936,8 @@ export function VirtualSpaceExperience({
     if (destination) navigate(destination);
   }, [navigate, openAssistant, personal, positionScope, projectId]);
 
-  const activateInteraction = useCallback((interaction: StudioWorldInteractionDefinition) => {
-    activateAction(interaction.action);
-  }, [activateAction]);
+  const worldRuleGate = useStudioWorldRuleGate(worldManifest, activity, activateAction);
+  const activateInteraction = worldRuleGate.request;
 
   const handleEngineLocalState = useCallback((next: StudioVirtualSpaceEngineLocalState) => {
     if (movingRef.current !== next.moving) {
@@ -1238,6 +1238,7 @@ export function VirtualSpaceExperience({
   return (
     <div className="vs2-shell vs2-shell--project" data-studio-live-shell="true" data-studio-personal-space={personal || undefined} data-route-ready="studio-live-space">
       <Container size="wide" className="vs2-live-container">
+        {worldRuleGate.element}
         {homeHeader ?? <LiveStudioTopbar
           projectId={projectId}
           preparing={preparing}

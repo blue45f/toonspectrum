@@ -278,6 +278,8 @@ export function studioWorldManifestToTiledMap(
       backgroundAssetKey: manifest.backgroundAssetKey,
       manifestVersion: manifest.version,
       manifestId: manifest.id,
+      assetIntegrity: manifest.assetIntegrity ? JSON.stringify(manifest.assetIntegrity) : undefined,
+      interactionRules: manifest.interactionRules ? JSON.stringify(manifest.interactionRules) : undefined,
     }),
     layers,
   };
