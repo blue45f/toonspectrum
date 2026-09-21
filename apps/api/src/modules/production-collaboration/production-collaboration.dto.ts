@@ -481,6 +481,7 @@ const ProductionNotificationPolicySchema = z.object({
   id: IdentitySchema,
   projectId: IdentitySchema,
   assignmentId: IdentitySchema,
+  timezone: z.string().trim().min(1).max(120).refine((zone) => { try { new Intl.DateTimeFormat("en", { timeZone: zone }); return true; } catch { return false; } }, "Invalid timezone").optional(),
   channels: z.array(z.enum(["in-app", "email", "push", "webhook"])).min(1).max(4),
   digest: z.enum(["immediate", "daily", "weekly"]),
   quietHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/u).nullable(),
@@ -1150,6 +1151,7 @@ const UpsertEpisodeOperationsCommandSchema = z.object({
 }).strict();
 const UpsertOperationsRecordCommandSchema = z.object({
   type: z.literal("upsert-operations-record"),
+  expectedNotificationPolicy: ProductionNotificationPolicySchema.nullable().optional(),
   record: ProductionOperationsRecordSchema,
 }).strict();
 const ApplyAutomationExecutionCommandSchema = z.object({

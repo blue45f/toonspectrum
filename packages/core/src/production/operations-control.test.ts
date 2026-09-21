@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createProductionProjectAggregate,
   deriveCriticalPathSchedule,
+  productionScheduleReadiness,
   derivePersonalProductionInbox,
   deriveProductionFinancialForecast,
   deriveProductionFlowAnalytics,
@@ -131,6 +132,18 @@ describe("production operations control", () => {
     expect(schedule.projectDurationHours).toBe(32);
     expect(schedule.criticalTaskIds).toEqual(["a", "b", "d"]);
     expect(schedule.nodes.find((node) => node.task.id === "c")?.totalFloatHours).toBe(12);
+  });
+
+  it("keeps unknown effort/calendar values explicit and refuses cyclic schedule inputs", () => {
+    const current = aggregate([task({ id: "a", title: "A", hours: 4, dependencies: ["b"] }), task({ id: "b", title: "B", hours: 4, dependencies: ["a"] })]);
+    const calendar: ResourceCalendar = { id: "calendar", projectId: PROJECT_ID, assignmentId: OWNER_ASSIGNMENT_ID, timezone: "Asia/Seoul", weeklyHours: 40, dailyHours: 8, workingWeekdays: [1, 2, 3, 4, 5], exceptions: [], revision: 1, updatedAt: NOW.toISOString() };
+    expect(productionScheduleReadiness(current)).toMatchObject({ complete: false, missingCalendarAssignmentIds: [OWNER_ASSIGNMENT_ID] });
+    expect(productionScheduleReadiness({ ...current, resourceCalendars: [calendar] })).toMatchObject({ complete: false, cycleTaskIds: expect.arrayContaining(["a", "b"]) });
+    const missing = { ...current, tasks: [{ ...current.tasks[0]!, estimateHours: null, dependencyTaskIds: ["missing"] }] };
+    expect(productionScheduleReadiness(missing)).toMatchObject({ complete: false, missingEstimateIds: ["a"], missingDependencyIds: ["missing"] });
+    const ready = { ...current, resourceCalendars: [calendar], tasks: [{ ...current.tasks[0]!, dependencyTaskIds: [] }] };
+    expect(productionScheduleReadiness(ready).complete).toBe(true);
+    expect(productionScheduleReadiness({ ...ready, resourceCalendars: [{ ...calendar, timezone: "Invalid/Zone" }] }).complete).toBe(false);
   });
 
   it("reports every task that remains in a dependency cycle", () => {

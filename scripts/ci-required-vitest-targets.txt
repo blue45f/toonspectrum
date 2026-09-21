@@ -14,6 +14,10 @@ apps/api/src/modules/creator/studio-review-task-completion-invalidation.test.ts
 apps/api/src/modules/creator/studio-review-task-completion.repository.test.ts
 apps/api/src/modules/fortune/fortune.controller.test.ts
 apps/api/src/modules/og/og-page.test.ts
+apps/api/src/modules/production-collaboration/production-collaboration.service.test.ts
+apps/api/src/modules/production-collaboration/production-integration-providers.test.ts
+apps/api/src/modules/production-collaboration/production-notification-safety.test.ts
+apps/api/src/modules/production-collaboration/production-webhook-network.test.ts
 apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
 apps/api/src/modules/studio-project-graph
 apps/api/src/modules/studio-project-graph/studio-project-graph.module.di.test.ts
@@ -145,7 +149,10 @@ apps/web/src/domains/creator/live/studio-live-p2p-overlay-transport.test.ts
 apps/web/src/domains/creator/live/studio-live-purpose-routed-transport.test.ts
 apps/web/src/domains/creator/live/studio-live-socket-transport.test.ts
 apps/web/src/domains/creator/offline
+apps/web/src/domains/creator/production-hub/ProductionNotificationPolicyEditor.test.tsx
+apps/web/src/domains/creator/production-hub/ProductionOperationsControlWorkspace.test.tsx
 apps/web/src/domains/creator/production-hub/ProductionStudioRevisionBridgePanel.test.tsx
+apps/web/src/domains/creator/production-hub/production-automation-execution.test.ts
 apps/web/src/domains/creator/project-graph/studio-project-graph-client.test.ts
 apps/web/src/domains/creator/review-capture
 apps/web/src/domains/creator/review-export
@@ -255,8 +262,11 @@ apps/web/tests/vite-react-compiler-runtime-interop.test.ts
 apps/web/tools/browser-harnesses/studio-p2p-direct-diagnostics.test.ts
 packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts
+packages/core/src/production/notification-digest.test.ts
+packages/core/src/production/operations-control.test.ts
 packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
+packages/studio-project-model/src/__tests__/review-policy.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts
 packages/studio-project-model/src/__tests__/review-task-reference.test.ts
 packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts

@@ -19,3 +19,5 @@ export * from "./creator-ecosystem.schema";
 export * from "./commerce.schema";
 
 export * from "./membership-wallet.schema";
+
+export * from "./studio-review-policy.schema";

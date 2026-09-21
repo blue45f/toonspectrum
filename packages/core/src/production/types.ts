@@ -1510,6 +1510,7 @@ export interface ProductionNotificationPolicy {
   readonly id: string;
   readonly projectId: string;
   readonly assignmentId: string;
+  readonly timezone?: string;
   readonly channels: readonly ("in-app" | "email" | "push" | "webhook")[];
   readonly digest: "immediate" | "daily" | "weekly";
   readonly quietHoursStart: string | null;

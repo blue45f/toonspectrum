@@ -10,7 +10,7 @@ import {
   googleAuthorizationUrl,
   uploadGoogleDriveArtifact,
 } from "./production-google-workspace";
-import { ProductionExternalHttpError } from "./production-integration-http";
+import { ProductionExternalHttpError, webhookSignature } from "./production-integration-http";
 import { sendProductionNotification } from "./production-notification-provider";
 import { confirmTossPayment } from "./production-toss-provider";
 
@@ -143,8 +143,7 @@ describe("production signature and notification providers", () => {
   });
 
   it("sends a signed generic webhook without exposing the secret in its body", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ accepted: true }));
-    vi.stubGlobal("fetch", fetchMock);
+    const post = vi.fn().mockResolvedValue({ accepted: true });
     const config = resolveProductionIntegrationConfig({
       PRODUCTION_GENERIC_WEBHOOK_URL: "https://hooks.example.com/production",
       PRODUCTION_GENERIC_WEBHOOK_SECRET: "server-only-secret",
@@ -161,14 +160,16 @@ describe("production signature and notification providers", () => {
         url: "/production/projects/project-1/review",
       },
       subscriptions: [],
-    });
+    }, { webhookPost: post });
     expect(result.sent).toBe(1);
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const headers = new Headers(init.headers);
+    const [, rawHeaders, body] = post.mock.calls[0] as [string, Record<string, string>, string, number];
+    const headers = new Headers(rawHeaders);
     expect(headers.get("x-toonspectrum-signature")).toMatch(
       /^sha256=[0-9a-f]{64}$/u,
     );
-    expect(String(init.body)).not.toContain("server-only-secret");
+    expect(body).not.toContain("server-only-secret");
+    expect(headers.get("x-toonspectrum-delivery-id")).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(headers.get("x-toonspectrum-delivery-signature")).toBe(webhookSignature("server-only-secret", `${headers.get("x-toonspectrum-delivery-timestamp")}\n${headers.get("x-toonspectrum-delivery-id")}\n${body}`));
   });
 });
 

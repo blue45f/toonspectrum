@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createProductionProjectAggregate,
+  deriveProductionAutomationExecutionPlan,
   episodeScope,
   type ProductionProjectAggregate,
 } from "@toonspectrum/core/production";
@@ -1049,89 +1050,57 @@ describe("ProductionCollaborationService", () => {
     })).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it("persists automation tasks, notifications and rule state in one aggregate revision", async () => {
-    const current = aggregate();
-    const assignmentId = current.assignments[0]!.id;
-    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, {
-      view: true,
-      comment: true,
-      edit: true,
-      manage: true,
-      owner: true,
-      role: "owner",
-    }));
-    const task = {
-      id: "automation-task:atomic",
-      projectId: current.projectId,
-      scope: { kind: "project" as const, id: current.projectId, ancestors: [] },
-      processKey: "producer-follow-up",
-      title: "지연 원인 확인",
-      status: "ready" as const,
-      assignmentIds: [assignmentId],
-      reviewerAssignmentIds: [],
-      inputRevisionRefs: [],
-      outputDeliverableIds: [],
-      dependencyTaskIds: [],
-      dueAt: "2026-09-17T13:00:00.000Z",
-      estimateHours: { optimistic: 1, likely: 2, pessimistic: 4 },
-      completionCriteria: ["원인 확인"],
-      sourceAgreementMilestoneId: null,
-    };
-    const notification = {
-      id: "automation-notification:atomic",
-      projectId: current.projectId,
-      assignmentId,
-      type: "automation" as const,
-      title: "지연 조치",
-      body: "마감이 지났습니다.",
-      href: `/production/projects/${current.projectId}/control`,
-      urgency: "critical" as const,
-      sourceType: "automation:rule:task",
-      sourceId: task.id,
-      status: "unread" as const,
-      createdAt: at,
-      readAt: null,
-    };
-    const rule = {
-      id: "automation-rule-atomic",
-      projectId: current.projectId,
-      name: "지연 조치",
-      trigger: "due-passed" as const,
-      conditions: [],
-      actions: [{
-        type: "notify" as const,
-        assignmentIds: [assignmentId],
-        urgency: "critical" as const,
-        message: "마감이 지났습니다.",
-      }],
-      failurePolicy: "require-review" as const,
-      enabled: true,
-      revision: 2,
-      lastEvaluatedAt: at,
-      createdByAssignmentId: assignmentId,
-      updatedAt: at,
-    };
-
-    const result = await service().executeCommand("owner-1", current.projectId, {
-      expectedRevision: 0,
-      mutationId: "14141414-1414-4414-8414-141414141414",
-      command: {
-        type: "apply-automation-execution",
-        tasks: [task],
-        notifications: [notification],
-        evaluatedRules: [rule],
+  it.each([false, true])("checks the exact policy record rather than only its timestamp (stale=%s)", async (stale) => {
+    const base = aggregate();
+    const policy = { id: "notification-policy", projectId: base.projectId, assignmentId: base.assignments[0]!.id,
+      channels: ["in-app" as const], digest: "daily" as const, timezone: "Asia/Seoul", quietHoursStart: "22:00", quietHoursEnd: "08:00",
+      dueSoonHours: 48, escalationHours: 24, enabled: true, updatedAt: at };
+    const current: ProductionProjectAggregate = { ...base, notificationPolicies: [policy] };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, { view: true, comment: true, edit: true, manage: true, owner: true, role: "owner" }));
+    const request = service().executeCommand("owner-1", base.projectId, {
+      expectedRevision: base.revision, mutationId: "15151515-1515-4515-8515-151515151515", command: { type: "upsert-operations-record",
+        record: { kind: "notification-policy", value: { ...policy, digest: "weekly" } },
+        expectedNotificationPolicy: stale ? { ...policy, dueSoonHours: 12 } : policy,
       },
     });
+    if (stale) await expect(request).rejects.toBeInstanceOf(ConflictException);
+    else expect((await request).aggregate.notificationPolicies).toEqual([{ ...policy, digest: "weekly" }]);
+  });
 
+  function automationFixture() {
+    const base = aggregate(), assignmentId = base.assignments[0]!.id;
+    const rule = { id: "automation-rule-atomic", projectId: base.projectId, name: "확인할 제작 업무", trigger: "manual" as const,
+      conditions: [], actions: [{ type: "create-task" as const, title: "원인 확인", processKey: "producer-follow-up", assignmentIds: [assignmentId], dueInHours: 4 },
+        { type: "notify" as const, assignmentIds: [assignmentId], urgency: "warning" as const, message: "작업을 확인해 주세요." }],
+      failurePolicy: "require-review" as const, enabled: true, revision: 1, lastEvaluatedAt: null, createdByAssignmentId: assignmentId, updatedAt: at };
+    const current: ProductionProjectAggregate = { ...base, automationRules: [rule], tasks: [{
+      id: "source-task", projectId: base.projectId, scope: { kind: "project", id: base.projectId, ancestors: [] }, title: "원본 작업", processKey: "producer-follow-up",
+      status: "ready", assignmentIds: [assignmentId], reviewerAssignmentIds: [], inputRevisionRefs: [], outputDeliverableIds: [], dependencyTaskIds: [],
+      dueAt: null, estimateHours: null, completionCriteria: [], sourceAgreementMilestoneId: null,
+    }] };
+    const plan = deriveProductionAutomationExecutionPlan(current, [rule], new Date());
+    const command = { type: "apply-automation-execution" as const, tasks: plan.tasks, notifications: plan.notifications, evaluatedRules: plan.evaluatedRules };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, { view: true, comment: true, edit: true, manage: true, owner: true, role: "owner" }));
+    return { current, plan, command };
+  }
+  it("persists only the server-derived confirmed automation plan in one aggregate revision", async () => {
+    const { current, plan, command } = automationFixture();
+    const result = await service().executeCommand("owner-1", current.projectId, { expectedRevision: 0, mutationId: "14141414-1414-4414-8414-141414141414", command });
     expect(result.aggregate).toMatchObject({ revision: 1 });
-    expect(result.aggregate.tasks).toMatchObject([task]);
-    expect(result.aggregate.notifications).toEqual([notification]);
-    expect(result.aggregate.automationRules).toEqual([rule]);
-    expect(result.derived).toEqual({
-      taskCount: 1,
-      notificationCount: 1,
-      evaluatedRuleCount: 1,
-    });
+    expect(result.aggregate.tasks).toEqual(expect.arrayContaining(plan.tasks.map((task) => ({ ...task, linkedRiskIds: [] }))));
+    expect(result.aggregate.tasks.find((task) => task.id === plan.tasks[0]?.id)?.estimateHours).toBeNull();
+    expect(result.aggregate.notifications).toEqual(plan.notifications);
+    expect(result.aggregate.automationRules).toEqual(plan.evaluatedRules);
+    expect(result.derived).toEqual({ taskCount: 1, notificationCount: 1, evaluatedRuleCount: 1 });
+  });
+  it.each(["task-approval", "notification-body", "rule-definition", "stale-time"])("rejects forged or stale automation output: %s", async (variant) => {
+    const { current, command } = automationFixture();
+    const changed = structuredClone(command);
+    if (variant === "task-approval") changed.tasks = [{ ...changed.tasks[0]!, status: "approved" }];
+    if (variant === "notification-body") changed.notifications = [{ ...changed.notifications[0]!, body: "unconfirmed content" }];
+    if (variant === "rule-definition") changed.evaluatedRules = [{ ...changed.evaluatedRules[0]!, name: "unconfirmed rule" }];
+    if (variant === "stale-time") changed.evaluatedRules = [{ ...changed.evaluatedRules[0]!, lastEvaluatedAt: "2020-01-01T00:00:00Z", updatedAt: "2020-01-01T00:00:00Z" }];
+    await expect(service().executeCommand("owner-1", current.projectId, { expectedRevision: 0, mutationId: "14141414-1414-4414-8414-141414141414", command: changed })).rejects.toBeInstanceOf(ConflictException);
   });
 
   it("projects only token-scoped immutable submissions to an external reviewer", async () => {

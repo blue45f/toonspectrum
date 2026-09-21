@@ -168,7 +168,7 @@ export function ProductionLandingPage() {
                         >
                           <div className="flex items-center justify-between gap-2"><Pill tone={tone}>{bucketLabel}</Pill><span className="text-[0.625rem] text-fg-3">{formatDay(item.dueAt)}</span></div>
                           <p className="mt-2 line-clamp-2 text-xs font-black leading-5 text-fg">{item.taskTitle}</p>
-                          <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{item.projectTitle} · {item.processKey} · {item.estimateHours}h</p>
+                          <p className="mt-1 truncate text-[0.6875rem] text-fg-3">{item.projectTitle} · {item.processKey} · {item.estimateHours === null ? "예상 시간 미입력" : `${item.estimateHours}h`}</p>
                         </Link>
                       );
                     })}

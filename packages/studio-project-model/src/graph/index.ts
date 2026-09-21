@@ -9,3 +9,5 @@ export * from "./review";
 export * from "./review-source-map";
 export * from "./external-file-binding";
 export * from "./sync";
+
+export * from "./review-policy";

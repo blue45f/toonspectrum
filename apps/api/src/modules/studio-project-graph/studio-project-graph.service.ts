@@ -1,5 +1,7 @@
+import { StudioReviewPolicyError } from "./studio-review-policy-store";
 import {
   ConflictException,
+  ServiceUnavailableException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -52,6 +54,11 @@ export class StudioProjectGraphService {
   }
 
   private rethrow(error: unknown): never {
+    if (error instanceof StudioReviewPolicyError) {
+      if (error.code === "unavailable") throw new ServiceUnavailableException({ code: error.message });
+      if (error.code === "forbidden") throw new ForbiddenException({ code: error.message });
+      throw new ConflictException({ code: error.message });
+    }
     if (error instanceof StudioProjectNotFoundError) {
       throw new NotFoundException({
         code: error.message,

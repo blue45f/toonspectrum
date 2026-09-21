@@ -1,3 +1,5 @@
+import { productionScheduleReadiness } from "./schedule-readiness";
+
 import type {
   EpisodeReleasePlan,
   ExternalReviewAccess,
@@ -51,6 +53,7 @@ export interface ScheduleTaskNode {
 }
 
 export interface CriticalPathSchedule {
+  readonly inputReadiness: ReturnType<typeof productionScheduleReadiness>;
   readonly generatedAt: string;
   readonly nodes: readonly ScheduleTaskNode[];
   readonly criticalTaskIds: readonly string[];
@@ -220,6 +223,7 @@ export function deriveCriticalPathSchedule(
   now = new Date(),
   durationOverrides: Readonly<Record<string, number>> = {},
 ): CriticalPathSchedule {
+  const inputReadiness = productionScheduleReadiness(aggregate);
   const tasks = aggregate.tasks.filter((task) => !["cancelled", "out-of-scope"].includes(task.status));
   const taskById = new Map(tasks.map((task) => [task.id, task]));
   const successors = new Map<string, string[]>();
@@ -299,13 +303,14 @@ export function deriveCriticalPathSchedule(
     now.toISOString(),
   );
   const releaseAt = releaseDeadline(aggregate);
-  const marginHours = releaseAt ? (Date.parse(releaseAt) - Date.parse(projectFinishAt)) / HOUR_MS : null;
+  const marginHours = releaseAt && inputReadiness.complete ? (Date.parse(releaseAt) - Date.parse(projectFinishAt)) / HOUR_MS : null;
   const confidencePercent = confidenceFor(
     marginHours,
     criticalTaskIds.map((id) => taskById.get(id)!).filter(Boolean),
   );
   return Object.freeze({
     generatedAt: now.toISOString(),
+    inputReadiness,
     nodes: Object.freeze(nodes),
     criticalTaskIds: Object.freeze(criticalTaskIds),
     cycleTaskIds: Object.freeze(cycleTaskIds),
@@ -838,8 +843,14 @@ export function validateProductionOperationsRecord(
     }
     case "notification-policy": {
       const value = record.value;
-      if (!aggregate.assignments.some((entry) => entry.id === value.assignmentId)) issues.push("notification-policy-assignment-missing");
+      if (!aggregate.assignments.some((entry) => entry.id === value.assignmentId && entry.status === "active")) issues.push("notification-policy-assignment-missing");
+      if ((aggregate.notificationPolicies ?? []).some((entry) => entry.assignmentId === value.assignmentId && entry.id !== value.id)) issues.push("notification-policy-assignment-duplicate");
       if (value.channels.length === 0 || !unique(value.channels)) issues.push("notification-policy-channels-invalid");
+      if ((value.quietHoursStart === null) !== (value.quietHoursEnd === null)) issues.push("notification-policy-quiet-hours-incomplete");
+      if (value.timezone !== undefined) {
+        try { if (!value.timezone.trim()) throw new Error("empty-zone"); new Intl.DateTimeFormat("en", { timeZone: value.timezone }); }
+        catch { issues.push("notification-policy-timezone-invalid"); }
+      }
       break;
     }
     case "notification": {
