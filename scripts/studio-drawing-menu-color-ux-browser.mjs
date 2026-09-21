@@ -67,10 +67,12 @@ try {
   assert(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 390 && bounds.y + bounds.height <= 700);
   const hueBounds = await mobileDialog.getByRole("slider", { name: "빠른 색조", exact: true }).boundingBox();
   assert(hueBounds && hueBounds.height >= 44);
+  const recentBounds = await mobile.locator("[data-studio-recent-color]").first().boundingBox();
+  assert(recentBounds && recentBounds.width >= 44 && recentBounds.height >= 44);
   await mobile.screenshot({ path: path.join(output, "color-picker-mobile.png") });
   await mobile.getByRole("button", { name: "캔버스에서 정밀 색 가져오기", exact: true }).click();
   assert.equal(await mobile.getByTestId("last-action").innerText(), "eyedropper");
-  checks.push("390px touch bottom sheet remains in viewport; 44px hue target; canvas eyedropper works");
+  checks.push("390px touch bottom sheet remains in viewport; 44px hue and recent-color targets; canvas eyedropper works");
   assert.deepEqual(errors, []);
   await fs.writeFile(path.join(output, "report.json"), JSON.stringify({ checks, errors }, null, 2));
   console.log(JSON.stringify({ checks, errors, output }, null, 2));

@@ -125,7 +125,7 @@ export function StudioDualColorWell({
             aria-pressed={isCurrentPrimary}
             onClick={() => onPrimaryChange(swatch)}
             className={cn(
-              "size-6 rounded-md border pointer-coarse:size-11 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
+              "size-6 shrink-0 rounded-md border pointer-coarse:size-11 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
               index >= 3 && "max-xl:hidden",
               STUDIO_FOCUS_RING,
               isCurrentPrimary
