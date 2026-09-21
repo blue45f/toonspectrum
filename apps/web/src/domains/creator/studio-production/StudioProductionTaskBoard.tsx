@@ -1,10 +1,14 @@
+import { StudioProductionMatrix } from "./StudioProductionMatrix";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { useSession } from "@/compat/auth-session-store";
+import { PRODUCTION_SMART_VIEWS, productionLocalDay, productionSmartMatches, type ProductionSmartView } from "./studio-production-smart-views";
 import {
   CheckCircle2,
   RotateCcw,
   Save,
   Trash2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import {
   STUDIO_PRODUCTION_PRIORITIES,
@@ -497,36 +501,72 @@ function TaskEditor({
   );
 }
 
-export function StudioProductionTaskBoard({
-  workspace,
-  canEdit,
-  canApprove,
-  canPublish,
-  onCommit,
-}: StudioProductionTaskBoardProps) {
-  if (workspace.tasks.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-line p-6 text-center">
-        <p className="text-sm font-bold">등록된 제작 작업이 없습니다</p>
-        <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-fg-2">
-          필요한 작업을 추가한 뒤 제작 단계·담당 역할·선행 작업·검수자를 지정하세요.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-2">
-      {workspace.tasks.map((task) => (
-        <TaskEditor
-          key={task.id}
-          task={task}
-          workspace={workspace}
-          canEdit={canEdit}
-          canApprove={canApprove}
-          canPublish={canPublish}
-          onCommit={onCommit}
-        />
-      ))}
+export function StudioProductionTaskBoard({ workspace, canEdit, canApprove, canPublish, onCommit }: StudioProductionTaskBoardProps) {
+  const bt = useBilingual("StudioProductionTaskBoard.filters");
+  const actorId = useSession().data?.user.id ?? null;
+  const groupId = useId();
+  const [layout, setLayout] = useState<"list" | "matrix">("list");
+  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  useEffect(() => {
+    if (layout !== "list" || !selectedTask) return;
+    const element = document.getElementById(`${groupId}-${selectedTask}`);
+    const details = element?.querySelector("details");
+    if (details) details.open = true;
+    element?.focus({ preventScroll: true });
+    element?.scrollIntoView?.({ block: "nearest" });
+  }, [layout, selectedTask, groupId]);
+  const [view, setView] = useState<ProductionSmartView>("all");
+  const [query, setQuery] = useState("");
+  const [stage, setStage] = useState<ProductionStage | "all">("all");
+  const [today, setToday] = useState(() => productionLocalDay(new Date()));
+  useEffect(() => { const timer = setInterval(() => setToday(productionLocalDay(new Date())), 60_000); return () => clearInterval(timer); }, []);
+  const taskById = useMemo(() => new Map(workspace.tasks.map((task) => [task.id, task])), [workspace.tasks]);
+  const filter = { view, query, stage, actorId, today };
+  const matches = workspace.tasks.filter((task) => productionSmartMatches(task, filter, taskById, workspace.roleAssignments));
+  const visible = new Set(matches.map((task) => task.id));
+  const names = {
+    all: bt("전체", "All"), mine: bt("내 할 일", "Assigned to me"), due: bt("오늘까지", "Due by today"),
+    blocked: bt("선행·지연 확인", "Dependencies and blockers"), unassigned: bt("미배정", "Unassigned"), done: bt("완료", "Done"),
+  };
+  if (!workspace.tasks.length) return <div className="rounded-xl border border-dashed border-line p-6 text-center">
+    <p className="text-sm font-bold">{bt("등록된 제작 작업이 없습니다", "No production tasks yet")}</p>
+    <p className="mx-auto mt-1 max-w-xl text-xs leading-relaxed text-fg-2">{bt("필요한 작업을 추가한 뒤 제작 단계·담당 역할·선행 작업·검수자를 지정하세요.", "Add work, then choose its stage, assignees, dependencies and reviewers.")}</p>
+  </div>;
+  return <div className="space-y-3" data-production-smart-views="true">
+    <div className="flex flex-wrap gap-2" role="group" aria-label={bt("작업 배치", "Task layout")}>
+      <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" aria-pressed={layout === "list"} onClick={() => setLayout("list")}>{bt("작업 목록", "Task list")}</button>
+      <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-sm" aria-pressed={layout === "matrix"} onClick={() => setLayout("matrix")}>{bt("회차·공정 표", "Episode matrix")}</button>
     </div>
-  );
+    <div role="group" aria-label={bt("작업 보기", "Task views")} className="flex flex-wrap gap-2">
+      {PRODUCTION_SMART_VIEWS.map((id) => <button key={id} type="button" disabled={id === "mine" && !actorId}
+        className={cn("min-h-11 rounded-lg border px-3 text-xs font-semibold", id === view ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg-2")}
+        aria-pressed={id === view} onClick={() => setView(id)}>
+        {names[id]} · {workspace.tasks.filter((task) => productionSmartMatches(task, { ...filter, view: id }, taskById, workspace.roleAssignments)).length}
+      </button>)}
+    </div>
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+      <label className="min-w-0 text-xs font-semibold text-fg-2">{bt("저장된 작업 검색", "Search saved tasks")}
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} maxLength={200}
+          placeholder={bt("제목·담당·차단 사유", "Title, owner or blocker")}
+          className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" />
+      </label>
+      <label className="min-w-0 text-xs font-semibold text-fg-2">{bt("제작 단계", "Production stage")}
+        <select className="mt-1 min-h-11 w-full rounded-lg border border-line bg-panel px-3 text-sm text-fg" value={stage}
+          onChange={(event) => setStage(event.target.value as ProductionStage | "all")}>
+          <option value="all">{bt("모든 단계", "All stages")}</option>
+          {STUDIO_PRODUCTION_STAGES.map((id) => <option key={id} value={id}>{STAGE_LABELS[id]}</option>)}
+        </select>
+      </label>
+    </div>
+    <p className="text-xs text-fg-2" role="status">{bt(`${matches.length} / ${workspace.tasks.length}개 작업 · 표시 조건은 승인이나 작업 상태를 변경하지 않습니다.`, `${matches.length} / ${workspace.tasks.length} tasks · Filters do not change work or approval status.`)}</p>
+    {!matches.length ? <div className="rounded-xl border border-dashed border-line p-5 text-sm">
+      <p>{bt("이 조건에 맞는 작업이 없습니다. 원래 작업은 그대로 보관됩니다.", "No tasks match these filters. Existing tasks are unchanged.")}</p>
+      <button type="button" className="mt-2 min-h-11 rounded-lg border border-line px-3" onClick={() => { setView("all"); setQuery(""); setStage("all"); }}>{bt("표시 조건 초기화", "Clear filters")}</button>
+    </div> : null}
+    {layout === "matrix" ? <StudioProductionMatrix workspace={workspace} tasks={matches} labels={STAGE_LABELS} onOpen={(id) => { setLayout("list"); setView("all"); setStage("all"); setQuery(""); setSelectedTask(id); }} /> : null}
+    {/* Keep each editor mounted so changing a view cannot discard its unsaved input. */}
+    {workspace.tasks.map((task) => <div key={task.id} id={`${groupId}-${task.id}`} tabIndex={-1} hidden={layout !== "list" || !visible.has(task.id)} className="outline-none focus:ring-2 focus:ring-accent">
+      <TaskEditor task={task} workspace={workspace} canEdit={canEdit} canApprove={canApprove} canPublish={canPublish} onCommit={onCommit} />
+    </div>)}
+  </div>;
 }

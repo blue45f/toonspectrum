@@ -375,7 +375,7 @@ function presentedTitleFor(catalogueGroupId: string): string {
 
 /** Pin the shipped first-run contract independently of the settings implementation. */
 export const FIRST_RUN_RAIL_TOOL_IDS = [
-  "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
+  "select", "transform", "pen", "eraser", "fill", "marquee-rect", "lasso", "smart-shape", "text", "image",
 ] as const satisfies readonly StudioRailToolId[];
 
 /** Every first-run tool and the specialized tools added below must remain reachable. */
@@ -1151,152 +1151,105 @@ async function assertDrawOptionsBar(page: Page): Promise<string[]> {
 async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
+    // Drawing options are now a persistent inline workbench, not a floating dock.
+    // Exercise the real optional arrangement launcher and keep offline/save safety visible.
+    const workbench = page.locator('[data-studio-workbench-options="true"]');
+    const arrangement = page.locator('[data-studio-shell-floating-target="workspace-arrangement"]');
+    const saveStatus = page.locator('[data-studio-draft-save-center]');
     const launcher = page.locator('[data-studio-shell-view-options="true"] > button');
-    await launcher.waitFor({ state: "visible", timeout: 5000 });
+    await workbench.waitFor({ state: "visible", timeout: 5000 });
+    await arrangement.waitFor({ state: "visible", timeout: 5000 });
     await launcher.click();
     const dialog = page.getByRole("dialog", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.name, exact: true });
     await dialog.waitFor({ state: "visible", timeout: 5000 });
-
-    const drawingOptions = page.locator('[data-studio-draw-options-dock="true"]');
-    if (await drawingOptions.count() === 0) {
-      failures.push("보기 설정이 관리할 그리기 옵션 바를 찾지 못함");
-    } else {
-      await dialog.getByRole("switch", { name: "그리기 옵션 숨기기" }).click();
-      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
-      await dialog.getByRole("switch", { name: "그리기 옵션 표시하기" }).click();
-      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
-
-      if (await dialog.locator('[data-studio-shell-mounted-state="available"]').count() === 0) {
-        failures.push("현재 화면에서 사용 가능한 플로팅 요소 상태가 표시되지 않음");
-      }
-      await dialog.getByRole("button", { name: /캔버스 집중/ }).click();
-      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
-      await dialog.locator('[data-studio-shell-focus-mode="true"]').waitFor({
-        state: "visible",
-        timeout: 3000,
-      });
-      await dialog.getByRole("button", { name: "원래 보기", exact: true }).click();
-      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
-
-      await dialog.getByRole("button", { name: "배치 편집", exact: true }).click();
-      const handle = page.locator('[data-studio-shell-floating-handle="drawing-options"]');
-      await handle.waitFor({ state: "visible", timeout: 3000 });
-      await handle.getByRole("button", { name: "그리기 옵션 위치 잠금" }).click();
-      if (!(await handle.getByRole("button", { name: "그리기 옵션 이동" }).isDisabled())) {
-        failures.push("그리기 옵션 위치 잠금 미적용");
-      }
-      await handle.getByRole("button", { name: "그리기 옵션 위치 잠금 해제" }).click();
-      const dockSelect = handle.getByRole("combobox", { name: "그리기 옵션 도킹 위치" });
-      await dockSelect.selectOption("top");
-      if (await dockSelect.inputValue() !== "top") {
-        failures.push("그리기 옵션 직접 도킹 선택 미적용");
-      }
-      await dockSelect.selectOption("bottom");
-      await dialog.getByRole("button", { name: "배치 완료", exact: true }).click();
-
-      const autoHide = dialog.getByRole("switch", { name: /펜으로 그리는 동안 자동 숨김/ });
-      if (await autoHide.getAttribute("aria-checked") !== "true") await autoHide.click();
-      const canvas = page.locator('[data-studio-canvas-viewport] canvas').first();
-      if (await canvas.count() === 0) {
-        failures.push("펜 자동 숨김을 검증할 캔버스를 찾지 못함");
-      } else {
-        await canvas.dispatchEvent("pointerdown", {
-          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
-        });
-        await page.waitForFunction(() =>
-          document.querySelector('[data-studio-shell-view-options="true"]')
-            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "true"
-        );
-        await canvas.dispatchEvent("pointerup", {
-          pointerId: 91, pointerType: "pen", button: 0, isPrimary: true,
-        });
-        await page.waitForFunction(() =>
-          document.querySelector('[data-studio-shell-view-options="true"]')
-            ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "false"
-        , undefined, { timeout: 2500 });
-      }
-
-      if (!(await dialog.isVisible().catch(() => false))) {
-        await launcher.click();
-        await dialog.waitFor({ state: "visible", timeout: 3000 });
-      }
-      await dialog.getByRole("button", { name: "모두 숨김" }).click();
-      await drawingOptions.waitFor({ state: "hidden", timeout: 3000 });
-      if (!(await launcher.isVisible())) failures.push("모두 숨김 후 보기 복구 버튼이 사라짐");
-      await dialog.getByRole("button", { name: "모두 표시" }).click();
-      await drawingOptions.waitFor({ state: "visible", timeout: 3000 });
+    await dialog.getByRole("switch", { name: "배치 편집 도구 숨기기", exact: true }).click();
+    await arrangement.waitFor({ state: "hidden", timeout: 3000 });
+    await workbench.waitFor({ state: "visible", timeout: 3000 });
+    await dialog.getByRole("switch", { name: "배치 편집 도구 표시하기", exact: true }).click();
+    await arrangement.waitFor({ state: "visible", timeout: 3000 });
+    if (await dialog.locator('[data-studio-shell-mounted-state="available"]').count() === 0) {
+      failures.push("현재 화면에서 사용 가능한 플로팅 요소 상태가 표시되지 않음");
     }
+    await dialog.getByRole("button", { name: /캔버스 집중/ }).click();
+    await arrangement.waitFor({ state: "hidden", timeout: 3000 });
+    await workbench.waitFor({ state: "visible", timeout: 3000 });
+    await dialog.locator('[data-studio-shell-focus-mode="true"]').waitFor({ state: "visible", timeout: 3000 });
+    await dialog.getByRole("button", { name: "원래 보기", exact: true }).click();
+    await arrangement.waitFor({ state: "visible", timeout: 3000 });
 
-    const strokeFocusSwitch = dialog.getByRole("switch", {
-      name: /펜으로 그리는 동안 자동 숨김/u,
-    });
-    if (!(await strokeFocusSwitch.isVisible().catch(() => false))
-      || await strokeFocusSwitch.getAttribute("aria-checked") !== "true") {
-      failures.push("드로잉 자동 숨김 설정 미노출 또는 활성 상태 미유지");
+    await dialog.getByRole("button", { name: "배치 편집", exact: true }).click();
+    const handle = page.locator('[data-studio-shell-floating-handle="workspace-arrangement"]');
+    await handle.waitFor({ state: "visible", timeout: 3000 });
+    await handle.getByRole("button", { name: "배치 편집 도구 위치 잠금", exact: true }).click();
+    if (!(await handle.getByRole("button", { name: "배치 편집 도구 이동", exact: true }).isDisabled())) {
+      failures.push("배치 편집 도구 위치 잠금 미적용");
     }
+    await handle.getByRole("button", { name: "배치 편집 도구 위치 잠금 해제", exact: true }).click();
+    const dock = handle.getByRole("combobox", { name: "배치 편집 도구 도킹 위치", exact: true });
+    await dock.selectOption("top");
+    if (await dock.inputValue() !== "top") failures.push("플로팅 도구 직접 도킹 선택 미적용");
+    await dock.selectOption("bottom");
+    await dialog.getByRole("button", { name: "배치 완료", exact: true }).click();
 
+    const autoHide = dialog.getByRole("switch", { name: /펜으로 그리는 동안 자동 숨김/ });
+    if (await autoHide.getAttribute("aria-checked") !== "true") await autoHide.click();
+    await dialog.getByRole("button", { name: "모두 숨김", exact: true }).click();
+    await arrangement.waitFor({ state: "hidden", timeout: 3000 });
+    await workbench.waitFor({ state: "visible", timeout: 3000 });
+    // A local preview has no authenticated save server. Never hide its offline warning
+    // merely to satisfy a layout test or imply that a server save succeeded.
+    if (await saveStatus.getAttribute("data-studio-shell-force-visible") !== "true") {
+      failures.push("로컬 preview의 저장 경고 안전 표시를 확인하지 못함");
+    }
+    await saveStatus.waitFor({ state: "visible", timeout: 3000 });
+    if (!(await launcher.isVisible())) failures.push("모두 숨김 후 보기 복구 버튼이 사라짐");
+    await dialog.getByRole("button", { name: "모두 표시", exact: true }).click();
+    await arrangement.waitFor({ state: "visible", timeout: 3000 });
+    if (await autoHide.getAttribute("aria-checked") !== "true") failures.push("드로잉 자동 숨김 활성 상태 미유지");
     await dialog.getByRole("button", { name: DESKTOP_FLOATING_LAYOUT_DIALOG.closeLabel, exact: true }).click();
     await dialog.waitFor({ state: "hidden", timeout: 3000 });
+
+    const canvas = page.locator('[data-studio-canvas-viewport] canvas').first();
+    await canvas.dispatchEvent("pointerdown", { pointerId: 91, pointerType: "pen", button: 0, isPrimary: true });
+    try {
+      await page.waitForFunction(() => document.querySelector('[data-studio-shell-view-options="true"]')
+        ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "true");
+      await saveStatus.waitFor({ state: "visible", timeout: 3000 });
+    } finally {
+      await canvas.dispatchEvent("pointerup", { pointerId: 91, pointerType: "pen", button: 0, isPrimary: true });
+    }
+    await page.waitForFunction(() => document.querySelector('[data-studio-shell-view-options="true"]')
+      ?.getAttribute("data-studio-shell-drawing-auto-hide-active") === "false", undefined, { timeout: 3000 });
     const viewport = await page.locator('[data-studio-canvas-viewport="true"]').first().boundingBox();
-    if (!viewport) {
-      failures.push("자동 집중 검증용 캔버스를 찾지 못함");
-    } else {
-      const x = viewport.x + viewport.width * 0.48;
-      const y = viewport.y + viewport.height * 0.45;
-      await page.mouse.move(x, y);
-      await page.mouse.down();
-      try {
-        await page.mouse.move(x + 28, y + 12, { steps: 4 });
-        await page.waitForFunction(() =>
-          document.documentElement.dataset.studioStrokeFocusPhase === "drawing",
-        );
-        const drawingState = await drawingOptions.evaluate((element) => {
-          const style = getComputedStyle(element);
-          return {
-            opacity: style.opacity,
-            visibility: style.visibility,
-            pointerEvents: style.pointerEvents,
-          };
-        });
-        if (
-          drawingState.opacity !== "0"
-          || drawingState.visibility !== "hidden"
-          || drawingState.pointerEvents !== "none"
-        ) {
-          failures.push(`획 입력 중 플로팅 UI가 남음: ${JSON.stringify(drawingState)}`);
-        }
-        // Playwright considers opacity:0 visible. The launcher deliberately fades
-        // while inert/aria-hidden remove it from pointer, keyboard and AT access.
-        await page.waitForFunction(() => {
-          const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
-          if (!root) return false;
-          const style = getComputedStyle(root);
-          return root.dataset.studioShellDrawingAutoHideActive === "true"
-            && root.inert && root.getAttribute("aria-hidden") === "true"
-            && style.opacity === "0" && style.pointerEvents === "none";
-        }, undefined, { timeout: 3000 });
-      } finally {
-        await page.mouse.up();
-      }
-      await page.waitForFunction(() =>
-        document.documentElement.dataset.studioStrokeFocusPhase === "settling",
-      );
-      if (await drawingOptions.isVisible()) failures.push("연속 획 대기 중 UI가 너무 일찍 복원됨");
-      await page.waitForFunction(() =>
-        !document.documentElement.hasAttribute("data-studio-stroke-focus-phase"),
-      );
-      await drawingOptions.waitFor({ state: "visible", timeout: 3_000 });
-      await launcher.waitFor({ state: "visible", timeout: 3_000 });
+    if (!viewport) throw new Error("자동 집중 검증용 캔버스를 찾지 못함");
+    const x = viewport.x + viewport.width * 0.48, y = viewport.y + viewport.height * 0.45;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    try {
+      await page.mouse.move(x + 28, y + 12, { steps: 4 });
+      await page.waitForFunction(() => document.documentElement.dataset.studioStrokeFocusPhase === "drawing");
       await page.waitForFunction(() => {
         const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
         if (!root) return false;
         const style = getComputedStyle(root);
-        return !root.inert && root.getAttribute("aria-hidden") !== "true"
-          && style.opacity === "1" && style.pointerEvents === "auto";
+        return root.dataset.studioShellDrawingAutoHideActive === "true" && root.inert
+          && root.getAttribute("aria-hidden") === "true" && style.opacity === "0" && style.pointerEvents === "none";
       }, undefined, { timeout: 3000 });
-    }
-
-    if (failures.length === 0) log("  floating visibility + WYSIWYG layout + stroke focus ok");
+      await workbench.waitFor({ state: "visible", timeout: 3000 });
+      await saveStatus.waitFor({ state: "visible", timeout: 3000 });
+      await arrangement.waitFor({ state: "visible", timeout: 3000 });
+    } finally { await page.mouse.up(); }
+    await page.waitForFunction(() => document.documentElement.dataset.studioStrokeFocusPhase === "settling");
+    await page.waitForFunction(() => !document.documentElement.hasAttribute("data-studio-stroke-focus-phase"));
+    await launcher.waitFor({ state: "visible", timeout: 3000 });
+    await page.waitForFunction(() => {
+      const root = document.querySelector<HTMLElement>('[data-studio-shell-view-options="true"]');
+      if (!root) return false;
+      const style = getComputedStyle(root);
+      return !root.inert && root.getAttribute("aria-hidden") !== "true"
+        && style.opacity === "1" && style.pointerEvents === "auto";
+    }, undefined, { timeout: 3000 });
+    if (failures.length === 0) log("  floating visibility + docking/locks + stroke focus + persistent safety/workbench ok");
   } catch (err) {
     failures.push(`플로팅 보기·배치: ${err instanceof Error ? err.message : String(err)}`);
     await page.keyboard.press("Escape").catch(() => undefined);

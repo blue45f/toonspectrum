@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { assertStudioTaskFrame } from "../scripts/lib/studio-task-frame-browser-contract.mjs";
+
 import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
@@ -64,26 +66,35 @@ test("route inventory retains comprehensive coverage", () => {
   expect(routes.some((path) => EXCLUDED.test(path))).toBe(false);
 });
 
-test("journey rail connects discovery, learning, materials and sharing by real clicks", async ({ page }) => {
+test("creative journey connects public discovery to unified materials and sharing by real clicks", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/references");
   const journey = page.getByRole("navigation", { name: "창작 단계별 바로가기" });
   await expect(journey.locator('[aria-current="step"]')).toContainText("영감 찾기");
-  for (const [name, destination] of [["기법 익히기", "/learn"], ["재료 고르기", "/market"], ["작품 나누기", "/showcase"]]) {
-    await journey.getByRole("link", { name: new RegExp(name, "u") }).click();
-    await expect(page).toHaveURL(new RegExp(`${destination}$`, "u"));
-    await expect(journey.locator('[aria-current="step"]')).toContainText(name);
-    expect(await journey.locator('[aria-current="step"]').evaluate((element) => {
-      const item = element.getBoundingClientRect();
-      const rail = element.parentElement!.getBoundingClientRect();
-      return item.left >= rail.left - 1 && item.right <= rail.right + 1;
-    })).toBe(true);
-    await expect(page.locator("[data-public-wayfinder]")).toBeVisible();
-  }
-  await page.locator('[data-public-wayfinder] a[href="/learn"]').click();
+  await journey.getByRole("link", { name: /기법 익히기/u }).click();
   await expect(page).toHaveURL(/\/learn$/u);
+  await expect(journey.locator('[aria-current="step"]')).toContainText("기법 익히기");
+  expect(await journey.locator('[aria-current="step"]').evaluate((element) => {
+    const item = element.getBoundingClientRect();
+    const rail = element.parentElement!.getBoundingClientRect();
+    return item.left >= rail.left - 1 && item.right <= rail.right + 1;
+  })).toBe(true);
+  await journey.getByRole("link", { name: /재료 고르기/u }).click();
+  await expect(page).toHaveURL(/\/market$/u);
+  await assertStudioTaskFrame(page, "소재 찾기");
+  await page.getByRole("navigation", { name: "주 메뉴", exact: true }).getByRole("link", { name: "둘러보기", exact: true }).click();
+  await expect(page).toHaveURL(/\/hub$/u);
+  await page.getByRole("link", { name: /창작 작품 전시/u }).click();
+  await expect(page).toHaveURL(/\/showcase$/u);
+  await assertStudioTaskFrame(page, "창작 작품");
+  await page.getByRole("navigation", { name: "주 메뉴", exact: true }).getByRole("link", { name: "작품", exact: true }).click();
+  await expect(page).toHaveURL(/\/studio$/u);
+  await expect(page.getByRole("region", { name: "작품 관리", exact: true })).toBeVisible();
   await page.goBack();
   await expect(page).toHaveURL(/\/showcase$/u);
+  await assertStudioTaskFrame(page, "창작 작품");
+  await page.goBack();
+  await expect(page).toHaveURL(/\/hub$/u);
 });
 
 test("footer is keyboard-discoverable without waiting for scrolling or the old timer", async ({ page }) => {

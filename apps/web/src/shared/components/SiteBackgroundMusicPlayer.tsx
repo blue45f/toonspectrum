@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { workspaceTaskRoute } from "./workspace/workspace-task-route";
 import {
   registerBgmPlaylist,
   resumeAudio,
@@ -18,7 +20,7 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import {
@@ -78,7 +80,9 @@ export interface SiteBackgroundMusicPlayerProps {
 }
 
 export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = false }: SiteBackgroundMusicPlayerProps = {}) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const [dock, setDock] = useState<HTMLElement | null>(null);
+  useEffect(() => { setDock(workspaceTaskRoute(pathname, search) ? document.getElementById("workspace-audio-dock") : null); }, [pathname, search]);
   const lang = useI18n((state) => state.lang);
   const korean = lang.startsWith("ko");
   const experience = useMemo(() => resolveSiteBgmExperience(pathname), [pathname]);
@@ -97,6 +101,20 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   } = useAmbientBgm();
   const audio = useAudioState();
   const [expanded, setExpanded] = useState(initial.expanded);
+  const dockToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!dock || !expanded) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented
+        || !(event.target instanceof Node) || !dock.contains(event.target)) return;
+      event.stopPropagation();
+      setExpanded(false);
+      writeSiteBgmExpanded(false);
+      dockToggle.current?.focus();
+    };
+    document.addEventListener("keydown", close);
+    return () => document.removeEventListener("keydown", close);
+  }, [dock, expanded]);
   const [followRoute, setFollowRoute] = useState(initial.followRoute);
   const [style, setStyle] = useState<SiteOstStylePreference>(initial.style);
   const [intensity, setIntensity] = useState<SiteOstIntensity>(initial.intensity);
@@ -214,15 +232,15 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     writeSiteBgmExpanded(next);
   };
 
-  return (
+  const player = (
     <aside
       data-testid="site-background-music-player"
       data-site-ost="mounted"
-      className="fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"
+      className={dock ? "relative z-50" : "fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"}
       aria-label={korean ? "툰스펙트럼 오리지널 OST" : "ToonSpectrum original OST"}
     >
       {expanded ? (
-        <div className="mb-2 w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl">
+        <div className={cn("w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl", dock ? "fixed right-3 top-20 sm:absolute sm:right-0 sm:top-14" : "mb-2")}>
           <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-accent">
@@ -322,7 +340,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
         </div>
       ) : null}
 
-      <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl">
+      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl">
         <button type="button" onClick={() => void togglePlayback()} disabled={!hasPublishedOst} className={cn("grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent", !hasPublishedOst ? "cursor-not-allowed bg-raised text-fg-3" : playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg")} aria-label={playing ? (korean ? "OST 일시정지" : "Pause OST") : (korean ? "OST 재생" : "Play OST")} aria-pressed={playing}>
           {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
         </button>
@@ -334,9 +352,10 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
           </span>
           {expanded ? <ChevronDown className="size-4 shrink-0 text-fg-3" aria-hidden="true" /> : <ChevronUp className="size-4 shrink-0 text-fg-3" aria-hidden="true" />}
         </button>
-      </div>
+      </div>}
     </aside>
   );
+  return dock ? createPortal(player, dock) : player;
 }
 
 export default SiteBackgroundMusicPlayer;

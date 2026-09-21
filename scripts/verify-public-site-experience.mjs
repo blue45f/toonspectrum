@@ -87,7 +87,7 @@ try {
     await check(`home color treatment and footer availability ${width}`, async () => {
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
       await assertStudioWorkspaceHome(page);
-      const background = await page.locator('.workspace-statusbar .workspace-primary').evaluate((element) => getComputedStyle(element).backgroundColor);
+      const background = await page.locator('.workspace-statusbar .workspace-primary, .workspace-live-status .workspace-live-actions > a').evaluate((element) => getComputedStyle(element).backgroundColor);
       assert(background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent', 'The primary action must retain its theme surface');
       await expect(page.locator('footer')).toBeAttached({ timeout: 5000 });
       await page.screenshot({ path: `${output}/home-${width}.png`, animations: 'disabled', timeout: 20000 });

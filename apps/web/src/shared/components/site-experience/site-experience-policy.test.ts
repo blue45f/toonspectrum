@@ -34,9 +34,9 @@ describe("studio-first destination ownership", () => {
   it.each(["/", "/home", "/studio", "/studio/", "/team", "/hub"])("does not prepend another promotional header to %s", (pathname) => {
     expect(supportsRoutePurposeScene(pathname)).toBe(false);
   });
-  it("retains document guidance and keeps the actual live space immersive", () => {
-    expect(supportsRoutePurposeScene("/studio/new")).toBe(true);
-    expect(supportsRoutePurposeScene("/studio/p/work/overview")).toBe(true);
+  it("keeps document tasks concise and the actual live space immersive", () => {
+    expect(supportsRoutePurposeScene("/studio/new")).toBe(false);
+    expect(supportsRoutePurposeScene("/studio/p/work/overview")).toBe(false);
     expect(supportsRoutePurposeScene("/studio/p/work/space")).toBe(false);
   });
 });
