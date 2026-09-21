@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   DEFAULT_STUDIO_QUICK_ACCESS_FLOATING_LAYOUT,
   loadStudioQuickAccessFloatingLayout,
+  positionStudioQuickAccessNearPoint,
   saveStudioQuickAccessFloatingLayout,
 } from "./studio-quick-access-surface-layout";
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
@@ -13,6 +14,7 @@ import type { StudioQuickAccessSurfaceLeafProps } from "./studio-quick-access-su
 
 /** Movable, resizable desktop presentation backed by the shared Studio window chrome. */
 export function StudioQuickAccessDesktopSurface({
+  launchPoint,
   state,
   catalog,
   descriptionId,
@@ -21,7 +23,11 @@ export function StudioQuickAccessDesktopSurface({
   onExecute,
   onClose,
 }: StudioQuickAccessSurfaceLeafProps) {
-  const [layout, setLayout] = useState(loadStudioQuickAccessFloatingLayout);
+  const [layout, setLayout] = useState(() => positionStudioQuickAccessNearPoint(loadStudioQuickAccessFloatingLayout(), launchPoint, { width: globalThis.innerWidth || 1280, height: globalThis.innerHeight || 800 }));
+  useEffect(() => {
+    if (!launchPoint) return;
+    setLayout((current) => positionStudioQuickAccessNearPoint(current, launchPoint, { width: globalThis.innerWidth || 1280, height: globalThis.innerHeight || 800 }));
+  }, [launchPoint]);
   const commitLayout = (next: StudioFloatingSurfaceLayout): void => {
     setLayout(next);
     saveStudioQuickAccessFloatingLayout(next);

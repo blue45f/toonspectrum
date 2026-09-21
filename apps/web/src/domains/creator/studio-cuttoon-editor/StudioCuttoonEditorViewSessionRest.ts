@@ -6,6 +6,7 @@ import type { StudioAnimaticWorkspaceDocument } from "../animatic/studio-animati
 import type { StudioSaveIntentScope } from "../studio-durable-save-intent";
 
 export type StudioCuttoonEditorViewSessionRest = {
+  quickAccessLaunchPoint?: { x: number; y: number } | null;
   saveIntentScope?: StudioSaveIntentScope | null;
   animaticWorkspace: StudioAnimaticWorkspaceDocument | null;
   animaticPersistenceBusy: boolean;

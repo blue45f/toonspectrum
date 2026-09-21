@@ -155,10 +155,31 @@ export type StudioTouchTwoFinger = "pan-zoom" | "undo-redo";
 export type StudioTouchThreeFinger = "undo" | "toggle-ui" | "none";
 export type StudioBrushCursorStyle = "outline" | "dot" | "none";
 
+export type StudioToolbarView = "single" | "double" | "list";
+export interface StudioToolbarProfile {
+  id: string;
+  name: string;
+  visibleIds: StudioRailToolId[];
+  view: StudioToolbarView;
+}
+export interface StudioToolbarPreferences {
+  visibleIds: StudioRailToolId[];
+  version?: 2;
+  /** false is a first-run recommendation; stored legacy arrays migrate to true. */
+  configured?: boolean;
+  view?: StudioToolbarView;
+  /** Preserve unknown ids, but never execute them. */
+  archivedIds?: string[];
+  profiles?: StudioToolbarProfile[];
+  activeProfileId?: string | null;
+}
+
 export type StudioAppSettings = {
   general: {
     densityMode: StudioUiDensityMode;
     toolHintMode: StudioToolHintMode;
+    colorPanelPinned?: boolean;
+    brushPanelWidth?: number;
     brushCursorStyle: StudioBrushCursorStyle;
     /** Show the transient pointer-to-ink tether while an input stabilizer is visibly trailing. */
     showStrokeGuide: boolean;
@@ -179,10 +200,7 @@ export type StudioAppSettings = {
     palmRejection: boolean;
     toolHintHoldMs: number;
   };
-  toolbar: {
-    /** Visible rail tools in order. Hidden tools are catalog ids not in this list. */
-    visibleIds: StudioRailToolId[];
-  };
+  toolbar: StudioToolbarPreferences;
   grids: {
     showCanvasRulers: boolean;
     showPixelGrid: boolean;
@@ -234,6 +252,8 @@ export function defaultStudioAppSettings(): StudioAppSettings {
     general: {
       densityMode: DEFAULT_STUDIO_UI_DENSITY_MODE,
       toolHintMode: DEFAULT_STUDIO_TOOL_HINT_MODE,
+      colorPanelPinned: false,
+      brushPanelWidth: 240,
       brushCursorStyle: "outline",
       // Keep the latency-critical surface opt-in. Artists who use strong stabilization can enable
       // the guide explicitly; zero-cost drawing remains the default on mouse, pen and mobile.
@@ -256,6 +276,8 @@ export function defaultStudioAppSettings(): StudioAppSettings {
     },
     toolbar: {
       visibleIds: [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS],
+      version: 2, configured: false, view: "single",
+      archivedIds: [], profiles: [], activeProfileId: null,
     },
     grids: {
       // Precision chrome should never reduce the first-open canvas.
@@ -298,6 +320,38 @@ export function normalizeStudioRailVisibleIds(value: unknown): StudioRailToolId[
   // New/invalid state gets a compact, predictable creation path. Persist every valid user choice.
   if (out.length === 0) return [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS];
   return out;
+}
+
+/** A stored array is an explicit choice even when it equals an old recommendation. */
+export function normalizeStudioToolbarPreferences(value: unknown): StudioToolbarPreferences {
+  const record = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const known = (raw: unknown): StudioRailToolId[] => Array.isArray(raw)
+    ? [...new Set(raw.filter(isStudioRailToolId))] : [];
+  const supplied = Array.isArray(record.visibleIds);
+  const pinned = known(record.visibleIds);
+  const configured = typeof record.configured === "boolean" ? record.configured : supplied;
+  const view = (raw: unknown): StudioToolbarView => raw === "double" || raw === "list" ? raw : "single";
+  const archivedIds = [...new Set([
+    ...(Array.isArray(record.archivedIds) ? record.archivedIds : []),
+    ...(supplied ? (record.visibleIds as unknown[]).filter((id) => !isStudioRailToolId(id)) : []),
+  ].filter((id): id is string => typeof id === "string" && id.length > 0 && id.length <= 128))].slice(0, 256);
+  const profiles: StudioToolbarProfile[] = [];
+  if (Array.isArray(record.profiles)) for (const raw of record.profiles.slice(0, 12)) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Record<string, unknown>;
+    if (typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/u.test(item.id)
+      || typeof item.name !== "string" || !item.name.trim() || profiles.some(({ id }) => id === item.id)) continue;
+    const ids = known(item.visibleIds);
+    if (!ids.length) continue;
+    profiles.push({ id: item.id, name: item.name.trim().slice(0, 48), visibleIds: ids, view: view(item.view) });
+  }
+  return {
+    version: 2, configured,
+    visibleIds: pinned.length ? pinned : [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS],
+    view: view(record.view), archivedIds, profiles,
+    activeProfileId: typeof record.activeProfileId === "string" && profiles.some(({ id }) => id === record.activeProfileId)
+      ? record.activeProfileId : null,
+  };
 }
 
 export function studioRailHiddenIds(visibleIds: readonly StudioRailToolId[]): StudioRailToolId[] {
@@ -519,6 +573,8 @@ export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
     general: {
       densityMode: normalizeStudioUiDensityMode(general.densityMode ?? defaults.general.densityMode),
       toolHintMode: normalizeStudioToolHintMode(general.toolHintMode, general.showToolHints),
+      colorPanelPinned: asBool(general.colorPanelPinned, false),
+      brushPanelWidth: asNum(general.brushPanelWidth, 240, 200, 360),
       brushCursorStyle: asEnum(
         general.brushCursorStyle,
         ["outline", "dot", "none"] as const,
@@ -552,9 +608,7 @@ export function normalizeStudioAppSettings(value?: unknown): StudioAppSettings {
       palmRejection: asBool(touch.palmRejection, defaults.touch.palmRejection),
       toolHintHoldMs: normalizeStudioToolHintTouchHoldMs(touch.toolHintHoldMs),
     },
-    toolbar: {
-      visibleIds: normalizeStudioRailVisibleIds(toolbar.visibleIds),
-    },
+    toolbar: normalizeStudioToolbarPreferences(toolbar),
     grids: {
       showCanvasRulers: asBool(grids.showCanvasRulers, defaults.grids.showCanvasRulers),
       showPixelGrid: asBool(grids.showPixelGrid, defaults.grids.showPixelGrid),

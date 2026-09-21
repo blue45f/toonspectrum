@@ -99,12 +99,12 @@ describe("StudioPaletteWorkbench", () => {
   it("keeps normalized recent colors visible and applies them in one step", () => {
     const { onPreviewColor, onCommitColor } = renderWorkbench();
 
-    expect(screen.getByRole("heading", { name: "최근 사용 색" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "최근 색상 #445566 선택" })).toBeTruthy();
-    expect(screen.getByRole("radio", { name: "최근 색상 #aabbcc 선택" })).toBeTruthy();
-    expect(screen.queryByRole("radio", { name: /invalid/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: "최근 선택 색" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "최근 선택 색 #445566 적용" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "최근 선택 색 #aabbcc 적용" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /invalid/ })).toBeNull();
 
-    fireEvent.click(screen.getByRole("radio", { name: "최근 색상 #445566 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "최근 선택 색 #445566 적용" }));
     expect(onPreviewColor).toHaveBeenCalledWith("#445566");
     expect(onCommitColor).toHaveBeenCalledWith("#445566");
   });
@@ -113,26 +113,28 @@ describe("StudioPaletteWorkbench", () => {
     const { onPreviewColor } = renderWorkbench();
 
     expect(screen.getByTestId("quick-picker")).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: /색상환:/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "색상 선택 방식" }), { target: { value: "wheel" } });
     expect(screen.getByTestId("disc-picker")).toBeTruthy();
     fireEvent.click(screen.getByTestId("disc-picker"));
-    expect(onPreviewColor).toHaveBeenCalledWith("#abcdef");
+    expect(onPreviewColor).not.toHaveBeenCalled();
+    fireEvent.keyUp(screen.getByTestId("disc-picker"), { key: "ArrowRight" });
+    expect(onPreviewColor).toHaveBeenCalledExactlyOnceWith("#abcdef");
 
-    fireEvent.click(screen.getByRole("tab", { name: /조화·웹툰:/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "배색" }));
     expect(screen.getByTestId("harmony-panel")).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: "웹툰 음영" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "배색 방식" }), { target: { value: "cel" } });
     expect(screen.getByTestId("webtoon-panel")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: /내 팔레트:/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "팔레트" }));
     expect(screen.getByTestId("palette-library")).toBeTruthy();
   });
 
   it("previews valid direct input, commits it on Enter, and rejects invalid hex values", () => {
     const { onPreviewColor, onCommitColor } = renderWorkbench();
-    const input = screen.getByRole("textbox", { name: "현재 색상 코드" });
+    const input = screen.getByRole("textbox", { name: "헥스 색상 코드" });
 
     fireEvent.change(input, { target: { value: "#ABC" } });
-    expect(onPreviewColor).toHaveBeenCalledWith("#aabbcc");
+    expect(onPreviewColor).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onCommitColor).toHaveBeenCalledWith("#aabbcc");
 
@@ -144,14 +146,15 @@ describe("StudioPaletteWorkbench", () => {
   it("saves the current flow and generated harmony sets through the shared palette repository", async () => {
     renderWorkbench();
 
-    fireEvent.click(screen.getByRole("button", { name: "현재 흐름을 내 팔레트로 저장" }));
+    fireEvent.click(screen.getByRole("tab", { name: "팔레트" }));
+    fireEvent.click(screen.getByRole("button", { name: "현재 색 모음을 내 팔레트에 저장" }));
     await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(1));
     expect(mocks.save.mock.calls[0]?.[0]).toMatchObject({
       name: "작업 색 #112233",
       colors: ["#112233", "#445566", "#aabbcc"],
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: /조화·웹툰:/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "배색" }));
     fireEvent.click(screen.getByRole("button", { name: "조화 저장" }));
     await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(2));
     expect(mocks.save.mock.calls[1]?.[0]).toMatchObject({
@@ -170,7 +173,7 @@ it("preserves a six-digit HEX draft through controlled short-hex previews and co
       onCommitColor={commit} libraryContent={null} />;
   }
   render(<ControlledWorkbench />);
-  const input = screen.getByRole("textbox", { name: "현재 색상 코드" }) as HTMLInputElement;
+  const input = screen.getByRole("textbox", { name: "헥스 색상 코드" }) as HTMLInputElement;
   for (const draft of ["#1", "#12", "#123", "#1234", "#12345", "#123456"]) {
     fireEvent.change(input, { target: { value: draft } });
     expect(input.value).toBe(draft);
@@ -183,12 +186,12 @@ it("preserves a six-digit HEX draft through controlled short-hex previews and co
 
 it("rolls back only a pending HEX edit, without undoing unrelated colors on Escape", () => {
   const { onPreviewColor, onCommitColor } = renderWorkbench();
-  const input = screen.getByRole("textbox", { name: "현재 색상 코드" });
+  const input = screen.getByRole("textbox", { name: "헥스 색상 코드" });
   fireEvent.keyDown(input, { key: "Escape" });
   expect(onPreviewColor).not.toHaveBeenCalled();
   fireEvent.change(input, { target: { value: "#ABC" } });
   fireEvent.keyDown(input, { key: "Escape" });
-  expect(onPreviewColor).toHaveBeenLastCalledWith("#112233");
+  expect(onPreviewColor).not.toHaveBeenCalled();
   fireEvent.blur(input);
   expect(onCommitColor).not.toHaveBeenCalled();
 });

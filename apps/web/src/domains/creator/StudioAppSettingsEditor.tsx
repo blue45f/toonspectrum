@@ -1,17 +1,11 @@
-import { matchesStudioRailToolQuery } from "./studio-rail-tool-search";
-import { isStudioDrawingCoreTool, studioDrawingVisibleTools } from "./studio-drawing-core-tools";
+import { StudioToolbarConfigurator } from "./StudioToolbarConfigurator";
 /**
  * Application Settings modal — tabs:
  * General · Shortcuts · Mouse · Touch · Toolbar · Grids · Other
  * Warm-ink design tokens only; no external brand styling.
  */
 import {
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
   RotateCcw,
-  Search,
   Settings2,
   X,
 } from "lucide-react";
@@ -27,24 +21,16 @@ import {
 import { createPortal } from "react-dom";
 
 import {
-  DEFAULT_STUDIO_RAIL_VISIBLE_IDS,
-  DEFAULT_STUDIO_RAIL_TOOL_ORDER,
   formatStudioShortcutChord,
-  hideStudioRailTool,
   listStudioShortcutConflicts,
-  moveStudioRailTool,
   normalizeStudioShortcutChordKey,
   studioShortcutActionLabel,
-  showStudioRailTool,
   STUDIO_APP_SETTINGS_TABS,
   STUDIO_PIXEL_GRID_SIZE_OPTIONS,
   STUDIO_SHORTCUT_ACTIONS,
   studioAppSettingsTabLabel,
-  studioRailHiddenIds,
-  studioRailToolLabel,
   type StudioAppSettings,
   type StudioAppSettingsTab,
-  type StudioRailToolId,
   type StudioShortcutActionId,
 } from "./studio-app-settings";
 import { runStudioDestructiveAction } from "./studio-destructive-action-preview";
@@ -138,8 +124,6 @@ export function StudioAppSettingsPanel({
   const titleId = useId();
   const [tab, setTab] = useState<StudioAppSettingsTab>(initialTab);
   const [recordingAction, setRecordingAction] = useState<StudioShortcutActionId | null>(null);
-  const [toolbarQuery, setToolbarQuery] = useState("");
-  const [toolbarBeforeShowAll, setToolbarBeforeShowAll] = useState<StudioRailToolId[] | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const dismissModal = useEffectEvent(() => {
     if (recordingAction) {
@@ -152,7 +136,6 @@ export function StudioAppSettingsPanel({
   useEffect(() => {
     if (open) {
       setTab(initialTab);
-      setToolbarQuery("");
     }
   }, [open, initialTab]);
 
@@ -213,12 +196,6 @@ export function StudioAppSettingsPanel({
   if (!open || typeof document === "undefined") return null;
 
   const patch = (partial: Partial<StudioAppSettings>) => onChange({ ...settings, ...partial });
-  const visible = studioDrawingVisibleTools(settings.toolbar.visibleIds);
-  const hidden = studioRailHiddenIds(visible);
-  const normalizedToolbarQuery = toolbarQuery.trim().normalize("NFKC").toLocaleLowerCase();
-  const matchesToolbarQuery = (id: StudioRailToolId) => matchesStudioRailToolQuery(id, toolbarQuery, t);
-  const visibleMatches = visible.filter(matchesToolbarQuery);
-  const hiddenMatches = hidden.filter(matchesToolbarQuery);
   const shortcutConflicts = listStudioShortcutConflicts(settings.shortcuts);
   const shortcutConflictCount = shortcutConflicts.size;
   const actionLabelById = new Map(
@@ -596,172 +573,9 @@ export function StudioAppSettingsPanel({
             ) : null}
 
             {tab === "toolbar" ? (
-              <>
-                <div className="sticky -top-4 z-10 -mx-4 -mt-4 space-y-2 border-b border-line bg-panel/95 px-4 pb-3 pt-4 backdrop-blur-sm">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <SectionLabel>{t("studio.settings.section.toolbar")}</SectionLabel>
-                      <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                        {t("studio.settings.toolbar.searchLiveHint")}
-                      </p>
-                    </div>
-                    <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold tabular-nums text-fg-3">
-                      {`${t("studio.settings.toolbar.visibleLabel")} ${visible.length} · ${t("studio.settings.toolbar.hiddenLabel")} ${hidden.length}`}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button type="button" disabled={hidden.length === 0}
-                      className="min-h-11 rounded-lg border border-accent/40 bg-accent-soft px-3 text-xs font-semibold text-accent disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent"
-                      onClick={() => {
-                        setToolbarBeforeShowAll([...settings.toolbar.visibleIds]);
-                        patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_TOOL_ORDER] } });
-                      }}>전체 {DEFAULT_STUDIO_RAIL_TOOL_ORDER.length}개 표시</button>
-                    {toolbarBeforeShowAll ? <button type="button" className="min-h-11 rounded-lg border border-line px-3 text-xs text-fg"
-                      onClick={() => {
-                        patch({ toolbar: { visibleIds: toolbarBeforeShowAll } });
-                        setToolbarBeforeShowAll(null);
-                      }}>전체 표시 이전 구성으로 복원</button> : null}
-                    <p className="text-[0.68rem] text-fg-3">27개 이상도 배치할 수 있으며, 표시 순서는 실제 도구막대에 적용됩니다.</p>
-                  </div>
-                  <label className="relative block">
-                    <span className="sr-only">{t("studio.settings.toolbar.searchAria")}</span>
-                    <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
-                    <input
-                      type="search"
-                      value={toolbarQuery}
-                      onChange={(event) => setToolbarQuery(event.target.value.slice(0, 80))}
-                      placeholder={t("studio.settings.toolbar.searchPlaceholder")}
-                      className="h-11 w-full rounded-xl border border-line bg-card pl-9 pr-3 text-xs text-fg outline-none transition-colors placeholder:text-fg-3 hover:border-line-strong focus:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:h-10 pointer-coarse:h-11 pointer-coarse:min-h-11"
-                    />
-                  </label>
-                </div>
-                <div className="grid min-h-0 gap-3 sm:grid-cols-2">
-                  <section className="flex min-h-0 flex-col rounded-xl border border-line bg-card/20 p-2" aria-labelledby={`${titleId}-toolbar-visible`}>
-                    <p id={`${titleId}-toolbar-visible`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
-                      <span>{t("studio.settings.toolbar.visibleLabel")}</span>
-                      <span className="tabular-nums">{visibleMatches.length}</span>
-                    </p>
-                    <ul className="max-h-[min(26rem,50dvh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
-                      {visibleMatches.map((id) => (
-                        <li
-                          key={id}
-                          className="group flex min-h-11 items-center gap-1 rounded-lg border border-transparent bg-card/70 px-2 py-1.5 text-xs text-fg transition-colors hover:border-line hover:bg-raised"
-                        >
-                          <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id, t)}</span>
-                          <button
-                            type="button"
-                            className={cn(
-                              buttonClass({ size: "sm", variant: "quiet" }),
-                              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                            )}
-                                aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.moveUp")}`}
-                            disabled={visible.indexOf(id) === 0}
-                            onClick={() =>
-                              patch({
-                                toolbar: { visibleIds: moveStudioRailTool(visible, id, -1) },
-                              })
-                            }
-                          >
-                            <ChevronUp className="size-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            className={cn(
-                              buttonClass({ size: "sm", variant: "quiet" }),
-                              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                            )}
-                                aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.moveDown")}`}
-                            disabled={visible.indexOf(id) === visible.length - 1}
-                            onClick={() =>
-                              patch({
-                                toolbar: { visibleIds: moveStudioRailTool(visible, id, 1) },
-                              })
-                            }
-                          >
-                            <ChevronDown className="size-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            className={cn(
-                              buttonClass({ size: "sm", variant: "quiet" }),
-                              "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                            )}
-                                aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.hide")}`}
-                            disabled={visible.length <= 1 || isStudioDrawingCoreTool(id)}
-                            title={isStudioDrawingCoreTool(id) ? "기본 드로잉 도구는 항상 표시됩니다" : undefined}
-                            onClick={() =>
-                              patch({ toolbar: { visibleIds: hideStudioRailTool(visible, id) } })
-                            }
-                          >
-                            <EyeOff className="size-3.5" />
-                          </button>
-                        </li>
-                      ))}
-                      {visibleMatches.length === 0 ? (
-                        <li className="rounded-lg px-2 py-6 text-center text-[0.7rem] text-fg-3">
-                          {t("studio.settings.toolbar.visibleHint")}
-                        </li>
-                      ) : null}
-                    </ul>
-                  </section>
-                  <section className="flex min-h-0 flex-col rounded-xl border border-line border-dashed bg-card/10 p-2" aria-labelledby={`${titleId}-toolbar-hidden`}>
-                    <p id={`${titleId}-toolbar-hidden`} className="mb-2 flex items-center justify-between gap-2 px-1 text-[0.66rem] font-semibold text-fg-3">
-                      <span>{t("studio.settings.toolbar.hiddenLabel")}</span>
-                      <span className="tabular-nums">{hiddenMatches.length}</span>
-                    </p>
-                    {hiddenMatches.length === 0 ? (
-                      <p className="grid min-h-24 place-items-center px-2 py-5 text-center text-[0.68rem] leading-relaxed text-fg-3">
-                        {normalizedToolbarQuery
-                          ? t("studio.settings.toolbar.hiddenEmptyWithQuery")
-                          : t("studio.settings.toolbar.hiddenEmpty")}
-                      </p>
-                    ) : (
-                      <ul className="max-h-[min(26rem,50dvh)] space-y-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-gutter:stable]">
-                        {hiddenMatches.map((id) => (
-                          <li
-                            key={id}
-                            className="flex min-h-11 items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-fg-2 transition-colors hover:bg-raised"
-                          >
-                            <span className="min-w-0 flex-1 truncate">{studioRailToolLabel(id, t)}</span>
-                            <button
-                              type="button"
-                              className={cn(
-                                buttonClass({ size: "sm", variant: "quiet" }),
-                                "min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                              )}
-                              aria-label={`${studioRailToolLabel(id, t)} ${t("studio.settings.toolbar.show")}`}
-                              onClick={() =>
-                                patch({ toolbar: { visibleIds: showStudioRailTool(visible, id) } })
-                              }
-                            >
-                              <Eye className="size-3.5" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </section>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-card/20 p-2.5">
-                  <p className="text-[0.68rem] text-fg-3">
-                    {t("studio.settings.toolbar.moveApplyHint")}
-                  </p>
-                  <button
-                    type="button"
-                    className={cn(
-                      buttonClass({ size: "sm", variant: "quiet" }),
-                      "min-h-11 sm:min-h-8 pointer-coarse:min-h-11"
-                    )}
-                    aria-label={t("studio.settings.toolbar.resetAria")}
-                    onClick={() =>
-                      patch({ toolbar: { visibleIds: [...DEFAULT_STUDIO_RAIL_VISIBLE_IDS] } })
-                    }
-                  >
-                    <RotateCcw className="size-3.5" aria-hidden />
-                    {t("studio.settings.toolbar.reset")}
-                  </button>
-                </div>
-              </>
+              <StudioToolbarConfigurator value={settings.toolbar}
+                onApply={(toolbar) => { patch({ toolbar }); onClose(); }}
+                onCancel={onClose} />
             ) : null}
 
             {tab === "grids" ? (

@@ -1,253 +1,105 @@
 // @vitest-environment jsdom
-
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useState } from "react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { StudioColorPopover } from "./StudioColorPopover";
 import * as paletteRepository from "./studio-palette-sqlite-repository";
 
-describe("StudioColorPopover Advanced Benchmarked Features", () => {
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
+vi.mock("./StudioPaletteLibraryPanel", () => ({ StudioPaletteLibraryPanel: () => <div>내 팔레트 저장소</div> }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+function open(value = "#ff0000", recentColors: string[] = []) {
+  const onChange = vi.fn();
+  render(<StudioColorPopover value={value} onChange={onChange} recentColors={recentColors} label="채색" initialOpen />);
+  return onChange;
+}
+const apply = () => fireEvent.click(screen.getByRole("button", { name: "색상 적용" }));
+const harmony = (mode: "harmony" | "cel" = "harmony") => {
+  fireEvent.click(screen.getByRole("tab", { name: "배색" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "배색 방식" }), { target: { value: mode } });
+};
+
+describe("shared advanced color workspace", () => {
+  it("groups every old picker mode under three labelled, linked top-level tabs", () => {
+    open();
+    const tabs = within(screen.getByRole("tablist", { name: "색상 작업 방식" })).getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["선택", "팔레트", "배색"]);
+    for (const tab of tabs) expect(document.getElementById(tab.getAttribute("aria-controls")!)?.getAttribute("aria-labelledby")).toBe(tab.id);
+    expect(screen.getByRole("combobox", { name: "색상 선택 방식" })).toBeTruthy();
+    expect(screen.getByText("정밀 수치 · RGB / HSV / HSL")).toBeTruthy();
   });
-
-  it("renders all 5 competitor-benchmarked mode tabs (팔레트, 휠, 조화, 웹툰, 슬라이더)", async () => {
-    render(
-      <StudioColorPopover
-        value="#ff5500"
-        onChange={vi.fn()}
-        recentColors={["#ff5500", "#0088ff"]}
-        label="채색 팔레트"
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "채색 팔레트" }));
-    await screen.findByRole("dialog", { name: "채색 팔레트 선택" });
-
-    // Mode tabs
-    expect(screen.getByRole("tab", { name: "팔레트 모드" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "휠 모드" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "조화 모드" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "웹툰 모드" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "슬라이더 모드" })).toBeDefined();
-
-    // Tints & Shades strip is present
-    expect(screen.getByRole("radiogroup", { name: "명도 및 음영 단계" })).toBeDefined();
+  it("uses manual tab activation with roving focus", () => {
+    open();
+    const select = screen.getByRole("tab", { name: "선택" });
+    const palettes = screen.getByRole("tab", { name: "팔레트" });
+    select.focus(); fireEvent.keyDown(select, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(palettes);
+    expect(select.getAttribute("aria-selected")).toBe("true");
+    expect(palettes.tabIndex).toBe(0); expect(select.tabIndex).toBe(-1);
+    fireEvent.click(palettes); expect(palettes.getAttribute("aria-selected")).toBe("true");
   });
-
-  it.each(["#ffffff", "#000000"])("checks only one duplicate shade/recent swatch and preserves a rebased slot's focus: %s", async (initial) => {
-    const onChange = vi.fn();
-    function ControlledPopover() {
-      const [value, setValue] = useState(initial);
-      return (
-        <StudioColorPopover
-          value={value}
-          onChange={(color) => { onChange(color); setValue(color); }}
-          recentColors={[initial.toUpperCase(), initial, "#ff0000"]}
-          label="중복 색상"
-        />
-      );
-    }
-    render(<ControlledPopover />);
-    fireEvent.click(screen.getByRole("button", { name: "중복 색상" }));
-    const shades = await screen.findByRole("radiogroup", { name: "명도 및 음영 단계" });
-    expect(within(shades).getAllByRole("radio", { checked: true })).toHaveLength(1);
-    const recent = screen.getByRole("radiogroup", { name: "최근 색상" });
-    expect(within(recent).getAllByRole("radio", { checked: true })).toHaveLength(1);
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "헥스 색상 코드" })));
-    const swatches = within(shades).getAllByRole("radio");
-    const choice = swatches[initial === "#ffffff" ? 8 : 0]!;
-    const requestedColor = choice.getAttribute("aria-label")!.match(/#[\da-f]{6}/iu)![0];
-    choice.focus();
-    fireEvent.click(choice);
-    expect(onChange).toHaveBeenLastCalledWith(requestedColor);
-    expect(document.activeElement).toBe(choice);
-    expect(within(shades).getAllByRole("radio", { checked: true })).toHaveLength(1);
+  it.each(["#ffffff", "#000000"])("deduplicates shade and recent colors for %s", (color) => {
+    open(color, [color.toUpperCase(), color, "#ff0000"]);
+    const recent = screen.getByRole("group", { name: "최근 선택 색 목록" });
+    expect(within(recent).getAllByRole("button")).toHaveLength(2);
+    expect(within(recent).getAllByRole("button", { pressed: true })).toHaveLength(1);
+    harmony();
+    const shades = within(screen.getByRole("group", { name: "밝기와 음영 단계 목록" })).getAllByRole("button");
+    expect(new Set(shades.map((button) => button.getAttribute("aria-label"))).size).toBe(shades.length);
   });
-
-  it.each([
-    ["조화 모드", "이 조화 배색을 내 팔레트로 저장"],
-    ["웹툰 모드", "이 음영 세트를 내 팔레트로 저장"],
-  ])("reports asynchronous persistence failure without a premature success badge in %s", async (tabName, saveLabel) => {
+  it.each([["harmony", "이 조화 배색을 내 팔레트로 저장"], ["cel", "이 음영 세트를 내 팔레트로 저장"]] as const)("does not report premature success for %s save failures", async (mode, label) => {
     const save = vi.fn().mockRejectedValue(new Error("storage unavailable"));
     vi.spyOn(paletteRepository, "getProductStudioPaletteSqliteRepository").mockReturnValue({ save } as unknown as paletteRepository.StudioPaletteSqliteRepository);
-    render(<StudioColorPopover value="#336699" onChange={vi.fn()} recentColors={[]} label="저장 실패" />);
-    fireEvent.click(screen.getByRole("button", { name: "저장 실패" }));
-    fireEvent.click(await screen.findByRole("tab", { name: tabName }));
-    const saveButton = screen.getByRole("button", { name: saveLabel });
-    fireEvent.click(saveButton);
-    expect(saveButton.textContent).toBe(saveLabel);
-    const result = await screen.findByRole("status", { name: "팔레트 저장 결과" });
-    expect(result.textContent).toContain("팔레트를 저장하지 못했어요");
-    expect(result.className).toContain("text-warn");
+    open("#336699"); harmony(mode);
+    const button = screen.getByRole("button", { name: label }); fireEvent.click(button);
+    expect(button.textContent).toBe(label);
+    const status = await screen.findByRole("status", { name: "색상 작업 결과" });
+    expect(status.textContent).toContain("저장하지 못했습니다");
+    expect(status.className).toContain("text-warn");
     expect(save).toHaveBeenCalledOnce();
-    expect(screen.queryByText(/저장했어요|저장되었습니다|저장 완료|라이브러리에 저장됨/u)).toBeNull();
   });
-
-  it("switches to Wheel mode and adjusts hue via arrow keys", async () => {
-    const onChange = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#ff0000"
-        onChange={onChange}
-        recentColors={[]}
-        label="색상환 테스트"
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "색상환 테스트" }));
-    await screen.findByRole("dialog", { name: "색상환 테스트 선택" });
-
-    // Switch to Wheel mode
-    fireEvent.click(screen.getByRole("tab", { name: "휠 모드" }));
-
-    const hueSlider = screen.getByRole("slider", { name: "색상환 색조 각도" });
-    expect(hueSlider).toBeDefined();
-
-    fireEvent.keyDown(hueSlider, { key: "ArrowRight" });
-    expect(onChange).toHaveBeenCalled();
+  it("edits wheel hue locally and applies through the same transaction", () => {
+    const changed = open();
+    fireEvent.change(screen.getByRole("combobox", { name: "색상 선택 방식" }), { target: { value: "wheel" } });
+    fireEvent.keyDown(screen.getByRole("slider", { name: "색상환 색조 각도" }), { key: "ArrowRight" });
+    expect(changed).not.toHaveBeenCalled(); apply();
+    expect(changed).toHaveBeenCalledOnce(); expect(changed.mock.calls[0]?.[0]).not.toBe("#ff0000");
   });
-
-  it("switches to Harmonies mode and applies complementary color", async () => {
-    const onChange = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#ff0000"
-        onChange={onChange}
-        recentColors={[]}
-        label="조화 배색 테스트"
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "조화 배색 테스트" }));
-    await screen.findByRole("dialog", { name: "조화 배색 테스트 선택" });
-
-    fireEvent.click(screen.getByRole("tab", { name: "조화 모드" }));
-    expect(screen.getByText(/180도 반대편 색으로/)).toBeDefined();
-
-    const compSwatches = screen.getAllByRole("radio", { name: /조화 색상/ });
-    expect(compSwatches.length).toBeGreaterThanOrEqual(2);
-
-    fireEvent.click(compSwatches[1]!);
-    expect(onChange).toHaveBeenCalled();
+  it("preserves harmony choices and confirms a complementary color", () => {
+    const changed = open(); harmony();
+    expect(screen.getByText(/180도 반대편 색으로/)).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("radio", { name: /조화 색상/ })[1]!);
+    expect(changed).not.toHaveBeenCalled(); apply();
+    expect(changed).toHaveBeenCalledExactlyOnceWith("#00ffff");
   });
-
-  it("switches to Webtoon mode and shows anti-muddy cel shadow stages", async () => {
-    const onChange = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#ffdcc5"
-        onChange={onChange}
-        recentColors={[]}
-        label="웹툰 음영 테스트"
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "웹툰 음영 테스트" }));
-    await screen.findByRole("dialog", { name: "웹툰 음영 테스트 선택" });
-
-    fireEvent.click(screen.getByRole("tab", { name: "웹툰 모드" }));
-
-    expect(screen.getByText("Anti-Muddy")).toBeDefined();
-    const cel1Button = screen.getByRole("radio", { name: /1차 음영/ });
-    expect(cel1Button).toBeDefined();
-
-    fireEvent.click(cel1Button);
-    expect(onChange).toHaveBeenCalled();
+  it("preserves webtoon cel shades and their anti-muddy controls", () => {
+    const changed = open("#ffdcc5"); harmony("cel");
+    expect(screen.getByText("Anti-Muddy")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /1차 음영/ }));
+    expect(changed).not.toHaveBeenCalled(); apply(); expect(changed).toHaveBeenCalledOnce();
   });
-
-  it("switches to Sliders mode and changes RGB channel", async () => {
-    const onChange = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#ff8800"
-        onChange={onChange}
-        recentColors={[]}
-        label="슬라이더 테스트"
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "슬라이더 테스트" }));
-    await screen.findByRole("dialog", { name: "슬라이더 테스트 선택" });
-
-    fireEvent.click(screen.getByRole("tab", { name: "슬라이더 모드" }));
-
-    const redSlider = screen.getByRole("slider", { name: "빨강 채널 R" });
-    fireEvent.change(redSlider, { target: { value: "100" } });
-    expect(onChange).toHaveBeenCalled();
+  it("offers exact RGB input without sending intermediate values to the document", () => {
+    const changed = open("#ff8800");
+    const details = screen.getByText("정밀 수치 · RGB / HSV / HSL").closest("details")!; details.open = true;
+    fireEvent.change(screen.getByRole("slider", { name: "빨강 채널 R" }), { target: { value: "100" } });
+    expect(changed).not.toHaveBeenCalled(); apply(); expect(changed).toHaveBeenCalledExactlyOnceWith("#648800");
   });
-
-  it("reverts to original color when clicking comparison chip", async () => {
-    const onChange = vi.fn();
-    const { rerender } = render(
-      <StudioColorPopover
-        value="#112233"
-        onChange={onChange}
-        recentColors={[]}
-        label="비교 테스트"
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "비교 테스트" }));
-    await screen.findByRole("dialog", { name: "비교 테스트 선택" });
-
-    rerender(
-      <StudioColorPopover
-        value="#998877"
-        onChange={onChange}
-        recentColors={[]}
-        label="비교 테스트"
-      />
-    );
-
-    const revertButton = screen.getByRole("button", { name: "이전 색상 #112233로 되돌리기" });
-    fireEvent.click(revertButton);
-    expect(onChange).toHaveBeenCalledWith("#112233");
+  it("restores the session's previous color without mutating an unrelated external revision", () => {
+    const changed = open("#112233");
+    fireEvent.change(screen.getByRole("textbox", { name: "헥스 색상 코드" }), { target: { value: "#998877" } });
+    fireEvent.click(screen.getByRole("button", { name: "이전 색상 #112233로 되돌리기" }));
+    expect(screen.getByLabelText("선택 중인 색상").textContent).toBe("#112233");
+    apply(); expect(changed).not.toHaveBeenCalled();
   });
-});
-
-
-it("keeps typed HEX text intact in a controlled color picker and Escape restores the opening color", async () => {
-  const changed = vi.fn();
-  function Controlled() {
-    const [value, setValue] = useState("#ffffff");
-    return <StudioColorPopover value={value} recentColors={[]} label="HEX 입력 검증" initialOpen initialTab="quick"
-      onChange={(color) => { changed(color); setValue(color); }} />;
-  }
-  render(<Controlled />);
-  const input = await screen.findByRole("textbox", { name: "헥스 색상 코드" }) as HTMLInputElement;
-  for (const draft of ["#1", "#12", "#123", "#1234", "#12345", "#123456"]) {
-    fireEvent.change(input, { target: { value: draft } });
-    expect(input.value).toBe(draft);
-  }
-  fireEvent.keyDown(input, { key: "Enter" });
-  expect(changed).toHaveBeenLastCalledWith("#123456");
-  fireEvent.keyDown(document, { key: "Escape" });
-  expect(changed).toHaveBeenLastCalledWith("#ffffff");
-});
-
-
-it("keeps the mobile color sheet inside a reduced visual viewport with keyboard offsets", () => {
-  const viewport = { width: 390, height: 320, offsetLeft: 0, offsetTop: 100,
-    addEventListener: vi.fn(), removeEventListener: vi.fn() };
-  const height = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(600);
-  vi.stubGlobal("visualViewport", viewport);
-  let view: ReturnType<typeof render> | undefined;
-  try {
-    view = render(<StudioColorPopover value="#123456" onChange={vi.fn()} recentColors={[]}
-      label="키보드 영역 검증" initialOpen />);
-    const dialog = screen.getByRole("dialog", { name: "키보드 영역 검증 선택" });
+  it.each([{ width: 390, height: 320 }, { width: 360, height: 640 }])("keeps core controls inside visual viewport $width x $height", ({ width, height }) => {
+    const viewport = { width, height, offsetLeft: 0, offsetTop: 100, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    vi.stubGlobal("visualViewport", viewport);
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(600);
+    open();
+    const dialog = screen.getByRole("dialog");
     expect(dialog.getAttribute("data-layout")).toBe("sheet");
     expect(parseFloat(dialog.style.top)).toBeGreaterThanOrEqual(108);
-    expect(parseFloat(dialog.style.top) + parseFloat(dialog.style.maxHeight)).toBeLessThanOrEqual(412);
-    expect(parseFloat(dialog.style.width)).toBe(374);
+    expect(parseFloat(dialog.style.top) + parseFloat(dialog.style.maxHeight)).toBeLessThanOrEqual(100 + height - 8);
+    expect(parseFloat(dialog.style.width)).toBe(width - 16);
     expect(viewport.addEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
-  } finally {
-    view?.unmount();
-    height.mockRestore();
-    vi.unstubAllGlobals();
-  }
-  expect(viewport.removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+    cleanup(); expect(viewport.removeEventListener).toHaveBeenCalledWith("resize", expect.any(Function));
+  });
 });

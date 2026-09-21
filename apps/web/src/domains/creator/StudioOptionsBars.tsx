@@ -2,7 +2,6 @@ import { memo, Suspense } from "react";
 
 import { StudioDrawingWorkbenchControls } from "./StudioDrawingWorkbenchControls";
 
-import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
 import {
   StudioDrawOptionsBar,
   StudioSelectOptionsBar,
@@ -101,6 +100,7 @@ export interface StudioOptionsBarsSelectionModel {
 }
 
 export interface StudioOptionsBarsHandlers {
+  openQuickAccess?: (point?: { x: number; y: number }) => void;
   toggleBrushDock?: () => void;
   restoreDrawingLayout?: () => void;
   undoDrawingLayoutRestore?: () => void;
@@ -194,7 +194,6 @@ export const StudioOptionsBars = memo(function StudioOptionsBars({
             stabilizerMode={draw.stabilizerMode}
             onStabilizerModeChange={stableHandlers.setStabilizerMode}
             color={draw.color}
-            recentSwatches={DRAW_COLOR_SWATCHES}
             brushSlots={draw.brushSlots}
             symmetryType={draw.symmetryType}
             quickShapeActive={draw.quickShapeActive}

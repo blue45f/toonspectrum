@@ -44,7 +44,9 @@ import {
   type ReactNode,
 } from "react";
 
-import { DRAW_COLOR_SWATCHES } from "./brush/studio-draw-color-swatches";
+import { StudioDualColorWell } from "./StudioDualColorWell";
+import { useStudioColorWorkspace } from "./color/StudioColorWorkspaceContext";
+import { requestStudioAllTools } from "./studio-toolbar-channel";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
 import {
   STUDIO_BRUSH_OPACITY_RANGE,
@@ -716,6 +718,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     setMobileSheet(null);
   };
   const mobileControlSide = workspaceState.mobileControlSide === "left" ? "left" : "right";
+  const colorWorkspace = useStudioColorWorkspace();
+  const mobileColorControlsRef = useRef<HTMLDivElement>(null);
   const colorVisionOpen = mobileSheet === "color-vision";
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
@@ -1187,44 +1191,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               )}
             </div>
 
-            {/* 색상 — 지우개에선 의미 없으니 숨김 */}
-            {drawMode !== "eraser" && (
-              <div className="mb-2.5">
-                <p className="mb-1 text-[0.7rem] font-medium text-fg-3">색상</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {DRAW_COLOR_SWATCHES.map((swatch) => (
-                    <button
-                      key={swatch}
-                      type="button"
-                      onClick={() => setColor(swatch)}
-                      aria-label={`색상 ${swatch}`}
-                      aria-pressed={color.toLowerCase() === swatch.toLowerCase()}
-                      className={cn(
-                        "size-11 rounded-xl transition-transform active:scale-95",
-                        color.toLowerCase() === swatch.toLowerCase()
-                          ? "ring-2 ring-accent ring-offset-2 ring-offset-panel"
-                          : "border border-line/60"
-                      )}
-                      style={{ background: swatch }}
-                    />
-                  ))}
-                  <label
-                    className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-xl border border-line shadow-sm"
-                    title="사용자 정의 색상"
-                    style={{ background: color }}
-                  >
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => setColor(e.target.value)}
-                      aria-label="사용자 정의 브러시 색상"
-                      className="absolute inset-[-1px] h-[calc(100%+2px)] w-[calc(100%+2px)] cursor-pointer opacity-0"
-                    />
-                    <Palette size={14} className="text-white mix-blend-difference" aria-hidden />
-                  </label>
-                </div>
-              </div>
-            )}
+            {drawMode !== "eraser" ? <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-2 rounded-lg border border-line px-3 text-sm"
+              onClick={() => mobileColorControlsRef.current?.querySelector<HTMLButtonElement>('button[aria-label="주 색"]')?.click()}>
+              <span className="size-6 rounded border border-line-strong" style={{ background: color }} aria-hidden />색상 편집 · {color.toUpperCase()}
+            </button> : null}
 
             {/* 모드 전환 — 일반 브러시와 1px raw 픽셀 도구를 같은 것으로 오인하지 않게 분리한다. */}
             <div className="mb-2.5 grid grid-cols-4 gap-1 rounded-xl border border-line bg-card/60 p-1" role="group" aria-label="그리기 모드">
@@ -1625,6 +1595,18 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
             style={{ bottom: safeMobileKeyboardInset }}
           >
+            <div className="flex min-h-12 items-center justify-between gap-1 border-b border-line pb-1" data-studio-mobile-primary-actions="true">
+              <span className="min-w-0 max-w-16 truncate text-xs text-fg-2" aria-label="현재 도구">{drawMode === "eraser" ? "지우개" : tool === "select" ? "선택" : activeCatalogBrushName}</span>
+              <div ref={mobileColorControlsRef} data-studio-mobile-color-controls="true">
+                <StudioDualColorWell compact primary={color} secondary={colorWorkspace?.secondary}
+                  onPrimaryChange={setColor} onSecondaryChange={colorWorkspace?.onSecondaryChange}
+                  onSwap={colorWorkspace ? () => { colorWorkspace.onPrimaryChange(colorWorkspace.secondary); colorWorkspace.onSecondaryChange(colorWorkspace.primary); } : undefined} />
+              </div>
+              <button type="button" aria-label="레이어 열기" className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"
+                onClick={() => { setMenu(null); openInspectorRoute({ primary: "layers" }, "props"); }}><Layers size={18} aria-hidden /></button>
+              <button type="button" aria-label="전체 도구 열기" className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"
+                onClick={(event) => { setMobileSheet(null); setMenu(null); requestStudioAllTools(event.currentTarget); }}><Grid3X3 size={18} aria-hidden /></button>
+            </div>
             {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/채우기/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
             <div className="flex min-w-0 items-stretch gap-1">
               <div

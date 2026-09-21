@@ -102,6 +102,7 @@ export function StudioCuttoonEditorContextMenu(s: StudioCuttoonEditorViewSession
           activatePrimaryCanvasTool("draw", "pen");
           setQuickShapeActive(true);
         }}
+        onOpenQuickAccess={() => s.studioOptionsBarsHandlers.openQuickAccess?.({ x: contextMenu.x, y: contextMenu.y })}
         onClose={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
       />
   );

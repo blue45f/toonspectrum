@@ -5,6 +5,7 @@ import type {
 import type { RefObject } from "react";
 
 export interface StudioQuickAccessSurfaceProps {
+  readonly launchPoint?: { readonly x: number; readonly y: number } | null;
   readonly state: StudioQuickAccessState;
   readonly catalog: readonly StudioQuickAccessCommandMeta[];
   readonly isMobile: boolean;

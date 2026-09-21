@@ -30,6 +30,7 @@ export function StudioQuickAccessSurface(props: StudioQuickAccessSurfaceProps) {
 
   if (typeof document === "undefined") return null;
   const leafProps = {
+    launchPoint: props.launchPoint,
     state,
     catalog,
     onStateChange,

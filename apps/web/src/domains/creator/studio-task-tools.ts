@@ -26,7 +26,7 @@ export function projectStudioTaskAppSettings(
   const isDefault = visible.length === DEFAULT_STUDIO_RAIL_VISIBLE_IDS.length
     && visible.every((id, index) => id === DEFAULT_STUDIO_RAIL_VISIBLE_IDS[index]);
   // An explicitly customized toolbar wins over recommendations, including in focus mode.
-  if (!isDefault || !workspace || density === "full") return settings;
+  if (settings.toolbar.configured || !isDefault || !workspace || density === "full") return settings;
   const tools = density === "focus" && workspace === "draw" ? QUICK_TOOLS : TASK_TOOLS[workspace];
   if (!tools) return settings;
   return { ...settings, toolbar: { ...settings.toolbar, visibleIds: [...tools] } };
@@ -38,11 +38,14 @@ export function preserveStudioTaskToolbarPreference(
   presented: StudioAppSettings,
   next: StudioAppSettings,
 ): StudioAppSettings {
-  if (presented === stored) return next;
-  const visible = next.toolbar.visibleIds;
-  const unchanged = visible.length === presented.toolbar.visibleIds.length
-    && visible.every((id, index) => id === presented.toolbar.visibleIds[index]);
-  return unchanged
-    ? { ...next, toolbar: { ...next.toolbar, visibleIds: stored.toolbar.visibleIds } }
-    : next;
+  const toolbar = { ...stored.toolbar, ...next.toolbar };
+  const changed = toolbar.visibleIds.length !== presented.toolbar.visibleIds.length
+    || toolbar.visibleIds.some((id, index) => id !== presented.toolbar.visibleIds[index])
+    || toolbar.view !== presented.toolbar.view
+    || toolbar.profiles !== presented.toolbar.profiles;
+  if (next.toolbar.configured === true || changed) {
+    return { ...next, toolbar: { ...toolbar, configured: true, version: 2 } };
+  }
+  return presented === stored ? { ...next, toolbar }
+    : { ...next, toolbar: { ...toolbar, visibleIds: stored.toolbar.visibleIds } };
 }

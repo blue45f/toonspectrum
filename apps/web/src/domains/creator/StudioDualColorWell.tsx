@@ -1,62 +1,22 @@
-import { useRef } from "react";
-
+import { ArrowLeftRight, Eraser, Pipette } from "lucide-react";
+import { useStudioColorWorkspace } from "./color/StudioColorWorkspaceContext";
+import { useStudioSharedColorHistory } from "./color/useStudioSharedColorHistory";
 import { LazyStudioColorPopover } from "./StudioLazyColorPopover";
-
-import {
-  STUDIO_EASE,
-  STUDIO_FOCUS_RING,
-} from "./studio-panel-ui";
+import { STUDIO_FOCUS_RING } from "./studio-panel-ui";
 import { studioToolHintFromLabel } from "./studio-tool-hints";
 import { StudioToolHintTarget } from "./StudioToolHint";
-
 import { cn } from "@/shared/lib/utils";
 
-/* eslint-disable react-refresh/only-export-components -- typed hint contracts share this lazy UI boundary */
-
-/** Exact rich-help contracts for the CSP-style foreground/background color well. */
+/* eslint-disable react-refresh/only-export-components -- shared typed hints are tested with their controls */
 export const STUDIO_DUAL_COLOR_WELL_HINTS = {
-  primary: studioToolHintFromLabel(
-    "주 색",
-    "펜·도형·채우기에 바로 적용할 앞쪽 색입니다. 색상 칩을 눌러 시스템 색 선택기를 열어요.",
-    undefined,
-    "color-palette",
-    "primary-color"
-  ),
-  secondary: studioToolHintFromLabel(
-    "보조 색",
-    "주 색과 빠르게 교체해 쓰는 뒤쪽 색입니다. 칩을 눌러 보조 색을 따로 지정할 수 있어요.",
-    undefined,
-    "color-palette",
-    "secondary-color"
-  ),
-  swap: studioToolHintFromLabel(
-    "주·보조 색 교체",
-    "앞쪽 주 색과 뒤쪽 보조 색의 역할을 한 번에 맞바꿉니다.",
-    "X",
-    "color-palette",
-    "swap-colors"
-  ),
-  transparent: studioToolHintFromLabel(
-    "투명색 그리기",
-    "현재 브러시의 모양·필압·질감을 그대로 유지한 채 지우개처럼 투명색으로 그립니다.",
-    "Shift+C",
-    "color-palette",
-    undefined
-  ),
+  primary: studioToolHintFromLabel("주 색", "펜·도형·채우기에 사용할 주 색을 편집합니다.", undefined, "color-palette", "primary-color"),
+  secondary: studioToolHintFromLabel("보조 색", "주 색과 교환할 보조 색을 같은 색상 편집기에서 고릅니다.", undefined, "color-palette", "secondary-color"),
+  swap: studioToolHintFromLabel("주·보조 색 교체", "두 색의 역할을 한 번에 맞바꿉니다.", "X", "color-palette", "swap-colors"),
+  transparent: studioToolHintFromLabel("지우개로 전환", "마지막으로 사용한 지우개로 전환합니다. 현재 브러시로 투명색을 그리는 기능과 다릅니다.", "E", "color-palette"),
 } as const;
 
-/** CSP / Photopea-style primary + secondary color well with a bounded recent strip. */
-export function StudioDualColorWell({
-  primary,
-  secondary,
-  recent = [],
-  onPrimaryChange,
-  onSecondaryChange,
-  onSwap,
-  className,
-  isTransparent,
-  onTransparentToggle,
-  onRequestCanvasEyedropper,
+export function StudioDualColorWell({ primary, secondary, recent, onPrimaryChange, onSecondaryChange,
+  onSwap, className, isTransparent, onTransparentToggle, onRequestCanvasEyedropper, compact = false,
 }: {
   primary: string;
   secondary?: string;
@@ -68,174 +28,50 @@ export function StudioDualColorWell({
   isTransparent?: boolean;
   onTransparentToggle?: () => void;
   onRequestCanvasEyedropper?: () => void;
+  compact?: boolean;
 }) {
-  const showSecondary = Boolean(onSecondaryChange && secondary !== undefined);
-  // Native color pickers vary on whether they continuously emit `input` and/or finish with
-  // `change`. Listen to both, but coalesce the same value within one browser task so parent
-  // history/recent-colour side effects run exactly once. This also makes synthetic/browser
-  // automation and embedded WebViews converge on the same controlled React state.
-  const primaryDispatchRef = useRef<string | null>(null);
-  const secondaryDispatchRef = useRef<string | null>(null);
-  const dispatchColor = (
-    kind: "primary" | "secondary",
-    value: string,
-  ): void => {
-    const normalized = value.toLowerCase();
-    const dispatchRef = kind === "primary" ? primaryDispatchRef : secondaryDispatchRef;
-    if (dispatchRef.current === normalized) return;
-    dispatchRef.current = normalized;
-    if (kind === "primary") onPrimaryChange(value);
-    else onSecondaryChange?.(value);
-    queueMicrotask(() => {
-      if (dispatchRef.current === normalized) dispatchRef.current = null;
-    });
+  const history = useStudioSharedColorHistory(recent);
+  const workspace = useStudioColorWorkspace();
+  const showSecondary = Boolean(secondary !== undefined && onSecondaryChange);
+  const common = {
+    recentColors: history.colors, documentColors: workspace?.documentColors,
+    onUseColor: history.rememberColor, onLoadRecentColors: history.ensureLoaded,
+    historyStatus: history.status, onRetryHistory: history.retry,
+    purpose: "brush-shape" as const, initialTab: "quick" as const,
+    onBeforeOpen: workspace?.onBeforePopupOpen,
   };
-  return (
-    <div
-      data-studio-dual-color-well="true"
-      data-studio-primary-color={primary.toLowerCase()}
-      data-studio-secondary-color={secondary?.toLowerCase()}
-      className={cn("flex shrink-0 items-center gap-1.5", className)}
-      role="group"
-      aria-label="색상"
-    >
-      <LazyStudioColorPopover
-        value={primary}
-        onChange={onPrimaryChange}
-        recentColors={recent}
-        label="다른 색상"
-        purpose="brush-shape"
-        initialTab="quick"
-        triggerVariant="labeled"
-        onRequestCanvasEyedropper={onRequestCanvasEyedropper}
-      />
-      {recent.slice(0, 5).map((swatch, index) => {
-        const isCurrentPrimary = primary.toLowerCase() === swatch.toLowerCase();
-        return (
-          <button
-            key={`${swatch}-${index}`}
-            type="button"
-            data-studio-recent-color="true"
-            data-studio-recent-color-current={isCurrentPrimary ? "true" : undefined}
-            aria-label={
-              isCurrentPrimary
-                ? `최근 색 ${index + 1} ${swatch} · 현재 주 색`
-                : `최근 색 ${index + 1} ${swatch} · 주 색으로 적용`
-            }
-            aria-pressed={isCurrentPrimary}
-            onClick={() => onPrimaryChange(swatch)}
-            className={cn(
-              "size-6 shrink-0 rounded-md border pointer-coarse:size-11 shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
-              index >= 3 && "max-xl:hidden",
-              STUDIO_FOCUS_RING,
-              isCurrentPrimary
-                ? "ring-2 ring-accent ring-offset-1 ring-offset-panel"
-                : "border-line/70"
-            )}
-            style={{ background: swatch }}
-          />
-        );
-      })}
-      <div className="flex shrink-0 items-center gap-1" data-studio-color-stack="true">
-        {showSecondary ? (
-          <StudioToolHintTarget
-            preferredSide="top"
-            className="relative size-8 pointer-coarse:size-11"
-            hint={STUDIO_DUAL_COLOR_WELL_HINTS.secondary}
-          >
-            <label
-              className="block size-full cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-panel rounded-md border border-white/20 shadow-[0_2px_4px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] transition-transform hover:scale-105 active:scale-95"
-              style={{ background: secondary }}
-            >
-              <span className="sr-only">보조 색 선택 · 현재 {secondary}</span>
-              <input
-                type="color"
-                value={secondary}
-                onInput={(event) => dispatchColor("secondary", event.currentTarget.value)}
-                onChange={(event) => dispatchColor("secondary", event.currentTarget.value)}
-                className="absolute inset-0 size-full cursor-pointer opacity-0"
-                aria-label={`보조 색 선택 · 현재 ${secondary}`}
-              />
-            </label>
-          </StudioToolHintTarget>
-        ) : null}
-        <StudioToolHintTarget
-          preferredSide="top"
-          className="relative size-8 pointer-coarse:size-11"
-          hint={STUDIO_DUAL_COLOR_WELL_HINTS.primary}
-        >
-          <label
-            className="block size-full cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-panel rounded-lg border border-white/20 shadow-[0_2px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-black/10 transition-transform hover:scale-105 active:scale-95"
-            style={{ background: primary }}
-          >
-            <span className="sr-only">주 색 선택 · 현재 {primary}</span>
-            <input
-              type="color"
-              value={primary}
-              onInput={(event) => dispatchColor("primary", event.currentTarget.value)}
-              onChange={(event) => dispatchColor("primary", event.currentTarget.value)}
-              className="absolute inset-0 size-full cursor-pointer opacity-0"
-              aria-label={`주 색 선택 · 현재 ${primary}`}
-            />
-          </label>
-        </StudioToolHintTarget>
-      </div>
-
-      {onTransparentToggle ? (
-        <StudioToolHintTarget preferredSide="top" hint={STUDIO_DUAL_COLOR_WELL_HINTS.transparent}>
-          <button
-            type="button"
-            onClick={onTransparentToggle}
-            aria-label="투명색 선택 (단축키 Shift+C)"
-            aria-pressed={isTransparent}
-            aria-keyshortcuts="Shift+C"
-            data-studio-transparent-color-well="true"
-            className={cn(
-              "grid size-11 shrink-0 place-items-center rounded-md border shadow-[inset_0_1px_0_oklch(0.97_0.01_85/0.12)] transition-transform hover:scale-110 motion-reduce:transform-none",
-              STUDIO_FOCUS_RING,
-              isTransparent
-                ? "ring-2 ring-accent ring-offset-1 ring-offset-panel border-transparent"
-                : "border-line/70"
-            )}
-            style={{
-              backgroundImage: "repeating-conic-gradient(#e5e7eb 0% 25%, #ffffff 0% 50%)",
-              backgroundSize: "6px 6px",
-            }}
-          >
-            <svg viewBox="0 0 10 10" className="size-full opacity-30" aria-hidden>
-              <line x1="0" y1="10" x2="10" y2="0" stroke="currentColor" strokeWidth="1" />
-            </svg>
-          </button>
-        </StudioToolHintTarget>
-      ) : null}
-
-      {onSwap && showSecondary ? (
-        <StudioToolHintTarget preferredSide="top" hint={STUDIO_DUAL_COLOR_WELL_HINTS.swap}>
-          <button
-            type="button"
-            onClick={onSwap}
-            aria-label="주 색과 보조 색 교체"
-            aria-keyshortcuts="X"
-            data-studio-color-swap="true"
-            className={cn(
-              "grid size-11 shrink-0 place-items-center rounded-lg border border-line/80 bg-card/80 text-fg-3",
-              "hover:border-line-strong hover:bg-raised hover:text-fg",
-              STUDIO_EASE,
-              STUDIO_FOCUS_RING
-            )}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M7 7h11M18 7l-3-3M18 7l-3 3M17 17H6M6 17l3-3M6 17l3 3"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </StudioToolHintTarget>
-      ) : null}
+  return <div data-studio-dual-color-well="true" data-studio-primary-color={primary.toLowerCase()}
+    data-studio-secondary-color={secondary?.toLowerCase()} role="group" aria-label="색상"
+    className={cn("flex shrink-0 items-center gap-1.5", className)}>
+    <div data-studio-color-stack="true" className="flex shrink-0 items-center gap-1.5">
+      <LazyStudioColorPopover {...common} value={primary} onChange={onPrimaryChange} label="주 색" targetKey="primary"
+        triggerVariant={compact ? "swatch" : "labeled"}
+        onRequestOpen={() => workspace?.requestDock("primary") ?? false}
+        onPinToWorkspace={workspace ? () => workspace.pinDock("primary") : undefined}
+        onRequestCanvasEyedropper={workspace?.onRequestSample ? () => workspace.sampleColor("primary") : onRequestCanvasEyedropper} />
+      {showSecondary ? <LazyStudioColorPopover {...common} value={secondary!} onChange={onSecondaryChange!} label="보조 색" targetKey="secondary"
+        triggerVariant="swatch" onRequestOpen={() => workspace?.requestDock("secondary") ?? false}
+        onPinToWorkspace={workspace ? () => workspace.pinDock("secondary") : undefined}
+        onRequestCanvasEyedropper={workspace?.onRequestSample ? () => workspace.sampleColor("secondary") : undefined} /> : null}
     </div>
-  );
+    {showSecondary && onSwap ? <StudioToolHintTarget preferredSide="bottom" hint={STUDIO_DUAL_COLOR_WELL_HINTS.swap}>
+      <button type="button" onClick={onSwap} aria-label="주 색과 보조 색 교체" aria-keyshortcuts="X"
+        data-studio-color-swap="true" className={cn("grid size-10 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-2 pointer-coarse:size-11", STUDIO_FOCUS_RING)}>
+        <ArrowLeftRight size={18} aria-hidden />
+      </button>
+    </StudioToolHintTarget> : null}
+    {onRequestCanvasEyedropper || workspace?.onRequestSample ? <button type="button" aria-label="캔버스 스포이드"
+      onClick={() => { workspace?.onBeforePopupOpen(); if (workspace?.onRequestSample) workspace.sampleColor("primary"); else onRequestCanvasEyedropper?.(); }}
+      className={cn("grid size-10 shrink-0 place-items-center rounded-lg border border-line text-fg-2 pointer-coarse:size-11", STUDIO_FOCUS_RING)}><Pipette size={18} aria-hidden /></button> : null}
+    {!compact && onTransparentToggle ? <StudioToolHintTarget preferredSide="bottom" hint={STUDIO_DUAL_COLOR_WELL_HINTS.transparent}>
+      <button type="button" onClick={onTransparentToggle} aria-label="지우개로 전환" aria-pressed={isTransparent || undefined}
+        data-studio-transparent-color-well="true" className={cn("grid size-10 shrink-0 place-items-center rounded-lg border border-line text-fg-2 pointer-coarse:size-11", STUDIO_FOCUS_RING)}><Eraser size={18} aria-hidden /></button>
+    </StudioToolHintTarget> : null}
+    {!compact ? <div className="hidden items-center gap-1 2xl:flex" aria-label="최근 선택 색">
+      {history.colors.slice(0, 3).map((color) => <button key={color} type="button" data-studio-recent-color="true"
+        aria-label={`최근 선택 색 ${color} 적용`} aria-pressed={primary.toLowerCase() === color.toLowerCase()}
+        onClick={() => { onPrimaryChange(color); history.rememberColor(color); }}
+        className={cn("size-9 shrink-0 rounded-md border border-line-strong pointer-coarse:size-11", STUDIO_FOCUS_RING)} style={{ background: color }} />)}
+    </div> : null}
+  </div>;
 }

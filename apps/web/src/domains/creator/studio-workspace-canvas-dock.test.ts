@@ -22,7 +22,7 @@ describe("studio workspace canvas dock insets", () => {
       visibleRightPanelOpen: true,
     });
 
-    expect(insets).toEqual({ left: 216, right: 288 });
+    expect(insets).toEqual({ left: 160 + 8 + STUDIO_CANVAS_DRAW_TOOL_RAIL_WIDTH, right: 288 });
   });
 
   it("maximizes dock width when left dock is hidden", () => {

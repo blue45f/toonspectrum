@@ -1,3 +1,5 @@
+import { toolbarViewWidth } from "./studio-toolbar-configuration";
+import type { StudioToolbarView } from "./studio-app-settings";
 /**
  * Studio chrome UI — toolbar, dock, and menu-shell primitives shared by StudioPage.
  *
@@ -16,6 +18,8 @@
 import { ArrowUpRight } from "lucide-react";
 import {
   forwardRef,
+  useLayoutEffect,
+  useRef,
   type ButtonHTMLAttributes,
   type CSSProperties,
   type ReactElement,
@@ -760,41 +764,75 @@ export function StudioVerticalToolRail({
   children,
   className,
   footer,
+  view = "single",
   id = "studio-tool-rail",
   "aria-label": ariaLabel = "그리기 도구",
 }: {
   children: ReactNode;
   className?: string;
   footer?: ReactNode;
+  view?: StudioToolbarView;
   id?: string;
   "aria-label"?: string;
 }): ReactElement {
   const lang = useI18n((state) => state.lang);
   const t = useT();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const lastFocusedRef = useRef<HTMLButtonElement | null>(null);
+  const syncTabStops = () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button:not([disabled])'))
+      .filter((button) => button.closest('[role="toolbar"]') === root);
+    const focused = lastFocusedRef.current;
+    const entry = focused && buttons.includes(focused) ? focused
+      : buttons.find((button) => button.getAttribute("aria-pressed") === "true") ?? buttons[0];
+    buttons.forEach((button) => { button.tabIndex = button === entry ? 0 : -1; });
+  };
+  useLayoutEffect(() => {
+    syncTabStops();
+    const root = rootRef.current;
+    if (!root) return;
+    const observer = new MutationObserver(syncTabStops);
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled"] });
+    return () => observer.disconnect();
+  });
   return (
     <div
+      ref={rootRef}
       id={id}
+      data-studio-tool-rail-view={view}
+      style={{ width: toolbarViewWidth(view) }}
       role="toolbar"
       tabIndex={-1}
       aria-orientation="vertical"
       aria-label={localizeStudioRailShellText(ariaLabel, lang, t)}
       data-studio-tool-rail="true"
+      onFocusCapture={(event) => {
+        if (event.target instanceof HTMLButtonElement && event.target.closest('[role="toolbar"]') === event.currentTarget) {
+          lastFocusedRef.current = event.target;
+          syncTabStops();
+        }
+      }}
       onKeyDown={(event) => {
-        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)
+        if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
           || !(event.target instanceof HTMLButtonElement)
           || event.target.closest('[role="toolbar"]') !== event.currentTarget) return;
         const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
         const index = buttons.indexOf(event.target);
         if (index < 0 || buttons.length === 0) return;
         const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
-          : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+          : Math.max(0, Math.min(buttons.length - 1, index + (
+            event.key === "ArrowDown" ? view === "double" ? 2 : 1
+              : event.key === "ArrowUp" ? view === "double" ? -2 : -1
+                : event.key === "ArrowRight" ? 1 : -1)));
         event.preventDefault();
         event.stopPropagation();
         buttons[next]?.focus({ preventScroll: true });
         buttons[next]?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
       }}
       className={cn(
-        "hidden min-h-0 w-12 shrink-0 flex-col overflow-hidden border-r border-line",
+        "hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-line",
         "lg:flex",
         className
       )}
@@ -802,8 +840,8 @@ export function StudioVerticalToolRail({
       <div
         data-studio-tool-rail-scroll="true"
         className={cn(
-          "flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain py-2.5",
-          "xl:gap-2 xl:py-3",
+          "min-h-0 flex-1 gap-1 overflow-y-auto overscroll-contain px-1 py-2",
+          view === "double" ? "grid grid-cols-2 content-start justify-items-center" : "flex flex-col items-center",
           "[scrollbar-width:thin] [scrollbar-color:var(--color-line)_transparent]"
         )}
       >
@@ -940,6 +978,7 @@ export function StudioHudPill({
 type StudioRailToolButtonBaseProps =
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
   active?: boolean;
+  showLabel?: boolean;
   icon: LucideIcon;
   label: string;
   /** Longer body for the rich hover tooltip (shown with StudioToolHintTarget). */
@@ -965,6 +1004,7 @@ export type StudioRailToolButtonProps = StudioRailToolButtonBaseProps
 /** Icon-only tool on the left Ibis-style rail. */
 export function StudioRailToolButton({
   active = false,
+  showLabel = false,
   icon: Icon,
   label,
   description,
@@ -1019,6 +1059,7 @@ export function StudioRailToolButton({
             ? "text-accent hover:bg-accent-soft/50"
             : "text-fg-2 hover:bg-raised/90 hover:text-fg hover:shadow-[inset_0_0_0_1px_oklch(0.4_0.012_64/0.35)]",
         disabled && "cursor-not-allowed opacity-35",
+        showLabel && "!flex !h-auto min-h-11 !w-full items-center justify-start gap-2 rounded-lg px-2 py-2 text-left",
         className
       )}
       {...rest}
@@ -1033,6 +1074,7 @@ export function StudioRailToolButton({
           disabled,
         })}
       />
+      {showLabel ? <span className="min-w-0 flex-1 text-[13px] leading-snug">{localizedLabel}</span> : null}
       {grouped ? (
         <span
           aria-hidden
@@ -1075,6 +1117,7 @@ export function StudioRailToolButton({
       hint={hint}
       // Vertical-rail coaches must not cover the neighboring tools above the footer.
       preferredSide="right"
+      className={showLabel ? "w-full" : undefined}
     >
       {button}
     </StudioToolHintTarget>

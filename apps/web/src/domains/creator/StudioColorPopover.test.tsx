@@ -1,304 +1,121 @@
 // @vitest-environment jsdom
-
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioColorPopover } from "./StudioColorPopover";
 
-class FakeEyeDropper {
-  open = vi.fn(async () => ({ sRGBHex: "#abcdef" }));
+vi.mock("./StudioPaletteLibraryPanel", () => ({ StudioPaletteLibraryPanel: () => <div>내 팔레트 저장소</div> }));
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+function setup(extra: Partial<React.ComponentProps<typeof StudioColorPopover>> = {}) {
+  const onChange = vi.fn();
+  const onUseColor = vi.fn();
+  const props = { value: "#123456", onChange, onUseColor, recentColors: ["#123456", "#654321"], label: "색 고르기", ...extra };
+  const view = render(<StudioColorPopover {...props} />);
+  fireEvent.click(screen.getByRole("button", { name: "색 고르기" }));
+  return { ...view, onChange, onUseColor, props };
 }
 
-beforeEach(() => {
-  Object.defineProperty(window, "EyeDropper", {
-    configurable: true,
-    value: FakeEyeDropper,
+describe("StudioColorPopover transactional surface", () => {
+  it("ports the editor outside clipping containers and preserves a labelled trigger", () => {
+    const { container } = setup();
+    const popup = screen.getByRole("dialog", { name: "색 고르기 선택" });
+    expect(popup.closest('[data-studio-color-surface-root]')?.parentElement).toBe(document.body);
+    expect(container.contains(popup)).toBe(false);
+    expect(screen.getByRole("button", { name: "색 고르기" }).getAttribute("aria-controls")).toBe(popup.id);
+    expect(within(popup).getAllByRole("button").some((button) => button.hasAttribute("title"))).toBe(false);
   });
-});
-
-afterEach(() => {
-  cleanup();
-  Reflect.deleteProperty(window, "EyeDropper");
-  vi.restoreAllMocks();
-});
-
-describe("StudioColorPopover", () => {
-  it("uses rich hints only for explanatory controls and keeps swatches native-title free", async () => {
-    const onChange = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#123456"
-        onChange={onChange}
-        recentColors={["#123456", "#654321"]}
-        label="브러시·도형 색상"
-        purpose="brush-shape"
-      />
-    );
-
-    const trigger = screen.getByRole("button", { name: "브러시·도형 색상" });
-    expect(trigger.hasAttribute("title")).toBe(false);
-    expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
-    expect(trigger.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
-
-    fireEvent.click(trigger);
-
-    const dialog = await screen.findByRole("dialog", { name: "브러시·도형 색상 선택" });
-    expect(dialog.parentElement).toBe(document.body);
-    expect(dialog.querySelector("[title]")).toBeNull();
-    expect(trigger.getAttribute("aria-controls")).toBe(dialog.id);
-
-    const recentCurrent = screen.getByRole("radio", { name: "최근 색상 #123456 선택" });
-    expect(recentCurrent.getAttribute("aria-checked")).toBe("true");
-    expect(recentCurrent.closest('[data-studio-tool-hint-target="true"]')).toBeNull();
-
-    const recentOther = screen.getByRole("radio", { name: "최근 색상 #654321 선택" });
-    fireEvent.click(recentOther);
-    expect(onChange).toHaveBeenCalledWith("#654321");
-
-    const eyedropper = screen.getByRole("button", { name: "화면 전체에서 색 가져오기" });
-    expect(eyedropper.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
-    expect(eyedropper.hasAttribute("title")).toBe(false);
-
-    const paletteFamily = await screen.findByRole("button", { name: "피부톤" });
-    expect(paletteFamily.closest('[data-studio-tool-hint-target="true"]')).not.toBeNull();
-    expect(paletteFamily.hasAttribute("title")).toBe(false);
-
-    const hairPaletteFamily = screen.getByRole("button", { name: "헤어 내추럴" });
-    fireEvent.click(hairPaletteFamily);
-    await waitFor(() => expect(hairPaletteFamily.getAttribute("aria-pressed")).toBe("true"));
-
-    const paletteSwatch = await screen.findByRole("radio", {
-      name: "헤어 내추럴 색상 #1b1b22 선택",
-    });
-    expect(paletteSwatch.closest('[data-studio-tool-hint-target="true"]')).toBeNull();
-    expect(paletteSwatch.hasAttribute("title")).toBe(false);
-
-    await waitFor(() => {
-      expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "헥스 색상 코드" }));
-    });
+  it("keeps the authored-canvas sampler available without a browser EyeDropper", () => {
+    const sample = vi.fn(); setup({ onRequestCanvasEyedropper: sample });
+    fireEvent.click(screen.getByRole("button", { name: "캔버스에서 정밀 색 가져오기" }));
+    expect(sample).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
-
-  it("keeps the authored-canvas eyedropper available without browser EyeDropper support", async () => {
-    Reflect.deleteProperty(window, "EyeDropper");
-    const onRequestCanvasEyedropper = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#123456"
-        onChange={vi.fn()}
-        recentColors={[]}
-        onRequestCanvasEyedropper={onRequestCanvasEyedropper}
-      />
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "색상 선택" }));
-    const canvasPicker = await screen.findByRole("button", { name: "캔버스에서 정밀 색 가져오기" });
-    expect(canvasPicker.getAttribute("aria-keyshortcuts")).toBe("I");
-    expect(screen.queryByRole("button", { name: "화면 전체에서 색 가져오기" })).toBeNull();
-    fireEvent.click(canvasPicker);
-    expect(onRequestCanvasEyedropper).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("dialog", { name: "색상 선택 선택" })).toBeNull();
-  });
-
-  it("closes with Escape and restores focus to the color trigger", async () => {
-    render(
-      <StudioColorPopover
-        value="#123456"
-        onChange={vi.fn()}
-        recentColors={[]}
-        label="말풍선 색상"
-        purpose="bubble-fill"
-      />
-    );
-
-    const trigger = screen.getByRole("button", { name: "말풍선 색상" });
-    trigger.focus();
-    fireEvent.click(trigger);
-    await screen.findByRole("dialog", { name: "말풍선 색상 선택" });
-
-    fireEvent.keyDown(document, { key: "Escape" });
-
-    expect(screen.queryByRole("dialog", { name: "말풍선 색상 선택" })).toBeNull();
-    await waitFor(() => expect(document.activeElement).toBe(trigger));
-    // Focusing the hinted trigger starts a best-effort chunk preload. Drain that request and any
-    // nested preview imports before Vitest tears down its module environment.
-    await vi.dynamicImportSettled();
-  });
-
-  it("previews a quick adjustment and restores the opening color on Escape", () => {
-    const onChange = vi.fn();
-    const onPreviewColor = vi.fn();
-    const onCancelColor = vi.fn();
-    const onInteractionEnd = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#123456"
-        onChange={onChange}
-        onPreviewColor={onPreviewColor}
-        onCancelColor={onCancelColor}
-        onInteractionEnd={onInteractionEnd}
-        recentColors={[]}
-        initialOpen
-        initialTab="quick"
-        label="선 색상"
-      />
-    );
-
-    fireEvent.keyDown(screen.getByRole("slider", { name: "채도와 명도" }), {
-      key: "ArrowLeft",
-    });
-    expect(onPreviewColor).toHaveBeenCalled();
-
-    fireEvent.keyDown(document, { key: "Escape" });
-    expect(onPreviewColor).toHaveBeenLastCalledWith("#123456");
-    expect(onCancelColor).toHaveBeenCalledWith("#123456");
+  it("previews locally and cancels without changing document state or recent colors", () => {
+    const onPreviewColor = vi.fn(); const onCancelColor = vi.fn();
+    const { onChange, onUseColor } = setup({ onPreviewColor, onCancelColor });
+    fireEvent.change(screen.getByRole("slider", { name: "빠른 색조" }), { target: { value: "80" } });
+    expect(onPreviewColor).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
-    expect(onInteractionEnd).toHaveBeenCalledOnce();
-  });
-
-  it("commits one preview when the popup is dismissed outside", () => {
-    const onPreviewColor = vi.fn();
-    const onCommitColor = vi.fn();
-    const onUseColor = vi.fn();
-    const onInteractionEnd = vi.fn();
-    render(
-      <>
-        <StudioColorPopover
-          value="#123456"
-          onChange={vi.fn()}
-          onPreviewColor={onPreviewColor}
-          onCommitColor={onCommitColor}
-          onUseColor={onUseColor}
-          onInteractionEnd={onInteractionEnd}
-          recentColors={[]}
-          initialOpen
-          initialTab="quick"
-          label="선 색상"
-        />
-        <button type="button">바깥 닫기</button>
-      </>
-    );
-
-    fireEvent.keyDown(screen.getByRole("slider", { name: "채도와 명도" }), {
-      key: "ArrowLeft",
-    });
-    const previewed = vi.mocked(onPreviewColor).mock.calls.at(-1)?.[0];
-    expect(previewed).toBeTruthy();
-
-    fireEvent.pointerDown(screen.getByRole("button", { name: "바깥 닫기" }));
-    expect(onCommitColor).toHaveBeenCalledOnce();
-    expect(onCommitColor).toHaveBeenCalledWith(previewed);
-    expect(onUseColor).toHaveBeenCalledWith(previewed);
-    expect(onInteractionEnd).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("dialog", { name: "선 색상 선택" })).toBeNull();
-  });
-
-  it("offers deduplicated document colors from the quick picker", () => {
-    render(
-      <StudioColorPopover
-        value="#123456"
-        onChange={vi.fn()}
-        recentColors={[]}
-        documentColors={["#abcdef", "#ABCDEF", "#654321"]}
-        initialOpen
-        initialTab="quick"
-      />
-    );
-
-    expect(screen.getByRole("radio", { name: "원고 색상 #abcdef 선택" })).toBeTruthy();
-    expect(screen.getAllByRole("radio", { name: /원고 색상/ })).toHaveLength(2);
-  });
-
-  it("keeps the portaled popup inside a short mobile viewport and dismisses outside", async () => {
-    const widthDescriptor = Object.getOwnPropertyDescriptor(window, "innerWidth");
-    const heightDescriptor = Object.getOwnPropertyDescriptor(window, "innerHeight");
-    const scrollHeightDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLElement.prototype,
-      "scrollHeight"
-    );
-    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
-    Object.defineProperty(window, "innerHeight", { configurable: true, value: 844 });
-    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
-      configurable: true,
-      get: () => 340,
-    });
-
-    try {
-      render(
-        <>
-          <StudioColorPopover
-            value="#123456"
-            onChange={vi.fn()}
-            recentColors={[]}
-            label="모바일 색상"
-          />
-          <button type="button">바깥</button>
-        </>
-      );
-
-      const trigger = screen.getByRole("button", { name: "모바일 색상" });
-      vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
-        bottom: 820,
-        height: 44,
-        left: 342,
-        right: 386,
-        top: 776,
-        width: 44,
-        x: 342,
-        y: 776,
-        toJSON: () => ({}),
-      });
-
-      fireEvent.click(trigger);
-      const dialog = await screen.findByRole("dialog", { name: "모바일 색상 선택" });
-      await waitFor(() => expect(dialog.style.visibility).toBe("visible"));
-
-      const left = Number.parseFloat(dialog.style.left);
-      const top = Number.parseFloat(dialog.style.top);
-      const width = Number.parseFloat(dialog.style.width);
-      const maxHeight = Number.parseFloat(dialog.style.maxHeight);
-      expect(left).toBeGreaterThanOrEqual(8);
-      expect(top).toBeGreaterThanOrEqual(8);
-      expect(left + width).toBeLessThanOrEqual(382);
-      expect(top + maxHeight).toBeLessThanOrEqual(836);
-      expect(dialog.getAttribute("data-layout")).toBe("sheet");
-      expect(document.activeElement).not.toBe(
-        screen.getByRole("textbox", { name: "헥스 색상 코드" }),
-      );
-
-      fireEvent.pointerDown(screen.getByRole("button", { name: "바깥" }));
-      expect(screen.queryByRole("dialog", { name: "모바일 색상 선택" })).toBeNull();
-    } finally {
-      if (widthDescriptor) Object.defineProperty(window, "innerWidth", widthDescriptor);
-      if (heightDescriptor) Object.defineProperty(window, "innerHeight", heightDescriptor);
-      if (scrollHeightDescriptor) {
-        Object.defineProperty(HTMLElement.prototype, "scrollHeight", scrollHeightDescriptor);
-      } else {
-        Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
-      }
-    }
-  });
-
-  it("records only the final legacy selection when the popup session closes", () => {
-    const onChange = vi.fn();
-    const onUseColor = vi.fn();
-    render(
-      <StudioColorPopover
-        value="#123456"
-        onChange={onChange}
-        onUseColor={onUseColor}
-        recentColors={["#654321"]}
-        initialOpen
-        label="레거시 색상"
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("radio", { name: "최근 색상 #654321 선택" }));
-    expect(onChange).toHaveBeenCalledWith("#654321");
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "헥스 색상 코드" }), { key: "Escape" });
+    expect(onCancelColor).toHaveBeenCalledExactlyOnceWith("#123456");
     expect(onUseColor).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
-    expect(onUseColor).toHaveBeenCalledOnce();
-    expect(onUseColor).toHaveBeenCalledWith("#654321");
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
-
+  it.each(["apply", "outside"])("commits exactly once through %s", (mode) => {
+    const onPreviewColor = vi.fn(); const onCommitColor = vi.fn(); const onInteractionEnd = vi.fn();
+    const { onUseColor, onChange, container } = setup({ onPreviewColor, onCommitColor, onInteractionEnd });
+    fireEvent.change(screen.getByRole("textbox", { name: "헥스 색상 코드" }), { target: { value: "#ABC" } });
+    expect(onPreviewColor).not.toHaveBeenCalled();
+    if (mode === "apply") fireEvent.click(screen.getByRole("button", { name: "색상 적용" }));
+    else fireEvent.pointerDown(container);
+    expect(onPreviewColor).toHaveBeenCalledExactlyOnceWith("#aabbcc");
+    expect(onCommitColor).toHaveBeenCalledExactlyOnceWith("#aabbcc");
+    expect(onUseColor).toHaveBeenCalledExactlyOnceWith("#aabbcc");
+    expect(onInteractionEnd).toHaveBeenCalledOnce();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+  it("blocks invalid outside commits and prevents the closing click from drawing", () => {
+    const canvasDown = vi.fn();
+    const { onChange, onUseColor } = setup();
+    const canvas = document.createElement("button"); document.body.append(canvas); canvas.addEventListener("pointerdown", canvasDown);
+    try {
+      const input = screen.getByRole("textbox", { name: "헥스 색상 코드" }) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "#invalid" } });
+      fireEvent.pointerDown(canvas);
+      expect(input.value).toBe("#invalid");
+      expect(screen.getByRole("dialog")).toBeTruthy();
+      expect(canvasDown).not.toHaveBeenCalled();
+      expect(onChange).not.toHaveBeenCalled(); expect(onUseColor).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    } finally { canvas.remove(); }
+  });
+  it("deduplicates document colors without labelling them as recent history", () => {
+    setup({ documentColors: ["#ABCDEF", "#abcdef", "transparent", "#112233"] });
+    fireEvent.click(screen.getByRole("tab", { name: "팔레트" }));
+    const group = screen.getByRole("group", { name: "문서 사용 색 목록" });
+    expect(within(group).getAllByRole("button")).toHaveLength(2);
+    fireEvent.click(within(group).getByRole("button", { name: "문서 사용 색 #abcdef 적용" }));
+    expect(screen.getByLabelText("선택 중인 색상").textContent).toBe("#ABCDEF");
+  });
+  it("preserves raw typing and confirms once on Enter, excluding IME composition", () => {
+    const { onChange } = setup();
+    const input = screen.getByRole("textbox", { name: "헥스 색상 코드" }) as HTMLInputElement;
+    for (const raw of ["#1", "#12", "#123", "#1234", "#12345", "#abcdef"]) {
+      fireEvent.change(input, { target: { value: raw } }); expect(input.value).toBe(raw);
+    }
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("#abcdef");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+  it.each(["target", "value"])("invalidates a pending session when %s changes", (kind) => {
+    const { rerender, props, onChange, onUseColor } = setup({ targetKey: "shape-a" });
+    fireEvent.change(screen.getByRole("textbox", { name: "헥스 색상 코드" }), { target: { value: "#abcdef" } });
+    rerender(<StudioColorPopover {...props} targetKey={kind === "target" ? "shape-b" : "shape-a"} value={kind === "value" ? "#654321" : "#123456"} />);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onChange).not.toHaveBeenCalled(); expect(onUseColor).not.toHaveBeenCalled();
+  });
+  it("contains the sheet inside a reduced keyboard visual viewport", () => {
+    const viewport = { width: 360, height: 310, offsetLeft: 0, offsetTop: 100, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    vi.stubGlobal("visualViewport", viewport);
+    setup();
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("data-layout")).toBe("sheet");
+    expect(parseFloat(dialog.style.width)).toBe(344);
+    expect(parseFloat(dialog.style.top)).toBeGreaterThanOrEqual(108);
+    expect(parseFloat(dialog.style.top) + parseFloat(dialog.style.maxHeight)).toBeLessThanOrEqual(402);
+    expect(screen.getByRole("button", { name: "색상 적용" })).toBeTruthy();
+  });
+  it("does not reorder recent swatches while previewing and records only the final selection", () => {
+    const { onChange, onUseColor } = setup();
+    const before = within(screen.getByRole("group", { name: "최근 선택 색 목록" })).getAllByRole("button").map((button) => button.getAttribute("aria-label"));
+    fireEvent.click(screen.getByRole("button", { name: "최근 선택 색 #654321 적용" }));
+    expect(onUseColor).not.toHaveBeenCalled();
+    const after = within(screen.getByRole("group", { name: "최근 선택 색 목록" })).getAllByRole("button").map((button) => button.getAttribute("aria-label"));
+    expect(after).toEqual(before);
+    fireEvent.click(screen.getByRole("button", { name: "색상 적용" }));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("#654321");
+    expect(onUseColor).toHaveBeenCalledExactlyOnceWith("#654321");
+  });
 });

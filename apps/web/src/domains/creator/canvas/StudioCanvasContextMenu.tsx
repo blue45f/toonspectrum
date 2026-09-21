@@ -44,6 +44,7 @@ export interface StudioCanvasContextMenuProps {
   onAddText: () => void;
   onAddPage: () => void;
   onEnableQuickShape: () => void;
+  onOpenQuickAccess?: () => void;
   onClose: () => void;
 }
 
@@ -71,6 +72,7 @@ export function StudioCanvasContextMenu({
   onAddText,
   onAddPage,
   onEnableQuickShape,
+  onOpenQuickAccess,
   onClose,
 }: StudioCanvasContextMenuProps) {
   if (!open) return null;
@@ -84,6 +86,8 @@ export function StudioCanvasContextMenu({
       className="fixed z-50 min-w-[140px] rounded-lg border border-line bg-panel p-1 shadow-xl motion-safe:animate-fade-in"
       onClick={(event) => event.stopPropagation()}
     >
+      {onOpenQuickAccess ? <button type="button" className="flex min-h-11 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm text-fg hover:bg-raised"
+        onClick={() => runAndClose(onOpenQuickAccess, onClose)}><Sparkles size={18} aria-hidden />커서 근처 빠른 실행</button> : null}
       {hasElement ? (
         <>
           {onEditVrm && (

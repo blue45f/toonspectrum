@@ -98,8 +98,8 @@ export interface StudioUiPreferencesRepository {
    */
   loadPrimaryTool(): Promise<StudioRememberedPrimaryTool | null>;
   savePrimaryTool(tool: StudioRememberedPrimaryTool): Promise<void>;
-  loadRecentColors(): Promise<string[]>;
-  saveRecentColors(colors: readonly string[]): Promise<void>;
+  loadRecentColors(ownerScope?: string): Promise<string[]>;
+  saveRecentColors(colors: readonly string[], ownerScope?: string): Promise<void>;
   loadServerAiProvider(): Promise<StudioServerAiProviderPreference>;
   saveServerAiProvider(provider: StudioServerAiProviderPreference): Promise<void>;
 }
@@ -242,11 +242,13 @@ export function createStudioUiPreferencesRepository(
       // 정규화가 걸러 낸 값(예: `hand`)은 저장하지 않는다 — 기억이 없는 상태가 정답이다.
       return normalized === null ? Promise.resolve() : enqueue(PRIMARY_TOOL_KEY, normalized);
     },
-    async loadRecentColors() {
-      return normalizeRecentColors(parseJson(await store.get(RECENT_COLORS_KEY)));
+    async loadRecentColors(ownerScope?: string) {
+      const key = ownerScope ? `${RECENT_COLORS_KEY}:${encodeURIComponent(ownerScope)}` : RECENT_COLORS_KEY;
+      return normalizeRecentColors(parseJson(await store.get(key)));
     },
-    saveRecentColors(colors: readonly string[]) {
-      return enqueue(RECENT_COLORS_KEY, JSON.stringify(normalizeRecentColors(colors)));
+    saveRecentColors(colors: readonly string[], ownerScope?: string) {
+      const key = ownerScope ? `${RECENT_COLORS_KEY}:${encodeURIComponent(ownerScope)}` : RECENT_COLORS_KEY;
+      return enqueue(key, JSON.stringify(normalizeRecentColors(colors)));
     },
     async loadServerAiProvider() {
       return normalizeServerAiProvider(await store.get(SERVER_AI_PROVIDER_KEY));

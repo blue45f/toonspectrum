@@ -1,3 +1,4 @@
+import { useStudioColorTargetKey } from "./color/StudioColorWorkspaceContext";
 import { Suspense, useState } from "react";
 
 import { studioColorPopoverTriggerHint } from "./studio-color-popover-hints";
@@ -79,14 +80,17 @@ export function LazyStudioColorPopover({
   onLoadRecentColors,
   ...props
 }: LazyStudioColorPopoverProps) {
-  const [activated, setActivated] = useState(false);
+  const targetKey = useStudioColorTargetKey(props.purpose ?? "generic", props.controlId, props.targetKey ?? props.label);
+  const [activationKey, setActivationKey] = useState<string | null>(null);
   const activate = () => {
     if (props.disabled) return;
+    if (props.onRequestOpen?.()) return;
+    props.onBeforeOpen?.();
     onLoadRecentColors?.();
-    setActivated(true);
+    setActivationKey(targetKey);
   };
 
-  if (!activated) {
+  if (activationKey !== targetKey) {
     return (
       <StudioColorPopoverFallback
         {...props}
@@ -98,7 +102,7 @@ export function LazyStudioColorPopover({
 
   return (
     <Suspense fallback={<StudioColorPopoverFallback {...props} busy />}>
-      <StudioColorPopoverContent {...props} initialOpen />
+      <StudioColorPopoverContent key={targetKey} {...props} initialOpen />
     </Suspense>
   );
 }
