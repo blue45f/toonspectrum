@@ -7,6 +7,10 @@
     "studio": "remotion studio src/index.tsx --public-dir=../../apps/web/public",
     "render": "node render.mjs",
     "render:product-tour": "node render-product-tour.mjs",
+    "generate:product-tour-narration": "node generate-product-tour-narration.mjs",
+    "verify:product-tour-narration": "node generate-product-tour-narration.mjs --check",
+    "mix:product-tour": "node mix-product-tour-audio.mjs",
+    "verify:product-tour": "node generate-product-tour-narration.mjs --check && node mix-product-tour-audio.mjs --check",
     "render:technology": "node render-technology.mjs",
     "typecheck": "tsc --noEmit"
   },

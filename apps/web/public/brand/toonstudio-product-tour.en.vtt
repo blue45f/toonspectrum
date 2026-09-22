@@ -1,73 +1,148 @@
 WEBVTT
 
+NOTE ToonStudio product tour narration captions.
+
 1
-00:00:00.000 --> 00:00:24.000
-ToonStudio is more than a tool for drawing a single image. It is a browser-based creative workspace that connects the stages around webtoon production in one work.
+00:00:00.800 --> 00:00:05.300
+ToonStudio is more than a tool for drawing a
+single image.
 
 2
-00:00:24.000 --> 00:00:48.000
-Move from planning into 2D and 3D production, project management, review and publishing preparation without losing the context of the story.
+00:00:12.200 --> 00:00:21.288
+From shaping an idea to finishing a manuscript
+and preparing a series, it keeps the webtoon
+workflow connected around one work.
 
 3
-00:00:48.000 --> 00:01:18.000
-The story workspace helps shape the world, characters, wants, obstacles and working premise before visual production begins.
+00:00:31.000 --> 00:00:39.515
+Start in the browser, then move naturally
+between planning, 2D and 3D production, review,
+and publishing preparation.
 
 4
-00:01:18.000 --> 00:01:48.000
-Keep episode goals, scene intent and dialogue in production context so the next stage knows what needs to be drawn.
+00:00:49.000 --> 00:00:52.342
+The work begins in the Story Lab.
 
 5
-00:01:48.000 --> 00:02:21.000
-The drawing workspace keeps the canvas central while brushes, layers, selection and editing tools stay close to the work.
+00:00:59.500 --> 00:01:05.905
+First, define the world, characters, desires,
+obstacles, and the principles that move the
+story.
 
 6
-00:02:21.000 --> 00:02:54.000
-Open texture, filters and color correction when needed while preserving as much screen space as possible for the manuscript itself.
+00:01:19.500 --> 00:01:28.039
+Keep episode goals, scene intent, and key
+dialogue in the production context so the next
+drawing step becomes clearer.
 
 7
-00:02:54.000 --> 00:03:21.000
-Turn a scene into readable storytelling through panel layout, dialogue, balloons and the rhythm of a vertical scroll.
+00:01:49.000 --> 00:01:52.236
+Now move into the drawing workspace.
 
 8
-00:03:21.000 --> 00:03:48.000
-Instead of separating art and text, refine eye flow and direction inside the same manuscript context.
+00:02:00.000 --> 00:02:07.321
+The canvas stays central, with brushes, layers,
+selection, and frequently used tools close at
+hand.
 
 9
-00:03:48.000 --> 00:04:24.000
-In the 3D workspace, compose character poses, environments and space to explore difficult shots quickly from multiple angles.
+00:02:26.000 --> 00:02:34.368
+Open texture, filters, and color correction only
+when needed, keeping more room for the actual
+manuscript.
 
 10
-00:04:24.000 --> 00:05:00.000
-Check cameras and shot transitions, then return that result to the current 2D manuscript as a practical scene-planning reference.
+00:02:55.000 --> 00:03:00.231
+A scene becomes a readable story from the moment
+you divide it into panels.
 
 11
-00:05:00.000 --> 00:05:27.000
-The AI workspace uses creator-controlled runtime and generation tools to assist repetitive production and idea exploration.
+00:03:11.500 --> 00:03:16.558
+Adjust balloons, dialogue, and the reader's eye
+flow on the same manuscript,
 
 12
-00:05:27.000 --> 00:05:54.000
-Automation does not make the final decision: creators remain responsible for reviewing, selecting and applying results to the work.
+00:03:29.000 --> 00:03:33.675
+then check the vertical scroll pacing to
+complete the scene's rhythm.
 
 13
-00:05:54.000 --> 00:06:27.000
-Projects keep owners, production state and next actions connected to the actual work instead of separate status documents.
+00:03:49.000 --> 00:03:54.576
+When a composition is difficult, design the
+scene first in the 3D workspace.
 
 14
-00:06:27.000 --> 00:07:00.000
-Revision requests, change history and review stay connected, reducing missed handoffs and bottlenecks caused by file-only workflows.
+00:04:08.000 --> 00:04:15.367
+Arrange character poses, backgrounds, and space,
+then move the camera to explore angles quickly.
 
 15
-00:07:00.000 --> 00:07:24.000
-The learning area covers the webtoon production process, drawing and story techniques, practical exercises and references close to the work.
+00:04:34.000 --> 00:04:42.817
+Bring the chosen composition and camera changes
+back into the current 2D manuscript. 3D is a
+tool for finding a better scene.
 
 16
-00:07:24.000 --> 00:07:48.000
-Creative resources such as assets and audio also stay near production, helping creators find a useful next action when a stage stalls.
+00:05:01.000 --> 00:05:06.082
+The AI workspace reduces repetition and supports
+idea exploration.
 
 17
-00:07:48.000 --> 00:08:06.000
-At the finishing stage, check manuscript images, work information and publishing settings, then validate the required output conditions.
+00:05:18.000 --> 00:05:21.939
+Use your personal Creator Runtime and generation
+tools,
 
 18
-00:08:06.000 --> 00:08:24.000
-From planning through production, 3D, collaboration, review, export and publishing preparation: start where you need and keep moving inside the same work.
+00:05:35.000 --> 00:05:42.283
+while keeping review, selection, and the final
+decision to apply a result in the creator's
+hands.
+
+19
+00:05:55.000 --> 00:06:00.846
+In team production, share the current state of
+the work instead of passing files around.
+
+20
+00:06:14.000 --> 00:06:20.481
+See owners, production stages, and next actions
+in the context of the actual work,
+
+21
+00:06:36.000 --> 00:06:42.438
+then connect revision requests, change history,
+and review results to reduce omissions and
+bottlenecks.
+
+22
+00:07:01.000 --> 00:07:06.140
+When work stalls, the learning area helps you
+find the next useful action.
+
+23
+00:07:18.000 --> 00:07:25.578
+Explore webtoon workflows, art and story
+techniques, exercises, and references that lead
+into real work,
+
+24
+00:07:34.500 --> 00:07:40.324
+and find creative resources such as assets and
+audio close to the production flow.
+
+25
+00:07:49.000 --> 00:07:55.625
+At the finishing stage, review the manuscript
+images, work information, and publishing
+settings once more.
+
+26
+00:08:02.000 --> 00:08:08.970
+Validate formats and required fields, then
+finish export and publishing preparation in the
+same work.
+
+27
+00:08:16.000 --> 00:08:21.335
+Start where you need to, and carry the work all
+the way through with ToonStudio.

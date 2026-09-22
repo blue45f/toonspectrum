@@ -481,6 +481,87 @@ describe("Cloudflare static gateway", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
+  it("serves a full R2 object as 200 even when R2 reports its full byte range", async () => {
+    const get = vi.fn(async () => r2Object("full", {
+      size: 4,
+      range: { offset: 0, length: 4 },
+    }));
+    const gateway = createCloudflareStaticGateway({ fetch: vi.fn<typeof fetch>() });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/brand/toonstudio-product-tour.mp4"),
+      environment({ LARGE_ASSETS: { get, head: vi.fn(async () => null) } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("full");
+    expect(response.headers.get("content-range")).toBeNull();
+    expect(response.headers.get("content-length")).toBe("4");
+    expect(get).toHaveBeenCalledWith("brand/toonstudio-product-tour.mp4", undefined);
+  });
+
+  it("serves large-asset HEAD metadata as a full 200 response", async () => {
+    const metadata = r2Object("ignored", {
+      size: 35_347_422,
+      range: { offset: 0, length: 35_347_422 },
+    });
+    const head = vi.fn(async () => metadata);
+    const get = vi.fn(async () => null);
+    const gateway = createCloudflareStaticGateway({ fetch: vi.fn<typeof fetch>() });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/brand/toonstudio-product-tour.mp4", { method: "HEAD" }),
+      environment({ LARGE_ASSETS: { get, head } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toBeNull();
+    expect(response.headers.get("content-range")).toBeNull();
+    expect(response.headers.get("content-length")).toBe("35347422");
+    expect(head).toHaveBeenCalledWith("brand/toonstudio-product-tour.mp4");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("honors a matching If-Range validator for resumable video playback", async () => {
+    const head = vi.fn(async (_key: string) => r2Object("metadata", { etag: '"video-etag"' }));
+    const get = vi.fn(async (_key: string, _options?: { readonly range?: Headers }) => r2Object("part", {
+      size: 35_347_422,
+      range: { offset: 1024, length: 4 },
+      etag: '"video-etag"',
+    }));
+    const gateway = createCloudflareStaticGateway({ fetch: vi.fn<typeof fetch>() });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/brand/toonstudio-product-tour.mp4", {
+        headers: { range: "bytes=1024-1027", "if-range": '"video-etag"' },
+      }),
+      environment({ LARGE_ASSETS: { get, head } }),
+    );
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get("content-range")).toBe("bytes 1024-1027/35347422");
+    expect(get.mock.calls[0]?.[1]?.range?.get("range")).toBe("bytes=1024-1027");
+    expect(head).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to a full 200 response when If-Range no longer matches", async () => {
+    const head = vi.fn(async (_key: string) => r2Object("metadata", { etag: '"new-etag"' }));
+    const get = vi.fn(async (_key: string, _options?: { readonly range?: Headers }) => r2Object("full", {
+      size: 4,
+      range: { offset: 0, length: 4 },
+      etag: '"new-etag"',
+    }));
+    const gateway = createCloudflareStaticGateway({ fetch: vi.fn<typeof fetch>() });
+    const response = await gateway(
+      new Request("https://www.toonstudio.cloud/brand/toonstudio-product-tour.mp4", {
+        headers: { range: "bytes=1024-1027", "if-range": '"old-etag"' },
+      }),
+      environment({ LARGE_ASSETS: { get, head } }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-range")).toBeNull();
+    expect(await response.text()).toBe("full");
+    expect(get).toHaveBeenCalledWith("brand/toonstudio-product-tour.mp4", undefined);
+  });
+
   it("preserves byte ranges while serving R2 large assets", async () => {
     const get = vi.fn(async (_key: string, _options?: { readonly range?: Headers }) => r2Object("part", {
       size: 65_864_037,

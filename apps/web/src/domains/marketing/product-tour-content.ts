@@ -1,5 +1,9 @@
+import { PRODUCT_TOUR_ASSET } from "./product-tour-asset.generated";
+
 export const PRODUCT_TOUR = {
-  src: "/brand/toonstudio-product-tour.mp4",
+  src: PRODUCT_TOUR_ASSET.src,
+  bytes: PRODUCT_TOUR_ASSET.bytes,
+  revision: PRODUCT_TOUR_ASSET.revision,
   poster: "/brand/toonstudio-product-tour-poster.jpg",
   captionsKo: "/brand/toonstudio-product-tour.ko.vtt",
   captionsEn: "/brand/toonstudio-product-tour.en.vtt",
@@ -138,7 +142,7 @@ export const PRODUCT_TOUR_COPY = {
     intro: "짧은 광고 대신 실제 제작 순서를 따라갑니다. 스토리 기획에서 시작해 드로잉, 컷 연출, 3D와 AI 보조, 팀 제작과 검토, 학습과 게시 준비가 하나의 작품 안에서 어떻게 이어지는지 충분한 호흡으로 보여드립니다.",
     watch: "8분 24초 전체 투어 보기",
     start: "새 작품 시작하기",
-    facts: [["영상 길이", "8분 24초"], ["구성", "9개 제작 챕터"], ["제작", "Remotion · 30fps"], ["접근성", "한·영 자막 · 챕터 탐색"]],
+    facts: [["영상 길이", "8분 24초"], ["구성", "9개 제작 챕터"], ["오디오", "한국어 내레이션 · 오리지널 OST"], ["접근성", "한·영 자막 · 챕터 탐색"]],
     videoEyebrow: "LONG-FORM PRODUCT WALKTHROUGH",
     videoTitle: "짧은 홍보가 아니라, 실제 제작 흐름을 따라갑니다.",
     videoBody: "실제 제품 화면과 기능별 설명을 함께 보세요. 챕터에서 필요한 기능으로 바로 이동할 수도 있고, 대본으로 전체 흐름을 빠르게 훑을 수도 있습니다.",
@@ -156,7 +160,7 @@ export const PRODUCT_TOUR_COPY = {
     closingTitle: "이제 한 장면을 직접 만들어보세요.",
     closingBody: "빈 프로젝트에서 시작해도 되고, 스토리·드로잉·3D·학습 중 지금 필요한 곳부터 들어가도 됩니다.",
     transcript: "챕터별 전체 내용 읽기",
-    silentNote: "무음 제품 투어입니다. 핵심 설명은 화면과 한·영 자막에 모두 포함되어 있습니다.",
+    audioNote: "합성 음성으로 제작한 한국어 내레이션과 툰스튜디오 오리지널 BGM이 포함되어 있습니다. 한·영 자막을 선택할 수 있습니다.",
     visualOpen: "이 기능 열기",
   },
   en: {
@@ -167,7 +171,7 @@ export const PRODUCT_TOUR_COPY = {
     intro: "Instead of a short advertisement, follow the production order creators actually use. See how story planning, drawing, panel direction, 3D, AI assistance, team review, learning and publishing preparation stay connected around one work.",
     watch: "Watch the 8m 24s product tour",
     start: "Start a new work",
-    facts: [["Duration", "8m 24s"], ["Structure", "9 production chapters"], ["Built with", "Remotion · 30fps"], ["Accessibility", "KO · EN captions · chapters"]],
+    facts: [["Duration", "8m 24s"], ["Structure", "9 production chapters"], ["Audio", "Korean narration · original OST"], ["Accessibility", "KO · EN captions · chapters"]],
     videoEyebrow: "LONG-FORM PRODUCT WALKTHROUGH",
     videoTitle: "Not a short ad. Follow the actual production journey.",
     videoBody: "Watch real product surfaces together with feature explanations. Jump directly into a workspace from any chapter, or scan the full structure through the transcript.",
@@ -185,7 +189,7 @@ export const PRODUCT_TOUR_COPY = {
     closingTitle: "Now make one scene yourself.",
     closingBody: "Start with a blank project or jump directly into story, drawing, 3D or learning—wherever your current work begins.",
     transcript: "Read the chapter-by-chapter outline",
-    silentNote: "This is a silent product tour. Core explanations are present on screen and in Korean and English captions.",
+    audioNote: "Includes synthesized Korean narration and ToonStudio original background music. Korean and English captions are available.",
     visualOpen: "Open this workspace",
   },
 } as const;

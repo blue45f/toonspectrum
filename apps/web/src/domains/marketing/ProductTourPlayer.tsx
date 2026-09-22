@@ -1,16 +1,34 @@
-import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { ArrowRight, Captions, LoaderCircle, Play, RotateCcw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { resumeBgmForContext, suspendBgmForContext } from "@toonspectrum/core/fx";
+import {
+  formatI18nTemplate,
+  translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
+import { ArrowRight, Captions, LoaderCircle, Play, RotateCcw, Volume2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "@/compat/router-link";
 
-import { creatorFilmChapterAt } from "./creator-film-playback";
+import { clampCreatorFilmTime, creatorFilmChapterAt } from "./creator-film-playback";
+import {
+  PRODUCT_TOUR_MAX_AUTOMATIC_RECOVERIES,
+  PRODUCT_TOUR_STALL_TIMEOUT_MS,
+  canAutomaticallyRecoverProductTour,
+  isExpectedMediaPlayRejection,
+  productTourRecoveryLabel,
+  productTourSourceForAttempt,
+} from "./product-tour-media-recovery";
 import { PRODUCT_TOUR, PRODUCT_TOUR_COPY, type ProductTourLocale } from "./product-tour-content";
 
 import "./product-tour-player.css";
 
+const TOUR_AUDIO_CONTEXT = "product-tour-video";
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("ProductTourPlayer", ko, en);
+
+type PlayerPhase = "idle" | "loading" | "ready" | "recovering" | "failed";
+type RecoveryReason = "decode" | "network" | "stall" | "online" | "manual";
 
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -18,56 +36,243 @@ function formatTime(seconds: number): string {
   return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
+function formatMegabytes(bytes: number): string {
+  return `${Math.ceil(bytes / (1024 * 1024))} MB`;
+}
+
+function browserIsOnline(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine;
+}
+
 export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLocale }) {
   useBilingualI18nRevision();
   const copy = bi((PRODUCT_TOUR_COPY).ko, (PRODUCT_TOUR_COPY).en);
+  const chapterStarts = useMemo(
+    () => PRODUCT_TOUR.chapters.map((chapter) => chapter.start),
+    [],
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
+  const stallTimerRef = useRef<number | null>(null);
+  const requestedStartRef = useRef(0);
+  const resumeAfterLoadRef = useRef(false);
+  const recoveryCountRef = useRef(0);
+  const recoveryBaselineRef = useRef(0);
+  const recoveringRef = useRef(false);
+  const waitingForOnlineRef = useRef(false);
+  const lastPlaybackTimeRef = useRef(0);
+  const mountedRef = useRef(false);
   const [activeChapter, setActiveChapter] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const requestedStartRef = useRef(0);
-  const autoplayRef = useRef(false);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [sourceAttempt, setSourceAttempt] = useState(0);
+  const [phase, setPhase] = useState<PlayerPhase>("idle");
+  const [recoveryDetail, setRecoveryDetail] = useState("");
+  const source = useMemo(
+    () => productTourSourceForAttempt(PRODUCT_TOUR.src, sourceAttempt),
+    [sourceAttempt],
+  );
+
+  const clearStallTimer = useCallback(() => {
+    if (stallTimerRef.current === null) return;
+    window.clearTimeout(stallTimerRef.current);
+    stallTimerRef.current = null;
+  }, []);
+
+  const releaseSiteMusic = useCallback(() => {
+    resumeBgmForContext(TOUR_AUDIO_CONTEXT);
+  }, []);
+
+  const failPlayback = useCallback(() => {
+    clearStallTimer();
+    recoveringRef.current = false;
+    waitingForOnlineRef.current = false;
+    resumeAfterLoadRef.current = false;
+    setPhase("failed");
+    releaseSiteMusic();
+  }, [clearStallTimer, releaseSiteMusic]);
+
+  const recoverPlayback = useCallback((reason: RecoveryReason) => {
+    if (!mountedRef.current || recoveringRef.current) return;
+    const video = videoRef.current;
+    const currentTime = video
+      && video.readyState >= HTMLMediaElement.HAVE_METADATA
+      && Number.isFinite(video.currentTime)
+      ? video.currentTime
+      : requestedStartRef.current;
+    requestedStartRef.current = currentTime;
+    recoveryBaselineRef.current = currentTime;
+    resumeAfterLoadRef.current = resumeAfterLoadRef.current
+      || Boolean(video && !video.paused && !video.ended);
+    clearStallTimer();
+
+    if (!browserIsOnline()) {
+      recoveringRef.current = true;
+      waitingForOnlineRef.current = true;
+      setRecoveryDetail(bi(
+        "인터넷 연결을 기다리고 있습니다. 연결되면 현재 위치에서 자동으로 이어집니다.",
+        "Waiting for the network. Playback will resume from the current position when it returns.",
+      ));
+      setPhase("recovering");
+      return;
+    }
+
+    if (!canAutomaticallyRecoverProductTour(recoveryCountRef.current, true)) {
+      failPlayback();
+      return;
+    }
+
+    recoveryCountRef.current += 1;
+    recoveringRef.current = true;
+    waitingForOnlineRef.current = false;
+    setRecoveryDetail(`${productTourRecoveryLabel(reason, locale)} ${recoveryCountRef.current}/${PRODUCT_TOUR_MAX_AUTOMATIC_RECOVERIES}`);
+    setPhase("recovering");
+    setSourceAttempt((attempt) => attempt + 1);
+  }, [clearStallTimer, failPlayback, locale]);
+
+  const playFrom = useCallback((video: HTMLVideoElement, seconds: number, autoplay: boolean) => {
+    requestedStartRef.current = seconds;
+    resumeAfterLoadRef.current = autoplay;
+    if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      setPhase("loading");
+      video.load();
+      return;
+    }
+
+    try {
+      video.currentTime = clampCreatorFilmTime(seconds, video.duration || PRODUCT_TOUR.duration);
+    } catch {
+      recoveringRef.current = false;
+      recoverPlayback("decode");
+      return;
+    }
+
+    if (!autoplay) {
+      setPhase("ready");
+      return;
+    }
+
+    setPhase(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
+    void Promise.resolve(video.play()).catch((reason: unknown) => {
+      if (isExpectedMediaPlayRejection(reason)) {
+        setPhase("ready");
+        return;
+      }
+      recoveringRef.current = false;
+      recoverPlayback("decode");
+    });
+  }, [recoverPlayback]);
+
+  useEffect(() => {
+    mountedRef.current = mounted;
+  }, [mounted]);
 
   useEffect(() => {
     if (!mounted) return;
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = requestedStartRef.current;
-    setLoading(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
-    if (autoplayRef.current) void video.play().catch(() => setLoading(false));
-    autoplayRef.current = false;
-  }, [mounted]);
+    recoveringRef.current = false;
+  }, [mounted, sourceAttempt]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (!waitingForOnlineRef.current) return;
+      waitingForOnlineRef.current = false;
+      recoveringRef.current = false;
+      recoverPlayback("online");
+    };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [recoverPlayback]);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    clearStallTimer();
+    videoRef.current?.pause();
+    releaseSiteMusic();
+  }, [clearStallTimer, releaseSiteMusic]);
+
+  const armStallRecovery = useCallback((video: HTMLVideoElement) => {
+    if (video.paused || video.ended || recoveringRef.current) return;
+    clearStallTimer();
+    setPhase("loading");
+    stallTimerRef.current = window.setTimeout(() => {
+      stallTimerRef.current = null;
+      if (videoRef.current !== video || video.paused || video.ended) return;
+      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return;
+      recoverPlayback("stall");
+    }, PRODUCT_TOUR_STALL_TIMEOUT_MS);
+  }, [clearStallTimer, recoverPlayback]);
 
   const seekTo = (seconds: number, autoplay = true) => {
     requestedStartRef.current = seconds;
-    autoplayRef.current = autoplay;
-    setFailed(false);
-    setActiveChapter(creatorFilmChapterAt(seconds, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)));
+    resumeAfterLoadRef.current = autoplay;
+    recoveryCountRef.current = 0;
+    recoveryBaselineRef.current = seconds;
+    waitingForOnlineRef.current = false;
+    recoveringRef.current = false;
+    setRecoveryDetail("");
+    setActiveChapter(creatorFilmChapterAt(seconds, chapterStarts));
+
     if (!mounted) {
+      mountedRef.current = true;
+      setPhase("loading");
       setMounted(true);
-      setLoading(true);
       return;
     }
+
+    if (phase === "failed") {
+      recoveringRef.current = true;
+      setRecoveryDetail(productTourRecoveryLabel("manual", locale));
+      setPhase("recovering");
+      setSourceAttempt((attempt) => attempt + 1);
+      return;
+    }
+
     const video = videoRef.current;
-    if (!video) return;
-    setLoading(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA);
-    video.currentTime = seconds;
-    if (autoplay) void video.play().catch(() => setLoading(false));
+    if (video) playFrom(video, seconds, autoplay);
   };
 
   const retry = () => {
-    requestedStartRef.current = PRODUCT_TOUR.chapters[activeChapter]?.start ?? 0;
-    autoplayRef.current = true;
-    setFailed(false);
-    setLoading(true);
-    if (!mounted) { setMounted(true); return; }
     const video = videoRef.current;
-    if (!video) return;
-    video.load();
-    video.currentTime = requestedStartRef.current;
-    void video.play().catch(() => setLoading(false));
+    requestedStartRef.current = video && Number.isFinite(video.currentTime)
+      ? video.currentTime
+      : PRODUCT_TOUR.chapters[activeChapter]?.start ?? 0;
+    resumeAfterLoadRef.current = true;
+    recoveryCountRef.current = 0;
+    recoveryBaselineRef.current = requestedStartRef.current;
+    waitingForOnlineRef.current = false;
+    recoveringRef.current = true;
+    setRecoveryDetail(productTourRecoveryLabel("manual", locale));
+    setPhase("recovering");
+    if (!mounted) {
+      mountedRef.current = true;
+      setMounted(true);
+    } else {
+      setSourceAttempt((attempt) => attempt + 1);
+    }
   };
+
+  const handleLoadedMetadata = (video: HTMLVideoElement) => {
+    recoveringRef.current = false;
+    clearStallTimer();
+    playFrom(video, requestedStartRef.current, resumeAfterLoadRef.current);
+  };
+
+  const handleTimeUpdate = (video: HTMLVideoElement) => {
+    const currentTime = video.currentTime;
+    setActiveChapter(creatorFilmChapterAt(currentTime, chapterStarts));
+    if (currentTime > lastPlaybackTimeRef.current + 0.05) clearStallTimer();
+    lastPlaybackTimeRef.current = currentTime;
+    if (
+      recoveryCountRef.current > 0
+      && currentTime >= recoveryBaselineRef.current + 30
+    ) {
+      recoveryCountRef.current = 0;
+    }
+  };
+
+  const loading = phase === "loading" || phase === "recovering";
+  const loadingMessage = phase === "recovering"
+    ? recoveryDetail
+    : bi("제품 투어와 오디오를 불러오는 중", "Loading the product tour and audio");
+  const downloadSize = formatMegabytes(PRODUCT_TOUR.bytes);
 
   return (
     <section className="product-tour-player" id="product-tour-video" aria-labelledby="product-tour-video-title">
@@ -78,44 +283,104 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         </div>
         <div>
           <p>{copy.videoBody}</p>
-          <span><Captions size={15} aria-hidden="true" />{copy.silentNote}</span>
+          <span><Volume2 size={15} aria-hidden="true" />{copy.audioNote}</span>
         </div>
       </header>
 
-      <div className="product-tour-player__screen" aria-busy={loading}>
+      <div className="product-tour-player__screen" aria-busy={loading || undefined}>
         {mounted ? (
           <video
+            key={source}
             ref={videoRef}
-            src={PRODUCT_TOUR.src}
+            src={source}
             poster={PRODUCT_TOUR.poster}
             controls
             playsInline
             preload="metadata"
             aria-label={copy.videoTitle}
-            onPlay={() => setFailed(false)}
-            onPlaying={() => setLoading(false)}
-            onCanPlay={() => setLoading(false)}
-            onWaiting={() => setLoading(true)}
-            onSeeked={() => setLoading(false)}
-            onError={() => { setLoading(false); setFailed(true); }}
-            onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, PRODUCT_TOUR.chapters.map((chapter) => chapter.start)))}
+            onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
+            onPlay={(event) => {
+              resumeAfterLoadRef.current = true;
+              suspendBgmForContext(TOUR_AUDIO_CONTEXT);
+              setPhase(event.currentTarget.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
+            }}
+            onPlaying={() => {
+              clearStallTimer();
+              recoveringRef.current = false;
+              waitingForOnlineRef.current = false;
+              setRecoveryDetail("");
+              setPhase("ready");
+              suspendBgmForContext(TOUR_AUDIO_CONTEXT);
+            }}
+            onPause={() => {
+              if (recoveringRef.current || waitingForOnlineRef.current) return;
+              resumeAfterLoadRef.current = false;
+              clearStallTimer();
+              releaseSiteMusic();
+              if (phase !== "failed") setPhase("ready");
+            }}
+            onEnded={() => {
+              resumeAfterLoadRef.current = false;
+              recoveryCountRef.current = 0;
+              clearStallTimer();
+              releaseSiteMusic();
+              setPhase("ready");
+            }}
+            onCanPlay={() => {
+              clearStallTimer();
+              if (phase === "loading") setPhase("ready");
+            }}
+            onSeeked={() => {
+              clearStallTimer();
+              if (phase === "loading") setPhase("ready");
+            }}
+            onWaiting={(event) => armStallRecovery(event.currentTarget)}
+            onStalled={(event) => armStallRecovery(event.currentTarget)}
+            onError={(event) => {
+              recoveringRef.current = false;
+              recoverPlayback(event.currentTarget.error?.code === 2 ? "network" : "decode");
+            }}
+            onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)}
           >
-            <track kind="captions" src={bi(PRODUCT_TOUR.captionsKo, PRODUCT_TOUR.captionsEn)} srcLang={locale} label={bi("한국어", "English")} default />
+            <track
+              kind="captions"
+              src={PRODUCT_TOUR.captionsKo}
+              srcLang="ko"
+              label="한국어"
+              default={locale === "ko"}
+            />
+            <track
+              kind="captions"
+              src={PRODUCT_TOUR.captionsEn}
+              srcLang="en"
+              label="English"
+              default={locale === "en"}
+            />
           </video>
         ) : (
           <button type="button" className="product-tour-player__poster" onClick={() => seekTo(0)} aria-label={copy.watch}>
             <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
             <span><Play size={24} fill="currentColor" aria-hidden="true" /></span>
             <strong>{copy.watch}</strong>
-            <small>{bi("클릭할 때만 35MB 본편을 불러옵니다", "The 35 MB film loads only after you press play")}</small>
+            <small>{bi(
+              `재생할 때만 약 ${downloadSize}의 내레이션·BGM 포함 본편을 불러옵니다`,
+              `The ${downloadSize} narrated film loads only after you press play`,
+            )}</small>
           </button>
         )}
-        {loading && !failed && <div className="product-tour-player__status" role="status"><LoaderCircle size={22} aria-hidden="true" />{bi("제품 투어를 불러오는 중", "Loading product tour")}</div>}
-        {failed && (
+        {loading && (
+          <div className="product-tour-player__status" role="status" aria-live="polite">
+            <LoaderCircle size={22} aria-hidden="true" />{loadingMessage}
+          </div>
+        )}
+        {phase === "failed" && (
           <div className="product-tour-player__error" role="alert">
-            <strong>{bi("영상을 불러오지 못했습니다.", "The video could not be loaded.")}</strong>
-            <p>{bi("아래 챕터와 실제 제품 화면으로 전체 내용을 계속 살펴볼 수 있습니다.", "You can still explore the complete tour through the chapters and product screens below.")}</p>
-            <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("다시 시도", "Try again")}</button>
+            <strong>{bi("영상을 안정적으로 이어 재생하지 못했습니다.", "Playback could not be recovered reliably.")}</strong>
+            <p>{bi(
+              "자동 복구를 두 번 시도했습니다. 현재 챕터에서 다시 시도하거나 아래 실제 제품 화면으로 계속 살펴볼 수 있습니다.",
+              "Two automatic recovery attempts were made. Try this chapter again or continue through the real product screens below.",
+            )}</p>
+            <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("현재 위치에서 다시 시도", "Retry from here")}</button>
           </div>
         )}
       </div>
@@ -139,7 +404,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
       </nav>
 
       <details className="product-tour-player__transcript">
-        <summary>{copy.transcript}</summary>
+        <summary><Captions size={15} aria-hidden="true" />{copy.transcript}</summary>
         <ol>
           {PRODUCT_TOUR.chapters.map((chapter) => (
             <li key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.ProductTourPlayer", "en", "{v0}-transcript"), { v0: String(chapter.id) })}>

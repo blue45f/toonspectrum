@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
@@ -40,7 +41,11 @@ describe("long-form product tour contracts", () => {
     expect(pageSource).toContain("<CreatorFeatureReels showFilm={false} embedded />");
     expect(playerSource).toContain("mounted ? (");
     expect(playerSource).toContain('preload="metadata"');
-    expect(playerSource).toContain('kind="captions"');
+    expect(playerSource).toContain('srcLang="ko"');
+    expect(playerSource).toContain('srcLang="en"');
+    expect(playerSource).toContain("PRODUCT_TOUR_STALL_TIMEOUT_MS");
+    expect(playerSource).toContain("recoverPlayback");
+    expect(playerSource).toContain("suspendBgmForContext");
     expect(playerSource).toContain("PRODUCT_TOUR.chapters.map");
   });
 
@@ -72,4 +77,38 @@ describe("long-form product tour contracts", () => {
       expect(existsSync(`${PUBLIC_BRAND}/${asset}`), asset).toBe(true);
     }
   });
+
+  it("ships a versioned narrated mix with original BGM and synchronized captions", () => {
+    const video = readFileSync(`${PUBLIC_BRAND}/toonstudio-product-tour.mp4`);
+    const manifest = JSON.parse(
+      readFileSync(`${PUBLIC_BRAND}/product-tour-manifest.json`, "utf8"),
+    ) as {
+      version: number;
+      bytes: number;
+      sha256: string;
+      audio?: { narration?: { locale?: string }; bgm?: unknown[]; mix?: string };
+    };
+    const sha256 = createHash("sha256").update(video).digest("hex");
+
+    expect(PRODUCT_TOUR.src).toMatch(/^\/brand\/toonstudio-product-tour\.mp4\?v=[a-f0-9]{16}$/u);
+    expect(PRODUCT_TOUR.bytes).toBe(video.byteLength);
+    expect(manifest).toMatchObject({
+      version: 2,
+      bytes: video.byteLength,
+      sha256,
+      audio: {
+        narration: { locale: "ko-KR" },
+        mix: "stereo-aac-128k-with-narration-ducking",
+      },
+    });
+    expect(manifest.audio?.bgm).toHaveLength(2);
+    expect(existsSync("media/brand-film/audio/toonstudio-product-tour-narration.ko.m4a")).toBe(true);
+
+    for (const locale of ["ko", "en"] as const) {
+      const captions = readFileSync(`${PUBLIC_BRAND}/toonstudio-product-tour.${locale}.vtt`, "utf8");
+      expect(captions.match(/-->/gu)).toHaveLength(27);
+      expect(captions).toContain("00:08:16.000");
+    }
+  });
+
 });
