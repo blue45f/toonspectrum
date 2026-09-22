@@ -443,6 +443,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0084_production_model_v2_compatibility",
       "0085_production_team_workspace",
       "0086_production_operation_policy",
+      "0087_studio_pinned_review_share",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
     expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([
