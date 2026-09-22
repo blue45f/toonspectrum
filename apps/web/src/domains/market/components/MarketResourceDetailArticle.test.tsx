@@ -110,9 +110,14 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
     const record = marketRecord("asset");
     const { container } = renderDetail(record);
 
-    expect(
-      screen.getByRole("link", { name: "스튜디오 캔버스에 에셋 삽입" }).getAttribute("href"),
-    ).toBe(`/studio?installMarketResource=${record.id}&assetMarket=community`);
+    const studioHref = new URL(
+      screen.getByRole("link", { name: "스튜디오 캔버스에 에셋 삽입" }).getAttribute("href")!,
+      "https://example.test",
+    );
+    expect(studioHref.pathname).toBe("/studio");
+    expect(studioHref.searchParams.get("installMarketResource")).toBe(record.id);
+    expect(studioHref.searchParams.get("assetMarket")).toBe("community");
+    expect(studioHref.searchParams.get("marketReturn")).toBe(`/market/resource/${record.id}`);
     expect(screen.getAllByText(/지원되는 첫 에셋을 현재 캔버스에 삽입/u).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "마켓 작가" }).getAttribute("href"))
       .toBe(`/u/${record.publisher.id}`);

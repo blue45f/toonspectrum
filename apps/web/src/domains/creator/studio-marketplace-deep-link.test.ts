@@ -11,6 +11,7 @@ import {
   createStudioMarketplaceDeepLinkLifecycleState,
   executeStudioMarketplaceDeepLinkOperation,
   isStudioMarketplaceDeepLinkOperationCurrent,
+  readStudioMarketplaceReturnHref,
   releaseStudioMarketplaceDeepLinkLifecycleSoon,
   retainStudioMarketplaceDeepLinkLifecycle,
 } from "./studio-marketplace-deep-link";
@@ -543,6 +544,24 @@ describe("Studio marketplace deep link", () => {
     expect(result.status).toBe("error");
     expect(result.message).toContain("삭제되었거나 공개가 종료");
     expect(result.message).not.toContain("not-found");
+  });
+
+  it("accepts only a canonical public marketplace return path", () => {
+    expect(readStudioMarketplaceReturnHref(
+      "?marketReturn=%2Fmarket%2Fresource%2Fresource-1",
+    )).toBe("/market/resource/resource-1");
+    expect(readStudioMarketplaceReturnHref(
+      "?marketReturn=%2Fmarket%2Fresource%2Frelease%2520one",
+    )).toBe("/market/resource/release%20one");
+
+    for (const search of [
+      "?marketReturn=https%3A%2F%2Fevil.test%2Fmarket%2Fresource%2Fx",
+      "?marketReturn=%2Fmarket%2Fresource%2Fx%3Ftoken%3Dsecret",
+      "?marketReturn=%2Fmarket%2Fresource%2F..",
+      "?marketReturn=%2Ffortune",
+    ]) {
+      expect(readStudioMarketplaceReturnHref(search)).toBeNull();
+    }
   });
 
   it("consumes only the one-shot install query", () => {

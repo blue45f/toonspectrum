@@ -1,4 +1,5 @@
 import type { CreatorMarketplaceInstallReceiptState } from "@/shared/lib/creator-marketplace-install-receipt";
+import { campusDocumentHref } from "@/shared/lib/spatial-campus/campus-return";
 import type {
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceRecord,
@@ -88,10 +89,33 @@ const HANDOFF_BY_KIND: Readonly<
   },
 };
 
-export function marketStudioResourceHref(resourceId: string): string {
-  return `/studio?installMarketResource=${encodeURIComponent(
-    resourceId,
-  )}&assetMarket=community`;
+export const MARKET_STUDIO_RETURN_QUERY = "marketReturn";
+
+function marketResourceReturnHref(resourceId: string): string {
+  return `/market/resource/${encodeURIComponent(resourceId)}`;
+}
+
+export function marketStudioResourceHref(
+  resourceId: string,
+  studioTargetHref?: string | null,
+): string {
+  let safeDocumentTarget: string | null = null;
+  if (studioTargetHref) {
+    try {
+      const target = new URL(studioTargetHref, "https://campus.invalid");
+      if (target.origin === "https://campus.invalid" && !target.hash) {
+        safeDocumentTarget = campusDocumentHref(target.pathname, target.search);
+      }
+    } catch {
+      // Invalid or external targets fall back to the identity-free Studio entry.
+    }
+  }
+  const baseHref = safeDocumentTarget ?? "/studio";
+  const url = new URL(baseHref, "https://campus.invalid");
+  url.searchParams.set("installMarketResource", resourceId);
+  url.searchParams.set("assetMarket", "community");
+  url.searchParams.set(MARKET_STUDIO_RETURN_QUERY, marketResourceReturnHref(resourceId));
+  return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 export function marketStudioHandoff(
@@ -100,6 +124,7 @@ export function marketStudioHandoff(
     "id" | "kind" | "resourceVersion"
   >,
   installState: CreatorMarketplaceInstallReceiptState = "no-verified-receipt",
+  studioTargetHref?: string | null,
 ): MarketStudioHandoff {
   const base = HANDOFF_BY_KIND[record.kind];
   const actionLabel = base.mode !== "install-tool-pack"
@@ -110,7 +135,7 @@ export function marketStudioHandoff(
         ? "Studio에서 설치 관리"
         : base.actionLabel;
   return {
-    href: marketStudioResourceHref(record.id),
+    href: marketStudioResourceHref(record.id, studioTargetHref),
     ...base,
     actionLabel,
   };

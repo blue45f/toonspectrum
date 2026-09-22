@@ -11,13 +11,35 @@ import type { CreatorMarketplaceResourceKind } from "@/shared/lib/creator-market
 const RESOURCE_ID = "10000000-0000-4000-8000-000000000001";
 
 describe("market Studio handoff", () => {
-  it("uses the exact query consumed by the Studio installer", () => {
-    expect(marketStudioResourceHref(RESOURCE_ID)).toBe(
-      `/studio?installMarketResource=${RESOURCE_ID}&assetMarket=community`,
+  it("uses the exact installer query and a public-only return receipt", () => {
+    const href = new URL(marketStudioResourceHref(RESOURCE_ID), "https://example.test");
+    expect(href.pathname).toBe("/studio");
+    expect(href.searchParams.get("installMarketResource")).toBe(RESOURCE_ID);
+    expect(href.searchParams.get("assetMarket")).toBe("community");
+    expect(href.searchParams.get("marketReturn")).toBe(`/market/resource/${RESOURCE_ID}`);
+
+    const spaced = new URL(marketStudioResourceHref("release with spaces"), "https://example.test");
+    expect(spaced.searchParams.get("installMarketResource")).toBe("release with spaces");
+    expect(spaced.searchParams.get("marketReturn")).toBe("/market/resource/release%20with%20spaces");
+  });
+
+  it("targets the exact remembered Studio document but rejects widened or external targets", () => {
+    const exact = new URL(
+      marketStudioResourceHref(RESOURCE_ID, "/studio/p/project-A/d/document-B?pageId=page-C"),
+      "https://example.test",
     );
-    expect(marketStudioResourceHref("release with spaces")).toBe(
-      "/studio?installMarketResource=release%20with%20spaces&assetMarket=community",
-    );
+    expect(exact.pathname).toBe("/studio/p/project-A/d/document-B");
+    expect(exact.searchParams.get("pageId")).toBe("page-C");
+    expect(exact.searchParams.get("installMarketResource")).toBe(RESOURCE_ID);
+
+    for (const unsafe of [
+      "https://evil.test/studio/p/project-A/d/document-B",
+      "/studio/p/project-A/d/document-B?token=secret",
+      "/fortune",
+    ]) {
+      expect(new URL(marketStudioResourceHref(RESOURCE_ID, unsafe), "https://example.test").pathname)
+        .toBe("/studio");
+    }
   });
 
   it.each<[

@@ -203,6 +203,35 @@ export async function executeStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
   });
 }
 
+export const STUDIO_MARKET_RETURN_QUERY = "marketReturn";
+
+const MARKET_RESOURCE_RETURN = /^\/market\/resource\/([^/?#]+)\/?$/u;
+
+export function readStudioMarketplaceReturnHref(search: string): string | null {
+  const value = new URLSearchParams(search).get(STUDIO_MARKET_RETURN_QUERY);
+  if (!value || value.length > 512) return null;
+  let url: URL;
+  try {
+    url = new URL(value, "https://studio.invalid");
+  } catch {
+    return null;
+  }
+  if (url.origin !== "https://studio.invalid" || url.search || url.hash) return null;
+  const match = MARKET_RESOURCE_RETURN.exec(url.pathname);
+  if (!match) return null;
+  try {
+    const decoded = decodeURIComponent(match[1]);
+    if (!decoded || decoded === "." || decoded === ".."
+      || /[\\/%]/u.test(decoded)
+      || [...decoded].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
+      return null;
+    }
+    return `/market/resource/${encodeURIComponent(decoded)}`;
+  } catch {
+    return null;
+  }
+}
+
 export function consumeStudioMarketplaceInstallSearch(search: string): string {
   const next = new URLSearchParams(search);
   next.delete("installMarketResource");
