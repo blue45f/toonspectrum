@@ -35,7 +35,7 @@ import {
   recipePreviewData,
   templatePreviewData,
 } from "../models/market-preview";
-import { marketStudioHandoff } from "../models/market-studio-handoff";
+import { useMarketStudioHandoff } from "../hooks/use-market-studio-handoff";
 
 import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudLibraryAction";
 import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
@@ -146,7 +146,7 @@ export function MarketResourceDetailArticle({
   const selectedRecipe = recipePreviews?.[safePreviewIndex];
   const [currentRecord, setCurrentRecord] = useState(record);
   const deviceInstall = useMarketDeviceInstall(currentRecord);
-  const studioHandoff = marketStudioHandoff(currentRecord, deviceInstall.state);
+  const studioHandoff = useMarketStudioHandoff(currentRecord, deviceInstall.state);
   const [viewer3dOpen, setViewer3dOpen] = useState(false);
 
   const [acquisitionModalOpen, setAcquisitionModalOpen] = useState(false);

@@ -80,6 +80,35 @@ function probe(): DOMStringMap {
 afterEach(cleanup);
 
 describe("canonical Studio document runtime", () => {
+  it("keeps the marketplace return receipt through canonical workspace projections", async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        "/studio/p/project-a/d/shared-document?workspace=draw&marketReturn=%2Fmarket%2Fresource%2Fasset-A",
+      ]}>
+        <CanonicalRuntimeHarness />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: /원래 리소스로 돌아가기|original marketplace resource/ })
+      .getAttribute("href")).toBe("/market/resource/asset-A");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "문서 작업공간" }), {
+      target: { value: "slides" },
+    });
+
+    await waitFor(() => {
+      const location = new URL(
+        screen.getByLabelText("location").textContent ?? "",
+        "https://example.test",
+      );
+      expect(location.pathname).toBe("/studio/p/project-a/d/shared-document");
+      expect(location.searchParams.get("workspace")).toBe("slides");
+      expect(location.searchParams.get("marketReturn")).toBe("/market/resource/asset-A");
+    });
+    expect(screen.getByRole("link", { name: /원래 리소스로 돌아가기|original marketplace resource/ })
+      .getAttribute("href")).toBe("/market/resource/asset-A");
+  });
+
   it("preserves editing state across all workspace projections and isolates project identity", async () => {
     nextMountId = 0;
     render(

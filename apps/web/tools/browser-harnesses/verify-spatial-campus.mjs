@@ -48,6 +48,37 @@ async function contextFor(width, height = 900) {
 const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
 const widths = (process.env.CAMPUS_QA_WIDTHS ?? "1440,1024,390,320").split(",").map(Number);
 
+async function verifyMarketStudioRoundTrip() {
+  const context = await contextFor(1440);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const detailPath = `/market/resource/${resource.id}`;
+    await page.goto(new URL(detailPath, origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const installLink = page.getByRole("link", { name: /Studio|스튜디오/u }).filter({ hasText: /팔레트/u }).first();
+    await installLink.waitFor({ timeout: 60000 });
+    const target = new URL(await installLink.getAttribute("href"), origin);
+    assert.equal(target.pathname, "/studio");
+    assert.equal(target.searchParams.get("installMarketResource"), resource.id);
+    assert.equal(target.searchParams.get("assetMarket"), "community");
+    assert.equal(target.searchParams.get("marketReturn"), detailPath);
+
+    await installLink.click();
+    await page.locator("[data-studio-market-return]").waitFor({ timeout: 60000 });
+    assert.equal(new URL(page.url()).pathname, "/studio/canvas");
+    const returnLink = page.getByRole("link", { name: /소재 거리의 원래 리소스로 돌아가기|original marketplace resource/u });
+    assert.equal(await returnLink.getAttribute("href"), detailPath);
+    await returnLink.click();
+    await page.getByRole("heading", { name: resource.name }).first().waitFor({ timeout: 60000 });
+    assert.equal(new URL(page.url()).pathname, detailPath);
+    assert.deepEqual(errors, []);
+    report.interactions.push("Market resource enters the real Studio canvas with a bounded return receipt and returns to the same public resource");
+  } finally {
+    await context.close();
+  }
+}
+
 async function verifySceneFailureIsolation() {
   const context = await contextFor(1440);
   await context.addInitScript(() => {
@@ -169,6 +200,7 @@ try {
   assert.deepEqual(interactionErrors, [], "Runtime errors during domain and Phaser interactions");
   report.interactions.push("Existing Phaser canvas boots locally; keyboard input measurably moves the actor, stop unmounts the canvas and the domain form is preserved");
   await context.close();
+  await verifyMarketStudioRoundTrip();
   await verifySceneFailureIsolation();
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);
