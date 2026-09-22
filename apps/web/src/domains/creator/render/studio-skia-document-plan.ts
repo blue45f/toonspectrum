@@ -4,7 +4,8 @@ import type { SceneNodeIR } from "@toonspectrum/studio-project-model";
 import { isDirectLiveDraftEl, resolveStudioCausalInkDrawContract } from "../brush/studio-draw-rendering";
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { planStudioCausalInk } from "../studio-causal-ink";
-import type { DrawEl, El } from "../studio-element-model";
+import type { DrawEl, El, FrameEl } from "../studio-element-model";
+import { createStudioPanelResolver } from "../studio-element-geometry";
 import { isStudioVelloDocumentVectorElement, lowerStudioElementsToRenderScene, parseSupportedCssColorToIR } from "./studio-document-scene-lower";
 
 export interface StudioSkiaDocumentPlan {
@@ -27,12 +28,39 @@ export function isStudioSkiaCausalInk(element: El): element is DrawEl & El {
     && (!element.blendMode || element.blendMode === "source-over");
 }
 
+export type StudioSkiaFrameTheme = "classic" | "soft" | "vivid";
+
+function isStudioSkiaDocumentFrame(element: El): boolean {
+  return element.type === "frame"
+    && !element.bg
+    && (element.opacity === undefined || element.opacity === 1)
+    && Number.isFinite(element.x) && Number.isFinite(element.y)
+    && Number.isFinite(element.width) && element.width > 0
+    && Number.isFinite(element.height) && element.height > 0
+    && (!element.points || (element.points.length >= 6 && element.points.length % 2 === 0 && element.points.every(Number.isFinite)))
+    && (!element.bgColor || parseSupportedCssColorToIR(element.bgColor) !== null)
+    && (!element.stroke || parseSupportedCssColorToIR(element.stroke) !== null);
+}
+
 export function isStudioSkiaDocumentElement(element: El): boolean {
-  return isStudioSkiaCausalInk(element) || isStudioVelloDocumentVectorElement(element);
+  return isStudioSkiaCausalInk(element) || isStudioVelloDocumentVectorElement(element) || isStudioSkiaDocumentFrame(element);
+}
+
+function framePanel(element: FrameEl & El, theme: StudioSkiaFrameTheme): NonNullable<SkiaDocumentItem["panel"]> {
+  const vivid = theme === "vivid"; const soft = theme === "soft";
+  const strokeWidth = element.strokeWidth ?? (vivid ? 1.2 : soft ? 1.8 : 3);
+  return {
+    x: element.x, y: element.y, width: element.width, height: element.height,
+    fill: parseSupportedCssColorToIR(element.bgColor ?? "#ffffff")!,
+    stroke: parseSupportedCssColorToIR(element.stroke ?? (vivid ? "#3a3a3a" : soft ? "#222222" : "#16100c"))!,
+    strokeWidth, radius: vivid ? 6 : soft ? 0 : 4, dashed: element.dashStyle === "dashed",
+    ...(element.points ? { points: [...element.points] } : {}),
+    ...(vivid ? { shadow: { blur: 5, opacity: 0.08, x: 1, y: 2 } } : {}),
+  };
 }
 
 /** Original dabs/pressure/paint identity are reused, not substituted with an approximate brush. */
-export function compileStudioSkiaDocumentItem(element: El): SkiaDocumentItem | null {
+export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSkiaFrameTheme = "classic"): SkiaDocumentItem | null {
   if (isStudioSkiaCausalInk(element)) {
     if (element.points.length < 2 || element.points.length % 2 || !element.points.every(Number.isFinite)) return null;
     const contract = resolveStudioCausalInkDrawContract(element);
@@ -48,6 +76,10 @@ export function compileStudioSkiaDocumentItem(element: El): SkiaDocumentItem | n
       ...(contract.nib ? { nib: contract.nib } : {}),
     } };
   }
+  if (element.type === "frame") {
+    if (!isStudioSkiaDocumentFrame(element)) return null;
+    return { id: element.id, revision: { element, frameTheme }, panel: framePanel(element, frameTheme) };
+  }
   if (!isStudioVelloDocumentVectorElement(element)) return null;
   const nodes = lowerStudioElementsToRenderScene([element], { width: 1, height: 1 }).nodes;
   if (nodes.some((node) => !["fill-path", "stroke-path", "group"].includes(node.kind))) return null;
@@ -56,33 +88,40 @@ export function compileStudioSkiaDocumentItem(element: El): SkiaDocumentItem | n
 
 /** One cache per editor: unchanged strokes are not replanned after every commit or camera move. */
 export function createStudioSkiaDocumentProjector() {
-  let compiled = new Map<string, SkiaDocumentItem>();
+  type CachedProjection = { element: El; panel: FrameEl | null; theme: StudioSkiaFrameTheme | null; item: SkiaDocumentItem };
+  let compiled = new Map<string, CachedProjection>();
   const inkBudget = 64 * 1024 * 1024;
   return {
     clear() { compiled.clear(); },
-    project(elements: readonly El[]): StudioSkiaDocumentPlan {
-      // Transparent frame paint still clips its children in the authoritative document.
-      if (elements.some((element) => element.type === "frame" && !element.hidden)) {
-        return { supported: false, items: [], ownedDocumentIds: [], reason: "frame-clip-requires-compatibility" };
+    project(elements: readonly El[], frameTheme: StudioSkiaFrameTheme = "classic"): StudioSkiaDocumentPlan {
+      const unsupportedFrame = elements.find((element) => element.type === "frame" && !element.hidden && !isStudioSkiaDocumentFrame(element));
+      if (unsupportedFrame) {
+        return { supported: false, items: [], ownedDocumentIds: [], reason: `unsupported-frame:${unsupportedFrame.id}` };
       }
+      const resolvePanel = createStudioPanelResolver(elements);
       const items: SkiaDocumentItem[] = [];
-      const next = new Map<string, SkiaDocumentItem>();
+      const next = new Map<string, CachedProjection>();
       let inkBytes = 0;
       const ids = new Set<string>();
       for (const element of elements) {
         if (element.hidden || (element.opacity ?? 1) <= 0) continue;
         if (ids.has(element.id)) return { supported: false, items: [], ownedDocumentIds: [], reason: "duplicate-document-id" };
         ids.add(element.id);
-        let item = compiled.get(element.id);
-        if (item?.revision !== element) item = undefined;
-        if (!item) {
-          const result = compileStudioSkiaDocumentItem(element);
+        const panel = element.type === "frame" || element.noClip ? null : resolvePanel(element);
+        const theme = element.type === "frame" ? frameTheme : null;
+        let entry = compiled.get(element.id);
+        if (entry?.element !== element || entry.panel !== panel || entry.theme !== theme) entry = undefined;
+        if (!entry) {
+          const result = compileStudioSkiaDocumentItem(element, frameTheme);
           if (!result) return { supported: false, items: [], ownedDocumentIds: [], reason: `unsupported-element:${element.id}` };
-          item = result;
+          const item = panel
+            ? { ...result, revision: { element, panel }, clip: { x: panel.x, y: panel.y, width: panel.width, height: panel.height } }
+            : result;
+          entry = { element, panel, theme, item };
         }
-        inkBytes += item.ink?.dabs.byteLength ?? 0;
+        inkBytes += entry.item.ink?.dabs.byteLength ?? 0;
         if (inkBytes > inkBudget) return { supported: false, items: [], ownedDocumentIds: [], reason: "GPU ink projection memory budget exceeded" };
-        next.set(element.id, item); items.push(item);
+        next.set(element.id, entry); items.push(entry.item);
       }
       compiled = next;
       return { supported: true, items, ownedDocumentIds: items.map((item) => item.id), reason: null };

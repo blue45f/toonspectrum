@@ -100,6 +100,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     tool,
     webGpuPreviewAuthorized,
     webGpuViewportSurface,
+    webtoonTheme,
     stableHandlers,
   } = props;
   const { setHokusaiLiveOverlaySurface, setLivingInkOverlaySurface } = stableHandlers;
@@ -577,7 +578,9 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && selectedId === null
     && marqueeIds.length === 0
     && velloEligibleDocumentIds.length > 0
-    && velloDocumentElements.every((element) => element.hidden || (element.opacity ?? 1) <= 0 || isStudioSkiaDocumentElement(element));
+    && velloDocumentElements.every((element) => element.hidden
+      || ((element.opacity ?? 1) <= 0 && element.type !== "frame")
+      || isStudioSkiaDocumentElement(element));
   const velloSceneRevision = useMemo(
     () => Object.freeze({
       pageId: activePage.id,
@@ -585,6 +588,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       elements: velloDocumentElements,
       transform: velloSceneDocumentTransform,
       dpr: velloSurfaceDpr,
+      frameTheme: webtoonTheme,
       viewportHeight: stageViewLayout.height,
       viewportWidth: stageViewLayout.width,
     }),
@@ -594,6 +598,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       velloDocumentElements,
       velloSceneDocumentTransform,
       velloSurfaceDpr,
+      webtoonTheme,
       stageViewLayout.height,
       stageViewLayout.width,
     ],

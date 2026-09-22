@@ -73,3 +73,18 @@ These results do not certify full Konva/Canvas2D removal, physical pen latency, 
 30/120-minute soak. The dedicated broader Full Test Diagnostic is distinct from core/verify; earlier
 run 35656230252 reported 9 failures in 6 unrelated unchanged test files, not a green full repository suite.
 No tests, budgets, authorization, persistence, Automerge, deployment or branch protection were weakened.
+
+## Static panel continuation — 2026-09-22
+
+This continuation keeps Yjs, commands, Undo and persistence unchanged while widening only the exact GPU display boundary. Static colour-only frames now retain the existing classic/soft/vivid border defaults, inset border, dash, clipped vivid shadow and child panel clipping. Frame image backgrounds, non-identity frame opacity and unsupported colours remain on the compatibility boundary.
+
+The frame theme participates in the exact scene revision and in retained picture invalidation. Transparent frame paint may still provide the authoritative child clip. Hidden frames do not clip. Child clipping continues to use the existing axis-aligned smallest-containing-frame rule; polygon geometry remains the frame's own paint/clip shape and is not silently substituted for that established child policy.
+The compatibility document layer and GPU projector each build one frame-only resolver per immutable projection rather than rescanning all unrelated elements for every child. The resolver has regression coverage against the established `containingPanel` policy.
+
+Focused tests currently cover frame admission, transparent clips, theme invalidation, retained panel changes and renderer validation. Chromium 151 on ANGLE Metal / Apple M2 Max and Firefox 153 passed the existing 3,000/10,000-stroke, append/undo, resize, camera and context-loss scenarios plus static panel pixel comparison. The panel comparison reported alpha ratio 1.0241, edge mismatch 0.0365 and premultiplied colour error below 2.74 in both browsers. These tolerances compare two antialiased renderers; they are not permission to omit panel pixels.
+
+The real `/studio/canvas` verifier also passed the existing draw, zoom/rotation, Undo/Redo and explicit same-engine loss recovery journey after this continuation. Static images, text shaping, masks, filters, natural media and exports remain separately gated and are not counted as completed by this evidence.
+
+Final local verification for this continuation used the exact branch source and the built production `dist`. The focused panel/projector/surface/wiring suite passed 6 files / 63 tests. The complete `studio-engine-skia`, Creator render and canvas test scope passed 229 files / 2,543 tests after materializing four tracked sparse-checkout WebP fixtures from their unchanged `origin/main` blobs. Web/API typecheck, architecture boundaries, changed-file secrets and lint, production build, generated notices, CSP and the existing Studio bundle ratchet passed without budget changes.
+
+The final direct GPU run passed 18 scenario groups across Chromium 151 on ANGLE Metal / Apple M2 Max and Firefox 153. It retained 10,000 strokes through 100 append/Undo cycles, preserved bounded picture bytes, and passed static panel pixel comparison in both browsers. The built production preview passed the real `/studio/canvas` four-part journey: draw, zoom/rotation, Undo/Redo, GPU loss and explicit same-engine exact-pixel recovery. Test-only harness HTML is a Vite development fixture and is not claimed as a production route.
