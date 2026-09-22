@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canStudioSkiaPublishOverSettledInk,
+  createStudioSkiaCommittedInkHostRuntime,
   decideStudioSkiaCommittedInkDraw,
   projectStudioSkiaCommittedInkAuthority,
   projectStudioSkiaCommittedInkVisibleReceipt,
@@ -156,5 +157,39 @@ describe("Skia committed-ink receipt bridge", () => {
       sceneRevision: {},
       ownedDocumentIds: ["stroke-a"],
     })).toBeNull();
+  });
+
+  it("keeps host retries and visible receipts isolated behind one runtime", () => {
+    let wakeCount = 0;
+    const queue = [handoff()];
+    const runtime = createStudioSkiaCommittedInkHostRuntime({
+      readQueue: () => queue,
+      wake: () => { wakeCount += 1; },
+    });
+
+    expect(runtime.canPublishOverSettledInk({
+      sceneRevision: revision(),
+      ownedDocumentIds: ["stroke-a"],
+    })).toBe(true);
+    expect(runtime.decide(request())).toEqual({ status: "wait", nextDeferAttempt: 1 });
+    runtime.defer("receipt-token", 1);
+    expect(runtime.decide(request())).toEqual({ status: "fallback" });
+
+    runtime.onAuthorityChange(authority("active"));
+    expect(runtime.decide(request())).toEqual({ status: "hold" });
+    runtime.onVisiblePresentation({
+      sceneRevision: revision(),
+      ownedDocumentIds: ["stroke-a"],
+    });
+    expect(runtime.decide(request())).toEqual({ status: "receipted" });
+    expect(wakeCount).toBe(2);
+
+    runtime.settle("receipt-token");
+    runtime.onAuthorityChange({
+      ...authority("starting"),
+      sceneRevision: revision(9),
+    });
+    expect(runtime.decide(request())).toEqual({ status: "fallback" });
+    runtime.clear();
   });
 });
