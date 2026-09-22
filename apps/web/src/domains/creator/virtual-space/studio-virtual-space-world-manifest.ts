@@ -22,7 +22,8 @@ import {
   STUDIO_VIRTUAL_SPACE_INTERACTIONS,
   type StudioVirtualSpaceInteractionAction,
 } from "./studio-virtual-space-interactions";
-import { STUDIO_CHARACTER_SKINS, studioCharacterActionClip } from "./studio-virtual-space-character-skins";
+import { studioCharacterActionClip } from "./studio-virtual-space-character-skins";
+import { STUDIO_NPC_CAST, studioNpcCastHasKey } from "./studio-virtual-space-npc-cast";
 import {
   StudioWorldConnectivityIndex,
   studioWorldCircleCanOccupy,
@@ -266,19 +267,19 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
   // The first point is a work approach; patrol points alternate reference checks and breaks.
   npcActivityAnchors: DEFAULT_NPC_ACTIVITY_ANCHORS,
   npcs: [
-    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"], skinKey: "dark", roomId: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 505, y: 485 }), facing: "down", scale: 0.68, speed: 58, behavior: "patrol", patrol: [
+    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"], skinKey: "npc-concierge", roomId: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 505, y: 485 }), facing: "down", scale: 0.68, speed: 58, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 455, y: 445 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 500, y: 550 }),
     ] },
-    { id: "studio-writer", activityAnchorIds: ["studio-writer-0", "studio-writer-1", "studio-writer-2"], skinKey: "silver", roomId: "writers", point: studioVirtualSpaceScaleLegacyPoint({ x: 435, y: 198 }), facing: "up", scale: 0.68, speed: 54, behavior: "patrol", patrol: [
+    { id: "studio-writer", activityAnchorIds: ["studio-writer-0", "studio-writer-1", "studio-writer-2"], skinKey: "npc-editor", roomId: "writers", point: studioVirtualSpaceScaleLegacyPoint({ x: 435, y: 198 }), facing: "up", scale: 0.68, speed: 54, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 660, y: 198 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 475, y: 235 }),
     ] },
-    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"], skinKey: "pink", roomId: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 885, y: 410 }), facing: "right", scale: 0.68, speed: 60, behavior: "patrol", patrol: [
+    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"], skinKey: "npc-atelier", roomId: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 885, y: 410 }), facing: "right", scale: 0.68, speed: 60, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 890, y: 310 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 870, y: 450 }),
     ] },
-    { id: "studio-librarian", activityAnchorIds: ["studio-librarian-0", "studio-librarian-1", "studio-librarian-2"], skinKey: "purple", roomId: "assets", point: studioVirtualSpaceScaleLegacyPoint({ x: 290, y: 410 }), facing: "left", scale: 0.68, speed: 52, behavior: "patrol", patrol: [
+    { id: "studio-librarian", activityAnchorIds: ["studio-librarian-0", "studio-librarian-1", "studio-librarian-2"], skinKey: "npc-archivist", roomId: "assets", point: studioVirtualSpaceScaleLegacyPoint({ x: 290, y: 410 }), facing: "left", scale: 0.68, speed: 52, behavior: "patrol", patrol: [
       studioVirtualSpaceScaleLegacyPoint({ x: 285, y: 300 }),
       studioVirtualSpaceScaleLegacyPoint({ x: 305, y: 450 }),
     ] },
@@ -400,7 +401,7 @@ export const STUDIO_WORLD_MAX_DIMENSION = 10_000;
 export const STUDIO_WORLD_MAX_ENTITIES = 4_096;
 const SAFE_WORLD_ID = /^[a-z0-9][a-z0-9_-]{0,63}$/iu;
 const WORLD_ACTIONS = new Set(["assistant", "assets", "canvas", "community", "comic", "live", "review", "story"]);
-const WORLD_CHARACTER_SKINS = new Set(STUDIO_CHARACTER_SKINS.map((skin) => skin.key));
+const WORLD_NPC_CAST_KEYS = new Set(STUDIO_NPC_CAST.map((skin) => skin.key));
 
 function hasUnsafeUrlCharacters(value: string): boolean {
   return [...value].some((char) => char === "\\" || char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127);
@@ -589,7 +590,7 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
   }
   for (const npc of manifest.npcs) {
     if (!roomIds.has(npc.roomId)) errors.push(`npc references missing room: ${npc.id}`);
-    if (!WORLD_CHARACTER_SKINS.has(npc.skinKey)) errors.push(`npc references missing skin: ${npc.id}`);
+    if (!WORLD_NPC_CAST_KEYS.has(npc.skinKey) || !studioNpcCastHasKey(npc.skinKey)) errors.push(`npc references missing cast: ${npc.id}`);
     if (!inBounds(npc.point) || !facingValid(npc.facing) || !optionalPositive(npc.speed) || !optionalPositive(npc.scale)) errors.push(`npc is invalid: ${npc.id}`);
     else if (!actorCanOccupy(npc.point)) errors.push(`npc start is blocked: ${npc.id}`);
     if (npc.behavior && !["idle", "talk", "draw", "review", "patrol"].includes(npc.behavior)) errors.push(`npc behavior is invalid: ${npc.id}`);
@@ -598,7 +599,7 @@ export function validateStudioWorldManifest(manifest: StudioVirtualSpaceWorldMan
       else for (const id of npc.activityAnchorIds) {
         const anchor: StudioWorldNpcActivityAnchor | undefined = Array.isArray(manifest.npcActivityAnchors) ? manifest.npcActivityAnchors.find((value) => value?.id === id) : undefined;
         if (!anchor) { errors.push(`npc references missing activity anchor: ${npc.id}`); continue; }
-        const skin = STUDIO_CHARACTER_SKINS.find((value) => value.key === npc.skinKey);
+        const skin = STUDIO_NPC_CAST.find((value) => value.key === npc.skinKey);
         if (anchor.animation !== "idle" && !(anchor.animation === "sit" ? skin?.poses?.sit
           : skin?.state?.[anchor.animation] || (skin && studioCharacterActionClip(skin, anchor.facing, anchor.animation)))) errors.push(`npc activity clip is unavailable: ${npc.id}/${anchor.id}`);
         if (inBounds(anchor.approachPoint) && actorCanOccupy(npc.point) && actorCanOccupy(anchor.approachPoint)

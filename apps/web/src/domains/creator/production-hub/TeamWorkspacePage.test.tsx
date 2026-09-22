@@ -20,6 +20,9 @@ function App({ path = "/production/workspaces" }: { path?: string }) {
     <Route path="/production/workspaces" element={<TeamWorkspacePage />} />
     <Route path="/production/workspaces/join" element={<TeamWorkspaceJoinPage />} />
     <Route path="/production/workspaces/:workspaceId" element={<TeamWorkspacePage />} />
+    <Route path="/studio/p/:projectId/space" element={<p>project-space-destination</p>} />
+    <Route path="/team" element={<p>team-lobby-destination</p>} />
+    <Route path="/collaborate/workspace" element={<p>interview-waiting-destination</p>} />
   </Routes></MemoryRouter>;
 }
 beforeEach(() => {
@@ -59,7 +62,22 @@ describe("free team workspace UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "artist@example.test", role: "member" }));
     await screen.findByText(/이메일은 발송되지 않았습니다/);
-    expect((screen.getByLabelText("새 초대 링크") as HTMLInputElement).value).toContain("#invite=");
+    const value = (screen.getByLabelText("새 초대 링크") as HTMLInputElement).value;
+    expect(value).toContain("#invite=");
+    expect(value).toContain("entry=team-lobby");
+  });
+  it("adds a project-space hint without changing the authoritative invite command", async () => {
+    mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
+    render(<App path="/production/workspaces/team-a" />);
+    await screen.findByRole("heading", { name: "구성원 초대" });
+    fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "artist@example.test" } });
+    fireEvent.change(screen.getByLabelText("수락 후 입장 안내"), { target: { value: "project-space" } });
+    fireEvent.change(screen.getByLabelText("입장할 프로젝트"), { target: { value: "work-a" } });
+    fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
+    await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "artist@example.test", role: "member" }));
+    const value = (await screen.findByLabelText("새 초대 링크") as HTMLInputElement).value;
+    expect(value).toContain("entry=project-space");
+    expect(value).toContain("project=work-a");
   });
   it("does not render private team state after switching to signed out", async () => {
     const view = render(<App path="/production/workspaces/team-a" />);
@@ -76,5 +94,6 @@ describe("free team workspace UI", () => {
     expect(window.location.search).toBe("");
     fireEvent.click(screen.getByRole("button", { name: "초대 수락하기" }));
     await waitFor(() => expect(mocks.accept).toHaveBeenCalledWith("b".repeat(43)));
+    await screen.findByText("team-lobby-destination");
   });
 });

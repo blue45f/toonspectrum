@@ -44,13 +44,13 @@ import {
 } from "./studio-virtual-space-motion";
 import {
   STUDIO_CHARACTER_SKINS,
-  studioCharacterSkinByKey,
   resolveStudioCharacterAppearance,
   studioCharacterWalkClip,
   studioCharacterActionClip,
   type StudioCharacterMotionState,
   type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
+import { STUDIO_NPC_CAST, studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
 import {
   StudioCharacterAssetResidency,
   studioCharacterFrameGeometry,
@@ -329,6 +329,11 @@ export function StudioVirtualSpacePhaserCanvas({
       const zoneTracker = new StudioWorldZoneTracker();
       const failedTextures = new Set<string>();
       const fallbackAsset = studioCharacterStaticAsset(STUDIO_CHARACTER_SKINS[0]!, "down");
+      const npcFallbackAsset = studioCharacterStaticAsset(STUDIO_NPC_CAST[0]!, "down");
+      const npcBootAssets = manifest.npcs.map((definition) => studioCharacterStaticAsset(
+        studioNpcCastSkinByKey(definition.skinKey),
+        definition.facing ?? "down",
+      ));
       const bootSelfAsset = studioCharacterStaticAsset(
         resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current).skin,
         snapshotRef.current.self.facing,
@@ -624,7 +629,7 @@ export function StudioVirtualSpacePhaserCanvas({
         this.load.image(backgroundTextureKey, worldAssetUrls?.get(manifest.backgroundUrl) ?? manifest.backgroundUrl);
 
         // Ready means the world and a safe actor frame exist, not that every clip has downloaded.
-        for (const asset of new Map([fallbackAsset, bootSelfAsset].map((item) => [item.key, item])).values()) {
+        for (const asset of new Map([fallbackAsset, bootSelfAsset, npcFallbackAsset, ...npcBootAssets].map((item) => [item.key, item])).values()) {
           this.load.image(asset.key, asset.url);
         }
 
@@ -825,12 +830,17 @@ export function StudioVirtualSpacePhaserCanvas({
 
         for (const view of npcDirector.views) {
           const npcDefinition = manifest.npcs.find((definition) => definition.id === view.id)!;
-          const skin = studioCharacterSkinByKey(npcDefinition.skinKey);
+          const skin = studioNpcCastSkinByKey(npcDefinition.skinKey);
           const visualScale = npcDefinition.scale ?? 0.72;
           const identity = studioNpcLabel(npcDefinition);
           const shadow = this.add.ellipse(view.point.x, view.point.y + 1, 30 * visualScale, 10 * visualScale, 0x15151c, 0.2)
             .setDepth(Math.round(view.point.y) + 990);
-          const sprite = this.add.sprite(view.point.x, view.point.y, fallbackAsset.key)
+          const npcInitialAsset = studioCharacterStaticAsset(skin, view.facing);
+          const sprite = this.add.sprite(
+            view.point.x,
+            view.point.y,
+            this.textures.exists(npcInitialAsset.key) ? npcInitialAsset.key : npcFallbackAsset.key,
+          )
             .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
             .setData({ visualWidth: 92 * visualScale, visualHeight: 123 * visualScale, assetOwner: `npc:${view.id}` })
             .setDisplaySize(92 * visualScale, 123 * visualScale)

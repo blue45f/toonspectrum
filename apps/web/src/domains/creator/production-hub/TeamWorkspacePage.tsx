@@ -8,6 +8,12 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { listProductionProjects, type ProductionProjectSummary } from "./production-dashboard-api";
 import { getEffectiveOperationPolicy, acceptTeamInvite, commandTeamWorkspace, createTeamWorkspace, getTeamUsage, getTeamWorkspace, listTeamWorkspaces } from "./team-workspace-api";
+import {
+  createStudioSpatialInviteFragment,
+  parseStudioSpatialInviteFragment,
+  studioSpatialInviteDestination,
+  type StudioSpatialInviteContext,
+} from "../virtual-space/studio-spatial-invite-context";
 
 const roles = { owner: "소유자", admin: "관리자", member: "구성원", guest: "게스트" } as const;
 const fieldClass = "min-h-11 rounded-lg border border-line bg-canvas px-3 text-fg";
@@ -40,6 +46,8 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<InvitableWorkspaceRole>("member");
+  const [inviteEntryKind, setInviteEntryKind] = useState<StudioSpatialInviteContext["kind"]>("team-lobby");
+  const [inviteProjectId, setInviteProjectId] = useState("");
   const [invitationLink, setInvitationLink] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -76,8 +84,16 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   async function command(input: TeamWorkspaceCommandInput) {
     if (!detail) return;
     const result = await commandTeamWorkspace(detail.workspace.id, detail.workspace.revision, input);
-    if (result.token) { setInvitationLink(`${window.location.origin}/production/workspaces/join#invite=${result.token}`); setEmail(""); }
-    else if (result.invitationId) setNotice("초대는 만들어졌지만 비밀 링크는 재표시하지 않습니다. 같은 이메일로 재발행해주세요.");
+    if (result.token) {
+      const entryContext: StudioSpatialInviteContext = inviteEntryKind === "project-space"
+        ? { kind: "project-space", projectId: inviteProjectId }
+        : inviteEntryKind === "interview-waiting"
+          ? { kind: "interview-waiting" }
+          : { kind: "team-lobby" };
+      const fragment = createStudioSpatialInviteFragment(result.token, entryContext);
+      setInvitationLink(`${window.location.origin}/production/workspaces/join${fragment}`);
+      setEmail("");
+    } else if (result.invitationId) setNotice("초대는 만들어졌지만 비밀 링크는 재표시하지 않습니다. 같은 이메일로 재발행해주세요.");
     else setNotice("변경 내용이 저장되었습니다.");
     if (input.type === "remove-member" && input.userId === userId) navigate("/production/workspaces");
   }
@@ -127,8 +143,15 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
       <label className="flex flex-col gap-2">초대받을 이메일<input type="email" required maxLength={320} className={fieldClass} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="flex flex-col gap-2">초대 역할<select className={fieldClass} value={inviteRole} onChange={(event) => setInviteRole(roleValue(event.target.value))}>
         {detail.workspace.role === "owner" && <option value="admin">관리자</option>}<option value="member">구성원</option><option value="guest">게스트</option></select></label>
-      <button type="submit" disabled={busy || !email.trim()} className={buttonClass()}>초대 링크 만들기</button></form>
-      <p className="mt-3 text-sm text-fg-2">7일간 유효하며 대기 초대도 구성원 한도에 포함됩니다. 같은 이메일로 재발행하면 이전 링크는 무효가 됩니다. 이메일은 자동 발송하지 않습니다.</p>
+      <label className="flex flex-col gap-2">수락 후 입장 안내<select className={fieldClass} value={inviteEntryKind}
+        onChange={(event) => setInviteEntryKind(event.target.value === "project-space" || event.target.value === "interview-waiting" ? event.target.value : "team-lobby")}>
+        <option value="team-lobby">팀 로비</option><option value="project-space">프로젝트 가상 스튜디오</option><option value="interview-waiting">면접·협업 대기실</option>
+      </select></label>
+      {inviteEntryKind === "project-space" && <label className="flex flex-col gap-2">입장할 프로젝트<select required className={fieldClass} value={inviteProjectId} onChange={(event) => setInviteProjectId(event.target.value)}>
+        <option value="">프로젝트 선택</option>{detail.projects.map((project) => <option key={project.id} value={project.workId}>{project.title}</option>)}
+      </select></label>}
+      <button type="submit" disabled={busy || !email.trim() || (inviteEntryKind === "project-space" && !inviteProjectId)} className={buttonClass()}>초대 링크 만들기</button></form>
+      <p className="mt-3 text-sm text-fg-2">7일간 유효하며 대기 초대도 구성원 한도에 포함됩니다. 같은 이메일로 재발행하면 이전 링크는 무효가 됩니다. 이메일은 자동 발송하지 않습니다. 입장 안내는 이동 목적지만 전달하며 프로젝트 권한을 새로 부여하지 않습니다.</p>
       <ul className="mt-4 space-y-2">{detail.invites.map((invitation) => <li key={invitation.id} className="flex flex-wrap items-center gap-3"><span>{invitation.email} · {roles[invitation.role]} · 만료 {new Date(invitation.expiresAt).toLocaleDateString("ko-KR")}</span>
         <button disabled={busy} className="underline" onClick={() => { void run(() => command({ type: "revoke-invite", invitationId: invitation.id })); }}>초대 취소</button></li>)}</ul></Card>}
     {usage && <UsageCard usage={usage} />}
@@ -140,20 +163,26 @@ export function TeamWorkspaceJoinPage() {
   const userId = useApp((state) => state.userId);
   const navigate = useNavigate();
   const [token, setToken] = useState("");
+  const [entryContext, setEntryContext] = useState<StudioSpatialInviteContext>({ kind: "team-lobby" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    const fragment = new URLSearchParams(window.location.hash.slice(1));
-    const invitation = fragment.get("invite");
-    if (invitation && /^[A-Za-z0-9_-]{43}$/u.test(invitation)) setToken(invitation);
-    if (invitation) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    const parsed = parseStudioSpatialInviteFragment(window.location.hash);
+    if (parsed.token) setToken(parsed.token);
+    setEntryContext(parsed.context);
+    if (window.location.hash) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
   }, []);
   return <div data-route-ready="team-workspace-join" className="min-h-dvh bg-canvas px-4 py-8 text-fg"><div className="mx-auto max-w-xl space-y-4">
     <h1 className="text-2xl font-black">워크스페이스 초대 수락</h1><p>초대받은 이메일로 로그인하고 이메일 인증을 완료해주세요. 작품별 접근 권한은 별도로 적용됩니다.</p>
     {error && <p role="alert">{error}</p>}
     {!userId && <p>로그인 후 원래 초대 링크를 다시 열거나 초대 코드를 입력해주세요. <Link to="/login" className="underline">로그인</Link></p>}
     <form className="flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); setBusy(true); setError("");
-      void acceptTeamInvite(token.trim()).then((result) => { setToken(""); navigate(`/production/workspaces/${result.workspaceId}`, { replace: true }); })
+      void acceptTeamInvite(token.trim()).then((result) => {
+        setToken("");
+        navigate(studioSpatialInviteDestination(entryContext, result.workspaceId), { replace: true });
+      })
         .catch(async (cause: unknown) => setError(await getApiErrorMessage(cause, "초대를 수락하지 못했습니다."))).finally(() => setBusy(false)); }}>
       <label className="flex flex-col gap-2">초대 코드<input className={fieldClass} value={token} onChange={(event) => setToken(event.target.value)} autoComplete="off" spellCheck={false} maxLength={43} /></label>
       <button disabled={!userId || busy || !/^[A-Za-z0-9_-]{43}$/u.test(token.trim())} className={buttonClass()} type="submit">초대 수락하기</button></form>

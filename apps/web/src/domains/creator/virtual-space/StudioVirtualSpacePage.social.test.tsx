@@ -17,6 +17,7 @@ import type { StudioSpaceSocialRequest, StudioSpaceSocialSnapshot } from "./Stud
 import type { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-social";
 import { STUDIO_P2P_HUDDLE_OPEN_EVENT, STUDIO_P2P_HUDDLE_CLOSE_EVENT, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpacePage } from "./StudioVirtualSpacePage";
+import { writeStudioVirtualSpaceEntryPreference } from "./studio-virtual-space-entry-preference";
 
 type Engine = ComponentProps<typeof StudioVirtualSpacePhaserCanvas>;
 type ConversationOptions = Parameters<typeof import("./use-studio-virtual-space-conversation").useStudioVirtualSpaceConversation>[0];
@@ -130,6 +131,7 @@ function showPanel(panel: "people" | "space") {
 
 beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
+  writeStudioVirtualSpaceEntryPreference(0);
   f.worldPublication = null; f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
   f.live.room.ready = false;
   f.presenceOverrides = {};
