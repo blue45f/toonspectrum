@@ -137,6 +137,7 @@ function sessionFromServer(
     visualBible:
       bundle.visualBibleRevisions?.[0]?.payload
       ?? sourcePayload.visualBible,
+    automation: sourcePayload.automation,
     jobs: bundle.jobs ?? sourcePayload.jobs,
     approval: bundle.approval ?? sourcePayload.approval,
     updatedAt: bundle.session.updatedAt,
@@ -151,6 +152,7 @@ function sessionPayload(session: StudioAiComicDirectorSessionDocument) {
     characterDescription: session.characterDescription,
     scenes: session.scenes,
     visualBible: session.visualBible,
+    automation: session.automation,
   };
 }
 

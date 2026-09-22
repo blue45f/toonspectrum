@@ -200,6 +200,17 @@ export function StudioAiProductionLaunchpad({
         <ArrowRight size={14} className="text-accent" aria-hidden />
       </a>
       <a
+        href={`${workspaceHref}?view=automation`}
+        className={cn(
+          "mt-2 flex min-h-11 items-center justify-between gap-2 rounded-lg border border-line bg-card px-3 py-2 text-xs font-semibold text-fg hover:bg-raised",
+          STUDIO_EASE,
+          STUDIO_FOCUS_RING,
+        )}
+      >
+        웹툰·30초 애니메이션 통합 제작 자동화 열기
+        <ArrowRight size={14} className="text-accent" aria-hidden />
+      </a>
+      <a
         href="/create/promo"
         target="_blank"
         rel="noopener noreferrer"

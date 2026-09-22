@@ -21,6 +21,23 @@ describe("AI Comic Director composition route", () => {
     expect(resolved.lifecycleKey).toContain("composition:session-1");
   });
 
+  it("preserves the automation view query without changing the session lifecycle", () => {
+    const resolved = resolveStudioRoute({
+      pathname: "/studio/compose/session-automation",
+      search: "?view=automation&from=launcher",
+    });
+
+    expect(resolved).toMatchObject({
+      kind: "composition",
+      sessionId: "session-automation",
+      canonicalHref:
+        "/studio/compose/session-automation?view=automation&from=launcher",
+    });
+    expect(resolved.lifecycleKey).toBe(
+      "/studio/draft/composition:session-automation",
+    );
+  });
+
   it("keeps work and session identities independent", () => {
     const resolved = resolveStudioRoute({
       pathname: "/studio/work/work-42/compose/session-9",
