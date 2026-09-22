@@ -94,3 +94,30 @@ those attributes in both environments. No engine implementation or private peer 
 The adapter also retains the last local pose when the scene is released offscreen and restored;
 a React/DOM regression verifies that resume and observer cleanup.
 The rebuilt production-preview rerun is recorded separately after completion.
+
+## Latest-main integration verified
+
+Main `030d53411cbba3a801ae0d86c4fa10c84a40fa17` was merged into this feature branch,
+not vice versa. Verified source commit: `9b3f51dd49620b7c3fe97ef66f980de82604f93e`.
+There were no merge conflicts. GPU canvas/render/engine files remain byte-identical to that
+main; the campus changes stay separate from the accepted GPU implementation.
+
+At this integrated source commit the following passed again:
+- 133 relevant test files / 1,344 tests; Web and API typechecks.
+- Production build, generated legal notices, CSP, unchanged static bundle ratchet.
+- The production-preview version of all 40 route/viewport cases and all four campus
+  interaction cases, including measured keyboard movement and preserved private input.
+- The existing main-owned `verify-studio-skia-product.mjs` against the same built preview:
+  actual local `/studio/canvas`, three pointer strokes, one visible Skia surface, 100% zoom,
+  90-degree rotation, existing Undo/Redo and explicit recovery from real GPU context loss.
+  Recovery restored identical document pixels; uncaught errors were zero. Observed renderer:
+  ANGLE Metal / Apple M2 Max. No authorization/API mock was added to this editor runner.
+
+The editor result is a small local smoke/regression test, not long-session performance,
+all-tool support or authenticated multi-user acceptance. Campus API fixtures remain as above.
+Logs: `/tmp/toonstudio-campus-c91e27-integrated-{tests,typecheck,build,postbuild,bundle,browser,editor}.log`.
+Campus report: `/tmp/toonstudio-campus-c91e27-qa/integrated-preview/report.json`.
+Editor report: `artifacts/skia-product/report.json` (generated, not committed).
+
+PR #1952 remains Draft. No main merge of this PR, production deployment, database migration,
+engine rewrite, lockfile update or validation-threshold relaxation was performed.
