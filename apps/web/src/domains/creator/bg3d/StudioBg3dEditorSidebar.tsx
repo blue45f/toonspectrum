@@ -11,6 +11,7 @@ import { StudioBg3dSceneDirectorPanel } from "./StudioBg3dSceneDirectorPanel";
 import type { StudioBg3dSceneGoal } from "./StudioBg3dSceneDirectorPanel";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { StudioBg3dEditorSidebarExtras } from "./StudioBg3dEditorSidebarExtras";
+import { listOfferedStudio3dCommands } from "./studio-bg3d-grade-plates";
 
 export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro = () => {} }) {
   const {
@@ -359,8 +360,9 @@ export function StudioBg3dEditorSidebar({ h, experienceMode = "pro", onOpenPro =
     else if (goal === "props") handlePanelTabChange("shapes");
     else { handlePanelTabChange("lt"); setLtEditorSection("line"); setLineArtPreview(true); }
   };
+  const offered3dCommands = listOfferedStudio3dCommands();
   return (
-          <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0">
+          <aside className="flex min-h-0 flex-col border-t border-line bg-panel lg:border-l lg:border-t-0" data-offered-3d-commands={offered3dCommands.map((command) => command.id).join(" ")}>
             {simpleMode ? (
               <StudioBg3dSceneDirectorPanel
                 activeGoal={activeSceneGoal}
