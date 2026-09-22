@@ -11,6 +11,7 @@
  *   TOONSPECTRUM_SOAK_MINUTES=300
  *   TOONSPECTRUM_SOAK_PROFILE=desktop|kakaotalk-android-360|instagram-ios-390|naver-android-412
  *   TOONSPECTRUM_SOAK_WEBGPU=1
+ *   TOONSPECTRUM_SOAK_INPUT=auto|mouse|pen|touch
  *   TOONSPECTRUM_SOAK_OUT=<directory>
  *   TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:4173  # optional existing preview
  */
@@ -25,11 +26,18 @@ import { STUDIO_ERASER_BRUSH_CATALOG_ITEMS, STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEM
 import { createStudioSoakCheckpoint } from "./lib/studio-five-hour-soak-checkpoint.mjs";
 import { collectStudioInAppRuntimeErrors, installStudioInAppFirstRunState, installStudioInAppGuestBoundary, STUDIO_INAPP_PROFILES, type StudioInAppRuntimeError } from "./lib/studio-inapp-sweep-harness.mjs";
 import { evaluateStudioSoakHeapGrowth, STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR } from "./lib/studio-memory-growth-policy.mjs";
+import {
+  createStudioPointerStrokePoints,
+  dispatchStudioPointerStroke,
+  parseStudioPointerInputMode,
+  resolveStudioPointerInputMode,
+} from "./lib/studio-pointer-input-driver.mjs";
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const MINUTES = Math.max(1, Number(process.env.TOONSPECTRUM_SOAK_MINUTES ?? "300") || 300);
 const PROFILE_ID = process.env.TOONSPECTRUM_SOAK_PROFILE?.trim() || "desktop";
 const WEBGPU = process.env.TOONSPECTRUM_SOAK_WEBGPU === "1";
+const INPUT_MODE_REQUEST = parseStudioPointerInputMode(process.env.TOONSPECTRUM_SOAK_INPUT);
 const OUT = process.env.TOONSPECTRUM_SOAK_OUT?.trim()
   || `artifacts/studio-five-hour-soak/${PROFILE_ID}${WEBGPU ? "-webgpu" : ""}`;
 const CYCLE_TARGET_MS = Math.max(5_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
@@ -65,6 +73,16 @@ interface PixelSample {
   readonly changedPixels: number;
   readonly brushId: string | null;
   readonly brushName: string | null;
+  readonly inputMode: "mouse" | "pen" | "touch";
+  readonly pointerPoints: number;
+  readonly pressureMin: number;
+  readonly pressureMax: number;
+  readonly tiltXMin: number;
+  readonly tiltXMax: number;
+  readonly tiltYMin: number;
+  readonly tiltYMax: number;
+  readonly twistMin: number;
+  readonly twistMax: number;
 }
 
 interface SoakFailure {
@@ -306,48 +324,48 @@ async function ensurePenReady(page: Page): Promise<boolean> {
     .catch(() => false);
 }
 
-async function drawEvidenceStroke(page: Page, cycle: number): Promise<{ changed: number; shot: Buffer }> {
+async function drawEvidenceStroke(
+  page: Page,
+  cdp: CDPSession | null,
+  cycle: number,
+  inputMode: "mouse" | "pen" | "touch",
+): Promise<{
+  changed: number;
+  shot: Buffer;
+  pointer: {
+    mode: "mouse" | "pen" | "touch";
+    points: number;
+    pressureMin: number;
+    pressureMax: number;
+    tiltXMin: number;
+    tiltXMax: number;
+    tiltYMin: number;
+    tiltYMax: number;
+    twistMin: number;
+    twistMax: number;
+  };
+}> {
   if (!(await closeBrushSurfaces(page))) {
     throw new Error("brush surfaces stayed open before drawing evidence");
   }
   const stage = page.locator(".konvajs-content").first();
   const box = await stage.boundingBox();
-  if (!box || box.width < 120 || box.height < 120) return { changed: -1, shot: Buffer.alloc(0) };
-  await page.mouse.move(4, 4);
+  if (!box || box.width < 120 || box.height < 120) {
+    throw new Error("Studio drawing surface is smaller than the pointer acceptance minimum.");
+  }
   await page.waitForTimeout(80);
   const before = await page.screenshot({ clip: box, animations: "disabled" });
-  // Keep hundreds of soak probes deterministic without repainting a tiny fixed lane set.
-  // Saturated pixels can otherwise make a healthy drawing pipeline report changedPixels=0.
-  const horizontalPhase = ((cycle * 73) % 997) / 996;
-  const verticalPhase = ((cycle * 151) % 991) / 990;
-  const wavePhase = (((cycle * 193) % 983) / 982) * Math.PI * 2;
-  const direction = cycle % 2 === 0 ? 1 : -1;
-  const marginX = Math.min(36, box.width * 0.08);
-  const marginY = Math.min(36, box.height * 0.08);
-  const minX = box.x + marginX;
-  const maxX = box.x + box.width - marginX;
-  const minY = box.y + marginY;
-  const maxY = box.y + box.height - marginY;
-  const travel = Math.min(280, box.width * 0.3);
-  const centerX = minX + (maxX - minX) * horizontalPhase;
-  const x0 = Math.max(minX, Math.min(maxX, centerX - direction * travel / 2));
-  const y0 = minY + (maxY - minY) * verticalPhase;
-  const waveHeight = 14 + Math.min(28, box.height * 0.03);
-  await page.mouse.move(x0, y0);
-  await page.mouse.down();
-  for (let step = 1; step <= 28; step += 1) {
-    const t = step / 28;
-    const x = Math.max(minX, Math.min(maxX, x0 + direction * travel * t));
-    const wave = Math.sin(t * Math.PI * 2 * 1.35 + wavePhase) * waveHeight;
-    const drift = (t - 0.5) * ((cycle % 7) - 3) * 3;
-    const y = Math.max(minY, Math.min(maxY, y0 + wave + drift));
-    await page.mouse.move(x, y, { steps: 2 });
-  }
-  await page.mouse.up();
-  await page.mouse.move(4, 4);
+  const points = createStudioPointerStrokePoints(box, cycle, { steps: 28 });
+  const pointer = await dispatchStudioPointerStroke({
+    page,
+    cdp,
+    mode: inputMode,
+    points,
+    stepDelayMs: inputMode === "mouse" ? 0 : 2,
+  });
   await page.waitForTimeout(500);
   const after = await page.screenshot({ clip: box, animations: "disabled" });
-  return { changed: changedPixels(before, after), shot: after };
+  return { changed: changedPixels(before, after), shot: after, pointer };
 }
 
 async function spawnPreview(): Promise<{ origin: string; child: ReturnType<typeof spawnVitePreview> | null }> {
@@ -367,12 +385,19 @@ const profile = PROFILE_ID === "desktop"
   ? null
   : STUDIO_INAPP_PROFILES.find((candidate) => candidate.id === PROFILE_ID) ?? null;
 if (PROFILE_ID !== "desktop" && !profile) throw new Error(`unknown in-app profile: ${PROFILE_ID}`);
+const inputMode = resolveStudioPointerInputMode(INPUT_MODE_REQUEST, { mobile: profile !== null });
 
 const report = {
   startedAt: new Date(startedAt).toISOString(),
   requestedMinutes: MINUTES,
   profile: PROFILE_ID,
   webgpuRequested: WEBGPU,
+  pointerInputRequested: INPUT_MODE_REQUEST,
+  pointerInputResolved: inputMode,
+  pointerInputEvidence: inputMode === "pen"
+    ? "synthetic-cdp-pen-pressure-tilt-twist"
+    : inputMode === "touch" ? "synthetic-cdp-touch-contact" : "playwright-mouse",
+  physicalDeviceCertified: false,
   origin: "",
   cycles: 0,
   strokes: 0,
@@ -423,6 +448,9 @@ try {
   const context = await browser.newContext({
     locale: "ko-KR",
     viewport: profile ? { width: profile.width, height: profile.height } : { width: 1440, height: 1100 },
+    deviceScaleFactor: profile ? 2 : 1,
+    isMobile: profile !== null,
+    hasTouch: profile !== null,
     ...(profile ? { userAgent: profile.userAgent } : {}),
   });
   page = await context.newPage();
@@ -431,11 +459,14 @@ try {
   await installGpuAndPerfCollector(page);
   const errors = await collectStudioInAppRuntimeErrors(page);
   cdp = await context.newCDPSession(page).catch(() => null);
+  if (inputMode !== "mouse" && !cdp) {
+    throw new Error(`${inputMode} soak input requires Chromium CDP; refusing a mouse downgrade.`);
+  }
   await page.goto(`${preview.origin}/studio`, { waitUntil: "domcontentloaded", timeout: 90_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 90_000 });
   await page.waitForTimeout(3_000);
 
-  log(`${PROFILE_ID} · ${MINUTES} min · webgpu=${WEBGPU ? "on" : "off"} · ${preview.origin}`);
+  log(`${PROFILE_ID} · ${MINUTES} min · input=${inputMode} · webgpu=${WEBGPU ? "on" : "off"} · ${preview.origin}`);
 
   while (Date.now() < deadline) {
     const cycleStarted = Date.now();
@@ -463,7 +494,7 @@ try {
       }
 
       if (penReady) {
-        const evidence = await drawEvidenceStroke(page, cycle);
+        const evidence = await drawEvidenceStroke(page, cdp, cycle, inputMode);
         report.strokes += 1;
         report.pixelSamples.push({
           cycle,
@@ -471,6 +502,16 @@ try {
           changedPixels: evidence.changed,
           brushId: activeBrush?.id ?? null,
           brushName: activeBrush?.name ?? null,
+          inputMode: evidence.pointer.mode,
+          pointerPoints: evidence.pointer.points,
+          pressureMin: evidence.pointer.pressureMin,
+          pressureMax: evidence.pointer.pressureMax,
+          tiltXMin: evidence.pointer.tiltXMin,
+          tiltXMax: evidence.pointer.tiltXMax,
+          tiltYMin: evidence.pointer.tiltYMin,
+          tiltYMax: evidence.pointer.tiltYMax,
+          twistMin: evidence.pointer.twistMin,
+          twistMax: evidence.pointer.twistMax,
         });
         consecutiveNoInk = evidence.changed >= INK_MIN_CHANGED_PIXELS ? 0 : consecutiveNoInk + 1;
         if (evidence.changed < INK_MIN_CHANGED_PIXELS) {

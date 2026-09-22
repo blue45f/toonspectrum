@@ -61,12 +61,20 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(draw).toContain("brush surfaces stayed open before drawing evidence");
   });
 
-  it("spreads raster probes instead of repainting seven saturated lanes", () => {
+  it("routes every raster probe through the shared pressure-aware input driver", () => {
     const draw = sliceFunction("drawEvidenceStroke", "spawnPreview");
-    expect(draw).not.toContain("const lane = cycle % 7");
-    expect(draw).toContain("((cycle * 73) % 997) / 996");
-    expect(draw).toContain("((cycle * 151) % 991) / 990");
-    expect(draw).toContain("((cycle * 193) % 983) / 982");
+    expect(draw).toContain("createStudioPointerStrokePoints(box, cycle");
+    expect(draw).toContain("dispatchStudioPointerStroke({");
+    expect(draw).toContain("mode: inputMode");
+    expect(draw).toContain("cdp");
+    expect(draw).not.toContain("page.mouse.down()");
+  });
+
+  it("refuses to downgrade pen or touch soak evidence when CDP is unavailable", () => {
+    expect(source).toContain('if (inputMode !== "mouse" && !cdp)');
+    expect(source).toContain("refusing a mouse downgrade");
+    expect(source).toContain("pointerInputResolved: inputMode");
+    expect(source).toContain("physicalDeviceCertified: false");
   });
 });
 
