@@ -1,0 +1,62 @@
+name: One-shot Skia host boundary repair
+
+on:
+  push:
+    branches:
+      - feat/skia-live-input-20260923
+    paths:
+      - .github/workflows/skia-host-boundary-repair.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skia-host-boundary-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v6
+        with:
+          ref: feat/skia-live-input-20260923
+          fetch-depth: 0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Extract Skia handoff coordination from the editor host
+        run: python3 .github/scripts/fix_skia_host_boundary.py
+      - name: Verify focused behavior and architecture
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/studio-skia-committed-ink-bridge.test.ts \
+            apps/web/src/domains/creator/render/StudioSkiaDocumentSurface.test.tsx \
+            apps/web/src/domains/creator/render/studio-webgpu-advanced-live-integration.test.ts \
+            --maxWorkers=2
+          pnpm exec eslint \
+            apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx \
+            apps/web/src/domains/creator/use-studio-skia-committed-ink-coordinator.ts \
+            --max-warnings=0
+          pnpm run typecheck
+          pnpm run validate:architecture
+          test "$(wc -l < apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx | tr -d ' ')" -le 29696
+      - name: Commit the focused extraction and remove one-shot machinery
+        env:
+          BRANCH: feat/skia-live-input-20260923
+        run: |
+          rm .github/workflows/skia-host-boundary-repair.yml
+          rm .github/scripts/fix_skia_host_boundary.py
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add -A
+          git commit -m "refactor(studio): isolate Skia committed-ink host coordination"
+          git push origin "HEAD:${BRANCH}"
