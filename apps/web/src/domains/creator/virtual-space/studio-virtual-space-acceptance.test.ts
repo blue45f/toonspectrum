@@ -5,6 +5,7 @@ import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest, studioWorld
 
 import {
   StudioWorldPortalTracker,
+  resolveStudioWorldPortalArrival,
   studioWorldArrivalInput,
   studioWorldHasModalBlocker,
   studioWorldInputBlocked,
@@ -174,6 +175,39 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     expect(tracker.enter(portals, { x: 90, y: 90 })).toBeNull();
     tracker.enter(portals, { x: 50, y: 50 });
     expect(tracker.enter(portals, { x: 90, y: 90 })?.id).toBe("b");
+  });
+
+  it("co-arrives the body and camera once, then ignores a second sample inside", () => {
+    const world = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 600, height: 400, props: [], colliders: [] };
+    const portals = [
+      { id: "door", point: { x: 80, y: 100 }, radius: 18, targetPoint: { x: 420, y: 100 } },
+      { id: "return", point: { x: 420, y: 100 }, radius: 18, targetPoint: { x: 80, y: 100 } },
+    ];
+    const tracker = new StudioWorldPortalTracker();
+    tracker.seed(portals, { x: 250, y: 100 });
+    const departure = { x: 80, y: 100 };
+    const first = resolveStudioWorldPortalArrival(tracker, world, portals, departure, { x: 40, y: 12 }, false);
+    expect(first.portal?.id).toBe("door");
+    expect(first.body).toEqual({ x: 420, y: 100 });
+    expect(first.cameraAnchor).toEqual(first.body);
+    expect(first.cameraAnchor).not.toEqual(departure);
+    expect(first.velocity).toEqual({ x: 0, y: 0 });
+
+    const stillInside = resolveStudioWorldPortalArrival(tracker, world, portals, first.body, first.velocity, false);
+    expect(stillInside.portal).toBeNull();
+    expect(stillInside.body).toEqual(first.body);
+    expect(stillInside.cameraAnchor).toEqual(first.body);
+    expect(stillInside.velocity).toEqual({ x: 0, y: 0 });
+
+    const left = resolveStudioWorldPortalArrival(tracker, world, portals, { x: 250, y: 100 }, { x: 0, y: 0 }, true);
+    expect(left.portal).toBeNull();
+    expect(left.body).toEqual({ x: 250, y: 100 });
+
+    const reentry = resolveStudioWorldPortalArrival(tracker, world, portals, first.body, { x: 30, y: 0 }, true);
+    expect(reentry.portal?.id).toBe("return");
+    expect(reentry.body).toEqual({ x: 80, y: 100 });
+    expect(reentry.cameraAnchor).toEqual(reentry.body);
+    expect(reentry.velocity).toEqual({ x: 0, y: 0 });
   });
 
   it("sanitizes joystick/path inputs and communicates an explicit stop", () => {
