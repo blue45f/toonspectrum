@@ -665,7 +665,12 @@ import {
   StudioLiveRetainedMediaOverlayRenderer,
   studioLiveRetainedMediaOverlaySupportsElement,
 } from "./live/studio-live-retained-media-overlay";
-import { createStudioLiveResourceLeaseController } from "./live/createStudioLiveResourceLeaseController";
+import { createStudioOfflineCapableResourceLeaseController } from "./offline-branch/createStudioOfflineCapableResourceLeaseController";
+import {
+  promoteStudioOfflineBranchPending,
+  reconcileStudioOfflineCrdtFrontier,
+  stageStudioOfflineSceneTransition,
+} from "./offline-branch/studio-offline-host-integration";
 import { createStudioLayerCompHandlers } from "./layer/createStudioLayerCompHandlers";
 import {
   captureStudioLayerCompLeaseRelease,
@@ -2038,13 +2043,15 @@ export function StudioCuttoonEditor({
     begin: beginLiveResourceEdit,
     beginAsync: beginLiveResourceEditAsync,
     end: endLiveResourceEdit,
-  } = createStudioLiveResourceLeaseController({
+  } = createStudioOfflineCapableResourceLeaseController({
     heldResourcesRef: studioLiveHeldResourcesRef,
     mutationGenerationRef: studioLiveMutationGenerationRef,
     pageId: activePage.id,
     pendingMutationRef: studioLivePendingMutationRef,
     reportError: setError,
+    reportNotice: setStatusNotice,
     roomRef: studioLiveRoomRef,
+    runtimeRef: studioCrdtSceneRuntimeRef,
   });
   const {
     autosaveDocumentLeadership,
@@ -2176,14 +2183,7 @@ export function StudioCuttoonEditor({
         layerGroupIds: ReadonlySet<string>;
       } | null
     ) => {
-      if (
-        !editorMountedRef.current ||
-        (changedIds === null
-          ? frontier.strokes.length === 0 && frontier.sceneElements.length === 0 &&
-            frontier.pages.length === 0 && frontier.layerGroups.length === 0
-          : changedIds.strokeIds.size === 0 && changedIds.sceneElementIds.size === 0 &&
-            changedIds.pageIds.size === 0 && changedIds.layerGroupIds.size === 0)
-      ) return;
+      if (!editorMountedRef.current) return;
       const runtime = studioCrdtSceneRuntimeRef.current;
       if (!runtime) return;
       const currentHistory = pagesHistoryRef.current;
@@ -2191,14 +2191,15 @@ export function StudioCuttoonEditor({
         0,
         Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
       );
-      const reconciled = runtime.reconcileHistory(
+      const reconciled = reconcileStudioOfflineCrdtFrontier({
+        runtime,
         currentHistory,
         currentIndex,
         frontier,
         changedIds,
-        readyStudioWorkAssetImageSources(studioWorkAssetHydrator)
-      );
-      if (!reconciled.changed) return;
+        referenceSources: readyStudioWorkAssetImageSources(studioWorkAssetHydrator),
+      });
+      if (!reconciled) return;
       studioRevisionProjectGenerationRef.current += 1;
       collaborationAccessRef.current = {
         ...collaborationAccessRef.current,
@@ -2207,11 +2208,18 @@ export function StudioCuttoonEditor({
       pagesHistoryRef.current = reconciled.history;
       pagesHiRef.current = currentIndex;
       rebaseStudioHistoryJournal(
-        reconciled.history[currentIndex] ?? [],
+        reconciled.currentPages,
         currentIndex,
         "remote CRDT reconciliation"
       );
       setPagesHistoryState(reconciled.history);
+      if (reconciled.shouldPromote) {
+        promoteStudioOfflineBranchPending({
+          runtime,
+          document: studioCrdtDocument,
+          reportError: setError,
+        });
+      }
     };
 
     applyFrontier({
@@ -16093,6 +16101,13 @@ const puppetWarpArmed =
   ): boolean {
     const document = studioCrdtDocumentRef.current;
     const runtime = studioCrdtSceneRuntimeRef.current;
+    const stagedOffline = stageStudioOfflineSceneTransition({
+      runtime,
+      previousPages,
+      nextPages,
+      reportNotice: setStatusNotice,
+    });
+    if (stagedOffline !== null) return stagedOffline;
     if (!document && !runtime) return true;
     if (!document || !runtime) return false;
     try {
