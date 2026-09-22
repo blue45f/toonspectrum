@@ -383,6 +383,14 @@ import {
 } from "./studio-committed-ink-handoff-coordinator";
 import type { StudioCommittedInkRetainedRetryState } from "./studio-committed-ink-release-retry";
 import {
+  canStudioSkiaPublishOverSettledInk,
+  decideStudioSkiaCommittedInkDraw,
+  projectStudioSkiaCommittedInkAuthority,
+  projectStudioSkiaCommittedInkVisibleReceipt,
+  type StudioSkiaCommittedInkAuthority,
+  type StudioSkiaCommittedInkVisibleReceipt,
+} from "./studio-skia-committed-ink-bridge";
+import {
   createStudioCommunityAssetCredit,
   formatStudioCommunityAssetCredit,
 } from "./studio-community-asset-license";
@@ -9886,8 +9894,11 @@ export function StudioCuttoonEditor({
   const rawPenInkPreviewGenerationRef = useRef(0);
   const causalPostCorrectionStateRef = useRef<StudioCausalPostCorrectionState | null>(null);
   const liveInkOverlayClearGenRef = useRef(0);
-  /** React 상태 예약이 아니라 실제 Konva draw 영수증 뒤에만 라이브 표면을 넘긴다. */
+  /** React 상태 예약이 아니라 실제 가시 픽셀 영수증 뒤에만 라이브 표면을 넘긴다. */
   const committedInkSurfaceHandoffsRef = useRef<StudioCommittedInkSurfaceHandoff[]>([]);
+  const skiaCommittedInkAuthorityRef = useRef<StudioSkiaCommittedInkAuthority | null>(null);
+  const skiaCommittedInkVisibleReceiptRef = useRef<StudioSkiaCommittedInkVisibleReceipt | null>(null);
+  const skiaCommittedInkDeferAttemptsRef = useRef(new Map<string, number>());
   /** Draw 실패 재시도는 StudioPage 전체 렌더가 아니라 bounded rAF coordinator로만 진행한다. */
   const committedInkSurfaceHandoffRafRef = useRef(0);
   const processCommittedInkSurfaceHandoffsRef = useRef<() => void>(() => undefined);
@@ -11396,8 +11407,8 @@ export function StudioCuttoonEditor({
 
   /**
    * 커밋 성공은 React 상태 예약일 뿐 실제 픽셀 영수증이 아니다. 현재 표면에서 아직 다른
-   * handoff가 예약하지 않은 FIFO 접두부만 예약하고, useLayoutEffect의 동기 mainLayer.draw()
-   * 완료 뒤 같은 브라우저 페인트 안에서 제거한다.
+   * handoff가 예약하지 않은 FIFO 접두부만 예약한다. 정확한 Skia 가시 영수증이 있으면 그
+   * 표면으로 원자 인계하고, 미지원/실패 시에만 동기 mainLayer.draw() 영수증으로 복귀한다.
    */
   function queueCommittedStrokeSurfaceHandoff(pageId: string, strokeIds: readonly string[]) {
     const pending = committedInkSurfaceHandoffsRef.current;
@@ -11431,6 +11442,34 @@ export function StudioCuttoonEditor({
     // batch. Always schedule one post-commit pass; the processor remains idempotent and waits
     // fail-visible until the canonical scene projection has caught up.
     scheduleCommittedInkSurfaceHandoffRetry();
+  }
+  function canSkiaDocumentPublishOverSettledInk(
+    candidate: Parameters<NonNullable<StudioCanvasViewportHandlers["canSkiaDocumentPublishOverSettledInk"]>>[0]
+  ): boolean {
+    return canStudioSkiaPublishOverSettledInk(
+      candidate,
+      committedInkSurfaceHandoffsRef.current,
+    );
+  }
+  function onSkiaDocumentAuthorityChange(
+    authority: Parameters<NonNullable<StudioCanvasViewportHandlers["onSkiaDocumentAuthorityChange"]>>[0]
+  ): void {
+    const projected = projectStudioSkiaCommittedInkAuthority(authority);
+    skiaCommittedInkAuthorityRef.current = projected;
+    if (
+      projected.status !== "active"
+      || skiaCommittedInkVisibleReceiptRef.current?.sceneRevision !== projected.sceneRevision
+    ) {
+      skiaCommittedInkVisibleReceiptRef.current = null;
+    }
+    processCommittedInkSurfaceHandoffsRef.current();
+  }
+  function onSkiaDocumentVisiblePresentation(
+    presentation: Parameters<NonNullable<StudioCanvasViewportHandlers["onSkiaDocumentVisiblePresentation"]>>[0]
+  ): void {
+    skiaCommittedInkVisibleReceiptRef.current =
+      projectStudioSkiaCommittedInkVisibleReceipt(presentation);
+    processCommittedInkSurfaceHandoffsRef.current();
   }
   function prepareStrokeCommitPage(): boolean {
     return prepareStudioPendingStrokeCommitPage(
@@ -16431,6 +16470,7 @@ const puppetWarpArmed =
       committedInkSurfaceHandoffsRef.current;
     if (queue.length === 0 || !editorMountedRef.current) {
       committedInkRetainedRetryRef.current = null;
+      skiaCommittedInkDeferAttemptsRef.current.clear();
       return;
     }
 
@@ -16447,17 +16487,40 @@ const puppetWarpArmed =
 
       if (transition.status === "wait" && transition.drawRequest) {
         const request = transition.drawRequest;
+        const drawDecision = decideStudioSkiaCommittedInkDraw({
+          request,
+          authority: skiaCommittedInkAuthorityRef.current,
+          visibleReceipt: skiaCommittedInkVisibleReceiptRef.current,
+          deferAttempt: skiaCommittedInkDeferAttemptsRef.current.get(request.token) ?? 0,
+        });
+        if (drawDecision.status === "hold") {
+          queue = transition.queue;
+          break;
+        }
+        if (drawDecision.status === "wait") {
+          skiaCommittedInkDeferAttemptsRef.current.set(
+            request.token,
+            drawDecision.nextDeferAttempt,
+          );
+          queue = transition.queue;
+          retryVisibleDraw = true;
+          break;
+        }
+
+        skiaCommittedInkDeferAttemptsRef.current.delete(request.token);
         armLiveStrokeCanonicalCanvasAudit(request.strokeIds, request.token);
-        let outcome: StudioCommittedInkVisibleDrawReceipt["outcome"] = "failed";
-        const mainLayer = mainLayerRef.current;
-        if (mainLayer) {
-          try {
-            // The exact synchronous draw return is the receipt boundary. Overlay release happens
-            // below in the same task, before the browser can composite an uncovered frame.
-            mainLayer.draw();
-            outcome = "drawn";
-          } catch {
-            outcome = "failed";
+        let outcome: StudioCommittedInkVisibleDrawReceipt["outcome"] =
+          drawDecision.status === "receipted" ? "drawn" : "failed";
+        if (drawDecision.status === "fallback") {
+          const mainLayer = mainLayerRef.current;
+          if (mainLayer) {
+            try {
+              // Compatibility fallback keeps the original exact synchronous receipt boundary.
+              mainLayer.draw();
+              outcome = "drawn";
+            } catch {
+              outcome = "failed";
+            }
           }
         }
         transition = transitionStudioCommittedInkHandoffHead(
@@ -28340,6 +28403,9 @@ function clearSelectionForEdit() {
   onWebGpuFrameReady,
   onWebGpuDeviceLost,
   onWebGpuBackendChange,
+  canSkiaDocumentPublishOverSettledInk,
+  onSkiaDocumentAuthorityChange,
+  onSkiaDocumentVisiblePresentation,
   setWebGpuCanvasHandle,
   setHokusaiLiveOverlaySurface,
   onHokusaiCanonicalImageReady,

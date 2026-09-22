@@ -92,6 +92,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     studioLiveGesturePreviewAdapter,
     studioLiveGesturePreviewAuthoritativeElementIds,
     studioRasterHiddenOperationIds,
+    studioRevisionProjectGeneration,
     studioWorkAssetRenderPlaceholders,
     studioWorkAssetRenderProjection,
     timelapseCapturing,
@@ -584,6 +585,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
   const velloSceneRevision = useMemo(
     () => Object.freeze({
       pageId: activePage.id,
+      projectGeneration: studioRevisionProjectGeneration ?? 0,
       documentHeight: canvasH,
       elements: velloDocumentElements,
       transform: velloSceneDocumentTransform,
@@ -595,6 +597,7 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     [
       activePage.id,
       canvasH,
+      studioRevisionProjectGeneration,
       velloDocumentElements,
       velloSceneDocumentTransform,
       velloSurfaceDpr,
