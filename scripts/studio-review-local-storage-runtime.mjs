@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, X509Certificate } from "node:crypto";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import https from "node:https";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -14,6 +14,12 @@ const run = promisify(execFile);
 export const STUDIO_REVIEW_MINIO_IMAGE = "quay.io/minio/minio@sha256:9966a92a734f9411e32f4f41d7d9d826fcdc0f68c4e20b70295bd4e7c11f8a2f";
 export const STUDIO_REVIEW_MC_IMAGE = "quay.io/minio/mc@sha256:37d109dddbbb2c95873f5fc81ac93f37023264770fc580a7564148892087b1b7";
 const OWNER_LABEL = "io.toonspectrum.qa.review-storage";
+const LEGACY_REVIEW_POSTGRES = "codex-virtual-studio-host-pg-20260920";
+const ISOLATED_REVIEW_POSTGRES_PATTERN = /^codex-review-storage-test-pg-[a-f0-9]{10}$/u;
+const REVIEW_POSTGRES_IMAGES = new Set([
+  "postgres:16-alpine",
+  "postgres@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb",
+]);
 
 /** Creates one local CA without installing it in any system trust store. */
 export async function createStudioReviewQaCertificates() {
@@ -71,13 +77,27 @@ export async function withStudioReviewLocalStorage(environment, output, verify) 
   const database = validateIsolatedMarketApiTarget({ rawApiUrl: environment.STUDIO_QA_API_BASE_URL ?? "http://127.0.0.1:4355/",
     rawDatabaseUrl: environment.TEST_DATABASE_URL, environment });
   const pgName = environment.STUDIO_QA_OWNED_POSTGRES;
-  assert.equal(pgName, "codex-virtual-studio-host-pg-20260920", "Explicitly select the existing owned Host QA PostgreSQL container.");
+  assert(typeof pgName === "string" && (pgName === LEGACY_REVIEW_POSTGRES || ISOLATED_REVIEW_POSTGRES_PATTERN.test(pgName)),
+    "Explicitly select the legacy Host QA PostgreSQL container or a uniquely named review-storage test container.");
   const postgres = JSON.parse((await docker(["inspect", pgName])).stdout)[0];
-  const pgPorts = postgres.HostConfig.PortBindings["5432/tcp"];
+  const configuredPorts = postgres.HostConfig?.PortBindings?.["5432/tcp"];
+  const assignedPorts = postgres.NetworkSettings?.Ports?.["5432/tcp"];
+  const pgPorts = Array.isArray(assignedPorts) && assignedPorts.length > 0 ? assignedPorts : configuredPorts;
+  assert(Array.isArray(pgPorts) && pgPorts.length === 1, "The owned PostgreSQL container must expose exactly one loopback port.");
   const databaseUrl = new URL(database.databaseUrl);
-  assert.equal(databaseUrl.hostname, "127.0.0.1"); assert.equal(databaseUrl.port, "59962");
-  assert.deepEqual(pgPorts, [{ HostIp: "127.0.0.1", HostPort: "59962" }]);
-  assert.equal(postgres.Config.Image, "postgres:16-alpine");
+  assert.equal(databaseUrl.hostname, "127.0.0.1");
+  assert.equal(pgPorts[0].HostIp, "127.0.0.1");
+  assert(/^\d{4,5}$/u.test(pgPorts[0].HostPort), "The owned PostgreSQL container needs an assigned unprivileged port.");
+  assert.equal(databaseUrl.port, pgPorts[0].HostPort, "The validated test URL must target the selected PostgreSQL container.");
+  assert(REVIEW_POSTGRES_IMAGES.has(postgres.Config.Image), "Use the verified PostgreSQL 16 QA image only.");
+  const postgresEnvironment = Object.fromEntries(postgres.Config.Env.map((entry) => entry.split(/=(.*)/su).slice(0, 2)));
+  assert.equal(postgresEnvironment.POSTGRES_DB, database.databaseName);
+  assert.equal(postgresEnvironment.POSTGRES_USER, decodeURIComponent(databaseUrl.username));
+  if (ISOLATED_REVIEW_POSTGRES_PATTERN.test(pgName)) {
+    assert.equal(postgres.Config.Labels?.["io.toonspectrum.qa.review-storage-postgres"], "true",
+      "The isolated review PostgreSQL container must carry the explicit QA ownership label.");
+    assert.equal(postgres.State.Running, true, "A random-port review test container must already be running.");
+  }
   for (const image of [STUDIO_REVIEW_MINIO_IMAGE, STUDIO_REVIEW_MC_IMAGE]) await docker(["image", "inspect", image]);
   const port = Number(environment.STUDIO_QA_STORAGE_PORT ?? "59963");
   assert(Number.isInteger(port) && port >= 1024 && port <= 65535);
@@ -86,9 +106,18 @@ export async function withStudioReviewLocalStorage(environment, output, verify) 
   await requireUnusedApiTarget({ apiOrigin: endpoint, apiPort: port });
   const runId = randomBytes(6).toString("hex"), name = `codex-vs-review-storage-${runId}`, volume = `${name}-data`;
   const directory = await createStudioReviewQaCertificates();
+  // Colima shares the repository path but not macOS /tmp. Keep CA material in /tmp and
+  // copy only the server pair plus public CA into a run-owned, cleaned mount directory.
+  const mountDirectory = await mkdtemp(path.join(output, `.minio-certs-${runId}-`));
+  await chmod(mountDirectory, 0o700);
+  await mkdir(path.join(mountDirectory, "CAs"), { mode: 0o700 });
+  await copyFile(path.join(directory, "public.crt"), path.join(mountDirectory, "public.crt"));
+  await copyFile(path.join(directory, "private.key"), path.join(mountDirectory, "private.key"));
+  await copyFile(path.join(directory, "ca.crt"), path.join(mountDirectory, "CAs", "qa.crt"));
+  await chmod(path.join(mountDirectory, "private.key"), 0o600);
   const options = { endpoint, runId, ownedDirectory: directory, accessKeyId: `qa${runId}`, secretAccessKey: randomBytes(32).toString("hex") };
   const buckets = ["source", "derived", "export"].map((purpose) => `qa-vs-review-${runId}-${purpose}`);
-  const record = { context, endpoint, container: name, volume, certificateDirectory: directory,
+  const record = { context, endpoint, container: name, volume, certificateDirectory: directory, certificateMountDirectory: mountDirectory,
     images: [STUDIO_REVIEW_MINIO_IMAGE, STUDIO_REVIEW_MC_IMAGE], buckets, createdVolume: false, createdContainer: false,
     postgres: { name: pgName, id: postgres.Id, originalRunning: postgres.State.Running, startedByRun: false, restored: false },
     cleanup: { containerRemoved: false, volumeRemoved: false, certificatesRemoved: false }, publicAccessDenied: false };
@@ -107,7 +136,7 @@ export async function withStudioReviewLocalStorage(environment, output, verify) 
     mayHaveContainer = true;
     await docker(["run", "-d", "--name", name, "--label", `${OWNER_LABEL}=${runId}`, "--memory", "512m", "--cpus", "1",
       "-p", `127.0.0.1:${port}:9000`, "-v", `${volume}:/data`,
-      "-v", `${directory}/public.crt:/certs/public.crt:ro`, "-v", `${directory}/private.key:/certs/private.key:ro`,
+      "-v", `${mountDirectory}:/certs:ro`,
       "-e", "MINIO_ROOT_USER", "-e", "MINIO_ROOT_PASSWORD", "-e", "MINIO_API_CORS_ALLOW_ORIGIN", "-e", "MINIO_BROWSER=off",
       STUDIO_REVIEW_MINIO_IMAGE, "server", "/data", "--address", ":9000", "--certs-dir", "/certs"],
     { env: { ...process.env, MINIO_ROOT_USER: options.accessKeyId, MINIO_ROOT_PASSWORD: options.secretAccessKey,
@@ -120,7 +149,7 @@ export async function withStudioReviewLocalStorage(environment, output, verify) 
     }
     assert(ready, "Owned TLS S3 server did not become ready.");
     const mc = async (args) => docker(["run", "--rm", "--name", `${name}-mc`, "--label", `${OWNER_LABEL}=${runId}`,
-      "--network", `container:${name}`, "-v", `${directory}/ca.crt:/root/.mc/certs/CAs/qa.crt:ro`, "-e", "MC_HOST_qa", STUDIO_REVIEW_MC_IMAGE, ...args],
+      "--network", `container:${name}`, "-v", `${path.join(mountDirectory, "CAs")}:/root/.mc/certs/CAs:ro`, "-e", "MC_HOST_qa", STUDIO_REVIEW_MC_IMAGE, ...args],
     { env: { ...process.env, MC_HOST_qa: `https://${options.accessKeyId}:${options.secretAccessKey}@127.0.0.1:9000` } });
     for (const bucket of buckets) {
       await mc(["mb", `qa/${bucket}`]);
@@ -155,7 +184,9 @@ export async function withStudioReviewLocalStorage(environment, output, verify) 
       } catch (error) { errors.push(error); }
     }
     try {
-      await rm(directory, { recursive: true, force: true }); record.cleanup.certificatesRemoved = true;
+      await rm(directory, { recursive: true, force: true });
+      await rm(mountDirectory, { recursive: true, force: true });
+      record.cleanup.certificatesRemoved = true;
     } catch (error) { errors.push(error); }
     try {
       const actual = JSON.parse((await docker(["inspect", pgName])).stdout)[0];

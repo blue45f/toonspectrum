@@ -11,6 +11,17 @@ import { studioReviewPreviewCaptureSchema, studioReviewPreviewCompleteSchema, st
 import { StudioReviewPreviewProducerService } from "./studio-review-preview-producer.service";
 import type { Request } from "express";
 
+export const STUDIO_REVIEW_PREVIEW_UPLOAD_LIMITS = {
+  fileSize: STUDIO_REVIEW_PREVIEW_MAX_BYTES,
+  files: 1,
+  fields: 1,
+  fieldSize: 8192,
+  fieldNameSize: 64,
+  // Busboy emits partsLimit when the parsed count reaches the configured value, so the
+  // one intent field plus one file needs a sentinel slot. fields/files remain exact.
+  parts: 3,
+} as const;
+
 export class StudioReviewCaptureDto extends createZodDto(studioReviewPreviewCaptureSchema) {}
 export class StudioReviewCaptureIntentDto extends createZodDto(studioReviewPreviewIntentSchema) {}
 export class StudioReviewCaptureCompleteDto extends createZodDto(studioReviewPreviewCompleteSchema) {}
@@ -44,7 +55,7 @@ export class StudioReviewPreviewProducerController {
 
   @Put("/pages/:ordinal")
   @UseGuards(StudioWorkAssetUploadGuard)
-  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: STUDIO_REVIEW_PREVIEW_MAX_BYTES, files: 1, fields: 1, fieldSize: 8192, fieldNameSize: 64, parts: 2 } }))
+  @UseInterceptors(FileInterceptor("file", { limits: STUDIO_REVIEW_PREVIEW_UPLOAD_LIMITS }))
   @Header("Cache-Control", "private, no-store, max-age=0")
   async upload(@Param(new ZodValidationPipe(StudioReviewCapturePageParamsDto)) params: StudioReviewCapturePageParamsDto,
     @Body(new ZodValidationPipe(StudioReviewCapturePageBodyDto)) body: StudioReviewCapturePageBodyDto,

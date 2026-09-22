@@ -1,105 +1,100 @@
 # Local private storage acceptance for captured review ZIPs
 
-Status: implementation prepared; the actual storage/browser run has not yet been executed.
-This QA extends the [authored full Host probe](virtual-studio-review-host-authored-evidence-20260920.md).
-It does not configure or deploy production R2/B2, replace authorization, or certify the full
-edit-comment-recapture-resolution workflow; that workflow remains a separate acceptance task.
+Status: **verified on current `origin/main` on 2026-09-23**. This QA extends the authored
+full Host probe with a real loopback TLS object store and an isolated, freshly prepared
+PostgreSQL test database. It does not configure or deploy production R2/B2, alter hosted
+infrastructure, or broaden product authorization.
 
-## Scope and ownership
+## Scope
 
-The entry point is `scripts/verify-virtual-studio-review-storage.mts`. It reuses actual pen
-authoring, login, Core, PostgreSQL and the shared gateway save from the Host verifier. Unlike
-the original fixture mode, every capture prepare/status/page/complete request reaches the real
-API. It then drives explicit review approval and the original-image ZIP download in product UI.
+The entry point is `scripts/verify-virtual-studio-review-storage.mts`. It exercises the real
+browser, API, Core save path, PostgreSQL persistence, review decision endpoint, signed object
+reads and product ZIP export. Capture prepare/status/page/complete requests are not mocked.
+The browser authors two pages with real pen input before requesting a review capture.
 
-Each run owns a random `codex-vs-review-storage-<12-hex>` container, a matching `-data` volume,
-private source/derived/export buckets, and a `toonspectrum-review-storage-qa-*` temporary
-certificate directory. Docker is restricted to an existing local Unix-socket context. MinIO
-binds only `127.0.0.1:59963` by default, has a 512 MiB / 1 CPU limit, and does not expose a
-console port. Resource names and labels are verified before cleanup. Unrelated containers,
-volumes, image caches, system certificates, production settings and `.env` files are not removed
-or changed. The images remain as local cached QA dependencies after the run.
+Each run owns a random `codex-vs-review-storage-<12-hex>` MinIO container, matching volume,
+private source/derived/export buckets, one-day local CA, server certificate and run-specific
+credentials. MinIO binds only to a loopback port, has a 512 MiB / 1 CPU limit and exposes no
+console port. The verifier checks ownership labels before cleanup and never removes unrelated
+containers, volumes, image caches, system certificates, `.env` files or production settings.
 
-The existing dedicated PostgreSQL container `codex-virtual-studio-host-pg-20260920` was stopped
-at inspection and maps only `127.0.0.1:59962`. The verifier requires explicit selection of this
-exact container and a matching loopback test database. It records the container ID and prior
-running state, starts it only if stopped, and restores that state after the run. It never removes
-the existing PG volume, resets a database or runs migrations; its disposable fixture rows remain
-in that QA database. The runtime requires an already migrated test/QA database.
+PostgreSQL must be an explicitly selected QA container. The accepted forms are:
 
-## Exact local dependencies
+- the legacy dedicated container `codex-virtual-studio-host-pg-20260920`; or
+- a fresh container named `codex-review-storage-test-pg-<10 lowercase hex>` with label
+  `io.toonspectrum.qa.review-storage-postgres=true`.
 
-Primary source releases and registry manifest inspection identify these ARM64 images:
+The verifier requires one loopback port, an exact PostgreSQL 16 QA image, and a
+`TEST_DATABASE_URL` whose port, database and user match that container. A fresh database must
+first be prepared with `scripts/prepare-studio-review-test-db.mjs`; this applies the current
+realtime, asset, live-lock, Studio AI and review migrations plus the Studio invariant triggers.
+The caller owns and removes this PostgreSQL container after the run.
 
-| Purpose | Official release | Pinned image |
-| --- | --- | --- |
-| MinIO | [2025-09-07 release](https://github.com/minio/minio/releases/tag/RELEASE.2025-09-07T16-13-09Z) | `quay.io/minio/minio@sha256:9966a92a734f9411e32f4f41d7d9d826fcdc0f68c4e20b70295bd4e7c11f8a2f` |
-| mc | [2025-08-13 release](https://github.com/minio/mc/releases/tag/RELEASE.2025-08-13T08-35-41Z) | `quay.io/minio/mc@sha256:37d109dddbbb2c95873f5fc81ac93f37023264770fc580a7564148892087b1b7` |
+## Pinned local object-store dependencies
 
-The later MinIO `2025-10-15` source release exists, but its equivalent Quay tag returned no
-manifest during this inspection. The selected older image is an isolated synthetic-data QA
-dependency, not a production recommendation or a claim of current security support. Both
-images were explicitly pulled by digest; the verifier does not pull or update images itself.
+| Purpose | Pinned image |
+| --- | --- |
+| MinIO | `quay.io/minio/minio@sha256:9966a92a734f9411e32f4f41d7d9d826fcdc0f68c4e20b70295bd4e7c11f8a2f` |
+| mc | `quay.io/minio/mc@sha256:37d109dddbbb2c95873f5fc81ac93f37023264770fc580a7564148892087b1b7` |
 
-MinIO uses its documented [certificate directory](https://github.com/minio/minio/blob/master/docs/tls/README.md)
-with a new one-day local CA and an IP-SAN leaf certificate. OpenSSL creates these files without
-installing trust on the host. The API receives only this CA through `NODE_EXTRA_CA_CERTS`;
-independent object GETs validate the same CA. A fresh Chromium process accepts only the leaf's
-SPKI for the local QA endpoint; it does not enable global certificate-error suppression or
-change the application's HTTPS validators. [CORS](https://github.com/minio/minio/blob/master/docs/config/README.md)
-is limited to the existing `127.0.0.1:5181` and `:5173` QA origins.
+The verifier does not pull or update images. These digests are isolated synthetic-data QA
+dependencies, not production recommendations.
+
+OpenSSL creates a private CA and IP-SAN leaf without installing trust on the host. Full CA
+material remains in the OS temporary directory. Because Colima does not share macOS `/tmp`
+reliably, only the server certificate, server private key and public CA are copied into a hidden,
+run-owned directory beneath the QA output and mounted read-only. The CA private key is never
+mounted into MinIO. API and independent GET probes validate the same public CA; Chromium trusts
+only the run's leaf SPKI for the loopback endpoint.
 
 ## Acceptance assertions
 
-- The strict QA storage option rejects HTTP, non-loopback/implicit/privileged origins,
-  userinfo/path/query/fragment, shared API ports, arbitrary extra environment fields,
-  non-owned certificate directories, symlink certificates and an invalid CA/leaf pair.
-  Parent storage credentials and arbitrary CA settings remain excluded by default.
-- All three private purpose buckets must reject anonymous listing. Every accepted review
-  page must also reject unsigned GET while the real server-issued signed GET succeeds.
-  A successful signed GET must return ACAO for the exact QA origin and omit ACAO for an
-  unrelated origin; the foreign-origin probe never makes an outbound connection to that origin.
-- The source revision and nonzero gateway sequence come from actual authoring and save.
-  Capture never rewrites the source. Server canonical receipts, persisted review identity,
-  signed GET bytes and ZIP entries must agree.
-- The server intentionally reconstructs each PNG and adds page identity. Input byte hashes
-  may differ from stored byte hashes; decoded pixels, dimensions, authored-stroke samples,
-  margins and 2x scale must remain intact. Evidence preserves both inputs and stored originals.
-- Approval uses the actual two-step UI and actual graph decision endpoint. ZIP export uses
-  the product's permission rechecks, signed URLs, checksum validation and archive Worker.
-  The ZIP's PNG bytes must equal the server-canonical S3 GET bytes exactly. Its manifest must
-  contain no signed URL, credentials, comment text or roster details.
-- After approval/export, one actual API request tries to replace completed ordinal 0 with the
-  different authored page 1 PNG. The existing head pin must return HTTP 409; the completed
-  receipt, fresh signed object hashes and canonical bytes must remain unchanged. GET metadata
-  also confirms the immutable cache policy, purpose, digest and length. This API rejection
-  occurs before storage, so it does not claim to execute the S3 conditional PUT conflict/HEAD branch.
-- The owned API, Vite, Chromium, MinIO, mc container, volume and temporary certificates must
-  close or be removed. `local-storage-resources.json` records cleanup without credential values.
+- The strict storage option rejects HTTP, non-loopback or implicit origins, privileged/reserved
+  ports, userinfo/path/query/fragment, extra fields, symlink certificates and invalid CA/leaf
+  pairs. Parent storage credentials and arbitrary CA settings are not inherited.
+- All private purpose buckets reject anonymous listing. Review objects reject unsigned reads,
+  while server-issued signed URLs return the canonical bytes and origin-specific CORS headers.
+- The source revision and gateway sequence come from real authoring and save. Capture does not
+  rewrite the source revision.
+- The server canonicalizes PNGs. Input byte hashes may change, but decoded dimensions, authored
+  stroke samples, margins, two-times scale and pixels must remain identical.
+- Approval uses the product's two-step UI and real graph decision endpoint. ZIP export performs
+  permission rechecks, signed fetches, checksum validation and worker-based archive generation.
+  ZIP PNG bytes must equal canonical object-store bytes and the manifest must not contain signed
+  URLs, credentials, comment text or roster details.
+- A post-completion replacement of ordinal 0 with different page bytes must return HTTP 409.
+  The completed receipt, signed object hashes, metadata and canonical bytes must remain unchanged.
+- API, Vite, Chromium, MinIO, mc, the MinIO volume and temporary certificate directories must
+  close or be removed. `local-storage-resources.json` records cleanup without secret values.
 
 ## Reproduce
 
-After coordinating a browser/API/PostgreSQL resource slot and supplying only the dedicated
-test database URL:
+Create a disposable PostgreSQL 16 container with the isolated naming pattern, ownership label
+and one random loopback port. Export its URL only in the invoking shell; do not store credentials
+in this document, logs or evidence.
 
 ```sh
+  pnpm exec node scripts/prepare-studio-review-test-db.mjs
+
 STUDIO_QA_LOCAL_STORAGE=true \
-  STUDIO_QA_OWNED_POSTGRES=codex-virtual-studio-host-pg-20260920 \
-  STUDIO_QA_OUTPUT=.qa/virtual-studio-review-storage \
-  pnpm exec tsx scripts/verify-virtual-studio-review-storage.mts
-pnpm exec vitest run scripts/studio-review-local-storage-config.test.ts scripts/isolated-market-api.test.ts
+STUDIO_QA_OWNED_POSTGRES='codex-review-storage-test-pg-<10-hex>' \
+STUDIO_QA_OUTPUT='.qa/virtual-studio-review-storage' \
+pnpm exec tsx scripts/verify-virtual-studio-review-storage.mts
 ```
 
-Do not put a database password or storage credentials in this document or the evidence report.
-No hosted service, remote build, paid runner or deployment is part of this procedure.
+Remove the disposable PostgreSQL container after the verifier has exited. No hosted service,
+remote build, paid runner or deployment is part of this procedure.
 
-## Current verification
+## Verified result
 
-The configuration and existing isolated-API regression tests passed: **21 tests / 2 files**.
-Scoped ESLint and `git diff --check` passed. Dependencies were installed with
-`pnpm install --offline --frozen-lockfile` under Node 24.16 / pnpm 11.4. The worktree uses
-TypeScript 6.0.3 and its `tsconfig.json` is byte-identical to the source worktree. The latter's
-existing incremental cache was inspected but was not copied or used for a compile here.
-Full Web/API typechecks are pending the coordinated integrated revision; no files or checks
-are excluded. Heavy runtime execution is also pending coordination; there is no actual
-storage/capture/approval/ZIP success claim yet.
+The 2026-09-23 integrated run completed real pen authoring, PostgreSQL save, TLS MinIO upload,
+canonical signed readback, pixel comparison, review approval, ZIP export and immutable-completion
+rejection. Anonymous object access was denied, foreign-origin CORS was omitted, and cleanup
+removed all run-owned MinIO resources and certificate directories. The successful report is
+`.qa/virtual-studio-review-storage-reconcile-20260923/report.json` relative to the validation
+worktree.
+
+During this run, the browser's valid one-field/one-file multipart upload exposed a Busboy boundary
+condition: `parts: 2` emitted `partsLimit` after parsing both expected parts. The controller now
+keeps `fields: 1` and `files: 1` while reserving a sentinel slot with `parts: 3`; a focused test
+locks that contract.
