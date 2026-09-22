@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(87);
+  expect(manifest).toHaveLength(88);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0087_studio_pinned_review_share");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(87);
+  expect(manifest.at(-1).id).toBe("0088_studio_review_delivery");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(88);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1758,8 +1758,25 @@ test("pinned review shares preserve immutable metadata and permit only revocatio
   expect(acl).toContain("public.studio_pinned_review_feedback");
   expect(guard).toContain("'studio_pinned_review_share'::text, ARRAY['revokedAt']::text[]");
   expect(guard).toContain("'studio_pinned_review_feedback'::text, ARRAY[]::text[]");
-  const migration = loadMigrationManifest().at(-1);
+  const migration = loadMigrationManifest().find((item) => item.id === "0087_studio_pinned_review_share");
   expect(migration.contents).toContain("studio_pinned_review_share_immutable_update");
   expect(migration.contents).toContain("studio_pinned_review_feedback_immutable_update");
   expect(migration.contents).not.toMatch(/ALTER TABLE|UPDATE creator_work|DROP TABLE/iu);
+});
+
+test("approved review delivery grants only bounded state and archive evidence updates", () => {
+  const acl = buildStudioProductionRuntimeAclSql("toonspectrum_runtime"), guard = buildStudioProductionRuntimeAclViolationSql("toonspectrum_runtime");
+  expect(acl).toContain("public.studio_review_delivery");
+  expect(acl).toContain("public.studio_review_delivery_event");
+  expect(acl).toContain('GRANT UPDATE (state, version, "archiveSha256", "archiveByteLength", "updatedAt", "issuedAt", "deliveredAt", "acceptedAt", "cancelledAt")');
+  expect(acl).toContain("GRANT USAGE, SELECT ON SEQUENCE public.studio_review_delivery_event_sequence_seq");
+  expect(acl).not.toMatch(/GRANT (?:DELETE|TRUNCATE)\s+ON[^;]*studio_review_delivery/iu);
+  expect(guard).toContain("'studio_review_delivery'::text, ARRAY['state','version','archiveSha256','archiveByteLength','updatedAt','issuedAt','deliveredAt','acceptedAt','cancelledAt']::text[]");
+  expect(guard).toContain("'studio_review_delivery_event'::text, ARRAY[]::text[]");
+  expect(guard).toContain("studio_review_delivery_event_sequence_seq");
+  const migration = loadMigrationManifest().find((item) => item.id === "0088_studio_review_delivery");
+  expect(migration.contents).toContain("studio_review_delivery_guard_update");
+  expect(migration.contents).toContain("studio_review_delivery_event_immutable_update");
+  expect(migration.contents).toContain("review delivery immutable inputs changed");
+  expect(migration.contents).not.toMatch(/DROP TABLE|TRUNCATE|UPDATE creator_work/iu);
 });

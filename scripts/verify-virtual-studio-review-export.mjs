@@ -36,8 +36,12 @@ await page.route("**/*", async (route) => {
   }
   if (url.origin !== origin.origin) return route.abort();
   if (!url.pathname.startsWith("/api/")) return route.continue();
-  assert(fixture); assert.equal(request.method(), "GET", "Export may not create approvals or mutate documents");
   requests.push(url.pathname);
+  if (url.pathname.endsWith("/review-deliveries")) {
+    assert.equal(request.method(), "GET");
+    return route.fulfill({ json: { items: [], recipients: [], canPrepare: false, mode: "free" } });
+  }
+  assert(fixture); assert.equal(request.method(), "GET", "Export may not create approvals or mutate documents");
   if (mode === "revoked" && previewReads >= 1) return route.fulfill({ status: 403, json: { message: "Fixture access revoked after image acquisition" } });
   if (url.pathname.endsWith("/projects/graph")) return route.fulfill({ json: fixture.project });
   if (url.pathname.endsWith("/reviews/review")) return route.fulfill({ json: fixture.review });

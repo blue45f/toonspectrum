@@ -109,6 +109,7 @@ test("review database invariants execute with real PostgreSQL and the accepted g
   const migrationFiles = [...preparation.matchAll(/"(\d{4}_[a-z0-9_]+\.sql)"/gu)]
     .map((match) => match[1]);
   assert.ok(migrationFiles.includes("0087_studio_pinned_review_share.sql"));
+  assert.ok(migrationFiles.includes("0088_studio_review_delivery.sql"));
   assert.ok(!migrationFiles.includes("0084_studio_pinned_review_share.sql"));
   for (const migration of migrationFiles) {
     assert.ok(

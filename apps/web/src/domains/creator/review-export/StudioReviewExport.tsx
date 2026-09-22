@@ -1,3 +1,4 @@
+import { StudioReviewDelivery } from "./StudioReviewDelivery";
 import { StudioReviewExportPreflight } from "./StudioReviewExportPreflight";
 import { useLayoutEffect, useRef, useState } from "react";
 import { getAuthSessionRevision, getAuthUserId, listeners as sessionListeners } from "@/compat/auth-session-state";
@@ -39,7 +40,7 @@ export function StudioReviewExport({ verified }: { readonly verified: StudioVirt
         : bt("현재 승인과 접근 권한을 확인하지 못했어요. 검토 기록을 새로 확인한 뒤 다시 시도해 주세요.", "Current approval and access could not be verified. Refresh the review before trying again."));
     } finally { if (active.current === controller) { active.current = null; if (mounted.current) setProgress(null); } }
   };
-  return <section className="mt-4 space-y-2 rounded-xl border border-line p-3" aria-label={bt("승인된 검수본 저장", "Save approved review images")}>
+  return <><section className="mt-4 space-y-2 rounded-xl border border-line p-3" aria-label={bt("승인된 검수본 저장", "Save approved review images")}>
     <p className="text-sm text-fg-2">{bt("이 검수본에 저장된 원본 이미지와 페이지별 확인 정보를 ZIP으로 저장합니다. 원고를 다시 렌더링하거나 게시하지 않아요.", "Save this review's original stored images and page checksums as a ZIP. This does not re-render or publish the document.")}</p>
     <StudioReviewExportPreflight verified={verified} />
     <div className="flex flex-wrap gap-2">
@@ -53,5 +54,5 @@ export function StudioReviewExport({ verified }: { readonly verified: StudioVirt
       : progress.phase === "archive" ? bt("원본 이미지 묶음을 준비 중…", "Preparing original image archive…")
         : bt("승인과 접근 권한 확인 중…", "Checking approval and access…")}</p> : null}
     {notice ? <p role="status" className="text-sm">{notice}</p> : null}
-  </section>;
+  </section><StudioReviewDelivery verified={verified} /></>;
 }
