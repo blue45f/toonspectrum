@@ -170,3 +170,69 @@ export function canStudioSkiaPublishOverSettledInk(
   return reservedSurfaceCount > 0
     && ownsEveryStroke(new Set(candidate.ownedDocumentIds), head.strokeIds);
 }
+
+export interface StudioSkiaCommittedInkHostRuntime {
+  readonly canPublishOverSettledInk: (
+    candidate: StudioSkiaDocumentPresentationCandidate,
+  ) => boolean;
+  readonly onAuthorityChange: (
+    authority: StudioRenderSurfaceAuthority,
+  ) => void;
+  readonly onVisiblePresentation: (
+    presentation: StudioSkiaDocumentPresentationCandidate,
+  ) => void;
+  readonly decide: (
+    request: StudioCommittedInkVisibleDrawRequest,
+  ) => StudioSkiaCommittedInkDrawDecision;
+  readonly defer: (token: string, nextAttempt: number) => void;
+  readonly settle: (token: string) => void;
+  readonly clear: () => void;
+}
+
+export function createStudioSkiaCommittedInkHostRuntime(
+  input: {
+    readonly readQueue: () => readonly StudioCommittedInkSurfaceHandoff[];
+    readonly wake: () => void;
+  },
+): StudioSkiaCommittedInkHostRuntime {
+  let authority: StudioSkiaCommittedInkAuthority | null = null;
+  let visibleReceipt: StudioSkiaCommittedInkVisibleReceipt | null = null;
+  const deferAttempts = new Map<string, number>();
+
+  return {
+    canPublishOverSettledInk(candidate) {
+      return canStudioSkiaPublishOverSettledInk(candidate, input.readQueue());
+    },
+    onAuthorityChange(nextAuthority) {
+      authority = projectStudioSkiaCommittedInkAuthority(nextAuthority);
+      if (
+        authority.status !== "active"
+        || visibleReceipt?.sceneRevision !== authority.sceneRevision
+      ) {
+        visibleReceipt = null;
+      }
+      input.wake();
+    },
+    onVisiblePresentation(presentation) {
+      visibleReceipt = projectStudioSkiaCommittedInkVisibleReceipt(presentation);
+      input.wake();
+    },
+    decide(request) {
+      return decideStudioSkiaCommittedInkDraw({
+        request,
+        authority,
+        visibleReceipt,
+        deferAttempt: deferAttempts.get(request.token) ?? 0,
+      });
+    },
+    defer(token, nextAttempt) {
+      deferAttempts.set(token, nextAttempt);
+    },
+    settle(token) {
+      deferAttempts.delete(token);
+    },
+    clear() {
+      deferAttempts.clear();
+    },
+  };
+}
