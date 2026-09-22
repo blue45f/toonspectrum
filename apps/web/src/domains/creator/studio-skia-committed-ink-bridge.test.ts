@@ -222,6 +222,11 @@ describe("Skia committed-ink receipt bridge", () => {
       ...authority("starting"),
       sceneRevision: revision(9),
     });
+    expect(runtime.decide(request())).toEqual({
+      status: "wait",
+      nextDeferAttempt: 1,
+    });
+    runtime.defer("receipt-token", 1);
     expect(runtime.decide(request())).toEqual({ status: "fallback" });
     runtime.clear();
   });

@@ -373,8 +373,6 @@ import {
   type StudioCommentsDocument,
 } from "./studio-comments";
 import {
-  createStudioCommittedInkSurfaceHandoff,
-  sumStudioCommittedInkHandoffSurfaceCounts,
   transitionStudioCommittedInkHandoffHead,
   type StudioCommittedInkAuthorityEvidence,
   type StudioCommittedInkSurfaceCounts,
@@ -383,13 +381,9 @@ import {
 } from "./studio-committed-ink-handoff-coordinator";
 import type { StudioCommittedInkRetainedRetryState } from "./studio-committed-ink-release-retry";
 import {
-  canStudioSkiaPublishOverSettledInk,
-  decideStudioSkiaCommittedInkDraw,
-  projectStudioSkiaCommittedInkAuthority,
-  projectStudioSkiaCommittedInkVisibleReceipt,
-  type StudioSkiaCommittedInkAuthority,
-  type StudioSkiaCommittedInkVisibleReceipt,
+  appendStudioCommittedInkHandoff,
 } from "./studio-skia-committed-ink-bridge";
+import { useStudioSkiaCommittedInkHostRuntime } from "./use-studio-skia-committed-ink-host-runtime";
 import {
   createStudioCommunityAssetCredit,
   formatStudioCommunityAssetCredit,
@@ -9896,12 +9890,13 @@ export function StudioCuttoonEditor({
   const liveInkOverlayClearGenRef = useRef(0);
   /** React 상태 예약이 아니라 실제 가시 픽셀 영수증 뒤에만 라이브 표면을 넘긴다. */
   const committedInkSurfaceHandoffsRef = useRef<StudioCommittedInkSurfaceHandoff[]>([]);
-  const skiaCommittedInkAuthorityRef = useRef<StudioSkiaCommittedInkAuthority | null>(null);
-  const skiaCommittedInkVisibleReceiptRef = useRef<StudioSkiaCommittedInkVisibleReceipt | null>(null);
-  const skiaCommittedInkDeferAttemptsRef = useRef(new Map<string, number>());
   /** Draw 실패 재시도는 StudioPage 전체 렌더가 아니라 bounded rAF coordinator로만 진행한다. */
   const committedInkSurfaceHandoffRafRef = useRef(0);
   const processCommittedInkSurfaceHandoffsRef = useRef<() => void>(() => undefined);
+  const skiaCommittedInkRuntime = useStudioSkiaCommittedInkHostRuntime(
+    committedInkSurfaceHandoffsRef,
+    processCommittedInkSurfaceHandoffsRef,
+  );
   const committedInkRetainedRetryRef = useRef<StudioCommittedInkRetainedRetryState | null>(null);
   const committedInkRetainedWarnedKeyRef = useRef<string | null>(null);
   // 재시도 예산 소진(반복 draw 실패)은 화면은 계속 정상 표시(fail-visible)되지만 표면 계정 정리가
@@ -11412,64 +11407,21 @@ export function StudioCuttoonEditor({
    */
   function queueCommittedStrokeSurfaceHandoff(pageId: string, strokeIds: readonly string[]) {
     const pending = committedInkSurfaceHandoffsRef.current;
-    const reserved = sumStudioCommittedInkHandoffSurfaceCounts(pending);
-    const overlaySettledCount = Math.max(
-      0,
-      liveInkOverlayRendererRef.current.settledStrokeCount
-        + liveRetainedMediaOverlayRendererRef.current.settledStrokeCount
-        + liveDynamicBrushOverlayRendererRef.current.settledStrokeCount
-        - reserved.overlay
-    );
-    const draftSettledCount = Math.max(
-      0,
-      draftPreviewStoreRef.current.settledCount - reserved.draft
-    );
-    const gpuSettledCount = Math.max(
-      0,
-      pendingGpuStrokesRef.current.length - reserved.gpu
-    );
-    if (overlaySettledCount + draftSettledCount + gpuSettledCount === 0) return;
-    const queued = createStudioCommittedInkSurfaceHandoff({
+    const next = appendStudioCommittedInkHandoff(pending, {
       pageId,
-      strokeIds: [...new Set(strokeIds)],
-      overlaySettledCount,
-      draftSettledCount,
-      gpuSettledCount,
+      strokeIds,
+      overlaySettledCount:
+        liveInkOverlayRendererRef.current.settledStrokeCount
+        + liveRetainedMediaOverlayRendererRef.current.settledStrokeCount
+        + liveDynamicBrushOverlayRendererRef.current.settledStrokeCount,
+      draftSettledCount: draftPreviewStoreRef.current.settledCount,
+      gpuSettledCount: pendingGpuStrokesRef.current.length,
       queuedRevision: studioRevisionProjectGenerationRef.current,
     });
-    committedInkSurfaceHandoffsRef.current = [...pending, queued];
-    // This ref-only append can happen after React's last layout effect in the automatic commit
-    // batch. Always schedule one post-commit pass; the processor remains idempotent and waits
-    // fail-visible until the canonical scene projection has caught up.
+    if (next === pending) return;
+    committedInkSurfaceHandoffsRef.current = [...next];
+    // The ref-only append can happen after React's last layout effect in the commit batch.
     scheduleCommittedInkSurfaceHandoffRetry();
-  }
-  function canSkiaDocumentPublishOverSettledInk(
-    candidate: Parameters<NonNullable<StudioCanvasViewportHandlers["canSkiaDocumentPublishOverSettledInk"]>>[0]
-  ): boolean {
-    return canStudioSkiaPublishOverSettledInk(
-      candidate,
-      committedInkSurfaceHandoffsRef.current,
-    );
-  }
-  function onSkiaDocumentAuthorityChange(
-    authority: Parameters<NonNullable<StudioCanvasViewportHandlers["onSkiaDocumentAuthorityChange"]>>[0]
-  ): void {
-    const projected = projectStudioSkiaCommittedInkAuthority(authority);
-    skiaCommittedInkAuthorityRef.current = projected;
-    if (
-      projected.status !== "active"
-      || skiaCommittedInkVisibleReceiptRef.current?.sceneRevision !== projected.sceneRevision
-    ) {
-      skiaCommittedInkVisibleReceiptRef.current = null;
-    }
-    processCommittedInkSurfaceHandoffsRef.current();
-  }
-  function onSkiaDocumentVisiblePresentation(
-    presentation: Parameters<NonNullable<StudioCanvasViewportHandlers["onSkiaDocumentVisiblePresentation"]>>[0]
-  ): void {
-    skiaCommittedInkVisibleReceiptRef.current =
-      projectStudioSkiaCommittedInkVisibleReceipt(presentation);
-    processCommittedInkSurfaceHandoffsRef.current();
   }
   function prepareStrokeCommitPage(): boolean {
     return prepareStudioPendingStrokeCommitPage(
@@ -16470,7 +16422,7 @@ const puppetWarpArmed =
       committedInkSurfaceHandoffsRef.current;
     if (queue.length === 0 || !editorMountedRef.current) {
       committedInkRetainedRetryRef.current = null;
-      skiaCommittedInkDeferAttemptsRef.current.clear();
+      skiaCommittedInkRuntime.clear();
       return;
     }
 
@@ -16487,18 +16439,13 @@ const puppetWarpArmed =
 
       if (transition.status === "wait" && transition.drawRequest) {
         const request = transition.drawRequest;
-        const drawDecision = decideStudioSkiaCommittedInkDraw({
-          request,
-          authority: skiaCommittedInkAuthorityRef.current,
-          visibleReceipt: skiaCommittedInkVisibleReceiptRef.current,
-          deferAttempt: skiaCommittedInkDeferAttemptsRef.current.get(request.token) ?? 0,
-        });
+        const drawDecision = skiaCommittedInkRuntime.decide(request);
         if (drawDecision.status === "hold") {
           queue = transition.queue;
           break;
         }
         if (drawDecision.status === "wait") {
-          skiaCommittedInkDeferAttemptsRef.current.set(
+          skiaCommittedInkRuntime.defer(
             request.token,
             drawDecision.nextDeferAttempt,
           );
@@ -16507,7 +16454,7 @@ const puppetWarpArmed =
           break;
         }
 
-        skiaCommittedInkDeferAttemptsRef.current.delete(request.token);
+        skiaCommittedInkRuntime.settle(request.token);
         armLiveStrokeCanonicalCanvasAudit(request.strokeIds, request.token);
         let outcome: StudioCommittedInkVisibleDrawReceipt["outcome"] =
           drawDecision.status === "receipted" ? "drawn" : "failed";
@@ -28403,9 +28350,11 @@ function clearSelectionForEdit() {
   onWebGpuFrameReady,
   onWebGpuDeviceLost,
   onWebGpuBackendChange,
-  canSkiaDocumentPublishOverSettledInk,
-  onSkiaDocumentAuthorityChange,
-  onSkiaDocumentVisiblePresentation,
+  canSkiaDocumentPublishOverSettledInk: skiaCommittedInkRuntime.canPublishOverSettledInk,
+  onSkiaDocumentAuthorityChange:
+    skiaCommittedInkRuntime.onAuthorityChange,
+  onSkiaDocumentVisiblePresentation:
+    skiaCommittedInkRuntime.onVisiblePresentation,
   setWebGpuCanvasHandle,
   setHokusaiLiveOverlaySurface,
   onHokusaiCanonicalImageReady,

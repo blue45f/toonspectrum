@@ -280,7 +280,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(page).toContain(
       'if (!outcome || outcome.status === "rejected") {'
     );
-    expect(page).toContain("pendingGpuStrokesRef.current.length - reserved.gpu");
+    expect(page).toContain("appendStudioCommittedInkHandoff(pending, {");
   });
 
   it("seals the release endpoint and rejects without publishing a Konva draft", () => {
@@ -523,14 +523,19 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     const queueStart = page.indexOf("function queueCommittedStrokeSurfaceHandoff(");
     const queueEnd = page.indexOf("function queueDeferredStrokeCommit(", queueStart);
     const queueSource = page.slice(queueStart, queueEnd);
+    const append = queueSource.indexOf(
+      "const next = appendStudioCommittedInkHandoff(pending, {",
+    );
     const install = queueSource.indexOf(
-      "committedInkSurfaceHandoffsRef.current = [...pending, queued]",
+      "committedInkSurfaceHandoffsRef.current = [...next]",
+      append,
     );
     const retry = queueSource.indexOf("scheduleCommittedInkSurfaceHandoffRetry()", install);
 
     expect(queueStart).toBeGreaterThan(-1);
     expect(queueEnd).toBeGreaterThan(queueStart);
-    expect(install).toBeGreaterThan(-1);
+    expect(append).toBeGreaterThan(-1);
+    expect(install).toBeGreaterThan(append);
     expect(retry).toBeGreaterThan(install);
   });
 
@@ -539,7 +544,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     const processStart = page.indexOf("processCommittedInkSurfaceHandoffsRef.current = () => {");
     const processEnd = page.indexOf("useLayoutEffect(() => {", processStart);
     const processSource = page.slice(processStart, processEnd);
-    const decision = processSource.indexOf("decideStudioSkiaCommittedInkDraw({");
+    const decision = processSource.indexOf("skiaCommittedInkRuntime.decide(request)");
     const wait = processSource.indexOf('if (drawDecision.status === "wait")', decision);
     const fallback = processSource.indexOf('if (drawDecision.status === "fallback")', wait);
     const compatibilityDraw = processSource.indexOf("mainLayer.draw()", fallback);
@@ -549,13 +554,18 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(fallback).toBeGreaterThan(wait);
     expect(compatibilityDraw).toBeGreaterThan(fallback);
     expect(processSource.slice(wait, fallback)).toContain(
-      "skiaCommittedInkDeferAttemptsRef.current.set",
+      "skiaCommittedInkRuntime.defer(",
     );
     expect(processSource).toContain(
       "if (retryVisibleDraw) scheduleCommittedInkSurfaceHandoffRetry()",
     );
-    expect(page).toContain("onSkiaDocumentVisiblePresentation");
-    expect(page).toContain("canSkiaDocumentPublishOverSettledInk");
+    expect(page).toContain("useStudioSkiaCommittedInkHostRuntime(");
+    expect(page).toContain(
+      "canSkiaDocumentPublishOverSettledInk: skiaCommittedInkRuntime.canPublishOverSettledInk",
+    );
+    expect(page).toContain(
+      "onSkiaDocumentVisiblePresentation:\n    skiaCommittedInkRuntime.onVisiblePresentation",
+    );
   });
 
   it("requires the full active journal identity before rebaselining a settled prefix", () => {
