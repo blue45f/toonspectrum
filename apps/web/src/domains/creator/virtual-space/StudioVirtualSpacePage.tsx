@@ -119,6 +119,16 @@ import {
 } from "./studio-virtual-space-session-position";
 
 import { StudioVirtualSpaceNpcPanel } from "./StudioVirtualSpaceNpcPanel";
+import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
+import { StudioVirtualSpaceP2pBoard } from "./StudioVirtualSpaceP2pBoard";
+import { StudioVirtualSpaceRoomCatalog } from "./StudioVirtualSpaceRoomCatalog";
+import { useStudioVirtualSpaceP2pBoard } from "./use-studio-virtual-space-p2p-board";
+import {
+  readStudioVirtualSpaceAvatarIndex,
+  readStudioVirtualSpaceEntryPreference,
+  writeStudioVirtualSpaceAvatarIndex,
+  writeStudioVirtualSpaceEntryPreference,
+} from "./studio-virtual-space-entry-preference";
 import { StudioVirtualSpaceDirectory } from "./StudioVirtualSpaceDirectory";
 import { StudioVirtualSpaceReviewPicker } from "./StudioVirtualSpaceReviewPicker";
 import { verifyStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-invitation";
@@ -138,7 +148,6 @@ import "./studio-workspace-live.css";
 
 const StudioP2pHuddleLauncher = lazy(() => import("../live/huddle/StudioP2pHuddleLauncher"));
 
-const VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
 const VIRTUAL_SPACE_REACTIONS: readonly {
   readonly id: StudioVirtualSpaceReaction;
   readonly emoji: string;
@@ -156,32 +165,6 @@ function virtualSpaceReactionEmoji(reaction: StudioVirtualSpaceReaction | null |
 }
 
 const VIRTUAL_AVATARS = STUDIO_CHARACTER_SKINS;
-
-function readVirtualSpaceAvatarIndex(): number {
-  if (typeof window === "undefined") return STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
-  try {
-    const raw = window.localStorage.getItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
-    const index = raw == null ? NaN : Number(raw);
-    return Number.isInteger(index) && index >= 0 && index < VIRTUAL_AVATARS.length
-      ? index
-      : STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
-  } catch {
-    return STUDIO_VIRTUAL_SPACE_AUTO_AVATAR;
-  }
-}
-
-function writeVirtualSpaceAvatarIndex(index: number): void {
-  if (typeof window === "undefined") return;
-  try {
-    if (index >= 0 && index < VIRTUAL_AVATARS.length) {
-      window.localStorage.setItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY, String(index));
-    } else {
-      window.localStorage.removeItem(VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
-    }
-  } catch {
-    // Local avatar choice is optional; a deterministic fallback remains available.
-  }
-}
 
 const ZONE_ICONS: Readonly<Partial<Record<StudioVirtualSpaceZoneId, typeof Coffee>>> = {
   lounge: Coffee,
@@ -584,9 +567,11 @@ export function VirtualSpaceExperience({
   publication,
   homeHeader,
   personal = false,
+  initialAvatarIndexOverride,
 }: {
   readonly homeHeader?: ReactNode;
   readonly personal?: boolean;
+  readonly initialAvatarIndexOverride?: number;
   readonly publication: ReturnType<typeof useStudioWorldPublication>;
   readonly projectId: string;
   readonly preparing: boolean;
@@ -623,7 +608,10 @@ export function VirtualSpaceExperience({
       preferred,
     ) ?? preferred;
   }, [fallbackIdentity, positionScope]);
-  const initialAvatarIndex = useMemo(() => readVirtualSpaceAvatarIndex(), []);
+  const initialAvatarIndex = useMemo(
+    () => initialAvatarIndexOverride ?? readStudioVirtualSpaceAvatarIndex(),
+    [initialAvatarIndexOverride],
+  );
   const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
     self: studioVirtualSpaceState(initial, "down", "available", false, initialAvatarIndex),
     peers: [],
@@ -638,7 +626,11 @@ export function VirtualSpaceExperience({
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
-  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | "search" | "work" | "sessions" | null>(() => { const q = new URLSearchParams(location.search); return q.has("session") || q.get("activity") === "sessions" ? "sessions" : null; });
+  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | "search" | "work" | "sessions" | "board" | null>(() => {
+    const query = new URLSearchParams(location.search);
+    if (query.get("activity") === "board") return "board";
+    return query.has("session") || query.get("activity") === "sessions" ? "sessions" : null;
+  });
   const spaceSearchRef = useRef<HTMLInputElement>(null);
   const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
   const [openingReview, setOpeningReview] = useState(false);
@@ -688,6 +680,19 @@ export function VirtualSpaceExperience({
   const movingRef = useRef(false);
   const visibleParticipantCount = connectivity.serverAvailable ? snapshot.peers.length + 1 : 1;
   const worldReady = worldLoaded && loadedPositionScope === positionScopeKey;
+  const boardScope = useMemo(() => {
+    const revision = publishedScope && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/u.test(publishedScope)
+      ? publishedScope
+      : `bundled-v${worldManifest.version}`;
+    return { boardId: "main-board", worldId: worldManifest.id, contentRevision: revision };
+  }, [publishedScope, worldManifest.id, worldManifest.version]);
+  const p2pBoard = useStudioVirtualSpaceP2pBoard({
+    participant: live.room?.participant,
+    port: live.room?.direct,
+    scope: boardScope,
+    storageOwnerId: privateActorId,
+    enabled: workspacePanel === "board" && signedIn && worldReady && !authoringMode,
+  });
   const cancelGuideTour = useCallback(() => {
     guideRequestRef.current = null; setGuideTourRequest(null);
     setGuideTour((current) => current ? { ...current, status: "cancelled" } : null);
@@ -1223,7 +1228,7 @@ export function VirtualSpaceExperience({
       || nextIndex >= VIRTUAL_AVATARS.length
     ) return;
     setAvatarIndex(nextIndex);
-    writeVirtualSpaceAvatarIndex(nextIndex);
+    writeStudioVirtualSpaceAvatarIndex(nextIndex);
     const controller = controllerRef.current;
     if (controller) {
       controller.setAvatarIndex(nextIndex);
@@ -1259,6 +1264,8 @@ export function VirtualSpaceExperience({
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "work"}
               onClick={() => setWorkspacePanel("work")}>{bt("검수·작업함", "Reviews & inbox")}</button>
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "sessions"} onClick={() => setWorkspacePanel("sessions")}>{bt("공동 작업 세션", "Work sessions")}</button>
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "board"}
+              onClick={() => setWorkspacePanel("board")}>{bt("P2P 화이트보드", "P2P whiteboard")}</button>
           </div>
         </div>
 
@@ -1424,17 +1431,36 @@ export function VirtualSpaceExperience({
             initialFocusRef={workspacePanel === "search" ? spaceSearchRef : undefined}
             title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization")
               : workspacePanel === "search" ? bt("방·팀원 찾기", "Find rooms & people")
-                : workspacePanel === "work" ? bt("검수·작업함", "Reviews & inbox") : workspacePanel === "sessions" ? bt("공동 작업 세션", "Work sessions") : bt("사람과 대화", "People and conversations")}
+                : workspacePanel === "work" ? bt("검수·작업함", "Reviews & inbox")
+                  : workspacePanel === "sessions" ? bt("공동 작업 세션", "Work sessions")
+                    : workspacePanel === "board" ? bt("P2P 공유 화이트보드", "P2P shared whiteboard")
+                      : bt("사람과 대화", "People and conversations")}
             onClose={() => setWorkspacePanel(null)}>
           <div className="vs2-live-inspector-content">
           {workspacePanel === "work" ? personal ? <p>{bt("작품을 만든 뒤 검수와 담당 작업을 연결할 수 있습니다.", "Create a work to connect reviews and assignments.")} <Link href="/studio/new">{bt("새 작품 만들기", "Create a work")}</Link></p> : <StudioWorkspaceInbox workId={projectId} /> : null}
           {workspacePanel === "sessions" ? personal ? <p>{bt("작품을 만들면 대본 리딩·콘티·검수·소재 검토를 고정 입력본과 함께 기록할 수 있습니다.", "Create a work to organize reading, storyboard, review and material sessions around a pinned input.")} <Link href="/studio/new">{bt("새 작품 만들기", "Create a work")}</Link></p> : <Suspense fallback={<p role="status">{bt("작업 세션 불러오는 중…", "Loading work sessions…")}</p>}><WorkSessionWorkspace workId={projectId} initialSessionId={new URLSearchParams(location.search).get("session")} /></Suspense> : null}
+          {workspacePanel === "board" ? <StudioVirtualSpaceP2pBoard
+            snapshot={p2pBoard.snapshot}
+            selfSessionId={live.room?.participant.sessionId}
+            onStroke={p2pBoard.addStroke}
+            onNote={p2pBoard.addNote}
+            onRemove={p2pBoard.remove}
+            onClearOwn={p2pBoard.clearOwn}
+          /> : null}
           <div hidden={workspacePanel !== "search"}>
             {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
               inputRef={spaceSearchRef} expanded onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} />
               : <p role="status">{bt("공간 목록을 확인 중입니다.", "Checking the space directory.")}</p>}
           </div>
           <div hidden={workspacePanel !== "space"}>
+            <StudioVirtualSpaceRoomCatalog
+              projectAvailable={!personal}
+              onPanel={(panel) => setWorkspacePanel(panel)}
+              onZone={(zoneId) => {
+                queuePathTo(studioWorldSpawn(worldManifest, zoneId).point);
+                setWorkspacePanel(null);
+              }}
+            />
             <details><summary>{bt("방별 작업 바로가기", "Room work shortcuts")}</summary>
             {worldReady ? <div className="workspace-live-room-links">
               {worldManifest.rooms.map((room) => (
@@ -1665,12 +1691,18 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
   const bt = useBilingual("StudioVirtualSpacePage");
   const { projectId = "" } = useParams<{ projectId: string }>();
   const decodedProjectId = projectIdOverride ?? decodeProjectId(projectId);
+  const location = useLocation();
+  const initialEntryPreference = useMemo(() => readStudioVirtualSpaceEntryPreference(), []);
+  const [entryAvatarIndex, setEntryAvatarIndex] = useState(initialEntryPreference.avatarIndex);
+  const [entryOpen, setEntryOpen] = useState(() =>
+    !initialEntryPreference.confirmed || new URLSearchParams(location.search).get("lobby") === "1",
+  );
   const session = useSession();
   const userId = session.data?.user.id ?? null;
-  const publication = useStudioWorldPublication(decodedProjectId, userId, !personal && session.ready && Boolean(userId)
+  const publication = useStudioWorldPublication(decodedProjectId, userId, !entryOpen && !personal && session.ready && Boolean(userId)
     && validProjectId(decodedProjectId) && !/^(?:virtual-demo|draft|local)(?:$|[:_-])/u.test(decodedProjectId));
   const transportFactory = useStudioLiveTransportAuth({
-    authReady: session.ready && !personal,
+    authReady: !entryOpen && session.ready && !personal,
     userId: personal ? null : userId,
   });
   const participant = useMemo(() => {
@@ -1698,6 +1730,19 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
     );
   }
 
+  if (entryOpen) {
+    return <StudioVirtualSpaceEntryLobby
+      avatarIndex={entryAvatarIndex}
+      returning={initialEntryPreference.confirmed}
+      projectName={personal ? bt("나의 아틀리에", "My atelier") : decodedProjectId}
+      onAvatarIndex={setEntryAvatarIndex}
+      onEnter={() => {
+        writeStudioVirtualSpaceEntryPreference(entryAvatarIndex);
+        setEntryOpen(false);
+      }}
+    />;
+  }
+
   return (
     <StudioLiveCollaborationProvider
       workId={decodedProjectId}
@@ -1714,6 +1759,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
         key={JSON.stringify([decodedProjectId, userId, publication.snapshot.active?.scope ?? "bundled"])}
         publication={publication}
         projectId={decodedProjectId}
+        initialAvatarIndexOverride={entryAvatarIndex}
         homeHeader={homeHeader}
         personal={personal}
         preparing={!personal && (!session.ready || !transportFactory)}
