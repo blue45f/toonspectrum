@@ -53,6 +53,9 @@
       ],
       "@toonspectrum/studio-project-model/pinned-review-share": [
         "../../packages/studio-project-model/src/graph/pinned-review-share.ts"
+      ],
+      "@toonspectrum/studio-project-model/review-delivery": [
+        "../../packages/studio-project-model/src/graph/review-delivery.ts"
       ]
     },
     "outDir": "dist",

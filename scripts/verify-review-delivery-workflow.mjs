@@ -77,7 +77,7 @@ try {
       const prepare = panel.getByRole("button", { name: "전달 준비", exact: true }); await expect(prepare).toBeDisabled();
       const statement = panel.getByRole("textbox", { name: "권리·사용 조건 확인 근거", exact: true });
       await statement.fill("이 승인본의 팀 전달 조건과 무료 운영 모드를 확인했습니다."); await panel.getByRole("checkbox").check(); await expect(prepare).toBeEnabled();
-      await prepare.focus(); await page.keyboard.press("Enter"); await expect(panel.getByRole("heading", { name: "승인된 검수본" })).toBeVisible();
+      await prepare.focus(); await page.keyboard.press("Enter"); await expect(panel.getByRole("heading", { name: "수정 검수", exact: true })).toBeVisible();
       await panel.getByRole("button", { name: "전달 발행", exact: true }).click(); await expect(panel.getByText(/전달 발행$/u)).toBeVisible();
       actor = "other"; await page.getByRole("button", { name: "예시 계정 전환", exact: true }).click();
       const save = panel.getByRole("button", { name: "검증 ZIP 저장", exact: true }); await expect(save).toBeVisible();

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { ConflictException, ForbiddenException, HttpException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
 import { canonicalJson } from "@toonspectrum/studio-project-model";
-import type { ReviewDeliveryAction, ReviewDeliveryAccept, ReviewDeliveryPrepare } from "@toonspectrum/studio-project-model/review-delivery";
+import { reviewDeliveryManifestSchema, type ReviewDeliveryAction, type ReviewDeliveryAccept, type ReviewDeliveryPrepare } from "@toonspectrum/studio-project-model/review-delivery";
 
 import { PrivateSignedReadUrlSchema, type LocatedPrivateObjectReference } from "../../../infrastructure/private-object-storage/private-object-storage.contract";
 import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../infrastructure/private-object-storage/private-object-storage.port";
@@ -66,14 +66,16 @@ export class StudioReviewDeliveryService {
   async download(actor: string, workId: string, id: string, input: ReviewDeliveryAction, signal?: AbortSignal) {
     const source = await this.repository.downloadSource(actor, workId, id, input);
     if (!this.storage || (await this.storage.verifyPrivatePurposeBuckets({ signal }, ["derived"])).ready !== true) return unavailable();
-    if (source.pages.length !== source.objects.length || source.pages.length !== source.row.manifest.pages.length) return unavailable();
+    const parsedManifest = reviewDeliveryManifestSchema.safeParse(source.row.manifest);
+    if (!parsedManifest.success) return unavailable();
+    const manifest = parsedManifest.data;
+    if (source.pages.length !== source.objects.length || source.pages.length !== manifest.pages.length) return unavailable();
     const pageBytes: Buffer[] = []; let total = 0;
     for (let index = 0; index < source.pages.length; index += 1) {
       signal?.throwIfAborted(); const page = source.pages[index]!, object = source.objects[index]!;
       const bytes = await readObject(this.storage, this.fetcher, object, page, signal); total += bytes.length;
       if (total > TOTAL_BYTES) return unavailable(); pageBytes.push(bytes);
     }
-    const manifest = JSON.parse(JSON.stringify(source.row.manifest));
     const entries = [
       { path: "manifest.json", bytes: Buffer.from(`${canonicalJson(manifest)}\n`, "utf8") },
       { path: "README.txt", bytes: Buffer.from("ToonStudio approved review delivery\nOriginal approved review image bytes with SHA-256 checksums.\nThis receipt is not publication, editable source, DRM, or legal certification.\n", "utf8") },
