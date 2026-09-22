@@ -14,28 +14,64 @@ import { campusObjectInteractionIndex, campusWorld } from "./campus-world";
 
 const PhaserCanvas = lazy(() => import("@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas").then((module) => ({ default: module.StudioVirtualSpacePhaserCanvas })));
 const noOperation = () => undefined;
+const MAX_WALK_OBJECTS = 3;
+const EMPTY_CAMPUS_OBJECTS: readonly CampusObject[] = Object.freeze([]);
+
+function sameCampusObjects(left: readonly CampusObject[], right: readonly CampusObject[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((item, index) => {
+    const candidate = right[index];
+    return Boolean(candidate)
+      && item.id === candidate.id
+      && item.title === candidate.title
+      && item.href === candidate.href
+      && item.kind === candidate.kind
+      && item.exposure === candidate.exposure
+      && item.thumbnail === candidate.thumbnail;
+  });
+}
 
 export function CampusRoom({ district, objects }: { readonly district: CampusDistrict; readonly objects: readonly CampusObject[] }) {
   const locale = useI18n((state) => state.lang.startsWith("ko") ? "ko" : "en");
   const campus = useCampus();
   const location = useLocation();
   const navigate = useNavigate();
-  const manifest = useMemo(() => campusWorld(district, objects), [district, objects]);
+  const spawnPoint = useMemo(() => campusWorld(district).spawns[0]!.point, [district]);
+  const [sceneProjection, setSceneProjection] = useState<{
+    readonly districtId: string;
+    readonly objects: readonly CampusObject[];
+  }>(() => ({
+    districtId: district.id,
+    objects: objects.slice(0, MAX_WALK_OBJECTS),
+  }));
+  const sceneObjects = useMemo(
+    () => sceneProjection.districtId === district.id ? sceneProjection.objects : EMPTY_CAMPUS_OBJECTS,
+    [district.id, sceneProjection],
+  );
+  const manifest = useMemo(() => campusWorld(district, sceneObjects), [district, sceneObjects]);
   const bridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   const [walking, setWalking] = useState(false);
   const [visible, setVisible] = useState(true);
   const [imageFailed, setImageFailed] = useState(false);
   const host = useRef<HTMLDivElement>(null);
-  const point = useRef(manifest.spawns[0]!.point);
+  const point = useRef(spawnPoint);
   const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
-    self: studioVirtualSpaceState(manifest.spawns[0]!.point), peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false,
+    self: studioVirtualSpaceState(spawnPoint), peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false,
   }));
   useEffect(() => {
-    point.current = manifest.spawns[0]!.point;
+    const nextObjects = objects.slice(0, MAX_WALK_OBJECTS);
+    if (sceneProjection.districtId === district.id && sameCampusObjects(sceneProjection.objects, nextObjects)) return;
+    if (sceneProjection.districtId === district.id) {
+      setSnapshot((current) => ({ ...current, self: studioVirtualSpaceState(point.current) }));
+    }
+    setSceneProjection({ districtId: district.id, objects: nextObjects });
+  }, [district.id, objects, sceneProjection]);
+  useEffect(() => {
+    point.current = spawnPoint;
     setWalking(false);
     setImageFailed(false);
     return () => bridge.clearMovement();
-  }, [manifest, bridge]);
+  }, [spawnPoint, bridge]);
   useEffect(() => {
     let intersects = true;
     const update = () => {
@@ -74,7 +110,7 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
               return;
             }
             const objectIndex = campusObjectInteractionIndex(interactionId);
-            const object = objectIndex === null ? null : objects[objectIndex];
+            const object = objectIndex === null ? null : sceneObjects[objectIndex];
             if (object) navigate(object.href);
           }} />
       </Suspense></CampusSceneBoundary> : artwork}

@@ -75,3 +75,52 @@ it("opens a verified live domain object from an authored Phaser interaction slot
 
   expect(screen.getByTestId("location").textContent).toBe("/market/resource/asset-A");
 });
+
+it("keeps the walking pose across equivalent projections and applies a real object update without leaving the room", async () => {
+  const district = campusDistrict("market");
+  const first = {
+    id: "asset-A",
+    title: "브러시 A",
+    href: "/market/resource/asset-A",
+    kind: "market-resource" as const,
+  };
+  const view = render(
+    <MemoryRouter initialEntries={["/market/browse"]}>
+      <CampusRoom district={district} objects={[first]} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "공용 아틀리에 걷기" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Move actor" }));
+  const art = view.container.querySelector<HTMLElement>(".campus-room-art")!;
+  expect(art.dataset.campusWalkX).toBe("123.000");
+  expect(art.dataset.campusWalkY).toBe("456.000");
+
+  view.rerender(
+    <MemoryRouter initialEntries={["/market/browse"]}>
+      <CampusRoom district={district} objects={[{ ...first }]} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("button", { name: "걷기 멈추기" })).toBeTruthy();
+  expect(art.dataset.campusWalkX).toBe("123.000");
+  expect(art.dataset.campusWalkY).toBe("456.000");
+
+  const updated = {
+    ...first,
+    title: "브러시 A · 업데이트",
+    href: "/market/resource/asset-A-v2",
+  };
+  view.rerender(
+    <MemoryRouter initialEntries={["/market/browse"]}>
+      <CampusRoom district={district} objects={[updated]} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByRole("button", { name: "걷기 멈추기" })).toBeTruthy();
+  expect(screen.getByTestId("local-pose").textContent).toBe("123:456");
+
+  fireEvent.click(screen.getByRole("button", { name: "Open first scene object" }));
+  expect(screen.getByTestId("location").textContent).toBe("/market/resource/asset-A-v2");
+});
