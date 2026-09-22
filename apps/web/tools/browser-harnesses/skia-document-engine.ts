@@ -13,6 +13,8 @@ let viewport = { width: 640, height: 480, dpr: 1 };
 const projector = createStudioSkiaDocumentProjector();
 let strokes: El[] = [];
 let panel: El | null = null;
+let rasterElement: El | null = null;
+let rasterImage: HTMLImageElement | null = null;
 let items: SkiaDocumentFrame["items"] = [];
 let camera: SkiaDocumentFrame["camera"] = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0, rotation: 0 };
 const pen = (index: number): El => {
@@ -53,6 +55,16 @@ function drawReference() {
     }
     context.restore();
   }
+  if (rasterElement?.type === "image" && rasterImage) {
+    context.save();
+    context.globalAlpha = rasterElement.opacity ?? 1;
+    context.translate(rasterElement.x, rasterElement.y);
+    context.rotate(rasterElement.rotation * Math.PI / 180);
+    context.translate(rasterElement.flipped ? rasterElement.width : 0, rasterElement.flippedY ? rasterElement.height : 0);
+    context.scale(rasterElement.flipped ? -1 : 1, rasterElement.flippedY ? -1 : 1);
+    context.drawImage(rasterImage, 0, 0, rasterElement.width, rasterElement.height);
+    context.restore();
+  }
   for (const element of strokes) {
     if (panel?.type === "frame" && !element.noClip) {
       context.save(); context.beginPath(); context.rect(panel.x, panel.y, panel.width, panel.height); context.clip();
@@ -60,7 +72,11 @@ function drawReference() {
     } else drawLiveFreehandDraftToContext(context as unknown as Konva.Context, element as DrawEl);
   }
 }
-const projectedElements = (): El[] => panel ? [panel, ...strokes] : strokes;
+const projectedElements = (): El[] => [
+  ...(panel ? [panel] : []),
+  ...(rasterElement ? [rasterElement] : []),
+  ...strokes,
+];
 
 async function present() {
   if (strokes.length <= 280) drawReference();
@@ -71,7 +87,7 @@ async function present() {
 }
 const api = {
   async load(count: number, brush = "pen") {
-    panel = null;
+    panel = null; rasterElement = null; rasterImage = null;
     strokes = Array.from({ length: count }, (_, index) => ({ ...pen(index), brush } as El));
     const plan = projector.project(strokes);
     if (!plan.supported) throw new Error(plan.reason ?? "Unsupported fixture");
@@ -79,12 +95,32 @@ const api = {
     return present();
   },
   async panel() {
+    rasterElement = null; rasterImage = null;
     panel = { id: "panel", type: "frame", x: 90, y: 70, width: 180, height: 120,
       bgColor: "#f4f0e8", stroke: "#16100c", strokeWidth: 3 } as El;
     strokes = [{ ...pen(0), id: "panel-ink", points: [40, 100, 140, 95, 320, 100],
       pressures: [0.5, 0.8, 0.5], strokeWidth: 14 } as El];
     const plan = projector.project(projectedElements(), "classic");
     if (!plan.supported) throw new Error(plan.reason ?? "Unsupported panel fixture");
+    items = plan.items; drawReference();
+    return present();
+  },
+  async image() {
+    panel = null; strokes = [];
+    const source = document.createElement("canvas");
+    source.width = 24; source.height = 16;
+    const sourceContext = source.getContext("2d")!;
+    sourceContext.fillStyle = "#ee3344"; sourceContext.fillRect(0, 0, 12, 16);
+    sourceContext.fillStyle = "#2288dd"; sourceContext.fillRect(12, 0, 12, 8);
+    sourceContext.fillStyle = "#55aa44"; sourceContext.fillRect(12, 8, 12, 8);
+    const src = source.toDataURL("image/png");
+    rasterImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image(); image.onload = () => resolve(image); image.onerror = () => reject(new Error("fixture image decode failed")); image.src = src;
+    });
+    rasterElement = { id: "raster", type: "image", src, x: 120, y: 90, width: 180, height: 120,
+      rotation: 12, opacity: 0.8, flipped: true, flippedY: false } as El;
+    const plan = projector.project(projectedElements());
+    if (!plan.supported) throw new Error(plan.reason ?? "Unsupported image fixture");
     items = plan.items; drawReference();
     return present();
   },

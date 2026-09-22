@@ -126,7 +126,7 @@ describe("paper grain lives on its own DOM canvas", () => {
     expect(paperAt).toBeGreaterThan(backgroundLayerAt);
     expect(paperAt).toBeLessThan(mainLayerAt);
     expect(source).toContain("name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}");
-    expect(source).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(source).toContain("visible={!frameGraphOwnsDocumentPixels}");
     expect(source).toContain(
       "<StudioCanvasViewportDocumentLayer {...documentLayerProps} />",
     );

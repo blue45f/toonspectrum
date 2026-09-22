@@ -88,6 +88,22 @@ it("preserves transparent frame paint as a child clipping boundary", () => {
   expect(clipped.items[1]?.clip).toEqual({ x: 0, y: 0, width: 80, height: 80 });
 });
 
+it("admits only exact static image semantics and preserves transform metadata", () => {
+  const image = {
+    id: "image", type: "image", src: "data:image/png;base64,AA==",
+    x: 12, y: 34, width: 50, height: 60, rotation: 15, opacity: 0.75,
+    flipped: true, flippedY: false,
+  } as El;
+  const item = compileStudioSkiaDocumentItem(image);
+  expect(item?.image).toEqual({
+    src: image.type === "image" ? image.src : "", x: 12, y: 34, width: 50, height: 60,
+    rotation: 15, opacity: 0.75, flipX: true, flipY: false,
+  });
+  expect(createStudioSkiaDocumentProjector().project([{ ...image, blur: 2 } as El]).supported).toBe(false);
+  expect(createStudioSkiaDocumentProjector().project([{ ...image, isAnimatedGif: true } as El]).supported).toBe(false);
+  expect(createStudioSkiaDocumentProjector().project([{ ...image, src: "data:image/webp;base64,AA==" } as El]).supported).toBe(false);
+});
+
 it("renders static frame paint and reprojects a child only when its panel changes", () => {
   const frame = { id: "panel", type: "frame", x: 0, y: 0, width: 80, height: 80, bgColor: "#fefefe" } as El;
   const child = { ...pen("child"), points: [10, 10, 20, 20, 30, 30] } as El;

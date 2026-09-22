@@ -5,7 +5,10 @@ export type CampusObjectKind =
   | "market-resource"
   | "story"
   | "community-post"
+  | "promotion-post"
   | "project"
+  | "review"
+  | "handoff"
   | "recipe"
   | "event"
   | "work";
@@ -63,11 +66,12 @@ function matchesDistrict(item: CampusObject, districtId: CampusDistrictId): bool
   if (publicScene && item.exposure === "private") return false;
   if (districtId === "market") return noQuery && /^\/market\/resource\/[^/]+\/?$/u.test(path);
   if (districtId === "library") return noQuery && /^\/(?:title|author)\/[^/]+\/?$/u.test(path);
-  if (districtId === "gallery") return noQuery && /^\/(?:community\/post|showcase\/(?:work|series))\/[^/]+\/?$/u.test(path);
+  if (districtId === "gallery") return noQuery
+    && /^\/(?:community\/(?:post|promote)|showcase\/(?:work|series))\/[^/]+\/?$/u.test(path);
   if (districtId === "production") return item.exposure === "private" && noQuery
-    && /^\/production\/projects\/[^/]+\/overview\/?$/u.test(path);
+    && /^\/production\/projects\/[^/]+\/(?:overview|review|handoff)\/?$/u.test(path);
   if (districtId === "atelier") return item.exposure === "private" && noQuery
-    && /^\/studio\/p\/[^/]+\/overview\/?$/u.test(path);
+    && /^\/studio\/p\/[^/]+\/(?:overview|review)\/?$/u.test(path);
   if (districtId === "academy" && path === "/learn/recipes") {
     const keys = [...url.searchParams.keys()];
     return keys.length === 1 && keys[0] === "lesson" && SAFE_RECIPE.test(url.searchParams.get("lesson") ?? "");

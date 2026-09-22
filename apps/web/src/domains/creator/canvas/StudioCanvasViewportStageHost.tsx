@@ -38,6 +38,7 @@ import {
 } from "./studio-canvas-viewport-primitives";
 import { StudioCanvasGuideUnderlay } from "./StudioCanvasGuideLayers";
 import { renderStudioCanvasSelectionDecorations } from "./StudioCanvasSelectionDecorations";
+import { StudioSkiaDocumentHitLayer } from "./StudioSkiaDocumentHitLayer";
 import {
   StudioCanvasViewportDocumentLayer,
   type StudioCanvasViewportDocumentLayerProps,
@@ -501,6 +502,7 @@ export function StudioCanvasViewportStageHost({
             }
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
             data-studio-document-renderer={frameGraphOwnsDocumentPixels ? "skia-canvaskit-document-webgl2" : "compatibility"}
+            data-studio-konva-document-shadow={frameGraphOwnsDocumentPixels ? "unmounted" : "mounted"}
             data-studio-vello-hub-authority={velloHubAuthority.status}
             data-studio-vello-hub-backend={velloHubAuthority.backendId ?? undefined}
             data-studio-frame-graph-document={
@@ -662,10 +664,19 @@ export function StudioCanvasViewportStageHost({
               />
               <Group
                 name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}
-                opacity={frameGraphOwnsDocumentPixels ? 0 : 1}
+                visible={!frameGraphOwnsDocumentPixels}
               >
-                <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
+                {!frameGraphOwnsDocumentPixels ? (
+                  <StudioCanvasViewportDocumentLayer {...documentLayerProps} />
+                ) : null}
               </Group>
+              {frameGraphOwnsDocumentPixels && tool === "select" ? (
+                <StudioSkiaDocumentHitLayer
+                  elements={live.velloDocumentElements}
+                  effectiveScale={effScale}
+                  onSelect={documentLayerProps.selectElementFromCanvas}
+                />
+              ) : null}
               {renderStudioCanvasSelectionDecorations({
                 activeGroupId,
                 activeSurfaceReviewLocked,
