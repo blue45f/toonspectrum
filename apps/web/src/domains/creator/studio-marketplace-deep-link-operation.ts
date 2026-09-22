@@ -125,6 +125,12 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
         status: "success",
         message: `“${record.name}” 에셋을 현재 캔버스에 삽입했어요.`,
         resourceId: normalizedResourceId,
+        receipt: {
+          kind: "asset-inserted",
+          resourceId: normalizedResourceId,
+          resourceKind: "asset",
+          authority: "studio-canvas",
+        },
       };
     }
 
@@ -181,8 +187,22 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
         status: "success",
         message: `“${record.name}” · ${catalogResult.message}`,
         resourceId: normalizedResourceId,
+        receipt: {
+          kind: "catalog-opened",
+          resourceId: normalizedResourceId,
+          resourceKind: record.kind as Exclude<CreatorMarketplaceResourceRecord["kind"], "asset">,
+          authority: "studio-catalog",
+        },
       };
     }
+
+    const installReceipt = {
+      kind: "package-installed" as const,
+      resourceId: normalizedResourceId,
+      resourceKind: record.kind as Exclude<CreatorMarketplaceResourceRecord["kind"], "asset">,
+      authority: "studio-local-library" as const,
+      installStatus: installResult.status as "installed" | "already-installed",
+    };
 
     if (
       dependencies.synchronizeInstalledPack
@@ -204,6 +224,7 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
           status: "success",
           message: `“${record.name}” · ${installResult.message} ${accountSync.message} 자산 메뉴의 커뮤니티 목록에서 상태를 확인할 수 있어요.`,
           resourceId: normalizedResourceId,
+          receipt: installReceipt,
           accountSync,
         };
       } catch (caught) {
@@ -215,6 +236,7 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
           status: "success",
           message: `“${record.name}” · ${installResult.message} 로컬 설치는 유지되지만 계정 설치 확인은 동기화하지 못했어요. 아래 재시도로 계정 기록만 다시 맞출 수 있습니다.`,
           resourceId: normalizedResourceId,
+          receipt: installReceipt,
           accountSync: {
             status: "retry-required",
             message: syncIssue,
@@ -227,6 +249,7 @@ export async function applyStudioMarketplaceDeepLinkOperation<TPack, TAsset>(
       status: "success",
       message: `“${record.name}” · ${installResult.message} 자산 메뉴의 커뮤니티 목록에서 상태를 확인할 수 있어요.`,
       resourceId: normalizedResourceId,
+      receipt: installReceipt,
     };
   } catch (caught) {
     if (caught instanceof StudioMarketplaceStaleInstallError || !isCurrent()) {

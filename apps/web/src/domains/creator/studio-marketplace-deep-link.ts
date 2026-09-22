@@ -5,10 +5,32 @@ export type StudioMarketplaceDeepLinkAccountSync = Readonly<{
   message: string;
 }>;
 
+export type StudioMarketplaceCompletionReceipt =
+  | Readonly<{
+      kind: "asset-inserted";
+      resourceId: string;
+      resourceKind: "asset";
+      authority: "studio-canvas";
+    }>
+  | Readonly<{
+      kind: "package-installed";
+      resourceId: string;
+      resourceKind: Exclude<CreatorMarketplaceResourceRecord["kind"], "asset">;
+      authority: "studio-local-library";
+      installStatus: "installed" | "already-installed";
+    }>
+  | Readonly<{
+      kind: "catalog-opened";
+      resourceId: string;
+      resourceKind: Exclude<CreatorMarketplaceResourceRecord["kind"], "asset">;
+      authority: "studio-catalog";
+    }>;
+
 export type StudioMarketplaceDeepLinkResult = Readonly<{
   status: "success" | "error" | "stale";
   message: string;
   resourceId: string;
+  receipt?: StudioMarketplaceCompletionReceipt;
   accountSync?: StudioMarketplaceDeepLinkAccountSync;
 }>;
 

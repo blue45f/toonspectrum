@@ -3,7 +3,8 @@ import { FortuneEnrichment } from "./FortuneEnrichment";
 import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { tryCopyFortuneText } from "./fortune-sharing";
 import { useState } from "react";
-import { BookOpen, List } from "lucide-react";
+import { BookOpen, List, Palette } from "lucide-react";
+import { useCampusPaletteSave } from "@/shared/components/spatial-campus/campus-palette-context";
 import { fortunePillarDetails, FORTUNE_ELEMENT_KEYS, FORTUNE_ELEMENT_NAMES, FORTUNE_EXPERIENCES } from "@toonspectrum/core/fortune";
 import type { FortuneReading, SajuResult } from "@toonspectrum/core/fortune";
 import { FortuneStoryReader } from "./FortuneStoryReader";
@@ -23,17 +24,36 @@ function Pillars({ chart, label }: { chart: SajuResult; label: string }) {
 }
 export function FortuneReadingView({ reading, cast = "ara", onCastChange }: { reading: FortuneReading; cast?: ComicCastId; onCastChange?: (id: ComicCastId) => void }) {
   const [mode, setMode] = useState<"story" | "report">("story");
+  const saveCampusPalette = useCampusPaletteSave();
   const [paletteNotice, setPaletteNotice] = useState("");
+  const [paletteSaving, setPaletteSaving] = useState(false);
   const [selectedDay, setSelectedDay] = useState(reading.calendar?.[0]?.date ?? "");
   const detail = reading.calendar?.find((d) => d.date === selectedDay);
   const experience = FORTUNE_EXPERIENCES.find((item) => item.id === reading.id);
+  const savePalette = async () => {
+    if (!saveCampusPalette || !reading.colors?.length || paletteSaving) return;
+    setPaletteSaving(true);
+    setPaletteNotice("");
+    try {
+      const receipt = await saveCampusPalette(reading.colors.map((color) => color.hex));
+      setPaletteNotice(`Studio 색상 라이브러리에 ${receipt.colorCount}색 팔레트를 저장했어요.`);
+    } catch (cause) {
+      setPaletteNotice(cause instanceof DOMException && cause.name === "AbortError"
+        ? "화면이나 계정이 바뀌어 팔레트 저장을 취소했어요."
+        : "Studio 색상 라이브러리에 저장하지 못했어요. 기존 팔레트는 변경하지 않았습니다.");
+    } finally {
+      setPaletteSaving(false);
+    }
+  };
   return <article className="fo-report" aria-label={`${reading.title} 결과`}>
     <header className="fo-result-intro"><div className="fo-result-copy"><p className="fo-eyebrow">YOUR READING · {reading.generatedFor}</p><h3>{reading.eyebrow}</h3><p>{reading.summary}</p>{reading.score !== undefined && <div className="fo-score"><strong>{reading.score}<small>/100</small></strong><span>전통 규칙 참고 지수<br /><small>실제 궁합의 확률이 아닙니다.</small></span></div>}</div>{experience && <div className="fo-result-art"><FortuneExperienceArt experience={experience} /></div>}</header>
     <div className="fo-reading-mode" aria-label="해석 읽기 방식"><button type="button" className="fo-button" aria-pressed={mode === "story"} onClick={() => setMode("story")}><BookOpen size={16} />웹툰으로 읽기</button><button type="button" className="fo-button" aria-pressed={mode === "report"} onClick={() => setMode("report")}><List size={16} />상세 리포트</button><span>같은 해석을 원하는 방식으로 읽어요</span></div>
     {mode === "story" && <FortuneStoryReader reading={reading} cast={cast} onCastChange={onCastChange} />}
     {reading.chart && <div className={reading.partnerChart ? "fo-chart-pair" : ""}><Pillars chart={reading.chart} label={reading.partnerChart ? "나의 원국" : "나를 이루는 네 기둥"} />{reading.partnerChart && <Pillars chart={reading.partnerChart} label="상대의 원국" />}</div>}
     {reading.cards && mode === "report" && <div className="fo-tarot-results">{reading.cards.map((card) => <figure key={card.id}><figcaption>{card.position}</figcaption><TarotCardFace card={card} /><p>{card.name} · {card.type === "upright" ? "정방향" : "역방향"}</p></figure>)}</div>}
-    {reading.colors && <div className="fo-palettes">{reading.colors.map((color) => <div key={color.hex}><div style={{ backgroundColor: color.hex }} aria-hidden="true" /><strong>{color.name}</strong><code>{color.hex}</code><button type="button" aria-label={`${color.name} ${color.hex} 색상 복사`} onClick={() => { void tryCopyFortuneText(color.hex).then((ok) => setPaletteNotice(ok ? `${color.hex} 색상을 복사했어요.` : `자동 복사가 제한되어 있어요. ${color.hex} 값을 직접 복사해 주세요.`)); }}>HEX 복사</button></div>)}</div>}
+    {reading.colors && <><div className="fo-palettes">{reading.colors.map((color) => <div key={color.hex}><div style={{ backgroundColor: color.hex }} aria-hidden="true" /><strong>{color.name}</strong><code>{color.hex}</code><button type="button" aria-label={`${color.name} ${color.hex} 색상 복사`} onClick={() => { void tryCopyFortuneText(color.hex).then((ok) => setPaletteNotice(ok ? `${color.hex} 색상을 복사했어요.` : `자동 복사가 제한되어 있어요. ${color.hex} 값을 직접 복사해 주세요.`)); }}>HEX 복사</button></div>)}</div>
+      {saveCampusPalette && <div className="fo-reading-tool-actions"><button type="button" className="fo-button" disabled={paletteSaving} onClick={() => { void savePalette(); }}><Palette size={16} />{paletteSaving ? "Studio에 저장 중…" : "이 색만 Studio 팔레트로 저장"}</button><span className="fo-help">해석·생일·질문은 넘기지 않고 HEX 색상만 현재 기기의 Studio 라이브러리에 저장합니다.</span></div>}
+    </>}
     {paletteNotice && <p className="fo-tool-status" role="status">{paletteNotice}</p>}
     {reading.calendar && <section className="fo-calendar-section"><h3>{reading.calendar[0]?.date.slice(0, 7)} 만세력</h3>
       <div className="fo-calendar"><div className="fo-weekdays">{["일", "월", "화", "수", "목", "금", "토"].map((day) => <span key={day}>{day}</span>)}</div>

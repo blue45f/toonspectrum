@@ -4,6 +4,7 @@ import { AvailabilityDots, PlatformTags } from "./availability";
 import { bestPricing } from "./availability-utils";
 import { BookmarkButton } from "./bookmark-button";
 import { TitlePoster } from "./title-poster";
+import { CampusObjectSource } from "./spatial-campus/CampusObjectSource";
 import { Card3D } from "./ui/card-3d";
 import { GenreChip } from "./ui/chip";
 import { GenreSpectrum } from "./ui/spectrum-bar";
@@ -81,6 +82,13 @@ export function TitleCard({
   if (feature) {
     return (
       <Card3D maxTilt={12} scale={1.02} className={cn("group relative block rounded-2xl", className)}>
+      <CampusObjectSource objects={[{
+                id: title.id,
+                title: title.title,
+                href: `/title/${encodeURIComponent(title.slug)}`,
+                kind: "story",
+                exposure: "public",
+              }]} />
         <article className="relative flex transform-gpu gap-4 overflow-hidden rounded-2xl border border-line/70 bg-panel/40 p-3 backface-hidden transition-[box-shadow,border-color] duration-200 surface-hl group-hover:border-line-strong group-hover:shadow-[0_22px_48px_-16px_oklch(0.14_0.02_68/0.45)] group-focus-within:border-line-strong">
           <div className="relative w-[38%] max-w-[8.5rem] shrink-0 overflow-hidden rounded-[0.9rem]">
             <div className="transition-transform duration-300 ease-out-expo group-hover:scale-[1.04]">
@@ -125,6 +133,13 @@ export function TitleCard({
 
   return (
     <Card3D maxTilt={10} scale={1.025} className={cn("group relative block rounded-2xl", className)}>
+    <CampusObjectSource objects={[{
+              id: title.id,
+              title: title.title,
+              href: `/title/${encodeURIComponent(title.slug)}`,
+              kind: "story",
+              exposure: "public",
+            }]} />
       <article className="relative block rounded-2xl">
         <div className="relative transform-gpu overflow-hidden rounded-2xl border border-line/70 bg-panel/35 p-1 backface-hidden transition-[box-shadow,border-color] duration-200 group-hover:border-line-strong group-hover:shadow-[0_20px_45px_-18px_oklch(0.14_0.02_68/0.4)] group-focus-within:border-line-strong">
           <div className="relative overflow-hidden rounded-[0.9rem] transition-transform duration-300 ease-out-expo group-hover:scale-[1.035]">
@@ -178,6 +193,13 @@ export function TitleRow({ title, className }: { title: Title; className?: strin
         className
       )}
     >
+      <CampusObjectSource objects={[{
+        id: title.id,
+        title: title.title,
+        href: `/title/${encodeURIComponent(title.slug)}`,
+        kind: "story",
+        exposure: "public",
+      }]} />
       <div className="w-16 shrink-0 sm:w-20">
         <TitlePoster title={title} size="sm" />
       </div>

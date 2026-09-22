@@ -301,6 +301,13 @@ describe("Studio marketplace deep link", () => {
 
     expect(result).toMatchObject({
       status: "success",
+      receipt: {
+        kind: "package-installed",
+        resourceId: "resource-1",
+        resourceKind: "brush",
+        authority: "studio-local-library",
+        installStatus: "installed",
+      },
       accountSync: { status: "synchronized" },
     });
     expect(result.message).toContain("실제 Studio 설치를 확인");
@@ -410,7 +417,15 @@ describe("Studio marketplace deep link", () => {
 
     const result = await applyStudioMarketplaceDeepLink("resource-1", deps);
 
-    expect(result).toMatchObject({ status: "success" });
+    expect(result).toMatchObject({
+      status: "success",
+      receipt: {
+        kind: "catalog-opened",
+        resourceId: "resource-1",
+        resourceKind: "template",
+        authority: "studio-catalog",
+      },
+    });
     expect(result.message).toContain("장면 템플릿 카탈로그");
     expect(deps.openBundledPackCatalog).toHaveBeenCalledWith(
       "pack-1",
@@ -514,7 +529,17 @@ describe("Studio marketplace deep link", () => {
       dependencies({ kind: "asset", assets: ["asset-record"], inserted: false }),
     );
 
-    expect(inserted).toMatchObject({ status: "success" });
+    expect(inserted).toMatchObject({
+      status: "success",
+      receipt: {
+        kind: "asset-inserted",
+        resourceId: "asset-1",
+        resourceKind: "asset",
+        authority: "studio-canvas",
+      },
+    });
+    expect(unsupported.receipt).toBeUndefined();
+    expect(locked.receipt).toBeUndefined();
     expect(unsupported.message).toContain("검증된 절차형 에셋");
     expect(locked.message).toContain("캔버스 잠금");
   });

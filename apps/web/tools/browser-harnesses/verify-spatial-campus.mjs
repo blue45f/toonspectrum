@@ -22,7 +22,14 @@ const manifest = {
 };
 const resource = { ...manifest, id: "11111111-2222-4333-8444-555555555555", manifestHash: digest(manifest), manifestByteSize: Buffer.byteLength(canonical(manifest)),
   publisher: { id: "u1", name: "QA only", avatar: null }, createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z", isOwner: false, access: "free" };
-const report = { origin: origin.origin, fixture: "anonymous and synthetic market records; all other API calls fail closed", cases: [], interactions: [] };
+const promotion = {
+  id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", kind: "series", stage: "amateur", genre: "드라마",
+  title: "QA 공개 작품 소개", seriesTitle: "QA 공개 작품", description: "공개 갤러리 공간 투영만 검증하는 합성 작품 소개입니다. 실제 사용자 콘텐츠가 아닙니다.",
+  readingUrl: "", videoUrl: "", cover: "", tags: ["qa"], contentWarning: "", rightsConfirmed: true,
+  author: { id: "qa-author", name: "QA 작가" }, createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z",
+  version: 1, hidden: false, archived: false, saved: false,
+};
+const report = { origin: origin.origin, fixture: "anonymous synthetic market and promotion records; all other API calls fail closed", cases: [], interactions: [] };
 const browser = await chromium.launch({ headless: true });
 async function contextFor(width, height = 900) {
   const context = await browser.newContext({ viewport: { width, height }, locale: "ko-KR", reducedMotion: "reduce", serviceWorkers: "block" });
@@ -33,12 +40,45 @@ async function contextFor(width, height = 900) {
     if (url.pathname === "/api/auth/session") return route.fulfill({ status: 200, json: null });
     if (url.pathname === "/api/creator/marketplace/resources") return route.fulfill({ status: 200, json: { items: [resource], limit: Number(url.searchParams.get("limit")) || 12, nextCursor: null, hasMore: false } });
     if (url.pathname === `/api/creator/marketplace/resources/${resource.id}`) return route.fulfill({ status: 200, json: resource });
+    if (url.pathname === "/api/promotions/posts") return route.fulfill({ status: 200, json: { items: [promotion], nextCursor: null, hasMore: false, canModerate: false } });
     return route.fulfill({ status: 503, json: { message: "Local QA: service unavailable" } });
   });
   return context;
 }
-const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/team", "/hub", "/home"];
+const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
 const widths = (process.env.CAMPUS_QA_WIDTHS ?? "1440,1024,390,320").split(",").map(Number);
+
+async function verifySceneFailureIsolation() {
+  const context = await contextFor(1440);
+  await context.addInitScript(() => {
+    window.__campusFailures = [];
+    window.addEventListener("toonspectrum:render-failure", (event) => {
+      window.__campusFailures.push({
+        surface: event.detail?.surface ?? null,
+        message: event.detail?.error?.message ?? null,
+        stack: event.detail?.componentStack ?? null,
+      });
+    });
+  });
+  await context.route(/CampusRoom(?:-[^/]+)?\.(?:js|tsx)(?:\?.*)?$/u, (route) => route.abort("failed"));
+  try {
+    const page = await context.newPage();
+    await page.goto(new URL("/fortune?content=dream", origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const input = page.getByRole("textbox", { name: /기억나는 꿈의 장면/ });
+    await input.fill("QA scene failure private draft");
+    await page.locator("[data-campus-scene-failure]").waitFor({ timeout: 60000 });
+    assert.equal(await input.inputValue(), "QA scene failure private draft");
+    assert.equal(new URL(page.url()).searchParams.get("content"), "dream");
+    await page.getByRole("button", { name: "같은 작업을 업무 보기로 계속" }).click();
+    assert.equal(await input.inputValue(), "QA scene failure private draft");
+    const failures = await page.evaluate(() => window.__campusFailures);
+    assert.deepEqual(failures, [{ surface: "campus-scene", message: "Optional campus scene unavailable", stack: null }]);
+    report.interactions.push("Injected scene chunk failure stays inside the optional scene boundary and preserves private domain input");
+  } finally {
+    await context.close();
+  }
+}
+
 try {
   for (const width of widths) {
     const context = await contextFor(width, width < 600 ? 844 : 900);
@@ -58,19 +98,29 @@ try {
       else if (path === "/market/browse") await page.locator(".market-browse-masthead h1").waitFor({ timeout: 60000 });
       else await page.locator("main h1").first().waitFor({ timeout: 60000 });
       await page.waitForTimeout(500);
-      const measurement = await page.evaluate(() => ({ viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth,
-        mains: document.querySelectorAll("main").length, district: document.documentElement.dataset.campusDistrict,
-        controls: document.querySelectorAll("[data-campus-controls]").length }));
+      const measurement = await page.evaluate(() => {
+        const artwork = document.querySelector(".campus-room-art > img");
+        return { viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth,
+          mains: document.querySelectorAll("main").length, district: document.documentElement.dataset.campusDistrict,
+          controls: document.querySelectorAll("[data-campus-controls]").length,
+          artwork: artwork?.getAttribute("src") ?? null,
+          artworkReady: artwork instanceof HTMLImageElement ? artwork.complete && artwork.naturalWidth > 0 : null };
+      });
       await page.screenshot({ path: `${output}/${path.replace(/[^a-z0-9]+/gi, "-")}-${width}.png` });
       report.cases.push({ path, width, ...measurement, errors });
       console.log(JSON.stringify(report.cases.at(-1)));
       page.off("pageerror", onError);
       assert.ok(measurement.scrollWidth <= width + 1, `horizontal overflow: ${path} ${width}`);
       assert.equal(measurement.mains, 1, `main landmark: ${path}`);
+      if (measurement.artwork) assert.equal(measurement.artworkReady, true, `district artwork: ${path}`);
       assert.deepEqual(errors, [], `runtime errors: ${path}`);
     }
     await context.close();
   }
+  const desktopArtwork = new Set(report.cases.filter((item) => item.width === 1440 && item.artwork).map((item) => item.artwork));
+  assert.ok(desktopArtwork.size >= 8, `expected district-specific artwork, found ${desktopArtwork.size}`);
+  report.interactions.push(`District identity uses ${desktopArtwork.size} distinct verified artwork surfaces`);
+
   const context = await contextFor(1440);
   const page = await context.newPage();
   const interactionErrors = [];
@@ -78,7 +128,11 @@ try {
   await page.goto(new URL("/market/browse", origin).href);
   await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
   await page.locator(".campus-public-objects").getByRole("link", { name: resource.name }).waitFor();
-  report.interactions.push("Synthetic public record appears in the live display projection");
+  report.interactions.push("Synthetic market record appears in the live display projection");
+  await page.goto(new URL("/community/promote", origin).href);
+  await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
+  await page.locator(".campus-public-objects").getByRole("link", { name: promotion.title }).waitFor();
+  report.interactions.push("Synthetic public promotion appears in the gallery scene after the existing publication authority returns it");
   await page.goto(new URL("/fortune?content=dream", origin).href);
   const input = page.getByRole("textbox", { name: /기억나는 꿈의 장면/ });
   await input.fill("QA only private dream");
@@ -115,6 +169,7 @@ try {
   assert.deepEqual(interactionErrors, [], "Runtime errors during domain and Phaser interactions");
   report.interactions.push("Existing Phaser canvas boots locally; keyboard input measurably moves the actor, stop unmounts the canvas and the domain form is preserved");
   await context.close();
+  await verifySceneFailureIsolation();
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);
   console.error(error);

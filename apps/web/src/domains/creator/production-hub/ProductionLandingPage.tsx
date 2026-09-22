@@ -25,6 +25,7 @@ import {
 } from "./production-dashboard-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
 import { getApiErrorMessage } from "@/infrastructure/api";
@@ -88,6 +89,32 @@ export function ProductionLandingPage() {
 
   return (
     <div data-route-ready="production-home" className="min-h-dvh bg-canvas text-fg">
+      <CampusObjectSource objects={projects.slice(0, 8).flatMap((project) => {
+        const id = encodeURIComponent(project.projectId);
+        return [
+          {
+            id: project.projectId,
+            title: project.title,
+            href: `/production/projects/${id}/overview`,
+            kind: "project" as const,
+            exposure: "private" as const,
+          },
+          {
+            id: `${project.projectId}.review`,
+            title: `${project.title} · 검수`,
+            href: `/production/projects/${id}/review`,
+            kind: "review" as const,
+            exposure: "private" as const,
+          },
+          {
+            id: `${project.projectId}.handoff`,
+            title: `${project.title} · 인계`,
+            href: `/production/projects/${id}/handoff`,
+            kind: "handoff" as const,
+            exposure: "private" as const,
+          },
+        ];
+      })} />
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">

@@ -26,6 +26,7 @@ import {
   KIND_ITEMS,
 } from "./fan-cafe-constants";
 import FanPostCard from "./fan-cafe-post-card";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 
 import type { FanCafeComposeLock, FanCafeKindFilter } from "./fan-cafe-constants";
 import type { FanCafePost, FanCafePostKind, FanCafeScopeFilter } from "@/shared/lib/types";
@@ -441,6 +442,13 @@ export function FanCafePanel({
 
   return (
     <section className="rounded-2xl border border-line bg-panel/45 p-5 surface-hl">
+      <CampusObjectSource objects={posts.slice(0, 24).map((post) => ({
+        id: post.id,
+        title: post.title || post.text.slice(0, 80),
+        href: `/community/post/${encodeURIComponent(post.id)}`,
+        kind: "community-post",
+        exposure: "public",
+      }))} />
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow flex items-center gap-1.5 text-accent">

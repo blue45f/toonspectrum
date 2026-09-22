@@ -33,6 +33,7 @@ import {
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { promotionClient } from "@/infrastructure/promotion-client";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {
   canSharePromotionPost,
   compactPublicShareDescription,
@@ -168,6 +169,13 @@ function PromotionPost({ id, userId }: { id: string; userId: string | null }) {
 
       {data && post ? (
         <>
+          <CampusObjectSource objects={!post.hidden && !post.archived ? [{
+            id: post.id,
+            title: post.title,
+            href: `/community/promote/${encodeURIComponent(post.id)}`,
+            kind: "promotion-post",
+            exposure: "public",
+          }] : []} />
           <article className="pc-post">
             <div className="pc-tags">
               <span>{PROMOTION_KINDS[post.kind]}</span>
