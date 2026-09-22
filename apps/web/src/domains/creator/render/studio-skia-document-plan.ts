@@ -4,8 +4,9 @@ import type { SceneNodeIR } from "@toonspectrum/studio-project-model";
 import { isDirectLiveDraftEl, resolveStudioCausalInkDrawContract } from "../brush/studio-draw-rendering";
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { planStudioCausalInk } from "../studio-causal-ink";
-import type { DrawEl, El, FrameEl } from "../studio-element-model";
+import type { DrawEl, El, FrameEl, ImageEl } from "../studio-element-model";
 import { createStudioPanelResolver } from "../studio-element-geometry";
+import { hasActiveImageFilters } from "./studio-konva-filter-fields";
 import { isStudioVelloDocumentVectorElement, lowerStudioElementsToRenderScene, parseSupportedCssColorToIR } from "./studio-document-scene-lower";
 
 export interface StudioSkiaDocumentPlan {
@@ -42,8 +43,24 @@ function isStudioSkiaDocumentFrame(element: El): boolean {
     && (!element.stroke || parseSupportedCssColorToIR(element.stroke) !== null);
 }
 
+function isStudioSkiaDocumentImage(element: El): element is ImageEl & El {
+  if (element.type !== "image" || !element.src || element.isAnimatedGif || (element.frames?.length ?? 0) > 1) return false;
+  if (element.filterPageComposite || element.adjustmentLayer || hasActiveImageFilters(element)) return false;
+  if (element.filterMaskSrc || element.filterMaskEnabled || element.maskSrc || element.maskEnabled
+    || element.clipBelow || element.alphaLocked || (element.blendMode && element.blendMode !== "source-over")) return false;
+  if (element.shadowColor || (element.cornerRadius ?? 0) !== 0 || (element.skewX ?? 0) !== 0 || (element.skewY ?? 0) !== 0) return false;
+  const opacity = element.opacity ?? 1;
+  return [element.x, element.y, element.width, element.height, element.rotation, opacity].every(Number.isFinite)
+    && element.width > 0 && element.height > 0 && opacity >= 0 && opacity <= 1
+    && element.src.length <= 48 * 1024 * 1024
+    && /^(?:data:image\/(?:png|jpeg);base64,|blob:|https?:\/\/|\/)/iu.test(element.src);
+}
+
 export function isStudioSkiaDocumentElement(element: El): boolean {
-  return isStudioSkiaCausalInk(element) || isStudioVelloDocumentVectorElement(element) || isStudioSkiaDocumentFrame(element);
+  return isStudioSkiaCausalInk(element)
+    || isStudioVelloDocumentVectorElement(element)
+    || isStudioSkiaDocumentFrame(element)
+    || isStudioSkiaDocumentImage(element);
 }
 
 function framePanel(element: FrameEl & El, theme: StudioSkiaFrameTheme): NonNullable<SkiaDocumentItem["panel"]> {
@@ -75,6 +92,23 @@ export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSki
       dabs, color, opacity: contract.opacity, union: contract.paintModel !== undefined, erase: element.mode === "eraser",
       ...(contract.nib ? { nib: contract.nib } : {}),
     } };
+  }
+  if (isStudioSkiaDocumentImage(element)) {
+    return {
+      id: element.id,
+      revision: element,
+      image: {
+        src: element.src,
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+        rotation: element.rotation,
+        opacity: element.opacity ?? 1,
+        flipX: Boolean(element.flipped),
+        flipY: Boolean(element.flippedY),
+      },
+    };
   }
   if (element.type === "frame") {
     if (!isStudioSkiaDocumentFrame(element)) return null;
