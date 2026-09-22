@@ -229,6 +229,7 @@ it("keeps source-specific image admission failures on the compatibility boundary
         src: "https://example.invalid/source.png",
         x: 10, y: 20, width: 40, height: 30, rotation: 0,
         opacity: 1, flipX: false, flipY: false,
+        skewX: 0, skewY: 0, cornerRadius: 0, blendMode: "source-over",
       },
     }],
   };

@@ -1,6 +1,7 @@
 import { createSkiaDocumentRenderer, type SkiaDocumentFrame } from "@toonspectrum/studio-engine-skia";
 
 import { drawLiveFreehandDraftToContext } from "../../src/domains/creator/brush/studio-draw-rendering";
+import { loadStudioSkiaDocumentFontData } from "../../src/domains/creator/render/studio-skia-document-font-source";
 import { createStudioSkiaDocumentProjector } from "../../src/domains/creator/render/studio-skia-document-plan";
 import { projectStudioSkiaLiveTransformElements } from "../../src/domains/creator/render/studio-skia-live-transform-projection";
 import { createStudioLiveTransformDraftStore } from "../../src/domains/creator/studio-live-transform-draft-store";
@@ -11,7 +12,10 @@ import type Konva from "konva";
 
 let gpu = document.querySelector<HTMLCanvasElement>("#gpu")!;
 const reference = document.querySelector<HTMLCanvasElement>("#reference")!;
-let engine = createSkiaDocumentRenderer(gpu);
+const createEngine = (canvas: HTMLCanvasElement) => createSkiaDocumentRenderer(canvas, {
+  loadFontData: loadStudioSkiaDocumentFontData,
+});
+let engine = createEngine(gpu);
 let viewport = { width: 640, height: 480, dpr: 1 };
 const projector = createStudioSkiaDocumentProjector();
 const transformStore = createStudioLiveTransformDraftStore();
@@ -23,6 +27,7 @@ let strokes: El[] = [];
 let panel: El | null = null;
 let rasterElement: El | null = null;
 let rasterImage: HTMLImageElement | null = null;
+let textElement: El | null = null;
 let items: SkiaDocumentFrame["items"] = [];
 let camera: SkiaDocumentFrame["camera"] = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0, rotation: 0 };
 const pen = (index: number): El => {
@@ -73,6 +78,26 @@ function drawReference() {
     context.drawImage(rasterImage, 0, 0, rasterElement.width, rasterElement.height);
     context.restore();
   }
+  if (textElement?.type === "text") {
+    context.save();
+    context.globalAlpha = textElement.opacity ?? 1;
+    context.fillStyle = textElement.fill;
+    context.translate(textElement.x, textElement.y);
+    context.rotate(textElement.rotation * Math.PI / 180);
+    context.font = `${textElement.fontStyle ?? "bold"} ${textElement.fontSize}px Pretendard`;
+    context.textBaseline = "top";
+    context.textAlign = textElement.align ?? "left";
+    const alignedX = textElement.align === "center"
+      ? textElement.width / 2
+      : textElement.align === "right" ? textElement.width : 0;
+    const letterContext = context as CanvasRenderingContext2D & { letterSpacing: string };
+    letterContext.letterSpacing = `${textElement.letterSpacing ?? 0}px`;
+    const lineHeight = textElement.fontSize * (textElement.lineHeight ?? 1);
+    textElement.text.split("\n").forEach((line, index) => {
+      context.fillText(line, alignedX, index * lineHeight, textElement.width);
+    });
+    context.restore();
+  }
   for (const element of strokes) {
     if (panel?.type === "frame" && !element.noClip) {
       context.save(); context.beginPath(); context.rect(panel.x, panel.y, panel.width, panel.height); context.clip();
@@ -83,6 +108,7 @@ function drawReference() {
 const projectedElements = (): El[] => [
   ...(panel ? [panel] : []),
   ...(rasterElement ? [rasterElement] : []),
+  ...(textElement ? [textElement] : []),
   ...strokes,
 ];
 
@@ -113,7 +139,7 @@ function transformProjection() {
 const api = {
   async load(count: number, brush = "pen") {
     releaseTransformFixture();
-    panel = null; rasterElement = null; rasterImage = null;
+    panel = null; rasterElement = null; rasterImage = null; textElement = null;
     strokes = Array.from({ length: count }, (_, index) => ({ ...pen(index), brush } as El));
     const plan = projector.project(strokes);
     if (!plan.supported) throw new Error(plan.reason ?? "Unsupported fixture");
@@ -121,7 +147,7 @@ const api = {
     return present();
   },
   async panel() {
-    rasterElement = null; rasterImage = null;
+    rasterElement = null; rasterImage = null; textElement = null;
     panel = { id: "panel", type: "frame", x: 90, y: 70, width: 180, height: 120,
       bgColor: "#f4f0e8", stroke: "#16100c", strokeWidth: 3 } as El;
     strokes = [{ ...pen(0), id: "panel-ink", points: [40, 100, 140, 95, 320, 100],
@@ -132,7 +158,7 @@ const api = {
     return present();
   },
   async image() {
-    panel = null; strokes = [];
+    panel = null; textElement = null; strokes = [];
     const source = document.createElement("canvas");
     source.width = 24; source.height = 16;
     const sourceContext = source.getContext("2d")!;
@@ -147,6 +173,31 @@ const api = {
       rotation: 12, opacity: 0.8, flipped: true, flippedY: false } as El;
     const plan = projector.project(projectedElements());
     if (!plan.supported) throw new Error(plan.reason ?? "Unsupported image fixture");
+    items = plan.items; drawReference();
+    return present();
+  },
+  async text() {
+    panel = null; rasterElement = null; rasterImage = null; strokes = [];
+    await document.fonts.load("italic 700 28px Pretendard", "안녕하세요 GPU 텍스트");
+    textElement = {
+      id: "text",
+      type: "text",
+      text: "안녕하세요 GPU\n문단 렌더링",
+      x: 120,
+      y: 100,
+      width: 320,
+      fontSize: 28,
+      fill: "#224466",
+      font: "Pretendard, sans-serif",
+      fontStyle: "bold italic",
+      align: "center",
+      letterSpacing: 1.5,
+      lineHeight: 1.25,
+      rotation: 8,
+      opacity: 0.8,
+    } as El;
+    const plan = projector.project(projectedElements());
+    if (!plan.supported) throw new Error(plan.reason ?? "Unsupported text fixture");
     items = plan.items; drawReference();
     return present();
   },
@@ -223,12 +274,12 @@ const api = {
   async recover() {
     engine.dispose();
     const replacement = gpu.cloneNode(false) as HTMLCanvasElement;
-    gpu.replaceWith(replacement); gpu = replacement; engine = createSkiaDocumentRenderer(gpu);
+    gpu.replaceWith(replacement); gpu = replacement; engine = createEngine(gpu);
     return present();
   },
   async interleavedSurface() {
     const other = document.createElement("canvas"); document.body.append(other);
-    const renderer = createSkiaDocumentRenderer(other);
+    const renderer = createEngine(other);
     try {
       const result = await renderer.present({ revision: {}, items, ...viewport, documentWidth: 640, documentHeight: 480, camera });
       if (result.status !== "presented") throw new Error("Second GPU context failed");
