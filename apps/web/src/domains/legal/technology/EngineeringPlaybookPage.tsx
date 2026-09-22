@@ -4,7 +4,6 @@ import {
   Boxes,
   Brush,
   CheckCircle2,
-  Clock3,
   Cuboid,
   Database,
   Film,
