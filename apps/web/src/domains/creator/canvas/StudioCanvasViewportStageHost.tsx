@@ -449,7 +449,7 @@ export function StudioCanvasViewportStageHost({
     onSkiaDocumentAuthorityChange:
       viewport.stableHandlers.onSkiaDocumentAuthorityChange,
     onSkiaDocumentVisiblePresentation: (presentation) => {
-      viewport.stableHandlers.onSkiaDocumentVisiblePresentation(presentation);
+      viewport.stableHandlers.onSkiaDocumentVisiblePresentation?.(presentation);
       const snapshot = liveTransformDraftStore.getSnapshot();
       if (
         snapshot?.scope === liveTransformDraftScope

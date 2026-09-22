@@ -122,8 +122,34 @@ URL query:
 - `episode`: 회차 필터.
 - `artifact`: 선택 공정.
 - `manuscriptView`: 현재 탭.
+- `manuscriptFilter`: 필수 수정·검수 중·최종본 필요·최종본 확정 필터.
+- `manuscriptSort`: 확인 필요순·최근 활동순·공정순.
+- `manuscriptLayout`: 카드 보기 또는 한눈 보기.
+- `manuscriptQuery`: 원고명·공정·회차 검색어.
 
 새로고침이나 링크 공유 후에도 같은 범위를 복원한다.
+
+### 3.1 UI/UX·편의성 고도화
+
+- 첫 화면의 기능 소개 카드를 제거하고 실제 제작 판단을 먼저 보여준다.
+- 필수 수정 → 진행 검수 → 최종본 미지정 → 최종본 확정 순으로 기본 정렬한다.
+- 헤더는 공정·버전·검수 숫자를 모두 나열하지 않고 최종본 준비, 버전, 진행 검수, 필수 수정 네 지표로 축약한다.
+- `지금 확인할 항목`은 현재 회차에서 가장 급한 공정과 다음 행동을 한 번에 제시한다.
+- 검색과 상태 필터, 정렬은 같은 툴바에 두고 결과 수와 초기화 행동을 즉시 노출한다.
+- 검색은 원고명뿐 아니라 revision ID·변경 설명·검수 제목과 상태까지 포함한다.
+- 카드 보기는 원고별 세부 맥락에, 한눈 보기는 공정별 head/final/review 비교에 최적화한다.
+- 이전·다음 회차와 이전·다음 공정 이동을 제공하며 탭을 바꾸지 않고 현재 맥락을 유지한다.
+- 현재 화면 링크 복사는 URL 상태만 공유하며 pinned review 공유 권한과 혼동하지 않는다.
+- 링크 복사 결과는 보조기기에 live status로 알리고 잠시 뒤 기본 상태로 되돌린다.
+- 잘못된 회차·원고 query는 서버 데이터 확인 후 제거해 깨진 북마크가 지속되지 않게 한다.
+- 탭은 WAI-ARIA tab 패턴과 Arrow/Home/End 키를 지원한다.
+- 전역 편의 키는 입력 요소 밖에서만 동작한다: `1–6` 탭, `/` 검색, `J/K` 공정 이동, `G` 보기 전환, `?` 도움말, `Esc` 닫기.
+- IME 조합, modal, `data-studio-shortcut-boundary` 내부에서는 단축키를 가로채지 않는다.
+- 필터로 기존 선택이 사라졌을 때 J/K는 첫 항목 또는 마지막 항목부터 자연스럽게 이어간다.
+- 모바일 카드 보기를 기본으로 유지하고 한눈 보기 표에는 가로 스크롤 안내를 제공한다.
+- 한눈 보기 표는 첫 공정 열을 고정하고 caption·column scope·원고별 action 이름을 제공한다.
+- 선택 원고는 URL 복원과 J/K 이동 후 자동으로 시야 안에 맞추며 reduced-motion 설정을 존중한다.
+- 필터 결과 없음, 회차 원고 없음, ProjectGraph 연결 없음, 네트워크 오류를 서로 다른 복구 행동으로 안내한다.
 
 ## 4. 의도적 차이
 
@@ -140,6 +166,14 @@ URL query:
   - 회차 범위 필터.
   - head/final/필수 피드백 projection.
   - revision/review 활동 시간순 정렬.
+- `production-manuscript-ux.test.ts`
+  - 필수 수정·검수·최종본 우선순위.
+  - 검색·필터·정렬과 중첩 상태 집계.
+- `ProductionManuscriptWorkspace.test.tsx`
+  - 실제 revision/final/required-feedback projection.
+  - 고정 검수본의 정확한 artifact/review/revision 링크.
+  - 검색 결과와 카드·한눈 보기 전환.
+  - 단축키 도움말, 검색 focus, 숫자 탭 전환.
 - `ProductionHubPage.test.tsx`
   - 샘플 프로젝트에서 전체 기능군 노출.
 - `production.routes.test.ts`
