@@ -238,8 +238,8 @@ export const STUDIO_RENDERER_ROLE_LEDGER: readonly RendererRoleEntry[] =
     Object.freeze({
       id: "vello-classic-gpu",
       displayName: "Vello Classic GPU (studio-vello-hub)",
-      role: "primary" as const,
-      authorities: Object.freeze(["document-vector-island" as const]),
+      role: "provider" as const,
+      authorities: Object.freeze([]),
       evidence: Object.freeze([
         "apps/web/src/domains/creator/render/studio-vello-hub.ts",
         "apps/web/src/domains/creator/render/studio-vello-hub-capability.ts",
@@ -250,12 +250,26 @@ export const STUDIO_RENDERER_ROLE_LEDGER: readonly RendererRoleEntry[] =
       candidateId: "E02",
       adr: "docs/adr/0018-no-automatic-engine-fallback-vello-primary.md",
       note:
-        "`studio-vello-hub-document-hybrid-v13` capability 는 기본 활성이고 scope 는 "
-        + "`document-vector-hybrid`, documentAuthority=true, inputAuthority=false, "
-        + "brushPixelAuthority=false, canonicalDocumentAuthority=false 다. "
-        + "productWidePromotionRequiresSoak=true, persistentWinnerStorage=false 이므로 "
-        + "전체 문서 컷오버가 아니다. ADR-0018 은 Vello WebGPU/WASM 을 2D 문서 픽셀 "
-        + "권위의 목표 엔진으로 두고, 자동 폴백을 금지한다.",
+        "검증된 Vello 비교·명시적 provider 경로는 유지한다. 현재 /studio의 제한된 문서 표시 "
+        + "슬롯은 ADR-0025의 Skia WebGL2 표면이 소유하며, Vello를 GPU 실패 후 자동 호출하지 않는다.",
+    }),
+    Object.freeze({
+      id: "skia-document-webgl2",
+      displayName: "Skia CanvasKit retained document surface",
+      role: "primary" as const,
+      authorities: Object.freeze(["document-vector-island" as const]),
+      evidence: Object.freeze([
+        "packages/studio-engine-skia/src/document-renderer.ts",
+        "apps/web/src/domains/creator/render/StudioSkiaDocumentSurface.tsx",
+        "apps/web/src/domains/creator/canvas/StudioCanvasViewportDomOverlays.tsx",
+      ]),
+      moduleSpecifiers: Object.freeze([]),
+      adr: "docs/adr/0025-skia-retained-document-migration.md",
+      note:
+        "동일한 source revision·가시 프레임 영수증으로 승인한 일반 선화·마커·확정 지우개와 "
+        + "지원 벡터 문서를 WebGL2에 직접 표시한다. SkPicture 기하 재사용, append-only 화면 갱신, "
+        + "bounded GPU 보기 캐시를 사용한다. 원고·Undo·입력 권위의 전면 교체는 아니다. "
+        + "문자·이미지·자연매체·혼합/마스크·편집 preview 등 미이행 조합은 기존 경계를 유지한다.",
     }),
     Object.freeze({
       id: "vello-hybrid-sparse",

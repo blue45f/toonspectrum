@@ -1,7 +1,10 @@
+import { createStudioSkiaCameraSource } from "../render/studio-skia-camera-source";
+import { waitForStudioSkiaPresentationFence } from "../render/studio-skia-presentation-fence";
 import {
   Profiler,
   Suspense,
   useLayoutEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -426,7 +429,10 @@ export function StudioCanvasViewportStageHost({
     wetMixRadius: viewport.wetMixRadius,
     setPerspectiveEyeLevelY: viewport.stableHandlers.setPerspectiveEyeLevelY,
   };
+  const skiaCameraSource = useMemo(() => createStudioSkiaCameraSource(() => stageRef.current), [stageRef]);
   const domOverlayProps: StudioCanvasViewportDomOverlaysProps = {
+    skiaCameraSource,
+    beforeSkiaPublish: (signal) => waitForStudioSkiaPresentationFence(mainLayerRef.current, signal),
     acceleratedSceneSelectedIds: live.acceleratedSceneSelectedIds,
     canonicalDryMediaCanvasVisible: live.canonicalDryMediaCanvasVisible,
     canonicalDryMediaCandidate: live.canonicalDryMediaCandidate,
@@ -493,10 +499,11 @@ export function StudioCanvasViewportStageHost({
                 : undefined
             }
             data-studio-comment-placement-active={commentPinArmed ? "true" : undefined}
+            data-studio-document-renderer={frameGraphOwnsDocumentPixels ? "skia-canvaskit-document-webgl2" : "compatibility"}
             data-studio-vello-hub-authority={velloHubAuthority.status}
             data-studio-vello-hub-backend={velloHubAuthority.backendId ?? undefined}
             data-studio-frame-graph-document={
-              frameGraphOwnsDocumentPixels ? "vello-skia" : "konva-shadow"
+              frameGraphOwnsDocumentPixels ? "skia-webgl2" : "konva-shadow"
             }
             className={cn(
               "relative rounded-sm shadow-[0_0_0_1px_oklch(0.3_0.012_64/0.55),0_18px_50px_oklch(0.08_0.01_70/0.45)]",
