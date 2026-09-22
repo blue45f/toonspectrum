@@ -5,11 +5,15 @@ import { spatialShowcaseObjects } from "./spatial-showcase-placement";
 
 function work(
   id: string,
-  options: { readonly portfolio?: boolean; readonly status?: string } = {},
+  options: {
+    readonly portfolio?: boolean;
+    readonly status?: string;
+    readonly title?: string;
+  } = {},
 ): WorkSummary {
   return {
     id,
-    title: `작품 ${id}`,
+    title: options.title ?? `작품 ${id}`,
     description: "",
     cover: "",
     tags: [],
@@ -50,12 +54,26 @@ describe("spatial showcase placement", () => {
       work("release with spaces"),
       work("second"),
     ], 1)).toEqual([{
-      id: "release with spaces",
+      id: "release%20with%20spaces",
       title: "작품 release with spaces",
       href: "/showcase/work/release%20with%20spaces",
       kind: "work",
       exposure: "public",
     }]);
     expect(spatialShowcaseObjects([work("featured")], 0)).toEqual([]);
+  });
+
+  it("fails closed when a public scene object cannot be canonicalized", () => {
+    expect(spatialShowcaseObjects([
+      work("unsafe/slash"),
+      work("blank-title", { title: "   " }),
+      work("safe"),
+    ])).toEqual([{
+      id: "safe",
+      title: "작품 safe",
+      href: "/showcase/work/safe",
+      kind: "work",
+      exposure: "public",
+    }]);
   });
 });

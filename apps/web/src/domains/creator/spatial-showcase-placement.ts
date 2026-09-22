@@ -1,5 +1,8 @@
 import type { WorkSummary } from "@/infrastructure/creator-client";
-import type { CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
+import {
+  canonicalCampusObjectCandidate,
+  type CampusObject,
+} from "@/shared/lib/spatial-campus/campus-objects";
 
 export const SPATIAL_SHOWCASE_WORK_LIMIT = 24;
 
@@ -23,13 +26,16 @@ export function spatialShowcaseObjects(
       continue;
     }
     seen.add(work.id);
-    objects.push({
-      id: work.id,
+    const encodedId = encodeURIComponent(work.id);
+    const object = canonicalCampusObjectCandidate({
+      id: encodedId,
       title: work.title,
-      href: `/showcase/work/${encodeURIComponent(work.id)}`,
+      href: `/showcase/work/${encodedId}`,
       kind: "work",
       exposure: "public",
     });
+    if (!object) continue;
+    objects.push(object);
     if (objects.length >= capacity) break;
   }
   return objects;
