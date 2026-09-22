@@ -31,7 +31,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); persistSession(null); vi.useRealTimers(); vi.restoreAllMocks(); });
 async function writeNote() {
   await screen.findByLabelText("이 버전에 의견 남기기");
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "Keep the final panel." } });
+  fireEvent.change(screen.getByLabelText("이 버전에 의견 남기기"), { target: { value: "Keep the final panel." } });
   fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
 }
 describe("Pinned review UI authority", () => {
@@ -52,14 +52,14 @@ describe("Pinned review UI authority", () => {
     await writeNote();
     await screen.findByText("현재 검수본에 의견을 남길 권한이 없어요.");
     expect(f.create).not.toHaveBeenCalled();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull();
   });
   it("preserves an uncertain save draft and reuses its identity instead of generating a duplicate", async () => {
     f.create.mockRejectedValueOnce(new Error("network response lost"));
     render(<StudioPinnedReviewPanel subject={subject} />);
     await writeNote();
     await screen.findByText(/저장 결과를 확인하지 못했어요/u);
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await waitFor(() => expect(f.create).toHaveBeenCalledTimes(2));
     expect(f.create.mock.calls[0]?.[1]).toEqual(f.create.mock.calls[1]?.[1]);
@@ -76,16 +76,16 @@ describe("Pinned review UI authority", () => {
     expect(screen.queryByText("Snapshot one")).not.toBeNull();
     await act(async () => { vi.advanceTimersByTime(5_000); });
     expect(screen.queryByText("Snapshot one")).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull();
     await act(async () => { resolve({ ok: false, reason: "access-denied" }); });
     expect(screen.queryByRole("alert")).not.toBeNull();
   });
   it("restarts a delayed focus read after the same actor's session publication without losing the draft or retry identity", async () => {
     f.create.mockRejectedValueOnce(new Error("network response lost"));
     render(<StudioPinnedReviewPanel subject={subject} />);
-    await screen.findByRole("textbox");
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Keep the final panel." } });
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "required" } });
+    await screen.findByLabelText("이 버전에 의견 남기기");
+    fireEvent.change(screen.getByLabelText("이 버전에 의견 남기기"), { target: { value: "Keep the final panel." } });
+    fireEvent.change(screen.getByLabelText("의견 유형"), { target: { value: "required" } });
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await screen.findByText(/저장 결과를 확인하지 못했어요/u);
     const attemptedInput = f.create.mock.calls[0]![1];
@@ -100,8 +100,8 @@ describe("Pinned review UI authority", () => {
     expect(getAuthSessionRevision()).toBeGreaterThan(beforePublication);
     await act(async () => { resolveFocus({ ok: false, reason: "access-denied" }); });
     await screen.findByText("Session-refreshed snapshot");
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("required");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
+    expect((screen.getByLabelText("의견 유형") as HTMLSelectElement).value).toBe("required");
     expect(f.create).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await waitFor(() => expect(f.create).toHaveBeenCalledTimes(2));
@@ -153,12 +153,12 @@ describe("Pinned review UI authority", () => {
     mounted.rerender(<StudioPinnedReviewPanel subject={subject} />);
     expect(screen.queryByText("Snapshot one")).toBeNull();
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull();
     await act(async () => { resolveSave(verified()); });
     expect(f.create).not.toHaveBeenCalled();
     await act(async () => { resolveNewActor(verified()); });
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("note");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("");
+    expect((screen.getByLabelText("의견 유형") as HTMLSelectElement).value).toBe("note");
     await writeNote();
     await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
   });
@@ -169,13 +169,13 @@ describe("Pinned review UI authority", () => {
     const mounted = render(<StudioPinnedReviewPanel subject={subject} />);
     await writeNote(); await screen.findByText(/저장 결과를 확인하지 못했어요/u);
     f.actor = "actor-b"; mounted.rerender(<StudioPinnedReviewPanel subject={subject} />);
-    await screen.findByRole("textbox");
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+    await screen.findByLabelText("이 버전에 의견 남기기");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("");
     await writeNote(); await waitFor(() => expect(f.create).toHaveBeenCalledTimes(2));
     expect(f.create.mock.calls.map((call) => call[1].id)).toEqual(["actor-a-note", "actor-b-note"]);
     f.actor = null; mounted.rerender(<StudioPinnedReviewPanel subject={subject} />);
     expect(screen.queryByRole("img")).toBeNull(); expect(screen.queryByText("Snapshot one")).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull();
   });
 
   it("does not issue a write when session authority changes before React publishes the next actor", async () => {
@@ -186,14 +186,14 @@ describe("Pinned review UI authority", () => {
     await writeNote();
     await act(async () => { persistSession({ user: { id: "actor-b" }, token: null }); });
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull();
     expect(f.verify).toHaveBeenCalledTimes(2);
     await act(async () => { resolve(verified()); });
     expect(f.create).not.toHaveBeenCalled();
     f.actor = "actor-b";
     mounted.rerender(<StudioPinnedReviewPanel subject={subject} />);
-    await screen.findByRole("textbox");
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).disabled).toBe(false);
+    await screen.findByLabelText("이 버전에 의견 남기기");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).disabled).toBe(false);
   });
 
   it("only refreshes reads when the same actor is published during a pending save and removes its session listener on unmount", async () => {
@@ -205,7 +205,7 @@ describe("Pinned review UI authority", () => {
     await act(async () => { persistSession({ user: { id: "actor-a" }, token: null }); });
     await act(async () => { resolveSave(verified()); });
     expect(f.create).not.toHaveBeenCalled();
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
     expect((screen.getByRole("button", { name: "의견 저장" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
@@ -226,18 +226,18 @@ describe("Pinned review UI authority", () => {
     const visibility = vi.spyOn(document, "visibilityState", "get");
     visibility.mockReturnValue("hidden");
     fireEvent(document, new Event("visibilitychange"));
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull();
     visibility.mockReturnValue("visible");
     fireEvent(document, new Event("visibilitychange"));
-    await screen.findByRole("textbox");
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
+    await screen.findByLabelText("이 버전에 의견 남기기");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
     expect((screen.getByRole("button", { name: "의견 저장" }) as HTMLButtonElement).disabled).toBe(false);
     let finishCurrent!: (value: StudioVirtualSpaceReviewVerification) => void;
     f.verify.mockImplementationOnce(() => new Promise((done) => { finishCurrent = done; }));
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await act(async () => { finishOld(); });
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).disabled).toBe(true);
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).disabled).toBe(true);
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
     expect(f.create).toHaveBeenCalledTimes(phase === "post" ? 1 : 0);
     await act(async () => { finishCurrent(verified()); });
     await screen.findByText("이 검수 버전에 의견을 남겼어요.");
@@ -265,9 +265,9 @@ describe("Pinned review UI authority", () => {
     expect(screen.queryByRole("img")).toBeNull();
     expect((screen.getByRole("button", { name: "검토 기록 새로 확인" }) as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "검토 기록 새로 확인" }));
-    await screen.findByRole("textbox");
+    await screen.findByLabelText("이 버전에 의견 남기기");
     await act(async () => { finishOld(); });
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Keep the final panel.");
     expect(f.create).toHaveBeenCalledTimes(phase === "post" ? 1 : 0);
     fireEvent.click(screen.getByRole("button", { name: "의견 저장" }));
     await screen.findByText("이 검수 버전에 의견을 남겼어요.");

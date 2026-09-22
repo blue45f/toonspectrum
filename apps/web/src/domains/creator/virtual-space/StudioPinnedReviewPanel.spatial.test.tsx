@@ -39,7 +39,7 @@ function selectCut() {
   fireEvent.change(page.getByLabelText("연결할 컷"), { target: { value: "cut-0" } });
   fireEvent.click(page.getByRole("button", { name: "이 위치에 의견 연결" }));
 }
-function write() { fireEvent.change(screen.getByRole("textbox"), { target: { value: "Move this exact cut." } }); }
+function write() { fireEvent.change(screen.getByLabelText("이 버전에 의견 남기기"), { target: { value: "Move this exact cut." } }); }
 function save() { fireEvent.click(screen.getByRole("button", { name: "의견 저장" })); }
 describe("real pinned preview to spatial note integration", () => {
   it("stores the explicit cut source and immutable review pin without inventing graph panel scope", async () => {
@@ -64,7 +64,7 @@ describe("real pinned preview to spatial note integration", () => {
     await screen.findByLabelText("2페이지 의견 위치");
     expect((screen.getByRole("button", { name: "의견 저장" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("위치를 다시 선택하거나 전체 검수본 의견으로 바꿔 주세요.")).toBeTruthy();
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Move this exact cut.");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("Move this exact cut.");
     fireEvent.click(screen.getByRole("button", { name: "전체 검수본에 의견" })); save();
     await waitFor(() => expect(f.create).toHaveBeenCalledOnce());
     expect(f.create.mock.lastCall?.[1].anchor).toEqual({ kind: "artifact", artifactId: "artifact", revisionId: "snapshot", scope: { projectId: "project" } });
@@ -76,22 +76,22 @@ describe("real pinned preview to spatial note integration", () => {
     const visibility = vi.spyOn(document, "visibilityState", "get");
     await act(async () => { visibility.mockReturnValue("hidden"); document.dispatchEvent(new Event("visibilitychange")); });
     await act(async () => { visibility.mockReturnValue("visible"); document.dispatchEvent(new Event("visibilitychange")); });
-    await screen.findByRole("textbox"); await act(async () => { resolve(verified()); });
+    await screen.findByLabelText("이 버전에 의견 남기기"); await act(async () => { resolve(verified()); });
     expect(f.create).not.toHaveBeenCalled(); expect((screen.getByRole("button", { name: "의견 저장" }) as HTMLButtonElement).disabled).toBe(true);
   });
   it("removes the old actor's annotation and draft during the account switch", async () => {
     const mounted = await mount(); selectCut(); write();
     await act(async () => { f.actor = "actor-b"; persistSession({ user: { id: f.actor }, token: null }); mounted.rerender(<StudioPinnedReviewPanel subject={subject} />); });
-    await screen.findByRole("textbox");
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+    await screen.findByLabelText("이 버전에 의견 남기기");
+    expect((screen.getByLabelText("이 버전에 의견 남기기") as HTMLTextAreaElement).value).toBe("");
     expect(screen.queryByRole("button", { name: "전체 검수본에 의견" })).toBeNull();
     write(); save(); await waitFor(() => expect(f.create).toHaveBeenCalledOnce()); expect(f.create.mock.lastCall?.[1].anchor.kind).toBe("artifact");
   });
   it("drops spatial placement after permission revocation without submitting its retained draft", async () => {
     await mount(); selectCut(); write(); f.verify.mockResolvedValueOnce(verified(false)); save();
     await screen.findByText("현재 검수본에 의견을 남길 권한이 없어요."); expect(f.create).not.toHaveBeenCalled();
-    expect(screen.queryByRole("textbox")).toBeNull(); expect(screen.queryByLabelText("위치 방식")).toBeNull();
-    fireEvent(window, new Event("focus")); await screen.findByRole("textbox");
+    expect(screen.queryByLabelText("이 버전에 의견 남기기")).toBeNull(); expect(screen.queryByLabelText("위치 방식")).toBeNull();
+    fireEvent(window, new Event("focus")); await screen.findByLabelText("이 버전에 의견 남기기");
     expect((screen.getByRole("button", { name: "의견 저장" }) as HTMLButtonElement).disabled).toBe(true);
   });
   it("offers only whole-review notes when an old capture has no verified source map", async () => {
