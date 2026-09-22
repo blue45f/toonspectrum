@@ -101,6 +101,22 @@ test("review database invariants execute with real PostgreSQL and the accepted g
   assert.match(database, /STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
   assert.match(database, /node scripts\/prepare-studio-review-test-db\.mjs/u);
   assert.match(database, /pnpm exec vitest run --no-file-parallelism/u);
+
+  const preparation = readFileSync(
+    new URL("./prepare-studio-review-test-db.mjs", import.meta.url),
+    "utf8",
+  );
+  const migrationFiles = [...preparation.matchAll(/"(\d{4}_[a-z0-9_]+\.sql)"/gu)]
+    .map((match) => match[1]);
+  assert.ok(migrationFiles.includes("0087_studio_pinned_review_share.sql"));
+  assert.ok(!migrationFiles.includes("0084_studio_pinned_review_share.sql"));
+  for (const migration of migrationFiles) {
+    assert.ok(
+      existsSync(join(repoRoot, "apps/api/src/db/migrations", migration)),
+      `Review DB preparation references a missing migration: ${migration}`,
+    );
+  }
+
   for (const suite of CORE_DATABASE_VITEST_TARGETS) {
     assert.ok(database.includes(suite), `Missing real database suite: ${suite}`);
   }
