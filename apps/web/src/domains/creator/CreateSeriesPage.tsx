@@ -22,12 +22,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AuthorAvatar, SeriesForm } from "./creator-community-ui";
 import { SERIES_STATUS_CLASS, SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { buildStudioHref } from "./creator-studio-links";
+import { spatialShowcaseSeriesObjects } from "./spatial-showcase-placement";
 import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
 import { studioDeleteSeriesRequest } from "./studio-destructive-command-catalog";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   canShareCreatorSeries,
@@ -216,6 +218,7 @@ export function CreateSeriesPage() {
     <Container size="wide" className="py-8 lg:py-10">
       {/* 스튜디오 밖 라우트에도 승인 표면을 둔다 — 없으면 네이티브 confirm 으로 떨어진다. */}
       <StudioDestructiveConfirmHost />
+      <CampusObjectSource objects={spatialShowcaseSeriesObjects([series])} />
       <Link
         href="/create?tab=series"
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"

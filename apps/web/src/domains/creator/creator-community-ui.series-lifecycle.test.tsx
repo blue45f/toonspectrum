@@ -22,6 +22,7 @@ const SAVED_SERIES = {
   cover: "",
   tags: ["미스터리"],
   status: "hiatus" as const,
+  showcaseEnabled: true,
   author: { id: "user-1", name: "작가", avatar: "#123456" },
   episodes: 7,
   views: 120,
@@ -50,6 +51,7 @@ describe("SeriesForm lifecycle controls", () => {
       target: { value: "다음 시즌 준비 중" },
     });
     fireEvent.click(screen.getByRole("radio", { name: "휴재" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "가상 전시관에 시리즈 배치" }));
     fireEvent.click(screen.getByRole("button", { name: "시리즈 만들기" }));
 
     await waitFor(() => expect(creatorClient.createSeries).toHaveBeenCalledWith({
@@ -57,6 +59,7 @@ describe("SeriesForm lifecycle controls", () => {
       description: "다음 시즌 준비 중",
       tags: [],
       status: "hiatus",
+      showcaseEnabled: true,
     }));
     expect(onSaved).toHaveBeenCalledWith(SAVED_SERIES);
   });
@@ -74,12 +77,14 @@ describe("SeriesForm lifecycle controls", () => {
     expect(
       screen.getByRole("radio", { name: "휴재" }).getAttribute("aria-checked"),
     ).toBe("true");
+    expect((screen.getByRole("checkbox", { name: "가상 전시관에 시리즈 배치" }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole("radio", { name: "연재중" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "가상 전시관에 시리즈 배치" }));
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
 
     await waitFor(() => expect(creatorClient.updateSeries).toHaveBeenCalledWith(
       "series-1",
-      expect.objectContaining({ status: "ongoing" }),
+      expect.objectContaining({ status: "ongoing", showcaseEnabled: false }),
     ));
     expect(onSaved).toHaveBeenCalledWith(SAVED_SERIES);
   });

@@ -36,7 +36,16 @@ const creatorWork = (id, title, portfolio) => ({ id, title, description: "합성
   liked: false, bookmarks: 0, bookmarked: false, createdAt: "2026-09-22T00:00:00.000Z", community: community(portfolio) });
 const featuredWork = creatorWork("qa-featured-work", "QA 전시 작품", true);
 const ordinaryWork = creatorWork("qa-public-work", "QA 일반 공개 작품", false);
-const report = { origin: origin.origin, fixture: "anonymous synthetic market, promotion and creator-work records; all other API calls fail closed", cases: [], interactions: [] };
+const creatorSeries = (id, title, showcaseEnabled, episodes = 1) => ({
+  id, title, description: "합성 QA 시리즈", cover: "", tags: ["qa"], status: "ongoing",
+  showcaseEnabled, author: { id: "qa-author", name: "QA 작가", avatar: "" }, episodes,
+  views: 0, likes: 0, latestEpisodeAt: episodes > 0 ? "2026-09-22T00:00:00.000Z" : null,
+  isOwner: false, createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z",
+});
+const featuredSeries = creatorSeries("qa-featured-series", "QA 전시 시리즈", true);
+const ordinarySeries = creatorSeries("qa-public-series", "QA 일반 공개 시리즈", false);
+const emptySeries = creatorSeries("qa-empty-series", "QA 공개 회차 없는 시리즈", true, 0);
+const report = { origin: origin.origin, fixture: "anonymous synthetic market, promotion, creator-work and creator-series records; all other API calls fail closed", cases: [], interactions: [] };
 const browser = await chromium.launch({ headless: true });
 async function contextFor(width, height = 900) {
   const context = await browser.newContext({ viewport: { width, height }, locale: "ko-KR", reducedMotion: "reduce", serviceWorkers: "block" });
@@ -48,12 +57,14 @@ async function contextFor(width, height = 900) {
     if (url.pathname === "/api/creator/marketplace/resources") return route.fulfill({ status: 200, json: { items: [resource], limit: Number(url.searchParams.get("limit")) || 12, nextCursor: null, hasMore: false } });
     if (url.pathname === `/api/creator/marketplace/resources/${resource.id}`) return route.fulfill({ status: 200, json: resource });
     if (url.pathname === "/api/creator/works") return route.fulfill({ status: 200, json: { works: [featuredWork, ordinaryWork] } });
+    if (url.pathname === "/api/creator/series") return route.fulfill({ status: 200, json: [featuredSeries, ordinarySeries, emptySeries] });
+    if (url.pathname === `/api/creator/series/${featuredSeries.id}`) return route.fulfill({ status: 200, json: { ...featuredSeries, episodeList: [featuredWork] } });
     if (url.pathname === "/api/promotions/posts") return route.fulfill({ status: 200, json: { items: [promotion], nextCursor: null, hasMore: false, canModerate: false } });
     return route.fulfill({ status: 503, json: { message: "Local QA: service unavailable" } });
   });
   return context;
 }
-const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
+const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/showcase?tab=series", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
 const widths = (process.env.CAMPUS_QA_WIDTHS ?? "1440,1024,390,320").split(",").map(Number);
 
 async function verifyExplicitShowcasePlacement() {
@@ -77,6 +88,39 @@ async function verifyExplicitShowcasePlacement() {
     assert.equal(await sceneObjects.locator(`a[href="/showcase/work/${ordinaryWork.id}"]`).count(), 0);
     assert.deepEqual(errors, []);
     report.interactions.push("The gallery keeps every public work in the list while spatial placement includes only published portfolio opt-ins");
+  } finally {
+    await context.close();
+  }
+}
+
+async function verifyExplicitSeriesShowcasePlacement() {
+  const context = await contextFor(1440);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(new URL("/showcase?tab=series", origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.getByText(featuredSeries.title, { exact: true }).first().waitFor({ timeout: 60000 });
+    await page.getByText(ordinarySeries.title, { exact: true }).first().waitFor();
+    await page.getByText(emptySeries.title, { exact: true }).first().waitFor();
+    await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
+    await page.locator(".campus-room").waitFor({ timeout: 30000 });
+
+    const sceneObjects = page.locator(".campus-public-objects");
+    const featuredHref = `/showcase/series/${featuredSeries.id}`;
+    const featuredLink = sceneObjects.locator(`a[href="${featuredHref}"]`);
+    await featuredLink.waitFor({ timeout: 30_000 });
+    assert.equal((await featuredLink.textContent())?.trim(), featuredSeries.title);
+    assert.equal(await sceneObjects.locator(`a[href="/showcase/series/${ordinarySeries.id}"]`).count(), 0);
+    assert.equal(await sceneObjects.locator(`a[href="/showcase/series/${emptySeries.id}"]`).count(), 0);
+
+    await featuredLink.click();
+    await page.waitForURL((url) => url.pathname === featuredHref, { timeout: 60000 });
+    const detailObject = page.locator(".campus-public-objects").locator(`a[href="${featuredHref}"]`);
+    await detailObject.waitFor({ timeout: 30_000 });
+    assert.equal((await detailObject.textContent())?.trim(), featuredSeries.title);
+    assert.deepEqual(errors, []);
+    report.interactions.push("Series remain discoverable in the list while list and detail spatial placement require explicit consent and at least one public episode");
   } finally {
     await context.close();
   }
@@ -365,6 +409,7 @@ try {
   report.interactions.push("Existing Phaser movement survives a full Space → Task → Space room remount without leaking the private domain form");
   await context.close();
   await verifyExplicitShowcasePlacement();
+  await verifyExplicitSeriesShowcasePlacement();
   await verifyNestedWorkspaceScrollRestoration();
   await verifyMarketStudioRoundTrip();
   await verifyMobileMarketReturnNotice();

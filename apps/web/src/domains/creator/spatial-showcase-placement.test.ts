@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { WorkSummary } from "@/infrastructure/creator-client";
+import type { SeriesSummary, WorkSummary } from "@/infrastructure/creator-client";
 import { createDefaultCreatorCommunityMetadata } from "@/shared/lib/creator-community-publication-contract";
-import { spatialShowcaseObjects } from "./spatial-showcase-placement";
+import {
+  spatialShowcaseObjects,
+  spatialShowcaseSeriesObjects,
+} from "./spatial-showcase-placement";
 
 function work(
   id: string,
@@ -30,6 +33,33 @@ function work(
       ...createDefaultCreatorCommunityMetadata(),
       portfolio: options.portfolio ?? true,
     },
+  };
+}
+
+function series(
+  id: string,
+  options: {
+    readonly showcaseEnabled?: boolean;
+    readonly episodes?: number;
+    readonly title?: string;
+  } = {},
+): SeriesSummary {
+  return {
+    id,
+    title: options.title ?? `시리즈 ${id}`,
+    description: "",
+    cover: "",
+    tags: [],
+    status: "ongoing",
+    showcaseEnabled: options.showcaseEnabled ?? true,
+    author: { id: "author-A", name: "작가", avatar: "" },
+    episodes: options.episodes ?? 1,
+    views: 0,
+    likes: 0,
+    latestEpisodeAt: "2026-09-23T00:00:00.000Z",
+    isOwner: false,
+    createdAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-09-23T00:00:00.000Z",
   };
 }
 
@@ -73,6 +103,36 @@ describe("spatial showcase placement", () => {
       title: "작품 safe",
       href: "/showcase/work/safe",
       kind: "work",
+      exposure: "public",
+    }]);
+  });
+
+  it("places only explicitly selected series that already have a public episode", () => {
+    expect(spatialShowcaseSeriesObjects([
+      series("featured"),
+      series("ordinary", { showcaseEnabled: false }),
+      series("empty", { episodes: 0 }),
+    ])).toEqual([{
+      id: "series-featured",
+      title: "시리즈 featured",
+      href: "/showcase/series/featured",
+      kind: "series",
+      exposure: "public",
+    }]);
+  });
+
+  it("keeps work and series identities separate and fails closed for unsafe series", () => {
+    expect(spatialShowcaseSeriesObjects([
+      series("release with spaces"),
+      series("release with spaces"),
+      series("unsafe/slash"),
+      series("blank", { title: "   " }),
+      series("second"),
+    ], 1)).toEqual([{
+      id: "series-release%20with%20spaces",
+      title: "시리즈 release with spaces",
+      href: "/showcase/series/release%20with%20spaces",
+      kind: "series",
       exposure: "public",
     }]);
   });

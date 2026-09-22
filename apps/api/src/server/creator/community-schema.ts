@@ -19,7 +19,7 @@ const VERIFY_COMMUNITY_SCHEMA_SQL = `
     creator_series_access AS (
       SELECT
         "id", "userId", "author", "avatar", "title", "description", "cover", "tags",
-        "status", "hidden", "createdAt", "updatedAt"
+        "status", "showcaseEnabled", "hidden", "createdAt", "updatedAt"
       FROM "creator_series"
       LIMIT 0
     ),
@@ -441,10 +441,13 @@ const CREATE_COMMUNITY_SCHEMA_SQL = `
     "cover" text NOT NULL DEFAULT '',
     "tags" jsonb NOT NULL DEFAULT '[]'::jsonb,
     "status" text NOT NULL DEFAULT 'ongoing',
+    "showcaseEnabled" boolean NOT NULL DEFAULT false,
     "hidden" boolean NOT NULL DEFAULT false,
     "createdAt" timestamp,
     "updatedAt" timestamp
   );
+  ALTER TABLE "creator_series"
+    ADD COLUMN IF NOT EXISTS "showcaseEnabled" boolean NOT NULL DEFAULT false;
   DO $$
   BEGIN
     IF NOT EXISTS (

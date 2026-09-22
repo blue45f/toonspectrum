@@ -36,6 +36,7 @@ export interface CreatorSeriesSummary {
   cover: string;
   tags: string[];
   status: CreatorSeriesStatus;
+  showcaseEnabled: boolean;
   author: CreatorAuthor;
   episodes: number; // 공개 회차 수
   views: number; // 공개 회차 조회 합산
@@ -85,6 +86,7 @@ interface SeriesRow {
   cover: string | null;
   tags: unknown;
   status: string | null;
+  showcaseEnabled: boolean | null;
   ownerId: string;
   authorSnapshot: string | null;
   avatarSnapshot: string | null;
@@ -107,6 +109,7 @@ function mapSeriesRow(row: SeriesRow, viewerId?: string): CreatorSeriesSummary {
     cover: row.cover || row.coverFallback || "",
     tags: parseTagValue(row.tags),
     status: parseSeriesStatus(row.status),
+    showcaseEnabled: row.showcaseEnabled === true,
     author: {
       id: row.ownerId,
       // users 조인 값 우선, 없으면 게시 시점 스냅샷 폴백
@@ -131,6 +134,7 @@ function seriesSelectMap() {
     cover: creatorSeries.cover,
     tags: creatorSeries.tags,
     status: creatorSeries.status,
+    showcaseEnabled: creatorSeries.showcaseEnabled,
     ownerId: creatorSeries.userId,
     authorSnapshot: creatorSeries.author,
     avatarSnapshot: creatorSeries.avatar,
@@ -257,6 +261,7 @@ export async function createSeries(userId: string, input: CreatorSeriesInput): P
     cover: value.cover,
     tags: value.tags,
     status: value.status,
+    showcaseEnabled: value.showcaseEnabled,
     createdAt: now,
     updatedAt: now,
   });
@@ -267,6 +272,7 @@ export async function createSeries(userId: string, input: CreatorSeriesInput): P
     cover: value.cover,
     tags: value.tags,
     status: value.status,
+    showcaseEnabled: value.showcaseEnabled,
     author: { id: userId, name: user?.name ?? "익명", avatar: user?.avatar ?? "#7c5cfc" },
     episodes: 0,
     views: 0,
@@ -305,6 +311,12 @@ export async function updateSeries(
   if (patch.cover !== undefined) fields.cover = String(patch.cover ?? "");
   if (patch.tags !== undefined) fields.tags = cleanTags(patch.tags);
   if (patch.status !== undefined) fields.status = parseSeriesStatus(patch.status);
+  if (patch.showcaseEnabled !== undefined) {
+    if (typeof patch.showcaseEnabled !== "boolean") {
+      throw new Error("가상 전시관 배치 여부를 확인해 주세요.");
+    }
+    fields.showcaseEnabled = patch.showcaseEnabled;
+  }
   await db.update(creatorSeries).set(fields).where(eq(creatorSeries.id, id));
 
   const detail = await getSeries(id, userId);

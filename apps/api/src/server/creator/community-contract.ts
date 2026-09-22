@@ -24,6 +24,7 @@ export interface CreatorSeriesInput {
   cover?: unknown;
   tags?: unknown;
   status?: unknown;
+  showcaseEnabled?: unknown;
 }
 
 export interface ValidatedSeriesInput {
@@ -32,6 +33,7 @@ export interface ValidatedSeriesInput {
   cover: string;
   tags: string[];
   status: CreatorSeriesStatus;
+  showcaseEnabled: boolean;
 }
 
 // 시리즈 입력 정규화 — community.validatePostInput과 같은 {value,error} 패턴.
@@ -45,6 +47,7 @@ export function validateSeriesInput(input: CreatorSeriesInput): { value?: Valida
       cover: String(input.cover ?? ""),
       tags: cleanTags(input.tags),
       status: parseSeriesStatus(input.status),
+      showcaseEnabled: input.showcaseEnabled === true,
     },
   };
 }

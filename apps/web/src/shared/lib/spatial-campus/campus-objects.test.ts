@@ -28,6 +28,8 @@ describe("district scene projections", () => {
     ["library", { id: "story-A", title: "Story", href: "/title/story-A", kind: "story", exposure: "public" }],
     ["gallery", { id: "post-A", title: "Post", href: "/community/post/post-A", kind: "community-post", exposure: "public" }],
     ["gallery", { id: "promo-A", title: "Promotion", href: "/community/promote/promo-A", kind: "promotion-post", exposure: "public" }],
+    ["gallery", { id: "work-A", title: "Work", href: "/showcase/work/work-A", kind: "work", exposure: "public" }],
+    ["gallery", { id: "series-A", title: "Series", href: "/showcase/series/series-A", kind: "series", exposure: "public" }],
     ["academy", { id: "lesson-A", title: "Lesson", href: "/learn/recipes?lesson=lesson-A", kind: "recipe", exposure: "public" }],
     ["production", { id: "project-A", title: "Project", href: "/production/projects/project-A/overview", kind: "project", exposure: "private" }],
     ["production", { id: "project-A.review", title: "Review", href: "/production/projects/project-A/review", kind: "review", exposure: "private" }],

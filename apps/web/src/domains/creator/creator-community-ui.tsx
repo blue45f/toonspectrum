@@ -228,6 +228,7 @@ export function SeriesForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [tagsText, setTagsText] = useState((initial?.tags ?? []).join(", "));
   const [status, setStatus] = useState<SeriesStatus>(initial?.status ?? "ongoing");
+  const [showcaseEnabled, setShowcaseEnabled] = useState(initial?.showcaseEnabled ?? false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -240,6 +241,7 @@ export function SeriesForm({
       description,
       tags: tagsText.split(/[,\n]/).map((t) => t.trim()).filter(Boolean),
       status,
+      showcaseEnabled,
     };
     try {
       const saved = initial ? await updateSeries(initial.id, input) : await createSeries(input);
@@ -296,6 +298,21 @@ export function SeriesForm({
             </button>
           ))}
         </div>
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-panel/40 p-3 text-left">
+          <input
+            type="checkbox"
+            checked={showcaseEnabled}
+            onChange={(event) => setShowcaseEnabled(event.target.checked)}
+            aria-label="가상 전시관에 시리즈 배치"
+            className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-fg">가상 전시관에 시리즈 배치</span>
+            <span className="mt-0.5 block text-xs leading-relaxed text-fg-3">
+              공개 회차가 한 편 이상 있을 때 전시관에 나타납니다. 이 선택만으로 회차가 공개되지는 않습니다.
+            </span>
+          </span>
+        </label>
         {error && <p className="text-xs text-bad">{error}</p>}
         <div className="flex items-center justify-end gap-2">
           <button type="button" onClick={onCancel} className={buttonClass({ size: "sm", variant: "quiet" })}>

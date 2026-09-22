@@ -30,6 +30,7 @@ describe("creator community schema ensure", () => {
     const verificationSql = String(mocks.query.mock.calls[0]?.[0]);
     expect(verificationSql).toContain('FROM "creator_work"');
     expect(verificationSql).toContain('FROM "creator_work_revision"');
+    expect(verificationSql).toContain('"showcaseEnabled"');
     expect(verificationSql).toContain("normalized_check_constraints");
     expect(verificationSql).toContain("creator_work_revision_positive_check");
     expect(verificationSql).toContain("creator_work_revision_restored_from_positive_check");
@@ -67,6 +68,7 @@ describe("creator community schema ensure", () => {
     expect(repairSql).toContain('CREATE INDEX "creator_work_series_idx"');
     expect(repairSql).toContain('CREATE INDEX "creator_work_challenge_idx"');
     expect(repairSql).toContain('CREATE INDEX "creator_series_user_idx"');
+    expect(repairSql).toContain('ADD COLUMN IF NOT EXISTS "showcaseEnabled" boolean NOT NULL DEFAULT false');
     expect(repairSql).toContain('INSERT INTO "creator_work_revision"');
     expect(String(mocks.query.mock.calls[2]?.[0])).toContain('AS "ready"');
   });
