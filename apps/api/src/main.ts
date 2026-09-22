@@ -10,6 +10,7 @@ import { configureApiBodyParserBoundary } from "./config/api-body-parser-boundar
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
 import { createEdgeOriginAuthMiddleware } from "./config/edge-origin-auth";
+import { resolvePaymentRuntimeSummary } from "./config/payment-runtime-observability";
 import {
   createApiRuntimeRoleGuard,
   resolveApiRuntimeRole,
@@ -82,6 +83,12 @@ async function bootstrap() {
     const host = process.env.NEST_API_HOST?.trim() || "0.0.0.0";
     await app.listen(port, host);
     console.log(`Nest backend started on ${host}:${port}`);
+    if (runtimeRole !== "capability-worker") {
+      console.log(JSON.stringify({
+        event: "payment-runtime-ready",
+        ...resolvePaymentRuntimeSummary(process.env),
+      }));
+    }
   } catch (error) {
     // app.close()가 이미 adapter.close()를 호출했더라도 disposePool()은 멱등이다. listen 이전
     // 실패에서도 preflight용 전용 풀을 남기지 않는다.
