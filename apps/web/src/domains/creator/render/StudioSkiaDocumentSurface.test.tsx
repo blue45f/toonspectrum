@@ -23,7 +23,7 @@ function setup() {
   return { parent, props, report };
 }
 const success = (frame: SkiaDocumentFrame): SkiaDocumentReceipt => ({ status: "presented", revision: frame.revision,
-  stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, frameMs: 1, interactiveReadbacks: 0 } });
+  stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, imageTextureBytes: 0, cachedImages: 0, frameMs: 1, interactiveReadbacks: 0 } });
 it("publishes exact receipts and waits for the owning stage before exposing pixels", async () => {
   const h = setup(); const view = render(<StudioSkiaDocumentSurface {...h.props} />);
   await waitFor(() => expect(requests).toHaveLength(1));
@@ -151,4 +151,24 @@ it("invalidates a pending source-hide acknowledgement when the live camera moves
     expect(beforePublish).toHaveBeenCalledTimes(3);
     expect(requests).toHaveLength(2);
   } finally { view.unmount(); animation.mockRestore(); cancel.mockRestore(); }
+});
+
+it("reports image admission failure as legacy without showing a GPU failure state", async () => {
+  const h = setup();
+  render(<StudioSkiaDocumentSurface {...h.props} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await act(async () => {
+    requests[0]!.finish({
+      status: "unsupported",
+      revision: requests[0]!.frame.revision,
+      reason: "image source stays on compatibility",
+    });
+  });
+  expect(h.report).toHaveBeenLastCalledWith(expect.objectContaining({
+    status: "legacy",
+    backendId: null,
+    ownedDocumentIds: [],
+    reason: "image source stays on compatibility",
+  }));
+  expect(h.report.mock.calls.some(([state]) => state.status === "unavailable")).toBe(false);
 });

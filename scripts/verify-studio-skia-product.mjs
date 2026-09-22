@@ -49,6 +49,17 @@ try {
     return debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
   });
   report.checks.push('Real /studio/canvas: three normal pointer strokes acquire one visible Skia surface without changing document authorization');
+  const host = page.locator('[data-studio-konva-document-shadow]');
+  await expect(host).toHaveAttribute('data-studio-konva-document-shadow', 'unmounted');
+  const selectRail = page.locator('[data-studio-rail-tool-id="select"]');
+  if (await selectRail.isVisible()) await selectRail.click(); else await viewTool('select');
+  await page.mouse.click(bounds.x + bounds.width * 0.4, bounds.y + 165);
+  await expect(host).toHaveAttribute('data-studio-konva-document-shadow', 'mounted');
+  await expect(page.locator('[data-studio-document-renderer="compatibility"]')).toBeVisible();
+  await page.mouse.click(bounds.x + 45, bounds.y + 45);
+  await gpuReady(3);
+  await expect(host).toHaveAttribute('data-studio-konva-document-shadow', 'unmounted');
+  report.checks.push('GPU-owned documents unmount the Konva paint tree; the lightweight hit proxy restores compatibility editing on selection');
   await viewTool('zoom');
   await page.getByRole('button', { name: '캔버스 실제 픽셀 100%', exact: true }).click();
   await gpuReady(3);
