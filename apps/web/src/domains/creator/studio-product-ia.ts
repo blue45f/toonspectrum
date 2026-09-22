@@ -20,12 +20,12 @@ export const STUDIO_GLOBAL_NAVIGATION = [
 ] as const;
 
 export const STUDIO_PROJECT_NAVIGATION = [
-  { id: "overview", label: "개요" },
-  { id: "story", label: "스토리" },
+  { id: "overview", label: "홈" },
+  { id: "story", label: "기획" },
   { id: "production", label: "제작" },
   { id: "assets", label: "소재" },
   { id: "review", label: "검토" },
-  { id: "export", label: "내보내기" },
+  { id: "export", label: "배포" },
 ] as const;
 
 export const STUDIO_DEFAULT_TOOL_GROUPS = [
@@ -109,7 +109,7 @@ export const STUDIO_CAPABILITY_REGISTRY: readonly StudioCapabilityDefinition[] =
   },
   {
     id: "story.workspace",
-    label: "스토리",
+    label: "기획",
     owner: "story",
     primaryRoute: "/studio/p/:projectId/story",
     maturity: "beta",
@@ -194,7 +194,7 @@ export const STUDIO_CAPABILITY_REGISTRY: readonly StudioCapabilityDefinition[] =
   },
   {
     id: "export.workspace",
-    label: "내보내기",
+    label: "배포",
     owner: "export",
     primaryRoute: "/studio/p/:projectId/export",
     maturity: "beta",
