@@ -37,6 +37,12 @@ import type { StudioPeerFabricPort } from "./studio-peer-fabric";
 
 export type StudioLiveTransportMode = "local" | "server";
 
+/** Canvas mutation arbitration advertised by a transport. */
+export type StudioLiveCanvasLockPolicy =
+  | "required"
+  | "append-only"
+  | "cooperative";
+
 /** Where live Yjs diffs are fanned out. Mesh is preferred to keep Socket.IO off the hot path. */
 export type StudioLiveCrdtFanout = "authoritative" | "mesh" | "none";
 
@@ -92,8 +98,11 @@ export interface StudioLiveTransport {
   readonly peerFabric?: StudioPeerFabricPort;
   /** Routed bulk transfer over the same RTC fabric; never a durable storage receipt. */
   readonly peerBulk?: StudioPeerBulkExchangePort;
-  /** Static policy: peer-only append never grants a lease or a server save receipt. */
-  readonly canvasLockPolicy?: "required" | "append-only";
+  /**
+   * `required` uses correlated server leases, `cooperative` uses peer/local soft locks, and
+   * `append-only` is the fail-closed compatibility mode for legacy signaling transports.
+   */
+  readonly canvasLockPolicy?: StudioLiveCanvasLockPolicy;
   readonly mode: StudioLiveTransportMode;
   readonly ready: boolean;
   /**

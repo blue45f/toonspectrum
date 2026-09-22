@@ -61,6 +61,15 @@ export function createStudioLiveResourceLeaseController({
   const resourcesFor = (elementIds?: readonly string[] | null): string[] =>
     studioLiveMutationResources({ pageId, elementIds });
 
+  const canStartEdit = (room: StudioLiveRoom): boolean => {
+    if (
+      room.ready
+      && ["owner", "admin", "editor"].includes(room.participant.role)
+    ) return true;
+    reportError("편집 연결과 권한을 확인한 뒤 다시 시도해 주세요.");
+    return false;
+  };
+
   const preflight = (
     room: StudioLiveRoom,
     elementIds?: readonly string[] | null,
@@ -79,19 +88,26 @@ export function createStudioLiveResourceLeaseController({
     return false;
   };
 
-  // Only new independent pen/shape strokes may enter the existing draft pipeline without
-  // a lease in explicitly peer-only rooms. Never fabricate locks or server acknowledgements.
-  const appendOnlyDecision = (
+  const usesSynchronousLocks = (room: StudioLiveRoom): boolean =>
+    room.mode !== "server" || room.canvasLockPolicy === "cooperative";
+
+  // A genuinely new stroke never mutates an existing shared resource. Keep it off the lock path
+  // in peer-only rooms so mesh setup/reconnect cannot interrupt continuous pen input.
+  const peerOnlyDecision = (
     room: StudioLiveRoom,
     elementIds: readonly string[] | null | undefined,
     intent: StudioCanvasMutationIntent,
   ): boolean | undefined => {
-    if (room.mode !== "server" || room.canvasLockPolicy !== "append-only") return undefined;
-    if (!room.ready || !["owner", "admin", "editor"].includes(room.participant.role)) {
-      reportError("편집 연결과 권한을 확인한 뒤 새 획을 추가해 주세요.");
-      return false;
+    if (room.mode !== "server") return undefined;
+    const independentAppend =
+      intent === "append-stroke" && (elementIds?.length ?? 0) === 0;
+    if (room.canvasLockPolicy === "cooperative") {
+      if (!independentAppend) return undefined;
+      reportError(null);
+      return true;
     }
-    if (intent !== "append-stroke" || (elementIds?.length ?? 0) > 0) {
+    if (room.canvasLockPolicy !== "append-only") return undefined;
+    if (!independentAppend) {
       reportError("현재 연결에서는 새 획을 추가할 수 있습니다. 기존 요소 수정은 편집 잠금 서버 연결이 필요합니다.");
       return false;
     }
@@ -105,10 +121,15 @@ export function createStudioLiveResourceLeaseController({
   ): Promise<boolean> => {
     const room = roomRef.current;
     if (!room) return true;
+    if (!canStartEdit(room)) return false;
     if (!preflight(room, elementIds, intent)) return false;
-    const appendOnly = appendOnlyDecision(room, elementIds, intent);
-    if (appendOnly !== undefined) return appendOnly;
-    if (room.mode === "server" && room.serverLockSupported === false) {
+    const peerOnly = peerOnlyDecision(room, elementIds, intent);
+    if (peerOnly !== undefined) return peerOnly;
+    if (
+      room.mode === "server"
+      && !usesSynchronousLocks(room)
+      && room.serverLockSupported === false
+    ) {
       reportError("편집 잠금 서버를 사용할 수 없습니다. 연결 설정을 확인해 주세요.");
       return false;
     }
@@ -141,9 +162,12 @@ export function createStudioLiveResourceLeaseController({
     });
     const entry = { room, key, promise: operation };
     pendingMutationRef.current = entry;
-    void operation.finally(() => {
+    const clearPending = (): void => {
       if (pendingMutationRef.current === entry) pendingMutationRef.current = null;
-    });
+    };
+    // `finally()` creates a second rejecting promise when an adapter throws. Settle both paths
+    // explicitly so one transport failure cannot become an unhandled browser rejection.
+    void operation.then(clearPending, clearPending);
     return operation;
   };
 
@@ -153,28 +177,45 @@ export function createStudioLiveResourceLeaseController({
   ): boolean => {
     const room = roomRef.current;
     if (!room) return true;
+    if (!canStartEdit(room)) return false;
     if (!preflight(room, elementIds, intent)) return false;
-    const appendOnly = appendOnlyDecision(room, elementIds, intent);
-    if (appendOnly !== undefined) return appendOnly;
-    if (room.mode === "server" && room.serverLockSupported === false) {
+    const peerOnly = peerOnlyDecision(room, elementIds, intent);
+    if (peerOnly !== undefined) return peerOnly;
+    if (
+      room.mode === "server"
+      && !usesSynchronousLocks(room)
+      && room.serverLockSupported === false
+    ) {
       reportError("편집 잠금 서버를 사용할 수 없습니다. 연결 설정을 확인해 주세요.");
       return false;
     }
     const resources = resourcesFor(elementIds);
 
-    // Local preview rooms can arbitrate synchronously. Server rooms may start a gesture only when
-    // the participant already owns every authoritative resource, otherwise acquisition is primed.
-    if (room.mode !== "server") {
-      const plan = planStudioLiveHeldResourceReplace(heldResourcesRef.current, resources);
-      for (const resource of plan.toRelease) room.releaseLock(resource);
-      for (const resource of plan.toClaim) {
-        if (!room.claimLock(resource)) {
-          releaseStudioLiveMutationLocks(room, plan.held);
-          heldResourcesRef.current = [];
-          return false;
+    // Local and cooperative rooms arbitrate synchronously. Claim/renew the complete next set
+    // before releasing obsolete resources so a failed multi-selection never leaves a partial edit.
+    // Required server rooms still wait for correlated authoritative acknowledgements below.
+    if (usesSynchronousLocks(room)) {
+      const previous = [...heldResourcesRef.current];
+      const previousSet = new Set(previous);
+      const newlyClaimed: string[] = [];
+      for (const resource of resources) {
+        if (room.claimLock(resource)) {
+          if (!previousSet.has(resource)) newlyClaimed.push(resource);
+          continue;
         }
+        releaseStudioLiveMutationLocks(room, newlyClaimed);
+        heldResourcesRef.current = previous;
+        if (preflight(room, elementIds, intent)) {
+          reportError(
+            "협업 연결이 불안정하여 편집 잠금을 공유하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.",
+          );
+        }
+        return false;
       }
+      const plan = planStudioLiveHeldResourceReplace(previous, resources);
+      for (const resource of plan.toRelease) room.releaseLock(resource);
       heldResourcesRef.current = [...plan.held];
+      reportError(null);
       return true;
     }
 

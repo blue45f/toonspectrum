@@ -25,6 +25,37 @@ export type StudioLiveMutationLockReplaceResult =
       failure: StudioLiveMutationLockAcquireFailure;
     };
 
+async function claimMutationLockSafely(
+  room: StudioLiveMutationLockRoom,
+  resource: string,
+): Promise<StudioLiveLockAcquireResult> {
+  try {
+    return await room.claimLockAsync(resource);
+  } catch (error) {
+    return {
+      status: "denied",
+      resource,
+      requestId: "client-transport-error",
+      code: "transport_error",
+      message: error instanceof Error
+        ? error.message
+        : "편집 잠금 요청 중 알 수 없는 오류가 발생했습니다.",
+    };
+  }
+}
+
+function releaseMutationLockSafely(
+  room: Pick<StudioLiveMutationLockRoom, "releaseLock">,
+  resource: string,
+): boolean {
+  try {
+    return room.releaseLock(resource);
+  } catch {
+    // Cleanup must never strand the pointer lifecycle or reject an otherwise handled lock result.
+    return false;
+  }
+}
+
 function uniqueResources(resources: readonly string[] | null | undefined): string[] {
   const unique: string[] = [];
   const seen = new Set<string>();
@@ -58,7 +89,7 @@ export async function replaceStudioLiveMutationLocks(input: {
   if (!room) return { ok: true, held: next, locks: [] };
 
   const results = await Promise.all(
-    next.map((resource) => room.claimLockAsync(resource))
+    next.map((resource) => claimMutationLockSafely(room, resource))
   );
   const failure = results.find(
     (result): result is StudioLiveMutationLockAcquireFailure => result.status !== "acquired"
@@ -68,13 +99,13 @@ export async function replaceStudioLiveMutationLocks(input: {
     for (const result of results) {
       if (result.status === "acquired") release.add(result.resource);
     }
-    for (const resource of release) room.releaseLock(resource);
+    for (const resource of release) releaseMutationLockSafely(room, resource);
     return { ok: false, held: [], failure };
   }
 
   const retained = new Set(next);
   for (const resource of previous) {
-    if (!retained.has(resource)) room.releaseLock(resource);
+    if (!retained.has(resource)) releaseMutationLockSafely(room, resource);
   }
   return {
     ok: true,
@@ -89,7 +120,9 @@ export function releaseStudioLiveMutationLocks(
   held: readonly string[] | null | undefined
 ): readonly [] {
   if (room) {
-    for (const resource of uniqueResources(held)) room.releaseLock(resource);
+    for (const resource of uniqueResources(held)) {
+      releaseMutationLockSafely(room, resource);
+    }
   }
   return [];
 }
