@@ -44,15 +44,30 @@ export async function verifyDrawingLayoutInteractions(page, capture) {
   await capture("interaction-touch-stroke-390x844");
   await page.getByRole("button", { name: "레이어 열기", exact: true }).click();
   await page.locator('[data-studio-layer-row]').first().waitFor({ state: "visible" });
-  for (const [width, height] of [[390, 844], [844, 390], [667, 375], [820, 1180]]) {
+  const compactSettingsCta = page.locator(
+    '#studio-inspector [data-studio-inspector-context-cta="compact"]',
+  );
+  await compactSettingsCta.waitFor({ state: "visible" });
+  for (const [width, height] of [[320, 568], [390, 844], [844, 390], [667, 375], [820, 1180]]) {
     await page.setViewportSize({ width, height });
     await capture(`interaction-layer-${width}x${height}`);
     const row = page.locator('[data-studio-layer-row]').first();
     const box = await row.boundingBox();
+    const ctaBox = await compactSettingsCta.boundingBox();
     assert(box && box.y >= 0 && box.y + box.height <= height, "The actual layer row must appear in the initial sheet view");
+    assert(ctaBox && ctaBox.y >= 0 && ctaBox.y + ctaBox.height <= height, "The compact settings return must remain visible in the layer sheet");
     await row.locator('[data-studio-layer-row-action="visibility"]').click({ trial: true });
+    await compactSettingsCta.click({ trial: true });
   }
-  checks.push("Touch stroke creates a layer; layer row visible and actionable in four orientations/sizes");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await compactSettingsCta.click();
+  const selectedItemTab = page.locator(
+    '#studio-inspector [data-studio-inspector-primary-tab="properties"]',
+  );
+  await selectedItemTab.waitFor({ state: "visible" });
+  assert.equal(await selectedItemTab.getAttribute("aria-selected"), "true", "The layer-sheet shortcut must return to selected-item settings");
+  assert(await selectedItemTab.evaluate((node) => document.activeElement === node), "The selected-item tab must receive focus after the contextual shortcut");
+  checks.push("Touch stroke creates a layer; layer row and compact settings return stay visible and actionable in five orientations/sizes");
   await page.getByRole("button", { name: "설정 닫기", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "주 색", exact: true }).click();
