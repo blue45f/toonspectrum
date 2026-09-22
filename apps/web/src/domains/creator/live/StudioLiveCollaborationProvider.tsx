@@ -480,7 +480,7 @@ export function StudioLiveCollaborationProvider({
       let crdtDocument: StudioCrdtDocument | null = null;
       let crdtBinding: StudioCrdtRoomBinding | null = null;
       let offlineBranchRuntime: StudioOfflineBranchRuntime | null = null;
-      let offlineBranchPeerSync: { close(): void } | null = null;
+      let offlineBranchPeerSync: { announce(): void; close(): void } | null = null;
       let crdtDurabilityWarning: string | null = null;
       const exposeReadyRoom = (nextError?: string | null) => {
         if (crdtDurabilityWarning) {
@@ -496,6 +496,7 @@ export function StudioLiveCollaborationProvider({
         if (event.type === "presence") {
           observedPeerCount = event.peers.length;
           setPeers(event.peers);
+          offlineBranchPeerSync?.announce();
           if (nextRoom.ready) exposeReadyRoom();
           return;
         }

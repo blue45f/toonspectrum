@@ -178,6 +178,25 @@ describe("StudioOfflineBranchRuntime", () => {
     await reopened.close();
   });
 
+  it("preserves a repeated semantic edit after an intervening revert", async () => {
+    const storage = new MemoryStorage();
+    const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(storage));
+    const original = [page("선화")];
+    const changed = [page("채색")];
+
+    expect(runtime.stageSceneTransition(original, changed)).toBe(true);
+    await runtime.exportPeerDocument();
+    expect(runtime.stageSceneTransition(changed, original)).toBe(true);
+    await runtime.exportPeerDocument();
+    expect(runtime.stageSceneTransition(original, changed)).toBe(true);
+    await runtime.exportPeerDocument();
+
+    expect(runtime.snapshot.operations).toHaveLength(3);
+    expect(new Set(runtime.snapshot.operations.map(({ dedupeKey }) => dedupeKey))).toHaveLength(3);
+    expect(runtime.projectPages(original)[0]?.groups?.[0]?.name).toBe("채색");
+    await runtime.close();
+  });
+
   it("promotes an admissible offline proposal into Yjs and records a server receipt", async () => {
     const storage = new MemoryStorage();
     const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(storage));

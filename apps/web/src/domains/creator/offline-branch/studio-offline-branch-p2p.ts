@@ -170,8 +170,14 @@ export function connectStudioOfflineBranchPeerSync({
     if (closed) return;
     const status = runtime.status;
     const heads = runtime.snapshot.heads.join(",");
-    const signature = `${heads}:${status.pendingOperations}:${status.conflicts}:${status.state}`;
-    if (signature === lastAnnouncement && status.pendingOperations === 0) return;
+    const peers = fabric.getPeers(CAPABILITY)
+      .map((peer) => peer.sessionId)
+      .sort()
+      .join(",");
+    const signature = `${heads}:${status.pendingOperations}:${status.conflicts}:${status.state}:${peers}`;
+    // Runtime notifications can be emitted after an idempotent peer import. Re-announcing an
+    // unchanged pending journal would make both peers answer each other forever.
+    if (signature === lastAnnouncement) return;
     lastAnnouncement = signature;
     fabric.broadcast(CAPABILITY, hello(workId, scope), {
       trafficClass: "control",

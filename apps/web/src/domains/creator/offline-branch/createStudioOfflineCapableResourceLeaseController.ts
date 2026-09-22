@@ -43,7 +43,7 @@ export function createStudioOfflineCapableResourceLeaseController({
 }: CreateStudioOfflineCapableResourceLeaseControllerOptions): StudioLiveResourceLeaseController {
   const base = createStudioLiveResourceLeaseController(baseOptions);
   const { pageId, reportError, roomRef } = baseOptions;
-  let proposalActive = false;
+  let proposalRuntime: StudioOfflineBranchRuntime | null = null;
 
   const beginProposal = (
     elementIds: readonly string[] | null | undefined,
@@ -51,14 +51,19 @@ export function createStudioOfflineCapableResourceLeaseController({
   ): boolean => {
     const runtime = runtimeRef.current?.offlineBranch ?? null;
     if (!canUseOfflineProposal(roomRef.current, runtime, elementIds, intent)) return false;
-    if (!proposalActive) {
-      proposalActive = runtime.beginProposal({
-        pageId,
-        elementIds: [...(elementIds ?? [])],
-        intent,
-      });
+    if (proposalRuntime && proposalRuntime !== runtime) {
+      proposalRuntime.endProposal();
+      proposalRuntime = null;
+      reportNotice(null);
     }
-    if (!proposalActive) return false;
+    if (!proposalRuntime && runtime.beginProposal({
+      pageId,
+      elementIds: [...(elementIds ?? [])],
+      intent,
+    })) {
+      proposalRuntime = runtime;
+    }
+    if (!proposalRuntime) return false;
     reportError(null);
     reportNotice(
       "서버 편집 잠금 없이 로컬 오프라인 제안으로 작업합니다. 재연결 후 정본과 비교해 합칩니다.",
@@ -82,9 +87,9 @@ export function createStudioOfflineCapableResourceLeaseController({
   };
 
   const end = (): void => {
-    if (proposalActive) {
-      proposalActive = false;
-      runtimeRef.current?.offlineBranch?.endProposal();
+    if (proposalRuntime) {
+      proposalRuntime.endProposal();
+      proposalRuntime = null;
       reportNotice(null);
     }
     base.end();

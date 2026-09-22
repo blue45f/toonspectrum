@@ -16,6 +16,7 @@ import {
   revertStudioOfflineBranchOperation,
   type StudioOfflinePreparedMutation,
 } from "./studio-offline-branch-scene-bridge";
+import { fingerprintStudioOfflineBranchValue } from "./studio-offline-branch-payload";
 import {
   createProductStudioOfflineBranchStorage,
   type StudioOfflineBranchStorage,
@@ -238,15 +239,44 @@ export class StudioOfflineBranchRuntime {
     return clonePages(this.canonicalPages);
   }
 
+  private causalPredecessorFor(
+    mutation: StudioOfflinePreparedMutation,
+  ): StudioOfflineBranchOperation | null {
+    let predecessor: StudioOfflineBranchOperation | null = null;
+    const consider = (operation: StudioOfflineBranchOperation): void => {
+      if (
+        operation.targetType !== mutation.targetType
+        || operation.targetId !== mutation.targetId
+        || operation.pageId !== mutation.pageId
+      ) return;
+      if (!predecessor || operationOrder(predecessor, operation) < 0) {
+        predecessor = operation;
+      }
+    };
+    for (const operation of this.snapshotValue.operations) consider(operation);
+    for (const entry of this.optimistic.values()) consider(entry.operation);
+    return predecessor;
+  }
+
   private optimisticOperation(
     mutation: StudioOfflinePreparedMutation,
     id: string,
     createdAt: number,
   ): StudioOfflineBranchOperation {
+    const predecessor = this.causalPredecessorFor(mutation);
+    const causalKey = predecessor
+      ? fingerprintStudioOfflineBranchValue({
+          id: predecessor.id,
+          dedupeKey: predecessor.dedupeKey,
+        })
+      : "root";
     return {
       version: STUDIO_OFFLINE_BRANCH_SCHEMA_VERSION,
       id,
-      dedupeKey: mutation.dedupeKey,
+      // Semantic equality alone is not a safe idempotency key: A→B→A→B must keep the
+      // final B transition. Chaining the key to the last operation on the same target keeps
+      // retries/peer copies idempotent while preserving repeated edits after an intervening op.
+      dedupeKey: `${mutation.dedupeKey}:${causalKey}`,
       targetType: mutation.targetType,
       action: mutation.action,
       targetId: mutation.targetId,
