@@ -207,12 +207,22 @@ export function StudioCanvasViewportStageHost({
   // useLayoutEffect releases the hidden source before paint, preventing both source flash and a
   // duplicate preview frame while React hands renderer authority back to the document Layer.
   useLayoutEffect(() => {
+    const snapshot = liveTransformDraftStore.getSnapshot();
+    // A GPU-owned handoff keeps the exact draft visible until the replacement document revision
+    // has produced a visible Skia receipt. Compatibility rendering remains synchronous and can
+    // acknowledge from this layout phase as before.
+    if (
+      live.velloDocumentSurfaceEnabled
+      && snapshot?.scope === liveTransformDraftScope
+      && snapshot.phase === "handoff"
+    ) return;
     liveTransformDraftStore.acknowledgeAuthoritative(
       liveTransformDraftScope,
       elements,
     );
   }, [
     elements,
+    live.velloDocumentSurfaceEnabled,
     liveTransformDraftScope,
     liveTransformDraftStore,
     liveTransformHandoffRevision,
@@ -438,8 +448,24 @@ export function StudioCanvasViewportStageHost({
       viewport.stableHandlers.canSkiaDocumentPublishOverSettledInk,
     onSkiaDocumentAuthorityChange:
       viewport.stableHandlers.onSkiaDocumentAuthorityChange,
-    onSkiaDocumentVisiblePresentation:
-      viewport.stableHandlers.onSkiaDocumentVisiblePresentation,
+    onSkiaDocumentVisiblePresentation: (presentation) => {
+      viewport.stableHandlers.onSkiaDocumentVisiblePresentation(presentation);
+      const snapshot = liveTransformDraftStore.getSnapshot();
+      if (
+        snapshot?.scope === liveTransformDraftScope
+        && snapshot.phase === "handoff"
+        && snapshot.entries.every(({ element }) =>
+          presentation.ownedDocumentIds.includes(element.id)
+        )
+      ) {
+        liveTransformDraftStore.acknowledgeAuthoritative(
+          liveTransformDraftScope,
+          elements,
+        );
+      }
+    },
+    liveTransformDraftStore,
+    liveTransformDraftScope,
     acceleratedSceneSelectedIds: live.acceleratedSceneSelectedIds,
     canonicalDryMediaCanvasVisible: live.canonicalDryMediaCanvasVisible,
     canonicalDryMediaCandidate: live.canonicalDryMediaCandidate,

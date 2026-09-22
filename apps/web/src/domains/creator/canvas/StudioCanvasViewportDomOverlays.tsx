@@ -17,6 +17,7 @@ import { StudioInkMeshLivePreviewHost } from "../StudioInkMeshLivePreviewHost";
 import { StudioPixiSceneOverlayHost } from "../StudioPixiSceneOverlayHost";
 
 import type { StudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
+import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import type {
   StudioCanvasViewportHandlers,
   StudioCanvasViewportProps,
@@ -28,6 +29,8 @@ export interface StudioCanvasViewportDomOverlaysProps {
   canSkiaDocumentPublishOverSettledInk: StudioCanvasViewportHandlers["canSkiaDocumentPublishOverSettledInk"];
   onSkiaDocumentAuthorityChange: StudioCanvasViewportHandlers["onSkiaDocumentAuthorityChange"];
   onSkiaDocumentVisiblePresentation: StudioCanvasViewportHandlers["onSkiaDocumentVisiblePresentation"];
+  liveTransformDraftStore: StudioLiveTransformDraftStore;
+  liveTransformDraftScope: string;
   acceleratedSceneSelectedIds: StudioCanvasViewportLiveSurfaces["acceleratedSceneSelectedIds"];
   canonicalDryMediaCanvasVisible: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCanvasVisible"];
   canonicalDryMediaCandidate: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCandidate"];
@@ -76,6 +79,8 @@ export function StudioCanvasViewportDomOverlays({
   canSkiaDocumentPublishOverSettledInk,
   onSkiaDocumentAuthorityChange,
   onSkiaDocumentVisiblePresentation,
+  liveTransformDraftStore,
+  liveTransformDraftScope,
   skiaCameraSource,
   acceleratedSceneSelectedIds,
   canonicalDryMediaCanvasVisible,
@@ -211,6 +216,8 @@ export function StudioCanvasViewportDomOverlays({
           <StudioSkiaDocumentSurface
             key={rendererAttempt}
             frameTheme={webtoonTheme}
+            liveTransformDraftStore={liveTransformDraftStore}
+            liveTransformDraftScope={liveTransformDraftScope}
             beforePublish={beforeSkiaPublish}
             cameraSource={skiaCameraSource}
             visible={velloHubAuthority.status === "active" && velloHubAuthority.sceneRevision === velloSceneRevision}

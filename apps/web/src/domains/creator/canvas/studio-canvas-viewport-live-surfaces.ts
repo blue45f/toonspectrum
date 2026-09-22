@@ -57,6 +57,18 @@ import type {
   StudioCanvasViewportProps,
 } from "./StudioCanvasViewportTypes";
 import type { StudioCanonicalVNextDryMediaCanvasAuthority } from "../StudioCanonicalVNextDryMediaCanvas";
+import type { El } from "../studio-element-model";
+
+export function studioSkiaSelectionKeepsExactSurface(
+  selectedId: string | null,
+  marqueeIds: readonly string[],
+  elements: readonly El[],
+): boolean {
+  if (selectedId === null) return marqueeIds.length === 0;
+  if (marqueeIds.length > 0) return false;
+  const selected = elements.find((element) => element.id === selectedId);
+  return selected?.type === "draw" && isStudioSkiaDocumentElement(selected);
+}
 
 export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportProps) {
   const {
@@ -570,13 +582,18 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && studioRasterHiddenOperationIds.size === 0
     && studioLiveGesturePreviewRenderPlan.previewElementIds.size === 0
     && studioLiveGesturePreviewRenderPlan.authoritativeHandoffToken === "[]";
+  const velloSelectionKeepsExactSurface = studioSkiaSelectionKeepsExactSurface(
+    selectedId,
+    marqueeIds,
+    velloDocumentElements,
+  );
   const velloDocumentSurfaceEnabled =
     velloHubCapability.enabled
     // The Skia surface lives in Stage-local coordinates and re-presents on scroll/clip changes.
     && velloSurfaceSizeAdmitted
     && velloHasExactPaintProjection
     && (tool === "select" || (tool === "draw" && drawMode !== "eraser"))
-    && selectedId === null
+    && velloSelectionKeepsExactSurface
     && marqueeIds.length === 0
     && velloEligibleDocumentIds.length > 0
     && velloDocumentElements.every((element) => element.hidden
