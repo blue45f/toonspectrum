@@ -1,5 +1,11 @@
 import type { ScenarioPreviewItem } from "../studio-scenario-layout";
 
+import {
+  createStudioToonAutomationDocument,
+  hydrateStudioToonAutomationDocument,
+  type StudioToonAutomationDocument,
+} from "./studio-toon-automation";
+
 import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 
 export type StudioAiComicDirectorStage =
@@ -103,6 +109,7 @@ export interface StudioAiComicDirectorSessionDocument {
   readonly characterDescription: string;
   readonly scenes: readonly ScenarioPreviewItem[];
   readonly visualBible: StudioAiVisualBibleDocument;
+  readonly automation: StudioToonAutomationDocument;
   readonly jobs: readonly StudioAiComicDirectorJob[];
   readonly approval: StudioAiComicDirectorApproval | null;
   readonly updatedAt: string;
@@ -213,6 +220,7 @@ export function createStudioAiComicDirectorSession(input: {
   readonly characterDescription?: string;
   readonly scenes?: readonly ScenarioPreviewItem[];
   readonly visualBible?: StudioAiVisualBibleDocument;
+  readonly automation?: StudioToonAutomationDocument;
 } = {}): StudioAiComicDirectorSessionDocument {
   const now = new Date().toISOString();
   return {
@@ -230,6 +238,7 @@ export function createStudioAiComicDirectorSession(input: {
     characterDescription: input.characterDescription ?? "",
     scenes: input.scenes ? [...input.scenes] : [],
     visualBible: input.visualBible ?? defaultBible(),
+    automation: input.automation ?? createStudioToonAutomationDocument(),
     jobs: [],
     approval: null,
     updatedAt: now,
@@ -371,6 +380,7 @@ export function hydrateStudioAiComicDirectorSession(
     characterDescription: text(raw.characterDescription),
     scenes: Array.isArray(raw.scenes) ? (raw.scenes as ScenarioPreviewItem[]) : [],
     visualBible: hydrateVisualBible(raw.visualBible),
+    automation: hydrateStudioToonAutomationDocument(raw.automation),
     jobs,
     approval,
     updatedAt: iso(raw.updatedAt),

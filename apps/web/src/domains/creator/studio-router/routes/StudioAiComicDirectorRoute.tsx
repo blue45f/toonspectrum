@@ -12,9 +12,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { requestStudioAiComicComposerOpen } from "../../ai/studio-ai-comic-composer-intent";
+import { StudioToonAutomationWorkspace } from "../../ai/StudioToonAutomationWorkspace";
 import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";
 import {
   createStudioAiComicDirectorSession,
@@ -54,6 +55,21 @@ function routePath(
     return `/studio/remix/${encodeURIComponent(resolution.remixSourceWorkId)}/compose/${encodeURIComponent(sessionId)}`;
   }
   return `/studio/compose/${encodeURIComponent(sessionId)}`;
+}
+
+type StudioAutomationSurface = "comic" | "animation" | "character";
+
+function studioSurfacePath(
+  resolution: StudioCompositionRouteResolution,
+  surface: StudioAutomationSurface,
+): string {
+  if (resolution.workId) {
+    return `/studio/work/${encodeURIComponent(resolution.workId)}/${surface}`;
+  }
+  if (resolution.remixSourceWorkId) {
+    return `/studio/remix/${encodeURIComponent(resolution.remixSourceWorkId)}/${surface}`;
+  }
+  return `/studio/${surface}`;
 }
 
 function initialSession(
@@ -102,10 +118,14 @@ const STAGES = [
 export function StudioAiComicDirectorRoute({
   resolution,
 }: StudioAiComicDirectorRouteProps): ReactElement {
+  const location = useLocation();
   const navigate = useNavigate();
   const api = useMemo(() => createStudioAiComicDirectorApiClient(), []);
   const [session, setSession] = useState(() => initialSession(resolution));
   const initialSessionRef = useRef(session);
+  const initialResolutionRef = useRef(resolution);
+  const initialSearchRef = useRef(location.search);
+  const automationOpen = new URLSearchParams(location.search).get("view") === "automation";
   const [syncState, setSyncState] = useState<
     "local" | "loading" | "saved" | "conflict" | "error"
   >("local");
@@ -123,9 +143,10 @@ export function StudioAiComicDirectorRoute({
   useEffect(() => {
     let active = true;
     const seedSession = initialSessionRef.current;
+    const initialResolution = initialResolutionRef.current;
     const synchronize = async () => {
       setSyncState("loading");
-      if (resolution.sessionId === "new") {
+      if (initialResolution.sessionId === "new") {
         const created = await api.createSession(seedSession);
         if (!active) return;
         if (created.ok) {
@@ -135,11 +156,14 @@ export function StudioAiComicDirectorRoute({
           setSyncState(created.code === "not_authenticated" ? "local" : "error");
           setMessage(created.message);
         }
-        navigate(routePath(resolution, seedSession.id), { replace: true });
+        navigate(
+          `${routePath(initialResolution, seedSession.id)}${initialSearchRef.current}`,
+          { replace: true },
+        );
         return;
       }
 
-      const remote = await api.getSession(resolution.sessionId);
+      const remote = await api.getSession(initialResolution.sessionId);
       if (!active) return;
       if (remote.ok) {
         setSession({
@@ -168,7 +192,7 @@ export function StudioAiComicDirectorRoute({
     return () => {
       active = false;
     };
-  }, [api, navigate, resolution]);
+  }, [api, navigate]);
 
   const patchSession = (
     patch: Partial<
@@ -178,6 +202,25 @@ export function StudioAiComicDirectorRoute({
     setSession((current) => updateStudioAiComicDirectorSession(current, patch));
     setSyncState("local");
     setMessage(null);
+  };
+
+  const setAutomationView = (open: boolean) => {
+    const params = new URLSearchParams(location.search);
+    if (open) params.set("view", "automation");
+    else params.delete("view");
+    const search = params.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: search ? `?${search}` : "",
+        hash: location.hash,
+      },
+      { replace: true },
+    );
+  };
+
+  const openStudioSurface = (surface: StudioAutomationSurface) => {
+    navigate(studioSurfacePath(resolution, surface));
   };
 
   const saveRemote = async () => {
@@ -299,6 +342,22 @@ export function StudioAiComicDirectorRoute({
             </p>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={automationOpen}
+              onClick={() => setAutomationView(!automationOpen)}
+              className={cn(
+                "inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-xs font-bold",
+                STUDIO_EASE,
+                STUDIO_FOCUS_RING,
+                automationOpen
+                  ? "border-accent bg-accent-soft text-accent"
+                  : "border-line bg-card text-fg hover:bg-raised",
+              )}
+            >
+              <Sparkles size={13} aria-hidden />
+              {automationOpen ? "디렉터 보기" : "통합 제작 자동화"}
+            </button>
             <span
               role="status"
               className={cn(
@@ -373,7 +432,21 @@ export function StudioAiComicDirectorRoute({
           </p>
         ) : null}
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
+        {automationOpen ? (
+          <StudioToonAutomationWorkspace
+            sessionId={session.id}
+            title={session.title}
+            storyText={session.storyText}
+            sceneCount={session.scenes.length}
+            visualBibleEntryCount={session.visualBible.entries.length}
+            document={session.automation}
+            onChange={(automation) => patchSession({ automation })}
+            onOpenDirector={() => setAutomationView(false)}
+            onOpenSurface={openStudioSurface}
+            disabled={syncState === "loading"}
+          />
+        ) : (
+          <div className="mt-4 grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
           <nav aria-label="AI 코믹 디렉터 제작 단계">
             <ol className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:grid-cols-1">
               {STAGES.map(([id, number, label]) => (
@@ -561,6 +634,7 @@ export function StudioAiComicDirectorRoute({
             ) : null}
           </section>
         </div>
+        )}
       </div>
     </div>
   );

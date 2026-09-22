@@ -35,6 +35,11 @@ describe("StudioAiProductionLaunchpad", () => {
     expect(onOpenSuperSuite).toHaveBeenCalledTimes(1);
     expect(
       screen
+        .getByRole("link", { name: /웹툰·30초 애니메이션 통합 제작 자동화/u })
+        .getAttribute("href"),
+    ).toBe("/studio/compose/new?view=automation");
+    expect(
+      screen
         .getByRole("link", { name: /홍보영상·모션툰 만들기/u })
         .getAttribute("href"),
     ).toBe("/create/promo");
