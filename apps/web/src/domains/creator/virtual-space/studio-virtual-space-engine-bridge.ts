@@ -52,6 +52,5 @@ export class StudioVirtualSpaceEngineBridge {
     this.joystick = { x: 0, y: 0 };
     this.moveTarget = null;
     this.followingPeerId = null;
-    this.interactRequested = false;
   }
 }

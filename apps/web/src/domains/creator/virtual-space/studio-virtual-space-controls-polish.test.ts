@@ -8,6 +8,8 @@ import {
   stepStudioWorldInteractionApproach,
   stepStudioWorldWalkOver,
   studioWorldArrivalInput,
+  studioWorldFloorFocusTarget,
+  studioWorldPromptInteractGate,
 } from "./studio-virtual-space-runtime-policy";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
@@ -309,6 +311,45 @@ describe("Virtual Studio interaction approach", () => {
     expect(sealed.highlightId).toBeNull();
     expect(sealed.prompt).toBe(false);
     expect(sealed.activateId).toBeNull();
+  });
+
+  it("keeps the interaction prompt when an NPC is nearby and accepts a focused prompt click", () => {
+    const inside = { x: center.x + 10, y: center.y };
+    const focus = studioWorldFloorFocusTarget({ npcNearby: true, interaction: target });
+    expect(focus).toEqual(target);
+    const highlighted = stepStudioWorldInteractionApproach(openWorld, EMPTY_STUDIO_WORLD_APPROACH, inside, {
+      focus,
+      nearby: focus,
+    });
+    expect(highlighted.highlightId).toBe("desk");
+    expect(highlighted.prompt).toBe(true);
+    expect(highlighted.activateId).toBeNull();
+
+    const promptClick = studioWorldPromptInteractGate({
+      requested: true,
+      canvasFocused: false,
+      promptFocused: true,
+      blocked: false,
+    });
+    expect(promptClick).toBe(true);
+    const activated = stepStudioWorldInteractionApproach(openWorld, EMPTY_STUDIO_WORLD_APPROACH, inside, {
+      focus,
+      nearby: focus,
+      inRangeInteract: promptClick,
+    });
+    expect(activated.activateId).toBe("desk");
+    expect(activated.walkTarget).toBeNull();
+    const again = stepStudioWorldInteractionApproach(openWorld, activated.state, inside, { focus, nearby: focus });
+    expect(again.activateId).toBeNull();
+    expect(again.prompt).toBe(true);
+
+    expect(studioWorldPromptInteractGate({
+      requested: true,
+      canvasFocused: false,
+      promptFocused: false,
+      blocked: false,
+    })).toBe(false);
+    expect(studioWorldFloorFocusTarget({ npcNearby: true, interaction: null })).toBeNull();
   });
 });
 
