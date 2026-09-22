@@ -721,6 +721,7 @@ function matchesIfNoneMatch(request: Request, httpEtag: string): boolean {
 function r2LargeAssetHeaders(
   object: R2ObjectBinding,
   contentType: string,
+  partial: boolean,
 ): Headers {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
@@ -729,8 +730,12 @@ function r2LargeAssetHeaders(
   headers.set("etag", object.httpEtag);
   headers.set("accept-ranges", "bytes");
   headers.set("access-control-allow-origin", "*");
+  headers.set(
+    "access-control-expose-headers",
+    "Accept-Ranges, Content-Length, Content-Range, ETag",
+  );
   headers.set("x-toonspectrum-large-asset-source", "r2");
-  if (object.range) {
+  if (partial && object.range) {
     const end = object.range.offset + object.range.length - 1;
     headers.set(
       "content-range",
@@ -738,6 +743,7 @@ function r2LargeAssetHeaders(
     );
     headers.set("content-length", String(object.range.length));
   } else {
+    headers.delete("content-range");
     headers.set("content-length", String(object.size));
   }
   return headers;
@@ -745,8 +751,14 @@ function r2LargeAssetHeaders(
 
 function r2RangeHeaders(request: Request): Headers | undefined {
   const range = request.headers.get("range");
-  if (!range || request.headers.has("if-range")) return undefined;
-  return new Headers({ range });
+  return range ? new Headers({ range }) : undefined;
+}
+
+function matchesIfRange(request: Request, httpEtag: string): boolean {
+  const raw = request.headers.get("if-range")?.trim();
+  if (!raw) return true;
+  if (raw.startsWith("W/") || !raw.startsWith('"')) return false;
+  return raw === httpEtag;
 }
 
 async function serveR2LargeAsset(
@@ -756,12 +768,7 @@ async function serveR2LargeAsset(
   const requestUrl = new URL(request.url);
   const descriptor = cloudflareLargeAssetDescriptor(requestUrl.pathname);
   const key = cloudflareLargeAssetKey(requestUrl.pathname);
-  if (
-    !descriptor
-    || !key
-    || !env.LARGE_ASSETS
-    || request.headers.has("if-range")
-  ) return null;
+  if (!descriptor || !key || !env.LARGE_ASSETS) return null;
 
   const method = request.method.toUpperCase();
   if (method === "OPTIONS") {
@@ -770,7 +777,7 @@ async function serveR2LargeAsset(
       headers: {
         "access-control-allow-origin": "*",
         "access-control-allow-methods": "GET, HEAD, OPTIONS",
-        "access-control-allow-headers": "Range, If-None-Match",
+        "access-control-allow-headers": "Range, If-Range, If-None-Match",
         "access-control-max-age": "86400",
       },
     }));
@@ -783,27 +790,46 @@ async function serveR2LargeAsset(
   }
 
   try {
-    const rangeHeaders = r2RangeHeaders(request);
-    const object = method === "HEAD"
-      ? await env.LARGE_ASSETS.head(key)
-      : await env.LARGE_ASSETS.get(
+    let partial = false;
+    let object: R2ObjectBinding | R2ObjectBodyBinding | null;
+    if (method === "HEAD") {
+      object = await env.LARGE_ASSETS.head(key);
+    } else {
+      const requestedRange = r2RangeHeaders(request);
+      let acceptedRange = requestedRange;
+      if (requestedRange && request.headers.has("if-range")) {
+        const metadata = await env.LARGE_ASSETS.head(key);
+        if (!metadata) return null;
+        acceptedRange = matchesIfRange(request, metadata.httpEtag)
+          ? requestedRange
+          : undefined;
+      }
+      object = await env.LARGE_ASSETS.get(
         key,
-        rangeHeaders ? { range: rangeHeaders } : undefined,
+        acceptedRange ? { range: acceptedRange } : undefined,
       );
+      partial = Boolean(acceptedRange && object?.range);
+    }
     if (!object) return null;
 
-    const headers = r2LargeAssetHeaders(object, descriptor.contentType);
+    const headers = r2LargeAssetHeaders(
+      object,
+      descriptor.contentType,
+      partial,
+    );
     if (matchesIfNoneMatch(request, object.httpEtag)) {
       headers.delete("content-length");
       headers.delete("content-range");
       return withSecurityHeaders(new Response(null, { status: 304, headers }));
     }
 
-    const status = object.range ? 206 : 200;
     const body = method === "HEAD"
       ? null
       : (object as R2ObjectBodyBinding).body;
-    return withSecurityHeaders(new Response(body, { status, headers }));
+    return withSecurityHeaders(new Response(body, {
+      status: partial ? 206 : 200,
+      headers,
+    }));
   } catch {
     return null;
   }

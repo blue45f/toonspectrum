@@ -1,11 +1,42 @@
 {
-  "version": 1,
+  "version": 2,
   "composition": "ToonStudioProductTour",
   "duration": 504,
   "fps": 30,
   "src": "/brand/toonstudio-product-tour.mp4",
   "poster": "/brand/toonstudio-product-tour-poster.jpg",
-  "bytes": 35347422,
-  "sha256": "2cc214c6b631f21fd10f9752b0f5fee251dfd19a2680c1fa6c4ccebb84d214db",
+  "captions": {
+    "ko": "/brand/toonstudio-product-tour.ko.vtt",
+    "en": "/brand/toonstudio-product-tour.en.vtt"
+  },
+  "audio": {
+    "narration": {
+      "locale": "ko-KR",
+      "voice": {
+        "provider": "macOS speech synthesis",
+        "name": "Yuna",
+        "locale": "ko-KR",
+        "rate": 185
+      },
+      "disclosure": {
+        "ko": "합성 음성으로 제작한 한국어 내레이션입니다.",
+        "en": "The Korean narration uses a synthesized voice."
+      },
+      "sha256": "6033fd24b93ab2bead9b9fcdcbf6138ab5f31ee2d308f46bbf001350d2384e79"
+    },
+    "bgm": [
+      {
+        "id": "ink-and-starlight-instrumental",
+        "sha256": "3084422f819b4b40406d331e1bfe22a7a83c2bdc541157e0d4f1a9323365e7c7"
+      },
+      {
+        "id": "atlas-of-starlight-instrumental",
+        "sha256": "c881a89656e0ec81a9cd7cea8cdfd407a4dd28397efcf0f4547b05f439adb071"
+      }
+    ],
+    "mix": "stereo-aac-128k-with-narration-ducking"
+  },
+  "bytes": 23469745,
+  "sha256": "2c55256eca42c4af1b4414c908d145d788f39adace6b0d07c908748ee2b67745",
   "sourceCommit": "local"
 }

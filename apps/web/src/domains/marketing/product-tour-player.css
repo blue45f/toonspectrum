@@ -325,3 +325,21 @@
 }
 .product-tour-player__poster > strong { margin-top: -18%; font-size: clamp(14px, 1.5vw, 18px); }
 .product-tour-player__poster > small { margin-top: -22%; color: rgb(255 255 255 / 72%); font-size: 11px; }
+
+.product-tour-player__status {
+  pointer-events: none;
+  padding: 24px;
+  background: linear-gradient(180deg, rgb(10 8 7 / 52%), rgb(10 8 7 / 76%));
+  text-align: center;
+}
+
+.product-tour-player__transcript summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .product-tour-player__status { align-items: flex-start; padding-top: 24px; }
+  .product-tour-player__poster > small { max-width: 82%; text-align: center; }
+}
