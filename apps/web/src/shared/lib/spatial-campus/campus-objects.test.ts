@@ -27,8 +27,12 @@ describe("district scene projections", () => {
     ["market", { id: "asset-A", title: "Asset", href: "/market/resource/asset-A", kind: "market-resource", exposure: "public" }],
     ["library", { id: "story-A", title: "Story", href: "/title/story-A", kind: "story", exposure: "public" }],
     ["gallery", { id: "post-A", title: "Post", href: "/community/post/post-A", kind: "community-post", exposure: "public" }],
+    ["gallery", { id: "promo-A", title: "Promotion", href: "/community/promote/promo-A", kind: "promotion-post", exposure: "public" }],
     ["academy", { id: "lesson-A", title: "Lesson", href: "/learn/recipes?lesson=lesson-A", kind: "recipe", exposure: "public" }],
     ["production", { id: "project-A", title: "Project", href: "/production/projects/project-A/overview", kind: "project", exposure: "private" }],
+    ["production", { id: "project-A.review", title: "Review", href: "/production/projects/project-A/review", kind: "review", exposure: "private" }],
+    ["production", { id: "project-A.handoff", title: "Handoff", href: "/production/projects/project-A/handoff", kind: "handoff", exposure: "private" }],
+    ["atelier", { id: "project-A.review", title: "Review", href: "/studio/p/project-A/review", kind: "review", exposure: "private" }],
     ["plaza", { id: "event-A", title: "Event", href: "/events/event-A", kind: "event", exposure: "public" }],
   ] as const)("keeps the real %s domain target without widening authority", (district, candidate) => {
     expect(campusSceneObjects([candidate], district)).toEqual([candidate]);
@@ -45,7 +49,9 @@ describe("district scene projections", () => {
     "/learn/recipes?lesson=one&lesson=two",
     "/learn/recipes?lesson=../escape",
     "/community/post/post-A?token=private",
+    "/community/promote/post-A?token=private",
     "/production/projects/project-A/overview?shareToken=private",
+    "/production/projects/project-A/review?shareToken=private",
   ])("rejects ambiguous or widened target %s", (href) => {
     expect(campusSceneObjects([{ id: "x", title: "x", href }], "academy")).toEqual([]);
     expect(campusSceneObjects([{ id: "x", title: "x", href }], "gallery")).toEqual([]);

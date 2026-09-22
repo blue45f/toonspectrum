@@ -296,13 +296,22 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
   const sectionViews = STUDIO_PROJECT_SECTION_VIEWS[section];
   return (
     <Container size="wide" className="py-6 sm:py-8 lg:py-10">
-      <CampusObjectSource objects={[{
-        id: displayProjectId,
-        title: displayProjectId,
-        href: `/studio/p/${encodeURIComponent(displayProjectId)}/overview`,
-        kind: "project",
-        exposure: "private",
-      }]} />
+      <CampusObjectSource objects={[
+        {
+          id: displayProjectId,
+          title: displayProjectId,
+          href: `/studio/p/${encodeURIComponent(displayProjectId)}/overview`,
+          kind: "project",
+          exposure: "private",
+        },
+        {
+          id: `${displayProjectId}.review`,
+          title: `${displayProjectId} · Review`,
+          href: `/studio/p/${encodeURIComponent(displayProjectId)}/review`,
+          kind: "review",
+          exposure: "private",
+        },
+      ]} />
       <header className="rounded-3xl border border-line bg-panel/60 p-5 shadow-sm sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>

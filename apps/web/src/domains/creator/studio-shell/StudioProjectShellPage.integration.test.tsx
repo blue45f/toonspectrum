@@ -52,16 +52,25 @@ describe("StudioProjectShellPage integration", () => {
     expect(document.querySelector("[data-studio-project-view=inbox]")).toBeTruthy();
   });
 
-  it("publishes only the current private project reference to the atelier boundary", async () => {
+  it("publishes only current private project and review references to the atelier boundary", async () => {
     const publish = vi.fn<CampusObjectPublisher>(() => () => undefined);
     renderReview("/studio/p/project-1/review?view=inbox", publish);
     await waitFor(() => expect(publish).toHaveBeenCalled());
-    expect(publish.mock.calls[0]?.[1]).toEqual([{
-      id: "project-1",
-      title: "project-1",
-      href: "/studio/p/project-1/overview",
-      kind: "project",
-      exposure: "private",
-    }]);
+    expect(publish.mock.calls[0]?.[1]).toEqual([
+      {
+        id: "project-1",
+        title: "project-1",
+        href: "/studio/p/project-1/overview",
+        kind: "project",
+        exposure: "private",
+      },
+      {
+        id: "project-1.review",
+        title: "project-1 · Review",
+        href: "/studio/p/project-1/review",
+        kind: "review",
+        exposure: "private",
+      },
+    ]);
   });
 });
