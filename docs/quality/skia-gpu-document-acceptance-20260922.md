@@ -35,6 +35,7 @@ pnpm exec vite --host 127.0.0.1 --port 5278 --strictPort
 # Independent renderer fixture and real product route; a normal Chromium binary is required.
 node scripts/verify-studio-skia-document-engine.mjs http://127.0.0.1:5278 chromium,firefox
 node scripts/verify-studio-skia-product.mjs http://127.0.0.1:5278
+node scripts/verify-studio-skia-multitab-mobile.mjs http://127.0.0.1:5278
 pnpm run typecheck
 pnpm run build:bundle && pnpm run check:studio-bundle
 ```
@@ -116,3 +117,15 @@ The focused bridge, surface, coordinator and source-boundary suite passed 5 file
 The real `/studio/canvas` Chromium run on ANGLE Metal / Apple M2 Max confirmed `data-studio-skia-source-fence="settled-ink"` for three pointer strokes, followed by exact GPU visibility, selection compatibility restoration, zoom/90-degree rotation, Undo/Redo and explicit same-engine recovery after real context loss.
 
 This does not move document authority, Undo, Yjs, SQLite/OPFS, permission checks or export. Automerge remains deferred and no production deployment was performed.
+
+## Host runtime, multitab and mobile-emulation continuation — 2026-09-23
+
+The editor host no longer owns separate Skia authority, visible-receipt and defer-attempt refs. A dedicated `useStudioSkiaCommittedInkHostRuntime` wraps the existing fail-closed runtime; the host only queues committed surfaces and performs the final release or compatibility draw. The one-shot self-modifying CI repair job and its branch-specific patch script were removed after the product source adopted the boundary directly. `StudioCuttoonEditorHost.tsx` is back within the 29,696-line architecture ratchet.
+
+Focused bridge, surface, integration and architecture tests passed **4 files / 49 tests**. The final broad `studio-engine-skia` + Creator render/canvas scope passed **234 files / 2,574 tests**. Changed-file lint, Web/API typecheck, the ToonStudio CI execution contract, architecture/app-boundary validation, production build, postbuild/CSP/legal generation and the existing Studio bundle ratchet all passed without changing budgets. Yjs, document/Undo, SQLite/OPFS, authorization, export and Automerge policy remain unchanged.
+
+The clean-server real `/studio/canvas` run confirmed the settled-ink source fence, exact GPU visibility, hit-proxy selection restoration, zoom/90-degree rotation without geometry recompilation, authoritative Undo/Redo and explicit same-engine exact-pixel recovery after a real context loss.
+
+A same-browser two-tab Chromium run gave each editor its own visible Skia surface. A real context loss in tab A showed only tab A's recovery state; tab B retained byte-identical pixels, and tab A recovered through the existing explicit same-engine action. A separate **390×844**, 2× DPR, touch-enabled iPhone-UA emulation drew two strokes and published exactly one bounded Skia document surface. This is browser-layout and GPU-isolation evidence, not physical iOS/Android pen, thermal, battery or OS memory-pressure certification. No production deployment was performed.
+
+The acceptance runner opens and publishes tab A before creating tab B, and explicitly foregrounds the page whose GPU state is being exercised. This prevents a background-tab scheduling timeout from being mistaken for a renderer failure. The mobile path dispatches Chromium `touchStart`, `touchMove` and `touchEnd` input rather than mouse events. The isolated production-preview rerun completed both checks in about 14 seconds with zero page errors on ANGLE Metal / Apple M2 Max.
