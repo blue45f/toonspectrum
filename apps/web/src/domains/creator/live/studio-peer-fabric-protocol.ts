@@ -10,6 +10,7 @@ export const STUDIO_PEER_CAPABILITIES = [
   "bulk-transfer-v1",
   "work-asset-transfer-v1",
   "recovery-handoff-v1",
+  "offline-branch-v1",
   "library-cas-transfer-v1",
   "mobile-reference-camera-v1",
   "trusted-compute-v1",
