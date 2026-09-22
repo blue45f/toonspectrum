@@ -105,6 +105,9 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
           canvas.dataset.studioSkiaReadbacks = "0";
           if (continuing && latest.current.visible) canvas.style.visibility = "visible";
           else report("active", state.sceneRevision, plan.ownedDocumentIds);
+        } else if (result.status === "unsupported") {
+          receipt.current = null; canvas.style.visibility = "hidden";
+          report("legacy", state.sceneRevision, [], result.reason);
         } else if (result.status === "unavailable") {
           receipt.current = null; canvas.style.visibility = "hidden";
           report("unavailable", state.sceneRevision, plan.ownedDocumentIds, result.reason);

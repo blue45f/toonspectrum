@@ -1,4 +1,9 @@
 import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "./document-contract";
+import {
+  createSkiaDocumentImageCache,
+  SkiaDocumentImageAdmissionError,
+  type SkiaDocumentImageBitmapLoader,
+} from "./document-images";
 import { drawSkiaDocumentPanel } from "./document-panel";
 import { renderSceneNodesToCanvas } from "./render";
 
@@ -11,6 +16,7 @@ export const SKIA_DOCUMENT_RENDERER_ID = "skia-canvaskit-document-webgl2" as con
 export type { SkiaDocumentInk, SkiaDocumentItem, SkiaDocumentFrame, SkiaDocumentStats, SkiaDocumentReceipt, SkiaDocumentRenderer } from "./document-contract";
 export interface SkiaDocumentRendererOptions {
   readonly loadCanvasKit?: () => Promise<CanvasKit>;
+  readonly loadImageBitmap?: SkiaDocumentImageBitmapLoader;
   readonly maxPictureBytes?: number;
   readonly onContextLost?: () => void;
 }
@@ -58,7 +64,7 @@ function validateFrame(frame: SkiaDocumentFrame): void {
   const ids = new Set<string>();
   for (const item of frame.items) {
     if (!item.id || ids.has(item.id) || !item.revision
-      || [item.nodes, item.ink, item.panel].filter(Boolean).length !== 1) throw new Error("Invalid GPU document item");
+      || [item.nodes, item.ink, item.image, item.panel].filter(Boolean).length !== 1) throw new Error("Invalid GPU document item");
     ids.add(item.id);
     if (item.clip && (Object.values(item.clip).some((value) => !Number.isFinite(value))
       || item.clip.width <= 0 || item.clip.height <= 0)) throw new Error("Invalid GPU panel clip");
@@ -71,6 +77,12 @@ function validateFrame(frame: SkiaDocumentFrame): void {
         || (panel.shadow && Object.values(panel.shadow).some((value) => !Number.isFinite(value)))) {
         throw new Error("Invalid GPU panel geometry");
       }
+    }
+    if (item.image && (!item.image.src
+      || [item.image.x, item.image.y, item.image.width, item.image.height, item.image.rotation, item.image.opacity]
+        .some((value) => !Number.isFinite(value))
+      || item.image.width <= 0 || item.image.height <= 0 || item.image.opacity < 0 || item.image.opacity > 1)) {
+      throw new Error("Invalid GPU image contract");
     }
     if (item.ink && (item.ink.dabs.length % 3 || item.ink.dabs.length > 300_000
       || !Number.isFinite(item.ink.opacity) || item.ink.opacity < 0 || item.ink.opacity > 1
@@ -87,6 +99,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
   const budget = options.maxPictureBytes ?? 128 * 1024 * 1024;
   if (!Number.isSafeInteger(budget) || budget <= 0) throw new Error("Invalid picture memory budget");
   const cache = new Map<string, { revision: object; picture: SkPicture; bytes: number }>();
+  const imageCache = createSkiaDocumentImageCache(options.loadImageBitmap);
   let ck: CanvasKit | null = null; let gl: WebGLContextHandle | null = null;
   let context: GrDirectContext | null = null; let surface: Surface | null = null;
   let surfaceWidth = 0; let surfaceHeight = 0;
@@ -113,6 +126,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
   let disposed = false; let failure: string | null = null; let running = false;
   type Pending = { frame: SkiaDocumentFrame; resolve: (receipt: SkiaDocumentReceipt) => void };
   let pending: Pending | null = null;
+  let activePreparation: AbortController | null = null;
   const safeDelete = (value: { delete(): void } | null) => { try { value?.delete(); } catch { /* lost context */ } };
   const clearPictures = () => {
     for (const batch of frameBatches) safeDelete(batch.picture);
@@ -123,7 +137,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
   // Failure is terminal: release resources even while recovery UI stays mounted.
   // Subsequent dispose and device-loss callbacks are intentionally idempotent.
   const releaseGpuResources = () => {
-    clearSnapshots(); clearPictures(); presentedItems = []; presentedLayout = null;
+    clearSnapshots(); clearPictures(); imageCache.dispose(); presentedItems = []; presentedLayout = null;
     safeDelete(surface); surface = null; surfaceWidth = 0; surfaceHeight = 0;
     try { context?.releaseResourcesAndAbandonContext(); } catch { /* lost context */ }
     safeDelete(context); context = null;
@@ -134,6 +148,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
     event.preventDefault();
     if (disposed || failure) return;
     failure = "CanvasKit GPU context lost; explicit renderer recovery is required";
+    activePreparation?.abort();
     canvas.style.visibility = "hidden";
     try { options.onContextLost?.(); } catch { /* Observer errors never defeat device-loss fencing. */ }
     // Let any active native draw stack unwind before releasing its handles.
@@ -183,6 +198,8 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
                   }
                 }
                 drawInk(ck!, target, item.ink);
+              } else if (item.image) {
+                imageCache.draw(ck!, target, item.image);
               } else if (item.panel) {
                 drawSkiaDocumentPanel(ck!, target, item.panel);
               } else {
@@ -244,10 +261,11 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
       throw cause;
     }
   }
-  function draw(frame: SkiaDocumentFrame): SkiaDocumentReceipt {
+  function draw(frame: SkiaDocumentFrame, preconfiguredBackingInvalid = false): SkiaDocumentReceipt {
     const started = performance.now(); validateFrame(frame);
     const layout = JSON.stringify([frame.width, frame.height, frame.dpr, frame.documentWidth, frame.documentHeight, frame.camera]);
-    const backingValid = surface !== null && canvas.width === surfaceWidth && canvas.height === surfaceHeight;
+    const backingValid = !preconfiguredBackingInvalid
+      && surface !== null && canvas.width === surfaceWidth && canvas.height === surfaceHeight;
     const unchanged = backingValid && presentedLayout === layout && sameItems(presentedItems, frame.items);
     const appended = backingValid && presentedLayout === layout && frame.items.length > presentedItems.length
       && presentedItems.every((item, index) => item.id === frame.items[index]?.id && item.revision === frame.items[index]?.revision);
@@ -298,6 +316,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
       pictureBytes: [...cache.values()].reduce((sum, item) => sum + item.bytes, frameBatches.reduce((sum, batch) => sum + batch.bytes, 0)),
       retainedSnapshotBytes: snapshots.reduce((sum, item) => sum + item.bytes, 0),
       gpuCacheBytes: Number.isFinite(gpuBytes) ? gpuBytes : null,
+      imageTextureBytes: imageCache.bytes, cachedImages: imageCache.size,
       frameMs: performance.now() - started, interactiveReadbacks: 0,
     } };
     } finally { if (restore) safeDelete(restore.image); }
@@ -310,14 +329,52 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
       while (pending) {
         const work = pending; pending = null;
         if (disposed) { work.resolve({ status: "disposed", revision: work.frame.revision }); continue; }
+        const preparation = new AbortController();
+        activePreparation = preparation;
         try {
           if (failure) throw new Error(failure);
-          work.resolve(draw(work.frame));
+          validateFrame(work.frame);
+          let preconfiguredBackingInvalid = false;
+          if (work.frame.items.some((item) => item.image)) {
+            const width = Math.ceil(work.frame.width * work.frame.dpr);
+            const height = Math.ceil(work.frame.height * work.frame.dpr);
+            preconfiguredBackingInvalid = surface !== null
+              && (canvas.width !== width || canvas.height !== height || surfaceWidth !== width || surfaceHeight !== height);
+            configure(work.frame);
+            await imageCache.prepare(work.frame.items, surface!, preparation.signal);
+          }
+          if (disposed) { work.resolve({ status: "disposed", revision: work.frame.revision }); continue; }
+          if (preparation.signal.aborted || pending) {
+            work.resolve({ status: "superseded", revision: work.frame.revision });
+            continue;
+          }
+          const result = draw(work.frame, preconfiguredBackingInvalid);
+          imageCache.retain(work.frame.items);
+          work.resolve(result);
         } catch (cause) {
+          if (disposed) {
+            work.resolve({ status: "disposed", revision: work.frame.revision });
+            continue;
+          }
+          if (preparation.signal.aborted && pending && !failure) {
+            work.resolve({ status: "superseded", revision: work.frame.revision });
+            continue;
+          }
+          if (cause instanceof SkiaDocumentImageAdmissionError) {
+            imageCache.retain(presentedItems);
+            work.resolve({
+              status: "unsupported",
+              revision: work.frame.revision,
+              reason: cause.message,
+            });
+            continue;
+          }
           failure = cause instanceof Error ? cause.message : String(cause);
           canvas.style.visibility = "hidden";
           releaseGpuResources();
           work.resolve({ status: "unavailable", revision: work.frame.revision, reason: failure });
+        } finally {
+          if (activePreparation === preparation) activePreparation = null;
         }
       }
     } catch (cause) {
@@ -329,6 +386,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
     present(frame) {
       if (disposed) return Promise.resolve({ status: "disposed", revision: frame.revision });
       if (failure) return Promise.resolve({ status: "unavailable", revision: frame.revision, reason: failure });
+      activePreparation?.abort();
       if (pending) pending.resolve({ status: "superseded", revision: pending.frame.revision });
       return new Promise((resolve) => {
         pending = { frame, resolve };
@@ -337,6 +395,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
     },
     dispose() {
       if (disposed) return; disposed = true;
+      activePreparation?.abort();
       if (pending) { const work = pending; pending = null; work.resolve({ status: "disposed", revision: work.frame.revision }); }
       canvas.removeEventListener("webglcontextlost", lost);
       releaseGpuResources();

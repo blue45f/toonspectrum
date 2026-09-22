@@ -78,7 +78,9 @@ describe("GPU document /studio product wiring and retained Vello comparison boun
     expect(viewportSource).toContain("frameGraphOwnsDocumentPixels");
     expect(viewportSource).toContain("velloEligibleDocumentIds");
     expect(viewportSource).toContain("name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}");
-    expect(viewportSource).toContain("opacity={frameGraphOwnsDocumentPixels ? 0 : 1}");
+    expect(viewportSource).toContain("visible={!frameGraphOwnsDocumentPixels}");
+    expect(viewportSource).toContain("<StudioSkiaDocumentHitLayer");
+    expect(viewportSource).toContain('data-studio-konva-document-shadow={frameGraphOwnsDocumentPixels ? "unmounted" : "mounted"}');
     expect(viewportSource).toContain(
       "<StudioCanvasViewportDocumentLayer {...documentLayerProps} />",
     );

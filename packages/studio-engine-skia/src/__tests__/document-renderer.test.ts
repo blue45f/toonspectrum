@@ -216,3 +216,33 @@ it("releases the context when GPU surface creation fails", async () => {
   renderer.dispose();
   expect(h.ck.deleteContext).toHaveBeenCalledOnce();
 });
+
+it("keeps source-specific image admission failures on the compatibility boundary", async () => {
+  const h = harness();
+  const imageFrame: SkiaDocumentFrame = {
+    ...h.frame,
+    revision: {},
+    items: [{
+      id: "image",
+      revision: {},
+      image: {
+        src: "https://example.invalid/source.png",
+        x: 10, y: 20, width: 40, height: 30, rotation: 0,
+        opacity: 1, flipX: false, flipY: false,
+      },
+    }],
+  };
+  const renderer = createSkiaDocumentRenderer(h.canvas, {
+    loadCanvasKit: async () => h.ck,
+    loadImageBitmap: async () => { throw new Error("cors denied"); },
+  });
+  expect(await renderer.present(imageFrame)).toMatchObject({
+    status: "unsupported",
+    reason: "cors denied",
+  });
+  expect(await renderer.present({ ...h.frame, revision: {} })).toMatchObject({
+    status: "presented",
+  });
+  expect(h.ck.GetWebGLContext).toHaveBeenCalledOnce();
+  renderer.dispose();
+});

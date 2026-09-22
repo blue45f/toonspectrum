@@ -6,6 +6,7 @@ import { PROMOTION_GENRES, PROMOTION_KINDS, PROMOTION_STAGES } from "../../../..
 import { usePromotionFeed } from "./use-promotion-feed";
 import "./promotion-community.css";
 
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { useApp } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -17,7 +18,15 @@ export function PromotionBoardPage() {
   for (const name of ["kind", "stage", "genre", "q", "mine", "saved"]) { const value = params.get(name); if (value) filters.set(name, value); }
   const feed = usePromotionFeed(filters.toString(), userId);
   const setFilter = (name: string, value: string) => setParams((previous) => { const next = new URLSearchParams(previous); if (value && value !== "all") next.set(name, value); else next.delete(name); return next; });
+  const publicPosts = (feed.page?.items ?? []).filter((post) => !post.hidden && !post.archived).slice(0, 24);
   return <div className="pc-shell">
+    <CampusObjectSource objects={publicPosts.map((post) => ({
+      id: post.id,
+      title: post.title,
+      href: `/community/promote/${encodeURIComponent(post.id)}`,
+      kind: "promotion-post",
+      exposure: "public",
+    }))} />
     <header className="pc-hero"><div><p className="pc-eyebrow"><Sparkles size={16} aria-hidden="true" /> TOONSTUDIO · CREATOR SPOTLIGHT</p><h1>아직 발견하지 못한,<br /><em>당신의 다음 웹툰.</em></h1><p className="pc-lead">첫 연재의 설렘부터 한 편의 트레일러까지.<br />새로운 작가를 만나고, 만드는 과정을 응원해 주세요.</p><div className="pc-actions"><Link className="pc-button pc-primary" to="/community/promote/new"><PenLine size={17} aria-hidden="true" />내 작품 소개하기</Link><Link className="pc-button" to="/collaborate">용역·어시·팀원 찾기 <ArrowRight size={16} aria-hidden="true" /></Link><Link className="pc-button" to="/showcase">창작 갤러리 <ArrowRight size={16} aria-hidden="true" /></Link></div></div><aside className="pc-hero-note"><Clapperboard size={42} aria-hidden="true" /><strong>완성 전의 이야기도,<br />시작하는 작가도 환영해요.</strong><span>직접 창작한 작품 · 제작 과정 · 첫 독자의 피드백</span><p>유료 상단 노출 없이 최신 등록순으로 만나요.</p></aside></header>
     <nav className="pc-quick" aria-label="추천 탐색"><button type="button" onClick={() => { setParams({ stage: "amateur" }); setSearch(""); }}>01 <strong>아마추어 작가 발견</strong><ArrowRight size={16} aria-hidden="true" /></button><button type="button" onClick={() => { setParams({ stage: "debut" }); setSearch(""); }}>02 <strong>첫 작품·신작 모아보기</strong><ArrowRight size={16} aria-hidden="true" /></button><button type="button" onClick={() => { setParams({ kind: "trailer" }); setSearch(""); }}>03 <strong>트레일러 상영관</strong><ArrowRight size={16} aria-hidden="true" /></button></nav>
     <section aria-labelledby="pc-discover-title"><div className="pc-heading"><div><p className="pc-eyebrow">DISCOVER THE NEXT STORY</p><h2 id="pc-discover-title">창작자의 이야기를 만나보세요</h2></div><button className="pc-button" type="button" disabled={feed.loading} onClick={feed.refresh}><RefreshCw size={16} aria-hidden="true" />새로고침</button></div>

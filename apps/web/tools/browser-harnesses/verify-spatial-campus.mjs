@@ -22,7 +22,14 @@ const manifest = {
 };
 const resource = { ...manifest, id: "11111111-2222-4333-8444-555555555555", manifestHash: digest(manifest), manifestByteSize: Buffer.byteLength(canonical(manifest)),
   publisher: { id: "u1", name: "QA only", avatar: null }, createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z", isOwner: false, access: "free" };
-const report = { origin: origin.origin, fixture: "anonymous and synthetic market records; all other API calls fail closed", cases: [], interactions: [] };
+const promotion = {
+  id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", kind: "series", stage: "amateur", genre: "드라마",
+  title: "QA 공개 작품 소개", seriesTitle: "QA 공개 작품", description: "공개 갤러리 공간 투영만 검증하는 합성 작품 소개입니다. 실제 사용자 콘텐츠가 아닙니다.",
+  readingUrl: "", videoUrl: "", cover: "", tags: ["qa"], contentWarning: "", rightsConfirmed: true,
+  author: { id: "qa-author", name: "QA 작가" }, createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z",
+  version: 1, hidden: false, archived: false, saved: false,
+};
+const report = { origin: origin.origin, fixture: "anonymous synthetic market and promotion records; all other API calls fail closed", cases: [], interactions: [] };
 const browser = await chromium.launch({ headless: true });
 async function contextFor(width, height = 900) {
   const context = await browser.newContext({ viewport: { width, height }, locale: "ko-KR", reducedMotion: "reduce", serviceWorkers: "block" });
@@ -33,11 +40,12 @@ async function contextFor(width, height = 900) {
     if (url.pathname === "/api/auth/session") return route.fulfill({ status: 200, json: null });
     if (url.pathname === "/api/creator/marketplace/resources") return route.fulfill({ status: 200, json: { items: [resource], limit: Number(url.searchParams.get("limit")) || 12, nextCursor: null, hasMore: false } });
     if (url.pathname === `/api/creator/marketplace/resources/${resource.id}`) return route.fulfill({ status: 200, json: resource });
+    if (url.pathname === "/api/promotions/posts") return route.fulfill({ status: 200, json: { items: [promotion], nextCursor: null, hasMore: false, canModerate: false } });
     return route.fulfill({ status: 503, json: { message: "Local QA: service unavailable" } });
   });
   return context;
 }
-const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
+const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
 const widths = (process.env.CAMPUS_QA_WIDTHS ?? "1440,1024,390,320").split(",").map(Number);
 
 async function verifyMarketStudioRoundTrip() {
@@ -151,7 +159,11 @@ try {
   await page.goto(new URL("/market/browse", origin).href);
   await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
   await page.locator(".campus-public-objects").getByRole("link", { name: resource.name }).waitFor();
-  report.interactions.push("Synthetic public record appears in the live display projection");
+  report.interactions.push("Synthetic market record appears in the live display projection");
+  await page.goto(new URL("/community/promote", origin).href);
+  await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
+  await page.locator(".campus-public-objects").getByRole("link", { name: promotion.title }).waitFor();
+  report.interactions.push("Synthetic public promotion appears in the gallery scene after the existing publication authority returns it");
   await page.goto(new URL("/fortune?content=dream", origin).href);
   const input = page.getByRole("textbox", { name: /기억나는 꿈의 장면/ });
   await input.fill("QA only private dream");
