@@ -413,7 +413,7 @@ export const ENGINEERING_PLAYBOOK_DOSSIERS = [
       { ko: "기술적으로 접근 가능해도 정책·권리 근거가 없으면 수집·노출하지 않습니다.", en: "Technical accessibility alone is insufficient without policy and rights basis." },
       { ko: "공개 API의 현재 schema와 quota는 배포 전 공식 문서·실응답으로 다시 검증합니다.", en: "Current public-API schemas and quotas are revalidated against official docs and live responses before release." },
     ],
-    evidence: ["docs/crawling-policy.md", "apps/api/src/modules/crawler", "apps/api/src/modules/creator-resources", "apps/web/src/domains/creator-resources"],
+    evidence: ["apps/web/src/domains/legal/CrawlerPolicyPage.tsx", "scripts/crawl.mjs", "apps/api/src/modules/creator-resources", "apps/web/src/domains/creator-resources"],
   },
   {
     id: "quality-delivery-promotion",

@@ -412,8 +412,15 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
         "/about/technology/story",
         "기술 제작 스토리",
         "Engineering story",
-        "문제 정의부터 검증까지 25개 기술 챕터",
-        "Follow 25 engineering chapters from problem definition to verification",
+        "문제 정의부터 검증까지 30개 기술 챕터",
+        "Follow 30 engineering chapters from problem definition to verification",
+      ),
+      destination(
+        "/about/technology/playbook",
+        "서비스·기술 플레이북",
+        "Service & engineering playbook",
+        "시장 벤치마크·기술 도시어·홍보영상·120분 세미나",
+        "Market benchmarks, technical dossiers, promotional film and a 120-minute seminar",
       ),
       destination(
         "/about/technology/guides",

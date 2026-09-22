@@ -17,10 +17,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AboutSectionNav } from "../AboutSectionNav";
 import { ENGINEERING_FIELD_NOTES } from "./engineering-field-notes-content";
 import {
-  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   type EngineeringLocale,
   type EngineeringStatus,
 } from "./engineering-story-content";
+import { PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS } from "./engineering-story-published-content";
 import {
   EngineeringPageIntro,
   EngineeringStatusBadge,
@@ -37,8 +37,8 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 
 const AUDIENCES = [
   { id: "investor", ko: "투자자 10장", en: "Investor · 10 slides" },
-  { id: "seminar", ko: "기술 세미나 · 29장", en: "Engineering seminar · 29 slides" },
-  { id: "study", ko: "스터디 심화 · 39장", en: "Study deep dive · 39 slides" },
+  { id: "seminar", ko: "기술 세미나 · 34장", en: "Engineering seminar · 34 slides" },
+  { id: "study", ko: "스터디 심화 · 44장", en: "Study deep dive · 44 slides" },
 ] as const;
 
 type Audience = (typeof AUDIENCES)[number]["id"];
@@ -156,13 +156,18 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       chapterSlide("architecture", locale),
       chapterSlide("open-source", locale),
       chapterSlide("authentication", locale),
+      chapterSlide("social-identity-lifecycle", locale),
+      chapterSlide("share-distribution-boundary", locale),
       chapterSlide("storage", locale),
       chapterSlide("worker-architecture", locale),
       chapterSlide("pwa-continuity", locale),
       chapterSlide("browser-local-compute", locale),
       chapterSlide("brush-engine", locale),
+      chapterSlide("brush-render-authority", locale),
+      chapterSlide("collaborative-crdt-boundary", locale),
       chapterSlide("performance", locale),
       chapterSlide("web-3d-engine", locale),
+      chapterSlide("virtual-studio-world-authority", locale),
       chapterSlide("blender-mcp-boundary", locale),
       chapterSlide("free-ai-routing", locale),
       chapterSlide("ai-assisted-engineering", locale),

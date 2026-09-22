@@ -29,7 +29,7 @@ describe("engineering story pages", () => {
       .toBe("location");
     expect(screen.getByRole("link", { name: /제작 스토리|Story/u }).getAttribute("aria-current"))
       .toBe("page");
-    expect(document.querySelectorAll("article[id]")).toHaveLength(25);
+    expect(document.querySelectorAll("article[id]")).toHaveLength(30);
     expect(screen.getByRole("link", { name: /적용 가이드 열기|Open implementation guides/u }).getAttribute("href"))
       .toBe("/about/technology/guides");
   });
@@ -122,8 +122,8 @@ describe("engineering story pages", () => {
     fireEvent.keyDown(document, { key: "Home" });
     expect(previous.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: /기술 세미나 · 29장|Engineering seminar · 29 slides/u }));
-    for (let step = 0; step < 20; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: /기술 세미나 · 34장|Engineering seminar · 34 slides/u }));
+    for (let step = 0; step < 25; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
     expect(
       document.querySelector('[data-engineering-deck-shell] [data-deck-slide] h2')?.textContent,
     ).toMatch(/Worker를 하나의 만능|Workers are task-specific/u);

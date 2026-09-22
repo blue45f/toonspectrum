@@ -6,6 +6,7 @@ import {
   Database,
   Film,
   Gauge,
+  GraduationCap,
   Layers3,
   LibraryBig,
   NotebookTabs,
@@ -18,10 +19,10 @@ import {
 
 import { AboutSectionNav } from "./AboutSectionNav";
 import {
-  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   ENGINEERING_STATUS_META,
   type EngineeringStatus,
 } from "./technology/engineering-story-content";
+import { PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS } from "./technology/engineering-story-published-content";
 import {
   EngineeringStatusBadge,
   EngineeringStoryNav,
@@ -85,8 +86,17 @@ const HUB_LINKS = [
     icon: BookOpen,
     title: { ko: "전체 제작 스토리", en: "Full engineering story" },
     body: {
-      ko: "문제, 선택, 포기한 대안, 사용자 가치와 실제 근거를 25개 챕터로 확인합니다.",
-      en: "Explore problems, decisions, rejected alternatives, user value and evidence across 25 chapters.",
+      ko: "문제, 선택, 포기한 대안, 사용자 가치와 실제 근거를 30개 챕터로 확인합니다.",
+      en: "Explore problems, decisions, rejected alternatives, user value and evidence across 30 chapters.",
+    },
+  },
+  {
+    href: "/about/technology/playbook",
+    icon: GraduationCap,
+    title: { ko: "서비스·시장·세미나 플레이북", en: "Service, market and seminar playbook" },
+    body: {
+      ko: "서비스 소개, 시장 벤치마크, 기술 도시어, AI 작업 방식, 홍보영상과 120분 세미나를 한 흐름으로 연결합니다.",
+      en: "Connect service positioning, market benchmarks, technical dossiers, AI workflows, promotional film and a 120-minute seminar.",
     },
   },
   {
@@ -148,13 +158,18 @@ const HUB_LINKS = [
 const FEATURED_CHAPTER_IDS = new Set([
   "architecture",
   "authentication",
+  "social-identity-lifecycle",
+  "share-distribution-boundary",
   "storage",
   "brush-engine",
+  "brush-render-authority",
+  "collaborative-crdt-boundary",
   "quality",
   "ai-routing",
   "worker-architecture",
   "pwa-continuity",
   "web-3d-engine",
+  "virtual-studio-world-authority",
   "free-ai-routing",
 ]);
 
@@ -205,6 +220,13 @@ export function TechnologyPage() {
           >
             {bi("전체 제작 과정 보기", "Read the full story")}
             <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+          <Link
+            href="/about/technology/playbook"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg"
+          >
+            <GraduationCap size={16} aria-hidden="true" />
+            {bi("기술 플레이북", "Engineering playbook")}
           </Link>
           <Link
             href="/about/technology/deck"
@@ -298,7 +320,7 @@ export function TechnologyPage() {
       <section className="py-14 sm:py-20" aria-labelledby="engineering-hub-title">
         <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.TechnologyPage", "en", "REUSE THE STORY")}</p>
         <h2 id="engineering-hub-title" className="mt-3 text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-          {bi("하나의 기술 원본을 여섯 가지 방식으로 사용합니다.", "Use one engineering source in six different ways.")}
+          {bi("하나의 기술 원본을 여덟 가지 방식으로 사용합니다.", "Use one engineering source in eight different ways.")}
         </h2>
         <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {HUB_LINKS.map((item) => {
