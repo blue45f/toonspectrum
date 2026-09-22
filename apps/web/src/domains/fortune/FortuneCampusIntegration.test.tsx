@@ -13,7 +13,9 @@ const actor = vi.hoisted(() => ({ id: "actor-A" }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: true }) }));
 const context: CampusContextValue = {
   binding: { routeId: "experience-fortune", districtId: "observatory", surface: "room", private: true },
-  district: campusDistrict("observatory"), mode: "scene", returnHref: null, setMode: () => undefined,
+  district: campusDistrict("observatory"), mode: "scene",
+  privacyMode: false, privacySensitive: true,
+  returnHref: null, setMode: () => undefined, setPrivacyMode: () => undefined,
 };
 const reading: FortuneReading = { id: "cookie", title: "포춘쿠키", eyebrow: "오늘의 문장", summary: "작은 시작", generatedFor: "2026-09-22", sections: [], notes: [] };
 function Observatory({ mode = "scene" }: { mode?: CampusContextValue["mode"] }) {
