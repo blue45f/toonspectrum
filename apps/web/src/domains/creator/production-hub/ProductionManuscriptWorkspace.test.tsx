@@ -168,11 +168,11 @@ describe("ProductionManuscriptWorkspace", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "공정별 원고·버전·피드백" })).toBeTruthy();
-    expect(screen.getByText("12화 작화 원고")).toBeTruthy();
-    expect(screen.getByText("12화 대본")).toBeTruthy();
+    expect(screen.getAllByText("12화 작화 원고").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("12화 대본").length).toBeGreaterThan(0);
     expect(screen.getAllByText("현재 작업본 · 체크포인트")).toHaveLength(2);
-    expect(screen.getByText("최종본", { selector: "span" })).toBeTruthy();
-    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
+    expect(screen.getByText("최종본 준비")).toBeTruthy();
+    expect(screen.getAllByText("필수 수정 2개").length).toBeGreaterThan(0);
     expect(f.getProject).toHaveBeenCalledWith("sample-work");
     expect(f.listRevisions).toHaveBeenCalledTimes(2);
     expect(f.listReviews).toHaveBeenCalledTimes(2);
@@ -189,8 +189,8 @@ describe("ProductionManuscriptWorkspace", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("12화 작화 원고");
-    fireEvent.click(within(screen.getByRole("navigation", { name: "원고 운영 보기" })).getByRole("button", { name: "피드백" }));
+    await screen.findAllByText("12화 작화 원고");
+    fireEvent.click(within(screen.getByRole("tablist", { name: "원고 운영 보기" })).getByRole("tab", { name: "피드백" }));
     expect(await screen.findByRole("heading", { name: "고정 원고 피드백" })).toBeTruthy();
     expect(screen.getByText("12화 편집 검수")).toBeTruthy();
     expect(screen.getByText("필수 2")).toBeTruthy();
@@ -198,5 +198,75 @@ describe("ProductionManuscriptWorkspace", () => {
     await waitFor(() => expect(link.getAttribute("href")).toContain("sharedReview=review-image"));
     expect(link.getAttribute("href")).toContain("revision=revision-review");
     expect(link.getAttribute("href")).toContain("artifact=artifact-image");
+  });
+
+  it("filters process work and switches to the at-a-glance matrix", async () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/manuscripts?episode=episode-12"]}>
+        <ProductionManuscriptWorkspace
+          aggregate={createProductionDemoProject()}
+          canEdit
+          isDemo={false}
+        />
+      </MemoryRouter>,
+    );
+
+    const search = await screen.findByRole("searchbox", { name: "원고·공정 검색" });
+    fireEvent.change(search, { target: { value: "대본" } });
+    const processPanel = screen.getByRole("tabpanel", { name: "공정·원고" });
+    expect(within(processPanel).getByRole("heading", { name: "12화 대본" })).toBeTruthy();
+    expect(within(processPanel).queryByRole("heading", { name: "12화 작화 원고" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "한눈 보기" }));
+    expect(await screen.findByRole("region", { name: "공정 한눈 보기 표" })).toBeTruthy();
+    expect(within(processPanel).getByRole("columnheader", { name: "현재 작업본" })).toBeTruthy();
+  });
+
+  it("does not hijack keys inside an explicit Studio shortcut boundary", async () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/manuscripts?episode=episode-12"]}>
+        <ProductionManuscriptWorkspace
+          aggregate={createProductionDemoProject()}
+          canEdit
+          isDemo={false}
+        />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("heading", { name: "공정별 원고·버전·피드백" });
+    const boundary = document.createElement("button");
+    boundary.setAttribute("data-studio-shortcut-boundary", "true");
+    boundary.textContent = "별도 도구";
+    document.body.append(boundary);
+    boundary.focus();
+    fireEvent.keyDown(boundary, { key: "2" });
+    expect(screen.getByRole("tab", { name: "공정·원고" }).getAttribute("aria-selected"))
+      .toBe("true");
+    expect(screen.queryByText("VERSION STACK PANEL")).toBeNull();
+    boundary.remove();
+  });
+
+  it("supports keyboard help, search focus and numbered view switching", async () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/manuscripts?episode=episode-12"]}>
+        <ProductionManuscriptWorkspace
+          aggregate={createProductionDemoProject()}
+          canEdit
+          isDemo={false}
+        />
+      </MemoryRouter>,
+    );
+
+    await screen.findByRole("heading", { name: "공정별 원고·버전·피드백" });
+    fireEvent.keyDown(window, { key: "?" });
+    expect(screen.getByRole("region", { name: "원고 운영 단축키" })).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "/" });
+    const search = screen.getByRole("searchbox", { name: "원고·공정 검색" });
+    await waitFor(() => expect(search).toBe(document.activeElement));
+    fireEvent.blur(search);
+    fireEvent.keyDown(window, { key: "2" });
+    expect(await screen.findByText("VERSION STACK PANEL")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "버전·비교" }).getAttribute("aria-selected")).toBe("true");
   });
 });
