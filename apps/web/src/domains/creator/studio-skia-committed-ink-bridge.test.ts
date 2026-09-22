@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appendStudioCommittedInkHandoff,
   canStudioSkiaPublishOverSettledInk,
   createStudioSkiaCommittedInkHostRuntime,
   decideStudioSkiaCommittedInkDraw,
@@ -148,6 +149,38 @@ describe("Skia committed-ink receipt bridge", () => {
       ...handoff(),
       overlaySettledCount: 0,
     }])).toBe(false);
+  });
+
+  it("reserves earlier queue prefixes and deduplicates the next stroke identity", () => {
+    const previous = handoff();
+    const next = appendStudioCommittedInkHandoff([previous], {
+      pageId: "page-a",
+      strokeIds: ["stroke-b", "stroke-b"],
+      overlaySettledCount: 3,
+      draftSettledCount: 1,
+      gpuSettledCount: 2,
+      queuedRevision: 9,
+    });
+    expect(next).toHaveLength(2);
+    expect(next[1]).toMatchObject({
+      strokeIds: ["stroke-b"],
+      overlaySettledCount: 2,
+      draftSettledCount: 1,
+      gpuSettledCount: 2,
+      queuedRevision: 9,
+    });
+  });
+
+  it("does not append an empty handoff after existing reservations", () => {
+    const queue = [handoff()];
+    expect(appendStudioCommittedInkHandoff(queue, {
+      pageId: "page-a",
+      strokeIds: ["stroke-b"],
+      overlaySettledCount: 1,
+      draftSettledCount: 0,
+      gpuSettledCount: 0,
+      queuedRevision: 9,
+    })).toBe(queue);
   });
 
   it("rejects malformed scene revision metadata", () => {
