@@ -2,8 +2,9 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StudioSkiaDocumentSurface } from "./StudioSkiaDocumentSurface";
+import { createStudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import type { StudioRenderSurfaceAuthority } from "./StudioRenderSurface";
-import type { El } from "../studio-element-model";
+import type { DrawEl, El } from "../studio-element-model";
 import type { SkiaDocumentFrame, SkiaDocumentReceipt } from "@toonspectrum/studio-engine-skia";
 
 const mocked = vi.hoisted(() => ({ create: vi.fn(), present: vi.fn(), dispose: vi.fn() }));
@@ -275,4 +276,100 @@ it("reports image admission failure as legacy without showing a GPU failure stat
     reason: "image source stays on compatibility",
   }));
   expect(h.report.mock.calls.some(([state]) => state.status === "unavailable")).toBe(false);
+});
+
+it("updates only transform source ownership without rebuilding on every exact draft frame", async () => {
+  const h = setup();
+  const store = createStudioLiveTransformDraftStore();
+  const original = pen();
+  const props = {
+    ...h.props,
+    visible: true,
+    elements: [original],
+    liveTransformDraftStore: store,
+    liveTransformDraftScope: "page:p1",
+  };
+  const view = render(<StudioSkiaDocumentSurface {...props} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
+  const claim = store.claim("page:p1", ["ink"]);
+  expect(claim).not.toBeNull();
+  const moved = { ...original, points: [40, 10, 60, 20, 90, 40] } as El;
+  act(() => claim!.present([{ element: moved as DrawEl, clip: null }]));
+  await waitFor(() => expect(requests).toHaveLength(2));
+  expect(requests[1]!.frame.items).toEqual([]);
+  await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
+  act(() => claim!.present([{
+    element: { ...moved, points: [44, 10, 64, 20, 94, 40] } as DrawEl,
+    clip: null,
+  }]));
+  expect(requests).toHaveLength(2);
+  act(() => { expect(claim!.release()).toBe(true); });
+  await waitFor(() => expect(requests).toHaveLength(3));
+  expect(requests[2]!.frame.items.map((item) => item.id)).toEqual(["ink"]);
+  view.unmount();
+});
+
+
+it("hides a superseded camera frame when transform projection ownership changes", async () => {
+  const h = setup();
+  const store = createStudioLiveTransformDraftStore();
+  const original = pen();
+  let notify!: () => void;
+  let scheduled!: FrameRequestCallback;
+  let camera = { scaleX: 1, scaleY: 1, rotation: 0, offsetX: 0, offsetY: 0 };
+  const cameraSource = {
+    read: () => camera,
+    subscribe: (callback: () => void) => {
+      notify = callback;
+      return () => undefined;
+    },
+  };
+  const props = {
+    ...h.props,
+    elements: [original],
+    cameraSource,
+    liveTransformDraftStore: store,
+    liveTransformDraftScope: "page:p1",
+  };
+  const view = render(<StudioSkiaDocumentSurface {...props} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
+  view.rerender(<StudioSkiaDocumentSurface {...props} visible />);
+  const canvas = h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!;
+  await waitFor(() => expect(canvas.style.visibility).toBe("visible"));
+  const animation = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => {
+    scheduled = callback;
+    return 1;
+  });
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => undefined);
+  const claim = store.claim("page:p1", ["ink"]);
+  expect(claim).not.toBeNull();
+  try {
+    act(() => {
+      camera = { ...camera, offsetX: -40 };
+      notify();
+      scheduled(0);
+    });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    act(() => claim!.present([{
+      element: { ...original, points: [40, 10, 60, 20, 90, 40] } as DrawEl,
+      clip: null,
+    }]));
+    await waitFor(() => expect(requests).toHaveLength(3));
+    expect(requests[1]!.frame.items.map((item) => item.id)).toEqual(["ink"]);
+    expect(requests[2]!.frame.items).toEqual([]);
+    await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
+    expect(canvas.style.visibility).toBe("hidden");
+    await act(async () => { requests[2]!.finish(success(requests[2]!.frame)); });
+    expect(h.report).toHaveBeenLastCalledWith(expect.objectContaining({ status: "active" }));
+    view.rerender(<StudioSkiaDocumentSurface {...props} />);
+    view.rerender(<StudioSkiaDocumentSurface {...props} visible />);
+    await waitFor(() => expect(canvas.style.visibility).toBe("visible"));
+  } finally {
+    view.unmount();
+    claim?.release();
+    animation.mockRestore();
+    cancel.mockRestore();
+  }
 });

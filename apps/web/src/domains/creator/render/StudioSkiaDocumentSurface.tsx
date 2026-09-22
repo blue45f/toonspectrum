@@ -6,7 +6,9 @@ import {
 import { useLayoutEffect, useRef, useState } from "react";
 import type { SkiaDocumentRenderer } from "@toonspectrum/studio-engine-skia";
 import type { StudioSkiaDocumentPresentationCandidate } from "../studio-skia-committed-ink-bridge";
+import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import { createStudioSkiaDocumentProjector } from "./studio-skia-document-plan";
+import { projectStudioSkiaLiveTransformElements } from "./studio-skia-live-transform-projection";
 import type { StudioRenderSurfaceAuthority, StudioRenderSurfaceProps } from "./StudioRenderSurface";
 
 export const STUDIO_SKIA_DOCUMENT_BACKEND = "skia-canvaskit-document-webgl2" as const;
@@ -35,8 +37,11 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   documentHeight, dpr = 1, elements, sceneRevision, documentTransform, onAuthorityChange,
   visible, beforePublish, cameraSource, frameTheme = "classic",
   canPublishOverSettledInk, onVisiblePresentation,
+  liveTransformDraftStore, liveTransformDraftScope,
 }: StudioRenderSurfaceProps & {
   readonly visible: boolean;
+  readonly liveTransformDraftStore?: StudioLiveTransformDraftStore;
+  readonly liveTransformDraftScope?: string;
   readonly beforePublish?: (signal: AbortSignal) => Promise<void>;
   readonly cameraSource?: StudioSkiaCameraSource;
   readonly frameTheme?: "classic" | "soft" | "vivid";
@@ -51,10 +56,12 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   sink.current = onAuthorityChange;
   const latest = useRef({ width, height, documentWidth, documentHeight, dpr, elements,
     sceneRevision, documentTransform, beforePublish, cameraSource, visible, frameTheme,
-    canPublishOverSettledInk, onVisiblePresentation });
+    canPublishOverSettledInk, onVisiblePresentation, liveTransformDraftStore,
+    liveTransformDraftScope });
   latest.current = { width, height, documentWidth, documentHeight, dpr, elements,
     sceneRevision, documentTransform, beforePublish, cameraSource, visible, frameTheme,
-    canPublishOverSettledInk, onVisiblePresentation };
+    canPublishOverSettledInk, onVisiblePresentation, liveTransformDraftStore,
+    liveTransformDraftScope };
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<SkiaDocumentRenderer | null>(null);
   const projectorRef = useRef(createStudioSkiaDocumentProjector());
@@ -137,6 +144,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     let pendingFence: AbortController | null = null;
     let cameraFrame = 0;
     let presentedCamera: StudioSkiaDocumentCamera | null = null;
+    let liveTransformProjectionToken = "base";
     const submit = (cameraOnly = false) => {
       if (!runtime || !alive || generation.current !== scope) return;
       pendingFence?.abort();
@@ -145,8 +153,15 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       canvas.dataset.studioSkiaRequest = String(request);
       canvas.dataset.studioSkiaPhase = "rendering";
       const continuing = cameraOnly && receipt.current === state.sceneRevision && sourceHiddenReceipt.current === state.sceneRevision && state.visible;
+      const transformProjection = projectStudioSkiaLiveTransformElements(
+        state.elements,
+        state.liveTransformDraftStore?.getSnapshot() ?? null,
+        state.liveTransformDraftScope ?? "",
+      );
+      const projectionToken = transformProjection.token;
+      liveTransformProjectionToken = projectionToken;
       let plan;
-      try { plan = projector.project(state.elements, state.frameTheme); }
+      try { plan = projector.project(transformProjection.elements, state.frameTheme); }
       catch (cause) { report("unavailable", state.sceneRevision, [], cause instanceof Error ? cause.message : String(cause)); return; }
       if (!plan.supported) {
         receipt.current = null;
@@ -177,13 +192,15 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         documentHeight: state.documentHeight, dpr: state.dpr, camera }), displayed]).then(([result]) => {
         if (!alive || generation.current !== scope) return;
         if (request !== revision.current) {
-          // A continuous scroll can supersede the request after CanvasKit has already flushed it.
-          // Rebase the CSS bridge onto those newly displayed pixels; keeping the old base camera
-          // would shift the retained frame by the stale request's delta until the next flush.
+          // A continuous scroll can supersede a camera-only request after CanvasKit has already
+          // flushed it. Rebase only when the projection token still matches; a stale transform
+          // ownership frame must be hidden instead of replacing newer document pixels.
           if (result.status === "presented" && result.revision === state.sceneRevision) {
             presentedCamera = camera;
             const current = latest.current;
-            const retained = current.visible
+            const retained = cameraOnly
+              && projectionToken === liveTransformProjectionToken
+              && current.visible
               && receipt.current === current.sceneRevision
               && sourceHiddenReceipt.current === current.sceneRevision
               && canvas.style.visibility === "visible"
@@ -273,6 +290,25 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       cameraFrame = requestAnimationFrame(() => submit(true));
     };
     const unsubscribeCamera = cameraSource?.subscribe(cameraChanged);
+    const syncLiveTransformProjection = () => {
+      const state = latest.current;
+      const next = projectStudioSkiaLiveTransformElements(
+        state.elements,
+        state.liveTransformDraftStore?.getSnapshot() ?? null,
+        state.liveTransformDraftScope ?? "",
+      );
+      if (next.token === liveTransformProjectionToken) return;
+      if (!runtime) {
+        liveTransformProjectionToken = next.token;
+        return;
+      }
+      // Projection ownership changes document pixels, so they must re-enter the guarded document
+      // handoff rather than borrowing the retained camera-only continuation path.
+      submit();
+    };
+    const unsubscribeLiveTransform = liveTransformDraftStore?.subscribe(
+      syncLiveTransformProjection,
+    ) ?? (() => undefined);
     submitted.current = submit;
     report("starting", latest.current.sceneRevision, []);
     void import("@toonspectrum/studio-engine-skia").then((module) => {
@@ -293,7 +329,8 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       if (alive && generation.current === scope) report("unavailable", latest.current.sceneRevision, [], cause instanceof Error ? cause.message : String(cause));
     });
     return () => {
-      alive = false; unsubscribeCamera?.(); cancelAnimationFrame(cameraFrame); pendingFence?.abort();
+      alive = false; unsubscribeCamera?.(); unsubscribeLiveTransform();
+      cancelAnimationFrame(cameraFrame); pendingFence?.abort();
       submitted.current = null;
       receipt.current = null;
       receiptOwnedDocumentIds.current = [];
@@ -303,7 +340,13 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       canvas.remove(); if (canvasRef.current === canvas) canvasRef.current = null;
       projector.clear();
     };
-  }, [enabled, mountParent, cameraSource]);
+  }, [
+    enabled,
+    mountParent,
+    cameraSource,
+    liveTransformDraftScope,
+    liveTransformDraftStore,
+  ]);
   useLayoutEffect(() => {
     if (canvasRef.current) {
       clearRetainedCameraTranslation(canvasRef.current);
