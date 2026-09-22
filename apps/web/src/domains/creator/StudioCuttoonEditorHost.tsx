@@ -665,12 +665,7 @@ import {
   StudioLiveRetainedMediaOverlayRenderer,
   studioLiveRetainedMediaOverlaySupportsElement,
 } from "./live/studio-live-retained-media-overlay";
-import { createStudioOfflineCapableResourceLeaseController } from "./offline-branch/createStudioOfflineCapableResourceLeaseController";
-import {
-  promoteStudioOfflineBranchPending,
-  reconcileStudioOfflineCrdtFrontier,
-  stageStudioOfflineSceneTransition,
-} from "./offline-branch/studio-offline-host-integration";
+import * as studioOfflineHost from "./offline-branch/studio-offline-host-integration";
 import { createStudioLayerCompHandlers } from "./layer/createStudioLayerCompHandlers";
 import {
   captureStudioLayerCompLeaseRelease,
@@ -2043,7 +2038,7 @@ export function StudioCuttoonEditor({
     begin: beginLiveResourceEdit,
     beginAsync: beginLiveResourceEditAsync,
     end: endLiveResourceEdit,
-  } = createStudioOfflineCapableResourceLeaseController({
+  } = studioOfflineHost.createStudioOfflineCapableResourceLeaseController({
     heldResourcesRef: studioLiveHeldResourcesRef,
     mutationGenerationRef: studioLiveMutationGenerationRef,
     pageId: activePage.id,
@@ -2191,8 +2186,9 @@ export function StudioCuttoonEditor({
         0,
         Math.min(pagesHiRef.current, Math.max(0, currentHistory.length - 1))
       );
-      const reconciled = reconcileStudioOfflineCrdtFrontier({
+      const reconciled = studioOfflineHost.reconcileStudioOfflineCrdtFrontier({
         runtime,
+        document: studioCrdtDocument, reportError: setError,
         currentHistory,
         currentIndex,
         frontier,
@@ -2213,13 +2209,6 @@ export function StudioCuttoonEditor({
         "remote CRDT reconciliation"
       );
       setPagesHistoryState(reconciled.history);
-      if (reconciled.shouldPromote) {
-        promoteStudioOfflineBranchPending({
-          runtime,
-          document: studioCrdtDocument,
-          reportError: setError,
-        });
-      }
     };
 
     applyFrontier({
@@ -16101,12 +16090,8 @@ const puppetWarpArmed =
   ): boolean {
     const document = studioCrdtDocumentRef.current;
     const runtime = studioCrdtSceneRuntimeRef.current;
-    const stagedOffline = stageStudioOfflineSceneTransition({
-      runtime,
-      previousPages,
-      nextPages,
-      reportNotice: setStatusNotice,
-    });
+    const stagedOffline = studioOfflineHost.stageStudioOfflineSceneTransition(
+      runtime, previousPages, nextPages, setStatusNotice);
     if (stagedOffline !== null) return stagedOffline;
     if (!document && !runtime) return true;
     if (!document || !runtime) return false;

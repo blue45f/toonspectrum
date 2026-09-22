@@ -56,6 +56,9 @@ describe("studio offline host integration", () => {
     const canonical = [page("서버")];
     const projected = [page("오프라인")];
     const observeCanonicalPages = vi.fn();
+    const promotePending = vi.fn(async () => undefined);
+    const reportError = vi.fn();
+    const document = {} as StudioCrdtDocument;
     const reconcileHistory = vi.fn()
       .mockReturnValueOnce({ history: [current], changed: false })
       .mockReturnValueOnce({ history: [canonical], changed: false });
@@ -65,14 +68,18 @@ describe("studio offline host integration", () => {
       reconstructCanonicalPages: vi.fn(),
       observeCanonicalPages,
       projectPages: () => projected,
+      promotePending,
     } as unknown as StudioOfflineBranchRuntime;
     const runtime = {
       offlineBranch,
       reconcileHistory,
+      flushAndWaitForDraftProtection: vi.fn(),
     } as unknown as StudioCrdtSceneGraphRuntime;
 
     const result = reconcileStudioOfflineCrdtFrontier({
       runtime,
+      document,
+      reportError,
       currentHistory: [current],
       currentIndex: 0,
       frontier: EMPTY_FRONTIER,
@@ -83,10 +90,13 @@ describe("studio offline host integration", () => {
     expect(result).toEqual({
       history: [projected],
       currentPages: projected,
-      shouldPromote: true,
     });
     expect(observeCanonicalPages).toHaveBeenCalledWith(canonical);
     expect(reconcileHistory).toHaveBeenCalledTimes(2);
+    expect(promotePending).toHaveBeenCalledWith(
+      document,
+      runtime.flushAndWaitForDraftProtection,
+    );
   });
 
   it("stages transitions only while the offline branch owns the proposal", () => {
@@ -101,20 +111,14 @@ describe("studio offline host integration", () => {
       },
     } as unknown as StudioCrdtSceneGraphRuntime;
 
-    expect(stageStudioOfflineSceneTransition({
-      runtime,
-      previousPages,
-      nextPages,
-      reportNotice,
-    })).toBe(true);
+    expect(stageStudioOfflineSceneTransition(
+      runtime, previousPages, nextPages, reportNotice,
+    )).toBe(true);
     expect(stageSceneTransition).toHaveBeenCalledWith(previousPages, nextPages);
     expect(reportNotice).toHaveBeenCalledOnce();
-    expect(stageStudioOfflineSceneTransition({
-      runtime: null,
-      previousPages,
-      nextPages,
-      reportNotice,
-    })).toBeNull();
+    expect(stageStudioOfflineSceneTransition(
+      null, previousPages, nextPages, reportNotice,
+    )).toBeNull();
   });
 
   it("reports failed canonical promotion without dropping the pending branch", async () => {

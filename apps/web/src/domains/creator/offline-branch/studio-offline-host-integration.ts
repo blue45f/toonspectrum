@@ -7,8 +7,12 @@ import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaboratio
 import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 
+export { createStudioOfflineCapableResourceLeaseController } from "./createStudioOfflineCapableResourceLeaseController";
+
 export interface StudioOfflineFrontierReconciliationInput {
   readonly runtime: StudioCrdtSceneGraphRuntime;
+  readonly document: StudioCrdtDocument;
+  readonly reportError: (message: string) => void;
   readonly currentHistory: PageState[][];
   readonly currentIndex: number;
   readonly frontier: StudioCrdtSceneGraphFrontier;
@@ -19,7 +23,6 @@ export interface StudioOfflineFrontierReconciliationInput {
 export interface StudioOfflineFrontierReconciliationResult {
   readonly history: PageState[][];
   readonly currentPages: PageState[];
-  readonly shouldPromote: boolean;
 }
 
 function changedIdsAreEmpty(changedIds: StudioCrdtSceneGraphChangedIds | null): boolean {
@@ -45,6 +48,8 @@ export function studioCrdtFrontierHasWork(
 
 export function reconcileStudioOfflineCrdtFrontier({
   runtime,
+  document,
+  reportError,
   currentHistory,
   currentIndex,
   frontier,
@@ -85,10 +90,12 @@ StudioOfflineFrontierReconciliationResult | null {
   } else {
     offlineBranch?.observeCanonicalPages(canonicalPages);
   }
+  if (offlineBranch?.status.canonicalAuthority) {
+    promoteStudioOfflineBranchPending({ runtime, document, reportError });
+  }
   return {
     history: nextHistory,
     currentPages: nextHistory[currentIndex] ?? [],
-    shouldPromote: offlineBranch?.status.canonicalAuthority === true,
   };
 }
 
@@ -111,20 +118,17 @@ export function promoteStudioOfflineBranchPending(input: {
   });
 }
 
-export function stageStudioOfflineSceneTransition(input: {
-  readonly runtime: StudioCrdtSceneGraphRuntime | null;
-  readonly previousPages: readonly PageState[];
-  readonly nextPages: readonly PageState[];
-  readonly reportNotice: (message: string) => void;
-}): boolean | null {
-  const offlineBranch = input.runtime?.offlineBranch ?? null;
+export function stageStudioOfflineSceneTransition(
+  runtime: StudioCrdtSceneGraphRuntime | null,
+  previousPages: readonly PageState[],
+  nextPages: readonly PageState[],
+  reportNotice: (message: string) => void,
+): boolean | null {
+  const offlineBranch = runtime?.offlineBranch ?? null;
   if (!offlineBranch?.shouldStageSceneTransition()) return null;
-  const staged = offlineBranch.stageSceneTransition(
-    input.previousPages,
-    input.nextPages,
-  );
+  const staged = offlineBranch.stageSceneTransition(previousPages, nextPages);
   if (staged) {
-    input.reportNotice(
+    reportNotice(
       "변경을 Automerge 오프라인 branch에 보호했습니다. 서버 정본 연결 후 안전하게 합칩니다.",
     );
   }
