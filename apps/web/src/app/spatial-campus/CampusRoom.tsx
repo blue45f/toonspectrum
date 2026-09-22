@@ -129,7 +129,11 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
       </Link>)}
     </nav>
     {objects.length > 0 && <nav className="campus-public-objects" aria-label={locale === "ko" ? "이 공간에서 바로 열 수 있는 항목" : "Items available in this place"}>
-      {objects.slice(0, 6).map((object) => <Link key={`${object.kind ?? "item"}:${object.id}:${object.href}`} to={object.href} data-campus-object-exposure={object.exposure ?? "public"}>
+      {objects.slice(0, 6).map((object) => <Link key={`${object.kind ?? "item"}:${object.id}:${object.href}`} to={object.href}
+        aria-label={locale === "ko"
+          ? `${object.title} · 공간에서 보기${object.exposure === "private" ? " · 내 화면에서만" : ""}`
+          : `${object.title} · Open in this place${object.exposure === "private" ? " · Only in your view" : ""}`}
+        data-campus-object-exposure={object.exposure ?? "public"}>
         {object.thumbnail ? <img src={object.thumbnail} alt="" loading="lazy" width={48} height={48} /> : null}
         <span>{object.title}{object.exposure === "private" ? <small>{locale === "ko" ? "내 화면에서만" : "Only in your view"}</small> : null}</span><ArrowUpRight size={16} aria-hidden="true" />
       </Link>)}

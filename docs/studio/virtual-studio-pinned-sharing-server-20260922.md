@@ -12,7 +12,7 @@ The showcase server path requires a previously approved exact review plus a sepa
 
 ## Schema and release boundary
 
-New migration `0084_studio_pinned_review_share.sql` adds separate share and feedback tables. Shares permit only one-way revocation updates; feedback is append-only. The managed migration manifest, readiness table inventory and least-privilege runtime SQL include this new contract. Runtime grants are SELECT/INSERT plus UPDATE of only `revokedAt` on share metadata; no broad update, delete, truncate or delegable rights are added. An actual non-owning disposable PostgreSQL role test verifies the boundary.
+New migration `0087_studio_pinned_review_share.sql` adds separate share and feedback tables. Shares permit only one-way revocation updates; feedback is append-only. The managed migration manifest, readiness table inventory and least-privilege runtime SQL include this new contract. Runtime grants are SELECT/INSERT plus UPDATE of only `revokedAt` on share metadata; no broad update, delete, truncate or delegable rights are added. An actual non-owning disposable PostgreSQL role test verifies the boundary.
 
 No production migration was run. A later authorized release must apply the managed migration with the existing separate operator procedure, provision the exact runtime grants, deploy API before UI and verify behavior. Do not deploy this draft into a database missing its schema. API startup does not perform DDL. Legacy external links and their data are unchanged.
 
