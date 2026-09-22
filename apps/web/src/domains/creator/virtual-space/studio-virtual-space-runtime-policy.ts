@@ -128,6 +128,33 @@ function approachPresence(
 }
 
 /**
+ * A nearby NPC does not hide an interaction the body is already standing inside.
+ * The interaction disk stays the highlight and prompt target.
+ */
+export function studioWorldFloorFocusTarget(input: {
+  readonly npcNearby: boolean;
+  readonly interaction: StudioWorldApproachTarget | null;
+}): StudioWorldApproachTarget | null {
+  if (input.interaction) return input.interaction;
+  if (input.npcNearby) return null;
+  return null;
+}
+
+/**
+ * The on-screen interact prompt is a button, so it takes focus away from the canvas.
+ * That click still counts. A request with neither the canvas nor the prompt focused does not.
+ */
+export function studioWorldPromptInteractGate(input: {
+  readonly requested: boolean;
+  readonly canvasFocused: boolean;
+  readonly promptFocused: boolean;
+  readonly blocked: boolean;
+}): boolean {
+  if (!input.requested || input.blocked) return false;
+  return input.canvasFocused || input.promptFocused;
+}
+
+/**
  * Outside the radius, walk to one occupiable point inside it and activate on entry.
  * An in-range selection or interact key activates immediately and does not start a walk.
  * A disk with no occupiable point neither activates nor keeps a walk.

@@ -25,9 +25,11 @@ import {
   resolveStudioWorldZonePresence,
   stepStudioWorldInteractionApproach,
   stepStudioWorldWalkOver,
+  studioWorldFloorFocusTarget,
   studioWorldHasModalBlocker,
   studioWorldInputBlocked,
   studioWorldPresenceZone,
+  studioWorldPromptInteractGate,
   type StudioWorldApproachState,
   type StudioWorldWalkOverState,
 } from "./studio-virtual-space-runtime-policy";
@@ -927,9 +929,10 @@ export function StudioVirtualSpacePhaserCanvas({
           event.preventDefault();
         };
         const releaseKey = (event: KeyboardEvent) => { heldKeys.delete(event.code); };
+        const promptHasFocus = () => document.activeElement?.matches('[data-interact-prompt="true"]') ?? false;
         const refocus = () => {
           if (this.input.keyboard) this.input.keyboard.enabled = document.activeElement === canvas;
-          if (document.activeElement !== canvas) stopMovement();
+          if (document.activeElement !== canvas && !promptHasFocus()) stopMovement();
         };
         const visibility = () => { if (document.hidden) { npcDirector.cancelGuideTour(); stopMovement(); } };
         const reduceMotionChanged = () => camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
@@ -1051,30 +1054,38 @@ export function StudioVirtualSpacePhaserCanvas({
           .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
           .find((npc) => studioNpcInteraction(manifest, npc.definition));
         const npcInteraction = nearbyNpc ? studioNpcInteraction(manifest, nearbyNpc.definition) : null;
-        const nearbyInteraction = npcInteraction ?? nearestInteraction(interactions, currentPoint);
-        const interactPressed = !typing && Boolean(
+        const radiusInteraction = nearestInteraction(interactions, currentPoint);
+        const floorFocus = studioWorldFloorFocusTarget({
+          npcNearby: Boolean(npcInteraction),
+          interaction: radiusInteraction
+            ? { id: radiusInteraction.id, point: radiusInteraction.point, radius: radiusInteraction.radius }
+            : null,
+        });
+        const promptInteract = studioWorldPromptInteractGate({
+          requested: bridge.consumeInteract(),
+          canvasFocused: document.activeElement === this.game.canvas,
+          promptFocused: document.activeElement?.matches('[data-interact-prompt="true"]') ?? false,
+          blocked,
+        });
+        const interactPressed = promptInteract || (!typing && Boolean(
           keyboardInteractQueued
-          || (gamepad.interact && !gamepadInteractHeld)
-          || bridge.consumeInteract(),
-        );
+          || (gamepad.interact && !gamepadInteractHeld),
+        ));
         keyboardInteractQueued = false;
         gamepadInteractHeld = gamepad.interact;
         const directInput = Math.hypot(ix, iy) > 0.04;
         const selection = queuedInteraction;
         queuedInteraction = null;
-        if (interactPressed && npcInteraction && !selection) {
+        if (interactPressed && npcInteraction && !selection && !floorFocus) {
           (callbacksRef.current.onNpcInteract ?? callbacksRef.current.onInteract)(npcInteraction);
           approachState = EMPTY_STUDIO_WORLD_APPROACH;
         } else {
           const previousApproach = approachState.pending;
-          const focus = nearbyInteraction && !npcInteraction
-            ? { id: nearbyInteraction.id, point: nearbyInteraction.point, radius: nearbyInteraction.radius }
-            : null;
           const decision = stepStudioWorldInteractionApproach(manifest, approachState, currentPoint, {
             selection: selection ? { id: selection.id, point: selection.point, radius: selection.radius } : null,
             inRangeInteract: interactPressed && !selection,
-            nearby: focus,
-            focus,
+            nearby: floorFocus,
+            focus: floorFocus,
           });
           approachState = decision.state;
           const highlighted = decision.prompt ? interactionById.get(decision.highlightId ?? "") ?? null : null;
