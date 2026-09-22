@@ -48,6 +48,46 @@ async function contextFor(width, height = 900) {
 const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
 const widths = (process.env.CAMPUS_QA_WIDTHS ?? "1440,1024,390,320").split(",").map(Number);
 
+async function verifyNestedWorkspaceScrollRestoration() {
+  const context = await contextFor(1440);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(new URL("/market/browse", origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.getByRole("button", { name: "공간 지도 열기", exact: true }).waitFor({ timeout: 60000 });
+
+    const pane = page.locator(".workspace-task-content");
+    await pane.evaluate((element) => {
+      element.style.maxHeight = "320px";
+      element.style.overflow = "auto";
+      element.scrollTop = 250;
+      element.dispatchEvent(new Event("scroll"));
+    });
+    await page.waitForFunction(() => {
+      const element = document.querySelector(".workspace-task-content");
+      return element instanceof HTMLElement && element.scrollTop === 250;
+    });
+
+    const breadcrumb = page.getByRole("navigation", { name: "현재 위치" });
+    await breadcrumb.getByRole("link", { name: "둘러보기" }).click();
+    await page.waitForURL((url) => url.pathname === "/hub", { timeout: 60000 });
+    await pane.waitFor({ state: "detached", timeout: 60000 });
+
+    await page.evaluate(() => history.back());
+    await page.waitForURL((url) => url.pathname === "/market/browse", { timeout: 60000 });
+    await page.waitForFunction(() => {
+      const element = document.querySelector(".workspace-task-content");
+      return element instanceof HTMLElement && element.scrollTop === 250;
+    });
+    assert.equal(await pane.evaluate((element) => element.scrollTop), 250);
+    assert.deepEqual(errors, []);
+    report.interactions.push("Nested workspace scroll restores the exact POP history position after the entire task shell unmounts and remounts");
+  } finally {
+    await context.close();
+  }
+}
+
 async function verifyMarketStudioRoundTrip() {
   const context = await contextFor(1440);
   try {
@@ -74,6 +114,39 @@ async function verifyMarketStudioRoundTrip() {
     assert.equal(new URL(page.url()).pathname, detailPath);
     assert.deepEqual(errors, []);
     report.interactions.push("Market resource enters the real Studio canvas with a bounded return receipt and returns to the same public resource");
+  } finally {
+    await context.close();
+  }
+}
+
+async function verifyMobileMarketReturnNotice() {
+  const context = await contextFor(320, 844);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const detailPath = `/market/resource/${resource.id}`;
+    await page.goto(new URL(detailPath, origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const installLink = page.getByRole("link", { name: /Studio|스튜디오/u }).filter({ hasText: /팔레트/u }).first();
+    await installLink.waitFor({ timeout: 60000 });
+    await installLink.click();
+
+    const notice = page.locator("[data-studio-market-return]");
+    await notice.waitFor({ timeout: 60000 });
+    const rect = await notice.boundingBox();
+    assert.ok(rect, "mobile market return notice must have a layout box");
+    assert.ok(rect.x >= -0.5, `mobile return notice starts outside viewport: ${rect.x}`);
+    assert.ok(rect.x + rect.width <= 320.5, `mobile return notice overflows viewport: ${rect.x + rect.width}`);
+    assert.ok(rect.y >= 0 && rect.y + rect.height <= 844.5, "mobile return notice must remain inside the visual viewport");
+    assert.ok(rect.height <= 64, `mobile return notice is too tall: ${rect.height}`);
+
+    const returnLink = page.getByRole("link", { name: /소재 거리의 원래 리소스로 돌아가기|original marketplace resource/u });
+    assert.equal(await returnLink.getAttribute("href"), detailPath);
+    await returnLink.click();
+    await page.getByRole("heading", { name: resource.name }).first().waitFor({ timeout: 60000 });
+    assert.equal(new URL(page.url()).pathname, detailPath);
+    assert.deepEqual(errors, []);
+    report.interactions.push("The 320px Studio marketplace return control stays inside the visual viewport and returns to the exact resource");
   } finally {
     await context.close();
   }
@@ -200,7 +273,9 @@ try {
   assert.deepEqual(interactionErrors, [], "Runtime errors during domain and Phaser interactions");
   report.interactions.push("Existing Phaser canvas boots locally; keyboard input measurably moves the actor, stop unmounts the canvas and the domain form is preserved");
   await context.close();
+  await verifyNestedWorkspaceScrollRestoration();
   await verifyMarketStudioRoundTrip();
+  await verifyMobileMarketReturnNotice();
   await verifySceneFailureIsolation();
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);

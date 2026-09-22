@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useEffect, useState } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceTaskFrame } from "./WorkspaceTaskFrame";
@@ -8,7 +8,7 @@ import { workspaceTaskRoute } from "./workspace-task-route";
 
 vi.mock("@/shared/components/open-search-button", () => ({ OpenSearchButton: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button> }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: null, ready: true }) }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("common task frame", () => {
   it("does not remount or lose the router child when chrome changes", () => {
     const mount = vi.fn();
@@ -73,5 +73,47 @@ describe("task history restoration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByTestId("path").textContent).toBe("/studio/assets");
     expect(pane.scrollTop).toBe(430);
+  });
+});
+
+describe("task shell lifetime restoration", () => {
+  it("restores the nested scroller after an unframed route unmounts the whole task shell", async () => {
+    let resize: (() => void) | undefined;
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resize = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    function Harness() {
+      const navigate = useNavigate(), location = useLocation();
+      if (location.pathname === "/hub") {
+        return <button type="button" onClick={() => navigate(-1)}>Back to task</button>;
+      }
+      return <WorkspaceTaskFrame route={workspaceTaskRoute(location.pathname, location.search)}>
+        <button type="button" onClick={() => navigate("/hub")}>Leave task shell</button>
+      </WorkspaceTaskFrame>;
+    }
+    const result = render(
+      <MemoryRouter initialEntries={[{ pathname: "/studio/assets", key: "shell-lifetime" }]}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    const pane = result.container.querySelector(".workspace-task-content") as HTMLDivElement;
+    Object.defineProperty(pane, "scrollHeight", { configurable: true, value: 1800 });
+    Object.defineProperty(pane, "clientHeight", { configurable: true, value: 500 });
+    pane.scrollTop = 520;
+    fireEvent.scroll(pane);
+    // Simulate the browser clamping a collapsing route subtree before React cleanup.
+    pane.scrollTop = 0;
+    fireEvent.click(screen.getByRole("button", { name: "Leave task shell" }));
+    expect(result.container.querySelector(".workspace-task-content")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to task" }));
+    const restored = result.container.querySelector(".workspace-task-content") as HTMLDivElement;
+    Object.defineProperty(restored, "scrollHeight", { configurable: true, value: 1800 });
+    Object.defineProperty(restored, "clientHeight", { configurable: true, value: 500 });
+    act(() => resize?.());
+
+    await waitFor(() => expect(restored.scrollTop).toBe(520));
   });
 });
