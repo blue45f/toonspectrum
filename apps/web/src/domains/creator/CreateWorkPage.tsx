@@ -41,9 +41,11 @@ import { studioDeleteWorkRequest } from "./studio-destructive-command-catalog";
 import { readWorkFx } from "./studio-motion-fx";
 import { StudioDestructiveConfirmHost } from "./StudioDestructiveConfirmHost";
 import { WorkFxPanel } from "./WorkFxPanel";
+import { spatialShowcaseObjects } from "./spatial-showcase-placement";
 
 import { CoverImage } from "@/shared/components/cover-image";
 import { Container } from "@/shared/components/section";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
@@ -609,6 +611,7 @@ export function CreateWorkPage() {
     <Container size="prose" className="py-8 lg:py-10">
       {/* 스튜디오 밖 라우트에도 승인 표면을 둔다 — 없으면 네이티브 confirm 으로 떨어진다. */}
       <StudioDestructiveConfirmHost />
+      <CampusObjectSource objects={spatialShowcaseObjects([work])} />
       <Link
         href="/create"
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
@@ -664,7 +667,7 @@ export function CreateWorkPage() {
             </span>
             {work.community.portfolio && (
               <span className="rounded-full border border-accent/35 bg-accent-soft/30 px-2.5 py-1 text-[0.7rem] font-medium text-accent">
-                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "포트폴리오")}</span>
+                {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "포트폴리오 · 전시")}</span>
             )}
           </div>
         )}
