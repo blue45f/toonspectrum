@@ -7,6 +7,7 @@ import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-co
 import { WebtoonGalleryIntro } from "./WebtoonGalleryIntro";
 
 import { Container } from "@/shared/components/section";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { CreativeJourneyLinks } from "@/shared/components/public-creative";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
@@ -249,11 +250,20 @@ function WorksTab({
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {works.map((work) => (
-        <WorkCard key={work.id} work={work} />
-      ))}
-    </div>
+    <>
+      <CampusObjectSource objects={works.slice(0, 24).map((work) => ({
+        id: work.id,
+        title: work.title,
+        href: `/showcase/work/${encodeURIComponent(work.id)}`,
+        kind: "work",
+        exposure: "public",
+      }))} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {works.map((work) => (
+          <WorkCard key={work.id} work={work} />
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -350,11 +360,20 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
           }
         />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {series.map((item) => (
-            <SeriesCard key={item.id} series={item} />
-          ))}
-        </div>
+        <>
+          <CampusObjectSource objects={series.slice(0, 24).map((item) => ({
+            id: item.id,
+            title: item.title,
+            href: `/showcase/series/${encodeURIComponent(item.id)}`,
+            kind: "work",
+            exposure: "public",
+          }))} />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {series.map((item) => (
+              <SeriesCard key={item.id} series={item} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -424,11 +443,20 @@ function FollowingTab() {
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {works.map((work) => (
-        <WorkCard key={work.id} work={work} />
-      ))}
-    </div>
+    <>
+      <CampusObjectSource objects={works.slice(0, 24).map((work) => ({
+        id: work.id,
+        title: work.title,
+        href: `/showcase/work/${encodeURIComponent(work.id)}`,
+        kind: "work",
+        exposure: "public",
+      }))} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {works.map((work) => (
+          <WorkCard key={work.id} work={work} />
+        ))}
+      </div>
+    </>
   );
 }
 

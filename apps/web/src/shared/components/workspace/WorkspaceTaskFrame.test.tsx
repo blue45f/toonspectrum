@@ -7,6 +7,7 @@ import { WorkspaceTaskFrame } from "./WorkspaceTaskFrame";
 import { workspaceTaskRoute } from "./workspace-task-route";
 
 vi.mock("@/shared/components/open-search-button", () => ({ OpenSearchButton: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button> }));
+vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: null, ready: true }) }));
 afterEach(cleanup);
 describe("common task frame", () => {
   it("does not remount or lose the router child when chrome changes", () => {
@@ -45,5 +46,32 @@ describe("task scroll ownership", () => {
     expect(pane.scrollTop).toBe(0);
     expect(pane.scrollLeft).toBe(0);
     expect(result.container.querySelector('.workspace-task-content')).toBe(pane);
+  });
+});
+
+describe("task history restoration", () => {
+  it("restores the nested desktop scroller on browser back without remounting the route child", () => {
+    function Harness() {
+      const navigate = useNavigate(), location = useLocation();
+      return <WorkspaceTaskFrame route={workspaceTaskRoute(location.pathname, location.search)}>
+        <output data-testid="path">{location.pathname}</output>
+        <button type="button" onClick={() => navigate("/market")}>Market</button>
+        <button type="button" onClick={() => navigate(-1)}>Back</button>
+      </WorkspaceTaskFrame>;
+    }
+    const result = render(<MemoryRouter initialEntries={["/studio/assets"]}><Harness /></MemoryRouter>);
+    const pane = result.container.querySelector(".workspace-task-content") as HTMLDivElement;
+    Object.defineProperty(pane, "scrollHeight", { configurable: true, value: 1600 });
+    Object.defineProperty(pane, "clientHeight", { configurable: true, value: 500 });
+    pane.scrollTop = 430;
+    fireEvent.scroll(pane);
+    fireEvent.click(screen.getByRole("button", { name: "Market" }));
+    expect(screen.getByTestId("path").textContent).toBe("/market");
+    expect(pane.scrollTop).toBe(0);
+    pane.scrollTop = 90;
+    fireEvent.scroll(pane);
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByTestId("path").textContent).toBe("/studio/assets");
+    expect(pane.scrollTop).toBe(430);
   });
 });

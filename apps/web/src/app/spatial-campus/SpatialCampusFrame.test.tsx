@@ -7,10 +7,11 @@ import { SpatialCampusFrame } from "./SpatialCampusFrame";
 import { campusBinding } from "@/shared/lib/spatial-campus/campus-bindings";
 import { CAMPUS_RETURN_KEY } from "@/shared/lib/spatial-campus/campus-return";
 import { useCreatorExperienceMode } from "@/shared/lib/creator-experience-mode";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 
 const actor = vi.hoisted(() => ({ id: "user-A", ready: true }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: actor.ready }) }));
-vi.mock("./CampusRoom", () => ({ CampusRoom: () => <div data-testid="scene">Local world</div> }));
+vi.mock("./CampusRoom", () => ({ CampusRoom: ({ objects = [] }: { objects?: readonly { title: string }[] }) => <div data-testid="scene">Local world · {objects.map((item) => item.title).join(" · ")}</div> }));
 vi.mock("@/shared/components/workspace/WorkspaceChrome", () => ({ WorkspaceBrand: () => <span>Brand</span>, WorkspaceSidebar: () => <aside>Navigation</aside>, WorkspaceAccountAction: () => null }));
 vi.mock("@/shared/components/open-search-button", () => ({ OpenSearchButton: () => <button type="button">Search</button> }));
 let mounts = 0;
@@ -78,5 +79,24 @@ describe("campus state continuity", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(trigger);
     await screen.findByTestId("scene");
+  });
+});
+describe("campus domain projection aggregation", () => {
+  it("combines multiple public sources inside the current district and rejects private cross-district data", async () => {
+    const binding = campusBinding("catalog-search", "/search");
+    const route = { titleKo: "이야기 도서관", titleEn: "Story library", hintKo: "", hintEn: "" };
+    render(<MemoryRouter initialEntries={["/search"]}>
+      <SpatialCampusFrame binding={binding} route={route}>
+        <CampusObjectSource objects={[{ id: "story-A", title: "Story A", href: "/title/story-A", kind: "story", exposure: "public" }]} />
+        <CampusObjectSource objects={[
+          { id: "story-B", title: "Story B", href: "/title/story-B", kind: "story", exposure: "public" },
+          { id: "project-A", title: "Private Project", href: "/production/projects/project-A/overview", kind: "project", exposure: "private" },
+        ]} />
+      </SpatialCampusFrame>
+    </MemoryRouter>);
+    const scene = await screen.findByTestId("scene");
+    await waitFor(() => expect(scene.textContent).toContain("Story A"));
+    expect(scene.textContent).toContain("Story B");
+    expect(scene.textContent).not.toContain("Private Project");
   });
 });

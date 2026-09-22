@@ -1476,6 +1476,7 @@ export function StudioCuttoonEditor({
 
   const studioSaveLocale = getActiveI18nLocale();
   const [params] = useSearchParams();
+  const tracePracticeRequested = params.get("practice") === "trace";
   const ecosystemSampleImportRef = useRef<string | null>(null);
   // Live-session identity (`?room=`, per-tab instant id) is owned by StudioDocumentLayout, one level
   // above this editor and inside the document runtime boundary. This page never parses that query.
@@ -6395,7 +6396,12 @@ export function StudioCuttoonEditor({
   // 아직 게시 전(pages 없음)인 신규 작품에는 이 패널을 노출하지 않는다.
   const [fxPanelOpen, setFxPanelOpen] = useState(false);
   const [fxPanelLoading, setFxPanelLoading] = useState(false);
-  const [referencePanelOpen, setReferencePanelOpen] = useState(false);
+  const [referencePanelOpen, setReferencePanelOpen] = useState(() => tracePracticeRequested);
+  useEffect(() => {
+    if (!tracePracticeRequested) return;
+    preloadStudioReferencePanel();
+    setReferencePanelOpen(true);
+  }, [tracePracticeRequested]);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);

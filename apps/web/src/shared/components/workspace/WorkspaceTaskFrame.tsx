@@ -1,12 +1,14 @@
 import { ArrowLeft, ChevronRight, Search } from "lucide-react";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
+import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { OpenSearchButton } from "@/shared/components/open-search-button";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { WorkspaceAccountAction, WorkspaceBrand, WorkspaceSidebar } from "./WorkspaceChrome";
 import { workspaceNavigationContext, workspaceNavigationHref } from "./workspace-navigation-model";
 import type { WorkspaceTaskRoute } from "./workspace-task-route";
+import { useWorkspaceScrollRestoration } from "./useWorkspaceScrollRestoration";
 import "./workspace.css";
 import "./workspace-redesign.css";
 import "./workspace-task-frame.css";
@@ -21,16 +23,9 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
 }) {
   const bt = useBilingual("WorkspaceTaskFrame");
   const { pathname, search } = useLocation();
-  const previousPath = useRef(pathname);
+  const session = useSession();
   const content = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    // This frame owns only its nested scroller, never the window or editor canvas.
-    if (route && previousPath.current !== pathname && content.current) {
-      content.current.scrollTop = 0;
-      content.current.scrollLeft = 0;
-    }
-    previousPath.current = pathname;
-  }, [pathname, route]);
+  useWorkspaceScrollRestoration(content, route !== null, session.data?.user.id ?? "local");
   const context = workspaceNavigationContext(pathname, search);
   const homeHref = workspaceNavigationHref("/home", context);
   return <div className={route ? "workspace-shell workspace-task-shell" : "workspace-task-passthrough"}

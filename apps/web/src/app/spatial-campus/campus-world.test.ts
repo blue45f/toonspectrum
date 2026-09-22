@@ -14,7 +14,8 @@ describe("local campus world adapter", () => {
     expect(manifest.interactionSlots).toEqual([]);
     expect(manifest.interactions.map((item) => item.id)).toEqual(district.destinations.map((item) => item.id));
     expect(manifest.props.every((prop) => !prop.action && !prop.portal)).toBe(true);
-    expect(manifest.backgroundUrl).toBe(DEFAULT_STUDIO_WORLD_MANIFEST.backgroundUrl);
+    expect(manifest.backgroundUrl).toBe(district.artworkUrl);
+    expect(manifest.assetIntegrity).toBeUndefined();
     expect(JSON.stringify(DEFAULT_STUDIO_WORLD_MANIFEST)).toBe(before);
   });
 });

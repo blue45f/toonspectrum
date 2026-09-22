@@ -104,3 +104,6 @@
  [data-campus-domain=fortune] .fo-safety{margin:12px 0;padding:8px 12px;font-size:12px;line-height:1.6}
  .fortune-campus-directory p{margin:6px 0 10px;font-size:13px}
 }
+
+.campus-public-objects a[data-campus-object-exposure="private"]{border-style:dashed;background:color-mix(in oklab,var(--color-card) 82%,var(--color-accent-soft))}
+.campus-public-objects span small{display:block;margin-top:2px;font-size:10px;font-weight:600;color:var(--color-fg-3)}

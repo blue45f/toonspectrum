@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { exerciseSvg, recipeById, RECIPES } from "./recipes";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
 import type { Recipe } from "./recipes";
@@ -54,6 +55,13 @@ export function RecipesPage() {
   const [params, setParams] = useSearchParams();
   const recipe = recipeById(params.get("lesson"));
   return <ResourceLayout title="웹툰 제작 레시피" intro="설명을 읽고 끝내지 말고, 값을 바꾸어 차이를 확인하세요. 여섯 개의 자체 제작 실습과 편집 가능한 컷 시트를 제공합니다.">
+    <CampusObjectSource objects={RECIPES.map((item) => ({
+      id: item.id,
+      title: item.title,
+      href: `/learn/recipes?${new URLSearchParams({ lesson: item.id })}`,
+      kind: "recipe",
+      exposure: "public",
+    }))} />
     <label htmlFor="recipe-select" className="block font-semibold">실습 선택<select id="recipe-select" className={`${RESOURCE_INPUT} mt-2`} value={recipe.id} onChange={(event) => setParams({ lesson: event.target.value })}>{RECIPES.map((item) => <option key={item.id} value={item.id}>{item.tag} · {item.title}</option>)}</select></label>
     <RecipeLesson key={recipe.id} recipe={recipe} />
   </ResourceLayout>;
