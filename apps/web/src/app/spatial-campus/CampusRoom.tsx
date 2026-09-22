@@ -10,7 +10,7 @@ import type { CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
 import { StudioVirtualSpaceEngineBridge } from "@/domains/creator/virtual-space/studio-virtual-space-engine-bridge";
 import { studioVirtualSpaceState } from "@/domains/creator/virtual-space/studio-virtual-space-model";
 import type { StudioVirtualSpaceSnapshot } from "@/domains/creator/virtual-space/studio-virtual-space-presence";
-import { campusWorld } from "./campus-world";
+import { campusObjectInteractionIndex, campusWorld } from "./campus-world";
 
 const PhaserCanvas = lazy(() => import("@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas").then((module) => ({ default: module.StudioVirtualSpacePhaserCanvas })));
 const noOperation = () => undefined;
@@ -20,7 +20,7 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
   const campus = useCampus();
   const location = useLocation();
   const navigate = useNavigate();
-  const manifest = useMemo(() => campusWorld(district), [district]);
+  const manifest = useMemo(() => campusWorld(district, objects), [district, objects]);
   const bridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
   const [walking, setWalking] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -65,7 +65,18 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
               host.current.dataset.campusWalkY = state.point.y.toFixed(3);
             }
           }} onPeerSelect={noOperation} onCancelFollow={noOperation}
-          onInteract={(interaction) => { const target = district.destinations.find((item) => item.id === interaction?.id); if (target) navigate(target.href); }} />
+          onInteract={(interaction) => {
+            const interactionId = interaction?.id;
+            if (!interactionId) return;
+            const target = district.destinations.find((item) => item.id === interactionId);
+            if (target) {
+              navigate(target.href);
+              return;
+            }
+            const objectIndex = campusObjectInteractionIndex(interactionId);
+            const object = objectIndex === null ? null : objects[objectIndex];
+            if (object) navigate(object.href);
+          }} />
       </Suspense></CampusSceneBoundary> : artwork}
     </div>
     <div className="campus-room-action-row">
