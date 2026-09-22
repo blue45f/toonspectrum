@@ -24,6 +24,12 @@ export const EngineeringStoryPage = lazyRetry(
   })),
   "EngineeringStoryPage",
 );
+export const EngineeringPlaybookPage = lazyRetry(
+  () => import("@/domains/legal/technology/EngineeringPlaybookPage").then((module) => ({
+    default: module.EngineeringPlaybookPage,
+  })),
+  "EngineeringPlaybookPage",
+);
 export const EngineeringGuidesPage = lazyRetry(
   () => import("@/domains/legal/technology/EngineeringGuidesPage").then((module) => ({
     default: module.EngineeringGuidesPage,

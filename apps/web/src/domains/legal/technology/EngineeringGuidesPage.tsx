@@ -11,10 +11,8 @@ import {
 import { useState } from "react";
 
 import { AboutSectionNav } from "../AboutSectionNav";
-import {
-  ALL_ENGINEERING_GUIDES as ENGINEERING_GUIDES,
-  type EngineeringStatus,
-} from "./engineering-story-content";
+import { PUBLISHED_ENGINEERING_GUIDES as ENGINEERING_GUIDES } from "./engineering-story-published-content";
+import { type EngineeringStatus } from "./engineering-story-content";
 import {
   EngineeringPageIntro,
   EngineeringStatusBadge,
