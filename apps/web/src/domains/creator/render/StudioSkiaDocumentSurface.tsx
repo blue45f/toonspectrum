@@ -1,4 +1,8 @@
 import type { StudioSkiaCameraSource } from "./studio-skia-camera-source";
+import {
+  planStudioSkiaRetainedCameraTranslation,
+  type StudioSkiaDocumentCamera,
+} from "./studio-skia-camera-continuity";
 import { useLayoutEffect, useRef, useState } from "react";
 import type { SkiaDocumentRenderer } from "@toonspectrum/studio-engine-skia";
 import type { StudioSkiaDocumentPresentationCandidate } from "../studio-skia-committed-ink-bridge";
@@ -6,6 +10,26 @@ import { createStudioSkiaDocumentProjector } from "./studio-skia-document-plan";
 import type { StudioRenderSurfaceAuthority, StudioRenderSurfaceProps } from "./StudioRenderSurface";
 
 export const STUDIO_SKIA_DOCUMENT_BACKEND = "skia-canvaskit-document-webgl2" as const;
+
+function clearRetainedCameraTranslation(canvas: HTMLCanvasElement): void {
+  canvas.style.transform = "";
+  delete canvas.dataset.studioSkiaCameraBridge;
+}
+
+function applyRetainedCameraTranslation(
+  canvas: HTMLCanvasElement,
+  presented: StudioSkiaDocumentCamera | null,
+  next: StudioSkiaDocumentCamera | null,
+): boolean {
+  const translation = planStudioSkiaRetainedCameraTranslation(presented, next);
+  if (!translation) return false;
+  const { x, y } = translation;
+  canvas.style.transform = x === 0 && y === 0
+    ? ""
+    : `translate3d(${x}px, ${y}px, 0)`;
+  canvas.dataset.studioSkiaCameraBridge = "retained-translation";
+  return true;
+}
 /** Receipt-gated direct GPU display. Existing document, input, Undo and storage stay authoritative. */
 export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height, documentWidth,
   documentHeight, dpr = 1, elements, sceneRevision, documentTransform, onAuthorityChange,
@@ -59,6 +83,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     if (!enabled || !visible || receipt.current !== sceneRevision) {
       sourceHiddenReceipt.current = null;
       visiblePresentationReceipt.current = null;
+      clearRetainedCameraTranslation(current);
       current.style.visibility = "hidden";
       return;
     }
@@ -111,6 +136,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     let runtime: SkiaDocumentRenderer | null = null;
     let pendingFence: AbortController | null = null;
     let cameraFrame = 0;
+    let presentedCamera: StudioSkiaDocumentCamera | null = null;
     const submit = (cameraOnly = false) => {
       if (!runtime || !alive || generation.current !== scope) return;
       pendingFence?.abort();
@@ -126,6 +152,8 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         receipt.current = null;
         receiptOwnedDocumentIds.current = [];
         visiblePresentationReceipt.current = null;
+        presentedCamera = null;
+        clearRetainedCameraTranslation(canvas);
         canvas.style.visibility = "hidden";
         report("legacy", state.sceneRevision, [], plan.reason); return;
       }
@@ -147,16 +175,43 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       void Promise.all([runtime.present({ revision: state.sceneRevision, items: plan.items,
         width: state.width, height: state.height, documentWidth: state.documentWidth,
         documentHeight: state.documentHeight, dpr: state.dpr, camera }), displayed]).then(([result]) => {
-        if (!alive || generation.current !== scope || request !== revision.current) return;
+        if (!alive || generation.current !== scope) return;
+        if (request !== revision.current) {
+          // A continuous scroll can supersede the request after CanvasKit has already flushed it.
+          // Rebase the CSS bridge onto those newly displayed pixels; keeping the old base camera
+          // would shift the retained frame by the stale request's delta until the next flush.
+          if (result.status === "presented" && result.revision === state.sceneRevision) {
+            presentedCamera = camera;
+            const current = latest.current;
+            const retained = current.visible
+              && receipt.current === current.sceneRevision
+              && sourceHiddenReceipt.current === current.sceneRevision
+              && canvas.style.visibility === "visible"
+              && applyRetainedCameraTranslation(
+                canvas,
+                presentedCamera,
+                current.cameraSource?.read() ?? null,
+              );
+            if (!retained) {
+              clearRetainedCameraTranslation(canvas);
+              canvas.style.visibility = "hidden";
+            }
+          }
+          return;
+        }
         if (result.status === "presented" && result.revision !== state.sceneRevision) {
           receipt.current = null;
           receiptOwnedDocumentIds.current = [];
           visiblePresentationReceipt.current = null;
+          presentedCamera = null;
+          clearRetainedCameraTranslation(canvas);
           canvas.style.visibility = "hidden";
           report("unavailable", state.sceneRevision, [], "GPU receipt does not match the requested document revision");
           return;
         }
         if (result.status === "presented") {
+          presentedCamera = camera;
+          clearRetainedCameraTranslation(canvas);
           receipt.current = state.sceneRevision;
           receiptOwnedDocumentIds.current = plan.ownedDocumentIds;
           visiblePresentationReceipt.current = null;
@@ -173,12 +228,16 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
           receipt.current = null;
           receiptOwnedDocumentIds.current = [];
           visiblePresentationReceipt.current = null;
+          presentedCamera = null;
+          clearRetainedCameraTranslation(canvas);
           canvas.style.visibility = "hidden";
           report("legacy", state.sceneRevision, [], result.reason);
         } else if (result.status === "unavailable") {
           receipt.current = null;
           receiptOwnedDocumentIds.current = [];
           visiblePresentationReceipt.current = null;
+          presentedCamera = null;
+          clearRetainedCameraTranslation(canvas);
           canvas.style.visibility = "hidden";
           report("unavailable", state.sceneRevision, plan.ownedDocumentIds, result.reason);
         }
@@ -187,13 +246,28 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         receipt.current = null;
         receiptOwnedDocumentIds.current = [];
         visiblePresentationReceipt.current = null;
+        presentedCamera = null;
+        clearRetainedCameraTranslation(canvas);
         canvas.style.visibility = "hidden";
         report("unavailable", state.sceneRevision, [], cause instanceof Error ? cause.message : String(cause));
       });
     };
     const cameraChanged = () => {
       if (!alive || !runtime) return;
-      canvas.style.visibility = "hidden";
+      const state = latest.current;
+      const retained = state.visible
+        && receipt.current === state.sceneRevision
+        && sourceHiddenReceipt.current === state.sceneRevision
+        && canvas.style.visibility === "visible"
+        && applyRetainedCameraTranslation(
+          canvas,
+          presentedCamera,
+          state.cameraSource?.read() ?? null,
+        );
+      if (!retained) {
+        clearRetainedCameraTranslation(canvas);
+        canvas.style.visibility = "hidden";
+      }
       revision.current += 1; pendingFence?.abort();
       cancelAnimationFrame(cameraFrame);
       cameraFrame = requestAnimationFrame(() => submit(true));
@@ -209,6 +283,8 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         receipt.current = null;
         receiptOwnedDocumentIds.current = [];
         visiblePresentationReceipt.current = null;
+        presentedCamera = null;
+        clearRetainedCameraTranslation(canvas);
         canvas.style.visibility = "hidden";
         report("unavailable", latest.current.sceneRevision, [], "GPU context lost; current document was not changed");
       } });
@@ -229,8 +305,19 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     };
   }, [enabled, mountParent, cameraSource]);
   useLayoutEffect(() => {
-    if (canvasRef.current) canvasRef.current.style.visibility = "hidden";
+    if (canvasRef.current) {
+      clearRetainedCameraTranslation(canvasRef.current);
+      canvasRef.current.style.visibility = "hidden";
+    }
     submitted.current?.();
-  }, [sceneRevision, width, height, documentWidth, documentHeight, dpr, documentTransform, elements, frameTheme]);
+  }, [sceneRevision, width, height, documentWidth, documentHeight, dpr, elements, frameTheme]);
+  useLayoutEffect(() => {
+    if (cameraSource) return;
+    if (canvasRef.current) {
+      clearRetainedCameraTranslation(canvasRef.current);
+      canvasRef.current.style.visibility = "hidden";
+    }
+    submitted.current?.();
+  }, [cameraSource, documentTransform]);
   return null;
 }

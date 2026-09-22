@@ -582,13 +582,19 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
     && velloDocumentElements.every((element) => element.hidden
       || ((element.opacity ?? 1) <= 0 && element.type !== "frame")
       || isStudioSkiaDocumentElement(element));
+  // Camera translation is presentation state, not document identity. In adaptive-clip mode every
+  // scroll frame changes x/y; including those offsets here would revoke exact GPU ownership again
+  // at the 170 ms settled-scroll commit and briefly remount the compatibility tree. Scale, mirror
+  // and rotation still participate because those changes keep the guarded view-transition handoff.
   const velloSceneRevision = useMemo(
     () => Object.freeze({
       pageId: activePage.id,
       projectGeneration: studioRevisionProjectGeneration ?? 0,
       documentHeight: canvasH,
       elements: velloDocumentElements,
-      transform: velloSceneDocumentTransform,
+      cameraScaleX: velloSceneDocumentTransform.scaleX,
+      cameraScaleY: velloSceneDocumentTransform.scaleY,
+      cameraRotation: velloSceneDocumentTransform.rotation,
       dpr: velloSurfaceDpr,
       frameTheme: webtoonTheme,
       viewportHeight: stageViewLayout.height,
@@ -599,7 +605,9 @@ export function useStudioCanvasViewportLiveSurfaces(props: StudioCanvasViewportP
       canvasH,
       studioRevisionProjectGeneration,
       velloDocumentElements,
-      velloSceneDocumentTransform,
+      velloSceneDocumentTransform.rotation,
+      velloSceneDocumentTransform.scaleX,
+      velloSceneDocumentTransform.scaleY,
       velloSurfaceDpr,
       webtoonTheme,
       stageViewLayout.height,
