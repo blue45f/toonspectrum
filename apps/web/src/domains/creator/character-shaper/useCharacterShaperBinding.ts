@@ -23,7 +23,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EXPRESSION_PRESETS } from "../studio-pose-presets";
-import { noteShaperPosePreset } from "./character-shaper-grade";
 import {
   applyAvatarForgeBodyPreset,
   createAvatarForgeState,
@@ -581,7 +580,6 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
         }
         case "pose-preset":
           host.handlePoseSelect?.(step.presetId);
-          noteShaperPosePreset(step.presetId);
           break;
         case "hand-pose": {
           const sides: readonly ("left" | "right")[] = step.side === "both" ? ["left", "right"] : [step.side];

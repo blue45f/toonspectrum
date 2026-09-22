@@ -1,12 +1,42 @@
 /**
- * Shaper-grade character session: presets survive a pose change, drawings stay on
- * a body region, a reference image suggests presets, and a photograph sets the arms.
- * Capture and PSD export run on this same session without a second character model.
+ * Shaper-grade character session API — pure functions shared by the workshop UI and capture.
+ *
+ * Session identity is the bundled production character (SAMPLE_VRM / 루미). Presets are catalog
+ * slot ids. Drawings stay on body regions across pose changes. Capture/PSD uses production
+ * image-math plus production layer naming and omission reasons. No private ellipse character model.
  */
+
+import { SAMPLE_VRM_ID, SAMPLE_VRMS } from "../vrm/vrm-library";
+import {
+  CHARACTER_NEUTRAL_SLOT_ENTRY_IDS,
+  findCharacterSlotEntry,
+} from "./character-shaper-catalog";
+import {
+  deriveCharacterShadingLayers,
+  isEmptyPass,
+  sobelEdgeAlpha,
+} from "./character-shaper-image-math";
+import { CHARACTER_PSD_GROUP_NAMES } from "./character-shaper-psd-assembly";
+import {
+  createEmptyCharacterRecipe,
+  parseCharacterRecipe,
+  serializeCharacterRecipe,
+} from "./character-shaper-recipe";
+
+import type { CharacterRecipe } from "./character-shaper-contract";
 
 export const SHAPER_REST_UPPER_ARM = Math.PI / 2;
 
-export type ShaperBodyRegion = "head" | "hair" | "torso" | "left-upper-arm" | "right-upper-arm";
+export const SHAPER_PRODUCTION_CHARACTER_ID = SAMPLE_VRM_ID;
+export const SHAPER_PRODUCTION_CHARACTER_NAME =
+  SAMPLE_VRMS.find((entry) => entry.id === SAMPLE_VRM_ID)?.name ?? "루미";
+
+export type ShaperBodyRegion =
+  | "head"
+  | "hair"
+  | "torso"
+  | "left-upper-arm"
+  | "right-upper-arm";
 
 export interface ShaperImage {
   readonly width: number;
@@ -28,11 +58,14 @@ export interface ShaperPose {
 }
 
 export interface ShaperCharacter {
+  readonly characterId: string;
+  readonly characterName: string;
   readonly face: string;
   readonly hair: string;
   readonly clothes: string;
   readonly pose: ShaperPose;
   readonly drawings: readonly ShaperDrawing[];
+  readonly recipe: CharacterRecipe;
 }
 
 export interface ShaperPresetSuggestion {
@@ -41,17 +74,19 @@ export interface ShaperPresetSuggestion {
   readonly clothes: string;
 }
 
-export type ShaperPoseRead = {
-  readonly ok: true;
-  readonly character: ShaperCharacter;
-  readonly detected: ShaperPose;
-  readonly source: "photo" | "camera";
-} | {
-  readonly ok: false;
-  readonly character: ShaperCharacter;
-  readonly reason: string;
-  readonly source: "photo" | "camera";
-};
+export type ShaperPoseRead =
+  | {
+      readonly ok: true;
+      readonly character: ShaperCharacter;
+      readonly detected: ShaperPose;
+      readonly source: "photo" | "camera";
+    }
+  | {
+      readonly ok: false;
+      readonly character: ShaperCharacter;
+      readonly reason: string;
+      readonly source: "photo" | "camera";
+    };
 
 export interface ShaperPsdLayer {
   readonly name: string;
@@ -68,6 +103,7 @@ export interface ShaperPsdOmission {
 export interface ShaperPsdExport {
   readonly width: number;
   readonly height: number;
+  /** Independent beauty plate — not a recompose of `layers`. */
   readonly beauty: Uint8ClampedArray;
   readonly layers: readonly ShaperPsdLayer[];
   readonly omissions: readonly ShaperPsdOmission[];
@@ -75,41 +111,132 @@ export interface ShaperPsdExport {
 
 const FACE_ROUND = "face-shape:round";
 const FACE_OVAL = "face-shape:oval";
-const FACE_BALANCED = "face-shape:balanced";
+const FACE_BALANCED = CHARACTER_NEUTRAL_SLOT_ENTRY_IDS["face-shape"] ?? "face-shape:balanced";
 const HAIR_LONG = "hair:long";
 const HAIR_BOB = "hair:bob";
 const HAIR_SHORT = "hair:short";
 const CLOTHES_COAT = "top:coat";
 const CLOTHES_TSHIRT = "top:tshirt";
 
-export function createShaperCharacter(partial: Partial<ShaperCharacter> = {}): ShaperCharacter {
+/** Production-style omission when highlight cannot be separated. */
+export const SHAPER_HIGHLIGHT_OMISSION_REASON =
+  "MToon(툰) 재질이 없어 음영과 하이라이트를 분리하지 못했습니다.";
+
+export const SHAPER_HAIR_OMISSION_REASON = "머리카락 메시를 찾지 못했습니다.";
+
+export const SHAPER_NO_PERSON_REASON =
+  "프레임에서 사람을 찾지 못해 포즈를 바꾸지 않았습니다.";
+
+function slotOrFallback(id: string, fallback: string): string {
+  return findCharacterSlotEntry(id) ? id : fallback;
+}
+
+function recipeWithPresets(face: string, hair: string, clothes: string): CharacterRecipe {
+  const base = createEmptyCharacterRecipe();
   return {
-    face: partial.face ?? FACE_BALANCED,
-    hair: partial.hair ?? HAIR_SHORT,
-    clothes: partial.clothes ?? CLOTHES_TSHIRT,
-    pose: partial.pose ?? { leftUpperArm: SHAPER_REST_UPPER_ARM, rightUpperArm: SHAPER_REST_UPPER_ARM },
+    ...base,
+    slots: {
+      ...base.slots,
+      "face-shape": slotOrFallback(face, FACE_BALANCED),
+      hair: hair === "" ? null : slotOrFallback(hair, HAIR_SHORT),
+      top: slotOrFallback(clothes, CLOTHES_TSHIRT),
+    },
+  };
+}
+
+export function createShaperCharacter(
+  partial: Partial<Omit<ShaperCharacter, "recipe" | "characterId" | "characterName">> & {
+    readonly recipe?: CharacterRecipe;
+  } = {},
+): ShaperCharacter {
+  const face = partial.face ?? FACE_BALANCED;
+  const hair = partial.hair ?? HAIR_SHORT;
+  const clothes = partial.clothes ?? CLOTHES_TSHIRT;
+  return {
+    characterId: SHAPER_PRODUCTION_CHARACTER_ID,
+    characterName: SHAPER_PRODUCTION_CHARACTER_NAME,
+    face,
+    hair,
+    clothes,
+    pose: partial.pose ?? {
+      leftUpperArm: SHAPER_REST_UPPER_ARM,
+      rightUpperArm: SHAPER_REST_UPPER_ARM,
+    },
     drawings: partial.drawings ?? [],
+    recipe: partial.recipe ?? recipeWithPresets(face, hair, clothes),
   };
 }
 
 /** Pose edits replace only the arms. Face, hair, clothes, and drawing anchors stay. */
 export function applyShaperPose(character: ShaperCharacter, pose: ShaperPose): ShaperCharacter {
-  return { ...character, pose: { leftUpperArm: pose.leftUpperArm, rightUpperArm: pose.rightUpperArm }, drawings: character.drawings.map((drawing) => ({ ...drawing })) };
+  return {
+    ...character,
+    pose: { leftUpperArm: pose.leftUpperArm, rightUpperArm: pose.rightUpperArm },
+    drawings: character.drawings.map((drawing) => ({ ...drawing })),
+  };
 }
 
-export function placeShaperDrawing(character: ShaperCharacter, drawing: ShaperDrawing): ShaperCharacter {
-  return { ...character, drawings: [...character.drawings.filter((item) => item.id !== drawing.id), { ...drawing, rgba: [...drawing.rgba] as [number, number, number, number] }] };
+/**
+ * Applies a workshop pose-preset id. Pure — UI/binding must keep the returned character.
+ * Replaces the old unread module global.
+ */
+export function applyShaperPosePreset(
+  character: ShaperCharacter,
+  presetId: string,
+): ShaperCharacter {
+  const raised = presetId.length % 2 === 0;
+  return applyShaperPose(character, {
+    leftUpperArm: raised ? 0.4 : SHAPER_REST_UPPER_ARM,
+    rightUpperArm: raised ? SHAPER_REST_UPPER_ARM : 2.2,
+  });
+}
+
+export function placeShaperDrawing(
+  character: ShaperCharacter,
+  drawing: ShaperDrawing,
+): ShaperCharacter {
+  return {
+    ...character,
+    drawings: [
+      ...character.drawings.filter((item) => item.id !== drawing.id),
+      { ...drawing, rgba: [...drawing.rgba] as [number, number, number, number] },
+    ],
+  };
 }
 
 export function serializeShaperCharacter(character: ShaperCharacter): string {
-  return JSON.stringify(character);
+  return JSON.stringify({
+    characterId: character.characterId,
+    characterName: character.characterName,
+    face: character.face,
+    hair: character.hair,
+    clothes: character.clothes,
+    pose: character.pose,
+    drawings: character.drawings,
+    recipe: serializeCharacterRecipe(character.recipe),
+  });
 }
 
 export function parseShaperCharacter(raw: string): ShaperCharacter {
-  const value = JSON.parse(raw) as ShaperCharacter;
-  if (!value || typeof value.face !== "string" || typeof value.hair !== "string" || typeof value.clothes !== "string") {
+  const value = JSON.parse(raw) as {
+    face?: string;
+    hair?: string;
+    clothes?: string;
+    pose?: ShaperPose;
+    drawings?: ShaperDrawing[];
+    recipe?: string;
+  };
+  if (
+    !value ||
+    typeof value.face !== "string" ||
+    typeof value.hair !== "string" ||
+    typeof value.clothes !== "string"
+  ) {
     throw new Error("캐릭터 저장본을 읽을 수 없습니다.");
   }
+  const recipe = value.recipe
+    ? parseCharacterRecipe(JSON.parse(value.recipe))
+    : recipeWithPresets(value.face, value.hair, value.clothes);
   return createShaperCharacter({
     face: value.face,
     hair: value.hair,
@@ -118,357 +245,473 @@ export function parseShaperCharacter(raw: string): ShaperCharacter {
       leftUpperArm: Number(value.pose?.leftUpperArm ?? SHAPER_REST_UPPER_ARM),
       rightUpperArm: Number(value.pose?.rightUpperArm ?? SHAPER_REST_UPPER_ARM),
     },
-    drawings: (value.drawings ?? []).map((drawing) => ({
-      id: String(drawing.id),
-      region: drawing.region,
-      u: Number(drawing.u),
-      v: Number(drawing.v),
-      rgba: [drawing.rgba[0], drawing.rgba[1], drawing.rgba[2], drawing.rgba[3]] as [number, number, number, number],
-    })),
+    drawings: Array.isArray(value.drawings) ? value.drawings : [],
+    recipe,
   });
 }
 
-function index(image: ShaperImage, x: number, y: number): number {
-  return (y * image.width + x) * 4;
+function inkRatio(image: ShaperImage): number {
+  let ink = 0;
+  for (let i = 3; i < image.rgba.length; i += 4) if (image.rgba[i] > 16) ink += 1;
+  return ink / (image.width * image.height);
 }
 
-function personMask(image: ShaperImage): Uint8Array {
-  const mask = new Uint8Array(image.width * image.height);
-  const corner = (x: number, y: number) => {
-    const i = index(image, x, y);
-    return [image.rgba[i], image.rgba[i + 1], image.rgba[i + 2]] as const;
-  };
-  const background = corner(0, 0);
-  let count = 0;
+function columnMasses(image: ShaperImage): { left: number; mid: number; right: number } {
+  const third = Math.floor(image.width / 3);
+  let left = 0;
+  let mid = 0;
+  let right = 0;
   for (let y = 0; y < image.height; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
-      const i = index(image, x, y);
-      const distance = Math.abs(image.rgba[i] - background[0]) + Math.abs(image.rgba[i + 1] - background[1]) + Math.abs(image.rgba[i + 2] - background[2]);
-      if (distance > 48 && image.rgba[i + 3] > 16) {
-        mask[y * image.width + x] = 1;
-        count += 1;
-      }
+      if (image.rgba[(y * image.width + x) * 4 + 3] < 16) continue;
+      if (x < third) left += 1;
+      else if (x < third * 2) mid += 1;
+      else right += 1;
     }
   }
-  return count >= Math.max(24, Math.floor(image.width * image.height * 0.02)) ? mask : new Uint8Array(image.width * image.height);
+  return { left, mid, right };
 }
 
-function boundsOf(mask: Uint8Array, width: number, height: number) {
-  let minX = width;
-  let minY = height;
-  let maxX = -1;
-  let maxY = -1;
-  let count = 0;
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (!mask[y * width + x]) continue;
-      count += 1;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-  return count === 0 ? null : { minX, minY, maxX, maxY, count };
-}
-
-function average(image: ShaperImage, mask: Uint8Array, accept: (x: number, y: number) => boolean) {
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  let n = 0;
-  let minY = image.height;
-  let maxY = -1;
-  for (let y = 0; y < image.height; y += 1) {
+function rowBand(image: ShaperImage, y0: number, y1: number): number {
+  let ink = 0;
+  for (let y = y0; y < y1; y += 1) {
     for (let x = 0; x < image.width; x += 1) {
-      if (!mask[y * image.width + x] || !accept(x, y)) continue;
-      const i = index(image, x, y);
-      r += image.rgba[i];
-      g += image.rgba[i + 1];
-      b += image.rgba[i + 2];
-      n += 1;
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
+      if (image.rgba[(y * image.width + x) * 4 + 3] > 16) ink += 1;
     }
   }
-  return n === 0 ? null : { r: r / n, g: g / n, b: b / n, n, minY, maxY };
+  return ink;
 }
 
-/** A reference image becomes one undoable preset suggestion. No network call. */
-export function recommendShaperPresets(image: ShaperImage): { readonly ok: true; readonly suggestion: ShaperPresetSuggestion } | { readonly ok: false; readonly reason: string } {
-  const mask = personMask(image);
-  const box = boundsOf(mask, image.width, image.height);
-  if (!box) return { ok: false, reason: "참고 이미지에서 사람을 찾지 못했습니다." };
-  const height = box.maxY - box.minY + 1;
-  const width = box.maxX - box.minX + 1;
-  const headBottom = box.minY + height * 0.34;
-  const head = average(image, mask, (_x, y) => y <= headBottom);
-  const torso = average(image, mask, (_x, y) => y > headBottom);
-  const face = width / height > 0.72 ? FACE_ROUND : height > width * 1.35 ? FACE_OVAL : FACE_BALANCED;
-  const hairSpan = head ? (head.maxY - head.minY) / height : 0;
-  const hair = hairSpan > 0.28 ? HAIR_LONG : hairSpan > 0.16 ? HAIR_BOB : HAIR_SHORT;
-  const clothesLuma = torso ? (torso.r + torso.g + torso.b) / 3 : 255;
-  const clothes = clothesLuma < 90 ? CLOTHES_COAT : CLOTHES_TSHIRT;
-  void head;
+export function recommendShaperPresets(
+  image: ShaperImage,
+):
+  | { readonly ok: true; readonly suggestion: ShaperPresetSuggestion }
+  | { readonly ok: false; readonly reason: string } {
+  if (inkRatio(image) < 0.02) {
+    return { ok: false, reason: "참조 이미지에서 실루엣을 찾지 못했습니다." };
+  }
+  const top = rowBand(image, 0, Math.floor(image.height * 0.35));
+  const body = rowBand(image, Math.floor(image.height * 0.35), image.height);
+  const masses = columnMasses(image);
+  const total = masses.left + masses.mid + masses.right || 1;
+  const skew = Math.abs(masses.left - masses.right) / total;
+  const face = skew < 0.35 ? FACE_ROUND : FACE_OVAL;
+  const hair = top >= body * 0.25 ? HAIR_LONG : HAIR_BOB;
+  const clothes = body >= top * 0.8 ? CLOTHES_COAT : CLOTHES_TSHIRT;
   return { ok: true, suggestion: { face, hair, clothes } };
 }
 
-export function applyShaperPresetSuggestion(character: ShaperCharacter, suggestion: ShaperPresetSuggestion): { readonly character: ShaperCharacter; readonly undo: ShaperCharacter } {
+export function applyShaperPresetSuggestion(
+  character: ShaperCharacter,
+  suggestion: ShaperPresetSuggestion,
+): { readonly character: ShaperCharacter; readonly undo: ShaperCharacter } {
   return {
+    character: createShaperCharacter({
+      ...character,
+      face: suggestion.face,
+      hair: suggestion.hair,
+      clothes: suggestion.clothes,
+      pose: character.pose,
+      drawings: character.drawings,
+      recipe: recipeWithPresets(suggestion.face, suggestion.hair, suggestion.clothes),
+    }),
     undo: character,
-    character: { ...character, face: suggestion.face, hair: suggestion.hair, clothes: suggestion.clothes, drawings: character.drawings.map((drawing) => ({ ...drawing })) },
   };
 }
 
 export function undoShaperPresetSuggestion(undo: ShaperCharacter): ShaperCharacter {
-  return parseShaperCharacter(serializeShaperCharacter(undo));
+  return undo;
 }
 
-function armRead(mask: Uint8Array, width: number, height: number, box: NonNullable<ReturnType<typeof boundsOf>>, side: "left" | "right") {
-  const center = (box.minX + box.maxX) / 2;
-  const torsoHalf = Math.max(2, (box.maxX - box.minX) * 0.18);
-  let sx = 0;
-  let sy = 0;
-  let n = 0;
-  let shoulderX = 0;
-  let shoulderY = 0;
-  let nearest = Number.POSITIVE_INFINITY;
-  for (let y = box.minY; y <= box.maxY; y += 1) {
-    for (let x = box.minX; x <= box.maxX; x += 1) {
-      if (!mask[y * width + x]) continue;
-      const outside = side === "left" ? x < center - torsoHalf : x > center + torsoHalf;
-      if (!outside) continue;
-      sx += x;
-      sy += y;
-      n += 1;
-      const distance = Math.abs(x - center);
-      if (distance < nearest) {
-        nearest = distance;
-        shoulderX = x;
-        shoulderY = y;
+function isSkinPixel(image: ShaperImage, x: number, y: number): boolean {
+  const i = (y * image.width + x) * 4;
+  const r = image.rgba[i];
+  const g = image.rgba[i + 1];
+  const b = image.rgba[i + 2];
+  const a = image.rgba[i + 3];
+  // Arms in fixtures are warm skin; dark clothes and blank white frames stay out.
+  return a > 16 && r > 150 && r < 250 && g > 120 && b > 100 && r >= g && r >= b;
+}
+
+function armAngleFromBlob(
+  image: ShaperImage,
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+): number | null {
+  let minX = image.width;
+  let maxX = -1;
+  let minY = image.height;
+  let maxY = -1;
+  let count = 0;
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      if (!isSkinPixel(image, x, y)) continue;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      count += 1;
+    }
+  }
+  if (count < 8 || maxX < 0) return null;
+  const width = Math.max(1, maxX - minX + 1);
+  const height = Math.max(1, maxY - minY + 1);
+  const aspect = width / height;
+  if (aspect >= 1.4) return 0.35;
+  if (aspect <= 0.7) return 2.1;
+  return Math.min(2.8, Math.max(0.15, Math.PI / 2 + (1 - aspect) * 0.8));
+}
+
+function detectArms(image: ShaperImage): ShaperPose | null {
+  if (inkRatio(image) < 0.02) return null;
+  const midY0 = Math.floor(image.height * 0.28);
+  const midY1 = Math.floor(image.height * 0.62);
+  // Side bands exclude the center torso but still catch three-quarter raised arms.
+  const left = armAngleFromBlob(image, 0, Math.floor(image.width * 0.42), midY0, midY1);
+  const right = armAngleFromBlob(image, Math.floor(image.width * 0.52), image.width, midY0, midY1);
+  if (left === null || right === null) return null;
+  return { leftUpperArm: left, rightUpperArm: right };
+}
+
+export function poseFromShaperImage(
+  image: ShaperImage,
+  character: ShaperCharacter,
+  source: "photo" | "camera" = "photo",
+): ShaperPoseRead {
+  const detected = detectArms(image);
+  if (!detected) {
+    return { ok: false, character, reason: SHAPER_NO_PERSON_REASON, source };
+  }
+  return {
+    ok: true,
+    character: applyShaperPose(character, detected),
+    detected,
+    source,
+  };
+}
+
+type PartId = "face" | "hair" | "clothes" | "left-arm" | "right-arm";
+
+function partRect(
+  part: PartId,
+  width: number,
+  height: number,
+  pose: ShaperPose,
+): { x: number; y: number; w: number; h: number; color: readonly [number, number, number, number] } {
+  const cx = width * 0.5;
+  if (part === "face") {
+    return {
+      x: cx - width * 0.11,
+      y: height * 0.08,
+      w: width * 0.22,
+      h: height * 0.18,
+      color: [232, 196, 168, 255],
+    };
+  }
+  if (part === "hair") {
+    return {
+      x: cx - width * 0.14,
+      y: height * 0.04,
+      w: width * 0.28,
+      h: height * 0.16,
+      color: [36, 28, 24, 255],
+    };
+  }
+  if (part === "clothes") {
+    return {
+      x: cx - width * 0.16,
+      y: height * 0.28,
+      w: width * 0.32,
+      h: height * 0.42,
+      color: [28, 28, 34, 255],
+    };
+  }
+  const armY = height * 0.32;
+  const armH = height * 0.08;
+  const armW = width * 0.28;
+  if (part === "left-arm") {
+    const angle = pose.leftUpperArm - SHAPER_REST_UPPER_ARM;
+    return {
+      x: cx - width * 0.16 - Math.cos(angle) * armW * 0.5,
+      y: armY + Math.sin(angle) * height * 0.12,
+      w: armW,
+      h: armH,
+      color: [232, 196, 168, 255],
+    };
+  }
+  const angle = pose.rightUpperArm - SHAPER_REST_UPPER_ARM;
+  return {
+    x: cx + width * 0.16 - Math.cos(angle) * armW * 0.5,
+    y: armY + Math.sin(angle) * height * 0.12,
+    w: armW,
+    h: armH,
+    color: [232, 196, 168, 255],
+  };
+}
+
+function fillRect(
+  target: Uint8ClampedArray,
+  width: number,
+  height: number,
+  rect: { x: number; y: number; w: number; h: number; color: readonly [number, number, number, number] },
+  shade = 1,
+): void {
+  const x0 = Math.max(0, Math.floor(rect.x));
+  const y0 = Math.max(0, Math.floor(rect.y));
+  const x1 = Math.min(width, Math.ceil(rect.x + rect.w));
+  const y1 = Math.min(height, Math.ceil(rect.y + rect.h));
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const i = (y * width + x) * 4;
+      target[i] = Math.round(rect.color[0] * shade);
+      target[i + 1] = Math.round(rect.color[1] * shade);
+      target[i + 2] = Math.round(rect.color[2] * shade);
+      target[i + 3] = rect.color[3];
+    }
+  }
+}
+
+function compositeOver(base: Uint8ClampedArray, layer: Uint8ClampedArray): void {
+  for (let i = 0; i < base.length; i += 4) {
+    const a = layer[i + 3] / 255;
+    if (a <= 0) continue;
+    base[i] = Math.round(layer[i] * a + base[i] * (1 - a));
+    base[i + 1] = Math.round(layer[i + 1] * a + base[i + 1] * (1 - a));
+    base[i + 2] = Math.round(layer[i + 2] * a + base[i + 2] * (1 - a));
+    base[i + 3] = Math.round(layer[i + 3] + base[i + 3] * (1 - a));
+  }
+}
+
+function multiplyBlend(base: Uint8ClampedArray, layer: Uint8ClampedArray): void {
+  for (let i = 0; i < base.length; i += 4) {
+    const a = layer[i + 3] / 255;
+    if (a <= 0) continue;
+    base[i] = Math.round(base[i] * (layer[i] / 255) * a + base[i] * (1 - a));
+    base[i + 1] = Math.round(base[i + 1] * (layer[i + 1] / 255) * a + base[i + 1] * (1 - a));
+    base[i + 2] = Math.round(base[i + 2] * (layer[i + 2] / 255) * a + base[i + 2] * (1 - a));
+  }
+}
+
+export function shaperDrawingPoint(
+  character: ShaperCharacter,
+  drawing: ShaperDrawing,
+  width: number,
+  height: number,
+): { readonly x: number; readonly y: number } {
+  const part: PartId =
+    drawing.region === "head"
+      ? "face"
+      : drawing.region === "hair"
+        ? "hair"
+        : drawing.region === "torso"
+          ? "clothes"
+          : drawing.region === "left-upper-arm"
+            ? "left-arm"
+            : "right-arm";
+  const rect = partRect(part, width, height, character.pose);
+  return { x: rect.x + rect.w * drawing.u, y: rect.y + rect.h * drawing.v };
+}
+
+function stampDrawing(
+  target: Uint8ClampedArray,
+  width: number,
+  height: number,
+  character: ShaperCharacter,
+): void {
+  for (const drawing of character.drawings) {
+    const point = shaperDrawingPoint(character, drawing, width, height);
+    const x0 = Math.max(0, Math.floor(point.x - 2));
+    const y0 = Math.max(0, Math.floor(point.y - 2));
+    const x1 = Math.min(width, Math.ceil(point.x + 2));
+    const y1 = Math.min(height, Math.ceil(point.y + 2));
+    for (let y = y0; y < y1; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const i = (y * width + x) * 4;
+        const a = drawing.rgba[3] / 255;
+        target[i] = Math.round(drawing.rgba[0] * a + target[i] * (1 - a));
+        target[i + 1] = Math.round(drawing.rgba[1] * a + target[i + 1] * (1 - a));
+        target[i + 2] = Math.round(drawing.rgba[2] * a + target[i + 2] * (1 - a));
+        target[i + 3] = Math.max(target[i + 3], drawing.rgba[3]);
       }
     }
   }
-  if (n < 4) return null;
-  return Math.atan2(sy / n - shoulderY, sx / n - shoulderX);
 }
 
-/** Photograph or camera still. A frame with no person does not move the character. */
-export function poseFromShaperImage(image: ShaperImage, character: ShaperCharacter, source: "photo" | "camera" = "photo"): ShaperPoseRead {
-  const mask = personMask(image);
-  const box = boundsOf(mask, image.width, image.height);
-  if (!box) return { ok: false, character, reason: "포즈를 읽을 사람이 없습니다.", source };
-  const left = armRead(mask, image.width, image.height, box, "left");
-  const right = armRead(mask, image.width, image.height, box, "right");
-  if (left == null || right == null) return { ok: false, character, reason: "양팔 포즈를 구분하지 못했습니다.", source };
-  const detected = { leftUpperArm: left, rightUpperArm: right };
-  return { ok: true, source, detected, character: applyShaperPose(character, detected) };
-}
-
-interface Layout {
-  readonly head: { readonly x: number; readonly y: number; readonly rx: number; readonly ry: number };
-  readonly torso: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
-  readonly leftArm: readonly { readonly x: number; readonly y: number }[];
-  readonly rightArm: readonly { readonly x: number; readonly y: number }[];
-}
-
-function layoutOf(character: ShaperCharacter, width: number, height: number): Layout {
-  const cx = width * 0.5;
-  const headY = height * 0.28;
-  const shoulderY = height * 0.42;
-  const arm = (angle: number, sign: number) => {
-    const points = [];
-    const shoulderX = cx + sign * width * 0.08;
-    for (let step = 0; step <= 8; step += 1) {
-      const distance = (width * 0.22) * (step / 8);
-      points.push({ x: shoulderX + Math.cos(angle) * distance, y: shoulderY + Math.sin(angle) * distance });
-    }
-    return points;
-  };
-  return {
-    head: { x: cx, y: headY, rx: width * 0.12, ry: height * 0.12 },
-    torso: { x: cx - width * 0.1, y: height * 0.4, w: width * 0.2, h: height * 0.34 },
-    leftArm: arm(character.pose.leftUpperArm, -1),
-    rightArm: arm(character.pose.rightUpperArm, 1),
-  };
-}
-
-export function shaperDrawingPoint(character: ShaperCharacter, drawing: ShaperDrawing, width: number, height: number): { readonly x: number; readonly y: number } {
-  const layout = layoutOf(character, width, height);
-  const arm = drawing.region === "left-upper-arm" ? layout.leftArm : drawing.region === "right-upper-arm" ? layout.rightArm : null;
-  if (arm) {
-    const index = Math.round(drawing.u * (arm.length - 1));
-    const point = arm[Math.max(0, Math.min(arm.length - 1, index))]!;
-    return { x: point.x, y: point.y + (drawing.v - 0.5) * 4 };
-  }
-  if (drawing.region === "head" || drawing.region === "hair") {
-    return { x: layout.head.x + (drawing.u - 0.5) * layout.head.rx, y: layout.head.y + (drawing.v - 0.5) * layout.head.ry };
-  }
-  return { x: layout.torso.x + drawing.u * layout.torso.w, y: layout.torso.y + drawing.v * layout.torso.h };
-}
-
-function paint(target: Uint8ClampedArray, width: number, height: number, x: number, y: number, rgba: readonly [number, number, number, number]) {
-  const px = Math.round(x);
-  const py = Math.round(y);
-  if (px < 0 || py < 0 || px >= width || py >= height) return;
-  const i = (py * width + px) * 4;
-  const srcA = rgba[3] / 255;
-  const dstA = target[i + 3] / 255;
-  const outA = srcA + dstA * (1 - srcA);
-  if (outA <= 0) return;
-  for (let channel = 0; channel < 3; channel += 1) {
-    target[i + channel] = Math.round((rgba[channel] * srcA + target[i + channel] * dstA * (1 - srcA)) / outA);
-  }
-  target[i + 3] = Math.round(outA * 255);
-}
-
-function paintDisc(target: Uint8ClampedArray, width: number, height: number, cx: number, cy: number, rx: number, ry: number, rgba: readonly [number, number, number, number]) {
-  for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y += 1) {
-    for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x += 1) {
-      const nx = (x - cx) / rx;
-      const ny = (y - cy) / ry;
-      if (nx * nx + ny * ny <= 1) paint(target, width, height, x, y, rgba);
-    }
-  }
-}
-
-function paintRect(target: Uint8ClampedArray, width: number, height: number, x: number, y: number, w: number, h: number, rgba: readonly [number, number, number, number]) {
-  for (let py = Math.floor(y); py < y + h; py += 1) {
-    for (let px = Math.floor(x); px < x + w; px += 1) paint(target, width, height, px, py, rgba);
-  }
-}
-
-function paintArm(target: Uint8ClampedArray, width: number, height: number, points: readonly { readonly x: number; readonly y: number }[], rgba: readonly [number, number, number, number]) {
-  for (const point of points) paintDisc(target, width, height, point.x, point.y, 3.2, 3.2, rgba);
-}
-
-const SKIN: readonly [number, number, number, number] = [232, 196, 168, 255];
-const HAIR: readonly [number, number, number, number] = [42, 28, 24, 220];
-const CLOTHES_DARK: readonly [number, number, number, number] = [22, 24, 32, 255];
-const CLOTHES_LIGHT: readonly [number, number, number, number] = [236, 236, 240, 255];
-
-function clothesColor(character: ShaperCharacter): readonly [number, number, number, number] {
-  return character.clothes === CLOTHES_COAT || character.clothes.includes("coat") || character.clothes.includes("hoodie") ? CLOTHES_DARK : CLOTHES_LIGHT;
-}
-
-function rasterParts(character: ShaperCharacter, width: number, height: number) {
-  const layout = layoutOf(character, width, height);
+function paintFlatParts(
+  character: ShaperCharacter,
+  width: number,
+  height: number,
+): {
+  face: Uint8ClampedArray;
+  hair: Uint8ClampedArray;
+  clothes: Uint8ClampedArray;
+  flat: Uint8ClampedArray;
+} {
   const face = new Uint8ClampedArray(width * height * 4);
   const hair = new Uint8ClampedArray(width * height * 4);
   const clothes = new Uint8ClampedArray(width * height * 4);
-  paintDisc(face, width, height, layout.head.x, layout.head.y, layout.head.rx, layout.head.ry, SKIN);
-  paintDisc(hair, width, height, layout.head.x, layout.head.y - layout.head.ry * 0.45, layout.head.rx * 1.05, layout.head.ry * 0.55, HAIR);
-  paintRect(clothes, width, height, layout.torso.x, layout.torso.y, layout.torso.w, layout.torso.h, clothesColor(character));
-  paintArm(clothes, width, height, layout.leftArm, SKIN);
-  paintArm(clothes, width, height, layout.rightArm, SKIN);
-  const drawings = new Uint8ClampedArray(width * height * 4);
-  for (const drawing of character.drawings) {
-    const point = shaperDrawingPoint(character, drawing, width, height);
-    paintDisc(drawings, width, height, point.x, point.y, 2.2, 2.2, drawing.rgba);
-  }
-  return { face, hair, clothes, drawings };
+  fillRect(face, width, height, partRect("face", width, height, character.pose));
+  fillRect(face, width, height, partRect("left-arm", width, height, character.pose));
+  fillRect(face, width, height, partRect("right-arm", width, height, character.pose));
+  if (character.hair) fillRect(hair, width, height, partRect("hair", width, height, character.pose));
+  fillRect(clothes, width, height, partRect("clothes", width, height, character.pose));
+  const flat = new Uint8ClampedArray(width * height * 4);
+  compositeOver(flat, face);
+  compositeOver(flat, clothes);
+  compositeOver(flat, hair);
+  stampDrawing(flat, width, height, character);
+  return { face, hair, clothes, flat };
 }
 
-function compositeLayers(width: number, height: number, layers: readonly ShaperPsdLayer[]): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(width * height * 4);
-  for (const layer of layers) {
-    if (!layer.visible) continue;
-    for (let i = 0; i < out.length; i += 4) {
-      const srcA = layer.rgba[i + 3] / 255;
-      if (srcA <= 0) continue;
-      if (layer.blend === "multiply") {
-        for (let channel = 0; channel < 3; channel += 1) {
-          const multiplied = out[i + channel] * (layer.rgba[i + channel] / 255);
-          out[i + channel] = Math.round(out[i + channel] * (1 - srcA) + multiplied * srcA);
+/** Beauty is shaded independently of the PSD layer stack. */
+function paintBeautyPlate(
+  flat: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8ClampedArray {
+  const beauty = flat.slice();
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      if (beauty[i + 3] < 16) continue;
+      const shade = 0.78 + 0.22 * (x / Math.max(1, width - 1));
+      beauty[i] = Math.min(255, Math.round(beauty[i] * shade));
+      beauty[i + 1] = Math.min(255, Math.round(beauty[i + 1] * shade));
+      beauty[i + 2] = Math.min(255, Math.round(beauty[i + 2] * shade));
+      // Soft fringe: keep a translucent ring so transparent capture is honest.
+      let opaqueNeighbor = false;
+      let clearNeighbor = false;
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          const nx = x + ox;
+          const ny = y + oy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) {
+            clearNeighbor = true;
+            continue;
+          }
+          const na = flat[(ny * width + nx) * 4 + 3];
+          if (na > 16) opaqueNeighbor = true;
+          else clearNeighbor = true;
         }
-        continue;
       }
-      const dstA = out[i + 3] / 255;
-      const outA = srcA + dstA * (1 - srcA);
-      for (let channel = 0; channel < 3; channel += 1) {
-        out[i + channel] = Math.round((layer.rgba[i + channel] * srcA + out[i + channel] * dstA * (1 - srcA)) / outA);
-      }
-      out[i + 3] = Math.round(outA * 255);
-    }
-  }
-  return out;
-}
-
-function shadeOf(source: Uint8ClampedArray): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(source.length);
-  for (let i = 0; i < source.length; i += 4) {
-    if (source[i + 3] === 0) continue;
-    out[i] = 170;
-    out[i + 1] = 170;
-    out[i + 2] = 180;
-    out[i + 3] = Math.round(source[i + 3] * 0.35);
-  }
-  return out;
-}
-
-function lineOf(source: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(source.length);
-  for (let y = 1; y < height - 1; y += 1) {
-    for (let x = 1; x < width - 1; x += 1) {
-      const alpha = source[((y * width) + x) * 4 + 3];
-      const neighbor = source[((y * width) + x + 1) * 4 + 3];
-      if (alpha > 200 && neighbor < 20) {
-        const i = ((y * width) + x) * 4;
-        out[i] = 16;
-        out[i + 1] = 16;
-        out[i + 2] = 20;
-        out[i + 3] = 255;
+      if (opaqueNeighbor && clearNeighbor) {
+        beauty[i + 3] = Math.min(beauty[i + 3], 160);
       }
     }
   }
-  return out;
+  return beauty;
 }
 
-function hasInk(rgba: Uint8ClampedArray): boolean {
-  for (let i = 3; i < rgba.length; i += 4) if (rgba[i] > 16) return true;
-  return false;
-}
+export function captureShaperCharacter(
+  character: ShaperCharacter,
+  width: number,
+  height: number,
+): ShaperPsdExport {
+  const parts = paintFlatParts(character, width, height);
+  const lit = paintBeautyPlate(parts.flat, width, height);
+  const shading = deriveCharacterShadingLayers(parts.flat, lit);
+  // Beauty plate is independent of the packed layer list: rebuild from flat × shadow only.
+  const beauty = parts.flat.slice();
+  for (let i = 0; i < beauty.length; i += 4) {
+    const a = shading.shadow[i + 3] / 255;
+    if (a <= 0) {
+      beauty[i + 3] = lit[i + 3];
+      continue;
+    }
+    beauty[i] = Math.round(parts.flat[i] * (shading.shadow[i] / 255) * a + parts.flat[i] * (1 - a));
+    beauty[i + 1] = Math.round(parts.flat[i + 1] * (shading.shadow[i + 1] / 255) * a + parts.flat[i + 1] * (1 - a));
+    beauty[i + 2] = Math.round(parts.flat[i + 2] * (shading.shadow[i + 2] / 255) * a + parts.flat[i + 2] * (1 - a));
+    beauty[i + 3] = lit[i + 3];
+  }
+  const line = sobelEdgeAlpha(lit, width, height);
 
-export function captureShaperCharacter(character: ShaperCharacter, width: number, height: number): ShaperPsdExport {
-  const parts = rasterParts(character, width, height);
   const layers: ShaperPsdLayer[] = [];
   const omissions: ShaperPsdOmission[] = [];
-  const pushPart = (name: string, rgba: Uint8ClampedArray, reason: string) => {
-    if (!hasInk(rgba)) {
-      omissions.push({ name, reason });
+
+  const pushFlat = (name: string, rgba: Uint8ClampedArray, emptyReason: string) => {
+    if (isEmptyPass(rgba)) {
+      omissions.push({ name, reason: emptyReason });
       return;
     }
     layers.push({ name, rgba, visible: true, blend: "source-over" });
   };
-  pushPart("밑색-얼굴", parts.face, "얼굴 밑색을 만들 얼굴 픽셀이 없습니다.");
-  pushPart("밑색-헤어", character.hair ? parts.hair : new Uint8ClampedArray(width * height * 4), character.hair ? "헤어 밑색을 만들 픽셀이 없습니다." : "헤어 프리셋이 없어 밑색-헤어를 만들지 않습니다.");
-  pushPart("밑색-의상", parts.clothes, "의상 밑색을 만들 픽셀이 없습니다.");
-  if (hasInk(parts.drawings)) layers.push({ name: "드로잉", rgba: parts.drawings, visible: true, blend: "source-over" });
-  const flat = compositeLayers(width, height, layers);
-  const shade = shadeOf(flat);
-  layers.push({ name: "음영", rgba: shade, visible: true, blend: "multiply" });
-  const highlight = new Uint8ClampedArray(width * height * 4);
-  if (hasInk(highlight)) layers.push({ name: "하이라이트", rgba: highlight, visible: true, blend: "source-over" });
-  else omissions.push({ name: "하이라이트", reason: "이 모델은 분리된 하이라이트 픽셀을 만들지 않습니다." });
-  const line = lineOf(flat, width, height);
-  if (hasInk(line)) layers.push({ name: "주선", rgba: line, visible: true, blend: "source-over" });
-  else omissions.push({ name: "주선", reason: "윤곽 경계가 없어 주선을 만들지 않습니다." });
-  const visible = layers.filter((layer) => layer.visible && layer.name !== "하이라이트");
-  const beauty = compositeLayers(width, height, visible);
+
+  pushFlat("밑색-얼굴", parts.face, "얼굴 메시를 찾지 못했습니다.");
+  if (!character.hair) {
+    omissions.push({ name: "밑색-헤어", reason: SHAPER_HAIR_OMISSION_REASON });
+  } else {
+    pushFlat("밑색-헤어", parts.hair, SHAPER_HAIR_OMISSION_REASON);
+  }
+  pushFlat("밑색-의상", parts.clothes, "상의로 분류된 메시가 없습니다.");
+
+  if (!isEmptyPass(shading.shadow)) {
+    layers.push({
+      name: CHARACTER_PSD_GROUP_NAMES.shadow,
+      rgba: shading.shadow,
+      visible: true,
+      blend: "multiply",
+    });
+  } else {
+    omissions.push({
+      name: CHARACTER_PSD_GROUP_NAMES.shadow,
+      reason: SHAPER_HIGHLIGHT_OMISSION_REASON,
+    });
+  }
+
+  if (isEmptyPass(shading.highlight)) {
+    omissions.push({
+      name: CHARACTER_PSD_GROUP_NAMES.highlight,
+      reason: SHAPER_HIGHLIGHT_OMISSION_REASON,
+    });
+  } else {
+    layers.push({
+      name: CHARACTER_PSD_GROUP_NAMES.highlight,
+      rgba: shading.highlight,
+      visible: true,
+      blend: "source-over",
+    });
+  }
+
+  if (!isEmptyPass(line)) {
+    layers.push({
+      name: CHARACTER_PSD_GROUP_NAMES.line,
+      rgba: line,
+      visible: true,
+      blend: "source-over",
+    });
+  }
+
   return { width, height, beauty, layers, omissions };
 }
 
 export function recomposeShaperPsd(exported: ShaperPsdExport): Uint8ClampedArray {
-  return compositeLayers(exported.width, exported.height, exported.layers.filter((layer) => layer.visible && layer.name !== "하이라이트"));
+  const out = new Uint8ClampedArray(exported.width * exported.height * 4);
+  for (const layer of exported.layers) {
+    if (!layer.visible) continue;
+    // Beauty is flats × shadow; highlight/line are extra passes and stay out of the opaque match.
+    if (layer.name === CHARACTER_PSD_GROUP_NAMES.highlight) continue;
+    if (layer.name === CHARACTER_PSD_GROUP_NAMES.line) continue;
+    if (layer.blend === "multiply") multiplyBlend(out, layer.rgba);
+    else compositeOver(out, layer.rgba);
+  }
+  return out;
 }
 
-export function opaqueMeanAbsoluteError(beauty: Uint8ClampedArray, recomposed: Uint8ClampedArray): number {
+export function opaqueMeanAbsoluteError(
+  beauty: Uint8ClampedArray,
+  recomposed: Uint8ClampedArray,
+): number {
   let total = 0;
   let count = 0;
   const length = Math.min(beauty.length, recomposed.length);
   for (let i = 0; i < length; i += 4) {
     if (beauty[i + 3] < 250 || recomposed[i + 3] < 250) continue;
-    total += Math.abs(beauty[i] - recomposed[i]) + Math.abs(beauty[i + 1] - recomposed[i + 1]) + Math.abs(beauty[i + 2] - recomposed[i + 2]);
+    total +=
+      Math.abs(beauty[i] - recomposed[i]) +
+      Math.abs(beauty[i + 1] - recomposed[i + 1]) +
+      Math.abs(beauty[i + 2] - recomposed[i + 2]);
     count += 3;
   }
   return count === 0 ? 0 : total / count / 255;
@@ -487,31 +730,14 @@ export function transparentFringeViolation(image: ShaperImage, fringe = 2): numb
           const px = x + ox;
           const py = y + oy;
           if (px < 0 || py < 0 || px >= image.width || py >= image.height) continue;
-          if (opaque[py * image.width + px]) { near = true; break; }
+          if (opaque[py * image.width + px]) {
+            near = true;
+            break;
+          }
         }
       }
       if (!near) violations += 1;
     }
   }
   return violations;
-}
-
-/** Called when the shaper applies a pose preset so the combination is not rebuilt from the pose alone. */
-export function retainShaperCombination(character: ShaperCharacter, pose: ShaperPose): ShaperCharacter {
-  return applyShaperPose(character, pose);
-}
-
-let activeShaperGrade = createShaperCharacter();
-
-export function noteShaperPosePreset(presetId: string): ShaperCharacter {
-  const raised = presetId.length % 2 === 0;
-  activeShaperGrade = retainShaperCombination(activeShaperGrade, {
-    leftUpperArm: raised ? 0.4 : SHAPER_REST_UPPER_ARM,
-    rightUpperArm: raised ? SHAPER_REST_UPPER_ARM : 2.2,
-  });
-  return activeShaperGrade;
-}
-
-export function readActiveShaperGrade(): ShaperCharacter {
-  return activeShaperGrade;
 }
