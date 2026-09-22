@@ -51,7 +51,7 @@ function resolveBlendMode(
   }
 }
 
-function rasterBounds(item: SkiaDocumentImage): readonly [number, number, number, number] {
+function rasterBounds(item: SkiaDocumentImage): [number, number, number, number] {
   const bounds = item.rasterBounds;
   return bounds
     ? [bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height]

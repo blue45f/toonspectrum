@@ -127,7 +127,7 @@ it("records only the affected composite batch rather than replaying the document
 
 it("bounds retained viewport images and releases GPU resources on repeated camera changes", async () => {
   const h = harness(); const images: Array<{ delete: ReturnType<typeof vi.fn> }> = [];
-  h.surface.makeImageSnapshot = () => { const image = { delete: vi.fn() }; images.push(image); return image; };
+  h.surface.makeImageSnapshot = () => { const image = { delete: vi.fn(), encodeToBytes: vi.fn(() => Uint8Array.of(1, 2, 3)) }; images.push(image); return image; };
   const abandon = vi.fn(); Object.assign(h.context, { releaseResourcesAndAbandonContext: abandon });
   const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck });
   for (let index = 0; index < 40; index++) {
@@ -184,7 +184,7 @@ it("releases retained GPU resources on loss without waiting for the editor to un
   const h = harness();
   const images: Array<{ delete: ReturnType<typeof vi.fn> }> = [];
   h.surface.makeImageSnapshot = () => {
-    const image = { delete: vi.fn() }; images.push(image); return image;
+    const image = { delete: vi.fn(), encodeToBytes: vi.fn(() => Uint8Array.of(1, 2, 3)) }; images.push(image); return image;
   };
   const abandon = vi.fn();
   Object.assign(h.context, { releaseResourcesAndAbandonContext: abandon });
