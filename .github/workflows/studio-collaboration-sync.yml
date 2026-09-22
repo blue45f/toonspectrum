@@ -9,6 +9,8 @@ on:
       - "scripts/verify-studio-collaboration-sync.mts"
       - "scripts/verify-studio-collaboration-entry.test.ts"
       - "scripts/lib/studio-collaboration-preview-session.ts"
+      - "scripts/lib/studio-composited-canvas-fingerprint.ts"
+      - "scripts/lib/studio-composited-canvas-fingerprint.test.ts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
@@ -23,6 +25,8 @@ on:
       - "scripts/verify-studio-collaboration-sync.mts"
       - "scripts/verify-studio-collaboration-entry.test.ts"
       - "scripts/lib/studio-collaboration-preview-session.ts"
+      - "scripts/lib/studio-composited-canvas-fingerprint.ts"
+      - "scripts/lib/studio-composited-canvas-fingerprint.test.ts"
       - "scripts/lib/studio-verify-preview-harness.mjs"
       - "scripts/lib/studio-verify-preview-harness.mts"
       - "apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx"
@@ -60,6 +64,7 @@ jobs:
         run: >-
           pnpm exec vitest run
           scripts/verify-studio-collaboration-entry.test.ts
+          scripts/lib/studio-composited-canvas-fingerprint.test.ts
           apps/web/src/domains/creator/studio-cuttoon-editor/runtime/studio-collaboration-access-policy.test.ts
           apps/web/src/domains/creator/live/studio-crdt-room-binding.test.ts
           apps/web/src/domains/creator/live/studio-live-client-identity.test.ts
@@ -80,6 +85,8 @@ jobs:
           apps/web/src/domains/creator/live/studio-live-page-lifecycle.test.ts
           apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx
           scripts/lib/studio-collaboration-preview-session.ts
+          scripts/lib/studio-composited-canvas-fingerprint.ts
+          scripts/lib/studio-composited-canvas-fingerprint.test.ts
           scripts/verify-studio-collaboration-entry.test.ts
           scripts/verify-studio-collaboration-sync.mts
       - name: Resolve collaboration evidence directories

@@ -30,6 +30,10 @@ import {
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
 import { installStudioCollaborationPreviewSession } from "./lib/studio-collaboration-preview-session";
+import {
+  fingerprintStudioCompositedPng,
+  type StudioCompositedCanvasFingerprint,
+} from "./lib/studio-composited-canvas-fingerprint";
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
@@ -37,19 +41,6 @@ const EXISTING_ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/$/u, 
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(tmpdir(), "toonspectrum-studio-collaboration-sync");
 const READY_PHASES = new Set(["synced", "read-only-follower", "syncing"]);
-
-interface CanvasFingerprint {
-  readonly hash: string;
-  readonly nonBlankSamples: number;
-  readonly sampledPixels: number;
-  readonly readableCanvasCount: number;
-  readonly canvases: readonly {
-    readonly width: number;
-    readonly height: number;
-    readonly sampledPixels: number;
-    readonly nonBlankSamples: number;
-  }[];
-}
 
 interface PageDiagnostics {
   readonly label: string;
@@ -204,96 +195,38 @@ async function waitForDocumentLane(
 
 async function enableBrushTool(page: Page): Promise<void> {
   await dismissOverlays(page);
+  const drawOptions = page.locator('[data-studio-draw-options="true"]').first();
+  if (await drawOptions.isVisible().catch(() => false)) return;
   const drawTool = page.locator('[data-studio-rail-tool-id="draw"]').first();
   if (await drawTool.isVisible().catch(() => false)) {
     await drawTool.click();
   } else {
     await page.keyboard.press("b");
   }
-  await page.locator('[data-studio-draw-options="true"]').waitFor({
+  await drawOptions.waitFor({
     state: "visible",
     timeout: 10_000,
   });
 }
 
-async function canvasFingerprint(page: Page): Promise<CanvasFingerprint> {
-  const viewport = page.locator('[data-studio-canvas-viewport="true"]').first();
-  await viewport.waitFor({ state: "visible" });
-  return viewport.evaluate((root): CanvasFingerprint => {
-    const canvases = [...root.querySelectorAll<HTMLCanvasElement>(".konvajs-content canvas")];
-    let hash = 0x811c9dc5;
-    let nonBlankSamples = 0;
-    let sampledPixels = 0;
-    let readableCanvasCount = 0;
-    const summaries: Array<{
-      width: number;
-      height: number;
-      sampledPixels: number;
-      nonBlankSamples: number;
-    }> = [];
-
-    for (let canvasIndex = 0; canvasIndex < canvases.length; canvasIndex += 1) {
-      const canvas = canvases[canvasIndex]!;
-      const width = canvas.width;
-      const height = canvas.height;
-      if (width <= 0 || height <= 0) continue;
-      const context = canvas.getContext("2d", { willReadFrequently: true });
-      if (!context) continue;
-      let pixels: Uint8ClampedArray;
-      try {
-        pixels = context.getImageData(0, 0, width, height).data;
-      } catch {
-        continue;
-      }
-      readableCanvasCount += 1;
-      const step = Math.max(1, Math.floor(Math.sqrt((width * height) / 300_000)));
-      let canvasSamples = 0;
-      let canvasNonBlankSamples = 0;
-      for (let y = 0; y < height; y += step) {
-        for (let x = 0; x < width; x += step) {
-          const offset = (y * width + x) * 4;
-          const red = pixels[offset]!;
-          const green = pixels[offset + 1]!;
-          const blue = pixels[offset + 2]!;
-          const alpha = pixels[offset + 3]!;
-          const nonBlank = alpha > 4 && (red < 245 || green < 245 || blue < 245);
-          if (nonBlank) {
-            nonBlankSamples += 1;
-            canvasNonBlankSamples += 1;
-          }
-          hash ^= red;
-          hash = Math.imul(hash, 0x01000193);
-          hash ^= green;
-          hash = Math.imul(hash, 0x01000193);
-          hash ^= blue;
-          hash = Math.imul(hash, 0x01000193);
-          hash ^= alpha;
-          hash = Math.imul(hash, 0x01000193);
-          hash ^= ((x & 0xffff) << 16) ^ (y & 0xffff) ^ canvasIndex;
-          hash = Math.imul(hash, 0x01000193);
-          sampledPixels += 1;
-          canvasSamples += 1;
-        }
-      }
-      summaries.push({
-        width,
-        height,
-        sampledPixels: canvasSamples,
-        nonBlankSamples: canvasNonBlankSamples,
-      });
-    }
-
-    return {
-      hash: (hash >>> 0).toString(16).padStart(8, "0"),
-      nonBlankSamples,
-      sampledPixels,
-      readableCanvasCount,
-      canvases: summaries,
-    };
+async function canvasFingerprint(page: Page): Promise<StudioCompositedCanvasFingerprint> {
+  const documentSurface = page.locator('[data-studio-post-processing-scope=""]').first();
+  await documentSurface.waitFor({ state: "visible" });
+  const clip = await documentSurface.boundingBox();
+  assert.ok(clip, "composited document surface has no browser bounds");
+  // Page-level capture reads the browser compositor. Element screenshots can reuse a transparent
+  // or stale backing store when CanvasKit owns document pixels with preserveDrawingBuffer=false.
+  const screenshot = await page.screenshot({
+    animations: "disabled",
+    caret: "hide",
+    clip,
+    scale: "css",
+    type: "png",
   });
+  return fingerprintStudioCompositedPng(screenshot);
 }
 
-async function settleCanvas(page: Page): Promise<CanvasFingerprint> {
+async function settleCanvas(page: Page): Promise<StudioCompositedCanvasFingerprint> {
   await page.mouse.move(8, 8);
   await page.waitForTimeout(500);
   let previous = await canvasFingerprint(page);
@@ -308,15 +241,15 @@ async function settleCanvas(page: Page): Promise<CanvasFingerprint> {
 
 async function waitForCanvasChange(
   page: Page,
-  baseline: CanvasFingerprint,
+  baseline: StudioCompositedCanvasFingerprint,
   label: string,
-): Promise<CanvasFingerprint> {
+): Promise<StudioCompositedCanvasFingerprint> {
   const deadline = Date.now() + 20_000;
   let latest = baseline;
   while (Date.now() < deadline) {
     latest = await canvasFingerprint(page);
     if (
-      latest.readableCanvasCount > 0
+      latest.sampledPixels > 0
       && latest.hash !== baseline.hash
       && latest.nonBlankSamples > baseline.nonBlankSamples + 2
     ) {
@@ -469,9 +402,13 @@ try {
   const peers = { A: await peerCount(pageA), B: await peerCount(pageB) };
   assert.ok(peers.A > 0 && peers.B > 0, `presence lane did not see both tabs: ${JSON.stringify(peers)}`);
 
+  await Promise.all([enableBrushTool(pageA), enableBrushTool(pageB)]);
   const blankA = await settleCanvas(pageA);
   const blankB = await settleCanvas(pageB);
-  assert.ok(blankA.readableCanvasCount > 0 && blankB.readableCanvasCount > 0, "canvas pixels are not readable");
+  assert.ok(
+    blankA.sampledPixels > 0 && blankB.sampledPixels > 0,
+    "composited document pixels are not readable",
+  );
 
   log("A authors stroke; wait for B document render");
   await drawStroke(pageA, 0.39);
@@ -493,6 +430,7 @@ try {
   await waitForCanvasSurface(pageC);
   await dismissOverlays(pageC);
   const phaseC = await waitForDocumentLane(pageC, attachedC.diagnostics);
+  await enableBrushTool(pageC);
   const lateJoinC = await settleCanvas(pageC);
   assert.ok(
     lateJoinC.hash !== blankB.hash
