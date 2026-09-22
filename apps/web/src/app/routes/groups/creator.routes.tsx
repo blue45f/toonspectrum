@@ -34,6 +34,8 @@ import {
   StudioEngineCenterPage,
   StudioProductionJobsPage,
   StudioPromoPage,
+  StudioPinnedReviewShowcasePage,
+  StudioPinnedReviewShowcaseDetailPage,
   StudioGenerativePage,
   StudioSpatialReaderPage,
   StudioTemplatesPage,
@@ -87,6 +89,8 @@ export const creatorRoutes = defineAppRoutes([
 
   // Canonical showcase routes retain the existing gallery implementation.
   { id: "creator-showcase", path: "/showcase", element: <CreateGalleryPage /> },
+  { id: "creator-showcase-reviews", path: "/showcase/reviews", element: <StudioPinnedReviewShowcasePage /> },
+  { id: "creator-showcase-review", path: "/showcase/reviews/:shareId", element: <StudioPinnedReviewShowcaseDetailPage /> },
   { id: "creator-showcase-challenges", path: "/showcase/challenges", element: <CreateChallengesPage /> },
   { id: "creator-showcase-promo", path: "/showcase/promo", element: <StudioPromoPage /> },
   { id: "creator-showcase-series", path: "/showcase/series/:id", element: <CreateSeriesPage /> },

@@ -7,7 +7,8 @@ describe("public creative chrome route boundaries", () => {
     "/", "/about", "/about/", "/help", "/support", "/contact", "/business", "/research/assets",
     "/learn", "/learn/process", "/learn/careers", "/learn/education", "/learn/resources", "/learn/classroom",
     "/learn/lessons/panel-pacing", "/learn/paths/webtoon", "/market/browse",
-    "/market/resource/brush-1", "/showcase/work/work-1", "/community/cafes/comics",
+    "/market/resource/brush-1", "/showcase/work/work-1", "/showcase/reviews",
+    "/showcase/reviews/11111111-1111-4111-8111-111111111111", "/community/cafes/comics",
   ])("keeps the creative journey on public destination %s", (pathname) => {
     expect(isPublicCreativeRoute(pathname)).toBe(true);
   });
@@ -15,6 +16,7 @@ describe("public creative chrome route boundaries", () => {
   it.each([
     "/my", "/settings", "/library", "/auth/callback", "/market/library", "/market/manage",
     "/market/publish", "/market/wishlist", "/learn/records", "/studio", "/studio/new",
+    "/production/pinned-review",
     "/does-not-exist", "/about/does-not-exist", "/market/does-not-exist", "/learn/does-not-exist",
     "/community/does-not-exist", "/community/all", "/research/does-not-exist", "/title/a/edit",
   ])("keeps promotion out of account, editing and unknown route %s", (pathname) => {
