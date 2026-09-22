@@ -15,7 +15,7 @@ import {
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 
 const npc: StudioWorldNpcDefinition = {
-  id: "test-writer", skinKey: "silver", roomId: "writers", point: { x: 55, y: 90 },
+  id: "test-writer", skinKey: "npc-editor", roomId: "writers", point: { x: 55, y: 90 },
   facing: "right", speed: 62, behavior: "patrol", patrol: [{ x: 205, y: 90 }, { x: 200, y: 180 }],
 };
 const fixture = (npcs: readonly StudioWorldNpcDefinition[] = [npc]): StudioVirtualSpaceWorldManifest => ({

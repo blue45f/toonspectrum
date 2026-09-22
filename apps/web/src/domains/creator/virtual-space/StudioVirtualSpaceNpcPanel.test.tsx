@@ -14,7 +14,7 @@ describe("StudioVirtualSpaceNpcPanel", () => {
     const buttons = view.getAllByRole("button");
     expect(buttons).toHaveLength(4);
     expect(interact).not.toHaveBeenCalled();
-    const writer = view.getByRole("button", { name: /Sina · NPC · Writer · Open Script desk/u });
+    const writer = view.getByRole("button", { name: /Yoon · Story editor · NPC · Writer · Open Script desk/u });
     writer.focus();
     expect(document.activeElement).toBe(writer);
     expect(interact).not.toHaveBeenCalled();
