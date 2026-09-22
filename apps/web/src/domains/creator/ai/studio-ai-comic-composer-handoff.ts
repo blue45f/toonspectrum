@@ -4,6 +4,10 @@ import type {
 } from "./studio-ai-episode-production-director";
 import type { ScenarioSceneInput } from "../studio-scenario-layout";
 import type { ScenarioBeatType } from "../studio-story-beats";
+import type {
+  StudioScenarioImageQualityProfile,
+  StudioScenarioImageVariationStrategy,
+} from "./studio-scenario-candidate-workflow";
 
 export interface StudioAiComicComposerScene extends ScenarioSceneInput {
   readonly sourceSceneNumber: number;
@@ -17,6 +21,8 @@ export interface StudioAiComicComposerHandoff {
   readonly storyText: string;
   readonly characterDescription: string;
   readonly variants: StudioAiVariantCount;
+  readonly qualityProfile?: StudioScenarioImageQualityProfile;
+  readonly variationStrategy?: StudioScenarioImageVariationStrategy;
   readonly modeLabel: string;
   readonly totalCuts: number;
   readonly projectedOutputCount: number;

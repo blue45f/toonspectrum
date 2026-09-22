@@ -26,6 +26,7 @@ export interface StudioScenarioCandidateDeskProps {
   readonly busy: boolean;
   readonly imageGenerationReady: boolean;
   readonly disabledReason?: string;
+  readonly generationActionLabel?: string;
   readonly onGenerate: (request: StudioScenarioImageGenerationRequest) => void;
   readonly onSelectCandidate: (index: number, candidateId: string) => void;
   readonly onApproveCandidate: (index: number, candidateId: string) => void;
@@ -39,6 +40,20 @@ function preferredVariantCount(
   return items.find((item) => item.preferredVariantCount)?.preferredVariantCount ?? 1;
 }
 
+function preferredQualityProfile(
+  items: readonly ScenarioPreviewItem[],
+): StudioScenarioImageQualityProfile {
+  return items.find((item) => item.preferredQualityProfile)?.preferredQualityProfile
+    ?? DEFAULT_STUDIO_SCENARIO_IMAGE_QUALITY_PROFILE;
+}
+
+function preferredVariationStrategy(
+  items: readonly ScenarioPreviewItem[],
+): StudioScenarioImageVariationStrategy {
+  return items.find((item) => item.preferredVariationStrategy)?.preferredVariationStrategy
+    ?? DEFAULT_STUDIO_SCENARIO_IMAGE_VARIATION_STRATEGY;
+}
+
 function qualityShortLabel(profile: ScenarioImageQualityProfile | undefined): string {
   return STUDIO_SCENARIO_IMAGE_QUALITY_PROFILES.find((option) => option.id === profile)?.shortLabel
     ?? "이전";
@@ -50,6 +65,7 @@ export function StudioScenarioCandidateDesk({
   busy,
   imageGenerationReady,
   disabledReason,
+  generationActionLabel,
   onGenerate,
   onSelectCandidate,
   onApproveCandidate,
@@ -58,12 +74,12 @@ export function StudioScenarioCandidateDesk({
   const [variants, setVariants] = useState<StudioScenarioImageVariantCount>(() =>
     preferredVariantCount(items),
   );
-  const [qualityProfile, setQualityProfile] = useState<StudioScenarioImageQualityProfile>(
-    DEFAULT_STUDIO_SCENARIO_IMAGE_QUALITY_PROFILE,
+  const [qualityProfile, setQualityProfile] = useState<StudioScenarioImageQualityProfile>(() =>
+    preferredQualityProfile(items),
   );
   const [variationStrategy, setVariationStrategy] =
-    useState<StudioScenarioImageVariationStrategy>(
-      DEFAULT_STUDIO_SCENARIO_IMAGE_VARIATION_STRATEGY,
+    useState<StudioScenarioImageVariationStrategy>(() =>
+      preferredVariationStrategy(items),
     );
 
   useEffect(() => {
@@ -75,9 +91,17 @@ export function StudioScenarioCandidateDesk({
   }, [items]);
 
   const importedVariantPreference = preferredVariantCount(items);
+  const importedQualityPreference = preferredQualityProfile(items);
+  const importedVariationPreference = preferredVariationStrategy(items);
   useEffect(() => {
     setVariants(importedVariantPreference);
-  }, [importedVariantPreference]);
+    setQualityProfile(importedQualityPreference);
+    setVariationStrategy(importedVariationPreference);
+  }, [
+    importedQualityPreference,
+    importedVariantPreference,
+    importedVariationPreference,
+  ]);
 
   const selected = useMemo(() => new Set(selectedIndexes), [selectedIndexes]);
   const readiness = useMemo(
@@ -283,7 +307,7 @@ export function StudioScenarioCandidateDesk({
           className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-8"
         >
           <Sparkles size={13} aria-hidden />
-          선택 컷 후보 {preflight.requestedCount}개 생성
+          {generationActionLabel ?? `선택 컷 후보 ${preflight.requestedCount}개 생성`}
         </button>
       </div>
       <p className="mt-1.5 text-[0.62rem] leading-relaxed text-fg-3">

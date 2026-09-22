@@ -71,6 +71,28 @@ describe("StudioScenarioCandidateDesk", () => {
     });
   });
 
+  it("restores handed-off quality and variation preferences", () => {
+    const items = preview();
+    items[0]!.preferredQualityProfile = "final";
+    items[0]!.preferredVariationStrategy = "coverage";
+    render(
+      <StudioScenarioCandidateDesk
+        items={items}
+        referenceSignature="refs"
+        busy={false}
+        imageGenerationReady
+        onGenerate={vi.fn()}
+        onSelectCandidate={vi.fn()}
+        onApproveCandidate={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: "최종 작화" }).getAttribute("aria-checked"))
+      .toBe("true");
+    expect(screen.getByRole("radio", { name: "커버리지" }).getAttribute("aria-checked"))
+      .toBe("true");
+  });
+
   it("selects and approves a current candidate while exposing its recipe metadata", () => {
     const onSelectCandidate = vi.fn();
     const onApproveCandidate = vi.fn();

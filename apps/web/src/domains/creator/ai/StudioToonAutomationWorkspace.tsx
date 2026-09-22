@@ -27,6 +27,11 @@ import {
   STUDIO_FOCUS_RING,
   STUDIO_TOUCH_TARGET,
 } from "../studio-panel-ui";
+import { StudioToonProductionBoard } from "./StudioToonProductionBoard";
+import {
+  scenarioImageReferenceSignature,
+  type StudioScenarioImageGenerationRequest,
+} from "./studio-scenario-candidate-workflow";
 import {
   STUDIO_TOON_AUTOMATION_ASPECT_RATIOS,
   STUDIO_TOON_AUTOMATION_MAX_CHARACTERS,
@@ -47,11 +52,14 @@ import {
   type StudioToonAutomationPromptRules,
 } from "./studio-toon-automation";
 
+import type { ScenarioPreviewItem } from "../studio-scenario-layout";
+
 import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 import { cn } from "@/shared/lib/utils";
 
 const TABS = [
   { id: "overview", label: "제작 개요", icon: Sparkles },
+  { id: "production", label: "장면 제작", icon: Clapperboard },
   { id: "characters", label: "캐릭터", icon: UserRound },
   { id: "prompts", label: "프롬프트", icon: WandSparkles },
   { id: "style", label: "스타일·음성", icon: Palette },
@@ -169,11 +177,16 @@ export interface StudioToonAutomationWorkspaceProps {
   readonly title: string;
   readonly storyText: string;
   readonly sceneCount: number;
+  readonly scenes: readonly ScenarioPreviewItem[];
   readonly visualBibleEntryCount: number;
   readonly document: StudioToonAutomationDocument;
   readonly onChange: (document: StudioToonAutomationDocument) => void;
+  readonly onChangeScene: (index: number, patch: Partial<ScenarioPreviewItem>) => void;
+  readonly onReplaceScenes: (scenes: readonly ScenarioPreviewItem[]) => void;
+  readonly onGenerateScenes: (request: StudioScenarioImageGenerationRequest) => void;
   readonly onOpenDirector: () => void;
   readonly onOpenSurface: (surface: StudioSurface) => void;
+  readonly onOpenUsage: () => void;
   readonly disabled?: boolean;
 }
 
@@ -226,11 +239,16 @@ export function StudioToonAutomationWorkspace({
   title,
   storyText,
   sceneCount,
+  scenes,
   visualBibleEntryCount,
   document,
   onChange,
+  onChangeScene,
+  onReplaceScenes,
+  onGenerateScenes,
   onOpenDirector,
   onOpenSurface,
+  onOpenUsage,
   disabled = false,
 }: StudioToonAutomationWorkspaceProps): ReactElement {
   const [tab, setTab] = useState<TabId>("overview");
@@ -245,6 +263,12 @@ export function StudioToonAutomationWorkspace({
       visualBibleEntryCount,
     }),
     [document, sceneCount, storyText, visualBibleEntryCount],
+  );
+  const referenceSignature = useMemo(
+    () => scenarioImageReferenceSignature(
+      document.scenarioReferenceAssetIds.map((assetId) => ({ assetId })),
+    ),
+    [document.scenarioReferenceAssetIds],
   );
 
   useEffect(() => () => {
@@ -566,6 +590,20 @@ export function StudioToonAutomationWorkspace({
                 </div>
               </section>
             </div>
+          ) : null}
+
+          {tab === "production" ? (
+            <StudioToonProductionBoard
+              items={scenes}
+              referenceSignature={referenceSignature}
+              disabled={disabled}
+              onChangeScene={onChangeScene}
+              onReplaceScenes={onReplaceScenes}
+              onGenerate={onGenerateScenes}
+              onOpenDirector={onOpenDirector}
+              onOpenUsage={onOpenUsage}
+              onOpenAnimation={() => onOpenSurface("animation")}
+            />
           ) : null}
 
           {tab === "characters" ? (
