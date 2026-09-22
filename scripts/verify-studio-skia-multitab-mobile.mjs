@@ -79,6 +79,43 @@ async function drawStrokes(page, bounds, count) {
   await page.mouse.move(12, 12);
 }
 
+async function drawTouchStrokes(context, page, bounds, count) {
+  const cdp = await context.newCDPSession(page);
+  try {
+    for (let index = 0; index < count; index++) {
+      const startX = bounds.x + bounds.width * 0.28;
+      const startY = bounds.y + Math.min(bounds.height - 60, 110 + index * 35);
+      const endX = bounds.x + bounds.width * 0.62;
+      const endY = startY + 24;
+      const point = (step) => ({
+        x: startX + (endX - startX) * (step / 10),
+        y: startY + (endY - startY) * (step / 10),
+        radiusX: 2,
+        radiusY: 2,
+        force: 0.5,
+        id: 1,
+      });
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [point(0)],
+      });
+      for (let step = 1; step <= 10; step++) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [point(step)],
+        });
+      }
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: [],
+      });
+      await page.waitForTimeout(40);
+    }
+  } finally {
+    await cdp.detach();
+  }
+}
+
 async function waitForGpu(page, minimumItems = 1) {
   await page.waitForFunction((minimum) => {
     const surface = document.querySelector('[data-studio-skia-document-surface]');
@@ -115,31 +152,33 @@ async function desktopMultitabCheck() {
     viewport: { width: 1280, height: 900 }, locale: 'ko-KR',
   });
   const first = await context.newPage();
-  const second = await context.newPage();
   observe(first, 'tab-a');
-  observe(second, 'tab-b');
+  let second;
   try {
     console.log('multitab: opening tab A');
+    await first.bringToFront();
     const firstBounds = await openEditor(first);
     await drawStrokes(first, firstBounds, 2);
-    await waitForGpu(first, 2);
+    const firstReady = await waitForGpu(first, 2);
     console.log('multitab: tab A GPU ready; opening tab B');
+    second = await context.newPage();
+    observe(second, 'tab-b');
+    await second.bringToFront();
     const secondBounds = await openEditor(second);
     await drawStrokes(second, secondBounds, 3);
     console.log('multitab: tab B strokes submitted');
-    const [firstState, secondState] = await Promise.all([
-      waitForGpu(first, 1),
-      waitForGpu(second, 1),
-    ]);
-    report.desktopDriver = firstState.driver;
+    const secondState = await waitForGpu(second, 3);
+    report.desktopDriver = firstReady.driver;
     console.log('multitab: both GPU surfaces ready');
     const secondPixels = secondState.pixels;
+    await first.bringToFront();
     await loseGpuContext(first);
     console.log('multitab: tab A context loss observed');
     await first.locator('[data-studio-vello-unavailable="true"]').waitFor({
       timeout: 15_000,
     });
-    const surviving = await waitForGpu(second, 1);
+    await second.bringToFront();
+    const surviving = await waitForGpu(second, 3);
     assert.equal(
       surviving.pixels,
       secondPixels,
@@ -149,13 +188,23 @@ async function desktopMultitabCheck() {
       await second.locator('[data-studio-vello-unavailable="true"]').count(),
       0,
     );
+    await first.bringToFront();
     await first.getByRole('button', {
       name: '같은 GPU 엔진 다시 준비', exact: true,
     }).click();
-    await waitForGpu(first, 1);
+    await waitForGpu(first, 2);
     report.checks.push(
       'Two tabs retain independent GPU recovery state without cross-tab pixel loss',
     );
+  } catch (error) {
+    for (const [index, page] of [first, second].filter(Boolean).entries()) {
+      if (!page.isClosed()) {
+        await page.screenshot({
+          path: path.join(output, `desktop-failure-${index + 1}.png`),
+        }).catch(() => undefined);
+      }
+    }
+    throw error;
   } finally {
     await context.close();
   }
@@ -176,8 +225,9 @@ async function mobileViewportCheck() {
   observe(page, 'mobile');
   try {
     console.log('mobile: opening 390x844 editor');
+    await page.bringToFront();
     const bounds = await openEditor(page);
-    await drawStrokes(page, bounds, 2);
+    await drawTouchStrokes(context, page, bounds, 2);
     const state = await waitForGpu(page, 2);
     report.mobileDriver = state.driver;
     const surfaceBounds = await page
@@ -194,6 +244,13 @@ async function mobileViewportCheck() {
     report.checks.push(
       '390x844 touch emulation draws and publishes one bounded Skia document surface',
     );
+  } catch (error) {
+    if (!page.isClosed()) {
+      await page.screenshot({
+        path: path.join(output, 'mobile-failure.png'),
+      }).catch(() => undefined);
+    }
+    throw error;
   } finally {
     await context.close();
   }
