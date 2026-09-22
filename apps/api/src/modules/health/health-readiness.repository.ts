@@ -183,6 +183,8 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "studio_external_file_binding",
   "studio_mutation_receipt",
   "studio_operation",
+  "studio_pinned_review_feedback",
+  "studio_pinned_review_share",
   "studio_project_graph",
   "studio_review",
   "studio_review_comment",

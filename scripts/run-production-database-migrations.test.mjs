@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(86);
+  expect(manifest).toHaveLength(87);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0086_production_operation_policy");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(86);
+  expect(manifest.at(-1).id).toBe("0087_studio_pinned_review_share");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(87);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1441,6 +1441,8 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_external_file_binding",
     "studio_mutation_receipt",
     "studio_operation",
+    "studio_pinned_review_share",
+    "studio_pinned_review_feedback",
     "studio_project_graph",
     "studio_review",
     "studio_review_comment",
@@ -1448,6 +1450,8 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_review_policy",
     "studio_review_policy_event",
     "studio_review_reviewer",
+    "studio_review_policy",
+    "studio_review_policy_event",
     "studio_revision",
     "studio_revision_blob",
     "studio_revision_parent",
@@ -1748,4 +1752,16 @@ test("group review runtime ACL keeps source identity and event history immutable
   expect(sql).toContain('GRANT EXECUTE ON FUNCTION public.studio_review_policy_actor_epoch(text,text)');
   expect(violation).toContain('EXECUTE WITH GRANT OPTION');
   expect(violation).toContain('prosecdef');
+});
+
+test("pinned review shares preserve immutable metadata and permit only revocation updates", () => {
+  const acl = buildStudioProductionRuntimeAclSql("toonspectrum_runtime"), guard = buildStudioProductionRuntimeAclViolationSql("toonspectrum_runtime");
+  expect(acl).toContain('GRANT UPDATE ("revokedAt")\n  ON TABLE public.studio_pinned_review_share');
+  expect(acl).toContain("public.studio_pinned_review_feedback");
+  expect(guard).toContain("'studio_pinned_review_share'::text, ARRAY['revokedAt']::text[]");
+  expect(guard).toContain("'studio_pinned_review_feedback'::text, ARRAY[]::text[]");
+  const migration = loadMigrationManifest().at(-1);
+  expect(migration.contents).toContain("studio_pinned_review_share_immutable_update");
+  expect(migration.contents).toContain("studio_pinned_review_feedback_immutable_update");
+  expect(migration.contents).not.toMatch(/ALTER TABLE|UPDATE creator_work|DROP TABLE/iu);
 });

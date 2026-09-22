@@ -50,6 +50,9 @@
       ],
       "@toonspectrum/studio-project-model/work-session-evidence": [
         "../../packages/studio-project-model/src/graph/work-session-evidence.ts"
+      ],
+      "@toonspectrum/studio-project-model/pinned-review-share": [
+        "../../packages/studio-project-model/src/graph/pinned-review-share.ts"
       ]
     },
     "outDir": "dist",

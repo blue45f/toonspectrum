@@ -1,3 +1,6 @@
+import { PinnedReviewShareController } from "./pinned-share/pinned-share.controller";
+import { PinnedReviewShareService } from "./pinned-share/pinned-share.service";
+import { PinnedReviewShareRepository } from "./pinned-share/pinned-share.repository";
 import { StudioReviewPolicyController, StudioReviewPolicyService } from "./studio-review-policy.controller";
 import { StudioReviewPolicyRepository } from "./studio-review-policy.repository";
 import { StudioSessionEvidenceController, StudioSessionEvidenceService } from "./studio-session-evidence.controller";
@@ -30,8 +33,9 @@ const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(pr
 
 @Module({
   imports: [CreatorModule, ...(privateObjectStorageModule ? [privateObjectStorageModule] : [])],
-  controllers: [StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
+  controllers: [PinnedReviewShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
   providers: [
+    PinnedReviewShareRepository, PinnedReviewShareService,
     StudioReviewPolicyRepository, StudioReviewPolicyService,
     StudioSessionEvidenceService,
     StudioWorkSessionRepository, StudioWorkSessionService,
