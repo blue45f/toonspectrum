@@ -31,7 +31,10 @@ describe("GPU document /studio product wiring and retained Vello comparison boun
       "documentTransform={velloSceneDocumentTransform}",
     );
     expect(viewportSource).toContain("sceneRevision={velloSceneRevision}");
+    expect(viewportSource).toContain("frameTheme={webtoonTheme}");
+    expect(viewportSource).toContain("frameTheme: webtoonTheme");
     expect(viewportSource).toContain("enabled={velloDocumentSurfaceEnabled}");
+    expect(viewportSource).toContain('((element.opacity ?? 1) <= 0 && element.type !== "frame")');
     expect(viewportSource).toContain("width={stageViewLayout.width}");
     expect(viewportSource).toContain("height={stageViewLayout.height}");
     expect(viewportSource).toContain("isPenDown={readVelloHubPenDown}");

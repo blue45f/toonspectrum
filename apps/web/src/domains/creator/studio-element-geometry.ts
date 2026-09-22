@@ -80,3 +80,20 @@ export function containingPanel(el: El, all: readonly El[]): FrameEl | null {
   if (el.type === "frame") return null;
   return panelContainingBounds(elBounds(el), all);
 }
+
+/**
+ * One resolver per immutable render projection. It preserves containingPanel semantics while
+ * avoiding an all-elements scan for every painted element.
+ */
+export function createStudioPanelResolver(elements: readonly El[]): (element: El) => FrameEl | null {
+  const panels = elements.filter((element): element is FrameEl => element.type === "frame" && !element.hidden);
+  const cache = new WeakMap<El, FrameEl | null>();
+  return (element) => {
+    if (element.type === "frame" || panels.length === 0) return null;
+    const cached = cache.get(element);
+    if (cached !== undefined) return cached;
+    const panel = panelContainingBounds(elBounds(element), panels);
+    cache.set(element, panel);
+    return panel;
+  };
+}

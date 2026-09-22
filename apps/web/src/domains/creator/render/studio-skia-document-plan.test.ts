@@ -66,9 +66,43 @@ it("releases removed renderer projections even when original history elements re
   expect(restored.items[0]?.ink?.dabs).toEqual(before.items[0]?.ink?.dabs);
 });
 
-it("does not bypass invisible frame clipping when only the frame paint has zero opacity", () => {
-  const frame = { id: "panel", type: "frame", x: 0, y: 0, width: 20, height: 20, opacity: 0 } as El;
+it("keeps legacy frame-opacity semantics on the compatibility boundary", () => {
+  const frame = { id: "panel", type: "frame", x: 0, y: 0, width: 80, height: 80, opacity: 0 } as El;
   const projector = createStudioSkiaDocumentProjector();
-  expect(projector.project([frame, pen()])).toMatchObject({ supported: false, ownedDocumentIds: [], reason: "frame-clip-requires-compatibility" });
-  expect(projector.project([{ ...frame, hidden: true }, pen()]).supported).toBe(true);
+  expect(projector.project([frame, pen()])).toMatchObject({
+    supported: false,
+    ownedDocumentIds: [],
+    reason: "unsupported-frame:panel",
+  });
+  const hidden = projector.project([{ ...frame, hidden: true }, pen()]);
+  expect(hidden.supported).toBe(true);
+  expect(hidden.items[0]?.clip).toBeUndefined();
+});
+
+it("preserves transparent frame paint as a child clipping boundary", () => {
+  const frame = { id: "panel", type: "frame", x: 0, y: 0, width: 80, height: 80,
+    bgColor: "#ffffff00", stroke: "#00000000", strokeWidth: 0 } as El;
+  const clipped = createStudioSkiaDocumentProjector().project([frame, pen()]);
+  expect(clipped.supported).toBe(true);
+  expect(clipped.items[0]?.panel?.fill.a).toBe(0);
+  expect(clipped.items[1]?.clip).toEqual({ x: 0, y: 0, width: 80, height: 80 });
+});
+
+it("renders static frame paint and reprojects a child only when its panel changes", () => {
+  const frame = { id: "panel", type: "frame", x: 0, y: 0, width: 80, height: 80, bgColor: "#fefefe" } as El;
+  const child = { ...pen("child"), points: [10, 10, 20, 20, 30, 30] } as El;
+  const projector = createStudioSkiaDocumentProjector();
+  const first = projector.project([frame, child], "vivid");
+  expect(first.supported).toBe(true);
+  expect(first.items[0]?.panel).toMatchObject({ radius: 6, strokeWidth: 1.2, dashed: false });
+  expect(first.items[1]?.clip).toEqual({ x: 0, y: 0, width: 80, height: 80 });
+  const second = projector.project([frame, child], "vivid");
+  expect(second.items[1]).toBe(first.items[1]);
+  const rethemed = projector.project([frame, child], "soft");
+  expect(rethemed.items[0]).not.toBe(first.items[0]);
+  expect(rethemed.items[1]).toBe(first.items[1]);
+  const resizedFrame = { ...frame, width: 60 };
+  const third = projector.project([resizedFrame, child], "vivid");
+  expect(third.items[1]).not.toBe(first.items[1]);
+  expect(third.items[1]?.clip?.width).toBe(60);
 });

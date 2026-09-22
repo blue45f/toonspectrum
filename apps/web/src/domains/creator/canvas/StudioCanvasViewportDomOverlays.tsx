@@ -32,6 +32,7 @@ export interface StudioCanvasViewportDomOverlaysProps {
   paperSurfaceForPreview?: StudioCanvasViewportLiveSurfaces["paperSurfaceForPreview"];
   canvasFlipH: StudioCanvasViewportProps["canvasFlipH"];
   canvasH: StudioCanvasViewportProps["canvasH"];
+  webtoonTheme: StudioCanvasViewportProps["webtoonTheme"];
   velloHubAuthority: StudioCanvasViewportLiveSurfaces["velloHubAuthority"];
   velloDocumentSurfaceEnabled: StudioCanvasViewportLiveSurfaces["velloDocumentSurfaceEnabled"];
   effScale: StudioCanvasViewportProps["effScale"];
@@ -77,6 +78,7 @@ export function StudioCanvasViewportDomOverlays({
   paperSurfaceForPreview,
   canvasFlipH,
   canvasH,
+  webtoonTheme,
   velloHubAuthority,
   velloDocumentSurfaceEnabled,
   effScale,
@@ -202,6 +204,7 @@ export function StudioCanvasViewportDomOverlays({
           </Suspense>
           <StudioSkiaDocumentSurface
             key={rendererAttempt}
+            frameTheme={webtoonTheme}
             beforePublish={beforeSkiaPublish}
             cameraSource={skiaCameraSource}
             visible={velloHubAuthority.status === "active" && velloHubAuthority.sceneRevision === velloSceneRevision}

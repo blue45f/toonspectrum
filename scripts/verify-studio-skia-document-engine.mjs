@@ -76,6 +76,17 @@ async function verify(type, name) {
     assert(markerParity.meanPremultipliedColorError < 8, `marker color ${JSON.stringify(markerParity)}`);
     checkpoint(`${name}: original marker nib, pressure and stroke opacity match within antialiasing tolerance`);
 
+    const panel = await page.evaluate(() => window.skiaEngineQA.panel());
+    assert.equal(panel.status, 'presented');
+    assert.equal(panel.stats.cachedItems, 2);
+    const panelParity = await pixelComparison(page);
+    assert(panelParity.alphaRatio > 0.93 && panelParity.alphaRatio < 1.07, `${name} panel alpha ${JSON.stringify(panelParity)}`);
+    assert(panelParity.edgeMismatch < 0.12, `${name} panel edge mismatch ${JSON.stringify(panelParity)}`);
+    assert(panelParity.meanPremultipliedColorError < 12, `${name} panel color ${JSON.stringify(panelParity)}`);
+    report.measurements.push({ engine: name, panelParity });
+    checkpoint(`${name}: static panel paint and child clipping stay on the retained GPU document surface`);
+    await page.evaluate(() => window.skiaEngineQA.load(80));
+
     const interleaved = await page.evaluate(() => window.skiaEngineQA.interleavedSurface());
     assert.equal(interleaved.status, 'presented');
     const interleavedParity = await pixelComparison(page);

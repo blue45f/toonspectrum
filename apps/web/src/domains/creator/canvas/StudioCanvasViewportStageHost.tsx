@@ -440,6 +440,7 @@ export function StudioCanvasViewportStageHost({
     paperSurfaceForPreview: live.paperSurfaceForPreview,
     canvasFlipH: viewport.canvasFlipH,
     canvasH: viewport.canvasH,
+    webtoonTheme: viewport.webtoonTheme,
     velloHubAuthority: live.velloHubAuthority,
     velloDocumentSurfaceEnabled: live.velloDocumentSurfaceEnabled,
     effScale: viewport.effScale,

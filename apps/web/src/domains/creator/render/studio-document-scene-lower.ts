@@ -17,7 +17,7 @@ import {
   starPathPoints,
   type StrokeLineCap,
 } from "../brush/studio-stroke-shapes";
-import { containingPanel } from "../studio-element-geometry";
+import { createStudioPanelResolver } from "../studio-element-geometry";
 import {
   planStudioPerfectFreehandRender,
   resolveStudioOutlineStrokeContract,
@@ -484,6 +484,7 @@ export function studioDocumentAllowsKonvaHide(
     || elements.some((element) => !element.hidden && (element.opacity ?? 1) > 0
       && element.type === "image" && element.adjustmentLayer)) return false;
   const owned = new Set(ownedDocumentIds);
+  const resolvePanel = createStudioPanelResolver(elements);
   for (const element of elements) {
     if (element.hidden || (element.opacity ?? 1) <= 0) continue;
     if (!isStudioVelloDocumentVectorElement(element)) return false;
@@ -493,7 +494,7 @@ export function studioDocumentAllowsKonvaHide(
     if (
       element.type !== "frame"
       && isStudioVelloDocumentVectorElement(element)
-      && containingPanel(element, elements)
+      && resolvePanel(element)
     ) return false;
     if (isStudioVelloDocumentVectorElement(element) && !owned.has(element.id)) {
       return false;
