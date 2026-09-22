@@ -2,8 +2,9 @@
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { CampusObjectPublisherContext, type CampusObjectPublisher } from "@/shared/components/spatial-campus/campus-object-context";
 import { StudioProjectShellPage } from "./StudioProjectShellPage";
 
 function LocationProbe() {
@@ -11,16 +12,18 @@ function LocationProbe() {
   return <output aria-label="location">{`${location.pathname}${location.search}`}</output>;
 }
 
-function renderReview(entry: string) {
+function renderReview(entry: string, publish: CampusObjectPublisher | null = null) {
   return render(
     <MemoryRouter initialEntries={[entry]}>
-      <LocationProbe />
-      <Routes>
-        <Route
-          path="/studio/p/:projectId/review"
-          element={<StudioProjectShellPage section="review" />}
-        />
-      </Routes>
+      <CampusObjectPublisherContext.Provider value={publish}>
+        <LocationProbe />
+        <Routes>
+          <Route
+            path="/studio/p/:projectId/review"
+            element={<StudioProjectShellPage section="review" />}
+          />
+        </Routes>
+      </CampusObjectPublisherContext.Provider>
     </MemoryRouter>,
   );
 }
@@ -47,5 +50,18 @@ describe("StudioProjectShellPage integration", () => {
       );
     });
     expect(document.querySelector("[data-studio-project-view=inbox]")).toBeTruthy();
+  });
+
+  it("publishes only the current private project reference to the atelier boundary", async () => {
+    const publish = vi.fn<CampusObjectPublisher>(() => () => undefined);
+    renderReview("/studio/p/project-1/review?view=inbox", publish);
+    await waitFor(() => expect(publish).toHaveBeenCalled());
+    expect(publish.mock.calls[0]?.[1]).toEqual([{
+      id: "project-1",
+      title: "project-1",
+      href: "/studio/p/project-1/overview",
+      kind: "project",
+      exposure: "private",
+    }]);
   });
 });

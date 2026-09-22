@@ -121,3 +121,56 @@ Editor report: `artifacts/skia-product/report.json` (generated, not committed).
 
 PR #1952 remains Draft. No main merge of this PR, production deployment, database migration,
 engine rewrite, lockfile update or validation-threshold relaxation was performed.
+
+## Spatial follow-up completed on 2026-09-22
+
+The previously uncommitted follow-up was recovered in the same dedicated worktree and committed as
+`5384c2286` (`feat(campus): connect spatial objects palettes and practice flows`). This closes the
+planned follow-up without creating a second router, editor or persistence authority:
+
+- Nine districts now retain distinct authored artwork while reusing the existing local Phaser
+  engine only as an optional presentation surface.
+- Market, library, gallery, academy, plaza and authorized production pages publish bounded typed
+  display references. Public districts reject a candidate marked `private` even when its URL
+  matches a public allow-list.
+- Existing project-shell pages publish only the current project id and canonical
+  `/studio/p/:projectId/overview` reference as `private` to the atelier boundary. Project
+  documents, team members, review state and query data do not cross that seam.
+- Fortune can hand only validated HEX colors to the existing Studio SQLite palette authority.
+  Context changes abort the handoff instead of committing into a stale project/session.
+- Academy `/learn/trace` launches the existing Studio reference canvas with
+  `practice=trace`; it does not create another drawing engine or storage format.
+- Nested workspace history restores the owned scroll container on browser POP while preserving
+  same-route filter position and clearing memory when the signed-in owner scope changes.
+- The production browser harness now verifies district artwork, optional-scene chunk failure
+  isolation, private form preservation and sanitized failure reporting.
+
+Follow-up verification passed:
+
+- Before the concurrent main advance, changed-file lint, Web/API typechecks, focused regressions and
+  the full production build had already completed with exit 0.
+- After rebasing without conflicts onto `8d5d8f7d7`, workspace-link verification, Web/API
+  typechecks and 9 focused files / 70 tests passed again.
+- The rebased source completed a fresh full production build, generated legal notices and static
+  CSP verification with exit 0.
+- A fresh production preview of that rebased build passed 48 route/viewport cases
+  (12 routes x 1440/1024/390/320), with no horizontal overflow, one main landmark and zero page errors.
+- The same preview verified nine distinct district artwork surfaces, synthetic public-record
+  projection, private fortune input preservation, the native nine-place map dialog, measurable
+  Phaser keyboard movement, clean scene unmount and injected CampusRoom chunk-failure isolation.
+- Trace-practice browser verification entered the real Studio editor/reference canvas and retained
+  the explicit `practice=trace` query with zero runtime errors.
+
+Campus report: `/tmp/toonstudio-campus-c91e27-rebased/report.json`.
+Trace artifacts: `/tmp/toonstudio-trace-practice-c91e27-rebased`.
+
+Existing dependency/bundler warnings (`import.meta` in CJS analysis, browser-externalized Node
+modules and third-party WASM direct-eval warnings) remain warnings; the verified build completed
+successfully.
+
+PR #1952 was merged by a concurrent session at `0c10f9a8d` and its source branch was
+deleted. These two follow-up commits were then rebased without conflicts onto the newer
+`origin/main` checkpoint `8d5d8f7d7` and moved to
+`feat/spatial-campus-v3-followup-20260922`. This follow-up itself has not been merged or
+deployed. No database migration, lockfile change, engine rewrite or validation-threshold
+relaxation was performed in this follow-up.
