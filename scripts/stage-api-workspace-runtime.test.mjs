@@ -61,7 +61,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       '"use strict";\n',
     );
 
-    const optionalModelEntries = ["work-session", "work-session-evidence", "world-publication", "world-acoustic", "world-conversation"];
+    const optionalModelEntries = ["work-session", "work-session-evidence", "pinned-review-share", "world-publication", "world-acoustic", "world-conversation"];
     for (const name of optionalModelEntries) {
       await compiledPackage(root, `packages/studio-project-model/src/graph/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
     }
