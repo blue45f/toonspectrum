@@ -4,10 +4,14 @@ import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useSession } from "@/compat/auth-session-store";
 import { ArrowRight, ArrowLeft, Search, Star, Sparkles, BookOpen, Trash2, BookmarkPlus } from "lucide-react";
 import { FORTUNE_EXPERIENCES, FORTUNE_GROUPS, FORTUNE_DISCLAIMER, buildFortuneReading, fortuneKstDate, fortuneReadingText } from "@toonspectrum/core/fortune";
 import type { FortuneBirthInput, FortuneGroup, FortuneReading } from "@toonspectrum/core/fortune";
 import { FortuneBirthFields } from "./FortuneBirthFields";
+import { FortuneCampusDirectory } from "./FortuneCampusDirectory";
+import { fortuneCampusRoom } from "./fortune-campus-map";
+import { useCampus } from "@/shared/components/spatial-campus/campus-context";
 import { FortuneReadingView } from "./FortuneReadingView";
 import { readFortunePreferences, writeFortunePreferences, clearFortunePreferences } from "./fortune-observatory-storage";
 import type { FortunePreferences } from "./fortune-observatory-storage";
@@ -20,13 +24,21 @@ import "./fortune-observatory.css";
 import "./fortune-cinematic.css";
 
 export function FortuneObservatory({ characterContent }: { characterContent?: ReactNode }) {
+  const session = useSession();
+  const accountId = session.data?.user.id ?? null;
+  return <FortuneObservatorySession key={accountId === null ? "device" : `account:${accountId}`} accountId={accountId} characterContent={characterContent} />;
+}
+
+/** Actor changes discard private inputs and select only this account’s device-local notes. */
+function FortuneObservatorySession({ characterContent, accountId }: { characterContent?: ReactNode; accountId: string | null }) {
   const [params, setParams] = useSearchParams();
+  const campus = useCampus();
   const requested = params.get("content") ?? "";
   const cast = comicCast(params.get("cast")).id;
   const changeCast = (id: ComicCastId) => { const next = new URLSearchParams(params); next.set("cast", id); setParams(next, { replace: true }); };
   const selected = FORTUNE_EXPERIENCES.find((item) => item.id === requested);
   const [group, setGroup] = useState<FortuneGroup>("전체"), [search, setSearch] = useState("");
-  const [favoritesOnly, setFavoritesOnly] = useState(false), [preferences, setPreferences] = useState(readFortunePreferences);
+  const [favoritesOnly, setFavoritesOnly] = useState(false), [preferences, setPreferences] = useState(() => readFortunePreferences(accountId));
   const [birth, setBirth] = useState<FortuneBirthInput>({ date: "", calendar: "solar" });
   const [partner, setPartner] = useState<FortuneBirthInput>({ date: "", calendar: "solar" });
   const [date, setDate] = useState(fortuneKstDate), [month, setMonth] = useState(() => fortuneKstDate().slice(0, 7));
@@ -40,12 +52,12 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
   useEffect(() => { sequence.current += 1; setReading(null); setError(""); setRunning(false); setPick(null); if (requested) workHeading.current?.focus({ preventScroll: true }); return () => { sequence.current += 1; }; }, [requested]);
   useEffect(() => { if (reading) resultHeading.current?.focus({ preventScroll: true }); }, [reading]);
   const navigate = (id: string) => { setParams(id ? { content: id, cast } : { cast }); if (id) requestAnimationFrame(() => document.getElementById("fortune-workbench")?.scrollIntoView({ block: "start" })); };
-  const persist = (next: FortunePreferences) => { setPreferences(next); const stored = writeFortunePreferences(next); if (!stored) setNotice("이 브라우저에서 저장이 제한되어 있어요. 현재 화면에서만 유지됩니다."); return stored; };
+  const persist = (next: FortunePreferences) => { setPreferences(next); const stored = writeFortunePreferences(next, accountId); if (!stored) setNotice("이 브라우저에서 저장이 제한되어 있어요. 현재 화면에서만 유지됩니다."); return stored; };
   const favorite = (id: string) => persist({ ...preferences, favorites: preferences.favorites.includes(id) ? preferences.favorites.filter((v) => v !== id) : [...preferences.favorites, id] });
   const saveReading = () => { if (!reading) return; const entry = { id: `${reading.id}-${Date.now()}`, title: reading.title, text: fortuneReadingText(reading), savedAt: fortuneKstDate() }; const stored = persist({ ...preferences, notebook: [entry, ...preferences.notebook].slice(0, 12) }); if (stored) setNotice("생일·시간·꿈 원문을 제외한 해석을 이 브라우저의 보관함에 추가했어요."); };
   const invalidateReading = () => { sequence.current += 1; setReading(null); setRunning(false); setError(""); };
   const clearInputs = () => { sequence.current += 1; setBirth({ date: "", calendar: "solar" }); setPartner({ date: "", calendar: "solar" }); setQuestion(""); setPick(null); setReading(null); setError(""); setRunning(false); setNotice("현재 입력과 결과를 지웠어요."); };
-  const clearSaved = () => { const ok = clearFortunePreferences(); setPreferences({ favorites: [], notebook: [] }); setNotice(ok ? "관측소의 즐겨찾기와 보관함을 모두 지웠어요." : "브라우저 저장소를 지울 수 없어요. 브라우저 설정에서 사이트 데이터를 확인해 주세요."); };
+  const clearSaved = () => { const ok = clearFortunePreferences(accountId); setPreferences({ favorites: [], notebook: [] }); setNotice(ok ? "관측소의 즐겨찾기와 보관함을 모두 지웠어요." : "브라우저 저장소를 지울 수 없어요. 브라우저 설정에서 사이트 데이터를 확인해 주세요."); };
   const run = async (event: FormEvent) => {
     event.preventDefault(); if (!selected || running) return;
     if (selected.id.startsWith("tarot") && pick === null) { setError("마음이 가는 카드를 먼저 골라 주세요."); return; }
@@ -56,9 +68,10 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
   };
   const visible = FORTUNE_EXPERIENCES.filter((item) => (group === "전체" || item.group === group) && (!favoritesOnly || preferences.favorites.includes(item.id)) && `${item.title} ${item.subtitle} ${item.tag} ${item.group}`.includes(search.trim()));
   if (requested === "character") return <div className="fortune-observatory fo-legacy"><button type="button" className="fo-button" onClick={() => navigate("")}><ArrowLeft size={16} />운세 관측소로</button><p className="fo-safety">{FORTUNE_DISCLAIMER}</p>{characterContent}</div>;
-  return <div className="fortune-observatory" data-fortune-experience="cinematic-v2">
-    <FortuneAmbientLayer theme={selected ? fortuneSceneTheme(selected.id) : "violet"} />
-    <FortuneStoryPortal onNavigate={navigate} compact={Boolean(selected)} cast={cast} onCastChange={changeCast} />
+  return <div className="fortune-observatory" data-fortune-experience="cinematic-v2" data-campus-domain={campus ? "fortune" : undefined} data-fortune-room={fortuneCampusRoom(requested)?.id}>
+    {!campus && <FortuneAmbientLayer theme={selected ? fortuneSceneTheme(selected.id) : "violet"} />}
+    {campus ? <FortuneCampusDirectory group={selected?.group ?? group} onSelect={(next) => { setGroup(next); setSearch(""); setFavoritesOnly(false); navigate(""); }} />
+      : <FortuneStoryPortal onNavigate={navigate} compact={Boolean(selected)} cast={cast} onCastChange={changeCast} />}
     <p className="fo-safety">{FORTUNE_DISCLAIMER}</p>
     {requested && !selected && <p role="status" className="fo-help">알 수 없는 콘텐츠 주소입니다. 아래에서 원하는 운세를 선택해 주세요.</p>}
     {selected && <section className="fo-workbench" id="fortune-workbench" data-theme={fortuneSceneTheme(selected.id)} data-running={running} aria-labelledby="fortune-work-title">
@@ -92,7 +105,7 @@ export function FortuneObservatory({ characterContent }: { characterContent?: Re
       <div className="fo-catalog">{visible.map((item, i) => <article key={item.id} className="fo-experience" data-group={item.group} style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}><button type="button" className="fo-experience-open" onClick={() => navigate(item.id)} aria-label={`${item.title} 살펴보기`}><span className="fo-card-top"><span className="fo-glyph" aria-hidden="true">{item.glyph}</span><small>{item.tag}</small></span><FortuneExperienceArt experience={item} compact /><h3>{item.title}</h3><p>{item.subtitle}</p><span className="fo-card-bottom">{item.group}<ArrowRight size={16} /></span></button><button type="button" className="fo-favorite" onClick={() => favorite(item.id)} aria-pressed={preferences.favorites.includes(item.id)} aria-label={`${item.title} 즐겨찾기`}><Star size={16} fill={preferences.favorites.includes(item.id) ? "currentColor" : "none"} /></button></article>)}</div>
       {!visible.length && <div className="fo-empty"><Sparkles size={28} /><h3>아직 찾지 못한 이야기</h3><p>다른 검색어나 카테고리로 살펴보세요.</p><button className="fo-button" type="button" onClick={() => { setSearch(""); setGroup("전체"); setFavoritesOnly(false); }}>전체 콘텐츠 보기</button></div>}
     </section>
-    {notebookOpen && <section className="fo-notebook" id="fo-notebook" tabIndex={-1} aria-label="나의 운세 보관함"><div className="fo-discover-head"><div><h2>나의 보관함</h2><p>이 브라우저에 저장한 해석 텍스트 · 최근 12개</p></div><button type="button" className="fo-button" onClick={clearSaved}><Trash2 size={15} />즐겨찾기·보관함 비우기</button></div>{preferences.notebook.length ? preferences.notebook.map((entry) => <details key={entry.id}><summary>{entry.title} · {entry.savedAt}</summary><pre>{entry.text}</pre><button type="button" className="fo-button" onClick={() => persist({ ...preferences, notebook: preferences.notebook.filter((n) => n.id !== entry.id) })}>이 기록 삭제</button></details>) : <p className="fo-help">결과에서 ‘해석 보관’을 누르면 이곳에 모입니다. 저장은 선택이며 언제든 지울 수 있어요.</p>}</section>}
+    {notebookOpen && <section className="fo-notebook" id="fo-notebook" tabIndex={-1} aria-label="나의 운세 보관함"><div className="fo-discover-head"><div><h2>나의 보관함</h2><p>{accountId ? "이 계정에서 이 브라우저에 보관한 해석 · 최근 12개 · 서버 동기화 없음" : "로그아웃 상태의 기기 공용 기록 · 최근 12개"}</p></div><button type="button" className="fo-button" onClick={clearSaved}><Trash2 size={15} />즐겨찾기·보관함 비우기</button></div>{preferences.notebook.length ? preferences.notebook.map((entry) => <details key={entry.id}><summary>{entry.title} · {entry.savedAt}</summary><pre>{entry.text}</pre><button type="button" className="fo-button" onClick={() => persist({ ...preferences, notebook: preferences.notebook.filter((n) => n.id !== entry.id) })}>이 기록 삭제</button></details>) : <p className="fo-help">결과에서 ‘해석 보관’을 누르면 이곳에 모입니다. 저장은 선택이며 언제든 지울 수 있어요.</p>}</section>}
     <section className="fo-character-callout"><div><p className="fo-eyebrow">A DIFFERENT WAY TO READ</p><h2>캐릭터가 읽어 주는 나의 이야기</h2><p>아라·단우·레오나·가온의 웹툰 해설, 타로와 독서 처방도 만나보세요.</p></div><button type="button" className="fo-button" onClick={() => navigate("character")}>캐릭터 웹툰 운세 <ArrowRight size={17} /></button></section>
     <p className="fo-notice" role="status" aria-live="polite">{notice}</p>
     <footer className="fo-footer"><strong>정해진 운명보다, 내가 만드는 다음 장면.</strong><p>{FORTUNE_DISCLAIMER}</p><p>브라우저 로컬 계산 · 한국 표준시 · 1900~2050년 · 최초 페이지 로드에는 연결이 필요합니다.</p></footer>

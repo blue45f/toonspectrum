@@ -12,9 +12,12 @@ import "./workspace-redesign.css";
 import "./workspace-task-frame.css";
 
 /** Stable child ancestry keeps AppRouter and editor lifetime independent of chrome changes. */
-export function WorkspaceTaskFrame({ route, children }: {
+export function WorkspaceTaskFrame({ route, children, campusMode, campusControls, campusScene }: {
   readonly route: WorkspaceTaskRoute | null;
   readonly children: ReactNode;
+  readonly campusMode?: "scene" | "task" | "focus";
+  readonly campusControls?: ReactNode;
+  readonly campusScene?: ReactNode;
 }) {
   const bt = useBilingual("WorkspaceTaskFrame");
   const { pathname, search } = useLocation();
@@ -31,7 +34,7 @@ export function WorkspaceTaskFrame({ route, children }: {
   const context = workspaceNavigationContext(pathname, search);
   const homeHref = workspaceNavigationHref("/home", context);
   return <div className={route ? "workspace-shell workspace-task-shell" : "workspace-task-passthrough"}
-    data-workspace-surface={route ? "task" : undefined}>
+    data-workspace-surface={route ? "task" : undefined} data-campus-frame={campusMode}>
     {route ? <header className="workspace-topbar" key="header">
       <WorkspaceBrand href={homeHref} />
       <nav className="workspace-task-breadcrumb" aria-label={bt("현재 위치", "Current location")}>
@@ -49,11 +52,15 @@ export function WorkspaceTaskFrame({ route, children }: {
     </header> : null}
     {route ? <WorkspaceSidebar context={context} key="navigation" /> : null}
     <div ref={content} key="content" className={route ? "workspace-main workspace-task-content" : "workspace-task-passthrough"}>
-      {route ? <div className="workspace-task-purpose" key="purpose">
+      {campusControls ? <div className="campus-toolbar" key="campus-controls">{campusControls}</div> : null}
+      {route && !campusMode ? <div className="workspace-task-purpose" key="purpose">
         <p>{bt(route.hintKo, route.hintEn)}</p>
         <Link href={homeHref}><ArrowLeft size={16} aria-hidden="true" />{bt("가상 스튜디오", "Virtual studio")}</Link>
       </div> : null}
-      <div key="route" className="workspace-task-route-content">{children}</div>
+      <div key="workbench" className={campusMode === "scene" ? "campus-workbench" : "workspace-task-passthrough"}>
+        {campusScene ? <aside key="scene" className="campus-scene-column">{campusScene}</aside> : null}
+        <div key="route" className="workspace-task-route-content">{children}</div>
+      </div>
     </div>
   </div>;
 }
