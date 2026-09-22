@@ -97,6 +97,23 @@ services:
         sync: false
       - key: PERSONAL_CLOUD_TOKEN_ENCRYPTION_KEY
         sync: false
+      # Payments remain fail-closed until the explicit switches and a matching Toss
+      # client/secret pair are configured in Render. Live credentials additionally
+      # require the cost-policy and live-allow gates; never commit credential values.
+      - key: SUPPORTER_PAYMENTS_ENABLED
+        sync: false
+      - key: COMMERCE_PAYMENTS_ENABLED
+        sync: false
+      - key: PRODUCTION_INTEGRATION_COST_POLICY
+        sync: false
+      - key: PRODUCTION_TOSS_ALLOW_LIVE
+        sync: false
+      - key: TOSS_PAYMENTS_API_BASE_URL
+        value: https://api.tosspayments.com
+      - key: TOSS_PAYMENTS_CLIENT_KEY
+        sync: false
+      - key: TOSS_PAYMENTS_SECRET_KEY
+        sync: false
       - key: STUDIO_REALTIME_TICKET_ENABLED
         sync: false
       - key: STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID
