@@ -51,6 +51,13 @@ function resolveBlendMode(
   }
 }
 
+function rasterBounds(item: SkiaDocumentImage): readonly [number, number, number, number] {
+  const bounds = item.rasterBounds;
+  return bounds
+    ? [bounds.x, bounds.y, bounds.x + bounds.width, bounds.y + bounds.height]
+    : [0, 0, item.width, item.height];
+}
+
 function drawTexture(
   ck: CanvasKit,
   target: Canvas,
@@ -75,7 +82,7 @@ function drawTexture(
     target.drawImageRectOptions(
       texture,
       [0, 0, texture.width(), texture.height()],
-      [0, 0, item.width, item.height],
+      rasterBounds(item),
       ck.FilterMode.Linear,
       ck.MipmapMode.None,
       paint,
@@ -208,11 +215,12 @@ export function createSkiaDocumentImageCache(
             Math.abs(item.shadow.offsetX),
             Math.abs(item.shadow.offsetY),
           ) + item.shadow.blur * 3 + 2;
+          const bounds = rasterBounds(item);
           target.saveLayer(layerPaint, [
-            -padding,
-            -padding,
-            item.width + padding,
-            item.height + padding,
+            bounds[0] - padding,
+            bounds[1] - padding,
+            bounds[2] + padding,
+            bounds[3] + padding,
           ]);
           try {
             drawTexture(ck, target, texture, item, sourcePaint);

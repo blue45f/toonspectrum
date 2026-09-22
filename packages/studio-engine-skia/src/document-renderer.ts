@@ -160,6 +160,16 @@ function validateFrame(frame: SkiaDocumentFrame): void {
       || item.image.opacity < 0
       || item.image.opacity > 1
       || item.image.cornerRadius < 0
+      || (item.image.rasterBounds && (
+        [
+          item.image.rasterBounds.x,
+          item.image.rasterBounds.y,
+          item.image.rasterBounds.width,
+          item.image.rasterBounds.height,
+        ].some((value) => !Number.isFinite(value))
+        || item.image.rasterBounds.width <= 0
+        || item.image.rasterBounds.height <= 0
+      ))
       || !SKIA_DOCUMENT_BLEND_MODES.has(item.image.blendMode)
       || (item.image.shadow && (
         [

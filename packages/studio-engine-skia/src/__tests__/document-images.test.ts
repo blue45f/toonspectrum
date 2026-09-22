@@ -171,3 +171,59 @@ describe("retained GPU document image cache", () => {
     cache.dispose();
   });
 });
+
+it("draws prepared filter padding outside the authored transform frame", async () => {
+  const texture = { width: () => 48, height: () => 38, delete: vi.fn() } as unknown as Image;
+  const cache = createSkiaDocumentImageCache(async () => bitmap(48, 38));
+  const surface = { makeImageFromTextureSource: () => texture } as unknown as Surface;
+  const base = imageItem("blob:specialist");
+  const prepared = {
+    ...base.image!,
+    rasterBounds: { x: -4, y: -4, width: 48, height: 38 },
+    shadow: {
+      color: { r: 0, g: 0, b: 0, a: 1 },
+      blur: 2,
+      offsetX: 1,
+      offsetY: 1,
+      opacity: 0.5,
+    },
+  };
+  await cache.prepare([{ ...base, image: prepared }], surface, new AbortController().signal);
+
+  const paints = Array.from({ length: 2 }, () => ({
+    setAntiAlias: vi.fn(), setAlphaf: vi.fn(), setBlendMode: vi.fn(),
+    setImageFilter: vi.fn(), delete: vi.fn(),
+  }));
+  let paintIndex = 0;
+  const filter = { delete: vi.fn() };
+  const canvas = {
+    save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
+    skew: vi.fn(), scale: vi.fn(), clipRRect: vi.fn(), saveLayer: vi.fn(),
+    drawImageRectOptions: vi.fn(),
+  };
+  const ck = {
+    Paint: class { constructor() { return paints[paintIndex++]!; } },
+    FilterMode: { Linear: 1 },
+    MipmapMode: { None: 0 },
+    BlendMode: { SrcOver: 1 },
+    ClipOp: { Intersect: 1 },
+    RRectXY: vi.fn((rect: unknown) => rect),
+    ImageFilter: { MakeDropShadow: vi.fn(() => filter) },
+  } as unknown as CanvasKit;
+
+  cache.draw(ck, canvas as never, prepared);
+  expect(canvas.drawImageRectOptions).toHaveBeenCalledWith(
+    texture,
+    [0, 0, 48, 38],
+    [-4, -4, 44, 34],
+    1,
+    0,
+    paints[0],
+  );
+  expect(canvas.saveLayer).toHaveBeenCalledWith(
+    paints[1],
+    [-13, -13, 53, 43],
+  );
+  expect(canvas.translate).toHaveBeenNthCalledWith(1, 10, 20);
+  cache.dispose();
+});

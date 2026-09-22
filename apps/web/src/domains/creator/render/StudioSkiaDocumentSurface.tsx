@@ -9,9 +9,27 @@ import type { StudioSkiaDocumentPresentationCandidate } from "../studio-skia-com
 import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import { createStudioSkiaDocumentProjector } from "./studio-skia-document-plan";
 import { projectStudioSkiaLiveTransformElements } from "./studio-skia-live-transform-projection";
+import {
+  createStudioSkiaSpecialistDocumentProjectionCache,
+  prepareStudioSkiaSpecialistDocumentProjection,
+  type StudioSkiaSpecialistDocumentProjection,
+} from "./studio-skia-specialist-document-projection";
+import {
+  requiresStudioSkiaSpecialistRaster,
+  STUDIO_SKIA_SPECIALIST_RASTER_ANIMATION_INTERVAL_MS,
+} from "./studio-skia-specialist-raster";
+import type { StudioSkiaSpecialistRasterCache } from "./studio-skia-specialist-raster-cache";
 import type { StudioRenderSurfaceAuthority, StudioRenderSurfaceProps } from "./StudioRenderSurface";
 
 export const STUDIO_SKIA_DOCUMENT_BACKEND = "skia-canvaskit-document-webgl2" as const;
+
+interface StudioSkiaSpecialistProjectionState {
+  readonly elements: StudioRenderSurfaceProps["elements"] | null;
+  readonly liveFrameRevision: number;
+  readonly projection: StudioSkiaSpecialistDocumentProjection | null;
+  readonly error: string | null;
+  readonly ready: boolean;
+}
 
 function clearRetainedCameraTranslation(canvas: HTMLCanvasElement): void {
   canvas.style.transform = "";
@@ -54,19 +72,30 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
 }) {
   const sink = useRef(onAuthorityChange);
   sink.current = onAuthorityChange;
+  const [liveFrameRevision, setLiveFrameRevision] = useState(0);
   const latest = useRef({ width, height, documentWidth, documentHeight, dpr, elements,
     sceneRevision, documentTransform, beforePublish, cameraSource, visible, frameTheme,
     canPublishOverSettledInk, onVisiblePresentation, liveTransformDraftStore,
-    liveTransformDraftScope });
+    liveTransformDraftScope, liveFrameRevision });
   latest.current = { width, height, documentWidth, documentHeight, dpr, elements,
     sceneRevision, documentTransform, beforePublish, cameraSource, visible, frameTheme,
     canPublishOverSettledInk, onVisiblePresentation, liveTransformDraftStore,
-    liveTransformDraftScope };
+    liveTransformDraftScope, liveFrameRevision };
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<SkiaDocumentRenderer | null>(null);
   const projectorRef = useRef(createStudioSkiaDocumentProjector());
+  const specialistCacheRef = useRef<StudioSkiaSpecialistRasterCache | null>(null);
+  const specialistStateRef = useRef<StudioSkiaSpecialistProjectionState>({
+    elements: null,
+    liveFrameRevision: -1,
+    projection: null,
+    error: null,
+    ready: false,
+  });
+  const specialistPreparationGeneration = useRef(0);
+  const [specialistPresentationRevision, setSpecialistPresentationRevision] = useState(0);
   const generation = useRef(0); const revision = useRef(0);
-  const submitted = useRef<((cameraOnly?: boolean) => void) | null>(null);
+  const submitted = useRef<((cameraOnly?: boolean, refreshOnly?: boolean) => void) | null>(null);
   const receipt = useRef<object | null>(null);
   const receiptOwnedDocumentIds = useRef<readonly string[]>([]);
   const sourceHiddenReceipt = useRef<object | null>(null);
@@ -76,6 +105,100 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     sink.current?.({ status, backendId: status === "disabled" || status === "legacy" ? null : STUDIO_SKIA_DOCUMENT_BACKEND, decision: null,
       sceneRevision: frame, ownedDocumentIds: ids, reason, visibleCanvasCount: status === "active" ? 1 : 0 });
   };
+  useLayoutEffect(() => {
+    const preparationGeneration = ++specialistPreparationGeneration.current;
+    const controller = new AbortController();
+    let cache = specialistCacheRef.current;
+    if (!cache || cache.snapshot().disposed) {
+      cache = createStudioSkiaSpecialistDocumentProjectionCache();
+      specialistCacheRef.current = cache;
+    }
+    const previous = specialistStateRef.current.projection;
+    const hasCandidates = elements.some(requiresStudioSkiaSpecialistRaster);
+    specialistStateRef.current = {
+      elements,
+      liveFrameRevision,
+      projection: previous,
+      error: null,
+      ready: false,
+    };
+    if (!hasCandidates) {
+      previous?.release({ invalidateLiveFrames: true });
+      specialistStateRef.current = {
+        elements,
+        liveFrameRevision,
+        projection: null,
+        error: null,
+        ready: true,
+      };
+      return () => controller.abort();
+    }
+    void prepareStudioSkiaSpecialistDocumentProjection(elements, {
+      cache,
+      liveFrameRevision,
+      signal: controller.signal,
+    }).then((projection) => {
+      if (
+        controller.signal.aborted
+        || preparationGeneration !== specialistPreparationGeneration.current
+      ) {
+        projection.release({ invalidateLiveFrames: true });
+        return;
+      }
+      previous?.release({ invalidateLiveFrames: true });
+      specialistStateRef.current = {
+        elements,
+        liveFrameRevision,
+        projection,
+        error: null,
+        ready: true,
+      };
+      setSpecialistPresentationRevision((value) => value + 1);
+    }).catch((cause: unknown) => {
+      if (
+        controller.signal.aborted
+        || preparationGeneration !== specialistPreparationGeneration.current
+      ) return;
+      previous?.release({ invalidateLiveFrames: true });
+      specialistStateRef.current = {
+        elements,
+        liveFrameRevision,
+        projection: null,
+        error: cause instanceof Error ? cause.message : String(cause),
+        ready: true,
+      };
+      setSpecialistPresentationRevision((value) => value + 1);
+    });
+    return () => controller.abort();
+  }, [elements, liveFrameRevision]);
+
+  useLayoutEffect(() => {
+    const hasLiveFrame = elements.some((element) =>
+      element.type === "image" && element.isAnimatedGif === true && !element.hidden
+    );
+    if (!enabled || !visible || !hasLiveFrame) return;
+    const interval = window.setInterval(() => {
+      setLiveFrameRevision((value) =>
+        value >= Number.MAX_SAFE_INTEGER - 1 ? 0 : value + 1
+      );
+    }, STUDIO_SKIA_SPECIALIST_RASTER_ANIMATION_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [elements, enabled, visible]);
+
+  useLayoutEffect(() => () => {
+    specialistPreparationGeneration.current += 1;
+    specialistStateRef.current.projection?.release({ invalidateLiveFrames: true });
+    specialistStateRef.current = {
+      elements: null,
+      liveFrameRevision: -1,
+      projection: null,
+      error: null,
+      ready: false,
+    };
+    specialistCacheRef.current?.dispose();
+    specialistCacheRef.current = null;
+  }, []);
+
   useLayoutEffect(() => {
     const current = canvasRef.current;
     if (!current) return;
@@ -162,7 +285,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     let cameraFrame = 0;
     let presentedCamera: StudioSkiaDocumentCamera | null = null;
     let liveTransformProjectionToken = "base";
-    const submit = (cameraOnly = false) => {
+    const submit = (cameraOnly = false, refreshOnly = false) => {
       if (!runtime || !alive || generation.current !== scope) return;
       pendingFence?.abort();
       const controller = new AbortController(); pendingFence = controller;
@@ -178,7 +301,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         && sourceHiddenReceipt.current === receipt.current
         && state.visible;
       const continuing = transformHandoffContinuing || (
-        cameraOnly
+        (cameraOnly || refreshOnly)
         && receipt.current === state.sceneRevision
         && sourceHiddenReceipt.current === state.sceneRevision
         && state.visible
@@ -190,9 +313,41 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       );
       const projectionToken = transformProjection.token;
       liveTransformProjectionToken = projectionToken;
+      const requiresSpecialistProjection = transformProjection.elements.some((element) =>
+        !element.hidden
+        && (element.opacity ?? 1) > 0
+        && requiresStudioSkiaSpecialistRaster(element)
+      );
+      const specialistState = specialistStateRef.current;
+      if (requiresSpecialistProjection && (
+        !specialistState.ready
+        || specialistState.elements !== state.elements
+        || specialistState.liveFrameRevision !== state.liveFrameRevision
+      )) {
+        report("starting", state.sceneRevision, [], "preparing-specialist-raster");
+        return;
+      }
+      if (requiresSpecialistProjection && specialistState.error) {
+        receipt.current = null;
+        receiptOwnedDocumentIds.current = [];
+        visiblePresentationReceipt.current = null;
+        presentedCamera = null;
+        clearRetainedCameraTranslation(canvas);
+        canvas.style.visibility = "hidden";
+        report("legacy", state.sceneRevision, [], specialistState.error);
+        return;
+      }
       let plan;
-      try { plan = projector.project(transformProjection.elements, state.frameTheme); }
-      catch (cause) { report("unavailable", state.sceneRevision, [], cause instanceof Error ? cause.message : String(cause)); return; }
+      try {
+        plan = projector.project(
+          transformProjection.elements,
+          state.frameTheme,
+          specialistState.projection?.sources,
+        );
+      } catch (cause) {
+        report("unavailable", state.sceneRevision, [], cause instanceof Error ? cause.message : String(cause));
+        return;
+      }
       if (!plan.supported) {
         receipt.current = null;
         receiptOwnedDocumentIds.current = [];
@@ -402,6 +557,10 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     }
     submitted.current?.();
   }, [sceneRevision, width, height, documentWidth, documentHeight, dpr, elements, frameTheme]);
+  useLayoutEffect(() => {
+    submitted.current?.(false, true);
+  }, [specialistPresentationRevision]);
+
   useLayoutEffect(() => {
     if (cameraSource) return;
     const state = latest.current;

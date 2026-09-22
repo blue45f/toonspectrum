@@ -66,6 +66,13 @@ export interface SkiaDocumentImage {
   readonly skewX: number;
   readonly skewY: number;
   readonly cornerRadius: number;
+  /** Optional document-local paint rectangle for a prepared raster with transparent padding. */
+  readonly rasterBounds?: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
   readonly blendMode: SkiaDocumentBlendMode;
   readonly shadow?: {
     readonly color: ColorIR;
