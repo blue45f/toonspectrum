@@ -1,0 +1,96 @@
+# Spatial campus v3 — isolated implementation
+
+Base: `84aa2f6a72f04ff808ffcdae26283135657c7d71`.
+Branch: `feat/spatial-campus-v3-c91e27-20260922`.
+Status: verified integration checkpoint; full v3 acceptance remains incomplete. No deployment or database changes.
+
+## Ownership
+
+This session owns additive `app/spatial-campus`, `shared/lib/spatial-campus`,
+`shared/components/spatial-campus`, focused market/fortune presentation adapters,
+and narrowly scoped AppShell/WorkspaceTaskFrame integration.
+
+Read-only overlap review found another session modifying manuscript contracts,
+API/package manifests, lockfile, migration 0087 and Skia render/canvas packages.
+Those files are not owned by this session. PR #1939 owns pinned review sharing;
+its server/UI work must not be recreated or implicitly merged here.
+
+The original checkout and every other worktree stay untouched. Dependencies are
+installed independently from the frozen lockfile. No shared node_modules links,
+process termination, branch reset, forced push, CI bypass or schema migration.
+
+## Acceptance
+
+Record route binding, domain integration, tests, browser evidence and unverified
+requirements separately. Existing pages remain the authority for domain writes.
+Scene rendering, interest lists and navigation never confer rights or confirm
+storage, approvals, purchases or publication.
+
+## Implemented checkpoint — resumed 2026-09-22
+
+- Explicit bindings for **205 registered top-level route IDs** across nine districts,
+  checked against the actual route AST. Wildcard router internals are not an exhaustive
+  per-page acceptance certificate. Existing URLs, route owners and aliases are retained.
+- Campus map, direct place selection and scene/task/focus presentations reuse the existing
+  workspace shell. View changes preserve the same child component and domain query values.
+- Existing authored art and Phaser runtime are reused as a **shared atelier**, not nine
+  newly illustrated rooms. Walking is optional and local-only; no presence/media is opened.
+- Market browse exposes bounded public record references in the scene, using the same
+  fetched results. This projection does not acquire, install, purchase or mutate a manuscript.
+- All **29 registered fortune experiences** have explicit room/category bindings; the legacy
+  character entrance remains separate. Existing calculations and result lifetimes are retained.
+- Exact allow-listed manuscript return references are tab-scoped, owner-checked and expiring.
+  Missing/unsupported references do not silently substitute a different document.
+- Scene failures now stay inside a dedicated boundary: no whole-document reload, no task
+  remount, one sanitized diagnostic and a same-task recovery action. Lazy rejection is unit-tested.
+- Fortune notebook reads/saves/deletes now use account-specific browser keys. Actor changes
+  reset ephemeral input and select that actor’s shelf. The pre-existing signed-out device key
+  is preserved, not automatically migrated or deleted. This is local UI separation, not
+  encryption or a new server authorization system; signed-out legacy notes remain device-shared.
+
+## Verified checkpoint
+
+- Changed-source ESLint: passed, zero warnings.
+- Combined relevant regression: **133 files / 1,344 tests passed** in one run (do not add the
+  earlier focused counts to this total). Includes app, workspace, market and fortune regressions.
+- Chromium development-server matrix: **40 route/viewport cases** (10 routes at widths
+  1440, 1024, 390 and 320). No uncaught runtime errors, horizontal document overflow or duplicate
+  main landmarks in these cases. Anonymous session and synthetic market records are fixtures;
+  remaining API calls deliberately return unavailable. This is not production API acceptance.
+- Browser interactions: public record projection; private dream input preserved across all
+  three modes without URL/storage leakage; nine-place dialog and Escape; real Phaser startup,
+  measured actor movement from keyboard input, canvas disposal on stop and unchanged domain input.
+- Architecture and toolchain coverage, Web/API typecheck, production build, generated legal notices, CSP and the unchanged bundle ratchet: passed. The static bundle gate reported zero regressions; its old runtime-startup telemetry was not remeasured.
+
+## Not completed / next work
+
+The whole v3 design is **not** complete. S2–S5 still include district-specific artwork/manifests,
+actual domain-object presentation beyond the market projection, the complete typed inventory and
+cross-domain apply/receipt paths, trace-practice integration, public-room publishing, media privacy
+warnings and end-to-end authorized production/review workflows. Existing implementation in other
+sessions must be reconciled, not duplicated.
+
+A nested workbench scroll-restoration module and an additional real-browser scene-import failure
+injection were attempted during this continuation but their write requests were rejected before
+execution by the connector security check. Neither was applied through another path. Existing
+navigation behavior is retained; the new scene-boundary failure tests are React/DOM tests only.
+Earlier blocked market-overview and palette-save adapter writes also remain unimplemented.
+
+Physical iOS/Android/pen/IME/screen-reader validation, one-hour soak, real GPU loss/recovery in
+this campus adapter, complete route/subrouter coverage and all 32 v3 acceptance gates remain.
+Repository-wide CI and production deployment are separate from the checks above.
+
+Concurrent open PR file lists reviewed: #1939 (pinned review), #1949/#1950/#1951 (Skia).
+No files from those lists are modified in this checkpoint. A broad all-worktree scan was blocked;
+there is no claim of a globally exclusive filesystem lock. The existing dedicated worktree is kept.
+
+## Production-preview follow-up
+
+The first production-preview run completed the 40 route/layout cases, then failed waiting for
+`data-local-x`, which the existing Phaser component intentionally emits only in development.
+The test was not weakened: the campus adapter now exposes only its existing local position
+callback as anonymous x/y diagnostic attributes, and the same >3-pixel movement assertion reads
+those attributes in both environments. No engine implementation or private peer data was changed.
+The adapter also retains the last local pose when the scene is released offscreen and restored;
+a React/DOM regression verifies that resume and observer cleanup.
+The rebuilt production-preview rerun is recorded separately after completion.

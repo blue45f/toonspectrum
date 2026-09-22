@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigationType, useSearchParams } from "react-router-dom";
 
 import { MarketNavHeader } from "../components/MarketNavHeader";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { MarketResourceCard } from "../components/MarketResourceCard";
 import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useMarketResources } from "../hooks/use-market-resources";
@@ -172,6 +173,9 @@ export function MarketBrowsePage() {
 
   return (
     <div>
+      <CampusObjectSource objects={hasInvalidQuery ? [] : page.items.map((record) => ({
+        id: record.id, title: record.name, href: `/market/resource/${encodeURIComponent(record.id)}`,
+      }))} />
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
           <MarketNavHeader />

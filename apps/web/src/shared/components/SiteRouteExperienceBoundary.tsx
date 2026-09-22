@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { RoutePurposeScene } from "./RoutePurposeScene";
+import { useCampus } from "./spatial-campus/campus-context";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
@@ -92,7 +93,8 @@ export function SiteRouteExperienceBoundary({
   );
   const narrow = useNarrowViewport();
   const online = useOnlineState();
-  const routePurposeSceneSupported = supportsRoutePurposeScene(pathname);
+  const campus = useCampus();
+  const routePurposeSceneSupported = !campus && supportsRoutePurposeScene(pathname);
 
   useEffect(() => {
     const root = document.documentElement;

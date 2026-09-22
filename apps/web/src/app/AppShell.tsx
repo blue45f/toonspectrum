@@ -3,7 +3,8 @@ import { useLocation } from "react-router-dom";
 
 import { RouteScrollRestoration } from "./RouteScrollRestoration";
 import { AppRouter } from "./routes/AppRouter";
-import { WorkspaceTaskFrame } from "@/shared/components/workspace/WorkspaceTaskFrame";
+import { SpatialCampusFrame } from "./spatial-campus/SpatialCampusFrame";
+import { campusTaskRoute, resolveCampusLocation } from "./spatial-campus/campus-route-adapter";
 import { workspaceTaskRoute } from "@/shared/components/workspace/workspace-task-route";
 
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -57,6 +58,8 @@ const ToastHost = lazy(() =>
 function CreatorContinuityTracker() {
   const { pathname, search } = useLocation();
   useEffect(() => {
+    const binding = resolveCampusLocation(pathname, search);
+    if (binding?.surface === "protected" || binding?.districtId === "observatory") return;
     recordCreatorDestination(pathname, search);
     recordSiteRouteVisit(pathname);
   }, [pathname, search]);
@@ -113,10 +116,12 @@ export function AppShell({
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   const { pathname, search } = useLocation();
-  const taskRoute = workspaceTaskRoute(pathname, search);
+  const campus = resolveCampusLocation(pathname, search);
+  const protectedCampus = campus?.surface === "protected";
+  const taskRoute = protectedCampus ? null : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
   const immersiveVirtualHome = ["/", "/home", "/team", "/hub", "/studio"].includes(pathname.replace(/\/+$/u, "") || "/");
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
-  const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null;
+  const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;
   const publicCreativeRoute = isPublicCreativeRoute(pathname);
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname) && !immersiveVirtualExperience;
   const resolvedMainClassName = immersiveVirtualHome || taskRoute !== null
@@ -145,7 +150,7 @@ export function AppShell({
         <main id="main-content" tabIndex={-1} className={resolvedMainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
           {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
           <WorkspaceAccountContext.Provider value={<AuthMenuShell />}>
-            <WorkspaceTaskFrame route={taskRoute}><AppRouter /></WorkspaceTaskFrame>
+            <SpatialCampusFrame binding={campus} route={taskRoute}><AppRouter /></SpatialCampusFrame>
           </WorkspaceAccountContext.Provider>
           {publicCreativeRoute && !immersiveVirtualExperience ? (
             <ErrorBoundary resetKey={pathname}>
@@ -161,10 +166,10 @@ export function AppShell({
           </ErrorBoundary>
         ) : null}
         {immersiveVirtualExperience ? null : footer}
-        {showCommandPalette ? <CommandPaletteHost /> : null}
-        {showGlobalOverlays ? <DeferredGlobalOverlays /> : null}
+        {showCommandPalette && !protectedCampus ? <CommandPaletteHost /> : null}
+        {showGlobalOverlays && !protectedCampus ? <DeferredGlobalOverlays /> : null}
         {immersiveVirtualExperience ? null : floatingControls}
-        {immersiveVirtualHome || immersiveVirtualProject ? null : chromeOverlay}
+        {immersiveVirtualExperience ? null : chromeOverlay}
       </SiteExperienceFrame>
     </AuthSessionProvider>
   );

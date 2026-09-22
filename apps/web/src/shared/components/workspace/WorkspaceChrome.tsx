@@ -4,6 +4,7 @@ import { WorkspaceAccountContext } from "./workspace-account-context";
 import Link from "@/compat/router-link";
 import { useI18n } from "@/shared/lib/i18n";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
+import { CampusControls } from "../spatial-campus/CampusControls";
 import type { WorkspaceNavigationContext } from "./workspace-navigation-model";
 
 export function WorkspaceBrand({ href = "/home" }: { readonly href?: string }) {
@@ -34,5 +35,5 @@ export function WorkspaceSidebar({ activeId, context, children }: {
 export function WorkspaceAccountAction() {
   const account = useContext(WorkspaceAccountContext);
   const korean = useI18n((state) => state.lang.startsWith("ko"));
-  return account ?? <Link href="/my" aria-label={korean ? "내 프로필" : "My profile"}><UserRound size={20} aria-hidden="true" /></Link>;
+  return <><CampusControls compact />{account ?? <Link href="/my" aria-label={korean ? "내 프로필" : "My profile"}><UserRound size={20} aria-hidden="true" /></Link>}</>;
 }
