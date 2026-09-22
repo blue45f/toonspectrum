@@ -49,7 +49,9 @@ ORDER BY relation_name
     [[...STUDIO_AI_COMIC_DIRECTOR_REQUIRED_RELATIONS]],
   );
   const relations = new Map(
-    result.rows.map(({ relationName, relation }) => [relationName, relation]),
+    result.rows.map(
+      ({ relationName, relation }) => [relationName, relation] as const,
+    ),
   );
   const missing = STUDIO_AI_COMIC_DIRECTOR_REQUIRED_RELATIONS.filter(
     (relationName) => !relations.get(relationName),
