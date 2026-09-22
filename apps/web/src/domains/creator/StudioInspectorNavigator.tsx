@@ -336,6 +336,13 @@ export function StudioInspectorNavigator({
     onChange(navigateStudioInspector(layout, route));
   }
 
+  function openCurrentSettings() {
+    navigate({ primary: "properties" });
+    globalThis.requestAnimationFrame?.(() => {
+      propertiesTabRef.current?.focus({ preventScroll: true });
+    });
+  }
+
   const selectionSummary = normalizedSelectionCount > 1
     ? `${normalizedSelectionCount}개 항목`
     : selectionLabel ?? copy("summaryElement");
@@ -381,6 +388,27 @@ export function StudioInspectorNavigator({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {(hasSelection || drawing) && layout.primary === "layers" && !publishMode ? (
+            <button
+              type="button"
+              onClick={openCurrentSettings}
+              aria-label={`${hasSelection ? `${selectionSummary} 설정` : copy("currentTool")} · ${copy("openTarget")}`}
+              aria-describedby={`${titleId}-context-settings-description`}
+              title={`${hasSelection ? `${selectionSummary} 설정` : copy("currentTool")} · ${copy("openTarget")}`}
+              data-inspector-priority="chrome"
+              data-inspector-control-id="panel.chrome.open-current-settings"
+              data-studio-inspector-context-cta="compact"
+              className={cn(
+                "grid size-11 shrink-0 place-items-center rounded-lg border border-accent/35 bg-accent-soft text-accent transition-colors hover:border-accent/65 hover:bg-accent-soft/80",
+                tabFocusClass,
+              )}
+            >
+              <PanelRightOpen size={15} aria-hidden />
+              <span id={`${titleId}-context-settings-description`} className="sr-only">
+                {hasSelection ? copy("openTargetSelection") : copy("openTargetTool")}
+              </span>
+            </button>
+          ) : null}
           {/* Desktop uses the shared search row; mobile opens the same dialog scoped here. */}
           <button
             type="button"
@@ -617,13 +645,9 @@ export function StudioInspectorNavigator({
       {(hasSelection || drawing) && layout.primary !== "properties" && layout.primary !== "layers" && !publishMode ? (
         <button
           type="button"
-          onClick={() => {
-            navigate({ primary: "properties" });
-            globalThis.requestAnimationFrame?.(() => {
-              propertiesTabRef.current?.focus({ preventScroll: true });
-            });
-          }}
+          onClick={openCurrentSettings}
           data-inspector-priority="chrome"
+          data-studio-inspector-context-cta="full"
           className={cn(
             "my-2 flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-accent/35 bg-accent-soft px-2.5 py-2 text-left transition-colors hover:border-accent/65 hover:bg-accent-soft/80",
             tabFocusClass,

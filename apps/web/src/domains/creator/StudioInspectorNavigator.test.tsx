@@ -268,6 +268,11 @@ describe("StudioInspectorNavigator", () => {
     expect(html).toContain("텍스트 설정");
     expect(html).toContain("선택한 그림·글자·말풍선의 설정을 바로 엽니다");
     expect(html).toContain("설정 열기");
+    expect(html).toMatch(
+      /data-studio-inspector-context-cta="compact"[^>]*class="[^"]*size-11/u,
+    );
+    expect(html).toMatch(/aria-describedby="[^"]*-context-settings-description"/u);
+    expect(html).not.toContain('data-studio-inspector-context-cta="full"');
   });
 
   it("treats a marquee count as a selection and summarizes it as generic items", () => {
