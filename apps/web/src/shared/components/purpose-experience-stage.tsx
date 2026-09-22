@@ -63,7 +63,7 @@ export function PurposeExperienceStage({
 
       <div className="relative flex h-full min-h-56 flex-col justify-between">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-display text-[0.62rem] font-bold tracking-[0.16em] text-fg-3">
+          <span className="font-display text-[0.65rem] font-bold tracking-[0.16em] text-fg-3">
             LIVE WORKFLOW
           </span>
           <span className="flex items-center gap-1.5 rounded-full border border-line bg-panel/70 px-2.5 py-1 text-[0.64rem] font-semibold text-fg-2">
@@ -89,7 +89,7 @@ export function PurposeExperienceStage({
                   <span className="grid size-9 place-items-center rounded-xl border border-line bg-canvas/65 text-accent transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105">
                     <Icon size={16} aria-hidden="true" />
                   </span>
-                  <span className="mt-4 block truncate font-display text-[0.56rem] font-bold tracking-[0.13em] text-fg-3">
+                  <span className="mt-4 block truncate font-display text-[0.625rem] font-bold tracking-[0.13em] text-fg-3">
                     {captions[index]}
                   </span>
                   <strong className="mt-1 block text-xs leading-4 text-fg sm:text-sm">{step}</strong>
@@ -163,7 +163,7 @@ export function FriendlyQuickGuide({
         <ol className="grid gap-2 sm:grid-cols-3">
           {steps.map((step, index) => (
             <li key={step} className="flex items-start gap-2 rounded-xl bg-card/65 p-3 text-xs leading-5 text-fg-2">
-              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent text-[0.62rem] font-bold text-on-accent">
+              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent text-[0.65rem] font-bold text-on-accent">
                 {index + 1}
               </span>
               <span>{step}</span>

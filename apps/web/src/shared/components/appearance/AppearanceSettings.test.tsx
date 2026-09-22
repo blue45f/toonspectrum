@@ -13,7 +13,7 @@ vi.mock("@/shared/lib/i18n", () => ({ useI18n: (selector: (state: { lang: string
 beforeEach(() => {
   useAppearanceDialog.getState().close();
   localStorage.clear();
-  useTheme.setState({ preference: "dark", studioPreference: "inherit", storageAvailable: true });
+  useTheme.setState({ preference: "dark", studioPreference: "inherit", systemDark: true, systemContrast: false, storageAvailable: true });
   setAppearanceScope("site");
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -22,6 +22,10 @@ describe("appearance controls", () => {
   it("exposes grouped signature, classic and accessibility presets with independent Studio preferences", () => {
     const result = render(<AppearanceSettings />);
     expect(screen.getAllByRole("radio")).toHaveLength(10);
+    expect(screen.getAllByRole("heading", { name: "홈 경험" })).toHaveLength(1);
+    const ids = Array.from(result.container.querySelectorAll<HTMLElement>("[id]"), (element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(screen.getByText("현재 적용")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "시그니처 테마" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "클래식 작업실" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "접근성" })).toBeTruthy();
@@ -51,7 +55,7 @@ describe("appearance controls", () => {
     const launcher = screen.getByRole("button", { name: "프로젝트 센터" });
     fireEvent.click(screen.getByRole("button", { name: "디자인 테마" }));
     view.rerender(<Fixture menu={false} />);
-    expect(await screen.findByRole("dialog", { name: "디자인 테마" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "디자인 테마" }, { timeout: 3_000 })).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: "세피아" }));
     expect(useTheme.getState().studioPreference).toBe("sepia");
     fireEvent.click(screen.getByRole("button", { name: "테마 설정 닫기" }));

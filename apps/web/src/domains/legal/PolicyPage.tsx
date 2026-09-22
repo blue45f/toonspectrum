@@ -180,7 +180,7 @@ function PolicyPageShell({ slug, eyebrow, fallbackName }: { slug: PolicySlug; ey
                 {outline.map((item, index) => (
                   <li key={item.id}>
                     <a href={`#${item.id}`} className="flex min-h-10 items-start gap-2 rounded-lg px-2 py-2 text-xs leading-5 text-fg-3 hover:bg-card hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
-                      <span className="mt-px font-mono text-[0.62rem] text-accent">{String(index + 1).padStart(2, "0")}</span>
+                      <span className="mt-px font-mono text-[0.65rem] text-accent">{String(index + 1).padStart(2, "0")}</span>
                       <span>{item.label}</span>
                     </a>
                   </li>

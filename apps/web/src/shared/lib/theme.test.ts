@@ -4,18 +4,34 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_STORAGE_KEY } from "./theme-presets";
 
 let dark = true;
+let contrast = false;
+let forced = false;
 let cleanup: (() => void) | undefined;
 let media: EventTarget & { matches: boolean };
+let contrastMedia: EventTarget & { matches: boolean };
+let forcedMedia: EventTarget & { matches: boolean };
 
 beforeEach(() => {
   vi.resetModules();
   localStorage.clear();
   dark = true;
-  media = Object.assign(new EventTarget(), { get matches() { return dark; } });
-  vi.stubGlobal("matchMedia", vi.fn(() => ({
-    get matches() { return dark; },
-    addEventListener: media.addEventListener.bind(media), removeEventListener: media.removeEventListener.bind(media),
-  })));
+  contrast = false;
+  forced = false;
+  media = new EventTarget() as typeof media;
+  contrastMedia = new EventTarget() as typeof contrastMedia;
+  forcedMedia = new EventTarget() as typeof forcedMedia;
+  vi.stubGlobal("matchMedia", vi.fn((query: string) => {
+    const target = query.includes("color-scheme") ? media
+      : query.includes("prefers-contrast") ? contrastMedia : forcedMedia;
+    return {
+      get matches() {
+        return query.includes("color-scheme") ? dark
+          : query.includes("prefers-contrast") ? contrast : forced;
+      },
+      addEventListener: target.addEventListener.bind(target),
+      removeEventListener: target.removeEventListener.bind(target),
+    };
+  }));
   window.history.replaceState({}, "", "/settings");
 });
 afterEach(() => { cleanup?.(); cleanup = undefined; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -55,6 +71,32 @@ describe("theme runtime", () => {
     useTheme.getState().setPreference("system");
     dark = false; media.dispatchEvent(new Event("change"));
     expect(useTheme.getState().theme).toBe("dark");
+  });
+  it("follows OS high contrast only for system appearance", async () => {
+    const { useTheme, installAppearanceSync } = await import("./theme");
+    cleanup = installAppearanceSync();
+    useTheme.getState().setPreference("system");
+    contrast = true;
+    contrastMedia.dispatchEvent(new Event("change"));
+    expect(useTheme.getState().resolvedTheme).toBe("contrast");
+    expect(document.documentElement.dataset.contrast).toBe("more");
+    expect(document.documentElement.dataset.themeSource).toBe("system");
+    contrast = false;
+    forced = true;
+    forcedMedia.dispatchEvent(new Event("change"));
+    expect(useTheme.getState().resolvedTheme).toBe("contrast");
+    useTheme.getState().setPreference("sepia");
+    expect(useTheme.getState().resolvedTheme).toBe("sepia");
+    expect(document.documentElement.dataset.contrast).toBe("more");
+  });
+  it("identifies an inherited Studio theme without losing the resolved system palette", async () => {
+    const { useTheme, setAppearanceScope } = await import("./theme");
+    useTheme.getState().setPreference("system");
+    setAppearanceScope("studio");
+    expect(useTheme.getState().resolvedTheme).toBe("dark");
+    expect(document.documentElement.dataset.themePreference).toBe("system");
+    expect(document.documentElement.dataset.themeSource).toBe("inherit");
+    expect(document.documentElement.dataset.themeScope).toBe("studio");
   });
   it("syncs cross-tab updates and clears without write-back loops", async () => {
     const { useTheme, installAppearanceSync } = await import("./theme");

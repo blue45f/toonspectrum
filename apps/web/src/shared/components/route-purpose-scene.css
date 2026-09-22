@@ -376,12 +376,12 @@
   .route-purpose-scene__card b { font-size: 0.52rem; }
   .route-purpose-scene__orbit { right: 18%; width: 6.5rem; }
   .route-purpose-scene__motion-toggle { top: auto; right: 0.65rem; bottom: 0.65rem; }
-  .route-purpose-scene__motion-toggle span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .route-purpose-scene__motion-label { display: none; }
 }
 
 @media (max-width: 390px) {
   .route-purpose-scene__meta { gap: 0.3rem; }
-  .route-purpose-scene__meta :is(span, strong) { padding-inline: 0.48rem; font-size: 0.61rem; }
+  .route-purpose-scene__meta :is(span, strong) { padding-inline: 0.48rem; font-size: 0.625rem; }
   .route-purpose-scene__cards { gap: 0.25rem; }
   .route-purpose-scene__card { min-width: 3.15rem; }
 }

@@ -266,7 +266,7 @@ export function NowVariationLab({
                 >
                   <span className="flex items-center justify-between gap-3">
                     <span className="text-xs font-bold tracking-[0.13em] text-accent">{candidate.routeLabel}</span>
-                    <span className="font-display text-3xl font-black tabular-nums text-fg/20">0{index + 1}</span>
+                    <span className="font-display text-3xl font-black tabular-nums text-fg-3">0{index + 1}</span>
                   </span>
                   <strong className="mt-5 block text-lg text-fg">{candidate.title}</strong>
                   <span className="mt-2 block text-xs font-semibold leading-5 text-fg-3">{candidate.signature}</span>

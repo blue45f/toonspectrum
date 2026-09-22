@@ -37,7 +37,7 @@ export function CreatorExperienceModeSwitch({
           aria-pressed={mode === option}
           onClick={() => setMode(option)}
           className={
-            "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition " +
+            "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition " +
             (mode === option
               ? "bg-accent text-on-accent "
               : "text-fg-2 hover:bg-raised hover:text-fg")

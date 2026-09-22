@@ -240,7 +240,7 @@ export function RoutePurposeScene({
               : copyLocale === "ko" ? "페이지 모션 일시정지" : "Pause page motion"}
           >
             {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
-            <span>{paused
+            <span className="route-purpose-scene__motion-label" aria-hidden="true">{paused
               ? copyLocale === "ko" ? "재생" : "Play"
               : copyLocale === "ko" ? "정지" : "Pause"}</span>
           </button>

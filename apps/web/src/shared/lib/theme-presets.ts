@@ -67,10 +67,26 @@ export function parseAppearance(serialized: string | null): AppearancePreference
   }
 }
 
-export function resolveDesignTheme(preferences: AppearancePreferences, scope: AppearanceScope, systemDark: boolean): DesignTheme {
-  const preference = scope === "studio" && preferences.studioPreference !== "inherit"
-    ? preferences.studioPreference : preferences.preference;
-  return preference === "system" ? systemDark ? "dark" : "light" : preference;
+export function getScopedThemePreference(
+  preferences: AppearancePreferences,
+  scope: AppearanceScope,
+): ThemePreference {
+  return scope === "studio" && preferences.studioPreference !== "inherit"
+    ? preferences.studioPreference
+    : preferences.preference;
+}
+
+/** System appearance follows OS contrast first, then its light/dark preference. */
+export function resolveDesignTheme(
+  preferences: AppearancePreferences,
+  scope: AppearanceScope,
+  systemDark: boolean,
+  systemContrast = false,
+): DesignTheme {
+  const preference = getScopedThemePreference(preferences, scope);
+  if (preference !== "system") return preference;
+  if (systemContrast) return "contrast";
+  return systemDark ? "dark" : "light";
 }
 
 export function getThemePreset(id: DesignTheme) {

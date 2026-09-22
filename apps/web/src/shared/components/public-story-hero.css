@@ -51,3 +51,56 @@
   .public-story-hero__image { transition: none; }
   .public-story-hero__figure:hover .public-story-hero__image { transform: none; }
 }
+
+/* The study controls must stay usable even when a route renders this hero outside the optional
+   site-experience frame. The framed experience may restyle these values, not remove the contract. */
+.public-story-hero__edition {
+  position: absolute;
+  z-index: 2;
+  inset: 22px auto auto 24px;
+  padding: 8px 11px;
+  border: 1px solid oklch(0.8 0.02 70 / 0.55);
+  background: oklch(0.18 0.01 68 / 0.9);
+  color: oklch(0.95 0.01 85);
+  font: 600 0.7rem var(--font-display);
+  letter-spacing: 0.12em;
+}
+.public-story-hero__views {
+  position: absolute;
+  z-index: 2;
+  bottom: 96px;
+  left: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid oklch(0.8 0.02 70 / 0.55);
+  border-radius: 12px;
+  background: oklch(0.17 0.01 68 / 0.94);
+}
+.public-story-hero__views button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: oklch(0.94 0.012 80);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.public-story-hero__views button[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+@media (max-width: 620px) {
+  .public-story-hero__edition { inset: 14px auto auto 16px; }
+  .public-story-hero__views { bottom: 86px; left: 16px; }
+}
+
+@media (forced-colors: active) {
+  .public-story-hero__edition,
+  .public-story-hero__views { border: 2px solid CanvasText; background: Canvas; color: CanvasText; }
+  .public-story-hero__views button[aria-pressed="true"] { background: Highlight; color: HighlightText; }
+}

@@ -457,3 +457,92 @@
 .appearance-experience-mode h3{font-size:.9rem;font-weight:760;color:var(--color-fg)}
 .appearance-experience-mode p{margin-top:.25rem;max-width:34rem;font-size:.75rem;line-height:1.6;color:var(--color-fg-2)}
 @media(max-width:620px){.appearance-experience-mode{grid-template-columns:1fr}.appearance-experience-mode [data-creator-experience-switch=true]{width:100%;justify-content:stretch}.appearance-experience-mode [data-creator-experience-switch=true] button{flex:1}}
+
+/* Semantic interaction tokens shared by every palette. The static values are safe fallbacks;
+   capable browsers receive stronger 3:1 control boundaries through OKLCH mixing. */
+:root[data-design-theme] {
+  --color-control-border: var(--color-line-strong);
+  --color-control-border-hover: var(--color-fg-3);
+  --color-control-fill: var(--color-panel);
+  --color-focus-ring: var(--color-accent);
+  --color-link: var(--color-accent);
+  --color-selection-bg: var(--color-accent);
+  --color-selection-fg: var(--color-on-accent);
+  --color-overlay: var(--color-canvas);
+  --color-disabled-fg: var(--color-fg-2);
+}
+
+@supports (color: color-mix(in oklch, black, white)) {
+  :root[data-design-theme] {
+    --color-control-border: color-mix(in oklch, var(--color-fg) 55%, var(--color-card));
+    --color-control-border-hover: color-mix(in oklch, var(--color-fg) 68%, var(--color-card));
+    --color-control-fill: color-mix(in oklch, var(--color-panel) 92%, var(--color-fg) 8%);
+    --color-overlay: color-mix(in oklch, var(--color-canvas) 78%, transparent);
+    --color-disabled-fg: color-mix(in oklch, var(--color-fg-2) 72%, var(--color-panel));
+  }
+}
+
+:root[data-design-theme="contrast"],
+:root[data-contrast="more"] {
+  --color-control-border: var(--color-line-strong);
+  --color-control-border-hover: var(--color-fg);
+  --color-control-fill: var(--color-panel);
+  --color-focus-ring: var(--color-accent);
+  --color-selection-bg: var(--color-accent);
+  --color-selection-fg: var(--color-on-accent);
+  --color-overlay: var(--color-canvas);
+}
+
+.appearance-current {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem 0.55rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-control-border);
+  border-radius: 0.7rem;
+  background: var(--color-control-fill);
+}
+.appearance-current > span {
+  color: var(--color-fg-2);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.appearance-current > strong { color: var(--color-fg); font-size: 0.82rem; }
+.appearance-current > small {
+  min-width: 0;
+  color: var(--color-fg-2);
+  font-size: 0.7rem;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.appearance-option-copy { display: grid; gap: 0.08rem; }
+.appearance-option-copy > small { color: var(--color-fg-3); font-size: 0.64rem; line-height: 1.35; }
+.appearance-card-mode {
+  border: 1px solid var(--color-control-border);
+  background: var(--color-control-fill);
+  color: var(--color-fg-2) !important;
+}
+.appearance-card[data-theme-contrast="enhanced"] .appearance-card-mode {
+  border-color: var(--color-line-strong);
+  background: var(--color-accent);
+  color: var(--color-on-accent) !important;
+}
+:root[data-contrast="more"] :is(.appearance-current, .appearance-option-row, .appearance-card) {
+  border-color: var(--color-line-strong);
+}
+:root[data-contrast="more"] .appearance-current { border-width: 2px; background: var(--color-panel); }
+
+@media (max-width: 620px) {
+  .appearance-current { grid-template-columns: auto 1fr; }
+  .appearance-current > small { grid-column: 1 / -1; text-align: left; }
+}
+
+@media (forced-colors: active) {
+  .appearance-current, .appearance-card-mode { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .appearance-card[data-theme-contrast="enhanced"] .appearance-card-mode { background: Highlight; color: HighlightText !important; }
+}

@@ -177,48 +177,59 @@ function renderUpdatePrompt(onApply: () => Promise<void>): void {
   const root = host.attachShadow({ mode: "open" });
   root.innerHTML = `
     <style>
-      :host { color-scheme: dark; }
+      :host { color-scheme: inherit; }
       .card {
         position: fixed; inset-block-end: 16px; inset-inline-start: 16px;
         z-index: 2147483000; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
         gap: 12px; align-items: center; width: min(520px, calc(100vw - 32px));
-        padding: 14px; border: 1px solid rgb(148 163 184 / 26%); border-radius: 14px;
+        padding: 14px; border: 1px solid var(--color-control-border, #64748b); border-radius: 14px;
         font: 500 13px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #f8fafc; background: rgb(15 23 42 / 96%);
+        color: var(--color-fg, #f8fafc); background: var(--color-panel, #0f172a);
+        background: color-mix(in oklch, var(--color-panel, #0f172a) 96%, transparent);
         box-shadow: 0 14px 38px rgb(0 0 0 / 42%);
         backdrop-filter: blur(14px);
       }
       .status-dot {
-        width: 10px; height: 10px; border-radius: 999px; background: #818cf8;
-        box-shadow: 0 0 0 5px rgb(129 140 248 / 14%);
+        width: 10px; height: 10px; border-radius: 999px; background: var(--color-accent, #818cf8);
+        box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-accent, #818cf8) 18%, transparent);
       }
       .copy { min-width: 0; }
       .title { display: block; font-weight: 750; letter-spacing: -0.01em; }
-      .description { display: block; margin-top: 2px; color: #cbd5e1; font-size: 12px; }
+      .description { display: block; margin-top: 2px; color: var(--color-fg-2, #cbd5e1); font-size: 12px; }
       .actions { display: flex; gap: 7px; align-items: center; }
       button {
-        min-height: 36px; font: inherit; font-weight: 700; cursor: pointer;
+        min-height: 44px; font: inherit; font-weight: 700; cursor: pointer;
         border-radius: 8px; border: 1px solid transparent; padding: 7px 11px;
         transition: transform 90ms ease, filter 120ms ease, opacity 120ms ease, background 120ms ease;
       }
       button:hover:not(:disabled) { filter: brightness(1.08); }
       button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
-      button:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 2px; }
+      button:focus-visible { outline: 3px solid var(--color-focus-ring, #a5b4fc); outline-offset: 2px; }
       button:disabled { cursor: wait; opacity: .68; }
-      .apply { min-width: 104px; background: #6366f1; color: #fff; }
-      .dismiss { background: transparent; color: #cbd5e1; border-color: #475569; }
+      .apply { min-width: 104px; background: var(--color-accent, #6366f1); color: var(--color-on-accent, #fff); }
+      .dismiss { background: var(--color-card, transparent); color: var(--color-fg-2, #cbd5e1); border-color: var(--color-control-border, #475569); }
       .spinner {
         display: none; width: 13px; height: 13px; margin-inline-end: 6px; vertical-align: -2px;
-        border: 2px solid rgb(255 255 255 / 35%); border-top-color: #fff; border-radius: 999px;
+        border: 2px solid color-mix(in oklch, var(--color-on-accent, #fff) 35%, transparent); border-top-color: var(--color-on-accent, #fff); border-radius: 999px;
         animation: spin .7s linear infinite;
       }
       .card[data-state="applying"] .spinner { display: inline-block; }
       .card[data-state="applying"] .status-dot { animation: pulse 1s ease-in-out infinite; }
-      .card[data-state="error"] .status-dot { background: #fb7185; box-shadow: 0 0 0 5px rgb(251 113 133 / 14%); }
+      .card[data-state="error"] .status-dot { background: var(--color-bad, #fb7185); box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-bad, #fb7185) 18%, transparent); }
       @keyframes spin { to { transform: rotate(360deg); } }
       @keyframes pulse { 50% { opacity: .45; transform: scale(.82); } }
       @media (prefers-reduced-motion: reduce) {
         button, .status-dot, .spinner { animation: none !important; transition: none !important; }
+      }
+      @media (prefers-contrast: more) {
+        .card { border-width: 2px; border-color: var(--color-line-strong, #cbd5e1); box-shadow: none; backdrop-filter: none; }
+        button { border-color: var(--color-line-strong, #cbd5e1); }
+      }
+      @media (forced-colors: active) {
+        .card { border: 2px solid CanvasText; color: CanvasText; background: Canvas; box-shadow: none; backdrop-filter: none; }
+        .status-dot { background: Highlight; box-shadow: none; }
+        button { border: 2px solid ButtonText; color: ButtonText; background: ButtonFace; forced-color-adjust: auto; }
+        button:focus-visible { outline-color: Highlight; }
       }
       @media (max-width: 560px) {
         .card { inset-inline: 12px; inset-block-end: 12px; width: auto; grid-template-columns: auto minmax(0, 1fr); }
@@ -226,10 +237,10 @@ function renderUpdatePrompt(onApply: () => Promise<void>): void {
         .apply { flex: 1; }
       }
     </style>
-    <div class="card" data-state="ready" role="status" aria-live="polite" aria-atomic="true">
+    <div class="card" data-state="ready" role="region" aria-labelledby="toonspectrum-sw-update-title">
       <span class="status-dot" aria-hidden="true"></span>
-      <span class="copy">
-        <strong class="title"></strong>
+      <span class="copy" role="status" aria-live="polite" aria-atomic="true">
+        <strong class="title" id="toonspectrum-sw-update-title"></strong>
         <span class="description"></span>
       </span>
       <span class="actions">
