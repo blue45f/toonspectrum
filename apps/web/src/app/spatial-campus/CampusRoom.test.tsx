@@ -4,8 +4,16 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import type { StudioVirtualSpacePhaserCanvasProps } from "@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas";
 import { campusDistrict } from "@/shared/lib/spatial-campus/campus-model";
+import { campusPositionMemory } from "./campus-position-memory";
 import { CampusRoom } from "./CampusRoom";
 
+const auth = vi.hoisted(() => ({ userId: null as string | null }));
+vi.mock("@/compat/auth-session-store", () => ({
+  useSession: () => ({
+    data: auth.userId ? { user: { id: auth.userId } } : null,
+    ready: true,
+  }),
+}));
 vi.mock("@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas", () => ({
   StudioVirtualSpacePhaserCanvas: ({
     manifest,
@@ -23,7 +31,12 @@ vi.mock("@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas", () => 
     </button>
   </div>,
 }));
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup();
+  campusPositionMemory.clear();
+  auth.userId = null;
+  vi.unstubAllGlobals();
+});
 it("releases an offscreen scene and resumes its last local pose without exposing identity", async () => {
   let updateVisibility: ((entries: { isIntersecting: boolean }[]) => void) | undefined;
   const disconnect = vi.fn();
@@ -133,4 +146,30 @@ it("gives scene object links contextual accessible names without colliding with 
   expect(screen.getByRole("link", { name: "첫 웹툰을 소개합니다 · 공간에서 보기" })).toBeTruthy();
   expect(screen.getByRole("link", { name: "검수 결과 · 공간에서 보기 · 내 화면에서만" })).toBeTruthy();
   expect(screen.queryByRole("link", { name: "첫 웹툰을 소개합니다" })).toBeNull();
+});
+
+it("restores the local pose after a full room remount and isolates another owner", async () => {
+  const district = campusDistrict("market");
+  const first = render(
+    <MemoryRouter><CampusRoom district={district} objects={[]} /></MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "공용 아틀리에 걷기" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Move actor" }));
+  expect(first.container.querySelector<HTMLElement>(".campus-room-art")
+    ?.dataset.campusWalkX).toBe("123.000");
+  first.unmount();
+
+  const resumed = render(
+    <MemoryRouter><CampusRoom district={district} objects={[]} /></MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "공용 아틀리에 걷기" }));
+  expect((await screen.findByTestId("local-pose")).textContent).toBe("123:456");
+  resumed.unmount();
+
+  auth.userId = "owner-b";
+  render(
+    <MemoryRouter><CampusRoom district={district} objects={[]} /></MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "공용 아틀리에 걷기" }));
+  expect((await screen.findByTestId("local-pose")).textContent).not.toBe("123:456");
 });
