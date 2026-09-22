@@ -373,3 +373,56 @@ it("hides a superseded camera frame when transform projection ownership changes"
     cancel.mockRestore();
   }
 });
+it("keeps the source-hidden GPU frame visible until an authoritative transform receipt lands", async () => {
+  const h = setup();
+  const store = createStudioLiveTransformDraftStore();
+  const original = pen();
+  const sceneA = { revision: "a" };
+  const sceneB = { revision: "b" };
+  const onVisiblePresentation = vi.fn();
+  const props = {
+    ...h.props,
+    visible: true,
+    elements: [original],
+    sceneRevision: sceneA,
+    liveTransformDraftStore: store,
+    liveTransformDraftScope: "page:p1",
+    onVisiblePresentation,
+  };
+  const view = render(<StudioSkiaDocumentSurface {...props} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
+  const canvas = h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!;
+  await waitFor(() => expect(canvas.style.visibility).toBe("visible"));
+  const claim = store.claim("page:p1", ["ink"]);
+  expect(claim).not.toBeNull();
+  const moved = { ...original, points: [40, 10, 60, 20, 90, 40] } as DrawEl;
+  act(() => claim!.present([{ element: moved, clip: null }]));
+  await waitFor(() => expect(requests).toHaveLength(2));
+  await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
+  expect(canvas.style.visibility).toBe("visible");
+  const releaseSource = vi.fn();
+  act(() => { expect(claim!.handoff([moved], releaseSource)).toBe(true); });
+  const nextProps = { ...props, elements: [moved], sceneRevision: sceneB };
+  view.rerender(<StudioSkiaDocumentSurface {...nextProps} />);
+  await waitFor(() => expect(requests).toHaveLength(3));
+  expect(canvas.style.visibility).toBe("visible");
+  expect(h.report).not.toHaveBeenLastCalledWith(
+    expect.objectContaining({ status: "starting", sceneRevision: sceneB }),
+  );
+  await act(async () => { requests[2]!.finish(success(requests[2]!.frame)); });
+  await waitFor(() => expect(onVisiblePresentation).toHaveBeenCalledWith({
+    sceneRevision: sceneB,
+    ownedDocumentIds: ["ink"],
+  }));
+  expect(canvas.style.visibility).toBe("visible");
+  expect(h.report).toHaveBeenLastCalledWith(expect.objectContaining({
+    status: "active",
+    sceneRevision: sceneB,
+    ownedDocumentIds: ["ink"],
+  }));
+  expect(store.acknowledgeAuthoritative("page:p1", [moved])).toBe(true);
+  expect(releaseSource).toHaveBeenCalledOnce();
+  expect(store.getSnapshot()).toBeNull();
+  view.unmount();
+});
