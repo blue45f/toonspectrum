@@ -3,6 +3,7 @@ import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { StudioSkiaDocumentSurface } from "./StudioSkiaDocumentSurface";
 import type { StudioRenderSurfaceAuthority } from "./StudioRenderSurface";
+import type { El } from "../studio-element-model";
 import type { SkiaDocumentFrame, SkiaDocumentReceipt } from "@toonspectrum/studio-engine-skia";
 
 const mocked = vi.hoisted(() => ({ create: vi.fn(), present: vi.fn(), dispose: vi.fn() }));
@@ -24,6 +25,10 @@ function setup() {
 }
 const success = (frame: SkiaDocumentFrame): SkiaDocumentReceipt => ({ status: "presented", revision: frame.revision,
   stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, imageTextureBytes: 0, cachedImages: 0, frameMs: 1, interactiveReadbacks: 0 } });
+const pen = (): El => ({ id: "ink", type: "draw", mode: "pen", kind: "freehand", brush: "pen",
+  points: [10, 10, 30, 20, 60, 40], pressures: [0.3, 0.6, 1], stroke: "#234567", strokeWidth: 12,
+  sampleSpacing: 0, pressureModel: "linear-residual-path-v3", paintModel: "layered-flow-v1", opacity: 0.4,
+} as El);
 it("publishes exact receipts and waits for the owning stage before exposing pixels", async () => {
   const h = setup(); const view = render(<StudioSkiaDocumentSurface {...h.props} />);
   await waitFor(() => expect(requests).toHaveLength(1));
@@ -43,6 +48,43 @@ it("publishes exact receipts and waits for the owning stage before exposing pixe
   expect(h.parent.querySelector('[data-studio-skia-document-surface]')).toBeNull();
   expect(h.parent.querySelectorAll('canvas')).toHaveLength(2);
 });
+
+it("uses retained settled ink instead of the first compatibility draw and receipts only visible GPU pixels", async () => {
+  const h = setup();
+  const sceneRevision = { pageId: "page-a", projectGeneration: 3 };
+  const beforePublish = vi.fn(async () => undefined);
+  const canPublishOverSettledInk = vi.fn(() => true);
+  const onVisiblePresentation = vi.fn();
+  const props = {
+    ...h.props,
+    elements: [pen()],
+    sceneRevision,
+    beforePublish,
+    canPublishOverSettledInk,
+    onVisiblePresentation,
+  };
+  const view = render(<StudioSkiaDocumentSurface {...props} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  expect(canPublishOverSettledInk).toHaveBeenCalledWith({
+    sceneRevision,
+    ownedDocumentIds: ["ink"],
+  });
+  const canvas = h.parent.querySelector<HTMLCanvasElement>('[data-studio-skia-document-surface]')!;
+  expect(canvas.dataset.studioSkiaSourceFence).toBe("settled-ink");
+  expect(beforePublish).not.toHaveBeenCalled();
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
+  expect(onVisiblePresentation).not.toHaveBeenCalled();
+  view.rerender(<StudioSkiaDocumentSurface {...props} visible />);
+  await waitFor(() => expect(canvas.style.visibility).toBe("visible"));
+  expect(beforePublish).toHaveBeenCalledOnce();
+  expect(onVisiblePresentation).toHaveBeenCalledOnce();
+  expect(onVisiblePresentation).toHaveBeenCalledWith({
+    sceneRevision,
+    ownedDocumentIds: ["ink"],
+  });
+  view.unmount();
+});
+
 it("ignores superseded frame receipts", async () => {
   const h = setup(); const view = render(<StudioSkiaDocumentSurface {...h.props} />);
   await waitFor(() => expect(requests).toHaveLength(1));
