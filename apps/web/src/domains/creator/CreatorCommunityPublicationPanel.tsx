@@ -291,7 +291,7 @@ export function CreatorCommunityPublicationPanel({
                   portfolio: event.target.checked,
                 }))}
               />
-              대표 포트폴리오에 포함
+              대표 포트폴리오·가상 전시관에 포함
             </label>
             <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-canvas px-3 text-xs text-fg-2">
               <input
@@ -316,6 +316,9 @@ export function CreatorCommunityPublicationPanel({
               AI 학습 사용 허용
             </label>
           </div>
+          <p className="text-[0.7rem] leading-relaxed text-fg-3">
+            가상 전시관에는 이 항목을 선택한 공개 작품만 배치됩니다. 저장만 한 초안이나 비공개 원본은 표시되지 않으며, 이 선택 자체가 작품을 공개하지도 않습니다.
+          </p>
 
           <fieldset className="space-y-2">
             <legend className="text-xs font-semibold text-fg">콘텐츠 설명자</legend>

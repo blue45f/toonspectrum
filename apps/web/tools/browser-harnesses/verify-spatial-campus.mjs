@@ -29,7 +29,14 @@ const promotion = {
   author: { id: "qa-author", name: "QA 작가" }, createdAt: "2026-09-22T00:00:00.000Z", updatedAt: "2026-09-22T00:00:00.000Z",
   version: 1, hidden: false, archived: false, saved: false,
 };
-const report = { origin: origin.origin, fixture: "anonymous synthetic market and promotion records; all other API calls fail closed", cases: [], interactions: [] };
+const community = (portfolio) => ({ version: 1, kind: "illustration", portfolio, provenance: "human",
+  contentDescriptors: [], feedbackTopics: ["general"], downloadAllowed: false, trainingAllowed: false, attributionText: "", altText: "" });
+const creatorWork = (id, title, portfolio) => ({ id, title, description: "합성 QA 작품", cover: "", tags: ["qa"], format: "cuttoon",
+  titleId: null, status: "published", author: { id: "qa-author", name: "QA 작가", avatar: "" }, likes: 0, comments: 0, views: 0,
+  liked: false, bookmarks: 0, bookmarked: false, createdAt: "2026-09-22T00:00:00.000Z", community: community(portfolio) });
+const featuredWork = creatorWork("qa-featured-work", "QA 전시 작품", true);
+const ordinaryWork = creatorWork("qa-public-work", "QA 일반 공개 작품", false);
+const report = { origin: origin.origin, fixture: "anonymous synthetic market, promotion and creator-work records; all other API calls fail closed", cases: [], interactions: [] };
 const browser = await chromium.launch({ headless: true });
 async function contextFor(width, height = 900) {
   const context = await browser.newContext({ viewport: { width, height }, locale: "ko-KR", reducedMotion: "reduce", serviceWorkers: "block" });
@@ -40,6 +47,7 @@ async function contextFor(width, height = 900) {
     if (url.pathname === "/api/auth/session") return route.fulfill({ status: 200, json: null });
     if (url.pathname === "/api/creator/marketplace/resources") return route.fulfill({ status: 200, json: { items: [resource], limit: Number(url.searchParams.get("limit")) || 12, nextCursor: null, hasMore: false } });
     if (url.pathname === `/api/creator/marketplace/resources/${resource.id}`) return route.fulfill({ status: 200, json: resource });
+    if (url.pathname === "/api/creator/works") return route.fulfill({ status: 200, json: { works: [featuredWork, ordinaryWork] } });
     if (url.pathname === "/api/promotions/posts") return route.fulfill({ status: 200, json: { items: [promotion], nextCursor: null, hasMore: false, canModerate: false } });
     return route.fulfill({ status: 503, json: { message: "Local QA: service unavailable" } });
   });
@@ -47,6 +55,32 @@ async function contextFor(width, height = 900) {
 }
 const paths = process.env.CAMPUS_QA_PATHS?.split(",") ?? ["/market/browse", "/community/promote", "/fortune", "/learn", "/help", "/discover", "/showcase", "/production", "/events", "/studio/new", "/team", "/hub", "/home"];
 const widths = (process.env.CAMPUS_QA_WIDTHS ?? "1440,1024,390,320").split(",").map(Number);
+
+async function verifyExplicitShowcasePlacement() {
+  const context = await contextFor(1440);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(new URL("/showcase", origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.getByRole("heading", { name: "창작자의 작품을 만나보세요" }).waitFor({ timeout: 60000 });
+    await page.getByText(featuredWork.title, { exact: true }).first().waitFor();
+    await page.getByText(ordinaryWork.title, { exact: true }).first().waitFor();
+    await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
+    await page.locator(".campus-room").waitFor({ timeout: 30000 });
+
+    const sceneObjects = page.locator(".campus-public-objects");
+    const featuredHref = `/showcase/work/${featuredWork.id}`;
+    const featuredLink = sceneObjects.locator(`a[href="${featuredHref}"]`);
+    await featuredLink.waitFor({ timeout: 30_000 });
+    assert.equal((await featuredLink.textContent())?.trim(), featuredWork.title);
+    assert.equal(await sceneObjects.locator(`a[href="/showcase/work/${ordinaryWork.id}"]`).count(), 0);
+    assert.deepEqual(errors, []);
+    report.interactions.push("The gallery keeps every public work in the list while spatial placement includes only published portfolio opt-ins");
+  } finally {
+    await context.close();
+  }
+}
 
 async function verifyNestedWorkspaceScrollRestoration() {
   const context = await contextFor(1440);
@@ -330,6 +364,7 @@ try {
   assert.deepEqual(interactionErrors, [], "Runtime errors during domain and Phaser interactions");
   report.interactions.push("Existing Phaser movement survives a full Space → Task → Space room remount without leaking the private domain form");
   await context.close();
+  await verifyExplicitShowcasePlacement();
   await verifyNestedWorkspaceScrollRestoration();
   await verifyMarketStudioRoundTrip();
   await verifyMobileMarketReturnNotice();

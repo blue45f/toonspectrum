@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { CreateFeaturedSections } from "./CreateFeaturedSections";
 import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-community-ui";
 import { WebtoonGalleryIntro } from "./WebtoonGalleryIntro";
+import { spatialShowcaseObjects } from "./spatial-showcase-placement";
 
 import { Container } from "@/shared/components/section";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
@@ -251,13 +252,7 @@ function WorksTab({
   }
   return (
     <>
-      <CampusObjectSource objects={works.slice(0, 24).map((work) => ({
-        id: work.id,
-        title: work.title,
-        href: `/showcase/work/${encodeURIComponent(work.id)}`,
-        kind: "work",
-        exposure: "public",
-      }))} />
+      <CampusObjectSource objects={spatialShowcaseObjects(works)} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {works.map((work) => (
           <WorkCard key={work.id} work={work} />
@@ -361,13 +356,6 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
         />
       ) : (
         <>
-          <CampusObjectSource objects={series.slice(0, 24).map((item) => ({
-            id: item.id,
-            title: item.title,
-            href: `/showcase/series/${encodeURIComponent(item.id)}`,
-            kind: "work",
-            exposure: "public",
-          }))} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {series.map((item) => (
               <SeriesCard key={item.id} series={item} />
@@ -444,13 +432,7 @@ function FollowingTab() {
   }
   return (
     <>
-      <CampusObjectSource objects={works.slice(0, 24).map((work) => ({
-        id: work.id,
-        title: work.title,
-        href: `/showcase/work/${encodeURIComponent(work.id)}`,
-        kind: "work",
-        exposure: "public",
-      }))} />
+      <CampusObjectSource objects={spatialShowcaseObjects(works)} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {works.map((work) => (
           <WorkCard key={work.id} work={work} />
@@ -612,7 +594,7 @@ export function CreateGalleryPage() {
                       : "border-line bg-card text-fg-2 hover:bg-raised",
                   )}
                 >
-                  대표 포트폴리오
+                  대표 포트폴리오·전시
                 </button>
               </div>
             )}
