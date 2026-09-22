@@ -79,6 +79,23 @@ describe("webtoon production collaboration UI", () => {
     expect(screen.getByRole("heading", { name: /episode-12 공동 회차 작업실/u })).toBeTruthy();
   });
 
+  it("exposes the integrated manuscript, version, feedback, sharing and AI workspace", () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/manuscripts"]}>
+        <Routes>
+          <Route path="/production/projects/:projectId/manuscripts" element={<ProductionProjectPage surface="manuscripts" />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "툰스튜디오에 통합된 제작 기능" })).toBeTruthy();
+    expect(screen.getByText("이미지·텍스트 공정")).toBeTruthy();
+    expect(screen.getByText("불변 버전·최종본")).toBeTruthy();
+    expect(screen.getByText("페이지·컷 피드백")).toBeTruthy();
+    expect(screen.getByText("보호 공유·모바일 검수")).toBeTruthy();
+    expect(screen.getByText("다중 형식 내보내기")).toBeTruthy();
+    expect(screen.getByText("AI 제작 보조")).toBeTruthy();
+  });
+
   it("shows procurement, agreement, delivery and unverified external payment as separate states", () => {
     render(
       <MemoryRouter initialEntries={["/production/projects/sample-project/procurement"]}>
