@@ -86,7 +86,8 @@ function resolveImageBlendMode(
   if (!value || value === "normal" || value === "source-over") {
     return "source-over";
   }
-  return isStudioStandardBlendMode(value) ? value : null;
+  if (!isStudioStandardBlendMode(value)) return null;
+  return value === "normal" ? "source-over" : value;
 }
 
 function resolveImageShadow(
@@ -145,7 +146,7 @@ function isStudioSkiaDocumentImage(element: El): element is ImageEl & El {
     && /^(?:data:image\/(?:png|jpeg);base64,|blob:|https?:\/\/|\/)/iu.test(element.src);
 }
 
-function isStudioSkiaSpecialistDocumentImage(element: El): element is ImageEl & El {
+function isStudioSkiaSpecialistDocumentImage(element: El): boolean {
   if (!requiresStudioSkiaSpecialistRaster(element)
     || element.filterPageComposite
     || element.adjustmentLayer
@@ -252,24 +253,25 @@ export function compileStudioSkiaDocumentItem(
   }
   if (isStudioSkiaSpecialistDocumentImage(element)) {
     if (!preparedImage) return null;
-    const blendMode = resolveImageBlendMode(element.blendMode);
-    const shadow = resolveImageShadow(element);
+    const imageElement = element as ImageEl & El;
+    const blendMode = resolveImageBlendMode(imageElement.blendMode);
+    const shadow = resolveImageShadow(imageElement);
     if (!blendMode || shadow === null) return null;
     return {
-      id: element.id,
-      revision: { element, specialistRasterKey: preparedImage.key },
+      id: imageElement.id,
+      revision: { element: imageElement, specialistRasterKey: preparedImage.key },
       image: {
         src: preparedImage.src,
-        x: element.x,
-        y: element.y,
-        width: element.width,
-        height: element.height,
-        rotation: element.rotation,
-        opacity: element.opacity ?? 1,
-        flipX: Boolean(element.flipped),
-        flipY: Boolean(element.flippedY),
-        skewX: skewDegToKonva(element.skewX ?? 0),
-        skewY: skewDegToKonva(element.skewY ?? 0),
+        x: imageElement.x,
+        y: imageElement.y,
+        width: imageElement.width,
+        height: imageElement.height,
+        rotation: imageElement.rotation,
+        opacity: imageElement.opacity ?? 1,
+        flipX: Boolean(imageElement.flipped),
+        flipY: Boolean(imageElement.flippedY),
+        skewX: skewDegToKonva(imageElement.skewX ?? 0),
+        skewY: skewDegToKonva(imageElement.skewY ?? 0),
         cornerRadius: 0,
         rasterBounds: preparedImage.rasterBounds,
         blendMode,

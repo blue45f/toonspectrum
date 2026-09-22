@@ -13,6 +13,7 @@ import {
 } from "../studio-page-grade";
 
 import type { ExportFormat } from "../export/studio-export";
+import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type {
   StudioRasterEncoded,
@@ -65,6 +66,10 @@ export function captureStudioRasterAtExportScale(
 export interface StudioRasterExportOrchestrationInput {
   readonly activePage: PageState;
   readonly pages: readonly PageState[];
+  readonly masterElements?: readonly El[];
+  readonly captureSkiaDocumentForExport?: typeof import(
+    "./studio-skia-document-export"
+  )["captureStudioSkiaDocumentForExport"];
   readonly currentPageId: string;
   readonly masterEditMode: boolean;
   readonly exportTransparent: boolean;
@@ -112,6 +117,8 @@ export interface StudioRasterExportOrchestration {
 export function createStudioRasterExportOrchestration({
   activePage,
   pages,
+  masterElements = [],
+  captureSkiaDocumentForExport,
   currentPageId,
   masterEditMode,
   exportTransparent,
@@ -137,6 +144,66 @@ export function createStudioRasterExportOrchestration({
     return { stage, page: capturedPage };
   }
 
+  async function captureRawPageAtScale(
+    page: PageState,
+    scale: number,
+    transparent: boolean,
+  ): Promise<{ canvas: HTMLCanvasElement; page: PageState }> {
+    const captured = await capturePage(page);
+    try {
+      const capture = captureSkiaDocumentForExport
+        ?? (await import("./studio-skia-document-export")).captureStudioSkiaDocumentForExport;
+      const skia = await capture({
+        page: captured.page,
+        masterElements,
+        exportScale: scale,
+        transparent,
+      });
+      if (skia.status === "captured") {
+        return { canvas: skia.canvas, page: captured.page };
+      }
+    } catch {
+      // The existing document renderer remains the exact compatibility authority.
+    }
+
+    const backgroundNode = transparent ? captured.stage.findOne(".bg") : null;
+    if (backgroundNode) {
+      backgroundNode.hide();
+      captured.stage.batchDraw();
+    }
+    try {
+      const canvas = captureStudioRasterAtExportScale(
+        captured.stage,
+        effectiveScale,
+        scale,
+      );
+      if (canvas.dataset) {
+        canvas.dataset.studioRasterExportBackend = "konva-compatibility";
+      }
+      return { canvas, page: captured.page };
+    } finally {
+      if (backgroundNode) {
+        backgroundNode.show();
+        captured.stage.batchDraw();
+      }
+    }
+  }
+
+  async function captureBakedPageAtScale(
+    page: PageState,
+    scale: number,
+    transparent = false,
+  ): Promise<{ canvas: HTMLCanvasElement; page: PageState }> {
+    const captured = await captureRawPageAtScale(page, scale, transparent);
+    return {
+      canvas: bakeStudioPageGradeIntoCanvas(
+        captured.canvas,
+        normalizePageGrade(captured.page.grade),
+      ),
+      page: captured.page,
+    };
+  }
+
   async function handleDownload() {
     if (!ensureSharedDocumentAvailableForExport()) return;
     const watermarkForExport = await ensureWatermarkLoaded();
@@ -147,23 +214,12 @@ export function createStudioRasterExportOrchestration({
     preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
-      const { stage, page: capturedPage } = await capturePage(activePage);
       const transparent = exportTransparent && exportFormat !== "jpg";
-      const backgroundNode = transparent ? stage.findOne(".bg") : null;
-      if (backgroundNode) {
-        backgroundNode.hide();
-        stage.batchDraw();
-      }
-      let canvas: HTMLCanvasElement;
-      try {
-        const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade));
-      } finally {
-        if (backgroundNode) {
-          backgroundNode.show();
-          stage.batchDraw();
-        }
-      }
+      const { canvas } = await captureBakedPageAtScale(
+        activePage,
+        exportScale,
+        transparent,
+      );
       drawWatermarkOnCanvas(canvas, watermarkForExport);
       const {
         canvasToBlob,
@@ -206,24 +262,13 @@ export function createStudioRasterExportOrchestration({
           globalThis.setTimeout(resolve, 0);
         }
       });
-      const { stage, page: capturedPage } = await capturePage(activePage);
       const alphaCapable = format === "qoi" || format === "tga" || format === "pam";
       const transparent = exportTransparent && alphaCapable;
-      const backgroundNode = transparent ? stage.findOne(".bg") : null;
-      if (backgroundNode) {
-        backgroundNode.hide();
-        stage.batchDraw();
-      }
-      let canvas: HTMLCanvasElement;
-      try {
-        const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-        canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade));
-      } finally {
-        if (backgroundNode) {
-          backgroundNode.show();
-          stage.batchDraw();
-        }
-      }
+      const { canvas } = await captureBakedPageAtScale(
+        activePage,
+        exportScale,
+        transparent,
+      );
       drawWatermarkOnCanvas(canvas, watermarkForExport);
       const context = canvas.getContext("2d", { willReadFrequently: true });
       if (!context) throw new Error("출력 픽셀을 읽을 수 없습니다.");
@@ -252,9 +297,7 @@ export function createStudioRasterExportOrchestration({
     preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
-      const { stage, page: capturedPage } = await capturePage(activePage);
-      const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-      const canvas = bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade));
+      const { canvas } = await captureBakedPageAtScale(activePage, exportScale);
       drawWatermarkOnCanvas(canvas, watermarkForExport);
       const { copyCanvasToClipboard } = await import("../export/studio-export");
       await copyCanvasToClipboard(canvas);
@@ -325,11 +368,8 @@ export function createStudioRasterExportOrchestration({
       try {
         for (const page of pages) {
           setCurrentPageId(page.id);
-          const { stage, page: capturedPage } = await capturePage(page);
-          const rawPageCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, scale);
-          pageCanvases.push(
-            bakeStudioPageGradeIntoCanvas(rawPageCanvas, normalizePageGrade(capturedPage.grade))
-          );
+          const { canvas } = await captureBakedPageAtScale(page, scale);
+          pageCanvases.push(canvas);
         }
       } finally {
         setCurrentPageId(originalPageId);
@@ -444,11 +484,8 @@ export function createStudioRasterExportOrchestration({
         seen.add(index);
         const page = pages[index]!;
         setCurrentPageId(page.id);
-        const { stage, page: capturedPage } = await capturePage(page);
-        const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-        captured.push(
-          bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade))
-        );
+        const { canvas } = await captureBakedPageAtScale(page, exportScale);
+        captured.push(canvas);
       }
     } finally {
       setCurrentPageId(originalPageId);
@@ -474,11 +511,8 @@ export function createStudioRasterExportOrchestration({
     const captured: HTMLCanvasElement[] = [];
     try {
       const page = pages.find((item) => item.id === currentPageId) ?? activePage;
-      const { stage, page: capturedPage } = await capturePage(page);
-      const rawCanvas = captureStudioRasterAtExportScale(stage, effectiveScale, exportScale);
-      captured.push(
-        bakeStudioPageGradeIntoCanvas(rawCanvas, normalizePageGrade(capturedPage.grade))
-      );
+      const { canvas } = await captureBakedPageAtScale(page, exportScale);
+      captured.push(canvas);
     } finally {
       setCurrentPageId(originalPageId);
       setMasterEditMode(originalMasterEditMode);

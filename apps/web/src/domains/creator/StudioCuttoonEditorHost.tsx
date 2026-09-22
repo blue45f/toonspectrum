@@ -26102,9 +26102,7 @@ function clearSelectionForEdit() {
   ), [openStudioQuickActionsAt, quickActionsOpen, workspaceControlSide]);
 
   const rasterExportOrchestration = useStudioRasterExportOrchestration({
-    activePage,
-    pages,
-    currentPageId,
+    activePage, pages, masterElements: master.elements, currentPageId,
     masterEditMode,
     exportTransparent,
     exportFormat,

@@ -78,23 +78,24 @@ function drawReference() {
     context.drawImage(rasterImage, 0, 0, rasterElement.width, rasterElement.height);
     context.restore();
   }
-  if (textElement?.type === "text") {
+  const text = textElement;
+  if (text?.type === "text") {
     context.save();
-    context.globalAlpha = textElement.opacity ?? 1;
-    context.fillStyle = textElement.fill;
-    context.translate(textElement.x, textElement.y);
-    context.rotate(textElement.rotation * Math.PI / 180);
-    context.font = `${textElement.fontStyle ?? "bold"} ${textElement.fontSize}px Pretendard`;
+    context.globalAlpha = text.opacity ?? 1;
+    context.fillStyle = text.fill;
+    context.translate(text.x, text.y);
+    context.rotate(text.rotation * Math.PI / 180);
+    context.font = `${text.fontStyle ?? "bold"} ${text.fontSize}px Pretendard`;
     context.textBaseline = "top";
-    context.textAlign = textElement.align ?? "left";
-    const alignedX = textElement.align === "center"
-      ? textElement.width / 2
-      : textElement.align === "right" ? textElement.width : 0;
+    context.textAlign = text.align ?? "left";
+    const alignedX = text.align === "center"
+      ? text.width / 2
+      : text.align === "right" ? text.width : 0;
     const letterContext = context as CanvasRenderingContext2D & { letterSpacing: string };
-    letterContext.letterSpacing = `${textElement.letterSpacing ?? 0}px`;
-    const lineHeight = textElement.fontSize * (textElement.lineHeight ?? 1);
-    textElement.text.split("\n").forEach((line, index) => {
-      context.fillText(line, alignedX, index * lineHeight, textElement.width);
+    letterContext.letterSpacing = `${text.letterSpacing ?? 0}px`;
+    const lineHeight = text.fontSize * (text.lineHeight ?? 1);
+    text.text.split("\n").forEach((line, index) => {
+      context.fillText(line, alignedX, index * lineHeight, text.width);
     });
     context.restore();
   }

@@ -42,6 +42,7 @@ function plan(key: string): StudioSkiaSpecialistRasterPlan {
     hasFilters: false,
     capturesLiveFrame: false,
     frameIdentity: null,
+    cornerRadius: 0,
     liveFrameRevision: null,
   };
 }

@@ -7,13 +7,17 @@ import type { StudioRenderSurfaceAuthority } from "./StudioRenderSurface";
 import type { DrawEl, El } from "../studio-element-model";
 import type { SkiaDocumentFrame, SkiaDocumentReceipt } from "@toonspectrum/studio-engine-skia";
 
-const mocked = vi.hoisted(() => ({ create: vi.fn(), present: vi.fn(), dispose: vi.fn() }));
+const mocked = vi.hoisted(() => ({
+  create: vi.fn(), present: vi.fn(), snapshotPng: vi.fn(), dispose: vi.fn(),
+}));
 vi.mock("@toonspectrum/studio-engine-skia", () => ({ createSkiaDocumentRenderer: mocked.create }));
 const requests: Array<{ frame: SkiaDocumentFrame; finish: (result: SkiaDocumentReceipt) => void }> = [];
 beforeEach(() => {
   requests.length = 0; mocked.create.mockReset(); mocked.present.mockReset(); mocked.dispose.mockReset();
   mocked.present.mockImplementation((frame: SkiaDocumentFrame) => new Promise((finish) => { requests.push({ frame, finish }); }));
-  mocked.create.mockImplementation(() => ({ present: mocked.present, dispose: mocked.dispose }));
+  mocked.create.mockImplementation(() => ({
+    present: mocked.present, snapshotPng: mocked.snapshotPng, dispose: mocked.dispose,
+  }));
 });
 afterEach(() => { cleanup(); document.body.replaceChildren(); });
 function setup() {
@@ -25,7 +29,7 @@ function setup() {
   return { parent, props, report };
 }
 const success = (frame: SkiaDocumentFrame): SkiaDocumentReceipt => ({ status: "presented", revision: frame.revision,
-  stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, imageTextureBytes: 0, cachedImages: 0, frameMs: 1, interactiveReadbacks: 0 } });
+  stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, imageTextureBytes: 0, cachedImages: 0, fontBytes: 0, cachedFonts: 0, frameMs: 1, interactiveReadbacks: 0 } });
 const pen = (): El => ({ id: "ink", type: "draw", mode: "pen", kind: "freehand", brush: "pen",
   points: [10, 10, 30, 20, 60, 40], pressures: [0.3, 0.6, 1], stroke: "#234567", strokeWidth: 12,
   sampleSpacing: 0, pressureModel: "linear-residual-path-v3", paintModel: "layered-flow-v1", opacity: 0.4,

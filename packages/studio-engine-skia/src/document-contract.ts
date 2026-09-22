@@ -147,5 +147,7 @@ export type SkiaDocumentReceipt =
   | { readonly status: "unavailable"; readonly revision: object; readonly reason: string };
 export interface SkiaDocumentRenderer {
   present(frame: SkiaDocumentFrame): Promise<SkiaDocumentReceipt>;
+  /** Exact PNG bytes are exposed only for the currently presented revision. */
+  snapshotPng(revision: object): Uint8Array | null;
   dispose(): void;
 }

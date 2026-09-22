@@ -43,7 +43,8 @@ export const STUDIO_SKIA_SPECIALIST_RASTER_MAX_PIXELS = 64 * 1024 * 1024;
 export const STUDIO_SKIA_SPECIALIST_RASTER_MAX_BYTES = 256 * 1024 * 1024;
 export const STUDIO_SKIA_SPECIALIST_RASTER_ANIMATION_INTERVAL_MS = 80;
 
-export type StudioSkiaSpecialistRasterElement = Extract<El, { type: "image" }>;
+export type StudioSkiaSpecialistRasterElement =
+  Extract<El, { type: "image" }> & ImageFilterFields;
 
 export interface StudioSkiaSpecialistRasterPlan {
   readonly key: string;

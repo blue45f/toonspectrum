@@ -77,7 +77,9 @@ export async function prepareStudioSkiaSpecialistDocumentProjection(
     return Object.freeze({
       sources,
       hasLiveFrames: acquired.some(({ lease }) => lease.capturesLiveFrame),
-      release(releaseOptions = {}): void {
+      release(
+        releaseOptions: { readonly invalidateLiveFrames?: boolean } = {},
+      ): void {
         if (released) return;
         released = true;
         for (const { lease } of acquired) {
