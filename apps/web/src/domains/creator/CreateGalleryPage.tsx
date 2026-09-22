@@ -5,7 +5,10 @@ import { useSearchParams } from "react-router-dom";
 import { CreateFeaturedSections } from "./CreateFeaturedSections";
 import { SeriesCard, SeriesForm, WorkCard, WorkGridSkeleton } from "./creator-community-ui";
 import { WebtoonGalleryIntro } from "./WebtoonGalleryIntro";
-import { spatialShowcaseObjects } from "./spatial-showcase-placement";
+import {
+  spatialShowcaseObjects,
+  spatialShowcaseSeriesObjects,
+} from "./spatial-showcase-placement";
 
 import { Container } from "@/shared/components/section";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
@@ -356,6 +359,7 @@ function SeriesTab({ sort }: { sort: WorkSort }) {
         />
       ) : (
         <>
+          <CampusObjectSource objects={spatialShowcaseSeriesObjects(series)} />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {series.map((item) => (
               <SeriesCard key={item.id} series={item} />

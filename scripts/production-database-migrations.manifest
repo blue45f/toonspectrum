@@ -86,3 +86,4 @@ apps/api/src/db/migrations/0085_production_team_workspace.sql
 apps/api/src/db/migrations/0086_production_operation_policy.sql
 apps/api/src/db/migrations/0087_studio_pinned_review_share.sql
 apps/api/src/db/migrations/0088_studio_review_delivery.sql
+apps/api/src/db/migrations/0089_creator_series_spatial_showcase.sql

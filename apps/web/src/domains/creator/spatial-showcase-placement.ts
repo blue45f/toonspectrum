@@ -1,4 +1,4 @@
-import type { WorkSummary } from "@/infrastructure/creator-client";
+import type { SeriesSummary, WorkSummary } from "@/infrastructure/creator-client";
 import {
   canonicalCampusObjectCandidate,
   type CampusObject,
@@ -32,6 +32,41 @@ export function spatialShowcaseObjects(
       title: work.title,
       href: `/showcase/work/${encodedId}`,
       kind: "work",
+      exposure: "public",
+    });
+    if (!object) continue;
+    objects.push(object);
+    if (objects.length >= capacity) break;
+  }
+  return objects;
+}
+
+export const SPATIAL_SHOWCASE_SERIES_LIMIT = 12;
+
+/**
+ * Series require their own explicit placement consent. Public episodes alone never imply consent,
+ * while consent alone never publishes a draft episode. The public episode aggregate must be > 0.
+ */
+export function spatialShowcaseSeriesObjects(
+  seriesList: readonly SeriesSummary[],
+  limit = SPATIAL_SHOWCASE_SERIES_LIMIT,
+): readonly CampusObject[] {
+  const capacity = Number.isFinite(limit)
+    ? Math.max(0, Math.min(SPATIAL_SHOWCASE_SERIES_LIMIT, Math.floor(limit)))
+    : SPATIAL_SHOWCASE_SERIES_LIMIT;
+  if (capacity === 0) return [];
+
+  const seen = new Set<string>();
+  const objects: CampusObject[] = [];
+  for (const series of seriesList) {
+    if (series.showcaseEnabled !== true || series.episodes < 1 || seen.has(series.id)) continue;
+    seen.add(series.id);
+    const encodedId = encodeURIComponent(series.id);
+    const object = canonicalCampusObjectCandidate({
+      id: `series-${encodedId}`,
+      title: series.title,
+      href: `/showcase/series/${encodedId}`,
+      kind: "series",
       exposure: "public",
     });
     if (!object) continue;

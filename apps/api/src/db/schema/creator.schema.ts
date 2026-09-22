@@ -1267,6 +1267,7 @@ export const creatorSeries = pgTable(
     cover: text("cover").notNull().default(""), // 대표 커버(데이터 URL 또는 외부 URL)
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     status: text("status").notNull().default("ongoing"), // ongoing(연재중) | hiatus(휴재) | completed(완결)
+    showcaseEnabled: boolean("showcaseEnabled").notNull().default(false), // 제작자가 명시적으로 가상 전시관 배치 동의
     hidden: boolean("hidden").notNull().default(false), // 관리자 비노출
     createdAt: timestamp("createdAt", { mode: "date" }).$defaultFn(() => new Date()),
     updatedAt: timestamp("updatedAt", { mode: "date" }).$defaultFn(() => new Date()),

@@ -38,8 +38,14 @@ describe("creator series lifecycle contract", () => {
         cover: "",
         tags: ["시즌제", "드라마"],
         status: "hiatus",
+        showcaseEnabled: false,
       },
     });
+  });
+
+  it("uses an explicit boolean for spatial showcase placement", () => {
+    expect(validateSeriesInput({ title: "공간 전시", showcaseEnabled: true }).value?.showcaseEnabled).toBe(true);
+    expect(validateSeriesInput({ title: "기본값" }).value?.showcaseEnabled).toBe(false);
   });
 
   it("continues numbering after the highest valid episode across hiatus", () => {

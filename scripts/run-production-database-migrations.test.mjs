@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(88);
+  expect(manifest).toHaveLength(89);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0088_studio_review_delivery");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(88);
+  expect(manifest.at(-1).id).toBe("0089_creator_series_spatial_showcase");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(89);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1447,6 +1447,8 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_review",
     "studio_review_comment",
     "studio_review_comment_assignee",
+    "studio_review_delivery",
+    "studio_review_delivery_event",
     "studio_review_policy",
     "studio_review_policy_event",
     "studio_review_reviewer",

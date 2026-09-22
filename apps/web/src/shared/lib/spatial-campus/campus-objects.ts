@@ -11,7 +11,8 @@ export type CampusObjectKind =
   | "handoff"
   | "recipe"
   | "event"
-  | "work";
+  | "work"
+  | "series";
 
 export interface CampusObject {
   readonly id: string;

@@ -1022,6 +1022,7 @@ export interface SeriesSummary {
   cover: string;
   tags: string[];
   status: SeriesStatus;
+  showcaseEnabled: boolean;
   author: WorkAuthor;
   episodes: number;
   views: number;
@@ -1042,6 +1043,7 @@ export interface SeriesInput {
   cover?: string;
   tags?: string[];
   status?: SeriesStatus;
+  showcaseEnabled?: boolean;
 }
 
 export async function listSeries(
