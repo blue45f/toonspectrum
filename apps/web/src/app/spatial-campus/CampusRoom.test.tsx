@@ -124,3 +124,13 @@ it("keeps the walking pose across equivalent projections and applies a real obje
   fireEvent.click(screen.getByRole("button", { name: "Open first scene object" }));
   expect(screen.getByTestId("location").textContent).toBe("/market/resource/asset-A-v2");
 });
+
+it("gives scene object links contextual accessible names without colliding with domain cards", () => {
+  render(<MemoryRouter><CampusRoom district={campusDistrict("gallery")} objects={[
+    { id: "public-work", title: "첫 웹툰을 소개합니다", href: "/community/promote/public-work", exposure: "public" },
+    { id: "private-review", title: "검수 결과", href: "/studio/p/project/review", exposure: "private" },
+  ]} /></MemoryRouter>);
+  expect(screen.getByRole("link", { name: "첫 웹툰을 소개합니다 · 공간에서 보기" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "검수 결과 · 공간에서 보기 · 내 화면에서만" })).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "첫 웹툰을 소개합니다" })).toBeNull();
+});
