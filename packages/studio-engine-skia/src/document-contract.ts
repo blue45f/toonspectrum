@@ -12,6 +12,47 @@ export interface SkiaDocumentInk {
   readonly erase?: boolean;
   readonly nib?: { readonly aspect: number; readonly angleRad: number };
 }
+export interface SkiaDocumentFontSource {
+  /** Stable cache identity for one exact family/source revision. */
+  readonly key: string;
+  readonly family: string;
+}
+
+export interface SkiaDocumentText {
+  readonly text: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly fontSize: number;
+  readonly rotation: number;
+  readonly opacity: number;
+  readonly color: ColorIR;
+  readonly align: "left" | "center" | "right";
+  readonly letterSpacing: number;
+  readonly lineHeight: number;
+  readonly weight: 400 | 700;
+  readonly italic: boolean;
+  readonly font: SkiaDocumentFontSource;
+}
+
+export type SkiaDocumentBlendMode =
+  | "source-over"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "soft-light"
+  | "hard-light"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "difference"
+  | "exclusion"
+  | "hue"
+  | "saturation"
+  | "color"
+  | "luminosity";
+
 export interface SkiaDocumentImage {
   readonly src: string;
   readonly x: number;
@@ -22,6 +63,17 @@ export interface SkiaDocumentImage {
   readonly opacity: number;
   readonly flipX: boolean;
   readonly flipY: boolean;
+  readonly skewX: number;
+  readonly skewY: number;
+  readonly cornerRadius: number;
+  readonly blendMode: SkiaDocumentBlendMode;
+  readonly shadow?: {
+    readonly color: ColorIR;
+    readonly blur: number;
+    readonly offsetX: number;
+    readonly offsetY: number;
+    readonly opacity: number;
+  };
 }
 
 export interface SkiaDocumentPanel {
@@ -48,6 +100,7 @@ export interface SkiaDocumentItem {
   readonly revision: object;
   readonly nodes?: readonly SceneNodeIR[];
   readonly ink?: SkiaDocumentInk;
+  readonly text?: SkiaDocumentText;
   readonly image?: SkiaDocumentImage;
   readonly panel?: SkiaDocumentPanel;
   /** Existing document panel semantics: axis-aligned child clip in document coordinates. */
@@ -75,6 +128,8 @@ export interface SkiaDocumentStats {
   readonly gpuCacheBytes: number | null;
   readonly imageTextureBytes: number;
   readonly cachedImages: number;
+  readonly fontBytes: number;
+  readonly cachedFonts: number;
   readonly frameMs: number;
   readonly interactiveReadbacks: 0;
 }

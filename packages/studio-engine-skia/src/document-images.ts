@@ -1,7 +1,19 @@
 import { loadSkiaDocumentImageBitmap } from "./document-image-source";
 
-import type { SkiaDocumentImage, SkiaDocumentItem } from "./document-contract";
-import type { Canvas, CanvasKit, Image, Surface } from "canvaskit-wasm";
+import type {
+  SkiaDocumentBlendMode,
+  SkiaDocumentImage,
+  SkiaDocumentItem,
+} from "./document-contract";
+import type {
+  BlendMode,
+  Canvas,
+  CanvasKit,
+  Image,
+  ImageFilter,
+  Paint,
+  Surface,
+} from "canvaskit-wasm";
 
 export const SKIA_DOCUMENT_IMAGE_TEXTURE_BUDGET = 64 * 1024 * 1024;
 
@@ -13,6 +25,64 @@ export type SkiaDocumentImageBitmapLoader = (
   src: string,
   signal: AbortSignal,
 ) => Promise<ImageBitmap>;
+
+function resolveBlendMode(
+  ck: CanvasKit,
+  mode: SkiaDocumentBlendMode,
+): BlendMode {
+  switch (mode) {
+    case "multiply": return ck.BlendMode.Multiply;
+    case "screen": return ck.BlendMode.Screen;
+    case "overlay": return ck.BlendMode.Overlay;
+    case "soft-light": return ck.BlendMode.SoftLight;
+    case "hard-light": return ck.BlendMode.HardLight;
+    case "darken": return ck.BlendMode.Darken;
+    case "lighten": return ck.BlendMode.Lighten;
+    case "color-dodge": return ck.BlendMode.ColorDodge;
+    case "color-burn": return ck.BlendMode.ColorBurn;
+    case "difference": return ck.BlendMode.Difference;
+    case "exclusion": return ck.BlendMode.Exclusion;
+    case "hue": return ck.BlendMode.Hue;
+    case "saturation": return ck.BlendMode.Saturation;
+    case "color": return ck.BlendMode.Color;
+    case "luminosity": return ck.BlendMode.Luminosity;
+    case "source-over": return ck.BlendMode.SrcOver;
+  }
+}
+
+function drawTexture(
+  ck: CanvasKit,
+  target: Canvas,
+  texture: Image,
+  item: SkiaDocumentImage,
+  paint: Paint,
+): void {
+  const radius = Math.min(
+    item.cornerRadius,
+    item.width / 2,
+    item.height / 2,
+  );
+  target.save();
+  try {
+    if (radius > 0) {
+      target.clipRRect(
+        ck.RRectXY([0, 0, item.width, item.height], radius, radius),
+        ck.ClipOp.Intersect,
+        true,
+      );
+    }
+    target.drawImageRectOptions(
+      texture,
+      [0, 0, texture.width(), texture.height()],
+      [0, 0, item.width, item.height],
+      ck.FilterMode.Linear,
+      ck.MipmapMode.None,
+      paint,
+    );
+  } finally {
+    target.restore();
+  }
+}
 
 export function createSkiaDocumentImageCache(
   loader: SkiaDocumentImageBitmapLoader = loadSkiaDocumentImageBitmap,
@@ -87,26 +157,64 @@ export function createSkiaDocumentImageCache(
     draw(ck: CanvasKit, target: Canvas, item: SkiaDocumentImage): void {
       const texture = textures.get(item.src)?.image;
       if (!texture) throw new Error("GPU image texture is not ready");
-      const paint = new ck.Paint();
+      const sourcePaint = new ck.Paint();
+      const layerPaint = item.shadow ? new ck.Paint() : null;
+      let shadowFilter: ImageFilter | null = null;
       target.save();
       try {
-        paint.setAntiAlias(true);
-        paint.setAlphaf(item.opacity);
         target.translate(item.x, item.y);
         target.rotate(item.rotation, 0, 0);
+        target.skew(item.skewX, item.skewY);
         target.translate(item.flipX ? item.width : 0, item.flipY ? item.height : 0);
         target.scale(item.flipX ? -1 : 1, item.flipY ? -1 : 1);
-        target.drawImageRectOptions(
-          texture,
-          [0, 0, texture.width(), texture.height()],
-          [0, 0, item.width, item.height],
-          ck.FilterMode.Linear,
-          ck.MipmapMode.None,
-          paint,
-        );
+        sourcePaint.setAntiAlias(true);
+        if (item.shadow && layerPaint) {
+          layerPaint.setAntiAlias(true);
+          layerPaint.setAlphaf(item.opacity);
+          layerPaint.setBlendMode(resolveBlendMode(ck, item.blendMode));
+          const alpha = item.shadow.color.a * item.shadow.opacity;
+          shadowFilter = ck.ImageFilter.MakeDropShadow(
+            item.shadow.offsetX,
+            item.shadow.offsetY,
+            item.shadow.blur / 2,
+            item.shadow.blur / 2,
+            ck.Color4f(
+              item.shadow.color.r,
+              item.shadow.color.g,
+              item.shadow.color.b,
+              alpha,
+            ),
+            null,
+          );
+          layerPaint.setImageFilter(shadowFilter);
+          const padding = Math.max(
+            Math.abs(item.shadow.offsetX),
+            Math.abs(item.shadow.offsetY),
+          ) + item.shadow.blur * 3 + 2;
+          target.saveLayer(layerPaint, [
+            -padding,
+            -padding,
+            item.width + padding,
+            item.height + padding,
+          ]);
+          try {
+            drawTexture(ck, target, texture, item, sourcePaint);
+          } finally {
+            target.restore();
+          }
+        } else {
+          sourcePaint.setAlphaf(item.opacity);
+          sourcePaint.setBlendMode(resolveBlendMode(ck, item.blendMode));
+          drawTexture(ck, target, texture, item, sourcePaint);
+        }
       } finally {
         target.restore();
-        paint.delete();
+        if (layerPaint) {
+          layerPaint.setImageFilter(null);
+          layerPaint.delete();
+        }
+        shadowFilter?.delete();
+        sourcePaint.delete();
       }
     },
 

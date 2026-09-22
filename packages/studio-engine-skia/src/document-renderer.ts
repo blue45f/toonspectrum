@@ -1,5 +1,10 @@
 import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "./document-contract";
 import {
+  createSkiaDocumentFontCache,
+  SkiaDocumentFontAdmissionError,
+  type SkiaDocumentFontDataLoader,
+} from "./document-fonts";
+import {
   createSkiaDocumentImageCache,
   SkiaDocumentImageAdmissionError,
   type SkiaDocumentImageBitmapLoader,
@@ -12,10 +17,39 @@ import type { Canvas, CanvasKit, GrDirectContext, Image, SkPicture, Surface, Web
 
 export const SKIA_DOCUMENT_PICTURE_BATCH_SIZE = 128;
 
+const SKIA_DOCUMENT_BLEND_MODES = new Set([
+  "source-over",
+  "multiply",
+  "screen",
+  "overlay",
+  "soft-light",
+  "hard-light",
+  "darken",
+  "lighten",
+  "color-dodge",
+  "color-burn",
+  "difference",
+  "exclusion",
+  "hue",
+  "saturation",
+  "color",
+  "luminosity",
+]);
+
 export const SKIA_DOCUMENT_RENDERER_ID = "skia-canvaskit-document-webgl2" as const;
-export type { SkiaDocumentInk, SkiaDocumentItem, SkiaDocumentFrame, SkiaDocumentStats, SkiaDocumentReceipt, SkiaDocumentRenderer } from "./document-contract";
+export type {
+  SkiaDocumentFontSource,
+  SkiaDocumentFrame,
+  SkiaDocumentInk,
+  SkiaDocumentItem,
+  SkiaDocumentReceipt,
+  SkiaDocumentRenderer,
+  SkiaDocumentStats,
+  SkiaDocumentText,
+} from "./document-contract";
 export interface SkiaDocumentRendererOptions {
   readonly loadCanvasKit?: () => Promise<CanvasKit>;
+  readonly loadFontData?: SkiaDocumentFontDataLoader;
   readonly loadImageBitmap?: SkiaDocumentImageBitmapLoader;
   readonly maxPictureBytes?: number;
   readonly onContextLost?: () => void;
@@ -64,7 +98,7 @@ function validateFrame(frame: SkiaDocumentFrame): void {
   const ids = new Set<string>();
   for (const item of frame.items) {
     if (!item.id || ids.has(item.id) || !item.revision
-      || [item.nodes, item.ink, item.image, item.panel].filter(Boolean).length !== 1) throw new Error("Invalid GPU document item");
+      || [item.nodes, item.ink, item.text, item.image, item.panel].filter(Boolean).length !== 1) throw new Error("Invalid GPU document item");
     ids.add(item.id);
     if (item.clip && (Object.values(item.clip).some((value) => !Number.isFinite(value))
       || item.clip.width <= 0 || item.clip.height <= 0)) throw new Error("Invalid GPU panel clip");
@@ -78,10 +112,70 @@ function validateFrame(frame: SkiaDocumentFrame): void {
         throw new Error("Invalid GPU panel geometry");
       }
     }
-    if (item.image && (!item.image.src
-      || [item.image.x, item.image.y, item.image.width, item.image.height, item.image.rotation, item.image.opacity]
-        .some((value) => !Number.isFinite(value))
-      || item.image.width <= 0 || item.image.height <= 0 || item.image.opacity < 0 || item.image.opacity > 1)) {
+    if (item.text && (
+      !item.text.text
+      || item.text.text.length > 200_000
+      || !item.text.font.key
+      || !item.text.font.family
+      || item.text.font.key.length > 512
+      || item.text.font.family.length > 256
+      || [
+        item.text.x,
+        item.text.y,
+        item.text.width,
+        item.text.fontSize,
+        item.text.rotation,
+        item.text.opacity,
+        item.text.letterSpacing,
+        item.text.lineHeight,
+      ].some((value) => !Number.isFinite(value))
+      || item.text.width <= 0
+      || item.text.fontSize <= 0
+      || item.text.opacity < 0
+      || item.text.opacity > 1
+      || item.text.lineHeight <= 0
+      || ![400, 700].includes(item.text.weight)
+      || !["left", "center", "right"].includes(item.text.align)
+      || Object.values(item.text.color).some(
+        (value) => !Number.isFinite(value) || value < 0 || value > 1,
+      )
+    )) {
+      throw new Error("Invalid GPU text contract");
+    }
+    if (item.image && (
+      !item.image.src
+      || [
+        item.image.x,
+        item.image.y,
+        item.image.width,
+        item.image.height,
+        item.image.rotation,
+        item.image.opacity,
+        item.image.skewX,
+        item.image.skewY,
+        item.image.cornerRadius,
+      ].some((value) => !Number.isFinite(value))
+      || item.image.width <= 0
+      || item.image.height <= 0
+      || item.image.opacity < 0
+      || item.image.opacity > 1
+      || item.image.cornerRadius < 0
+      || !SKIA_DOCUMENT_BLEND_MODES.has(item.image.blendMode)
+      || (item.image.shadow && (
+        [
+          item.image.shadow.blur,
+          item.image.shadow.offsetX,
+          item.image.shadow.offsetY,
+          item.image.shadow.opacity,
+        ].some((value) => !Number.isFinite(value))
+        || item.image.shadow.blur < 0
+        || item.image.shadow.opacity < 0
+        || item.image.shadow.opacity > 1
+        || Object.values(item.image.shadow.color).some(
+          (value) => !Number.isFinite(value) || value < 0 || value > 1,
+        )
+      ))
+    )) {
       throw new Error("Invalid GPU image contract");
     }
     if (item.ink && (item.ink.dabs.length % 3 || item.ink.dabs.length > 300_000
@@ -100,6 +194,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
   if (!Number.isSafeInteger(budget) || budget <= 0) throw new Error("Invalid picture memory budget");
   const cache = new Map<string, { revision: object; picture: SkPicture; bytes: number }>();
   const imageCache = createSkiaDocumentImageCache(options.loadImageBitmap);
+  let fontCache: ReturnType<typeof createSkiaDocumentFontCache> | null = null;
   let ck: CanvasKit | null = null; let gl: WebGLContextHandle | null = null;
   let context: GrDirectContext | null = null; let surface: Surface | null = null;
   let surfaceWidth = 0; let surfaceHeight = 0;
@@ -137,7 +232,8 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
   // Failure is terminal: release resources even while recovery UI stays mounted.
   // Subsequent dispose and device-loss callbacks are intentionally idempotent.
   const releaseGpuResources = () => {
-    clearSnapshots(); clearPictures(); imageCache.dispose(); presentedItems = []; presentedLayout = null;
+    clearSnapshots(); clearPictures(); fontCache?.dispose(); fontCache = null;
+    imageCache.dispose(); presentedItems = []; presentedLayout = null;
     safeDelete(surface); surface = null; surfaceWidth = 0; surfaceHeight = 0;
     try { context?.releaseResourcesAndAbandonContext(); } catch { /* lost context */ }
     safeDelete(context); context = null;
@@ -198,6 +294,9 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
                   }
                 }
                 drawInk(ck!, target, item.ink);
+              } else if (item.text) {
+                if (!fontCache) throw new Error("GPU text font cache is not ready");
+                fontCache.draw(target, item.text);
               } else if (item.image) {
                 imageCache.draw(ck!, target, item.image);
               } else if (item.panel) {
@@ -317,6 +416,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
       retainedSnapshotBytes: snapshots.reduce((sum, item) => sum + item.bytes, 0),
       gpuCacheBytes: Number.isFinite(gpuBytes) ? gpuBytes : null,
       imageTextureBytes: imageCache.bytes, cachedImages: imageCache.size,
+      fontBytes: fontCache?.bytes ?? 0, cachedFonts: fontCache?.size ?? 0,
       frameMs: performance.now() - started, interactiveReadbacks: 0,
     } };
     } finally { if (restore) safeDelete(restore.image); }
@@ -334,6 +434,16 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
         try {
           if (failure) throw new Error(failure);
           validateFrame(work.frame);
+          const hasText = work.frame.items.some((item) => item.text);
+          if (hasText) {
+            if (!options.loadFontData) {
+              throw new SkiaDocumentFontAdmissionError(
+                "GPU text font loader is unavailable; compatibility renderer retained",
+              );
+            }
+            fontCache ??= createSkiaDocumentFontCache(ck!, options.loadFontData);
+            await fontCache.prepare(work.frame.items, preparation.signal);
+          }
           let preconfiguredBackingInvalid = false;
           if (work.frame.items.some((item) => item.image)) {
             const width = Math.ceil(work.frame.width * work.frame.dpr);
@@ -349,6 +459,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
             continue;
           }
           const result = draw(work.frame, preconfiguredBackingInvalid);
+          fontCache?.retain(work.frame.items);
           imageCache.retain(work.frame.items);
           work.resolve(result);
         } catch (cause) {
@@ -360,7 +471,9 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
             work.resolve({ status: "superseded", revision: work.frame.revision });
             continue;
           }
-          if (cause instanceof SkiaDocumentImageAdmissionError) {
+          if (cause instanceof SkiaDocumentImageAdmissionError
+            || cause instanceof SkiaDocumentFontAdmissionError) {
+            fontCache?.retain(presentedItems);
             imageCache.retain(presentedItems);
             work.resolve({
               status: "unsupported",

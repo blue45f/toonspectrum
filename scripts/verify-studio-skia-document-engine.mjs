@@ -25,6 +25,29 @@ async function pixelComparison(page) {
     return { alphaRatio: alphaA / alphaB, edgeMismatch: bad / painted, meanAlphaError: absolute / painted, meanPremultipliedColorError: colorError / (painted * 3) };
   });
 }
+async function paintedGeometry(page) {
+  return page.evaluate(() => {
+    const measure = (canvas) => {
+      const probe = document.createElement('canvas');
+      probe.width = canvas.width; probe.height = canvas.height;
+      const context = probe.getContext('2d'); context.drawImage(canvas, 0, 0);
+      const data = context.getImageData(0, 0, probe.width, probe.height).data;
+      let minX = probe.width, minY = probe.height, maxX = -1, maxY = -1;
+      let alpha = 0, weightedX = 0, weightedY = 0;
+      for (let y = 0; y < probe.height; y++) for (let x = 0; x < probe.width; x++) {
+        const value = data[(y * probe.width + x) * 4 + 3];
+        if (!value) continue;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        alpha += value; weightedX += x * value; weightedY += y * value;
+      }
+      return { width: maxX - minX + 1, height: maxY - minY + 1,
+        alpha, centerX: weightedX / alpha, centerY: weightedY / alpha };
+    };
+    return { gpu: measure(document.querySelector('#gpu')),
+      reference: measure(document.querySelector('#reference')) };
+  });
+}
 async function verify(type, name) {
   const browser = await type.launch({ headless: true, ...(name === 'chromium' ? { channel: 'chromium' } : {}) });
   let timedOut = false;
@@ -114,6 +137,32 @@ async function verify(type, name) {
     assert(imageParity.meanPremultipliedColorError < 8, `${name} image color ${JSON.stringify(imageParity)}`);
     report.measurements.push({ engine: name, imageParity, textureBytes: image.stats.imageTextureBytes });
     checkpoint(`${name}: static PNG texture preserves rotation, flip, opacity and bounded GPU residency`);
+
+    const text = await page.evaluate(() => window.skiaEngineQA.text());
+    assert.equal(text.status, 'presented');
+    assert.equal(text.stats.cachedFonts, 1);
+    assert(text.stats.fontBytes > 0 && text.stats.fontBytes <= 64 * 1024 * 1024);
+    const textParity = await pixelComparison(page);
+    const textGeometry = await paintedGeometry(page);
+    const textAlphaRatio = textGeometry.gpu.alpha / textGeometry.reference.alpha;
+    assert(textAlphaRatio > 0.75 && textAlphaRatio < 1.25, `${name} text alpha ${JSON.stringify(textGeometry)}`);
+    assert(Math.abs(textGeometry.gpu.width - textGeometry.reference.width) <= 3, `${name} text width ${JSON.stringify(textGeometry)}`);
+    assert(Math.abs(textGeometry.gpu.height - textGeometry.reference.height) <= 3, `${name} text height ${JSON.stringify(textGeometry)}`);
+    assert(Math.hypot(textGeometry.gpu.centerX - textGeometry.reference.centerX,
+      textGeometry.gpu.centerY - textGeometry.reference.centerY) <= 10, `${name} text center ${JSON.stringify(textGeometry)}`);
+    assert(textParity.meanPremultipliedColorError < 36, `${name} text color ${JSON.stringify(textParity)}`);
+    const textCamera = await page.evaluate(() => window.skiaEngineQA.camera({ scaleX: 0.8, scaleY: 0.8, rotation: 12, offsetX: 30, offsetY: 25 }));
+    assert.equal(textCamera.status, 'presented');
+    assert.equal(textCamera.stats.compiledItems, 0);
+    assert.equal(textCamera.stats.cachedFonts, 1);
+    report.measurements.push({
+      engine: name,
+      textParity,
+      textGeometry,
+      fontBytes: text.stats.fontBytes,
+    });
+    checkpoint(`${name}: Pretendard paragraph preserves Korean glyphs, alignment, spacing, rotation and retained font reuse`);
+    await page.evaluate(() => window.skiaEngineQA.camera({ scaleX: 1, scaleY: 1, rotation: 0, offsetX: 0, offsetY: 0 }));
     await page.evaluate(() => window.skiaEngineQA.load(80));
 
     const interleaved = await page.evaluate(() => window.skiaEngineQA.interleavedSurface());

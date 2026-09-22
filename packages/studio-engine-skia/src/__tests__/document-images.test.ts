@@ -13,6 +13,7 @@ function imageItem(src: string): SkiaDocumentItem {
     image: {
       src, x: 10, y: 20, width: 40, height: 30, rotation: 15,
       opacity: 0.5, flipX: true, flipY: false,
+      skewX: 0, skewY: 0, cornerRadius: 0, blendMode: "source-over",
     },
   };
 }
@@ -50,15 +51,23 @@ describe("retained GPU document image cache", () => {
     const surface = { makeImageFromTextureSource: () => texture } as unknown as Surface;
     await cache.prepare([imageItem("data:image/png;base64,b")], surface, new AbortController().signal);
 
-    const paint = { setAntiAlias: vi.fn(), setAlphaf: vi.fn(), delete: vi.fn() };
+    const paint = {
+      setAntiAlias: vi.fn(), setAlphaf: vi.fn(), setBlendMode: vi.fn(),
+      setImageFilter: vi.fn(), delete: vi.fn(),
+    };
     const canvas = {
-      save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(), scale: vi.fn(),
+      save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
+      skew: vi.fn(), scale: vi.fn(), clipRRect: vi.fn(), saveLayer: vi.fn(),
       drawImageRectOptions: vi.fn(),
     };
     const ck = {
       Paint: class { constructor() { return paint; } },
       FilterMode: { Linear: 1 },
       MipmapMode: { None: 0 },
+      BlendMode: { SrcOver: 1 },
+      ClipOp: { Intersect: 1 },
+      RRectXY: vi.fn((rect: unknown) => rect),
+      ImageFilter: { MakeDropShadow: vi.fn() },
     } as unknown as CanvasKit;
 
     cache.draw(ck, canvas as never, imageItem("data:image/png;base64,b").image!);
@@ -69,5 +78,60 @@ describe("retained GPU document image cache", () => {
     expect(canvas.drawImageRectOptions).toHaveBeenCalledOnce();
     cache.dispose();
     expect(texture.delete).toHaveBeenCalledOnce();
+  });
+
+  it("isolates rounded, skewed, blended shadow images exactly once", async () => {
+    const texture = { width: () => 4, height: () => 3, delete: vi.fn() } as unknown as Image;
+    const cache = createSkiaDocumentImageCache(async () => bitmap());
+    const surface = { makeImageFromTextureSource: () => texture } as unknown as Surface;
+    const base = imageItem("data:image/png;base64,effect");
+    const effect = {
+      ...base.image!,
+      skewX: 0.25,
+      skewY: -0.1,
+      cornerRadius: 8,
+      blendMode: "multiply" as const,
+      shadow: {
+        color: { r: 0.1, g: 0.2, b: 0.3, a: 0.5 },
+        blur: 8,
+        offsetX: 4,
+        offsetY: -3,
+        opacity: 0.6,
+      },
+    };
+    await cache.prepare([{ ...base, image: effect }], surface, new AbortController().signal);
+
+    const paints = Array.from({ length: 2 }, () => ({
+      setAntiAlias: vi.fn(), setAlphaf: vi.fn(), setBlendMode: vi.fn(),
+      setImageFilter: vi.fn(), delete: vi.fn(),
+    }));
+    let paintIndex = 0;
+    const filter = { delete: vi.fn() };
+    const canvas = {
+      save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
+      skew: vi.fn(), scale: vi.fn(), clipRRect: vi.fn(), saveLayer: vi.fn(),
+      drawImageRectOptions: vi.fn(),
+    };
+    const ck = {
+      Paint: class { constructor() { return paints[paintIndex++]!; } },
+      FilterMode: { Linear: 1 }, MipmapMode: { None: 0 },
+      BlendMode: { SrcOver: 1, Multiply: 2 }, ClipOp: { Intersect: 1 },
+      RRectXY: vi.fn((rect: unknown, rx: number, ry: number) => ({ rect, rx, ry })),
+      ImageFilter: { MakeDropShadow: vi.fn(() => filter) },
+    } as unknown as CanvasKit;
+
+    cache.draw(ck, canvas as never, effect);
+    expect(canvas.skew).toHaveBeenCalledWith(0.25, -0.1);
+    expect(canvas.clipRRect).toHaveBeenCalledOnce();
+    expect(canvas.saveLayer).toHaveBeenCalledOnce();
+    expect(paints[1]!.setAlphaf).toHaveBeenCalledWith(0.5);
+    expect(paints[1]!.setBlendMode).toHaveBeenCalledWith(2);
+    expect(ck.ImageFilter.MakeDropShadow).toHaveBeenCalledWith(
+      4, -3, 4, 4, [0.1, 0.2, 0.3, 0.3], null,
+    );
+    expect(canvas.drawImageRectOptions).toHaveBeenCalledOnce();
+    expect(filter.delete).toHaveBeenCalledOnce();
+    expect(paints.every((paint) => paint.delete.mock.calls.length === 1)).toBe(true);
+    cache.dispose();
   });
 });

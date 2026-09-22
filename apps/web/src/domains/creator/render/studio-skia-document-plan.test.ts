@@ -98,10 +98,48 @@ it("admits only exact static image semantics and preserves transform metadata", 
   expect(item?.image).toEqual({
     src: image.type === "image" ? image.src : "", x: 12, y: 34, width: 50, height: 60,
     rotation: 15, opacity: 0.75, flipX: true, flipY: false,
+    skewX: 0, skewY: 0, cornerRadius: 0, blendMode: "source-over",
   });
   expect(createStudioSkiaDocumentProjector().project([{ ...image, blur: 2 } as El]).supported).toBe(false);
   expect(createStudioSkiaDocumentProjector().project([{ ...image, isAnimatedGif: true } as El]).supported).toBe(false);
   expect(createStudioSkiaDocumentProjector().project([{ ...image, src: "data:image/webp;base64,AA==" } as El]).supported).toBe(false);
+});
+
+it("preserves exact image blend, skew, rounded clip and shadow metadata", () => {
+  const image = {
+    id: "effect-image", type: "image", src: "data:image/png;base64,AA==",
+    x: 12, y: 34, width: 80, height: 60, rotation: 15, opacity: 0.75,
+    blendMode: "multiply", cornerRadius: 12, skewX: 15, skewY: -10,
+    shadowColor: "#11223380", shadowBlur: 8,
+    shadowOffsetX: 4, shadowOffsetY: -3, shadowOpacity: 0.6,
+  } as El;
+  expect(compileStudioSkiaDocumentItem(image)?.image).toMatchObject({
+    blendMode: "multiply",
+    cornerRadius: 12,
+    skewX: expect.closeTo(Math.tan(15 * Math.PI / 180)),
+    skewY: expect.closeTo(Math.tan(-10 * Math.PI / 180)),
+    shadow: {
+      blur: 8,
+      offsetX: 4,
+      offsetY: -3,
+      opacity: 0.6,
+      color: { r: expect.any(Number), g: expect.any(Number), b: expect.any(Number), a: expect.any(Number) },
+    },
+  });
+});
+
+it.each([
+  { blendMode: "linear-dodge" },
+  { cornerRadius: -1 },
+  { skewX: 61 },
+  { shadowColor: "not-a-color" },
+  { shadowColor: "#000000", shadowOpacity: 2 },
+])("keeps unsupported image effects on compatibility: %j", (patch) => {
+  const image = {
+    id: "image", type: "image", src: "data:image/png;base64,AA==",
+    x: 0, y: 0, width: 20, height: 20, rotation: 0, ...patch,
+  } as El;
+  expect(createStudioSkiaDocumentProjector().project([image]).supported).toBe(false);
 });
 
 it("renders static frame paint and reprojects a child only when its panel changes", () => {
@@ -121,4 +159,67 @@ it("renders static frame paint and reprojects a child only when its panel change
   const third = projector.project([resizedFrame, child], "vivid");
   expect(third.items[1]).not.toBe(first.items[1]);
   expect(third.items[1]?.clip?.width).toBe(60);
+});
+
+it("admits exact horizontal solid text and preserves paragraph metadata", () => {
+  const element = {
+    id: "text",
+    type: "text",
+    text: "안녕하세요\nGPU 텍스트",
+    x: 12,
+    y: 34,
+    width: 240,
+    fontSize: 28,
+    fill: "#224466",
+    font: "Pretendard, sans-serif",
+    fontStyle: "bold italic",
+    align: "center",
+    letterSpacing: 1.5,
+    lineHeight: 1.25,
+    rotation: 10,
+    opacity: 0.8,
+  } as El;
+  expect(compileStudioSkiaDocumentItem(element)?.text).toMatchObject({
+    text: element.type === "text" ? element.text : "",
+    x: 12,
+    y: 34,
+    width: 240,
+    fontSize: 28,
+    rotation: 10,
+    opacity: 0.8,
+    align: "center",
+    letterSpacing: 1.5,
+    lineHeight: 1.25,
+    weight: 700,
+    italic: true,
+    font: { family: "Pretendard" },
+  });
+});
+
+it.each([
+  { vertical: true },
+  { rubySpans: [{ start: 0, end: 1, ruby: "안" }] },
+  { rangeFormats: [{ start: 0, end: 1, style: {} }] },
+  { fillType: "gradient", gradient: { enabled: true } },
+  { stroke: "#000000", strokeWidth: 1 },
+  { shadowColor: "#000000", shadowOpacity: 0.5 },
+  { textPath: { type: "arc", bend: 0.5 } },
+  { skewX: 10 },
+  { text: "مرحبا بالعالم" },
+])("keeps advanced text semantics on compatibility: %j", (patch) => {
+  const element = {
+    id: "text",
+    type: "text",
+    text: "텍스트",
+    x: 0,
+    y: 0,
+    width: 120,
+    fontSize: 20,
+    fill: "#000000",
+    rotation: 0,
+    ...patch,
+  } as El;
+  const plan = createStudioSkiaDocumentProjector().project([element]);
+  expect(plan.supported).toBe(false);
+  expect(plan.items).toEqual([]);
 });

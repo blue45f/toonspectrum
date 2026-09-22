@@ -344,9 +344,14 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     ) ?? (() => undefined);
     submitted.current = submit;
     report("starting", latest.current.sceneRevision, []);
-    void import("@toonspectrum/studio-engine-skia").then((module) => {
+    void Promise.all([
+      import("@toonspectrum/studio-engine-skia"),
+      import("./studio-skia-document-font-source"),
+    ]).then(([module, fontSource]) => {
       if (!alive || generation.current !== scope) return;
-      runtime = module.createSkiaDocumentRenderer(canvas, { onContextLost: () => {
+      runtime = module.createSkiaDocumentRenderer(canvas, {
+        loadFontData: fontSource.loadStudioSkiaDocumentFontData,
+        onContextLost: () => {
         if (!alive || generation.current !== scope) return;
         revision.current += 1; pendingFence?.abort();
         receipt.current = null;
