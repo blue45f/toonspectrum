@@ -12,6 +12,18 @@ export interface SkiaDocumentInk {
   readonly erase?: boolean;
   readonly nib?: { readonly aspect: number; readonly angleRad: number };
 }
+export interface SkiaDocumentImage {
+  readonly src: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly rotation: number;
+  readonly opacity: number;
+  readonly flipX: boolean;
+  readonly flipY: boolean;
+}
+
 export interface SkiaDocumentPanel {
   readonly x: number;
   readonly y: number;
@@ -36,6 +48,7 @@ export interface SkiaDocumentItem {
   readonly revision: object;
   readonly nodes?: readonly SceneNodeIR[];
   readonly ink?: SkiaDocumentInk;
+  readonly image?: SkiaDocumentImage;
   readonly panel?: SkiaDocumentPanel;
   /** Existing document panel semantics: axis-aligned child clip in document coordinates. */
   readonly clip?: SkiaDocumentClip;
@@ -60,12 +73,15 @@ export interface SkiaDocumentStats {
   readonly cachedItems: number;
   readonly pictureBytes: number;
   readonly gpuCacheBytes: number | null;
+  readonly imageTextureBytes: number;
+  readonly cachedImages: number;
   readonly frameMs: number;
   readonly interactiveReadbacks: 0;
 }
 export type SkiaDocumentReceipt =
   | { readonly status: "presented"; readonly revision: object; readonly stats: SkiaDocumentStats }
   | { readonly status: "superseded" | "disposed"; readonly revision: object }
+  | { readonly status: "unsupported"; readonly revision: object; readonly reason: string }
   | { readonly status: "unavailable"; readonly revision: object; readonly reason: string };
 export interface SkiaDocumentRenderer {
   present(frame: SkiaDocumentFrame): Promise<SkiaDocumentReceipt>;

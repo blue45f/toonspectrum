@@ -85,6 +85,17 @@ async function verify(type, name) {
     assert(panelParity.meanPremultipliedColorError < 12, `${name} panel color ${JSON.stringify(panelParity)}`);
     report.measurements.push({ engine: name, panelParity });
     checkpoint(`${name}: static panel paint and child clipping stay on the retained GPU document surface`);
+
+    const image = await page.evaluate(() => window.skiaEngineQA.image());
+    assert.equal(image.status, 'presented');
+    assert.equal(image.stats.cachedImages, 1);
+    assert(image.stats.imageTextureBytes > 0 && image.stats.imageTextureBytes <= 64 * 1024 * 1024);
+    const imageParity = await pixelComparison(page);
+    assert(imageParity.alphaRatio > 0.96 && imageParity.alphaRatio < 1.04, `${name} image alpha ${JSON.stringify(imageParity)}`);
+    assert(imageParity.edgeMismatch < 0.08, `${name} image edge mismatch ${JSON.stringify(imageParity)}`);
+    assert(imageParity.meanPremultipliedColorError < 8, `${name} image color ${JSON.stringify(imageParity)}`);
+    report.measurements.push({ engine: name, imageParity, textureBytes: image.stats.imageTextureBytes });
+    checkpoint(`${name}: static PNG texture preserves rotation, flip, opacity and bounded GPU residency`);
     await page.evaluate(() => window.skiaEngineQA.load(80));
 
     const interleaved = await page.evaluate(() => window.skiaEngineQA.interleavedSurface());
