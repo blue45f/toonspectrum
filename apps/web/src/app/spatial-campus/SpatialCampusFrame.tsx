@@ -12,6 +12,7 @@ import { CampusContext } from "@/shared/components/spatial-campus/campus-context
 import { CampusControls } from "@/shared/components/spatial-campus/CampusControls";
 import { CampusSceneBoundary } from "@/shared/components/spatial-campus/CampusSceneBoundary";
 import { CampusSceneRecovery } from "@/shared/components/spatial-campus/CampusSceneRecovery";
+import { CampusPrivacyCurtain } from "@/shared/components/spatial-campus/CampusPrivacyCurtain";
 import { WorkspaceTaskFrame } from "@/shared/components/workspace/WorkspaceTaskFrame";
 import type { WorkspaceTaskRoute } from "@/shared/components/workspace/workspace-task-route";
 import "@/shared/components/spatial-campus/campus.css";
@@ -32,8 +33,11 @@ export function SpatialCampusFrame({ binding, route, children }: {
   const preference = useCreatorExperienceMode((state) => state.mode);
   const setPreference = useCreatorExperienceMode((state) => state.setMode);
   const [focusPath, setFocusPath] = useState<string | null>(null);
+  const [privacyMode, setPrivacyMode] = useState(false);
   const protectedRoute = binding?.surface === "protected";
   const districtId = binding?.districtId ?? null;
+  const privacySensitive = binding?.surface === "room" && binding.private;
+  const privacyActive = Boolean(privacySensitive && privacyMode);
   const sceneObjectsAllowed = !protectedRoute
     && binding?.surface === "room"
     && districtId !== null
@@ -74,14 +78,18 @@ export function SpatialCampusFrame({ binding, route, children }: {
       return Object.keys(sources).length ? { scope, sources } : null;
     });
   }, [districtId, sceneObjectsAllowed, scope]);
-  const objects = sceneObjectsAllowed && districtId && projection?.scope === scope
+  const objects = sceneObjectsAllowed && !privacyActive && districtId && projection?.scope === scope
     ? campusSceneObjects(Object.values(projection.sources).flat(), districtId)
     : [];
   useEffect(() => {
     const storage = campusSessionStorage();
     const changedOwner = previousOwner.current !== owner;
     previousOwner.current = owner;
-    if (changedOwner) { writeCampusReturn(storage, null); setMemory(null); }
+    if (changedOwner) {
+      writeCampusReturn(storage, null);
+      setMemory(null);
+      setPrivacyMode(false);
+    }
     if (protectedRoute || !session.ready) return;
     const href = campusDocumentHref(pathname, search);
     if (href) {
@@ -93,6 +101,9 @@ export function SpatialCampusFrame({ binding, route, children }: {
       setMemory((current) => stored ?? (current?.owner === owner && Date.now() - current.savedAt < CAMPUS_RETURN_TTL ? current : null));
     }
   }, [owner, pathname, search, session.ready, protectedRoute]);
+  useEffect(() => {
+    if (!privacySensitive) setPrivacyMode(false);
+  }, [privacySensitive]);
   const mode: CampusMode = focusPath === pathname ? "focus" : preference === "virtual-studio" ? "scene" : "task";
   const setMode = (next: CampusMode) => {
     setFocusPath(next === "focus" ? pathname : null);
@@ -111,7 +122,16 @@ export function SpatialCampusFrame({ binding, route, children }: {
   const returnHref = !protectedRoute && session.ready && memory?.owner === owner ? memory.href : null;
   const district = binding ? campusDistrict(binding.districtId) : null;
   const context = binding && district && !protectedRoute
-    ? { binding, district, mode, setMode, returnHref } : null;
+    ? {
+        binding,
+        district,
+        mode,
+        privacyMode: privacyActive,
+        privacySensitive,
+        returnHref,
+        setMode,
+        setPrivacyMode,
+      } : null;
   const ownsRoom = binding?.surface === "room";
   const activeDistrictId = context?.district.id;
   useEffect(() => {
@@ -130,6 +150,11 @@ export function SpatialCampusFrame({ binding, route, children }: {
       </Suspense>
     </CampusSceneBoundary>
   ) : null;
+  const domain = privacySensitive ? (
+    <CampusPrivacyCurtain key={owner} active={privacyActive} onReveal={() => setPrivacyMode(false)}>
+      {children}
+    </CampusPrivacyCurtain>
+  ) : children;
   return <CampusContext.Provider value={context}>
     <CampusPaletteContext.Provider value={!protectedRoute && districtId === "observatory" ? savePalette : null}>
       <CampusObjectPublisherContext.Provider value={sceneObjectsAllowed ? publishObjects : null}>
@@ -137,7 +162,7 @@ export function SpatialCampusFrame({ binding, route, children }: {
           campusMode={ownsRoom ? mode : undefined}
           campusControls={ownsRoom ? <CampusControls /> : undefined}
           campusScene={scene}>
-          {children}
+          {domain}
         </WorkspaceTaskFrame>
       </CampusObjectPublisherContext.Provider>
     </CampusPaletteContext.Provider>

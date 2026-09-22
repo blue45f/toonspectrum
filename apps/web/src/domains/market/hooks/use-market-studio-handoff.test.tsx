@@ -17,8 +17,11 @@ describe("useMarketStudioHandoff", () => {
         binding: { routeId: "market-resource", districtId: "market", surface: "room", private: false },
         district: campusDistrict("market"),
         mode: "task",
+        privacyMode: false,
+        privacySensitive: false,
         returnHref: "/studio/p/project-A/d/document-B?pageId=page-C",
         setMode: vi.fn(),
+        setPrivacyMode: vi.fn(),
       }}>
         <Probe />
       </CampusContext.Provider>,

@@ -80,6 +80,41 @@ describe("campus state continuity", () => {
     expect(document.activeElement).toBe(trigger);
     await screen.findByTestId("scene");
   });
+  it("hides a private domain without remounting or persisting its draft", async () => {
+    const view = render(<MemoryRouter initialEntries={["/fortune?content=dream"]}><Fixture /></MemoryRouter>);
+    const input = screen.getByRole("textbox", { name: "private draft" });
+    fireEvent.change(input, { target: { value: "공유하면 안 되는 꿈 기록" } });
+    fireEvent.click(screen.getByRole("button", { name: "공개 화면 모드 켜기" }));
+
+    expect(view.container.querySelector('[data-campus-privacy="hidden"]')).toBeTruthy();
+    expect(screen.getByRole("region", { name: "개인 작업 보호" })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "private draft" })).toBeNull();
+    expect(input.isConnected).toBe(true);
+    expect((input as HTMLTextAreaElement).value).toBe("공유하면 안 되는 꿈 기록");
+    expect(JSON.stringify({ ...localStorage, ...sessionStorage })).not.toContain("공유하면 안 되는 꿈 기록");
+    expect(screen.getByTestId("location").textContent).toBe("/fortune?content=dream");
+
+    fireEvent.click(screen.getByRole("button", { name: "가림 해제" }));
+    expect(screen.getByRole("textbox", { name: "private draft" })).toBe(input);
+    expect((input as HTMLTextAreaElement).value).toBe("공유하면 안 되는 꿈 기록");
+    expect(mounts).toBe(1);
+  });
+  it("resets presentation privacy and remounts private state when the account identity changes", async () => {
+    const view = render(<MemoryRouter initialEntries={["/fortune"]}><Fixture /></MemoryRouter>);
+    const previousInput = screen.getByRole("textbox", { name: "private draft" });
+    fireEvent.change(previousInput, { target: { value: "user-A only" } });
+    fireEvent.click(screen.getByRole("button", { name: "공개 화면 모드 켜기" }));
+    expect(screen.getByRole("region", { name: "개인 작업 보호" })).toBeTruthy();
+
+    actor.id = "user-B";
+    view.rerender(<MemoryRouter initialEntries={["/fortune"]}><Fixture /></MemoryRouter>);
+    await waitFor(() => expect(screen.queryByRole("region", { name: "개인 작업 보호" })).toBeNull());
+    const nextInput = screen.getByRole("textbox", { name: "private draft" });
+    expect(nextInput).not.toBe(previousInput);
+    expect((nextInput as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByRole("button", { name: "공개 화면 모드 켜기" }).getAttribute("aria-pressed")).toBe("false");
+    expect(mounts).toBe(2);
+  });
 });
 describe("campus domain projection aggregation", () => {
   it("combines multiple public sources inside the current district and rejects private cross-district data", async () => {
@@ -98,5 +133,23 @@ describe("campus domain projection aggregation", () => {
     await waitFor(() => expect(scene.textContent).toContain("Story A"));
     expect(scene.textContent).toContain("Story B");
     expect(scene.textContent).not.toContain("Private Project");
+  });
+  it("removes private project objects from the scene while presentation privacy is active", async () => {
+    const binding = campusBinding("production-project-overview", "/production/projects/project-A/overview");
+    const route = { titleKo: "제작관", titleEn: "Production", hintKo: "", hintEn: "" };
+    render(<MemoryRouter initialEntries={["/production/projects/project-A/overview"]}>
+      <SpatialCampusFrame binding={binding} route={route}>
+        <CampusObjectSource objects={[
+          { id: "project-A", title: "Private Project", href: "/production/projects/project-A/overview", kind: "project", exposure: "private" },
+        ]} />
+      </SpatialCampusFrame>
+    </MemoryRouter>);
+
+    const scene = await screen.findByTestId("scene");
+    await waitFor(() => expect(scene.textContent).toContain("Private Project"));
+    fireEvent.click(screen.getByRole("button", { name: "공개 화면 모드 켜기" }));
+    await waitFor(() => expect(scene.textContent).not.toContain("Private Project"));
+    fireEvent.click(screen.getByRole("button", { name: "가림 해제" }));
+    await waitFor(() => expect(scene.textContent).toContain("Private Project"));
   });
 });
