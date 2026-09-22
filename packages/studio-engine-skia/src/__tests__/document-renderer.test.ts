@@ -163,3 +163,56 @@ it("does not restore viewport textures from a previous backing-store generation"
   expect(h.output.drawImage).not.toHaveBeenCalled();
   renderer.dispose();
 });
+
+
+it("releases retained GPU resources on loss without waiting for the editor to unmount", async () => {
+  const h = harness();
+  const images: Array<{ delete: ReturnType<typeof vi.fn> }> = [];
+  h.surface.makeImageSnapshot = () => {
+    const image = { delete: vi.fn() }; images.push(image); return image;
+  };
+  const abandon = vi.fn();
+  Object.assign(h.context, { releaseResourcesAndAbandonContext: abandon });
+  const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck,
+    onContextLost: () => { throw new Error("observer failed"); } });
+  await renderer.present(h.frame);
+  await renderer.present({ ...h.frame, camera: { ...h.frame.camera, offsetX: 10 } });
+  h.canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+  await Promise.resolve();
+  expect(h.pictures.every((picture) => picture.delete.mock.calls.length === 1)).toBe(true);
+  expect(images.length).toBeGreaterThan(0);
+  expect(images.every((image) => image.delete.mock.calls.length === 1)).toBe(true);
+  expect(h.surface.delete).toHaveBeenCalledOnce();
+  expect(abandon).toHaveBeenCalledOnce();
+  expect(h.ck.deleteContext).toHaveBeenCalledOnce();
+  expect(await renderer.present(h.frame)).toMatchObject({ status: "unavailable" });
+  renderer.dispose(); renderer.dispose();
+  expect(h.context.delete).toHaveBeenCalledOnce();
+  expect(h.ck.deleteContext).toHaveBeenCalledOnce();
+});
+
+it("releases old and partially compiled pictures when a later frame exceeds the budget", async () => {
+  const h = harness();
+  const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck, maxPictureBytes: 96 });
+  const items = [...h.frame.items, { id: "b", revision: {}, nodes: [] }];
+  expect(await renderer.present(h.frame)).toMatchObject({ status: "presented" });
+  expect(await renderer.present({ ...h.frame, items })).toMatchObject({ status: "presented" });
+  const result = await renderer.present({ ...h.frame, items: [...items, { id: "c", revision: {}, nodes: [] }] });
+  expect(result).toMatchObject({ status: "unavailable", reason: expect.stringContaining("budget") });
+  expect(h.surface.flush).toHaveBeenCalledTimes(2);
+  expect(h.pictures.every((picture) => picture.delete.mock.calls.length === 1)).toBe(true);
+  expect(h.context.delete).toHaveBeenCalledOnce();
+  expect(await renderer.present(h.frame)).toMatchObject({ status: "unavailable" });
+  renderer.dispose();
+  expect(h.ck.deleteContext).toHaveBeenCalledOnce();
+});
+
+it("releases the context when GPU surface creation fails", async () => {
+  const h = harness(); vi.mocked(h.ck.MakeOnScreenGLSurface).mockReturnValue(null);
+  const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck });
+  expect(await renderer.present(h.frame)).toMatchObject({ status: "unavailable" });
+  expect(h.context.delete).toHaveBeenCalledOnce();
+  expect(h.ck.deleteContext).toHaveBeenCalledOnce();
+  renderer.dispose();
+  expect(h.ck.deleteContext).toHaveBeenCalledOnce();
+});

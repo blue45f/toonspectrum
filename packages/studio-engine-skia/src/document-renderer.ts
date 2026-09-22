@@ -106,12 +106,24 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
     for (const entry of cache.values()) safeDelete(entry.picture);
     cache.clear(); previousItems = [];
   };
+  // Failure is terminal: release resources even while recovery UI stays mounted.
+  // Subsequent dispose and device-loss callbacks are intentionally idempotent.
+  const releaseGpuResources = () => {
+    clearSnapshots(); clearPictures(); presentedItems = []; presentedLayout = null;
+    safeDelete(surface); surface = null; surfaceWidth = 0; surfaceHeight = 0;
+    try { context?.releaseResourcesAndAbandonContext(); } catch { /* lost context */ }
+    safeDelete(context); context = null;
+    if (ck && gl !== null && gl > 0) { try { ck.deleteContext(gl); } catch { /* lost context */ } }
+    gl = null;
+  };
   const lost = (event: Event) => {
     event.preventDefault();
     if (disposed || failure) return;
     failure = "CanvasKit GPU context lost; explicit renderer recovery is required";
     canvas.style.visibility = "hidden";
     try { options.onContextLost?.(); } catch { /* Observer errors never defeat device-loss fencing. */ }
+    // Let any active native draw stack unwind before releasing its handles.
+    queueMicrotask(releaseGpuResources);
   };
   canvas.addEventListener("webglcontextlost", lost);
 
@@ -267,6 +279,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
         } catch (cause) {
           failure = cause instanceof Error ? cause.message : String(cause);
           canvas.style.visibility = "hidden";
+          releaseGpuResources();
           work.resolve({ status: "unavailable", revision: work.frame.revision, reason: failure });
         }
       }
@@ -289,11 +302,7 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
       if (disposed) return; disposed = true;
       if (pending) { const work = pending; pending = null; work.resolve({ status: "disposed", revision: work.frame.revision }); }
       canvas.removeEventListener("webglcontextlost", lost);
-      clearSnapshots(); clearPictures(); presentedItems = []; presentedLayout = null; safeDelete(surface); surface = null;
-      try { context?.releaseResourcesAndAbandonContext(); } catch { /* lost context */ }
-      safeDelete(context); context = null;
-      if (ck && gl !== null && gl > 0) { try { ck.deleteContext(gl); } catch { /* lost context */ } }
-      gl = null;
+      releaseGpuResources();
     },
   };
 }

@@ -47,3 +47,29 @@ Screenshots and JSON reports are generated under `artifacts/skia-document/` and 
 The default Chromium headless-shell was observed using SwiftShader, not physical GPU hardware. Its dense camera-repeat attempt exceeded the bounded run; it is not counted as a hardware performance success. The runner now uses the documented regular Chromium channel and records the actual driver instead of assuming GPU acceleration from the API name. Firefox may mask its GPU name.
 
 Current canonical input, committed-stroke fences, selection, complex images/text/masks/filters, natural-media providers and exports still retain existing compatibility boundaries. A change to unsupported content may leave this bounded display slice. Full removal of Konva/Canvas2D, 30/120-minute real-device operation, complete original-file/export parity, and end-to-end large-document latency remain separate acceptance gates. No tests, image thresholds, CI protections or bundle ratchets were relaxed. No production deployment was performed.
+
+## Main integration continuation — 2026-09-22
+
+The user requested completion of this in-progress GPU change and a main merge, not an operational deployment.
+The existing acceptance worktree and PR #1951 are the integration owner. #1949 is already an ancestor;
+#1950 was compared file by file rather than merged over newer publication and backing-store fixes.
+
+The unique terminal-resource cleanup from #1950 is integrated: GPU loss schedules native resource
+release after the drawing stack unwinds, and a failed frame releases pictures, snapshots, surface and
+context immediately. The failure remains latched until explicit same-engine recreation. Cleanup is
+idempotent with later unmount/dispose and cannot be prevented by a throwing observer.
+
+Three new regressions were first run against the previous source: all three failed; the prior 12 passed.
+After the cleanup integration, all 15 renderer tests passed. Expanded package, registry, React surface,
+frontier, canvas and access-policy tests: **445 passed, 4 existing capability-dependent skips**.
+
+The unchanged Chromium/Firefox hardware suite passed all **16 scenario groups**, including 10,000
+short strokes and 100 append/undo cycles. The real editor verifier now includes GPU loss, recovery UI,
+explicit retry and exact recovered GPU pixel comparison, in addition to drawing/zoom/rotation/Undo.
+All **4 real-editor scenario groups** passed on Chromium/ANGLE Metal Apple M2 Max without API or ACL mocks.
+
+Production rebuild and exact-head remote core/verify results are recorded in the PR after completion.
+These results do not certify full Konva/Canvas2D removal, physical pen latency, total GPU memory or
+30/120-minute soak. The dedicated broader Full Test Diagnostic is distinct from core/verify; earlier
+run 35656230252 reported 9 failures in 6 unrelated unchanged test files, not a green full repository suite.
+No tests, budgets, authorization, persistence, Automerge, deployment or branch protection were weakened.

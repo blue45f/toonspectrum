@@ -67,6 +67,23 @@ try {
   await page.keyboard.press('ControlOrMeta+Shift+z'); await gpuReady(3);
   report.checks.push('Existing document Undo/Redo remains authoritative and the GPU display follows its restored source');
   await page.screenshot({ path: path.join(output, 'restored-document.png') });
+  const beforeLossPixels = await page.locator('[data-studio-skia-document-surface]').evaluate(canvas => canvas.toDataURL());
+  await page.locator('[data-studio-skia-document-surface]').evaluate(canvas => {
+    const extension = canvas.getContext('webgl2')?.getExtension('WEBGL_lose_context');
+    if (!extension) throw new Error('GPU context-loss injection is unavailable');
+    return new Promise(resolve => {
+      canvas.addEventListener('webglcontextlost', () => resolve(), { once: true });
+      extension.loseContext();
+    });
+  });
+  await expect(page.locator('[data-studio-vello-unavailable="true"]')).toBeVisible();
+  await expect(page.locator('[data-studio-skia-document-surface]')).toHaveCSS('visibility', 'hidden');
+  await page.getByRole('button', { name: '같은 GPU 엔진 다시 준비', exact: true }).click();
+  await gpuReady(3);
+  const recoveredPixels = await page.locator('[data-studio-skia-document-surface]').evaluate(canvas => canvas.toDataURL());
+  assert(recoveredPixels === beforeLossPixels, 'Explicit same-engine recovery changed the document pixels');
+  await expect(page.locator('[data-studio-vello-unavailable="true"]')).toHaveCount(0);
+  report.checks.push('Real GPU context loss shows recovery UI; explicit retry restores one same-engine surface and exact document pixels');
   assert.deepEqual(report.errors, []);
 } catch (error) {
   report.errors.push(error.stack ?? String(error));
