@@ -434,6 +434,12 @@ export function StudioCanvasViewportStageHost({
   const domOverlayProps: StudioCanvasViewportDomOverlaysProps = {
     skiaCameraSource,
     beforeSkiaPublish: (signal) => waitForStudioSkiaPresentationFence(mainLayerRef.current, signal),
+    canSkiaDocumentPublishOverSettledInk:
+      viewport.stableHandlers.canSkiaDocumentPublishOverSettledInk,
+    onSkiaDocumentAuthorityChange:
+      viewport.stableHandlers.onSkiaDocumentAuthorityChange,
+    onSkiaDocumentVisiblePresentation:
+      viewport.stableHandlers.onSkiaDocumentVisiblePresentation,
     acceleratedSceneSelectedIds: live.acceleratedSceneSelectedIds,
     canonicalDryMediaCanvasVisible: live.canonicalDryMediaCanvasVisible,
     canonicalDryMediaCandidate: live.canonicalDryMediaCandidate,

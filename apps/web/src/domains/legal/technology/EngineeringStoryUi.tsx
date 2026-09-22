@@ -1,5 +1,5 @@
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import { BookOpen, CheckCircle2, CircleDashed, CircleDot, Film, FlaskConical, LibraryBig, Presentation, Scale, Wrench } from "lucide-react";
+import { BookOpen, CheckCircle2, CircleDashed, CircleDot, Film, FlaskConical, GraduationCap, LibraryBig, Presentation, Scale, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
 import Link from "@/compat/router-link";
@@ -18,6 +18,12 @@ const NAV_ITEMS = [
     icon: BookOpen,
     ko: "제작 스토리",
     en: "Story",
+  },
+  {
+    href: "/about/technology/playbook",
+    icon: GraduationCap,
+    ko: "플레이북",
+    en: "Playbook",
   },
   {
     href: "/about/technology/guides",
@@ -118,7 +124,7 @@ export function EngineeringStoryNav({ className }: { readonly className?: string
         className,
       )}
     >
-      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

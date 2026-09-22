@@ -25,6 +25,9 @@ import type {
 export interface StudioCanvasViewportDomOverlaysProps {
   skiaCameraSource: StudioSkiaCameraSource;
   beforeSkiaPublish: (signal: AbortSignal) => Promise<void>;
+  canSkiaDocumentPublishOverSettledInk: StudioCanvasViewportHandlers["canSkiaDocumentPublishOverSettledInk"];
+  onSkiaDocumentAuthorityChange: StudioCanvasViewportHandlers["onSkiaDocumentAuthorityChange"];
+  onSkiaDocumentVisiblePresentation: StudioCanvasViewportHandlers["onSkiaDocumentVisiblePresentation"];
   acceleratedSceneSelectedIds: StudioCanvasViewportLiveSurfaces["acceleratedSceneSelectedIds"];
   canonicalDryMediaCanvasVisible: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCanvasVisible"];
   canonicalDryMediaCandidate: StudioCanvasViewportLiveSurfaces["canonicalDryMediaCandidate"];
@@ -70,6 +73,9 @@ export interface StudioCanvasViewportDomOverlaysProps {
 
 export function StudioCanvasViewportDomOverlays({
   beforeSkiaPublish,
+  canSkiaDocumentPublishOverSettledInk,
+  onSkiaDocumentAuthorityChange,
+  onSkiaDocumentVisiblePresentation,
   skiaCameraSource,
   acceleratedSceneSelectedIds,
   canonicalDryMediaCanvasVisible,
@@ -219,7 +225,12 @@ export function StudioCanvasViewportDomOverlays({
             elements={elements}
             sceneRevision={velloSceneRevision}
             isPenDown={readVelloHubPenDown}
-            onAuthorityChange={setVelloHubAuthority}
+            canPublishOverSettledInk={canSkiaDocumentPublishOverSettledInk}
+            onVisiblePresentation={onSkiaDocumentVisiblePresentation}
+            onAuthorityChange={(authority) => {
+              setVelloHubAuthority(authority);
+              onSkiaDocumentAuthorityChange?.(authority);
+            }}
           />
           {velloHubAuthority.status === "unavailable" ? (
             <div

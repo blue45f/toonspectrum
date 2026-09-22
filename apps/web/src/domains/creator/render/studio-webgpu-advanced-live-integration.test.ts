@@ -534,6 +534,30 @@ describe("Studio advanced WebGPU live-ink integration", () => {
     expect(retry).toBeGreaterThan(install);
   });
 
+  it("accepts an exact visible Skia receipt before falling back to a synchronous Konva draw", () => {
+    const page = source("../StudioCuttoonEditorHost.tsx");
+    const processStart = page.indexOf("processCommittedInkSurfaceHandoffsRef.current = () => {");
+    const processEnd = page.indexOf("useLayoutEffect(() => {", processStart);
+    const processSource = page.slice(processStart, processEnd);
+    const decision = processSource.indexOf("decideStudioSkiaCommittedInkDraw({");
+    const wait = processSource.indexOf('if (drawDecision.status === "wait")', decision);
+    const fallback = processSource.indexOf('if (drawDecision.status === "fallback")', wait);
+    const compatibilityDraw = processSource.indexOf("mainLayer.draw()", fallback);
+
+    expect(decision).toBeGreaterThan(-1);
+    expect(wait).toBeGreaterThan(decision);
+    expect(fallback).toBeGreaterThan(wait);
+    expect(compatibilityDraw).toBeGreaterThan(fallback);
+    expect(processSource.slice(wait, fallback)).toContain(
+      "skiaCommittedInkDeferAttemptsRef.current.set",
+    );
+    expect(processSource).toContain(
+      "if (retryVisibleDraw) scheduleCommittedInkSurfaceHandoffRetry()",
+    );
+    expect(page).toContain("onSkiaDocumentVisiblePresentation");
+    expect(page).toContain("canSkiaDocumentPublishOverSettledInk");
+  });
+
   it("requires the full active journal identity before rebaselining a settled prefix", () => {
     const page = source("../StudioCuttoonEditorHost.tsx");
     const matchStart = page.indexOf("function activeGpuLiveSourceJournalMatchesPlan(");
