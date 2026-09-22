@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarDays, Gift, Sparkles } from "lucide-react";
 
 import Link from "@/compat/router-link";
+import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {
   useDocumentTitle,
   useMetaDescription,
@@ -34,6 +35,13 @@ export function EventsHubPage() {
 
   return (
     <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas px-4 py-10 sm:px-6 sm:py-16">
+      <CampusObjectSource objects={MARKETING_EVENTS.map((event) => ({
+        id: event.id,
+        title: text(event.title),
+        href: `/events/${encodeURIComponent(event.slug)}`,
+        kind: "event",
+        exposure: "public",
+      }))} />
       <div className="mx-auto max-w-6xl">
         <header className="max-w-3xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-black tracking-[0.14em] text-accent">

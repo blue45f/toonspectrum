@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { CampusObjectPublisherContext } from "@/shared/components/spatial-campus/campus-object-context";
-import { campusPublicObjects, type CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
+import { CampusPaletteContext } from "@/shared/components/spatial-campus/campus-palette-context";
+import { saveCampusPaletteToStudio } from "./campus-palette-adapter";
+import { campusSceneObjects, type CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
 import { useLocation } from "react-router-dom";
 import { useSession } from "@/compat/auth-session-store";
 import { useCreatorExperienceMode } from "@/shared/lib/creator-experience-mode";
@@ -31,17 +33,50 @@ export function SpatialCampusFrame({ binding, route, children }: {
   const setPreference = useCreatorExperienceMode((state) => state.setMode);
   const [focusPath, setFocusPath] = useState<string | null>(null);
   const protectedRoute = binding?.surface === "protected";
-  const publicObjectsAllowed = !protectedRoute && binding?.routeId === "market-browse";
+  const districtId = binding?.districtId ?? null;
+  const sceneObjectsAllowed = !protectedRoute
+    && binding?.surface === "room"
+    && districtId !== null
+    && districtId !== "observatory"
+    && districtId !== "service";
   const scope = JSON.stringify([owner, routeKey]);
   const activeScope = useRef(scope);
   activeScope.current = scope;
-  const [projection, setProjection] = useState<{ scope: string; sourceId: string; objects: readonly CampusObject[] } | null>(null);
-  const publishObjects = useCallback((sourceId: string, objects: readonly CampusObject[]) => {
-    if (!publicObjectsAllowed || activeScope.current !== scope) return () => undefined;
-    setProjection({ scope, sourceId, objects: campusPublicObjects(objects) });
-    return () => setProjection((current) => current?.scope === scope && current.sourceId === sourceId ? null : current);
-  }, [scope, publicObjectsAllowed]);
-  const objects = publicObjectsAllowed && projection?.scope === scope ? projection.objects : [];
+  const paletteScope = JSON.stringify([owner, routeKey, districtId]);
+  const activePaletteScope = useRef(paletteScope);
+  activePaletteScope.current = paletteScope;
+  const savePalette = useCallback((colors: readonly string[]) => {
+    const requestedScope = paletteScope;
+    return saveCampusPaletteToStudio(colors, () => {
+      if (activePaletteScope.current !== requestedScope) {
+        throw new DOMException("Palette destination changed.", "AbortError");
+      }
+    });
+  }, [paletteScope]);
+  const [projection, setProjection] = useState<{
+    scope: string;
+    sources: Readonly<Record<string, readonly CampusObject[]>>;
+  } | null>(null);
+  const publishObjects = useCallback((sourceId: string, candidates: readonly CampusObject[]) => {
+    if (!sceneObjectsAllowed || !districtId || activeScope.current !== scope) return () => undefined;
+    const next = campusSceneObjects(candidates, districtId);
+    setProjection((current) => ({
+      scope,
+      sources: {
+        ...(current?.scope === scope ? current.sources : {}),
+        [sourceId]: next,
+      },
+    }));
+    return () => setProjection((current) => {
+      if (current?.scope !== scope || !(sourceId in current.sources)) return current;
+      const sources = { ...current.sources };
+      delete sources[sourceId];
+      return Object.keys(sources).length ? { scope, sources } : null;
+    });
+  }, [districtId, sceneObjectsAllowed, scope]);
+  const objects = sceneObjectsAllowed && districtId && projection?.scope === scope
+    ? campusSceneObjects(Object.values(projection.sources).flat(), districtId)
+    : [];
   useEffect(() => {
     const storage = campusSessionStorage();
     const changedOwner = previousOwner.current !== owner;
@@ -96,13 +131,15 @@ export function SpatialCampusFrame({ binding, route, children }: {
     </CampusSceneBoundary>
   ) : null;
   return <CampusContext.Provider value={context}>
-    <CampusObjectPublisherContext.Provider value={publicObjectsAllowed ? publishObjects : null}>
-    <WorkspaceTaskFrame route={route}
-      campusMode={ownsRoom ? mode : undefined}
-      campusControls={ownsRoom ? <CampusControls /> : undefined}
-      campusScene={scene}>
-      {children}
-    </WorkspaceTaskFrame>
-    </CampusObjectPublisherContext.Provider>
+    <CampusPaletteContext.Provider value={!protectedRoute && districtId === "observatory" ? savePalette : null}>
+      <CampusObjectPublisherContext.Provider value={sceneObjectsAllowed ? publishObjects : null}>
+        <WorkspaceTaskFrame route={route}
+          campusMode={ownsRoom ? mode : undefined}
+          campusControls={ownsRoom ? <CampusControls /> : undefined}
+          campusScene={scene}>
+          {children}
+        </WorkspaceTaskFrame>
+      </CampusObjectPublisherContext.Provider>
+    </CampusPaletteContext.Provider>
   </CampusContext.Provider>;
 }

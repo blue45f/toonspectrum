@@ -52,8 +52,16 @@ describe("campus route authority coverage", () => {
     expect(campusProtectedSearch(`?${key}=secret`)).toBe(true);
     expect(campusBinding("market-home", "/market", `?${key}=secret`)?.surface).toBe("protected");
   });
-  it("retains nine distinct districts and unique direct actions", () => {
+  it("retains nine distinct districts, visual identities and unique direct actions", () => {
     expect(CAMPUS_DISTRICTS).toHaveLength(9);
-    for (const district of CAMPUS_DISTRICTS) expect(new Set(district.destinations.map((item) => item.id)).size).toBe(district.destinations.length);
+    expect(new Set(CAMPUS_DISTRICTS.map((district) => district.artworkUrl)).size).toBe(9);
+    for (const district of CAMPUS_DISTRICTS) {
+      expect(district.artworkUrl).toMatch(/^\/(?:assets|brand)\//u);
+      expect(new Set(district.destinations.map((item) => item.id)).size).toBe(district.destinations.length);
+    }
+    expect(CAMPUS_DISTRICTS.find((district) => district.id === "academy")?.destinations)
+      .toContainEqual(expect.objectContaining({ id: "trace", href: "/learn/trace" }));
+    expect(CAMPUS_DISTRICTS.find((district) => district.id === "gallery")?.destinations)
+      .toContainEqual(expect.objectContaining({ id: "publish", href: "/community/promote/new" }));
   });
 });

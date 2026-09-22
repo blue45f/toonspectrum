@@ -19,6 +19,9 @@ export function createNavigationMemory(limit = 80) {
         positions.delete(first);
       }
     },
+    clear() {
+      positions.clear();
+    },
     get size() { return positions.size; },
   };
 }

@@ -6,6 +6,7 @@ import { LearningHome, LearningPathPage } from "./LearningHome";
 import { LearningClassroomPage } from "./LearningClassroomPage";
 import { LearningResourcesPage } from "./LearningResourcesPage";
 import { LearningRecordsPage } from "./LearningRecordsPage";
+import { TracePracticePage } from "./TracePracticePage";
 import { WebtoonCareerPage } from "./WebtoonCareerPage";
 import { WebtoonProcessPage } from "./WebtoonProcessPage";
 
@@ -15,11 +16,10 @@ import "./learning-academy.css";
 const REFERENCE_LINKS = [
   { path: "/learn/resources", label: "강좌·자료" },
   { path: "/learn/classroom", label: "Classroom" },
+  { path: "/learn/trace", label: "따라 그리기" },
   { path: "/learn/process", label: "웹툰 제작 과정" },
   { path: "/learn/careers", label: "진로·직무 안내" },
   { path: "/learn/education", label: "교육기관 찾기" },
-  { path: "/learn/resources", label: "교육 자료 허브" },
-  { path: "/learn/classroom", label: "교육기관 활용" },
 ] as const;
 
 function LearningReferenceNavigation({ pathname }: { readonly pathname: string }) {
@@ -62,7 +62,9 @@ export function LearnPage() {
     ? <LearningResourcesPage />
     : normalizedPath === "/learn/classroom"
       ? <LearningClassroomPage />
-      : null;
+      : normalizedPath === "/learn/trace"
+        ? <TracePracticePage />
+        : null;
   const referencePage = normalizedPath === "/learn/process"
     ? <WebtoonProcessPage />
     : normalizedPath === "/learn/careers"

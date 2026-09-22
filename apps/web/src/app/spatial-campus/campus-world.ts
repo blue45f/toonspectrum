@@ -8,6 +8,7 @@ export function campusWorld(district: CampusDistrict): StudioVirtualSpaceWorldMa
     ...original,
     id: `campus-${district.id}`,
     backgroundAssetKey: `campus-${district.id}`,
+    backgroundUrl: district.artworkUrl,
     props: original.props.map((prop) => {
       const { action: _action, portal: _portal, ...decoration } = prop;
       return { ...decoration, kind: prop.kind === "portal" ? "decor" : prop.kind };

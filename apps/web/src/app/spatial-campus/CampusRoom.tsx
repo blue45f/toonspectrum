@@ -5,6 +5,7 @@ import { CampusSceneBoundary } from "@/shared/components/spatial-campus/CampusSc
 import { CampusSceneRecovery } from "@/shared/components/spatial-campus/CampusSceneRecovery";
 import { useI18n } from "@/shared/lib/i18n";
 import type { CampusDistrict } from "@/shared/lib/spatial-campus/campus-model";
+import { useCampus } from "@/shared/components/spatial-campus/campus-context";
 import type { CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
 import { StudioVirtualSpaceEngineBridge } from "@/domains/creator/virtual-space/studio-virtual-space-engine-bridge";
 import { studioVirtualSpaceState } from "@/domains/creator/virtual-space/studio-virtual-space-model";
@@ -16,6 +17,7 @@ const noOperation = () => undefined;
 
 export function CampusRoom({ district, objects }: { readonly district: CampusDistrict; readonly objects: readonly CampusObject[] }) {
   const locale = useI18n((state) => state.lang.startsWith("ko") ? "ko" : "en");
+  const campus = useCampus();
   const location = useLocation();
   const navigate = useNavigate();
   const manifest = useMemo(() => campusWorld(district), [district]);
@@ -48,7 +50,7 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
     update();
     return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", update); };
   }, []);
-  const artwork = !imageFailed ? <img src={manifest.backgroundUrl} alt="" width={manifest.width} height={manifest.height}
+  const artwork = !imageFailed ? <img src={district.artworkUrl} alt="" width={manifest.width} height={manifest.height}
     onError={() => setImageFailed(true)} decoding="async" /> : <p role="status">{locale === "ko" ? "그림 없이도 아래 기능을 사용할 수 있어요." : "All actions remain available without the artwork."}</p>;
   return <section className="campus-room" aria-label={district.label[locale]} data-campus-room={district.id}>
     <header><h2>{district.label[locale]}</h2><p>{district.description[locale]}</p></header>
@@ -79,14 +81,19 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
         <span>{destination.label[locale]}</span><ArrowUpRight size={16} aria-hidden="true" />
       </Link>)}
     </nav>
-    {objects.length > 0 && <nav className="campus-public-objects" aria-label={locale === "ko" ? "진열 중인 공개 항목" : "Displayed public items"}>
-      {objects.slice(0, 6).map((object) => <Link key={object.id} to={object.href}>
+    {objects.length > 0 && <nav className="campus-public-objects" aria-label={locale === "ko" ? "이 공간에서 바로 열 수 있는 항목" : "Items available in this place"}>
+      {objects.slice(0, 6).map((object) => <Link key={`${object.kind ?? "item"}:${object.id}:${object.href}`} to={object.href} data-campus-object-exposure={object.exposure ?? "public"}>
         {object.thumbnail ? <img src={object.thumbnail} alt="" loading="lazy" width={48} height={48} /> : null}
-        <span>{object.title}</span><ArrowUpRight size={16} aria-hidden="true" />
+        <span>{object.title}{object.exposure === "private" ? <small>{locale === "ko" ? "내 화면에서만" : "Only in your view"}</small> : null}</span><ArrowUpRight size={16} aria-hidden="true" />
       </Link>)}
     </nav>}
     {district.id === "observatory" && <p className="campus-private-note">{locale === "ko"
       ? "입력과 해석은 나만의 세션입니다. 이 공간은 위치·질문·결과를 다른 사람에게 전송하지 않아요."
       : "Inputs and readings stay in your session. This scene does not broadcast your location, questions or results."}</p>}
+    {campus?.binding.private && district.id !== "observatory" && <p className="campus-private-note">
+      {locale === "ko"
+        ? "이 공간에는 비공개 작품·팀 정보가 보일 수 있습니다. 화면 공유나 공개 스트리밍 전에 표시 내용을 확인하세요."
+        : "This place can contain private work or team information. Check what is visible before screen sharing or streaming."}
+    </p>}
   </section>;
 }
