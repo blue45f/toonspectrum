@@ -1355,7 +1355,8 @@ export function VirtualSpaceExperience({
                     type="button"
                     className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-accent/30 bg-accent-soft px-3 text-[0.7rem] font-black text-accent"
                     data-space-interactive="true"
-                    onClick={activateCurrentRoom}
+                    data-interact-prompt={currentInteraction ? "true" : undefined}
+                    onClick={() => { if (currentInteraction) engineBridge.requestInteract(); else activateCurrentRoom(); }}
                   >
                     E · {currentInteraction
                       ? bt(currentInteraction.labelKo, currentInteraction.labelEn)
@@ -1374,7 +1375,8 @@ export function VirtualSpaceExperience({
                   type="button"
                   className="studio-vspace-touch-action absolute bottom-5 left-4 z-50 inline-flex min-h-12 max-w-[11rem] items-center gap-2 rounded-2xl border border-accent/35 bg-panel/90 px-4 text-xs font-black text-accent shadow-xl backdrop-blur lg:hidden"
                   data-space-interactive="true"
-                  onClick={activateCurrentRoom}
+                  data-interact-prompt={currentInteraction ? "true" : undefined}
+                  onClick={() => { if (currentInteraction) engineBridge.requestInteract(); else activateCurrentRoom(); }}
                 >
                   <Gamepad2 size={15} aria-hidden />
                   <span className="truncate">

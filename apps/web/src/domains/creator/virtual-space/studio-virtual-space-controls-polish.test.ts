@@ -4,7 +4,9 @@ import { DEFAULT_STUDIO_MOTION_CONFIG, stepStudioVirtualSpaceMotion } from "./st
 import { advanceStudioWorldPath, stepStudioWorldCruise, steerStudioWorldCruise } from "./studio-virtual-space-path-steering";
 import {
   EMPTY_STUDIO_WORLD_APPROACH,
+  EMPTY_STUDIO_WORLD_WALK_OVER,
   stepStudioWorldInteractionApproach,
+  stepStudioWorldWalkOver,
   studioWorldArrivalInput,
 } from "./studio-virtual-space-runtime-policy";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
@@ -225,5 +227,118 @@ describe("Virtual Studio interaction approach", () => {
     const retry = stepStudioWorldInteractionApproach(blocked, first.state, { x: 40, y: 200 }, {});
     expect(retry.walkTarget).toBeNull();
     expect(retry.activateId).toBeNull();
+  });
+
+  it("highlights and prompts only inside a walkable radius, and activates once", () => {
+    let state = EMPTY_STUDIO_WORLD_APPROACH;
+    let point = { x: 80, y: 200 };
+    let velocity = { x: 0, y: 0 };
+    const outside = stepStudioWorldInteractionApproach(openWorld, state, point, { selection: target, focus: target });
+    expect(outside.highlightId).toBeNull();
+    expect(outside.prompt).toBe(false);
+    expect(outside.activateId).toBeNull();
+    expect(outside.walkTarget).not.toBeNull();
+    state = outside.state;
+
+    let activations = 0;
+    let sawInside = false;
+    for (let frame = 0; frame < 360 && !sawInside; frame += 1) {
+      const before = Math.hypot(point.x - center.x, point.y - center.y);
+      const walkTarget = state.pending?.walkTarget ?? outside.walkTarget!;
+      const dx = walkTarget.x - point.x;
+      const dy = walkTarget.y - point.y;
+      const gap = Math.hypot(dx, dy) || 1;
+      const motion = stepStudioVirtualSpaceMotion(
+        { velocity },
+        gap <= 2 ? { x: 0, y: 0 } : { x: dx / gap, y: dy / gap },
+        1 / 60,
+        DEFAULT_STUDIO_MOTION_CONFIG,
+      );
+      velocity = motion.velocity;
+      point = { x: point.x + velocity.x / 60, y: point.y + velocity.y / 60 };
+      const stepped = stepStudioWorldInteractionApproach(openWorld, state, point, { focus: target });
+      state = stepped.state;
+      const after = Math.hypot(point.x - center.x, point.y - center.y);
+      if (after > radius) {
+        expect(stepped.highlightId).toBeNull();
+        expect(stepped.prompt).toBe(false);
+        expect(stepped.activateId).toBeNull();
+      }
+      if (before > radius && after <= radius) {
+        expect(stepped.highlightId).toBe("desk");
+        expect(stepped.prompt).toBe(true);
+        expect(stepped.activateId).toBe("desk");
+        activations += 1;
+        sawInside = true;
+      }
+    }
+    expect(activations).toBe(1);
+    const still = stepStudioWorldInteractionApproach(openWorld, state, point, { focus: target });
+    expect(still.activateId).toBeNull();
+    expect(still.highlightId).toBe("desk");
+    expect(still.prompt).toBe(true);
+
+    const left = stepStudioWorldInteractionApproach(openWorld, still.state, { x: 80, y: 200 }, { focus: target });
+    expect(left.highlightId).toBeNull();
+    expect(left.prompt).toBe(false);
+    expect(left.activateId).toBeNull();
+
+    const inside = { x: center.x + 10, y: center.y };
+    const key = stepStudioWorldInteractionApproach(openWorld, EMPTY_STUDIO_WORLD_APPROACH, inside, {
+      inRangeInteract: true,
+      nearby: target,
+      focus: target,
+    });
+    expect(key.activateId).toBe("desk");
+    expect(key.walkTarget).toBeNull();
+    expect(key.highlightId).toBe("desk");
+    expect(key.prompt).toBe(true);
+    const again = stepStudioWorldInteractionApproach(openWorld, key.state, inside, { focus: target, nearby: target });
+    expect(again.activateId).toBeNull();
+    expect(again.prompt).toBe(true);
+
+    const blocked = {
+      ...openWorld,
+      colliders: [{ x: center.x - 80, y: center.y - 80, width: 160, height: 160 }],
+    };
+    const sealed = stepStudioWorldInteractionApproach(blocked, EMPTY_STUDIO_WORLD_APPROACH, { x: 40, y: 200 }, {
+      selection: target,
+      focus: target,
+    });
+    expect(sealed.walkTarget).toBeNull();
+    expect(sealed.highlightId).toBeNull();
+    expect(sealed.prompt).toBe(false);
+    expect(sealed.activateId).toBeNull();
+  });
+});
+
+describe("Virtual Studio walk-over", () => {
+  it("follows a moving person beside them, then drops the route when steered", () => {
+    const person = { id: "bob", point: { x: 320, y: 200 } };
+    const start = { x: 80, y: 200 };
+    const first = stepStudioWorldWalkOver(openWorld, EMPTY_STUDIO_WORLD_WALK_OVER, start, { choice: person });
+    expect(first.follow).toBe(true);
+    expect(first.routeTarget).not.toBeNull();
+    expect(studioWorldCanOccupy(openWorld, first.routeTarget!)).toBe(true);
+    expect(Math.hypot(first.routeTarget!.x - person.point.x, first.routeTarget!.y - person.point.y)).toBeGreaterThan(20);
+    expect(Math.hypot(first.routeTarget!.x - person.point.x, first.routeTarget!.y - person.point.y)).toBeLessThanOrEqual(40);
+
+    const movedPerson = { id: "bob", point: { x: 420, y: 260 } };
+    const followed = stepStudioWorldWalkOver(openWorld, first.state, start, { followTarget: movedPerson });
+    expect(followed.follow).toBe(true);
+    expect(followed.routeTarget).not.toBeNull();
+    expect(studioWorldCanOccupy(openWorld, followed.routeTarget!)).toBe(true);
+    expect(Math.hypot(followed.routeTarget!.x - movedPerson.point.x, followed.routeTarget!.y - movedPerson.point.y)).toBeLessThanOrEqual(40);
+    expect(followed.routeTarget).not.toEqual(first.routeTarget);
+
+    const steered = stepStudioWorldWalkOver(openWorld, followed.state, start, { followTarget: movedPerson, direct: true });
+    expect(steered.follow).toBe(false);
+    expect(steered.routeTarget).toBeNull();
+    expect(steered.state.routeTarget).toBeNull();
+
+    const beside = { x: person.point.x + 30, y: person.point.y };
+    const already = stepStudioWorldWalkOver(openWorld, EMPTY_STUDIO_WORLD_WALK_OVER, beside, { choice: person });
+    expect(already.routeTarget).toBeNull();
+    expect(already.follow).toBe(true);
   });
 });

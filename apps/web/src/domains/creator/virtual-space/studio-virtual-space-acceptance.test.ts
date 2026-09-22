@@ -5,7 +5,10 @@ import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest, studioWorld
 
 import {
   StudioWorldPortalTracker,
+  StudioWorldZoneTracker,
   resolveStudioWorldPortalArrival,
+  resolveStudioWorldUnstuck,
+  resolveStudioWorldZonePresence,
   studioWorldArrivalInput,
   studioWorldHasModalBlocker,
   studioWorldInputBlocked,
@@ -208,6 +211,53 @@ describe("Virtual Studio motion and lifecycle policies", () => {
     expect(reentry.body).toEqual({ x: 80, y: 100 });
     expect(reentry.cameraAnchor).toEqual(reentry.body);
     expect(reentry.velocity).toEqual({ x: 0, y: 0 });
+  });
+
+  it("announces a zone once and unsticks onto the nearest spawn", () => {
+    const world = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      width: 640,
+      height: 320,
+      props: [],
+      colliders: [{ x: 180, y: 40, width: 80, height: 80 }],
+      rooms: [
+        { id: "lounge", labelKo: "라운지", labelEn: "Lounge", x: 0, y: 0, width: 160, height: 160 },
+        { id: "drawing", labelKo: "작업실", labelEn: "Studio", x: 400, y: 0, width: 160, height: 160 },
+      ],
+      acousticZones: [],
+      spawns: [
+        { id: "west", point: { x: 48, y: 48 } },
+        { id: "east", point: { x: 520, y: 80 } },
+      ],
+    };
+    const tracker = new StudioWorldZoneTracker();
+    tracker.seed(null);
+    const outside = { x: 280, y: 240 };
+    const entered = resolveStudioWorldZonePresence(tracker, world, { x: 40, y: 40 }, false);
+    expect(entered.zoneId).toBe("lounge");
+    expect(entered.announce).toBe(true);
+    expect(entered.separated).toBe(true);
+    const still = resolveStudioWorldZonePresence(tracker, world, { x: 60, y: 50 }, false);
+    expect(still.announce).toBe(false);
+    expect(still.separated).toBe(true);
+    expect(still.zoneId).toBe("lounge");
+    const left = resolveStudioWorldZonePresence(tracker, world, outside, true);
+    expect(left.announce).toBe(false);
+    expect(left.separated).toBe(false);
+    expect(left.zoneId).toBeNull();
+    const again = resolveStudioWorldZonePresence(tracker, world, { x: 440, y: 40 }, true);
+    expect(again.announce).toBe(true);
+    expect(again.zoneId).toBe("drawing");
+    expect(again.separated).toBe(true);
+
+    const stuck = { x: 500, y: 90 };
+    const rescue = resolveStudioWorldUnstuck(world, stuck);
+    expect(rescue.spawn).toEqual({ x: 520, y: 80 });
+    expect(rescue.velocity).toEqual({ x: 0, y: 0 });
+    expect(rescue.route).toEqual([]);
+    expect(rescue.cameraAnchor).toEqual(rescue.spawn);
+    expect(rescue.cameraAnchor).not.toEqual(stuck);
+    expect(rescue.portal).toBeNull();
   });
 
   it("sanitizes joystick/path inputs and communicates an explicit stop", () => {
