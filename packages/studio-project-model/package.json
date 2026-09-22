@@ -48,6 +48,11 @@
       "types": "./src/graph/world-conversation.ts",
       "import": "./src/graph/world-conversation.ts",
       "default": "./src/graph/world-conversation.ts"
+    },
+    "./pinned-review-share": {
+      "types": "./src/graph/pinned-review-share.ts",
+      "import": "./src/graph/pinned-review-share.ts",
+      "default": "./src/graph/pinned-review-share.ts"
     }
   },
   "scripts": {
@@ -72,6 +77,9 @@
       ],
       "world-conversation": [
         "src/graph/world-conversation.ts"
+      ],
+      "pinned-review-share": [
+        "src/graph/pinned-review-share.ts"
       ]
     }
   }
