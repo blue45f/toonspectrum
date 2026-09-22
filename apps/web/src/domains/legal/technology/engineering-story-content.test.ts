@@ -3,12 +3,14 @@ import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
-  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
-  ALL_ENGINEERING_GUIDES as ENGINEERING_GUIDES,
   ENGINEERING_LICENSE_GROUPS,
   ENGINEERING_STATUS_META,
   ENGINEERING_VIDEO_FORMATS,
 } from "./engineering-story-content";
+import {
+  PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
+  PUBLISHED_ENGINEERING_GUIDES as ENGINEERING_GUIDES,
+} from "./engineering-story-published-content";
 import {
   ENGINEERING_REFERENCES,
   ENGINEERING_TROUBLESHOOTING_CASES,
@@ -17,11 +19,11 @@ import {
 const unique = (values: readonly string[]): boolean => new Set(values).size === values.length;
 
 describe("engineering story content", () => {
-  it("keeps a complete, ordered and uniquely addressable 25-chapter story", () => {
-    expect(ENGINEERING_CHAPTERS).toHaveLength(25);
+  it("keeps a complete, ordered and uniquely addressable 30-chapter story", () => {
+    expect(ENGINEERING_CHAPTERS).toHaveLength(30);
     expect(unique(ENGINEERING_CHAPTERS.map((chapter) => chapter.id))).toBe(true);
     expect(ENGINEERING_CHAPTERS.map((chapter) => chapter.order)).toEqual(
-      Array.from({ length: 25 }, (_, index) => index + 1),
+      Array.from({ length: 30 }, (_, index) => index + 1),
     );
   });
 

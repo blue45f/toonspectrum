@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -41,6 +43,10 @@ describe("engineering playbook content", () => {
       expect(dossier.portability.length, dossier.id).toBeGreaterThanOrEqual(2);
       expect(dossier.limits.length, dossier.id).toBeGreaterThanOrEqual(2);
       expect(dossier.evidence.length, dossier.id).toBeGreaterThanOrEqual(3);
+      for (const evidencePath of dossier.evidence) {
+        const [repositoryPath] = evidencePath.split("#", 1);
+        expect(existsSync(repositoryPath), `${dossier.id}: missing evidence ${evidencePath}`).toBe(true);
+      }
       expect(dossier.question.ko.trim(), dossier.id).not.toBe("");
       expect(dossier.question.en.trim(), dossier.id).not.toBe("");
     }
