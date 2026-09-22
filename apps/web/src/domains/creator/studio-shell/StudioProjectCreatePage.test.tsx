@@ -25,6 +25,24 @@ afterEach(() => {
 });
 
 describe("StudioProjectCreatePage", () => {
+  it("shows only three common project types before the user asks for more", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/studio/new"]}>
+        <StudioProjectCreatePage />
+      </MemoryRouter>,
+    );
+
+    expect(container.querySelectorAll("[data-studio-primary-create-kind]")).toHaveLength(3);
+    expect(container.querySelector("[data-studio-additional-create-kind]")).toBeNull();
+    expect(container.querySelector("[data-studio-create-optional-settings]")?.hasAttribute("open"))
+      .toBe(false);
+
+    fireEvent.click(screen.getByRole("button", {
+      name: /다른 작업 종류 보기|Show more project types/u,
+    }));
+    expect(container.querySelectorAll("[data-studio-additional-create-kind]")).toHaveLength(5);
+  });
+
   it("creates a project and its initial document, then opens the canonical document route", async () => {
     render(
       <MemoryRouter initialEntries={["/studio/new"]}>

@@ -82,8 +82,12 @@ export interface SiteBackgroundMusicPlayerProps {
 
 export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = false }: SiteBackgroundMusicPlayerProps = {}) {
   const { pathname, search } = useLocation();
+  const taskRoute = workspaceTaskRoute(pathname, search);
+  const focusedTask = taskRoute?.chrome === "focused";
   const [dock, setDock] = useState<HTMLElement | null>(null);
-  useEffect(() => { setDock(workspaceTaskRoute(pathname, search) ? document.getElementById("workspace-audio-dock") : null); }, [pathname, search]);
+  useEffect(() => {
+    setDock(taskRoute && !focusedTask ? document.getElementById("workspace-audio-dock") : null);
+  }, [focusedTask, taskRoute]);
   const lang = useI18n((state) => state.lang);
   const korean = lang.startsWith("ko");
   const experience = useMemo(() => resolveSiteBgmExperience(pathname), [pathname]);
@@ -122,7 +126,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
   const [vocals, setVocals] = useState<SiteOstVocalPreference>(initial.vocals);
   const [playlistTracks, setPlaylistTracks] = useState<readonly SiteOstTrack[]>([]);
   const [sourceError, setSourceError] = useState("");
-  const suspended = externallySuspended || experience.suspended;
+  const suspended = externallySuspended || experience.suspended || focusedTask;
   const hasPublishedOst = playlistTracks.length > 0;
   const playbackEpoch = useRef(0);
   // Async unlocks belong to this route and catalogue, not to a later screen or user intent.

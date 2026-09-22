@@ -14,6 +14,13 @@ describe("workspace task chrome ownership", () => {
   it.each(["?token=secret", "?reviewToken=secret", "?invite=secret"])("keeps external invitations minimal %s", (search) => {
     expect(workspaceTaskRoute("/studio/share", search)).toBeNull();
   });
+  it("uses focused chrome for creation and project-stage pages", () => {
+    expect(workspaceTaskRoute("/studio/new")?.chrome).toBe("focused");
+    expect(workspaceTaskRoute("/studio/import")?.chrome).toBe("focused");
+    expect(workspaceTaskRoute("/studio/p/project-1/overview")?.chrome).toBe("focused");
+    expect(workspaceTaskRoute("/studio/p/project-1/review")?.chrome).toBe("focused");
+    expect(workspaceTaskRoute("/studio/assets")?.chrome).toBeUndefined();
+  });
   it("does not let context values choose the task identity or title", () => {
     expect(workspaceTaskRoute("/studio/review", "?project=x&title=private"))
       .toEqual(workspaceTaskRoute("/studio/review"));

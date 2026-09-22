@@ -19,6 +19,14 @@ describe("ToonStudio final product IA", () => {
   it("keeps the bounded navigation and default-tool budgets", () => {
     expect(STUDIO_GLOBAL_NAVIGATION).toHaveLength(4);
     expect(STUDIO_PROJECT_NAVIGATION).toHaveLength(6);
+    expect(STUDIO_PROJECT_NAVIGATION.map((item) => item.label)).toEqual([
+      "홈",
+      "기획",
+      "제작",
+      "소재",
+      "검토",
+      "배포",
+    ]);
     expect(STUDIO_DEFAULT_TOOL_GROUPS).toHaveLength(9);
     expect(STUDIO_USER_WORK_STATES).toHaveLength(4);
     expect(validateStudioProductIa()).toEqual([]);

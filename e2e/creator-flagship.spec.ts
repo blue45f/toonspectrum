@@ -154,27 +154,31 @@ test("new project flow explains a disabled start action and preserves the chosen
   await page.setViewportSize({ width: 320, height: 1000 });
   await page.goto("/studio/new?kind=webtoon&template=webtoon-vertical", { waitUntil: "domcontentloaded" });
 
+  await expect(page.locator('[data-workspace-surface="focused"]')).toBeVisible();
+  await expect(page.locator(".workspace-sidebar, .campus-toolbar")).toHaveCount(0);
+  await expect(page.getByTestId("site-background-music-player")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "무엇을 만들까요?", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "만들 작업 선택", exact: true })).toHaveValue("webtoon");
   await expect(page.getByRole("combobox", { name: "시작 템플릿", exact: true })).toHaveValue("webtoon-vertical");
-  const advanced = page.getByText("제작 흐름과 고급 시작 설정", { exact: true });
-  await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeHidden();
-  await advanced.click();
-  await expect(page.getByRole("navigation", { name: "새 프로젝트 시작 단계" })).toBeVisible();
-  await advanced.click();
+  const optionalSettings = page.locator('[data-studio-create-optional-settings="true"]');
+  await expect(optionalSettings).not.toHaveAttribute("open", "");
+  await optionalSettings.getByText("추가 설정", { exact: true }).click();
+  await expect(optionalSettings).toHaveAttribute("open", "");
+  await expect(optionalSettings.getByText("준비되는 작업 화면 보기", { exact: true })).toBeVisible();
+  await optionalSettings.getByText("추가 설정", { exact: true }).click();
 
   const projectName = page.getByLabel("프로젝트 이름");
   await projectName.fill("");
   const startButton = page.locator('button[aria-describedby*="studio-create-disabled-reason"]');
   await expect(startButton).toBeDisabled();
-  await expect(page.getByText("프로젝트 이름을 입력하면 자동 저장되는 작업공간을 시작할 수 있습니다.", { exact: true })).toBeVisible();
+  await expect(page.getByText("프로젝트 이름을 입력해 주세요.", { exact: true })).toBeVisible();
 
   await projectName.fill("별빛 식당 1화");
   await expect(startButton).toHaveCount(0);
   await expect(projectName).toHaveValue("별빛 식당 1화");
   await expect(page.getByRole("button", { name: /시작$/u }).last()).toBeEnabled();
   await expect(page.getByText("이 기기에 저장됨", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("시작하면 이 기기에 저장합니다. 팀 공유와 클라우드 백업은 별도로 연결하세요.", { exact: true })).toBeVisible();
+  await expect(page.getByText(/작업은 이 기기에 자동 저장됩니다/u)).toBeVisible();
 
   const hasNoHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth <= window.innerWidth + 1,

@@ -7,10 +7,16 @@ import { WorkspaceNavigation } from "./WorkspaceNavigation";
 import { CampusControls } from "../spatial-campus/CampusControls";
 import type { WorkspaceNavigationContext } from "./workspace-navigation-model";
 
-export function WorkspaceBrand({ href = "/home" }: { readonly href?: string }) {
+export function WorkspaceBrand({
+  href = "/home",
+  compact = false,
+}: {
+  readonly href?: string;
+  readonly compact?: boolean;
+}) {
   return <Link href={href} className="workspace-brand" aria-label="ToonStudio">
     <span className="workspace-brand-mark" aria-hidden="true"><Brush size={20} /></span>
-    <strong>ToonStudio<small>VIRTUAL STUDIO</small></strong>
+    <strong>ToonStudio{compact ? null : <small>VIRTUAL STUDIO</small>}</strong>
   </Link>;
 }
 
@@ -32,8 +38,15 @@ export function WorkspaceSidebar({ activeId, context, children }: {
   </aside>;
 }
 
-export function WorkspaceAccountAction() {
+export function WorkspaceAccountAction({
+  showCampusControls = true,
+}: {
+  readonly showCampusControls?: boolean;
+} = {}) {
   const account = useContext(WorkspaceAccountContext);
   const korean = useI18n((state) => state.lang.startsWith("ko"));
-  return <><CampusControls compact />{account ?? <Link href="/my" aria-label={korean ? "내 프로필" : "My profile"}><UserRound size={20} aria-hidden="true" /></Link>}</>;
+  return <>
+    {showCampusControls ? <CampusControls compact /> : null}
+    {account ?? <Link href="/my" aria-label={korean ? "내 프로필" : "My profile"}><UserRound size={20} aria-hidden="true" /></Link>}
+  </>;
 }

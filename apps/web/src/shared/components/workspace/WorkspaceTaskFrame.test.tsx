@@ -20,11 +20,26 @@ describe("common task frame", () => {
     result.rerender(view(true));
     expect(screen.getByRole("textbox")).toHaveProperty("value", "unsaved stroke");
     expect(mount).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByRole("navigation", { name: "주 메뉴" })).toHaveLength(1);
-    result.rerender(view(false));
+    expect(result.container.querySelector('[data-workspace-surface="focused"]')).toBeTruthy();
+    expect(result.container.querySelector(".workspace-focused-topbar")).toBeTruthy();
     expect(screen.queryByRole("navigation", { name: "주 메뉴" })).toBeNull();
+    result.rerender(view(false));
+    expect(result.container.querySelector(".workspace-focused-topbar")).toBeNull();
     expect(screen.getByRole("textbox")).toHaveProperty("value", "unsaved stroke");
     expect(mount).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the full workspace navigation for library-style task pages", () => {
+    const result = render(
+      <MemoryRouter initialEntries={["/studio/assets"]}>
+        <WorkspaceTaskFrame route={workspaceTaskRoute("/studio/assets")}>
+          <div>Assets</div>
+        </WorkspaceTaskFrame>
+      </MemoryRouter>,
+    );
+
+    expect(result.container.querySelector('[data-workspace-surface="task"]')).toBeTruthy();
+    expect(screen.getAllByRole("navigation", { name: "주 메뉴" })).toHaveLength(1);
   });
 });
 

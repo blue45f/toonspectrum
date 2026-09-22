@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -38,8 +38,38 @@ describe("StudioProjectShellPage integration", () => {
     const view = renderReview("/studio/p/project-1/review?view=versions");
     expect(view.container.querySelector("[data-studio-project-view=versions]")).toBeTruthy();
 
+    fireEvent.click(screen.getByText(/다른 작업 3개|3 more actions/u));
     const target = screen.getByRole("link", { name: /버전 비교|Version comparison/u });
     expect(target.getAttribute("href")).toBe("/studio/work/project-1/versions");
+  });
+
+  it("keeps the default hierarchy focused on five stages and one next action", () => {
+    const view = renderReview("/studio/p/project-1/review?view=inbox");
+    const primarySections = view.container.querySelectorAll(
+      "[data-studio-project-primary-section]",
+    );
+
+    expect(primarySections).toHaveLength(5);
+    expect(Array.from(primarySections, (item) => item.textContent)).toEqual([
+      "홈",
+      "기획",
+      "제작",
+      "검토",
+      "배포",
+    ]);
+    expect(view.container.querySelectorAll("[data-studio-project-primary-action]")).toHaveLength(1);
+    expect((view.container.querySelector(
+      "[data-studio-project-secondary-navigation]",
+    ) as HTMLDetailsElement).open).toBe(false);
+    expect((view.container.querySelector(
+      "[data-studio-project-view-picker]",
+    ) as HTMLDetailsElement).open).toBe(false);
+    expect((view.container.querySelector(
+      "[data-studio-project-more-actions]",
+    ) as HTMLDetailsElement).open).toBe(false);
+    expect((view.container.querySelector(
+      "[data-studio-project-health]",
+    ) as HTMLDetailsElement).open).toBe(false);
   });
 
   it("canonicalizes missing view state instead of leaving an inert query", async () => {

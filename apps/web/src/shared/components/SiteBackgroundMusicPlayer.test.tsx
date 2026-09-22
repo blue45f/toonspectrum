@@ -281,8 +281,8 @@ describe("SiteBackgroundMusicPlayer", () => {
     expect(mocks.setEnabled).not.toHaveBeenCalled();
     expect(mocks.enabled).toBe(true);
     await act(async () => { fireEvent.keyDown(window, { key: "Enter" }); });
-    expect(mocks.resumeAudio).toHaveBeenCalledTimes(2);
-    expect(mocks.setEnabled).toHaveBeenCalledExactlyOnceWith(true);
+    await waitFor(() => expect(mocks.resumeAudio).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocks.setEnabled).toHaveBeenCalledExactlyOnceWith(true));
   });
 
   it("ignores a failed older play request after a newer request succeeded", async () => {
@@ -313,10 +313,19 @@ describe("SiteBackgroundMusicPlayer", () => {
   });
 });
 
+describe("focused task audio policy", () => {
+  it("removes ambient OST controls from focused creation screens", () => {
+    mockManifest();
+    renderAt("/studio/new");
+    expect(screen.queryByTestId("site-background-music-player")).toBeNull();
+    expect(mocks.suspend).toHaveBeenCalledWith("site-route-audio-conflict");
+  });
+});
+
 describe("task workspace audio dock", () => {
   it("keeps OST controls in the header and returns focus after Escape", async () => {
     mockManifest();
-    render(<MemoryRouter initialEntries={["/studio/new"]}>
+    render(<MemoryRouter initialEntries={["/studio/assets"]}>
       <div id="workspace-audio-dock" /><SiteBackgroundMusicPlayer />
     </MemoryRouter>);
     const toggle = await screen.findByRole("button", { name: "OST 설정" });
