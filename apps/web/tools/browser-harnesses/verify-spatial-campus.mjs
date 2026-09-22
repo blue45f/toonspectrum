@@ -264,14 +264,24 @@ try {
   await page.keyboard.down("ArrowRight");
   await page.waitForTimeout(450);
   await page.keyboard.up("ArrowRight");
+  await page.waitForTimeout(250);
   const afterWalk = await pose();
   assert.ok(Math.hypot(afterWalk.x - beforeWalk.x, afterWalk.y - beforeWalk.y) > 3, "Arrow input must move the actor, not only focus a canvas");
   await page.screenshot({ path: `${output}/local-phaser-walk.png` });
+  await page.locator(".campus-modes").getByRole("button", { name: "업무", exact: true }).click();
+  assert.equal(await canvas.count(), 0);
+  await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
+  await page.getByRole("button", { name: "공용 아틀리에 걷기", exact: true }).click();
+  await page.locator('[data-studio-engine-status="ready"]').waitFor({ timeout: 60000 });
+  await page.locator("[data-campus-walk-x][data-campus-walk-y]").waitFor();
+  const resumedPose = await pose();
+  assert.ok(Math.hypot(resumedPose.x - afterWalk.x, resumedPose.y - afterWalk.y) < 1,
+    `Space mode must resume the tab-local actor position after the room remounts: ${JSON.stringify({ afterWalk, resumedPose })}`);
   await page.getByRole("button", { name: "걷기 멈추기", exact: true }).click();
   assert.equal(await canvas.count(), 0);
   assert.equal(await input.inputValue(), "QA only private dream");
   assert.deepEqual(interactionErrors, [], "Runtime errors during domain and Phaser interactions");
-  report.interactions.push("Existing Phaser canvas boots locally; keyboard input measurably moves the actor, stop unmounts the canvas and the domain form is preserved");
+  report.interactions.push("Existing Phaser movement survives a full Space → Task → Space room remount without leaking the private domain form");
   await context.close();
   await verifyNestedWorkspaceScrollRestoration();
   await verifyMarketStudioRoundTrip();

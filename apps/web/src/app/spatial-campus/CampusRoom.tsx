@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Footprints, Pause, ArrowUpRight } from "lucide-react";
+import { useSession } from "@/compat/auth-session-store";
 import { CampusSceneBoundary } from "@/shared/components/spatial-campus/CampusSceneBoundary";
 import { CampusSceneRecovery } from "@/shared/components/spatial-campus/CampusSceneRecovery";
 import { useI18n } from "@/shared/lib/i18n";
@@ -10,6 +11,7 @@ import type { CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
 import { StudioVirtualSpaceEngineBridge } from "@/domains/creator/virtual-space/studio-virtual-space-engine-bridge";
 import { studioVirtualSpaceState } from "@/domains/creator/virtual-space/studio-virtual-space-model";
 import type { StudioVirtualSpaceSnapshot } from "@/domains/creator/virtual-space/studio-virtual-space-presence";
+import { campusPositionMemory } from "./campus-position-memory";
 import { campusObjectInteractionIndex, campusWorld } from "./campus-world";
 
 const PhaserCanvas = lazy(() => import("@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas").then((module) => ({ default: module.StudioVirtualSpacePhaserCanvas })));
@@ -33,10 +35,16 @@ function sameCampusObjects(left: readonly CampusObject[], right: readonly Campus
 
 export function CampusRoom({ district, objects }: { readonly district: CampusDistrict; readonly objects: readonly CampusObject[] }) {
   const locale = useI18n((state) => state.lang.startsWith("ko") ? "ko" : "en");
+  const session = useSession();
+  const ownerScope = session.data?.user.id ?? "local";
   const campus = useCampus();
   const location = useLocation();
   const navigate = useNavigate();
   const spawnPoint = useMemo(() => campusWorld(district).spawns[0]!.point, [district]);
+  const initialPoint = useMemo(
+    () => campusPositionMemory.read(ownerScope, district.id) ?? spawnPoint,
+    [district.id, ownerScope, spawnPoint],
+  );
   const [sceneProjection, setSceneProjection] = useState<{
     readonly districtId: string;
     readonly objects: readonly CampusObject[];
@@ -54,9 +62,9 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
   const [visible, setVisible] = useState(true);
   const [imageFailed, setImageFailed] = useState(false);
   const host = useRef<HTMLDivElement>(null);
-  const point = useRef(spawnPoint);
+  const point = useRef(initialPoint);
   const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
-    self: studioVirtualSpaceState(spawnPoint), peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false,
+    self: studioVirtualSpaceState(initialPoint), peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false,
   }));
   useEffect(() => {
     const nextObjects = objects.slice(0, MAX_WALK_OBJECTS);
@@ -67,11 +75,16 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
     setSceneProjection({ districtId: district.id, objects: nextObjects });
   }, [district.id, objects, sceneProjection]);
   useEffect(() => {
-    point.current = spawnPoint;
+    const restoredPoint = campusPositionMemory.read(ownerScope, district.id) ?? spawnPoint;
+    point.current = restoredPoint;
+    setSnapshot((current) => ({ ...current, self: studioVirtualSpaceState(restoredPoint) }));
     setWalking(false);
     setImageFailed(false);
-    return () => bridge.clearMovement();
-  }, [spawnPoint, bridge]);
+    return () => {
+      campusPositionMemory.write(ownerScope, district.id, point.current);
+      bridge.clearMovement();
+    };
+  }, [bridge, district.id, ownerScope, spawnPoint]);
   useEffect(() => {
     let intersects = true;
     const update = () => {
@@ -95,6 +108,7 @@ export function CampusRoom({ district, objects }: { readonly district: CampusDis
         <PhaserCanvas manifest={manifest} snapshot={snapshot} bridge={bridge} atmosphere="focus"
           onLocalState={(state) => {
             point.current = state.point;
+            campusPositionMemory.write(ownerScope, district.id, state.point);
             // Local-only renderer diagnostics: no identity, domain input, peers or network writes.
             if (host.current) {
               host.current.dataset.campusWalkX = state.point.x.toFixed(3);
