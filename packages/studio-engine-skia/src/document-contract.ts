@@ -12,11 +12,33 @@ export interface SkiaDocumentInk {
   readonly erase?: boolean;
   readonly nib?: { readonly aspect: number; readonly angleRad: number };
 }
+export interface SkiaDocumentPanel {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly fill: ColorIR;
+  readonly stroke: ColorIR;
+  readonly strokeWidth: number;
+  readonly radius: number;
+  readonly dashed: boolean;
+  readonly points?: readonly number[];
+  readonly shadow?: { readonly blur: number; readonly opacity: number; readonly x: number; readonly y: number };
+}
+export interface SkiaDocumentClip {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 export interface SkiaDocumentItem {
   readonly id: string;
   readonly revision: object;
   readonly nodes?: readonly SceneNodeIR[];
   readonly ink?: SkiaDocumentInk;
+  readonly panel?: SkiaDocumentPanel;
+  /** Existing document panel semantics: axis-aligned child clip in document coordinates. */
+  readonly clip?: SkiaDocumentClip;
 }
 export interface SkiaDocumentFrame {
   readonly revision: object;

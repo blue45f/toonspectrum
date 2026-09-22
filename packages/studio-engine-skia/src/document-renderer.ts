@@ -1,4 +1,5 @@
 import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "./document-contract";
+import { drawSkiaDocumentPanel } from "./document-panel";
 import { renderSceneNodesToCanvas } from "./render";
 
 import type { SkiaDocumentInk, SkiaDocumentItem, SkiaDocumentFrame, SkiaDocumentReceipt, SkiaDocumentRenderer } from "./document-contract";
@@ -56,8 +57,21 @@ function validateFrame(frame: SkiaDocumentFrame): void {
     || frame.camera.scaleX === 0 || frame.camera.scaleY === 0) throw new Error("Invalid or over-budget GPU document frame");
   const ids = new Set<string>();
   for (const item of frame.items) {
-    if (!item.id || ids.has(item.id) || !item.revision || (!!item.nodes === !!item.ink)) throw new Error("Invalid GPU document item");
+    if (!item.id || ids.has(item.id) || !item.revision
+      || [item.nodes, item.ink, item.panel].filter(Boolean).length !== 1) throw new Error("Invalid GPU document item");
     ids.add(item.id);
+    if (item.clip && (Object.values(item.clip).some((value) => !Number.isFinite(value))
+      || item.clip.width <= 0 || item.clip.height <= 0)) throw new Error("Invalid GPU panel clip");
+    if (item.panel) {
+      const panel = item.panel;
+      if ([panel.x, panel.y, panel.width, panel.height, panel.strokeWidth, panel.radius].some((value) => !Number.isFinite(value))
+        || panel.width <= 0 || panel.height <= 0 || panel.strokeWidth < 0 || panel.radius < 0
+        || [panel.fill, panel.stroke].some((color) => Object.values(color).some((value) => !Number.isFinite(value) || value < 0 || value > 1))
+        || (panel.points && (panel.points.length < 6 || panel.points.length % 2 || panel.points.length > 8192 || !panel.points.every(Number.isFinite)))
+        || (panel.shadow && Object.values(panel.shadow).some((value) => !Number.isFinite(value)))) {
+        throw new Error("Invalid GPU panel geometry");
+      }
+    }
     if (item.ink && (item.ink.dabs.length % 3 || item.ink.dabs.length > 300_000
       || !Number.isFinite(item.ink.opacity) || item.ink.opacity < 0 || item.ink.opacity > 1
       || Object.values(item.ink.color).some((value) => !Number.isFinite(value) || value < 0 || value > 1)
@@ -161,12 +175,35 @@ export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement,
           const recorder = new ck!.PictureRecorder();
           try {
             const target = recorder.beginRecording(bounds, true);
-            if (item.ink) {
-              for (let i = 0; i < item.ink.dabs.length; i++) {
-                if (!Number.isFinite(item.ink.dabs[i]) || (i % 3 === 2 && item.ink.dabs[i]! <= 0)) throw new Error("Invalid GPU dab geometry");
+            const renderItem = () => {
+              if (item.ink) {
+                for (let i = 0; i < item.ink.dabs.length; i++) {
+                  if (!Number.isFinite(item.ink.dabs[i]) || (i % 3 === 2 && item.ink.dabs[i]! <= 0)) {
+                    throw new Error("Invalid GPU dab geometry");
+                  }
+                }
+                drawInk(ck!, target, item.ink);
+              } else if (item.panel) {
+                drawSkiaDocumentPanel(ck!, target, item.panel);
+              } else {
+                renderSceneNodesToCanvas(ck!, target, item.nodes!, {});
               }
-              drawInk(ck!, target, item.ink);
-            } else renderSceneNodesToCanvas(ck!, target, item.nodes!, {});
+            };
+            if (item.clip) {
+              target.save();
+              try {
+                target.clipRect(
+                  [item.clip.x, item.clip.y, item.clip.x + item.clip.width, item.clip.y + item.clip.height],
+                  ck!.ClipOp.Intersect,
+                  true,
+                );
+                renderItem();
+              } finally {
+                target.restore();
+              }
+            } else {
+              renderItem();
+            }
             const picture = recorder.finishRecordingAsPicture(); allocated.push(picture);
             entry = { revision: item.revision, picture, bytes: picture.approximateBytesUsed() }; compiled++;
           } finally { recorder.delete(); }

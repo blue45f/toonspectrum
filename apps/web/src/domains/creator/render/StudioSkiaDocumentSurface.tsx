@@ -7,12 +7,12 @@ import type { StudioRenderSurfaceAuthority, StudioRenderSurfaceProps } from "./S
 export const STUDIO_SKIA_DOCUMENT_BACKEND = "skia-canvaskit-document-webgl2" as const;
 /** Receipt-gated direct GPU display. Existing document, input, Undo and storage stay authoritative. */
 export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height, documentWidth,
-  documentHeight, dpr = 1, elements, sceneRevision, documentTransform, onAuthorityChange, visible, beforePublish, cameraSource,
-}: StudioRenderSurfaceProps & { readonly visible: boolean; readonly beforePublish?: (signal: AbortSignal) => Promise<void>; readonly cameraSource?: StudioSkiaCameraSource }) {
+  documentHeight, dpr = 1, elements, sceneRevision, documentTransform, onAuthorityChange, visible, beforePublish, cameraSource, frameTheme = "classic",
+}: StudioRenderSurfaceProps & { readonly visible: boolean; readonly beforePublish?: (signal: AbortSignal) => Promise<void>; readonly cameraSource?: StudioSkiaCameraSource; readonly frameTheme?: "classic" | "soft" | "vivid" }) {
   const sink = useRef(onAuthorityChange);
   sink.current = onAuthorityChange;
-  const latest = useRef({ width, height, documentWidth, documentHeight, dpr, elements, sceneRevision, documentTransform, beforePublish, cameraSource, visible });
-  latest.current = { width, height, documentWidth, documentHeight, dpr, elements, sceneRevision, documentTransform, beforePublish, cameraSource, visible };
+  const latest = useRef({ width, height, documentWidth, documentHeight, dpr, elements, sceneRevision, documentTransform, beforePublish, cameraSource, visible, frameTheme });
+  latest.current = { width, height, documentWidth, documentHeight, dpr, elements, sceneRevision, documentTransform, beforePublish, cameraSource, visible, frameTheme };
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<SkiaDocumentRenderer | null>(null);
   const projectorRef = useRef(createStudioSkiaDocumentProjector());
@@ -75,7 +75,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       canvas.dataset.studioSkiaPhase = "rendering";
       const continuing = cameraOnly && receipt.current === state.sceneRevision && sourceHiddenReceipt.current === state.sceneRevision && state.visible;
       let plan;
-      try { plan = projector.project(state.elements); }
+      try { plan = projector.project(state.elements, state.frameTheme); }
       catch (cause) { report("unavailable", state.sceneRevision, [], cause instanceof Error ? cause.message : String(cause)); return; }
       if (!plan.supported) {
         receipt.current = null; canvas.style.visibility = "hidden";
@@ -147,6 +147,6 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   useLayoutEffect(() => {
     if (canvasRef.current) canvasRef.current.style.visibility = "hidden";
     submitted.current?.();
-  }, [sceneRevision, width, height, documentWidth, documentHeight, dpr, documentTransform, elements]);
+  }, [sceneRevision, width, height, documentWidth, documentHeight, dpr, documentTransform, elements, frameTheme]);
   return null;
 }

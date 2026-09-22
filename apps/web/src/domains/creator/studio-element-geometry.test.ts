@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { containingPanel, elBounds } from "./studio-element-geometry";
+import { containingPanel, createStudioPanelResolver, elBounds } from "./studio-element-geometry";
 
 import type { El } from "./studio-element-model";
 
@@ -234,5 +234,21 @@ describe("containingPanel", () => {
     const threshold = draw([-20, -20, 120, 120]);
 
     expect(containingPanel(threshold, [container, threshold])?.id).toBe("container");
+  });
+
+  it("reuses one panel index without changing the established containment policy", () => {
+    const large = frame("large", 0, 0, 300, 300);
+    const small = frame("small", 50, 50, 100, 100);
+    const hidden = frame("hidden", 0, 0, 30, 30, { hidden: true });
+    const subject = draw([80, 80, 120, 120]);
+    const outside = draw([400, 400, 410, 410], { id: "outside" });
+    const elements = [large, small, hidden, subject, outside];
+    const resolve = createStudioPanelResolver(elements);
+
+    expect(resolve(subject)).toBe(containingPanel(subject, elements));
+    expect(resolve(subject)?.id).toBe("small");
+    expect(resolve(outside)).toBeNull();
+    expect(resolve(large)).toBeNull();
+    expect(resolve(subject)).toBe(resolve(subject));
   });
 });

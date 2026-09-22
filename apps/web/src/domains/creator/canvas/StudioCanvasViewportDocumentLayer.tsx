@@ -18,7 +18,7 @@ import { shouldApplyLayerMask } from "../layer/studio-layer-mask";
 import { imageFilterCacheKey } from "../render/studio-konva-filter-fields";
 import { studioAdjustmentStackToFilterFields } from "../studio-adjustment-stack";
 import { resolveTimelineComposite, resolveTimelineTransforms } from "../studio-anim-tracks";
-import { containingPanel, elBounds } from "../studio-element-geometry";
+import { createStudioPanelResolver, elBounds } from "../studio-element-geometry";
 import { studioKonvaDrawTransformRecoveryPendingForElement } from "../studio-live-transform-gesture-konva";
 import { studioLiveTransformPreviewBlockedForElement } from "../studio-live-transform-preview-eligibility";
 import { clampFrameIndex, frameIndexOf, onionSkinLayers } from "../studio-frame-animation";
@@ -254,6 +254,7 @@ export function StudioCanvasViewportDocumentLayer({
                 // 프레임의 locked 여부를 보지 않는다 — "잠금"은 프레임 자체가 옮겨지지 않게 하는 것이지
                 // 다른 요소가 그 위에 도킹되는 걸 막는 개념이 아니다).
                 const autoFitFrameCandidates = canvasRenderElements.filter((e): e is FrameEl => e.type === "frame" && !e.hidden);
+                const resolvePanel = createStudioPanelResolver(canvasRenderElements);
                 // 한 요소를 렌더하는 함수. opts.asMask=클리핑 마스크의 베이스 사본(비상호작용),
                 // opts.compositeOverride=알파 클리핑 자식의 "source-in" 합성.
                 const renderEl = (el: El, idx: number, opts: { asMask?: boolean; compositeOverride?: string } = {}) => {
@@ -335,7 +336,7 @@ export function StudioCanvasViewportDocumentLayer({
                       setElementNodeRef(el.id, n);
                     };
                 // 패널 내부 콘텐츠 클리핑(들어간 패널 영역). 아래 레이어 클리핑 마스크는 ClipMaskGroup이 알파로 처리한다.
-                const panelClip = el.noClip ? null : containingPanel(el, canvasRenderElements);
+                const panelClip = el.noClip ? null : resolvePanel(el);
                 const clip = panelClip
                   ? { x: panelClip.x, y: panelClip.y, width: panelClip.width, height: panelClip.height }
                   : null;
