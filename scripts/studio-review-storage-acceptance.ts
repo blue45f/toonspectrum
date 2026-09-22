@@ -83,7 +83,8 @@ export async function rejectCompletedStudioReviewReplacement(input: {
   assert.equal(replacement.status(), 409);
   const rejection = await replacement.json(); assert.equal(rejection.code, "preview-head-version-mismatch");
   const completed = await context.request.post(`${origin.origin}/api/studio-project-graph/review-captures/status`, { headers, data: intent });
-  assert.equal(completed.status(), 200); assert.deepEqual(await completed.json(), { status: "completed", subject });
+  assert(completed.ok(), `Completed capture status returned ${completed.status()}`);
+  assert.deepEqual(await completed.json(), { status: "completed", subject });
   const query = new URLSearchParams({ workId: subject.workId, projectId: subject.projectId, artifactId: subject.artifactId,
     revisionId: subject.revisionId, rootGraphHash: subject.rootGraphHash });
   const previewResponse = await context.request.get(`${origin.origin}/api/studio-project-graph/reviews/${subject.reviewId}/previews?${query}`);
