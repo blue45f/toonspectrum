@@ -66,6 +66,9 @@ export interface StudioWorldApproachStep {
   readonly state: StudioWorldApproachState;
   readonly walkTarget: StudioVirtualSpacePoint | null;
   readonly activateId: string | null;
+  /** Set only while the body is inside a disk that has an occupiable stand point. */
+  readonly highlightId: string | null;
+  readonly prompt: boolean;
 }
 
 function insideRadius(current: StudioVirtualSpacePoint, target: StudioWorldApproachTarget): boolean {
@@ -108,7 +111,21 @@ const idleApproach: StudioWorldApproachStep = {
   state: EMPTY_STUDIO_WORLD_APPROACH,
   walkTarget: null,
   activateId: null,
+  highlightId: null,
+  prompt: false,
 };
+
+function approachPresence(
+  manifest: StudioVirtualSpaceWorldManifest,
+  current: StudioVirtualSpacePoint,
+  target: StudioWorldApproachTarget | null,
+): Pick<StudioWorldApproachStep, "highlightId" | "prompt"> {
+  if (!target || !insideRadius(current, target)) return { highlightId: null, prompt: false };
+  if (!findStudioWorldApproachPoint(manifest, current, target.point, target.radius)) {
+    return { highlightId: null, prompt: false };
+  }
+  return { highlightId: target.id, prompt: true };
+}
 
 /**
  * Outside the radius, walk to one occupiable point inside it and activate on entry.
@@ -123,32 +140,40 @@ export function stepStudioWorldInteractionApproach(
     readonly selection?: StudioWorldApproachTarget | null;
     readonly inRangeInteract?: boolean;
     readonly nearby?: StudioWorldApproachTarget | null;
+    /** Disk to highlight while the body is inside it, even after the walk has finished. */
+    readonly focus?: StudioWorldApproachTarget | null;
   } = {},
 ): StudioWorldApproachStep {
   const selection = options.selection ?? null;
+  const focusOf = (partial: Omit<StudioWorldApproachStep, "highlightId" | "prompt">): StudioWorldApproachStep => {
+    const focus = options.focus ?? options.nearby ?? selection ?? (partial.state.pending
+      ? { id: partial.state.pending.id, point: partial.state.pending.point, radius: partial.state.pending.radius }
+      : null);
+    return { ...partial, ...approachPresence(manifest, current, focus) };
+  };
   if (selection) {
     if (insideRadius(current, selection)) {
-      return { state: EMPTY_STUDIO_WORLD_APPROACH, walkTarget: null, activateId: selection.id };
+      return focusOf({ state: EMPTY_STUDIO_WORLD_APPROACH, walkTarget: null, activateId: selection.id });
     }
     const walkTarget = findStudioWorldApproachPoint(manifest, current, selection.point, selection.radius);
-    if (!walkTarget) return idleApproach;
+    if (!walkTarget) return focusOf(idleApproach);
     const pending = { id: selection.id, point: selection.point, radius: selection.radius, walkTarget };
-    return { state: { pending }, walkTarget, activateId: null };
+    return focusOf({ state: { pending }, walkTarget, activateId: null });
   }
 
   const nearby = options.nearby ?? null;
-  if (options.inRangeInteract && nearby && insideRadius(current, nearby)) {
-    return { state: EMPTY_STUDIO_WORLD_APPROACH, walkTarget: null, activateId: nearby.id };
+  if (options.inRangeInteract && nearby && insideRadius(current, nearby) && approachPresence(manifest, current, nearby).prompt) {
+    return focusOf({ state: EMPTY_STUDIO_WORLD_APPROACH, walkTarget: null, activateId: nearby.id });
   }
 
   const pending = state.pending;
-  if (!pending) return idleApproach;
-  if (insideRadius(current, pending)) {
-    return { state: EMPTY_STUDIO_WORLD_APPROACH, walkTarget: null, activateId: pending.id };
+  if (!pending) return focusOf(idleApproach);
+  if (insideRadius(current, pending) && approachPresence(manifest, current, pending).prompt) {
+    return focusOf({ state: EMPTY_STUDIO_WORLD_APPROACH, walkTarget: null, activateId: pending.id });
   }
   const stillInside = Math.hypot(pending.walkTarget.x - pending.point.x, pending.walkTarget.y - pending.point.y) <= pending.radius;
-  if (!stillInside || !studioWorldCanOccupy(manifest, pending.walkTarget)) return idleApproach;
-  return { state, walkTarget: pending.walkTarget, activateId: null };
+  if (!stillInside || !studioWorldCanOccupy(manifest, pending.walkTarget)) return focusOf(idleApproach);
+  return focusOf({ state, walkTarget: pending.walkTarget, activateId: null });
 }
 
 export interface StudioWorldPortalArrival {
@@ -182,6 +207,182 @@ export function resolveStudioWorldPortalArrival(
     body: { x: target.x, y: target.y },
     cameraAnchor: { x: target.x, y: target.y },
     velocity: { x: 0, y: 0 },
+  };
+}
+
+/** Stand off the other person so the route stops beside them, not inside them. */
+export const STUDIO_WORLD_BESIDE_DISTANCE = 32;
+
+export interface StudioWorldWalkOverSubject {
+  readonly id: string;
+  readonly point: StudioVirtualSpacePoint;
+}
+
+export interface StudioWorldWalkOverState {
+  readonly follow: boolean;
+  readonly targetId: string | null;
+  readonly routeTarget: StudioVirtualSpacePoint | null;
+}
+
+export const EMPTY_STUDIO_WORLD_WALK_OVER: StudioWorldWalkOverState = Object.freeze({
+  follow: false,
+  targetId: null,
+  routeTarget: null,
+});
+
+export function findStudioWorldBesidePoint(
+  manifest: StudioVirtualSpaceWorldManifest,
+  current: StudioVirtualSpacePoint,
+  person: StudioVirtualSpacePoint,
+): StudioVirtualSpacePoint | null {
+  let best: StudioVirtualSpacePoint | null = null;
+  let bestGap = Number.POSITIVE_INFINITY;
+  for (let step = 0; step < 16; step += 1) {
+    const angle = (Math.PI * 2 * step) / 16;
+    const candidate = {
+      x: person.x + Math.cos(angle) * STUDIO_WORLD_BESIDE_DISTANCE,
+      y: person.y + Math.sin(angle) * STUDIO_WORLD_BESIDE_DISTANCE,
+    };
+    if (!studioWorldCanOccupy(manifest, candidate)) continue;
+    const gap = Math.hypot(candidate.x - current.x, candidate.y - current.y);
+    if (gap < bestGap) {
+      best = candidate;
+      bestGap = gap;
+    }
+  }
+  return best;
+}
+
+function alreadyBeside(current: StudioVirtualSpacePoint, person: StudioVirtualSpacePoint): boolean {
+  return Math.hypot(current.x - person.x, current.y - person.y) <= STUDIO_WORLD_BESIDE_DISTANCE + 8;
+}
+
+/**
+ * Walk to an occupiable point beside a person. Follow keeps that point with them.
+ * Direct steering or an explicit stop drops the route and the follow.
+ */
+export function stepStudioWorldWalkOver(
+  manifest: StudioVirtualSpaceWorldManifest,
+  state: StudioWorldWalkOverState,
+  current: StudioVirtualSpacePoint,
+  options: {
+    readonly choice?: StudioWorldWalkOverSubject | null;
+    readonly followTarget?: StudioWorldWalkOverSubject | null;
+    readonly direct?: boolean;
+    readonly stop?: boolean;
+  } = {},
+): { readonly state: StudioWorldWalkOverState; readonly routeTarget: StudioVirtualSpacePoint | null; readonly follow: boolean } {
+  if (options.direct || options.stop) {
+    return { state: EMPTY_STUDIO_WORLD_WALK_OVER, routeTarget: null, follow: false };
+  }
+  const followed = state.follow && options.followTarget && options.followTarget.id === state.targetId
+    ? options.followTarget
+    : null;
+  const subject = options.choice ?? followed;
+  if (!subject) return { state, routeTarget: state.routeTarget, follow: state.follow };
+  if (alreadyBeside(current, subject.point)) {
+    const next = { follow: true, targetId: subject.id, routeTarget: null };
+    return { state: next, routeTarget: null, follow: true };
+  }
+  const beside = findStudioWorldBesidePoint(manifest, current, subject.point);
+  if (!beside) return { state: EMPTY_STUDIO_WORLD_WALK_OVER, routeTarget: null, follow: false };
+  const next = { follow: true, targetId: subject.id, routeTarget: beside };
+  return { state: next, routeTarget: beside, follow: true };
+}
+
+interface ZoneRect {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function containsZone(rect: ZoneRect, point: StudioVirtualSpacePoint): boolean {
+  return point.x >= rect.x && point.x <= rect.x + rect.width
+    && point.y >= rect.y && point.y <= rect.y + rect.height;
+}
+
+/** Private acoustic zones win over the room under the same floor point. Outside every rect is nowhere. */
+export function studioWorldPresenceZone(
+  manifest: StudioVirtualSpaceWorldManifest,
+  point: StudioVirtualSpacePoint,
+): { readonly id: string; readonly rect: ZoneRect } | null {
+  const privateZone = (manifest.acousticZones ?? []).find((zone) => zone.policy === "private" && containsZone(zone, point));
+  if (privateZone) return { id: privateZone.id, rect: privateZone };
+  const room = manifest.rooms.find((candidate) => containsZone(candidate, point));
+  return room ? { id: room.id, rect: room } : null;
+}
+
+export class StudioWorldZoneTracker {
+  private occupied: string | null = null;
+
+  seed(zoneId: string | null): void {
+    this.occupied = zoneId;
+  }
+
+  /** True only on the frame the body crosses into a zone. */
+  enter(zoneId: string | null): boolean {
+    if (zoneId === this.occupied) return false;
+    this.occupied = zoneId;
+    return zoneId != null;
+  }
+}
+
+export interface StudioWorldZonePresence {
+  readonly zoneId: string | null;
+  readonly announce: boolean;
+  readonly separated: boolean;
+  readonly rect: ZoneRect | null;
+}
+
+export function resolveStudioWorldZonePresence(
+  tracker: StudioWorldZoneTracker,
+  manifest: StudioVirtualSpaceWorldManifest,
+  point: StudioVirtualSpacePoint,
+  _reducedMotion = false,
+): StudioWorldZonePresence {
+  void _reducedMotion;
+  const zone = studioWorldPresenceZone(manifest, point);
+  const zoneId = zone?.id ?? null;
+  return {
+    zoneId,
+    announce: tracker.enter(zoneId),
+    separated: zoneId != null,
+    rect: zone?.rect ?? null,
+  };
+}
+
+export interface StudioWorldUnstuck {
+  readonly spawn: StudioVirtualSpacePoint | null;
+  readonly velocity: StudioVirtualSpacePoint;
+  readonly route: readonly StudioVirtualSpacePoint[];
+  readonly cameraAnchor: StudioVirtualSpacePoint;
+  readonly portal: null;
+}
+
+/** Nearest authored spawn that can be occupied. No path is built through furniture. */
+export function resolveStudioWorldUnstuck(
+  manifest: StudioVirtualSpaceWorldManifest,
+  stuck: StudioVirtualSpacePoint,
+): StudioWorldUnstuck {
+  const stopped = { x: 0, y: 0 };
+  const spawns = manifest.spawns.filter((spawn) => studioWorldCanOccupy(manifest, spawn.point));
+  if (spawns.length === 0) {
+    return { spawn: null, velocity: stopped, route: [], cameraAnchor: stuck, portal: null };
+  }
+  const nearest = spawns.reduce((best, spawn) => (
+    Math.hypot(spawn.point.x - stuck.x, spawn.point.y - stuck.y)
+      < Math.hypot(best.point.x - stuck.x, best.point.y - stuck.y)
+      ? spawn
+      : best
+  ));
+  return {
+    spawn: { x: nearest.point.x, y: nearest.point.y },
+    velocity: stopped,
+    route: [],
+    cameraAnchor: { x: nearest.point.x, y: nearest.point.y },
+    portal: null,
   };
 }
 

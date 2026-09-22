@@ -17,12 +17,19 @@ import { steerStudioWorldCruise } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   EMPTY_STUDIO_WORLD_APPROACH,
+  EMPTY_STUDIO_WORLD_WALK_OVER,
   StudioWorldPortalTracker,
+  StudioWorldZoneTracker,
   resolveStudioWorldPortalArrival,
+  resolveStudioWorldUnstuck,
+  resolveStudioWorldZonePresence,
   stepStudioWorldInteractionApproach,
+  stepStudioWorldWalkOver,
   studioWorldHasModalBlocker,
   studioWorldInputBlocked,
+  studioWorldPresenceZone,
   type StudioWorldApproachState,
+  type StudioWorldWalkOverState,
 } from "./studio-virtual-space-runtime-policy";
 
 import { readStudioVirtualSpaceGamepadsInput } from "./studio-virtual-space-gamepad";
@@ -317,6 +324,7 @@ export function StudioVirtualSpacePhaserCanvas({
       const portals = studioWorldPortals(manifest);
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}`;
       const portalTracker = new StudioWorldPortalTracker();
+      const zoneTracker = new StudioWorldZoneTracker();
       const failedTextures = new Set<string>();
       const fallbackAsset = studioCharacterStaticAsset(STUDIO_CHARACTER_SKINS[0]!, "down");
       const bootSelfAsset = studioCharacterStaticAsset(
@@ -361,6 +369,11 @@ export function StudioVirtualSpacePhaserCanvas({
       let path: readonly StudioVirtualSpacePoint[] = [];
       let approachState: StudioWorldApproachState = EMPTY_STUDIO_WORLD_APPROACH;
       let queuedInteraction: StudioWorldInteractionDefinition | null = null;
+      let walkOverState: StudioWorldWalkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
+      let queuedWalkOver: { id: string; point: StudioVirtualSpacePoint } | null = null;
+      let zoneVeil: import("phaser").GameObjects.Graphics | null = null;
+      let highlightRing: import("phaser").GameObjects.Graphics | null = null;
+      let zoneNote: HTMLParagraphElement | null = null;
       let routeOverlay: import("phaser").GameObjects.Graphics | null = null;
       let motion = { velocity: { x: 0, y: 0 } };
       let facing: StudioVirtualSpaceFacing = snapshotRef.current.self.facing;
@@ -370,7 +383,6 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastAssetCollectionAt = -Infinity;
       let lastPublishedFacing = facing;
       let lastPublishedMoving = moving;
-      let lastFollowPathAt = -Infinity;
       let gamepadInteractHeld = false;
       const heldKeys = new Set<string>();
       let keyboardInteractQueued = false;
@@ -514,7 +526,8 @@ export function StudioVirtualSpacePhaserCanvas({
               event: InputEventLike,
             ) => {
               event.stopPropagation();
-              callbacksRef.current.onPeerSelect(id);
+              queuedWalkOver = { id, point: { x: sprite.x, y: sprite.y } };
+              bridge.setFollowingPeer(id);
             },
           );
           const label = scene.add.text(peer.state.x, peer.state.y + 18, peer.participant.displayName, {
@@ -653,6 +666,8 @@ export function StudioVirtualSpacePhaserCanvas({
         }
 
         routeOverlay = this.add.graphics().setDepth(650);
+        zoneVeil = this.add.graphics().setDepth(40_000);
+        highlightRing = this.add.graphics().setDepth(80_000);
 
         if (debugWorld) {
           const graphics = this.add.graphics().setDepth(170_000);
@@ -945,6 +960,29 @@ export function StudioVirtualSpacePhaserCanvas({
           modalObserver.disconnect();
         });
         portalTracker.seed(portals, initialPoint);
+        zoneTracker.seed(studioWorldPresenceZone(manifest, initialPoint)?.id ?? null);
+        zoneNote = document.createElement("p");
+        zoneNote.hidden = true;
+        zoneNote.setAttribute("role", "status");
+        Object.assign(zoneNote.style, {
+          position: "absolute", top: "12px", left: "50%", transform: "translateX(-50%)",
+          zIndex: "6", margin: "0", padding: "6px 12px", borderRadius: "999px",
+          background: "#14120fd9", color: "#f6edd8", font: "700 12px/1.2 Pretendard, sans-serif",
+          pointerEvents: "none",
+        });
+        const unstuckButton = document.createElement("button");
+        unstuckButton.type = "button";
+        unstuckButton.textContent = btRef.current("빠져나오기", "Unstuck");
+        unstuckButton.setAttribute("aria-label", unstuckButton.textContent);
+        Object.assign(unstuckButton.style, {
+          position: "absolute", left: "50%", bottom: "12px", transform: "translateX(-50%)",
+          zIndex: "6", border: "0", borderRadius: "999px", padding: "8px 14px",
+          background: "#f6edd8", color: "#241c14", font: "800 12px/1 Pretendard, sans-serif",
+          cursor: "pointer",
+        });
+        unstuckButton.addEventListener("click", () => bridge.requestUnstuck());
+        parent.append(zoneNote, unstuckButton);
+        cleanup.push(() => { zoneNote.remove(); unstuckButton.remove(); });
         sceneReady = true;
         globalThis.clearTimeout(bootDeadline);
         setFailure(false);
@@ -983,6 +1021,8 @@ export function StudioVirtualSpacePhaserCanvas({
           path = [];
           motion = { velocity: { x: 0, y: 0 } };
           localBodyPhysics.setVelocity(0, 0);
+          walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
         }
         let ix = blocked ? 0 : bridge.getJoystick().x;
         let iy = blocked ? 0 : bridge.getJoystick().y;
@@ -1011,20 +1051,10 @@ export function StudioVirtualSpacePhaserCanvas({
           .find((npc) => studioNpcInteraction(manifest, npc.definition));
         const npcInteraction = nearbyNpc ? studioNpcInteraction(manifest, nearbyNpc.definition) : null;
         const nearbyInteraction = npcInteraction ?? nearestInteraction(interactions, currentPoint);
-        const nextNearbyId = nearbyInteraction?.id ?? null;
-        if (nextNearbyId !== nearbyInteractionId) {
-          nearbyInteractionId = nextNearbyId;
-          callbacksRef.current.onNearbyInteractionChange?.(nearbyInteraction);
-          for (const [id, marker] of interactionMarkers) {
-            const active = id === nextNearbyId;
-            marker.setAlpha(active ? 1 : 0.62);
-            marker.setScale(active ? 1.16 : 1);
-          }
-        }
-
         const interactPressed = !typing && Boolean(
           keyboardInteractQueued
-          || (gamepad.interact && !gamepadInteractHeld),
+          || (gamepad.interact && !gamepadInteractHeld)
+          || bridge.consumeInteract(),
         );
         keyboardInteractQueued = false;
         gamepadInteractHeld = gamepad.interact;
@@ -1036,14 +1066,30 @@ export function StudioVirtualSpacePhaserCanvas({
           approachState = EMPTY_STUDIO_WORLD_APPROACH;
         } else {
           const previousApproach = approachState.pending;
+          const focus = nearbyInteraction && !npcInteraction
+            ? { id: nearbyInteraction.id, point: nearbyInteraction.point, radius: nearbyInteraction.radius }
+            : null;
           const decision = stepStudioWorldInteractionApproach(manifest, approachState, currentPoint, {
             selection: selection ? { id: selection.id, point: selection.point, radius: selection.radius } : null,
             inRangeInteract: interactPressed && !selection,
-            nearby: nearbyInteraction && !npcInteraction
-              ? { id: nearbyInteraction.id, point: nearbyInteraction.point, radius: nearbyInteraction.radius }
-              : null,
+            nearby: focus,
+            focus,
           });
           approachState = decision.state;
+          const highlighted = decision.prompt ? interactionById.get(decision.highlightId ?? "") ?? null : null;
+          if ((highlighted?.id ?? null) !== nearbyInteractionId) {
+            nearbyInteractionId = highlighted?.id ?? null;
+            callbacksRef.current.onNearbyInteractionChange?.(highlighted);
+            for (const [id, marker] of interactionMarkers) {
+              const active = id === nearbyInteractionId;
+              marker.setAlpha(active ? 1 : 0.62);
+              marker.setScale(active ? 1.16 : 1);
+            }
+          }
+          highlightRing?.clear();
+          if (highlighted) {
+            highlightRing?.lineStyle(3, 0xf5d78a, 1).strokeCircle(highlighted.point.x, highlighted.point.y, highlighted.radius);
+          }
           if (decision.activateId) {
             const chosen = interactionById.get(decision.activateId) ?? (selection?.id === decision.activateId ? selection : null);
             if (chosen) callbacksRef.current.onInteract(chosen);
@@ -1070,19 +1116,30 @@ export function StudioVirtualSpacePhaserCanvas({
         }
 
         const followPeerId = bridge.getFollowingPeer();
-        if (!blocked && followPeerId && time - lastFollowPathAt >= 320) {
-          const peer = getPeerSnapshot(followPeerId);
-          if (!peer) {
+        const followPeer = followPeerId ? getPeerSnapshot(followPeerId) : null;
+        const walkChoice = queuedWalkOver;
+        queuedWalkOver = null;
+        if (!blocked && (walkChoice || followPeerId)) {
+          if (followPeerId && !followPeer && !walkChoice) {
             bridge.setFollowingPeer(null);
             callbacksRef.current.onCancelFollow();
+            walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
           } else {
-            const distance = Math.hypot(peer.state.x - localBody.x, peer.state.y - localBody.y);
-            if (distance > 86) {
+            const previousRoute = walkOverState.routeTarget;
+            const walked = stepStudioWorldWalkOver(manifest, walkOverState, currentPoint, {
+              choice: walkChoice,
+              followTarget: followPeer ? { id: followPeerId!, point: { x: followPeer.state.x, y: followPeer.state.y } } : null,
+              direct: directInput,
+            });
+            walkOverState = walked.state;
+            if (walked.follow && walked.state.targetId) bridge.setFollowingPeer(walked.state.targetId);
+            const routeMoved = walked.routeTarget
+              && (!previousRoute || previousRoute.x !== walked.routeTarget.x || previousRoute.y !== walked.routeTarget.y);
+            if (walked.routeTarget && routeMoved && !directInput) {
               approachState = EMPTY_STUDIO_WORLD_APPROACH;
-              setPathTo({ x: peer.state.x, y: peer.state.y });
-            } else path = [];
+              setPathTo(walked.routeTarget);
+            } else if (walked.follow && !walked.routeTarget) path = [];
           }
-          lastFollowPathAt = time;
         }
 
         const cruise = steerStudioWorldCruise({
@@ -1098,6 +1155,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (followPeerId) bridge.setFollowingPeer(null);
           if (interruptedNavigation) callbacksRef.current.onCancelFollow();
           approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
         }
         if (!blocked) {
           path = cruise.path;
@@ -1109,7 +1167,23 @@ export function StudioVirtualSpacePhaserCanvas({
         localBodyPhysics.setVelocity(motion.velocity.x, motion.velocity.y);
         let portal: StudioWorldPortalDefinition | null = null;
         let snapCamera = false;
-        if (!blocked) {
+        if (bridge.consumeUnstuck()) {
+          const rescue = resolveStudioWorldUnstuck(manifest, currentPoint);
+          if (rescue.spawn) {
+            localBodyPhysics.reset(rescue.spawn.x, rescue.spawn.y);
+            localPose.reset(rescue.spawn, fixedStepClock.time);
+            previousRendered = null;
+            motion = { velocity: rescue.velocity };
+            localBodyPhysics.setVelocity(rescue.velocity.x, rescue.velocity.y);
+            path = [];
+            walkOverState = EMPTY_STUDIO_WORLD_WALK_OVER;
+            approachState = EMPTY_STUDIO_WORLD_APPROACH;
+            bridge.setFollowingPeer(null);
+            lastPosition = rescue.spawn;
+            currentPoint = rescue.cameraAnchor;
+            snapCamera = true;
+          }
+        } else if (!blocked) {
           const arrival = resolveStudioWorldPortalArrival(
             portalTracker,
             manifest,
@@ -1148,6 +1222,28 @@ export function StudioVirtualSpacePhaserCanvas({
             routeOverlay.strokeEllipse(destination.x, destination.y, 20, 10);
           }
         }
+        const zone = resolveStudioWorldZonePresence(zoneTracker, manifest, currentPoint, reducedMotion.matches);
+        zoneVeil?.clear();
+        if (zone.separated && zone.rect) {
+          const rect = zone.rect;
+          const veil = reducedMotion.matches ? 0.42 : 0.55;
+          zoneVeil?.fillStyle(0x07060b, veil);
+          zoneVeil?.fillRect(0, 0, manifest.width, rect.y);
+          zoneVeil?.fillRect(0, rect.y, rect.x, rect.height);
+          zoneVeil?.fillRect(rect.x + rect.width, rect.y, Math.max(0, manifest.width - rect.x - rect.width), rect.height);
+          zoneVeil?.fillRect(0, rect.y + rect.height, manifest.width, Math.max(0, manifest.height - rect.y - rect.height));
+        }
+        if (zoneNote) {
+          zoneNote.style.transition = reducedMotion.matches ? "none" : "opacity 180ms linear";
+          if (!zone.separated) zoneNote.hidden = true;
+          else if (zone.announce) {
+            zoneNote.hidden = false;
+            zoneNote.textContent = btRef.current("이 공간에 들어왔어요", "Entered this area");
+          }
+        }
+        parent.dataset.zoneId = zone.zoneId ?? "";
+        parent.dataset.zoneSeparated = String(zone.separated);
+        parent.dataset.zoneAnnounced = String(zone.announce);
         const speed = Math.hypot(motion.velocity.x, motion.velocity.y);
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
