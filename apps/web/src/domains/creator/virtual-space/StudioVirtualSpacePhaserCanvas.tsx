@@ -13,13 +13,16 @@ import {
   type StudioNpcAtmosphere, type StudioNpcPhase,
 } from "./studio-virtual-space-npc-director";
 import type { StudioVirtualNpcGuideTourRequest, StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
-import { advanceStudioWorldPath } from "./studio-virtual-space-path-steering";
+import { steerStudioWorldCruise } from "./studio-virtual-space-path-steering";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
+  EMPTY_STUDIO_WORLD_APPROACH,
   StudioWorldPortalTracker,
-  studioWorldArrivalInput,
+  resolveStudioWorldPortalArrival,
+  stepStudioWorldInteractionApproach,
   studioWorldHasModalBlocker,
   studioWorldInputBlocked,
+  type StudioWorldApproachState,
 } from "./studio-virtual-space-runtime-policy";
 
 import { readStudioVirtualSpaceGamepadsInput } from "./studio-virtual-space-gamepad";
@@ -62,7 +65,6 @@ import type { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engi
 import {
   studioWorldCollisionRects,
   studioWorldInteractions,
-  studioWorldPortalTarget,
   studioWorldPropDepth,
   studioWorldPortals,
   studioWorldRoomAt,
@@ -357,6 +359,8 @@ export function StudioVirtualSpacePhaserCanvas({
       let localLabel: import("phaser").GameObjects.Text | null = null;
       let localReaction: import("phaser").GameObjects.Text | null = null;
       let path: readonly StudioVirtualSpacePoint[] = [];
+      let approachState: StudioWorldApproachState = EMPTY_STUDIO_WORLD_APPROACH;
+      let queuedInteraction: StudioWorldInteractionDefinition | null = null;
       let routeOverlay: import("phaser").GameObjects.Graphics | null = null;
       let motion = { velocity: { x: 0, y: 0 } };
       let facing: StudioVirtualSpaceFacing = snapshotRef.current.self.facing;
@@ -706,10 +710,7 @@ export function StudioVirtualSpacePhaserCanvas({
                 event: InputEventLike,
               ) => {
                 event.stopPropagation();
-                const current = { x: localBody?.x ?? 0, y: localBody?.y ?? 0 };
-                const distance = Math.hypot(interaction.point.x - current.x, interaction.point.y - current.y);
-                if (distance <= interaction.radius) callbacksRef.current.onInteract(interaction);
-                else setPathTo(interaction.point);
+                queuedInteraction = interaction;
               },
             );
           }
@@ -787,10 +788,7 @@ export function StudioVirtualSpacePhaserCanvas({
               event: InputEventLike,
             ) => {
               event.stopPropagation();
-              const current = { x: localBody?.x ?? initialPoint.x, y: localBody?.y ?? initialPoint.y };
-              const distance = Math.hypot(interaction.point.x - current.x, interaction.point.y - current.y);
-              if (distance <= interaction.radius) callbacksRef.current.onInteract(interaction);
-              else setPathTo(interaction.point);
+              queuedInteraction = interaction;
             },
           );
           interactionMarkers.set(interaction.id, marker);
@@ -859,6 +857,8 @@ export function StudioVirtualSpacePhaserCanvas({
           if (!pointer.leftButtonDown()) return;
           bridge.setFollowingPeer(null);
           callbacksRef.current.onCancelFollow();
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          queuedInteraction = null;
           setPathTo({ x: pointer.worldX, y: pointer.worldY });
         });
 
@@ -1005,7 +1005,7 @@ export function StudioVirtualSpacePhaserCanvas({
           maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1),
         };
 
-        const currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
+        let currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
         const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.groundPoint.x - currentPoint.x, npc.groundPoint.y - currentPoint.y) < 55)
           .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
           .find((npc) => studioNpcInteraction(manifest, npc.definition));
@@ -1028,13 +1028,46 @@ export function StudioVirtualSpacePhaserCanvas({
         );
         keyboardInteractQueued = false;
         gamepadInteractHeld = gamepad.interact;
-        if (interactPressed) {
-          if (npcInteraction) (callbacksRef.current.onNpcInteract ?? callbacksRef.current.onInteract)(npcInteraction);
-          else callbacksRef.current.onInteract(nearbyInteraction);
+        const directInput = Math.hypot(ix, iy) > 0.04;
+        const selection = queuedInteraction;
+        queuedInteraction = null;
+        if (interactPressed && npcInteraction && !selection) {
+          (callbacksRef.current.onNpcInteract ?? callbacksRef.current.onInteract)(npcInteraction);
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+        } else {
+          const previousApproach = approachState.pending;
+          const decision = stepStudioWorldInteractionApproach(manifest, approachState, currentPoint, {
+            selection: selection ? { id: selection.id, point: selection.point, radius: selection.radius } : null,
+            inRangeInteract: interactPressed && !selection,
+            nearby: nearbyInteraction && !npcInteraction
+              ? { id: nearbyInteraction.id, point: nearbyInteraction.point, radius: nearbyInteraction.radius }
+              : null,
+          });
+          approachState = decision.state;
+          if (decision.activateId) {
+            const chosen = interactionById.get(decision.activateId) ?? (selection?.id === decision.activateId ? selection : null);
+            if (chosen) callbacksRef.current.onInteract(chosen);
+          } else if (interactPressed && !selection) {
+            callbacksRef.current.onInteract(null);
+          }
+          if (decision.walkTarget && !directInput && !blocked) {
+            const sameWalk = previousApproach
+              && previousApproach.id === decision.state.pending?.id
+              && previousApproach.walkTarget.x === decision.walkTarget.x
+              && previousApproach.walkTarget.y === decision.walkTarget.y;
+            if (!sameWalk) {
+              const nextPath = findStudioWorldPath(manifest, currentPoint, decision.walkTarget);
+              if (nextPath.length === 0) approachState = EMPTY_STUDIO_WORLD_APPROACH;
+              else path = nextPath;
+            }
+          }
         }
 
         const moveRequest = bridge.consumeMoveTarget();
-        if (moveRequest && !blocked) setPathTo(moveRequest);
+        if (moveRequest && !blocked && !selection) {
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+          setPathTo(moveRequest);
+        }
 
         const followPeerId = bridge.getFollowingPeer();
         if (!blocked && followPeerId && time - lastFollowPathAt >= 320) {
@@ -1044,35 +1077,64 @@ export function StudioVirtualSpacePhaserCanvas({
             callbacksRef.current.onCancelFollow();
           } else {
             const distance = Math.hypot(peer.state.x - localBody.x, peer.state.y - localBody.y);
-            if (distance > 86) setPathTo({ x: peer.state.x, y: peer.state.y });
-            else path = [];
+            if (distance > 86) {
+              approachState = EMPTY_STUDIO_WORLD_APPROACH;
+              setPathTo({ x: peer.state.x, y: peer.state.y });
+            } else path = [];
           }
           lastFollowPathAt = time;
         }
 
-        const directInput = Math.hypot(ix, iy) > 0.04;
+        const cruise = steerStudioWorldCruise({
+          manifest,
+          current: currentPoint,
+          path,
+          maxSpeed: config.maxSpeed,
+          deceleration: config.deceleration,
+          direct: blocked ? { x: 0, y: 0 } : { x: ix, y: iy },
+        });
         if (directInput) {
-          const interruptedNavigation = path.length > 0 || Boolean(followPeerId);
-          path = [];
+          const interruptedNavigation = cruise.cleared || path.length > 0 || Boolean(followPeerId);
           if (followPeerId) bridge.setFollowingPeer(null);
           if (interruptedNavigation) callbacksRef.current.onCancelFollow();
-        } else if (!blocked && path.length > 0) {
-          path = advanceStudioWorldPath(manifest, currentPoint, path, Math.hypot(motion.velocity.x, motion.velocity.y));
-          const target = path[0]!;
-          const dx = target.x - currentPoint.x;
-          const dy = target.y - currentPoint.y;
-          const distance = Math.hypot(dx, dy);
-          if (distance <= 3) {
-            path = path.slice(1);
-          } else {
-            const input = studioWorldArrivalInput(currentPoint, target, config.maxSpeed, config.deceleration);
-            ix = input.x;
-            iy = input.y;
-          }
+          approachState = EMPTY_STUDIO_WORLD_APPROACH;
+        }
+        if (!blocked) {
+          path = cruise.path;
+          ix = cruise.input.x;
+          iy = cruise.input.y;
         }
 
         motion = stepStudioVirtualSpaceMotion(motion, { x: ix, y: iy }, dt, config);
         localBodyPhysics.setVelocity(motion.velocity.x, motion.velocity.y);
+        let portal: StudioWorldPortalDefinition | null = null;
+        let snapCamera = false;
+        if (!blocked) {
+          const arrival = resolveStudioWorldPortalArrival(
+            portalTracker,
+            manifest,
+            portals,
+            currentPoint,
+            motion.velocity,
+            reducedMotion.matches,
+          );
+          portal = arrival.portal;
+          const moved = arrival.body.x !== currentPoint.x || arrival.body.y !== currentPoint.y;
+          if (portal && moved) {
+            localBodyPhysics.reset(arrival.body.x, arrival.body.y);
+            localPose.reset(arrival.body, fixedStepClock.time);
+            previousRendered = null;
+            motion = { velocity: arrival.velocity };
+            localBodyPhysics.setVelocity(arrival.velocity.x, arrival.velocity.y);
+            path = [];
+            bridge.clearMovement();
+            lastPosition = arrival.body;
+            currentPoint = arrival.body;
+            approachState = EMPTY_STUDIO_WORLD_APPROACH;
+            snapCamera = true;
+          }
+          if (portal) callbacksRef.current.onPortal?.(portal);
+        }
 
         if (routeOverlay) {
           routeOverlay.clear();
@@ -1111,8 +1173,9 @@ export function StudioVirtualSpacePhaserCanvas({
         localSprite.setData("seatAttached", Boolean(localSeat));
         applyAvatarVisual(localSprite, snapshotRef.current.self, localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, localState, identityRef.current);
         cameraTarget.x = rendered.x; cameraTarget.y = rendered.y;
-        const followAmount = reducedMotion.matches ? 1 : studioCameraLerp(dt);
+        const followAmount = snapCamera || reducedMotion.matches ? 1 : studioCameraLerp(dt);
         this.cameras.main.setLerp(followAmount, followAmount);
+        if (snapCamera) this.cameras.main.centerOn(rendered.x, rendered.y);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
         const bob = nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0;
@@ -1202,22 +1265,6 @@ export function StudioVirtualSpacePhaserCanvas({
           npc.reaction.setPosition(visualPoint.x, headY - (attached ? 45 : 8))
             .setVisible(view.greeting && !reducedMotion.matches && atmosphereRef.current !== "focus");
           if (view.greeting) npc.reaction.setText(btRef.current(greeting.ko, greeting.en));
-        }
-
-        const portal = blocked ? null : portalTracker.enter(portals, currentPoint);
-        if (portal) {
-          const target = studioWorldPortalTarget(manifest, portal);
-          if (target && studioWorldCanOccupy(manifest, target)) {
-            localBodyPhysics.reset(target.x, target.y);
-            localPose.reset(target, fixedStepClock.time);
-            previousRendered = null;
-            motion = { velocity: { x: 0, y: 0 } };
-            path = [];
-            bridge.clearMovement();
-            lastPosition = target;
-            portalTracker.seed(portals, target);
-          }
-          callbacksRef.current.onPortal?.(portal);
         }
 
         const changed = !lastPublishedPoint || Math.hypot(localBody.x - lastPublishedPoint.x, localBody.y - lastPublishedPoint.y) > 0.02
