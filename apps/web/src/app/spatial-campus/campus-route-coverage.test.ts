@@ -61,6 +61,8 @@ describe("campus route authority coverage", () => {
     }
     expect(CAMPUS_DISTRICTS.find((district) => district.id === "academy")?.destinations)
       .toContainEqual(expect.objectContaining({ id: "trace", href: "/learn/trace" }));
+    expect(campusBinding("legal-about-technology-playbook", "/about/technology/playbook")?.districtId)
+      .toBe("academy");
     expect(CAMPUS_DISTRICTS.find((district) => district.id === "gallery")?.destinations)
       .toContainEqual(expect.objectContaining({ id: "publish", href: "/community/promote/new" }));
   });
