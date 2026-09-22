@@ -267,6 +267,7 @@ packages/core/src/production/notification-digest.test.ts
 packages/core/src/production/operations-control.test.ts
 packages/core/src/search-normalization.test.ts
 packages/core/src/server/home.cpu-cache.test.ts
+packages/studio-project-model/src/__tests__/pinned-review-share.test.ts
 packages/studio-project-model/src/__tests__/review-policy-history.test.ts
 packages/studio-project-model/src/__tests__/review-policy.test.ts
 packages/studio-project-model/src/__tests__/review-source-map.test.ts

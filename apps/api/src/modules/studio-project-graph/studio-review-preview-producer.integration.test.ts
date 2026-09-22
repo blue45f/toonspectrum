@@ -1,10 +1,11 @@
+import type { PinnedShareCreate } from "@toonspectrum/studio-project-model/pinned-review-share";
 import { createHash, randomUUID } from "node:crypto";
 import { Image, decodePng, encodePng } from "image-js";
 import { Pool } from "pg";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { studioHandoffReceiptQuery } from "../creator/studio-handoff-receipt-query";
 import { createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as DatabaseRuntime from "../../db";
 import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
 import type { DrizzleStudioWorkAssetRepository } from "../creator/studio-work-asset.repository";
@@ -661,6 +662,124 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     await sessions.create(f.actor, f.input.workId, { id, operationId: randomUUID(), title: "Legacy source", purpose: "No producer proof", kind: "review", input: { ...captured.subject, reviewId: duplicateReviewId }, invitedUserIds: [] });
     const value = await new StudioSessionEvidenceService(sessions).read(f.actor, f.input.workId, id);
     expect(value.evidence).toBeNull(); expect(value.nextOffset).toBeNull();
+  });
+
+  async function pinnedShareFixture(purpose: PinnedShareCreate["purpose"] = "external-review") {
+    const f = await capture(2), captured = await completeCapture(f.actor, f.intent);
+    const { PinnedReviewShareRepository } = await import("./pinned-share/pinned-share.repository");
+    const shares = new PinnedReviewShareRepository();
+    if (purpose === "showcase") await graph.decideReview(f.actor, captured.subject.reviewId, { status: "approved" });
+    const input: PinnedShareCreate = { id: randomUUID(), operationId: randomUUID(), subject: captured.subject, title: "Explicit shared title", instructions: "Only inspect the selected page",
+      purpose, role: purpose === "showcase" ? "viewer" : "commenter", pageOrdinals: [0], expiresInHours: 24, watermark: true,
+      rightsStatement: purpose === "showcase" ? "Owner-stated permission for this submitted image; no third-party certification" : "", publicationConsent: purpose === "showcase" };
+    const created = await shares.create(f.actor, f.input.workId, input);
+    return { ...f, captured, shares, shareInput: input, created };
+  }
+  it.each(["external-review", "mentoring"] as const)("keeps %s access on selected immutable pages without giving work membership", async (purpose) => {
+    const f = await pinnedShareFixture(purpose), token = f.created.token!;
+    const view = await f.shares.view({ token });
+    expect(view.pages.map((page) => page.ordinal)).toEqual([0]); expect(view.title).toBe("Explicit shared title");
+    expect(view.purpose).toBe(purpose); expect(view.feedback).toEqual([]);
+    expect(JSON.stringify(view)).not.toContain(f.actor); expect(JSON.stringify(view)).not.toContain(f.input.workId);
+    expect(JSON.stringify(view)).not.toContain("objectPath"); expect(JSON.stringify(view)).not.toContain("sourceSnapshot");
+    await pool.query('UPDATE creator_work SET title=$2,doc=$3::jsonb,revision=5 WHERE id=$1', [f.input.workId, "PRIVATE CURRENT TITLE", JSON.stringify({ private: "CURRENT PRIVATE DOCUMENT" })]);
+    const after = await f.shares.view({ token }); expect(after.pages).toEqual(view.pages); expect(after.title).toBe(view.title);
+    expect(JSON.stringify(after)).not.toContain("PRIVATE");
+    expect((await f.shares.image({ token }, 0)).page.sha256).toBe(view.pages[0]!.sha256);
+    await expect(f.shares.image({ token }, 1)).rejects.toMatchObject({ code: "forbidden" });
+    await expect(f.shares.view({ publicId: f.created.share.id })).rejects.toMatchObject({ code: "not-found" });
+    const legacy = new (await import("../creator/studio-production.repository")).DrizzleStudioProductionRepository();
+    await expect(legacy.getExternalReview(token)).rejects.toMatchObject({ reason: "invalid" });
+    const storedShare = (await pool.query('SELECT * FROM studio_pinned_review_share WHERE id=$1', [f.shareInput.id])).rows[0];
+    expect(JSON.stringify(storedShare)).not.toContain(token); expect(storedShare.tokenHash).toBe(createHash("sha256").update(token).digest("hex"));
+  });
+  it("recovers creation by exact operation identity without persisting or redisclosing the token", async () => {
+    const f = await pinnedShareFixture();
+    const again = await f.shares.create(f.actor, f.input.workId, f.shareInput);
+    expect(again).toMatchObject({ token: null, replayed: true, share: { id: f.shareInput.id } });
+    await expect(f.shares.create(f.actor, f.input.workId, { ...f.shareInput, title: "Different intent" })).rejects.toMatchObject({ code: "conflict" });
+    expect((await f.shares.list(f.actor, f.input.workId, null)).items).toHaveLength(1);
+    const concurrent = { ...f.shareInput, id: randomUUID(), operationId: randomUUID() };
+    const attempts = await Promise.all([f.shares.create(f.actor, f.input.workId, concurrent), f.shares.create(f.actor, f.input.workId, concurrent)]);
+    expect(attempts.filter((result) => result.token !== null)).toHaveLength(1);
+    expect((await f.shares.list(f.actor, f.input.workId, null)).items).toHaveLength(2);
+  });
+  it("persists isolated comments once and never changes internal approval or page scope", async () => {
+    const f = await pinnedShareFixture(), access = { token: f.created.token! };
+    const input = { id: randomUUID(), pageOrdinal: 0, reviewerName: "External display name", body: "Please clarify this submitted page." };
+    const first = await f.shares.comment(access, input); expect(await f.shares.comment(access, input)).toEqual(first);
+    expect((await f.shares.view(access)).feedback).toEqual([first]);
+    await expect(f.shares.comment(access, { ...input, body: "A different request" })).rejects.toMatchObject({ code: "conflict" });
+    await expect(f.shares.comment(access, { ...input, id: randomUUID(), pageOrdinal: 1 })).rejects.toMatchObject({ code: "forbidden" });
+    expect((await graph.getReview(f.actor, f.captured.subject.reviewId)).status).toBe("open");
+    expect((await graph.getReview(f.actor, f.captured.subject.reviewId)).comments).toEqual([]);
+    await expect(pool.query('UPDATE studio_pinned_review_feedback SET content=$2::jsonb WHERE "shareId"=$1', [f.shareInput.id, JSON.stringify({ ...input, body: "overwrite" })])).rejects.toThrow("immutable");
+  });
+  it("makes revocation idempotent and one-way even when a caller still knows the old token", async () => {
+    const f = await pinnedShareFixture(), access = { token: f.created.token! };
+    const first = await f.shares.revoke(f.actor, f.input.workId, f.shareInput.id);
+    expect(first.revokedAt).not.toBeNull(); expect(await f.shares.revoke(f.actor, f.input.workId, f.shareInput.id)).toEqual(first);
+    await expect(f.shares.view(access)).rejects.toMatchObject({ code: "revoked" });
+    await expect(f.shares.image(access, 0)).rejects.toMatchObject({ code: "revoked" });
+    await expect(f.shares.comment(access, { id: randomUUID(), pageOrdinal: 0, reviewerName: "Guest", body: "Late comment" })).rejects.toMatchObject({ code: "revoked" });
+    await expect(pool.query('UPDATE studio_pinned_review_share SET "revokedAt"=NULL WHERE id=$1', [f.shareInput.id])).rejects.toThrow("immutable");
+    await expect(pool.query(`UPDATE studio_pinned_review_share SET snapshot=jsonb_set(snapshot,'{input,title}','"replaced"') WHERE id=$1`, [f.shareInput.id])).rejects.toThrow("immutable");
+  });
+  it("requires a current manager, preserves grant identity across role loss, and hides prior links after regrant", async () => {
+    const f = await pinnedShareFixture(), admin = randomUUID(); users.push(admin);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [admin, "External link manager"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'editor','active',$3,now())`, [f.input.workId, admin, randomUUID()]);
+    await expect(f.shares.create(admin, f.input.workId, { ...f.shareInput, id: randomUUID(), operationId: randomUUID() })).rejects.toMatchObject({ code: "forbidden" });
+    await pool.query(`UPDATE creator_work_collaborator SET role='admin',"updatedAt"=now() WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, admin]);
+    const shared = await f.shares.create(admin, f.input.workId, { ...f.shareInput, id: randomUUID(), operationId: randomUUID() });
+    expect((await f.shares.view({ token: shared.token! })).pages).toHaveLength(1);
+    await pool.query(`UPDATE creator_work_collaborator SET role='viewer',"updatedAt"=now() WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, admin]);
+    await expect(f.shares.view({ token: shared.token! })).rejects.toMatchObject({ code: "forbidden" });
+    await pool.query(`UPDATE creator_work_collaborator SET role='admin',"updatedAt"=now() WHERE "workId"=$1 AND "userId"=$2`, [f.input.workId, admin]);
+    await expect(f.shares.view({ token: shared.token! })).rejects.toMatchObject({ code: "revoked" });
+  });
+  it("requires separate explicit publication of an approved snapshot and removes a revoked showcase", async () => {
+    const f = await pinnedShareFixture();
+    const publish: PinnedShareCreate = { ...f.shareInput, id: randomUUID(), operationId: randomUUID(), purpose: "showcase", role: "viewer", publicationConsent: true, rightsStatement: "Owner confirmed image display rights" };
+    await expect(f.shares.create(f.actor, f.input.workId, publish)).rejects.toMatchObject({ code: "invalid-source" });
+    await graph.decideReview(f.actor, f.captured.subject.reviewId, { status: "approved" });
+    const publicShare = await f.shares.create(f.actor, f.input.workId, publish);
+    expect(publicShare.token).toBeNull();
+    const view = await f.shares.view({ publicId: publicShare.share.id }); expect(view.role).toBe("viewer"); expect(view.purpose).toBe("showcase");
+    expect((await f.shares.publicList(null)).items.some((item) => item.id === publicShare.share.id)).toBe(true);
+    await expect(f.shares.comment({ publicId: publicShare.share.id }, { id: randomUUID(), pageOrdinal: 0, reviewerName: "Visitor", body: "Should not post" })).rejects.toMatchObject({ code: "forbidden" });
+    await f.shares.revoke(f.actor, f.input.workId, publicShare.share.id);
+    expect((await f.shares.publicList(null)).items.some((item) => item.id === publicShare.share.id)).toBe(false);
+    await expect(f.shares.view({ publicId: publicShare.share.id })).rejects.toMatchObject({ code: "revoked" });
+  });
+
+  it("grants a non-owning share runtime only read/insert and the single revocation column", async () => {
+    const f = await pinnedShareFixture(), role = `pinned_share_test_${randomUUID().replaceAll("-", "")}`;
+    const { buildStudioProductionRuntimeAclSql, buildStudioProductionRuntimeAclViolationSql } = await import("../../../../../scripts/run-production-database-migrations.mjs");
+    await pool.query(`CREATE ROLE "${role}" NOLOGIN`);
+    try {
+      await pool.query(buildStudioProductionRuntimeAclSql(role));
+      expect((await pool.query(`SELECT ${buildStudioProductionRuntimeAclViolationSql(role)} AS invalid`)).rows[0].invalid).toBe(false);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN"); await client.query(`SET LOCAL ROLE "${role}"`);
+        expect((await client.query('SELECT id FROM studio_pinned_review_share WHERE id=$1', [f.shareInput.id])).rows).toHaveLength(1);
+        await expect(client.query('UPDATE studio_pinned_review_share SET "snapshotHash"=$2 WHERE id=$1', [f.shareInput.id, "f".repeat(64)])).rejects.toThrow(/permission denied/u);
+        await client.query("ROLLBACK"); await client.query("BEGIN"); await client.query(`SET LOCAL ROLE "${role}"`);
+        await client.query('UPDATE studio_pinned_review_share SET "revokedAt"=GREATEST(statement_timestamp(),"createdAt") WHERE id=$1', [f.shareInput.id]);
+        await client.query("COMMIT");
+      } finally { await client.query("ROLLBACK"); client.release(); }
+    } finally { await pool.query(`DROP OWNED BY "${role}"`); await pool.query(`DROP ROLE "${role}"`); }
+  });
+
+  it("expires a share independently of browser state without rewriting immutable timestamps", async () => {
+    const f = await pinnedShareFixture(), access = { token: f.created.token! };
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse(f.created.share.expiresAt) + 1);
+    try {
+      await expect(f.shares.view(access)).rejects.toMatchObject({ code: "expired" });
+      await expect(f.shares.image(access, 0)).rejects.toMatchObject({ code: "expired" });
+      await expect(f.shares.comment(access, { id: randomUUID(), pageOrdinal: 0, reviewerName: "Guest", body: "Past deadline" })).rejects.toMatchObject({ code: "expired" });
+    } finally { clock.mockRestore(); }
   });
 
   it.each(["createdAt", "updatedAt"] as const)("keeps task completion timestamps monotonic when saved %s is ahead of the server clock", async (field) => {

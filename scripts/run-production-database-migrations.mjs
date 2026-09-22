@@ -212,6 +212,8 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "studio_external_file_binding",
   "studio_mutation_receipt",
   "studio_operation",
+  "studio_pinned_review_share",
+  "studio_pinned_review_feedback",
   "studio_project_graph",
   "studio_review",
   "studio_review_comment",
@@ -219,6 +221,8 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "studio_review_policy",
   "studio_review_policy_event",
   "studio_review_reviewer",
+  "studio_review_policy",
+  "studio_review_policy_event",
   "studio_revision",
   "studio_revision_blob",
   "studio_revision_parent",
@@ -1173,7 +1177,9 @@ BEGIN
     'creator_work_production_workspace',
     'creator_studio_personal_kit',
     'creator_work_review_link',
-    'creator_work_review_feedback'
+    'creator_work_review_feedback',
+    'studio_pinned_review_share',
+    'studio_pinned_review_feedback'
   ]::text[] LOOP
     SELECT string_agg(format('%I', attribute.attname), ', ' ORDER BY attribute.attnum)
     INTO column_list
@@ -1201,14 +1207,18 @@ REVOKE ALL ON TABLE
   public.creator_work_production_workspace,
   public.creator_studio_personal_kit,
   public.creator_work_review_link,
-  public.creator_work_review_feedback
+  public.creator_work_review_feedback,
+  public.studio_pinned_review_share,
+  public.studio_pinned_review_feedback
 FROM PUBLIC;
 
 REVOKE ALL ON TABLE
   public.creator_work_production_workspace,
   public.creator_studio_personal_kit,
   public.creator_work_review_link,
-  public.creator_work_review_feedback
+  public.creator_work_review_feedback,
+  public.studio_pinned_review_share,
+  public.studio_pinned_review_feedback
 FROM ${quotedRole};
 
 GRANT SELECT, INSERT
@@ -1216,7 +1226,9 @@ GRANT SELECT, INSERT
     public.creator_work_production_workspace,
     public.creator_studio_personal_kit,
     public.creator_work_review_link,
-    public.creator_work_review_feedback
+    public.creator_work_review_feedback,
+  public.studio_pinned_review_share,
+  public.studio_pinned_review_feedback
   TO ${quotedRole};
 
 GRANT UPDATE ("revision", "document", "updatedBy", "updatedAt")
@@ -1227,6 +1239,9 @@ GRANT UPDATE ("revision", "document", "updatedAt")
   TO ${quotedRole};
 GRANT UPDATE ("revokedAt", "updatedAt")
   ON TABLE public.creator_work_review_link
+  TO ${quotedRole};
+GRANT UPDATE ("revokedAt")
+  ON TABLE public.studio_pinned_review_share
   TO ${quotedRole};
 `;
 }
@@ -1261,7 +1276,9 @@ export function buildStudioProductionRuntimeAclViolationSql(
         (
           'creator_work_review_feedback'::text,
           ARRAY[]::text[]
-        )
+        ),
+        ('studio_pinned_review_share'::text, ARRAY['revokedAt']::text[]),
+        ('studio_pinned_review_feedback'::text, ARRAY[]::text[])
       ) AS production_contract(relation_name, mutable_columns)
       WHERE NOT pg_catalog.has_table_privilege(
         ${roleLiteral},
