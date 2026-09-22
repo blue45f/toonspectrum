@@ -44,6 +44,11 @@ try {
     await page.mouse.move(bounds.x + bounds.width * 0.5, y + 30, { steps: 12 }); await page.mouse.up();
   }
   await page.mouse.move(20, 20); await gpuReady(3);
+  await expect(page.locator('[data-studio-skia-document-surface]')).toHaveAttribute(
+    'data-studio-skia-source-fence',
+    'settled-ink',
+  );
+  report.checks.push('Settled live ink protects the exact Skia handoff without a redundant visible Konva document draw');
   report.driver = await page.locator('[data-studio-skia-document-surface]').evaluate(canvas => {
     const gl = canvas.getContext('webgl2'); const debug = gl.getExtension('WEBGL_debug_renderer_info');
     return debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);

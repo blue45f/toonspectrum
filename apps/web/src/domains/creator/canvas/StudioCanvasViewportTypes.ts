@@ -24,6 +24,7 @@ import type { StudioLivePressureStore } from "../live/StudioLiveInkHosts";
 import type { StudioHokusaiLiveOverlayProjection } from "../render/studio-hokusai-live-brush-overlay";
 import type { StudioRasterHandoffCandidate } from "../render/studio-raster-handoff-authority";
 import type { StudioRasterVisibleDocumentRect } from "../render/studio-raster-visible-rect";
+import type { StudioRenderSurfaceAuthority } from "../render/StudioRenderSurface";
 import type { StudioGpuBackend, StudioGpuFrameReceipt } from "../render/studio-webgpu-frame-contract";
 import type { StudioGpuStroke } from "../render/studio-webgpu-stroke";
 import type { StudioWebGpuViewportSurfacePlan } from "../render/studio-webgpu-viewport";
@@ -53,6 +54,7 @@ import type { VanishingPoint } from "../studio-perspective-guide";
 import type { PuppetPin } from "../studio-puppet-warp";
 import type { QuickMaskBrushMode } from "../studio-quick-mask";
 import type { StudioScrollViewport, StudioScrollViewportStore } from "../studio-scroll-viewport-store";
+import type { StudioSkiaDocumentPresentationCandidate } from "../studio-skia-committed-ink-bridge";
 import type {
   PixelSelection,
   PolyLassoSession,
@@ -94,6 +96,13 @@ export interface StudioCanvasViewportHandlers {
   onWebGpuFrameReady: (receipt: StudioGpuFrameReceipt) => void;
   onWebGpuDeviceLost: () => void;
   onWebGpuBackendChange: (backend: StudioGpuBackend) => void;
+  canSkiaDocumentPublishOverSettledInk?: (
+    candidate: StudioSkiaDocumentPresentationCandidate
+  ) => boolean;
+  onSkiaDocumentAuthorityChange?: (authority: StudioRenderSurfaceAuthority) => void;
+  onSkiaDocumentVisiblePresentation?: (
+    presentation: StudioSkiaDocumentPresentationCandidate
+  ) => void;
   setWebGpuCanvasHandle: (handle: StudioWebGpuCanvasHandle | null) => void;
   setHokusaiLiveOverlaySurface: (
     surface: StudioHokusaiLiveOverlaySurfaceBinding | null
@@ -403,6 +412,7 @@ export interface StudioCanvasViewportProps {
   pageSequenceOpen: boolean;
   pagesHi: number;
   pagesHistory: PageState[][];
+  studioRevisionProjectGeneration?: number;
   panelGutter: number;
   panelSplitArmed: boolean;
   panelSplitPreview: PanelSplitPreview | null;

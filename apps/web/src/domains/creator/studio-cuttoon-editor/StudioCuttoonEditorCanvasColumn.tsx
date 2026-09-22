@@ -175,6 +175,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
     pages,
     pagesHi,
     pagesHistory,
+    studioRevisionProjectGenerationRef,
     paintRetouchStrokeLineRef,
     panelGutter,
     panelSplitArmed,
@@ -562,6 +563,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           pageSequenceOpen={pageSequenceOpen}
           pagesHi={pagesHi}
           pagesHistory={pagesHistory}
+          studioRevisionProjectGeneration={studioRevisionProjectGenerationRef.current}
           panelGutter={panelGutter}
           panelSplitArmed={panelSplitArmed}
           panelSplitPreview={panelSplitPreview}

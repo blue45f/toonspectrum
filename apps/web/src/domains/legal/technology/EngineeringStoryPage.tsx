@@ -16,8 +16,8 @@ import {
 } from "lucide-react";
 
 import { AboutSectionNav } from "../AboutSectionNav";
+import { PUBLISHED_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS } from "./engineering-story-published-content";
 import {
-  ALL_ENGINEERING_CHAPTERS as ENGINEERING_CHAPTERS,
   ENGINEERING_STATUS_META,
   type EngineeringEvidenceKind,
   type EngineeringStatus,
