@@ -39,6 +39,7 @@ function harness(unresolved: number[] = []) {
   const provider = { registerFont: vi.fn(), delete: vi.fn() };
   const paragraph = {
     layout: vi.fn(),
+    getLineMetrics: vi.fn(() => [{ baseline: 22, ascent: -18 }]),
     unresolvedCodepoints: vi.fn(() => unresolved),
     delete: vi.fn(),
   };
@@ -101,7 +102,7 @@ describe("retained GPU document font cache", () => {
     expect(h.paragraph.layout).toHaveBeenCalledWith(240);
     expect(h.canvas.translate).toHaveBeenCalledWith(20, 30);
     expect(h.canvas.rotate).toHaveBeenCalledWith(15, 0, 0);
-    expect(h.canvas.drawParagraph).toHaveBeenCalledWith(h.paragraph, 0, 0);
+    expect(h.canvas.drawParagraph).toHaveBeenCalledWith(h.paragraph, 0, -4);
 
     cache.retain([]);
     expect(h.provider.delete).toHaveBeenCalledOnce();
