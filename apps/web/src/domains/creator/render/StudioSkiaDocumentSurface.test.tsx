@@ -144,16 +144,78 @@ it("coalesces imperative camera movement and does not rebuild the React display 
   const count = h.report.mock.calls.length;
   try {
     act(() => { camera = { ...camera, offsetX: -100 }; notify(); camera = { ...camera, offsetY: -200 }; notify(); });
-    expect(h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!.style.visibility).toBe("hidden");
+    const canvas = h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!;
+    expect(canvas.style.visibility).toBe("visible");
+    expect(canvas.style.transform).toBe("translate3d(-100px, -200px, 0)");
+    expect(canvas.dataset.studioSkiaCameraBridge).toBe("retained-translation");
     act(() => scheduled(0));
     expect(requests).toHaveLength(2);
     expect(requests[1]!.frame.camera).toMatchObject({ offsetX: -100, offsetY: -200 });
     await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
     expect(beforePublish).toHaveBeenCalledTimes(2);
     expect(h.report).toHaveBeenCalledTimes(count);
-    expect(h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!.style.visibility).toBe("visible");
+    expect(canvas.style.visibility).toBe("visible");
+    expect(canvas.style.transform).toBe("");
+    expect(canvas.dataset.studioSkiaCameraBridge).toBeUndefined();
     view.unmount(); expect(unsubscribe).toHaveBeenCalledOnce();
   } finally { animation.mockRestore(); cancel.mockRestore(); }
+});
+
+it("rebases the retained scroll bridge when an intermediate GPU frame finishes late", async () => {
+  const h = setup(); let notify!: () => void;
+  const scheduled: FrameRequestCallback[] = [];
+  let camera = { scaleX: 1, scaleY: 1, rotation: 0, offsetX: 0, offsetY: 0 };
+  const cameraSource = { read: () => camera, subscribe: (callback: () => void) => { notify = callback; return () => undefined; } };
+  const view = render(<StudioSkiaDocumentSurface {...h.props} cameraSource={cameraSource} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
+  view.rerender(<StudioSkiaDocumentSurface {...h.props} visible cameraSource={cameraSource} />);
+  const canvas = h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!;
+  await waitFor(() => expect(canvas.style.visibility).toBe("visible"));
+  const animation = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => {
+    scheduled.push(callback); return scheduled.length;
+  });
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => undefined);
+  try {
+    act(() => { camera = { ...camera, offsetX: -100 }; notify(); });
+    expect(canvas.style.transform).toBe("translate3d(-100px, 0px, 0)");
+    act(() => scheduled.shift()!(0));
+    expect(requests).toHaveLength(2);
+
+    act(() => { camera = { ...camera, offsetX: -200 }; notify(); });
+    expect(canvas.style.transform).toBe("translate3d(-200px, 0px, 0)");
+    await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
+    expect(canvas.style.visibility).toBe("visible");
+    expect(canvas.style.transform).toBe("translate3d(-100px, 0px, 0)");
+
+    act(() => scheduled.shift()!(16));
+    expect(requests).toHaveLength(3);
+    await act(async () => { requests[2]!.finish(success(requests[2]!.frame)); });
+    expect(canvas.style.visibility).toBe("visible");
+    expect(canvas.style.transform).toBe("");
+  } finally { view.unmount(); animation.mockRestore(); cancel.mockRestore(); }
+});
+
+it("keeps non-translation camera changes on the guarded hidden handoff", async () => {
+  const h = setup(); let notify!: () => void; let scheduled!: FrameRequestCallback;
+  let camera = { scaleX: 1, scaleY: 1, rotation: 0, offsetX: 0, offsetY: 0 };
+  const cameraSource = { read: () => camera, subscribe: (callback: () => void) => { notify = callback; return () => undefined; } };
+  const view = render(<StudioSkiaDocumentSurface {...h.props} cameraSource={cameraSource} />);
+  await waitFor(() => expect(requests).toHaveLength(1));
+  await act(async () => { requests[0]!.finish(success(requests[0]!.frame)); });
+  view.rerender(<StudioSkiaDocumentSurface {...h.props} visible cameraSource={cameraSource} />);
+  const canvas = h.parent.querySelector<HTMLCanvasElement>("[data-studio-skia-document-surface]")!;
+  await waitFor(() => expect(canvas.style.visibility).toBe("visible"));
+  const animation = vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((callback) => { scheduled = callback; return 1; });
+  const cancel = vi.spyOn(globalThis, "cancelAnimationFrame").mockImplementation(() => undefined);
+  try {
+    act(() => { camera = { ...camera, scaleX: 2 }; notify(); });
+    expect(canvas.style.visibility).toBe("hidden");
+    expect(canvas.style.transform).toBe("");
+    act(() => scheduled(0));
+    await act(async () => { requests[1]!.finish(success(requests[1]!.frame)); });
+    expect(canvas.style.visibility).toBe("visible");
+  } finally { view.unmount(); animation.mockRestore(); cancel.mockRestore(); }
 });
 
 it("waits for the parent's hidden-document paint before revealing the completed GPU frame", async () => {
