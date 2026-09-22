@@ -1177,7 +1177,9 @@ BEGIN
     'creator_work_review_link',
     'creator_work_review_feedback',
     'studio_pinned_review_share',
-    'studio_pinned_review_feedback'
+    'studio_pinned_review_feedback',
+    'studio_review_delivery',
+    'studio_review_delivery_event'
   ]::text[] LOOP
     SELECT string_agg(format('%I', attribute.attname), ', ' ORDER BY attribute.attnum)
     INTO column_list
@@ -1207,7 +1209,9 @@ REVOKE ALL ON TABLE
   public.creator_work_review_link,
   public.creator_work_review_feedback,
   public.studio_pinned_review_share,
-  public.studio_pinned_review_feedback
+  public.studio_pinned_review_feedback,
+  public.studio_review_delivery,
+  public.studio_review_delivery_event
 FROM PUBLIC;
 
 REVOKE ALL ON TABLE
@@ -1216,7 +1220,9 @@ REVOKE ALL ON TABLE
   public.creator_work_review_link,
   public.creator_work_review_feedback,
   public.studio_pinned_review_share,
-  public.studio_pinned_review_feedback
+  public.studio_pinned_review_feedback,
+  public.studio_review_delivery,
+  public.studio_review_delivery_event
 FROM ${quotedRole};
 
 GRANT SELECT, INSERT
@@ -1225,8 +1231,10 @@ GRANT SELECT, INSERT
     public.creator_studio_personal_kit,
     public.creator_work_review_link,
     public.creator_work_review_feedback,
-  public.studio_pinned_review_share,
-  public.studio_pinned_review_feedback
+    public.studio_pinned_review_share,
+    public.studio_pinned_review_feedback,
+    public.studio_review_delivery,
+    public.studio_review_delivery_event
   TO ${quotedRole};
 
 GRANT UPDATE ("revision", "document", "updatedBy", "updatedAt")
@@ -1241,6 +1249,10 @@ GRANT UPDATE ("revokedAt", "updatedAt")
 GRANT UPDATE ("revokedAt")
   ON TABLE public.studio_pinned_review_share
   TO ${quotedRole};
+GRANT UPDATE (state, version, "archiveSha256", "archiveByteLength", "updatedAt", "issuedAt", "deliveredAt", "acceptedAt", "cancelledAt")
+  ON TABLE public.studio_review_delivery
+  TO ${quotedRole};
+GRANT USAGE, SELECT ON SEQUENCE public.studio_review_delivery_event_sequence_seq TO ${quotedRole};
 `;
 }
 
@@ -1256,7 +1268,10 @@ export function buildStudioProductionRuntimeAclViolationSql(
   const role = validateRuntimeDatabaseRole(runtimeDatabaseRole);
   const roleLiteral = sqlLiteral(role);
   return `(
-    EXISTS (
+    NOT pg_catalog.has_sequence_privilege(${roleLiteral}, 'public.studio_review_delivery_event_sequence_seq', 'USAGE, SELECT')
+    OR pg_catalog.has_sequence_privilege(0::oid, 'public.studio_review_delivery_event_sequence_seq', 'USAGE')
+    OR pg_catalog.has_sequence_privilege(${roleLiteral}, 'public.studio_review_delivery_event_sequence_seq', 'UPDATE')
+    OR EXISTS (
       SELECT 1
       FROM (VALUES
         (
@@ -1276,7 +1291,9 @@ export function buildStudioProductionRuntimeAclViolationSql(
           ARRAY[]::text[]
         ),
         ('studio_pinned_review_share'::text, ARRAY['revokedAt']::text[]),
-        ('studio_pinned_review_feedback'::text, ARRAY[]::text[])
+        ('studio_pinned_review_feedback'::text, ARRAY[]::text[]),
+        ('studio_review_delivery'::text, ARRAY['state','version','archiveSha256','archiveByteLength','updatedAt','issuedAt','deliveredAt','acceptedAt','cancelledAt']::text[]),
+        ('studio_review_delivery_event'::text, ARRAY[]::text[])
       ) AS production_contract(relation_name, mutable_columns)
       WHERE NOT pg_catalog.has_table_privilege(
         ${roleLiteral},

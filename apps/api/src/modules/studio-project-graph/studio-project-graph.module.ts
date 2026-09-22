@@ -1,3 +1,6 @@
+import { StudioReviewDeliveryController } from "./review-delivery/review-delivery.controller";
+import { STUDIO_REVIEW_DELIVERY_POOL, StudioReviewDeliveryRepository } from "./review-delivery/review-delivery.repository";
+import { StudioReviewDeliveryService } from "./review-delivery/review-delivery.service";
 import { PinnedReviewShareController } from "./pinned-share/pinned-share.controller";
 import { PinnedReviewShareService } from "./pinned-share/pinned-share.service";
 import { PinnedReviewShareRepository } from "./pinned-share/pinned-share.repository";
@@ -7,6 +10,7 @@ import { StudioSessionEvidenceController, StudioSessionEvidenceService } from ".
 import { StudioWorkSessionController, StudioWorkSessionService } from "./studio-work-session.controller";
 import { StudioWorkSessionRepository } from "./studio-work-session.repository";
 import { Module } from "@nestjs/common";
+import { dbPool } from "../../db";
 import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
 import { CreatorModule } from "../creator/creator.module";
 
@@ -33,8 +37,9 @@ const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(pr
 
 @Module({
   imports: [CreatorModule, ...(privateObjectStorageModule ? [privateObjectStorageModule] : [])],
-  controllers: [PinnedReviewShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
+  controllers: [StudioReviewDeliveryController, PinnedReviewShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
   providers: [
+    { provide: STUDIO_REVIEW_DELIVERY_POOL, useValue: dbPool }, StudioReviewDeliveryRepository, StudioReviewDeliveryService,
     PinnedReviewShareRepository, PinnedReviewShareService,
     StudioReviewPolicyRepository, StudioReviewPolicyService,
     StudioSessionEvidenceService,

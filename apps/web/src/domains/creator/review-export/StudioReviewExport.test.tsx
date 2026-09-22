@@ -6,6 +6,7 @@ import { reviewProductionFixture } from "../review-production/studio-review-prod
 import { StudioReviewExport } from "./StudioReviewExport";
 
 const f = vi.hoisted(() => ({ prepare: vi.fn(), download: vi.fn() }));
+vi.mock("./StudioReviewDelivery", () => ({ StudioReviewDelivery: () => null }));
 vi.mock("./studio-review-export", () => ({ prepareStudioReviewExport: f.prepare, StudioReviewExportError: class extends Error {} }));
 vi.mock("../export/studio-export", () => ({ downloadBlob: f.download }));
 const approved = () => { const value = reviewProductionFixture().verified; return { ...value, review: { ...value.review, status: "approved" as const } }; };

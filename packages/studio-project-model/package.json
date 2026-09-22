@@ -53,6 +53,11 @@
       "types": "./src/graph/pinned-review-share.ts",
       "import": "./src/graph/pinned-review-share.ts",
       "default": "./src/graph/pinned-review-share.ts"
+    },
+    "./review-delivery": {
+      "types": "./src/graph/review-delivery.ts",
+      "import": "./src/graph/review-delivery.ts",
+      "default": "./src/graph/review-delivery.ts"
     }
   },
   "scripts": {
@@ -80,6 +85,9 @@
       ],
       "pinned-review-share": [
         "src/graph/pinned-review-share.ts"
+      ],
+      "review-delivery": [
+        "src/graph/review-delivery.ts"
       ]
     }
   }

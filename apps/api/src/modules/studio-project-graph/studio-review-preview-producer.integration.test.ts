@@ -4,7 +4,7 @@ import { Image, decodePng, encodePng } from "image-js";
 import { Pool } from "pg";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { studioHandoffReceiptQuery } from "../creator/studio-handoff-receipt-query";
-import { createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
+import { canonicalJson, createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as DatabaseRuntime from "../../db";
 import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
@@ -753,6 +753,64 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     await expect(f.shares.view({ publicId: publicShare.share.id })).rejects.toMatchObject({ code: "revoked" });
   });
 
+  it("delivers one exact approved review and separates issue, recipient download, and acceptance", async () => {
+    const f = await capture(2), captured = await completeCapture(f.actor, f.intent), recipient = randomUUID(); users.push(recipient);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [recipient, "Delivery recipient"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt")
+      VALUES ($1,$2,'commenter','active',$3,now())`, [f.input.workId, recipient, randomUUID()]);
+    await graph.decideReview(f.actor, captured.subject.reviewId, { status: "approved" });
+    const Repository = (await import("./review-delivery/review-delivery.repository")).StudioReviewDeliveryRepository;
+    const deliveries = new Repository(pool), mode = "free" as const;
+    const profile = { contract: "studio-review-delivery-profile-v1" as const, id: "approved-review-original-zip" as const,
+      version: 1 as const, container: "zip-store" as const, includeReadme: true as const };
+    const statement = "Owner attests the approved image delivery conditions; no automatic legal certification.";
+    const rightsGraphDigest = createHash("sha256").update(canonicalJson({ subject: captured.subject, recipient, mode, statement, profile })).digest("hex");
+    const id = randomUUID(), prepare = { id, operationId: randomUUID(), subject: captured.subject, title: "Approved original delivery", recipientUserId: recipient,
+      profile, rights: { contract: "studio-review-delivery-rights-v1" as const, statementVersion: 1 as const, mode,
+        rightsGraphDigest, confirmed: true as const, statement } };
+    const created = await deliveries.prepare(f.actor, f.input.workId, prepare);
+    expect(created).toMatchObject({ id, state: "prepared", version: 0, recipient: { userId: recipient } });
+    expect(created.manifest.pages).toHaveLength(2);
+    expect(created.manifest.totalPageBytes).toBe(created.manifest.pages.reduce((sum, page) => sum + page.byteLength, 0));
+    for (const page of created.manifest.pages) expect(stored.get(`derived:sha256:${page.sha256}`)?.length).toBe(page.byteLength);
+    expect(await deliveries.prepare(f.actor, f.input.workId, prepare)).toEqual(created);
+    await expect(deliveries.prepare(f.actor, f.input.workId, { ...prepare, title: "Changed same request" })).rejects.toMatchObject({ response: { code: "studio_review_delivery_operation_conflict" } });
+    const issued = await deliveries.issue(f.actor, f.input.workId, id, { operationId: randomUUID(), expectedVersion: 0, manifestDigest: created.manifestDigest });
+    expect(issued).toMatchObject({ state: "issued", version: 1 });
+    const source = await deliveries.downloadSource(recipient, f.input.workId, id, { operationId: randomUUID(), expectedVersion: 1, manifestDigest: created.manifestDigest });
+    expect(source.pages).toEqual(created.manifest.pages.map(({ path: _path, ...page }) => page)); expect(source.objects).toHaveLength(2);
+    const downloadOperation = randomUUID(), archive = { sha256: "e".repeat(64), byteLength: 1234 };
+    const delivered = await deliveries.confirmDownload(recipient, f.input.workId, id, { operationId: downloadOperation, expectedVersion: 1, manifestDigest: created.manifestDigest }, archive);
+    expect(delivered).toMatchObject({ state: "delivered", version: 2, archiveSha256: archive.sha256, archiveByteLength: archive.byteLength, canAccept: true });
+    expect(await deliveries.confirmDownload(recipient, f.input.workId, id, { operationId: downloadOperation, expectedVersion: 1, manifestDigest: created.manifestDigest }, archive)).toEqual(delivered);
+    const accepted = await deliveries.accept(recipient, f.input.workId, id, { operationId: randomUUID(), expectedVersion: 2, manifestDigest: created.manifestDigest, confirmed: true });
+    expect(accepted).toMatchObject({ state: "accepted", version: 3, canAccept: false });
+    await expect(pool.query(`UPDATE studio_review_delivery SET manifest=jsonb_set(manifest,'{title}','"changed"') WHERE id=$1`, [id])).rejects.toThrow("immutable");
+    await expect(pool.query(`UPDATE studio_review_delivery_event SET response='{}'::jsonb WHERE "deliveryId"=$1`, [id])).rejects.toThrow("immutable");
+    await expect(pool.query('DELETE FROM studio_review_delivery WHERE id=$1', [id])).rejects.toThrow("retained");
+  });
+
+  it("invalidates delivery receipt authority after collaborator revocation and reinvitation", async () => {
+    const f = await capture(1), captured = await completeCapture(f.actor, f.intent), recipient = randomUUID(); users.push(recipient);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [recipient, "Revoked delivery recipient"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'commenter','active',$3,now())`, [f.input.workId, recipient, randomUUID()]);
+    await graph.decideReview(f.actor, captured.subject.reviewId, { status: "approved" });
+    const Repository = (await import("./review-delivery/review-delivery.repository")).StudioReviewDeliveryRepository;
+    const deliveries = new Repository(pool), mode = "free" as const;
+    const profile = { contract: "studio-review-delivery-profile-v1" as const, id: "approved-review-original-zip" as const,
+      version: 1 as const, container: "zip-store" as const, includeReadme: true as const };
+    const statement = "Explicit owner attestation for this exact approved review delivery.";
+    const rightsGraphDigest = createHash("sha256").update(canonicalJson({ subject: captured.subject, recipient, mode, statement, profile })).digest("hex");
+    const id = randomUUID(), created = await deliveries.prepare(f.actor, f.input.workId, { id, operationId: randomUUID(), subject: captured.subject, title: "Bound recipient", recipientUserId: recipient,
+      profile, rights: { contract: "studio-review-delivery-rights-v1", statementVersion: 1, mode, rightsGraphDigest, confirmed: true, statement } });
+    const issued = await deliveries.issue(f.actor, f.input.workId, id, { operationId: randomUUID(), expectedVersion: 0, manifestDigest: created.manifestDigest });
+    await pool.query('DELETE FROM creator_work_collaborator WHERE "workId"=$1 AND "userId"=$2', [f.input.workId, recipient]);
+    await expect(deliveries.downloadSource(recipient, f.input.workId, id, { operationId: randomUUID(), expectedVersion: issued.version, manifestDigest: issued.manifestDigest })).rejects.toMatchObject({ response: { code: "studio_review_delivery_conflict" } });
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt") VALUES ($1,$2,'commenter','active',$3,now())`, [f.input.workId, recipient, randomUUID()]);
+    const visible = (await deliveries.list(recipient, f.input.workId)).items[0]!;
+    expect(visible).toMatchObject({ currentRecipientBinding: false, canDownload: false, canAccept: false });
+  });
+
   it("grants a non-owning share runtime only read/insert and the single revocation column", async () => {
     const f = await pinnedShareFixture(), role = `pinned_share_test_${randomUUID().replaceAll("-", "")}`;
     const { buildStudioProductionRuntimeAclSql, buildStudioProductionRuntimeAclViolationSql } = await import("../../../../../scripts/run-production-database-migrations.mjs");
@@ -760,6 +818,13 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     try {
       await pool.query(buildStudioProductionRuntimeAclSql(role));
       expect((await pool.query(`SELECT ${buildStudioProductionRuntimeAclViolationSql(role)} AS invalid`)).rows[0].invalid).toBe(false);
+      expect((await pool.query(`SELECT has_table_privilege($1,'public.studio_review_delivery','SELECT,INSERT') AS ok`, [role])).rows[0].ok).toBe(true);
+      expect((await pool.query(`SELECT has_table_privilege($1,'public.studio_review_delivery','UPDATE,DELETE,TRUNCATE') AS unsafe`, [role])).rows[0].unsafe).toBe(false);
+      expect((await pool.query(`SELECT has_column_privilege($1,'public.studio_review_delivery','state','UPDATE') AS state,
+        has_column_privilege($1,'public.studio_review_delivery','manifest','UPDATE') AS manifest`, [role])).rows[0]).toEqual({ state: true, manifest: false });
+      expect((await pool.query(`SELECT has_table_privilege($1,'public.studio_review_delivery_event','SELECT,INSERT') AS ok,
+        has_table_privilege($1,'public.studio_review_delivery_event','UPDATE,DELETE,TRUNCATE') AS unsafe,
+        has_sequence_privilege($1,'public.studio_review_delivery_event_sequence_seq','USAGE,SELECT') AS sequence`, [role])).rows[0]).toEqual({ ok: true, unsafe: false, sequence: true });
       const client = await pool.connect();
       try {
         await client.query("BEGIN"); await client.query(`SET LOCAL ROLE "${role}"`);

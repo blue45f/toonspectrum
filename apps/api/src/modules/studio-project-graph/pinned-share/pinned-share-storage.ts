@@ -42,7 +42,7 @@ export async function pinnedShareCapture(client: PoolClient, subject: Subject) {
   if (!rasters.success || rasters.data.some((page, i) => page.ordinal !== i)) return failShare("invalid-source");
   const approvalDigest = row[0].status === "approved" && row[0].decidedBy && row[0].decidedAt
     ? shareHash({ subject, decidedBy: row[0].decidedBy, decidedAt: row[0].decidedAt }) : null;
-  return { rasters: rasters.data, approvalDigest };
+  return { rasters: rasters.data, approvalDigest, decidedAt: approvalDigest ? row[0].decidedAt : null };
 }
 export async function pinnedShareImages(client: PoolClient, subject: Subject,
   capture: Awaited<ReturnType<typeof pinnedShareCapture>>, ordinals: readonly number[]): Promise<{ pages: PinnedSharePage[]; objects: LocatedPrivateObjectReference[] }> {

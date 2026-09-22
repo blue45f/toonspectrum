@@ -62,6 +62,8 @@ const DRIZZLE_SCHEMA_PATHS = Object.freeze([
   "apps/api/src/db/schema/production.schema.ts",
   "apps/api/src/db/schema/team-workspace.schema.ts",
   "apps/api/src/db/schema/operation-policy.schema.ts",
+  "apps/api/src/db/schema/pinned-review-share.schema.ts",
+  "apps/api/src/db/schema/review-delivery.schema.ts",
 ]);
 const BOOTSTRAP_CONTRACT_PATHS = Object.freeze([
   "package.json",
