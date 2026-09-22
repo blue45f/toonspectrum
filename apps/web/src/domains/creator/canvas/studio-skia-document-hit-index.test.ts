@@ -68,11 +68,12 @@ describe("retained Skia document hit index", () => {
     const elements = Array.from({ length: 10_000 }, (_, index) =>
       image(`image-${index}`, index * 2, 0, 1, 1)
     );
-    expect(runtime.sync(elements)).toHaveLength(10_000);
+    const firstRegions = runtime.sync(elements);
+    expect(firstRegions).toHaveLength(10_000);
     expect(runtime.stats()).toEqual({ size: 10_000, mutationSequence: 1 });
     expect(runtime.resolve({ x: 19_999, y: 0.5 }, 1)?.id).toBe("image-9999");
 
-    runtime.sync(elements);
+    expect(runtime.sync(elements)).toBe(firstRegions);
     expect(runtime.stats().mutationSequence).toBe(1);
 
     const replacement = image("image-9999", 40_000, 0, 1, 1);

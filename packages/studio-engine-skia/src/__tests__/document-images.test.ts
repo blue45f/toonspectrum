@@ -80,6 +80,34 @@ describe("retained GPU document image cache", () => {
     expect(texture.delete).toHaveBeenCalledOnce();
   });
 
+  it("fails closed when an image loader ignores cancellation and exceeds its deadline", async () => {
+    vi.useFakeTimers();
+    try {
+      const cache = createSkiaDocumentImageCache(
+        () => new Promise<ImageBitmap>(() => undefined),
+        10,
+      );
+      const surface = {
+        makeImageFromTextureSource: vi.fn(),
+      } as unknown as Surface;
+      const preparing = cache.prepare(
+        [imageItem("data:image/png;base64,timeout")],
+        surface,
+        new AbortController().signal,
+      );
+      const rejection = expect(preparing).rejects.toThrow(
+        "GPU image preparation timed out",
+      );
+      await vi.advanceTimersByTimeAsync(11);
+      await rejection;
+      expect(cache.size).toBe(0);
+      expect(surface.makeImageFromTextureSource).not.toHaveBeenCalled();
+      cache.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("isolates rounded, skewed, blended shadow images exactly once", async () => {
     const texture = { width: () => 4, height: () => 3, delete: vi.fn() } as unknown as Image;
     const cache = createSkiaDocumentImageCache(async () => bitmap());
@@ -107,6 +135,7 @@ describe("retained GPU document image cache", () => {
     }));
     let paintIndex = 0;
     const filter = { delete: vi.fn() };
+    const makeDropShadow = vi.fn((..._args: unknown[]) => filter);
     const canvas = {
       save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(),
       skew: vi.fn(), scale: vi.fn(), clipRRect: vi.fn(), saveLayer: vi.fn(),
@@ -117,7 +146,7 @@ describe("retained GPU document image cache", () => {
       FilterMode: { Linear: 1 }, MipmapMode: { None: 0 },
       BlendMode: { SrcOver: 1, Multiply: 2 }, ClipOp: { Intersect: 1 },
       RRectXY: vi.fn((rect: unknown, rx: number, ry: number) => ({ rect, rx, ry })),
-      ImageFilter: { MakeDropShadow: vi.fn(() => filter) },
+      ImageFilter: { MakeDropShadow: makeDropShadow },
     } as unknown as CanvasKit;
 
     cache.draw(ck, canvas as never, effect);
@@ -126,9 +155,16 @@ describe("retained GPU document image cache", () => {
     expect(canvas.saveLayer).toHaveBeenCalledOnce();
     expect(paints[1]!.setAlphaf).toHaveBeenCalledWith(0.5);
     expect(paints[1]!.setBlendMode).toHaveBeenCalledWith(2);
-    expect(ck.ImageFilter.MakeDropShadow).toHaveBeenCalledWith(
-      4, -3, 4, 4, [0.1, 0.2, 0.3, 0.3], null,
-    );
+    expect(makeDropShadow).toHaveBeenCalledOnce();
+    const shadowCall = makeDropShadow.mock.calls[0]!;
+    expect(shadowCall.slice(0, 4)).toEqual([4, -3, 4, 4]);
+    expect(shadowCall[4]).toBeInstanceOf(Float32Array);
+    const shadowColor = shadowCall[4] as Float32Array;
+    expect(shadowColor[0]).toBeCloseTo(0.1);
+    expect(shadowColor[1]).toBeCloseTo(0.2);
+    expect(shadowColor[2]).toBeCloseTo(0.3);
+    expect(shadowColor[3]).toBeCloseTo(0.3);
+    expect(shadowCall[5]).toBeNull();
     expect(canvas.drawImageRectOptions).toHaveBeenCalledOnce();
     expect(filter.delete).toHaveBeenCalledOnce();
     expect(paints.every((paint) => paint.delete.mock.calls.length === 1)).toBe(true);

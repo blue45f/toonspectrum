@@ -194,6 +194,9 @@ export function createStudioSkiaDocumentHitIndex() {
         (id) => !nextGeometries.has(id),
       );
       const mutationCount = changed.length + removed.length;
+      if (mutationCount === 0 && nextGeometries.size === geometries.size) {
+        return regions;
+      }
       const rebuildThreshold = Math.max(64, Math.ceil(nextGeometries.size / 4));
       let synchronized = true;
       if (geometries.size === 0 || mutationCount > rebuildThreshold) {
