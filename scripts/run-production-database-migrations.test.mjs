@@ -1447,6 +1447,8 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_review",
     "studio_review_comment",
     "studio_review_comment_assignee",
+    "studio_review_delivery",
+    "studio_review_delivery_event",
     "studio_review_policy",
     "studio_review_policy_event",
     "studio_review_reviewer",
