@@ -961,10 +961,11 @@ export function StudioVirtualSpacePhaserCanvas({
         });
         portalTracker.seed(portals, initialPoint);
         zoneTracker.seed(studioWorldPresenceZone(manifest, initialPoint)?.id ?? null);
-        zoneNote = document.createElement("p");
-        zoneNote.hidden = true;
-        zoneNote.setAttribute("role", "status");
-        Object.assign(zoneNote.style, {
+        const note = document.createElement("p");
+        zoneNote = note;
+        note.hidden = true;
+        note.setAttribute("role", "status");
+        Object.assign(note.style, {
           position: "absolute", top: "12px", left: "50%", transform: "translateX(-50%)",
           zIndex: "6", margin: "0", padding: "6px 12px", borderRadius: "999px",
           background: "#14120fd9", color: "#f6edd8", font: "700 12px/1.2 Pretendard, sans-serif",
@@ -981,8 +982,8 @@ export function StudioVirtualSpacePhaserCanvas({
           cursor: "pointer",
         });
         unstuckButton.addEventListener("click", () => bridge.requestUnstuck());
-        parent.append(zoneNote, unstuckButton);
-        cleanup.push(() => { zoneNote.remove(); unstuckButton.remove(); });
+        parent.append(note, unstuckButton);
+        cleanup.push(() => { note.remove(); unstuckButton.remove(); });
         sceneReady = true;
         globalThis.clearTimeout(bootDeadline);
         setFailure(false);
