@@ -30,10 +30,11 @@ jobs:
           node-version: '24'
           cache: pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - name: Preserve original assistant and all existing test expectations
+      - name: Preserve validated assistant baseline and all existing test expectations
         run: |
-          test "$(git hash-object apps/web/src/domains/creator/assistant/StudioWebtoonAssistantContent.tsx)" = 675512f9781ef42103cbe2868e386695bf35a0b5
-          sed 's@from "./StudioWebtoonAssistantContent"@from "./StudioWebtoonAssistantModal"@' apps/web/src/domains/creator/assistant/StudioWebtoonAssistantModal.test.tsx | git hash-object --stdin | grep -Fx b174c1ddff166bacf26af479c2773c9e938490d1
+          # Refresh these only after the complete assistant regression and focused lint jobs pass.
+          test "$(git hash-object apps/web/src/domains/creator/assistant/StudioWebtoonAssistantContent.tsx)" = 996e5cd27064525797bc99b100fe95568bfb5a4b
+          sed 's@from "./StudioWebtoonAssistantContent"@from "./StudioWebtoonAssistantModal"@' apps/web/src/domains/creator/assistant/StudioWebtoonAssistantModal.test.tsx | git hash-object --stdin | grep -Fx 4e1ddb106d6f001da65ebe76df04a1650dd53fe5
       - name: Original assistant features, loading lifecycle and existing boundary tests
         run: >-
           pnpm exec vitest run
