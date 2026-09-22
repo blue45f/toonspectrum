@@ -16,6 +16,7 @@ import type {
 } from "canvaskit-wasm";
 
 export const SKIA_DOCUMENT_IMAGE_TEXTURE_BUDGET = 64 * 1024 * 1024;
+export const SKIA_DOCUMENT_IMAGE_PREPARATION_TIMEOUT_MS = 15_000;
 
 export class SkiaDocumentImageAdmissionError extends Error {
   override readonly name = "SkiaDocumentImageAdmissionError";
@@ -86,7 +87,11 @@ function drawTexture(
 
 export function createSkiaDocumentImageCache(
   loader: SkiaDocumentImageBitmapLoader = loadSkiaDocumentImageBitmap,
+  preparationTimeoutMs = SKIA_DOCUMENT_IMAGE_PREPARATION_TIMEOUT_MS,
 ) {
+  if (!Number.isFinite(preparationTimeoutMs) || preparationTimeoutMs <= 0) {
+    throw new Error("Invalid GPU image preparation timeout");
+  }
   const textures = new Map<string, { image: Image; bytes: number }>();
   let disposed = false;
   const byteSize = () => [...textures.values()].reduce((sum, entry) => sum + entry.bytes, 0);
@@ -112,12 +117,24 @@ export function createSkiaDocumentImageCache(
         const controller = new AbortController();
         const onAbort = () => controller.abort(signal.reason);
         signal.addEventListener("abort", onAbort, { once: true });
-        const timer = setTimeout(() => controller.abort(new Error("GPU image preparation timed out")), 15_000);
-        const loading = loader(src, controller.signal);
+        if (signal.aborted) onAbort();
+        const timer = setTimeout(
+          () => controller.abort(new Error("GPU image preparation timed out")),
+          preparationTimeoutMs,
+        );
+        const loading = Promise.resolve().then(
+          () => loader(src, controller.signal),
+        );
         let bitmap: ImageBitmap | null = null;
         try {
           const abortPromise = new Promise<never>((_, reject) => {
-            const rejectAbort = () => reject(controller.signal.reason);
+            const rejectAbort = () => reject(
+              controller.signal.reason ?? new Error("GPU image preparation aborted"),
+            );
+            if (controller.signal.aborted) {
+              rejectAbort();
+              return;
+            }
             controller.signal.addEventListener("abort", rejectAbort, { once: true });
             void loading.then(
               () => controller.signal.removeEventListener("abort", rejectAbort),
@@ -178,7 +195,7 @@ export function createSkiaDocumentImageCache(
             item.shadow.offsetY,
             item.shadow.blur / 2,
             item.shadow.blur / 2,
-            ck.Color4f(
+            Float32Array.of(
               item.shadow.color.r,
               item.shadow.color.g,
               item.shadow.color.b,
