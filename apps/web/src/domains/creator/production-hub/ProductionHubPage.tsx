@@ -16,6 +16,7 @@ import { ProductionVisualPlanningWorkspace } from "./ProductionVisualPlanningWor
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
+import { ProductionManuscriptWorkspace } from "./ProductionManuscriptWorkspace";
 import { ProductionOperationsControlWorkspace } from "./ProductionOperationsControlWorkspace";
 import { executeProductionCommand, getProductionPersonalInbox, getProductionProject, listProductionProjects, type ProductionClientCommand, type ProductionPersonalInboxItem, type ProductionProjectAccess, type ProductionProjectSummary } from "./production-api";
 
@@ -30,6 +31,7 @@ export type ProductionProjectSurface =
   | "overview"
   | "planning"
   | "episodes"
+  | "manuscripts"
   | "production"
   | "schedule"
   | "control"
@@ -88,6 +90,7 @@ const SURFACES: readonly {
   { id: "overview", label: "프로젝트 홈", description: "오늘 할 일과 막힌 작업", icon: LayoutDashboard },
   { id: "planning", label: "기획", description: "작품·시즌·장면 기준", icon: BookOpenText },
   { id: "episodes", label: "회차", description: "회차별 상태와 원고", icon: PanelTopOpen },
+  { id: "manuscripts", label: "원고·버전", description: "공정·비교·피드백·공유", icon: Layers3 },
   { id: "production", label: "작업 보드", description: "담당자와 진행 상태", icon: Workflow },
   { id: "schedule", label: "일정", description: "마감과 작업량 확인", icon: CalendarClock },
   { id: "control", label: "운영 제어", description: "임계경로·연재·자동화", icon: GitBranch },
@@ -1309,6 +1312,7 @@ function SurfaceContent({
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} executeStrict={executeStrict} canEdit={canEdit} isDemo={isDemo} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
+    case "manuscripts": return <ProductionManuscriptWorkspace aggregate={aggregate} canEdit={canEdit} isDemo={isDemo} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={canEdit} canManage={canManage} />;
@@ -1440,7 +1444,7 @@ export function ProductionEpisodeRoomPage() {
         <div className="mx-auto max-w-[100rem]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><Link className="text-xs font-semibold text-fg-3 hover:text-accent" to={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "en", "/production/projects/{v0}/episodes"), { v0: String(aggregate.projectId) })}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "← 회차 목록")}</Link><h1 className="mt-1 text-2xl font-black text-fg">{episode.episodeId} {translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "공동 회차 작업실")}</h1></div>
-            <div className="flex items-center gap-2"><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>{readiness ? <Pill tone={readiness.ready ? "success" : "danger"}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "넘기기 준비도 ")}{readiness.score}</Pill> : null}</div>
+            <div className="flex flex-wrap items-center gap-2"><Link className={buttonClass({ variant: "outline", size: "sm" })} to={`/production/projects/${encodeURIComponent(aggregate.projectId)}/manuscripts?episode=${encodeURIComponent(episode.episodeId)}`}>원고·버전</Link><Pill tone={stateTone(episode.state)}>{EPISODE_STATE_LABELS[episode.state]}</Pill>{readiness ? <Pill tone={readiness.ready ? "success" : "danger"}>{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "넘기기 준비도 ")}{readiness.score}</Pill> : null}</div>
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1">{pipeline.map((step) => <TimelineStep key={step.label} {...step} />)}</div>
         </div>
