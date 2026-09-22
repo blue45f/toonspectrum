@@ -1,6 +1,8 @@
-import type {
-  StudioCommittedInkSurfaceHandoff,
-  StudioCommittedInkVisibleDrawRequest,
+import {
+  createStudioCommittedInkSurfaceHandoff,
+  sumStudioCommittedInkHandoffSurfaceCounts,
+  type StudioCommittedInkSurfaceHandoff,
+  type StudioCommittedInkVisibleDrawRequest,
 } from "./studio-committed-ink-handoff-coordinator";
 import type { StudioRenderSurfaceAuthority } from "./render/StudioRenderSurface";
 
@@ -131,8 +133,6 @@ export function decideStudioSkiaCommittedInkDraw(
     request,
   );
   if (authorityMatches) {
-    // `active` ownership has already unmounted the Konva document paint tree. Until the exact
-    // GPU canvas is visibly receipted, retained live ink is the only safe fail-visible surface.
     if (authority?.status === "active") return { status: "hold" };
     if (authority?.status === "starting") {
       if (deferAttempt < maxDeferAttempts) {
@@ -143,8 +143,6 @@ export function decideStudioSkiaCommittedInkDraw(
     return { status: "fallback" };
   }
 
-  // Child layout effects publish the first `starting` authority after the parent handoff effect.
-  // Give that publication one frame; an unsupported page then falls back without hiding ink.
   if (deferAttempt === 0 && maxDeferAttempts > 0) {
     return { status: "wait", nextDeferAttempt: 1 };
   }
@@ -169,6 +167,48 @@ export function canStudioSkiaPublishOverSettledInk(
     + head.gpuSettledCount;
   return reservedSurfaceCount > 0
     && ownsEveryStroke(new Set(candidate.ownedDocumentIds), head.strokeIds);
+}
+
+export interface StudioCommittedInkQueueSnapshot {
+  readonly pageId: string;
+  readonly strokeIds: readonly string[];
+  readonly overlaySettledCount: number;
+  readonly draftSettledCount: number;
+  readonly gpuSettledCount: number;
+  readonly queuedRevision: number;
+}
+
+export function appendStudioCommittedInkHandoff(
+  queue: readonly StudioCommittedInkSurfaceHandoff[],
+  snapshot: StudioCommittedInkQueueSnapshot,
+): readonly StudioCommittedInkSurfaceHandoff[] {
+  const reserved = sumStudioCommittedInkHandoffSurfaceCounts(queue);
+  const overlaySettledCount = Math.max(
+    0,
+    snapshot.overlaySettledCount - reserved.overlay,
+  );
+  const draftSettledCount = Math.max(
+    0,
+    snapshot.draftSettledCount - reserved.draft,
+  );
+  const gpuSettledCount = Math.max(
+    0,
+    snapshot.gpuSettledCount - reserved.gpu,
+  );
+  if (overlaySettledCount + draftSettledCount + gpuSettledCount === 0) {
+    return queue;
+  }
+  return [
+    ...queue,
+    createStudioCommittedInkSurfaceHandoff({
+      pageId: snapshot.pageId,
+      strokeIds: [...new Set(snapshot.strokeIds)],
+      overlaySettledCount,
+      draftSettledCount,
+      gpuSettledCount,
+      queuedRevision: snapshot.queuedRevision,
+    }),
+  ];
 }
 
 export interface StudioSkiaCommittedInkHostRuntime {
