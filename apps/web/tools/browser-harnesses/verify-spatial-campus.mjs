@@ -152,6 +152,40 @@ async function verifyMobileMarketReturnNotice() {
   }
 }
 
+async function verifyMobilePresentationPrivacy() {
+  const context = await contextFor(320, 844);
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(new URL("/fortune?content=dream", origin).href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const input = page.getByRole("textbox", { name: /기억나는 꿈의 장면/ });
+    await input.fill("mobile private dream");
+    const inputHandle = await input.elementHandle();
+    assert.ok(inputHandle, "mobile private input must have a stable mounted element");
+    await page.getByRole("button", { name: "공개 화면 모드 켜기", exact: true }).click();
+
+    const curtain = page.getByRole("region", { name: "개인 작업 보호" });
+    await curtain.waitFor();
+    const rect = await curtain.boundingBox();
+    assert.ok(rect, "mobile privacy curtain must have a layout box");
+    assert.ok(rect.x >= -0.5 && rect.x + rect.width <= 320.5, "mobile privacy curtain must stay inside the viewport");
+    assert.ok(rect.y >= 0 && rect.y + rect.height <= 844.5, "mobile privacy curtain must stay inside the visual viewport");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    assert.equal(await inputHandle.isVisible(), false);
+    assert.equal(await inputHandle.inputValue(), "mobile private dream");
+    await page.getByText(/전체 화면 공유 중인 다른 앱과 운영체제 알림/u).waitFor();
+    await page.screenshot({ path: `${output}/mobile-presentation-privacy.png` });
+    await page.getByRole("button", { name: "가림 해제", exact: true }).click();
+    await input.waitFor({ state: "visible" });
+    assert.equal(await input.inputValue(), "mobile private dream");
+    assert.deepEqual(errors, []);
+    report.interactions.push("The 320px presentation-privacy curtain stays inside the viewport and restores the same private input");
+  } finally {
+    await context.close();
+  }
+}
+
 async function verifySceneFailureIsolation() {
   const context = await contextFor(1440);
   await context.addInitScript(() => {
@@ -240,6 +274,8 @@ try {
   await page.goto(new URL("/fortune?content=dream", origin).href);
   const input = page.getByRole("textbox", { name: /기억나는 꿈의 장면/ });
   await input.fill("QA only private dream");
+  const inputHandle = await input.elementHandle();
+  assert.ok(inputHandle, "private fortune input must have a stable mounted element");
   for (const mode of ["업무", "집중", "공간"]) {
     await page.locator(".campus-modes").getByRole("button", { name: mode, exact: true }).click();
     assert.equal(await input.inputValue(), "QA only private dream");
@@ -247,6 +283,17 @@ try {
   }
   assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes("QA only private dream")), false);
   report.interactions.push("Private fortune input survives all view modes without URL or storage leakage");
+  await page.getByRole("button", { name: "공개 화면 모드 켜기", exact: true }).click();
+  await page.getByRole("region", { name: "개인 작업 보호" }).waitFor();
+  assert.equal(await inputHandle.isVisible(), false);
+  assert.equal(await inputHandle.inputValue(), "QA only private dream");
+  assert.equal(await page.locator(".campus-private-content").getAttribute("aria-hidden"), "true");
+  assert.equal(await page.locator(".campus-private-content").getAttribute("inert"), "");
+  assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes("QA only private dream")), false);
+  await page.getByRole("button", { name: "가림 해제", exact: true }).click();
+  await input.waitFor({ state: "visible" });
+  assert.equal(await input.inputValue(), "QA only private dream");
+  report.interactions.push("Presentation privacy hides the mounted private domain and restores the same in-memory input without URL or storage writes");
   await page.getByRole("button", { name: "공간 지도 열기", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "창작 세계의 공간 지도" });
   assert.equal(await dialog.locator(".campus-place").count(), 9);
@@ -264,18 +311,29 @@ try {
   await page.keyboard.down("ArrowRight");
   await page.waitForTimeout(450);
   await page.keyboard.up("ArrowRight");
+  await page.waitForTimeout(250);
   const afterWalk = await pose();
   assert.ok(Math.hypot(afterWalk.x - beforeWalk.x, afterWalk.y - beforeWalk.y) > 3, "Arrow input must move the actor, not only focus a canvas");
   await page.screenshot({ path: `${output}/local-phaser-walk.png` });
+  await page.locator(".campus-modes").getByRole("button", { name: "업무", exact: true }).click();
+  assert.equal(await canvas.count(), 0);
+  await page.locator(".campus-modes").getByRole("button", { name: "공간", exact: true }).click();
+  await page.getByRole("button", { name: "공용 아틀리에 걷기", exact: true }).click();
+  await page.locator('[data-studio-engine-status="ready"]').waitFor({ timeout: 60000 });
+  await page.locator("[data-campus-walk-x][data-campus-walk-y]").waitFor();
+  const resumedPose = await pose();
+  assert.ok(Math.hypot(resumedPose.x - afterWalk.x, resumedPose.y - afterWalk.y) < 1,
+    `Space mode must resume the tab-local actor position after the room remounts: ${JSON.stringify({ afterWalk, resumedPose })}`);
   await page.getByRole("button", { name: "걷기 멈추기", exact: true }).click();
   assert.equal(await canvas.count(), 0);
   assert.equal(await input.inputValue(), "QA only private dream");
   assert.deepEqual(interactionErrors, [], "Runtime errors during domain and Phaser interactions");
-  report.interactions.push("Existing Phaser canvas boots locally; keyboard input measurably moves the actor, stop unmounts the canvas and the domain form is preserved");
+  report.interactions.push("Existing Phaser movement survives a full Space → Task → Space room remount without leaking the private domain form");
   await context.close();
   await verifyNestedWorkspaceScrollRestoration();
   await verifyMarketStudioRoundTrip();
   await verifyMobileMarketReturnNotice();
+  await verifyMobilePresentationPrivacy();
   await verifySceneFailureIsolation();
 } catch (error) {
   report.error = error instanceof Error ? error.message : String(error);

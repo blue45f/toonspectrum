@@ -11,8 +11,12 @@ import {
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 /** Own both processes, reject occupied ports, and restrict writes to a local test DB.
- * The shared isolated-API environment excludes local .env files and paid services. */
-export async function withStudioReviewHostQaRuntime(environment, verify) {
+ * The shared isolated-API environment excludes local .env files and paid services.
+ * @param {NodeJS.ProcessEnv} environment
+ * @param {(context: {origin: URL, databaseTarget: import("./isolated-market-api.mjs").IsolatedMarketApiTarget}) => Promise<unknown>} verify
+ * @param {{localReviewStorage?: import("./studio-review-local-storage-config.mjs").StudioReviewLocalStorageOptions}} options
+ */
+export async function withStudioReviewHostQaRuntime(environment, verify, options = {}) {
   const web = new URL(environment.STUDIO_QA_BASE_URL ?? "http://127.0.0.1:5181/");
   // These exact development origins are already supported by the real CSRF/CORS
   // contract; do not widen or bypass that contract just for the browser probe.
@@ -26,7 +30,10 @@ export async function withStudioReviewHostQaRuntime(environment, verify) {
     environment,
   });
   await requireUnusedApiTarget({ apiOrigin: web.origin, apiPort: Number(web.port) });
-  const api = await startIsolatedMarketApi(target, { environment });
+  if (options.localReviewStorage && Number(new URL(options.localReviewStorage.endpoint).port) === Number(web.port)) {
+    throw new Error("Studio QA storage and web must have distinct loopback ports.");
+  }
+  const api = await startIsolatedMarketApi(target, { environment, localReviewStorage: options.localReviewStorage });
   let webProcess;
   try {
     webProcess = spawn("pnpm", ["exec", "vite", "--host", web.hostname, "--port", web.port, "--strictPort"], {

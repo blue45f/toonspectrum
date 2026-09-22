@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Map, X } from "lucide-react";
+import { ArrowLeft, EyeOff, Map, X } from "lucide-react";
 import { useI18n } from "@/shared/lib/i18n";
 import { CAMPUS_DISTRICTS, type CampusMode } from "@/shared/lib/spatial-campus/campus-model";
 import { WorkspaceContextPanel } from "../workspace/WorkspaceContextPanel";
@@ -34,6 +34,20 @@ function CampusControlsView({ campus, compact }: { readonly campus: CampusContex
       {modes.map(([mode, ko, en]) => <button key={mode} type="button" aria-pressed={campus.mode === mode}
         onClick={() => campus.setMode(mode)}>{locale === "ko" ? ko : en}</button>)}
     </div>}
+    {!compact && campus.binding.surface === "room" && campus.privacySensitive ? <button
+      type="button"
+      className="campus-control campus-privacy-toggle"
+      aria-pressed={campus.privacyMode}
+      aria-label={locale === "ko"
+        ? campus.privacyMode ? "개인 화면 보기" : "공개 화면 모드 켜기"
+        : campus.privacyMode ? "Show private view" : "Enable presentation privacy"}
+      onClick={() => campus.setPrivacyMode(!campus.privacyMode)}
+    >
+      <EyeOff size={17} aria-hidden="true" />
+      <span>{locale === "ko"
+        ? campus.privacyMode ? "가림 해제" : "공개 화면"
+        : campus.privacyMode ? "Reveal" : "Privacy"}</span>
+    </button> : null}
     {!compact && campus.returnHref && <Link className="campus-control" to={campus.returnHref}>
       <ArrowLeft size={16} aria-hidden="true" />{locale === "ko" ? "작업으로 돌아가기" : "Return to work"}
     </Link>}

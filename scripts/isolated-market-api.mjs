@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validatePostgresIntegrationUrl } from "./run-postgres-integration-tests.mjs";
+import { createStudioReviewLocalStorageEnvironment } from "./studio-review-local-storage-config.mjs";
 
 const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const API_ROOT = resolve(REPOSITORY_ROOT, "apps/api");
@@ -216,9 +217,14 @@ export async function requireUnusedApiTarget(target) {
   });
 }
 
+/** @param {IsolatedMarketApiTarget} target
+ * @param {NodeJS.ProcessEnv} environment
+ * @param {import("./studio-review-local-storage-config.mjs").StudioReviewLocalStorageOptions | undefined} localReviewStorage
+ */
 export function createIsolatedMarketApiEnvironment(
   target,
   environment = process.env,
+  localReviewStorage = undefined,
 ) {
   const safeEnvironment = Object.fromEntries(
     SAFE_PARENT_ENV_KEYS.flatMap((key) =>
@@ -249,6 +255,7 @@ export function createIsolatedMarketApiEnvironment(
     SUPABASE_OBJECT_STORAGE_ENABLED: "false",
     TEST_DATABASE_URL: target.databaseUrl,
     UPSTASH_COORDINATION_ENABLED: "false",
+    ...createStudioReviewLocalStorageEnvironment(localReviewStorage, [target.apiPort]),
   };
 }
 
@@ -279,6 +286,7 @@ async function requireRunningApi(apiOrigin, child) {
  * @param {{
  *   environment?: NodeJS.ProcessEnv,
  *   onSpawn?: (child: import("node:child_process").ChildProcess) => void,
+ *   localReviewStorage?: import("./studio-review-local-storage-config.mjs").StudioReviewLocalStorageOptions,
  * }} [options]
  */
 export async function startIsolatedMarketApi(target, options = {}) {
@@ -290,7 +298,7 @@ export async function startIsolatedMarketApi(target, options = {}) {
     {
       cwd: API_ROOT,
       detached: process.platform !== "win32",
-      env: createIsolatedMarketApiEnvironment(target, environment),
+      env: createIsolatedMarketApiEnvironment(target, environment, options.localReviewStorage),
       stdio: "inherit",
     },
   );
