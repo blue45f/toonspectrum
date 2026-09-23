@@ -238,6 +238,7 @@
     "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts"
   },
   "dependencies": {
+    "@automerge/automerge": "3.5.0",
     "@babylonjs/core": "9.19.0",
     "@babylonjs/loaders": "9.19.0",
     "@capacitor/android": "8.5.2",

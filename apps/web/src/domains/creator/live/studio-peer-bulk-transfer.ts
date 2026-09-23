@@ -14,6 +14,7 @@ export const STUDIO_PEER_BULK_SEND_WINDOW = 8;
 export const STUDIO_PEER_BULK_KINDS = [
   "work-asset",
   "recovery-package",
+  "offline-branch",
   "library-cas",
   "clipboard-attachment",
   "reference-capture",
