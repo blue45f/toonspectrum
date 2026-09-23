@@ -27,6 +27,12 @@ describe("buttonClass touch targets", () => {
     expect(large).not.toContain("pointer-coarse:h-11");
   });
 
+  it("keeps quiet labels on the primary foreground token across signature themes", () => {
+    const classes = buttonClass({ variant: "quiet", size: "sm" }).split(/\s+/u);
+    expect(classes).toContain("text-fg");
+    expect(classes).not.toContain("text-fg-2");
+  });
+
   it("still composes variant and caller classes", () => {
     const composed = buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" });
     expect(composed).toContain("gap-1.5");

@@ -117,7 +117,7 @@ export function MarketplaceBrushPublishShortcut({
           aria-busy={busy}
           onClick={() => void publish()}
           disabled={busy}
-          className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-xs font-bold text-accent-fg disabled:cursor-wait disabled:opacity-60"
+          className="min-h-11 shrink-0 rounded-xl bg-accent px-4 text-xs font-bold text-on-accent disabled:cursor-wait disabled:opacity-60"
         >
           {busy ? "준비 중" : "등록 준비"}
         </button>

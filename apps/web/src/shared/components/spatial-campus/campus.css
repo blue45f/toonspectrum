@@ -69,14 +69,14 @@
 .campus-public-objects a>span{min-width:0;flex:1;overflow-wrap:anywhere}
 .campus-public-objects img{width:48px;height:48px;object-fit:contain;border-radius:6px}
 .campus-public-objects a:focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
-.fortune-campus-directory{padding:8px 0 16px;color:var(--color-fg)}
+.fortune-campus-directory{padding:8px 0 16px;color:var(--fo-ink,var(--color-fg))}
 .fortune-campus-directory h1{font-size:clamp(24px,3cqi,32px);line-height:1.35;margin:0}
-.fortune-campus-directory p{font-size:14px;line-height:1.7;color:var(--color-fg-2);margin:8px 0 12px}
+.fortune-campus-directory p{font-size:14px;line-height:1.7;color:var(--fo-muted,var(--color-fg-2));margin:8px 0 12px}
 .fortune-campus-directory nav{display:flex;gap:8px;flex-wrap:wrap}
-.fortune-campus-directory button{min-height:44px;padding:10px 12px;border:1px solid var(--color-line);border-radius:10px;font-size:13px;background:var(--color-panel);color:var(--color-fg)}
-.fortune-campus-directory button[aria-pressed=true]{border-color:var(--color-accent);background:var(--color-accent-soft);color:var(--color-accent)}
-.fortune-campus-directory button:focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
-[data-campus-domain=fortune]{padding:0!important;max-width:none!important;background:transparent!important}
+.fortune-campus-directory button{min-height:44px;padding:10px 12px;border:1px solid var(--fo-line,var(--color-line));border-radius:10px;font-size:13px;background:var(--fo-panel,var(--color-panel));color:var(--fo-ink,var(--color-fg))}
+.fortune-campus-directory button[aria-pressed=true]{border-color:var(--fo-gold,var(--color-accent));background:var(--fo-panel,var(--color-panel));color:var(--fo-gold,var(--color-accent));box-shadow:inset 0 0 0 1px var(--fo-gold,var(--color-accent))}
+.fortune-campus-directory button:focus-visible{outline:2px solid var(--fo-gold,var(--color-accent));outline-offset:3px}
+[data-campus-domain=fortune]{padding:0!important;max-width:none!important;background:var(--fo-bg)!important}
 [data-campus-domain=fortune] .fo-workbench{scroll-margin-top:16px}
 @container(max-width:650px){
  [data-campus-domain=fortune] .fo-work-head{flex-wrap:wrap}

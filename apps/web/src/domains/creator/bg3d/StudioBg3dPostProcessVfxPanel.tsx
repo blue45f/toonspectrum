@@ -84,7 +84,7 @@ export function StudioBg3dPostProcessVfxPanel({
             onClick={handleToggleDof}
             className={`rounded px-2 py-0.5 font-mono text-[0.65rem] font-bold transition-all ${
               config.dof.enabled
-                ? "bg-accent text-accent-fg"
+                ? "bg-accent text-on-accent"
                 : "border border-line bg-raised text-fg-2 hover:text-fg"
             }`}
           >
@@ -133,7 +133,7 @@ export function StudioBg3dPostProcessVfxPanel({
                     }}
                     className={`rounded px-1.5 py-0.5 font-mono text-[0.65rem] font-bold ${
                       config.dof.fStop === f
-                        ? "bg-accent text-accent-fg"
+                        ? "bg-accent text-on-accent"
                         : "border border-line bg-raised text-fg-2 hover:text-fg"
                     }`}
                   >
@@ -158,7 +158,7 @@ export function StudioBg3dPostProcessVfxPanel({
             onClick={handleToggleBloom}
             className={`rounded px-2 py-0.5 font-mono text-[0.65rem] font-bold transition-all ${
               config.bloom.enabled
-                ? "bg-accent text-accent-fg"
+                ? "bg-accent text-on-accent"
                 : "border border-line bg-raised text-fg-2 hover:text-fg"
             }`}
           >
@@ -197,7 +197,7 @@ export function StudioBg3dPostProcessVfxPanel({
       <button
         type="button"
         onClick={() => onApplyPostProcessConfig?.(config)}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
         <span>3D 뷰포트에 렌즈 PostFX 적용</span>

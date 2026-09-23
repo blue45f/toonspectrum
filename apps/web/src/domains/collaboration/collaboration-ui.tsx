@@ -11,8 +11,9 @@ import type { ReactNode } from "react";
 import Link from "@/compat/router-link";
 
 export const collabInput = "mt-2 min-h-11 w-full rounded-xl border border-line-strong bg-canvas px-3 py-2.5 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-50";
-export const collabButton = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line-strong bg-panel px-4 py-2 text-sm font-semibold text-fg transition-colors hover:border-accent/60 hover:bg-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
-export const collabPrimary = `${collabButton} border-accent bg-accent text-on-accent hover:bg-accent-2`;
+const collabButtonBase = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+export const collabButton = `${collabButtonBase} border-line-strong bg-panel text-fg hover:border-accent/60 hover:bg-raised`;
+export const collabPrimary = `${collabButtonBase} border-accent bg-accent text-on-accent hover:bg-accent-2`;
 export function CollabField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return <label className="block min-w-0 text-sm font-semibold text-fg">{label}{children}{hint && <span className="mt-2 block text-xs font-normal leading-relaxed text-fg-3">{hint}</span>}</label>;
 }

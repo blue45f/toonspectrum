@@ -13,7 +13,7 @@ const variants: Record<Variant, string> = {
     "border border-line-strong/90 text-fg hover:border-accent/70 hover:bg-accent-soft/80 hover:text-accent active:text-on-accent active:bg-accent",
   ghost: "text-fg hover:bg-raised hover:text-fg",
   quiet:
-    "text-fg-2 hover:text-fg hover:bg-raised/60 focus-visible:bg-raised/60",
+    "text-fg hover:bg-raised/60 focus-visible:bg-raised/60",
 };
 
 /**

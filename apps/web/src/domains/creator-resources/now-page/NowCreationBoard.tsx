@@ -36,7 +36,7 @@ function IngredientCard({
 }) {
   return (
     <article className="group relative min-h-52 overflow-hidden rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-accent/35 sm:p-6">
-      <span className="absolute right-4 top-2 font-display text-6xl font-black tabular-nums text-fg/5" aria-hidden="true">
+      <span className="absolute right-4 top-2 font-display text-6xl font-black tabular-nums text-fg-3" aria-hidden="true">
         {index}
       </span>
       <div className="relative flex items-center justify-between gap-3">

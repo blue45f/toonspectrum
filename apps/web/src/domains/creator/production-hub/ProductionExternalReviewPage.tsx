@@ -181,7 +181,7 @@ export function ProductionExternalReviewPage() {
           {view.submissions.map((submission, index) => (
             <article key={submission.id} className="relative overflow-hidden rounded-3xl border border-line bg-card p-5 sm:p-6">
               {view.review.watermark ? (
-                <div className="pointer-events-none absolute -right-10 top-8 rotate-12 text-5xl font-black text-fg/5" aria-hidden="true">REVIEW</div>
+                <div className="pointer-events-none absolute -right-10 top-8 rotate-12 text-5xl font-black text-fg-3" aria-hidden="true">REVIEW</div>
               ) : null}
               <div className="relative">
                 <div className="flex flex-wrap items-center justify-between gap-3">

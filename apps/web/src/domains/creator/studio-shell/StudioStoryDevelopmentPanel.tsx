@@ -216,7 +216,7 @@ export function StudioStoryDevelopmentPanel({
                 item.id === chapter.id ? "border-accent bg-accent-soft text-accent" : "border-transparent text-fg-2 hover:bg-raised",
               )}>
                 <span className="block truncate">{item.title || bt("제목 없음", "Untitled")}</span>
-                <span className="mt-0.5 block text-[0.65rem] font-medium opacity-70">{item.status} · {item.body.length.toLocaleString()} chars</span>
+                <span className="mt-0.5 block text-[0.65rem] font-medium">{item.status} · {item.body.length.toLocaleString()} chars</span>
               </button>
             ))}
           </div>

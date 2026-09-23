@@ -1,5 +1,3 @@
-import { dismissBetaEvent } from "../scripts/lib/public-page-event-gate.mjs";
-
 import { expect, test } from "./fixtures/non-studio-test";
 
 const backup = { _app: "toonspectrum-library", version: 1, ratings: { "isolated-work": 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
@@ -20,22 +18,22 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test.describe("mobile menu keyboard focus", () => {
-  // A late first-visit dialog must finish before this isolated focus round trip.
-  // Its automatic handler would otherwise click a second dialog after Escape.
+test.describe("mobile campus map keyboard focus", () => {
+  // The spatial campus owns this route and suppresses the marketing overlay.
+  // Disable the optional fixture handler so this round trip observes only the map dialog.
   test.use({ dismissBetaEvent: false });
 
-  test("mobile menu opens, closes with Escape and restores keyboard focus", async ({ page }) => {
+  test("campus map opens, closes with Escape and restores keyboard focus", async ({ page }) => {
     await page.goto("/about");
-    await dismissBetaEvent(page);
-    const trigger = page.getByRole("button", { name: "전체 메뉴", exact: true, includeHidden: true });
-    const menu = page.getByRole("dialog", { name: "전체 메뉴", exact: true });
+    await expect(page.locator('[role="dialog"][aria-labelledby="beta-open-gate-title"]')).toHaveCount(0);
+    const trigger = page.getByRole("button", { name: "공간 지도 열기", exact: true });
+    const map = page.getByRole("dialog", { name: "창작 세계의 공간 지도", exact: true });
+    await trigger.focus();
     await trigger.click();
     await expect(trigger).toHaveAttribute("aria-expanded", "true");
-    await expect(menu).toBeVisible();
+    await expect(map).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(trigger).toHaveAttribute("aria-expanded", "false");
-    await expect(menu).toBeHidden();
+    await expect(map).toBeHidden();
     await expect(trigger).toBeFocused();
   });
 });

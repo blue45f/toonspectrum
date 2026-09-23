@@ -200,7 +200,7 @@ export function StudioBg3dCharacterAnimatorPanel({
           onApplyFacialExpression?.(FACIAL_EXPRESSION_PRESETS[selectedExpression]);
           onPlayAnimationClip?.(selectedClip);
         }}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
         <span>캐릭터 신체/표정/모션 파라미터 적용</span>
