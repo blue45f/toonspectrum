@@ -227,12 +227,12 @@ it("acknowledges the blocking Studio beta notice before menu interactions", asyn
   await dismissOverlays(page as unknown as import("playwright").Page);
 
   expect(page.locator).toHaveBeenCalledWith('[data-studio-beta-notice="true"]');
-  expect(noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 3000 });
+  expect(noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 10_000 });
   expect(notice.getByRole).toHaveBeenCalledWith("button", {
     name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
   });
-  expect(acknowledgeClick).toHaveBeenCalledWith({ timeout: 3000 });
-  expect(noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 3000 });
+  expect(acknowledgeClick).toHaveBeenCalledWith({ timeout: 30_000, noWaitAfter: true });
+  expect(noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 30_000 });
   expect(acknowledgeClick.mock.invocationCallOrder[0]).toBeLessThan(keyboardPress.mock.invocationCallOrder[0]!);
 });
 
