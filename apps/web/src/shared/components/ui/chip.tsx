@@ -84,7 +84,7 @@ export function Badge({
     good: "border-[color:oklch(0.8_0.15_150/0.3)] text-good bg-[oklch(0.8_0.15_150/0.12)]",
     warn: "border-[color:oklch(0.82_0.15_80/0.3)] text-warn bg-[oklch(0.82_0.15_80/0.12)]",
     bad: "border-[color:oklch(0.66_0.2_25/0.35)] text-bad bg-[oklch(0.66_0.2_25/0.14)]",
-    cool: "border-[color:oklch(0.8_0.11_232/0.3)] text-cool bg-[oklch(0.8_0.11_232/0.12)]",
+    cool: "border-cool/40 bg-cool/15 text-fg",
   };
   return (
     <span

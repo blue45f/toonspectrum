@@ -416,7 +416,7 @@ export function ExplorePage() {
         <DiscoveryWorkspaceNav current="explore" />
 
         <RevealOnScroll variant="fade">
-          <p className="eyebrow mb-3 text-fg-3">BY CODE / 코드로 좁히기</p>
+          <p className="eyebrow mb-3 text-fg-2">BY CODE / 코드로 좁히기</p>
           <div className="flex flex-wrap gap-2">
             {visibleTags.map(({ tag: entry, count }) => {
               const active = filters.tags.includes(entry);

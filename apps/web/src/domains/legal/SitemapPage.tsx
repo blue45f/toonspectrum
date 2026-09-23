@@ -79,7 +79,7 @@ function RouteConditionBadges({ href, locale: _locale }: { href: string; locale:
         <small
           key={badge.key}
           data-tone={badge.tone}
-          className="inline-flex min-h-5 items-center rounded-full border border-line bg-panel px-2 text-[0.58rem] font-bold leading-none text-fg-3 data-[tone=accent]:border-accent/30 data-[tone=accent]:text-accent data-[tone=warning]:border-amber-500/35 data-[tone=warning]:text-amber-500"
+          className="inline-flex min-h-5 items-center rounded-full border border-line bg-panel px-2 text-[0.58rem] font-bold leading-none text-fg-3 data-[tone=accent]:border-accent/30 data-[tone=accent]:text-accent data-[tone=warning]:border-warn/40 data-[tone=warning]:bg-warning-soft data-[tone=warning]:text-fg"
         >
           {badge.label}
         </small>

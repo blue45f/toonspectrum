@@ -48,7 +48,7 @@ function statusTone(status: StudioProductionJob["status"]): string {
   if (status === "completed") return "border border-good/40 bg-good/15 text-fg";
   if (status === "failed") return "bg-red-500/15 text-red-700 dark:text-red-300";
   if (status === "cancelled") return "bg-raised text-fg-3";
-  if (status === "running") return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
+  if (status === "running") return "border border-cool/40 bg-cool/15 text-fg";
   return "border border-warn/40 bg-warn/15 text-fg";
 }
 
