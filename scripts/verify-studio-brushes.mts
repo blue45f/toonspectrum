@@ -858,20 +858,49 @@ async function dismissTransientChrome(page: Page, clearAutosave = true): Promise
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
   await dismissQuickStartOverlay(page, 250);
-  if (
-    clearAutosave
-    && await page.locator("[data-studio-recovery-notice]")
-      .isVisible({ timeout: 250 })
-      .catch(() => false)
-  ) {
-    const recovery = page.locator("[data-studio-recovery-notice]");
-    const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
-    if (await more.getAttribute("aria-expanded") !== "true") await more.click();
-    await recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true }).click();
-    const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
-    await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
-    await confirmation.waitFor({ state: "hidden" });
-    await recovery.waitFor({ state: "hidden" });
+  if (!clearAutosave) return;
+
+  const recovery = page.locator("[data-studio-recovery-notice]").first();
+  if (!(await recovery.isVisible({ timeout: 250 }).catch(() => false))) return;
+
+  // The automatic-resume variant deliberately has no action buttons. Older survey cleanup read
+  // `aria-expanded` from a non-existent "다른 방법" button and let Playwright's default timeout
+  // abort the remaining catalogue after the first product failure. Give auto-resume a bounded
+  // opportunity to settle, then interact only with controls that actually exist.
+  if (await recovery.getAttribute("data-studio-auto-resume") === "true") {
+    await page.waitForFunction(() => {
+      const notice = document.querySelector('[data-studio-recovery-notice]');
+      return !notice || notice.getAttribute("data-studio-auto-resume") !== "true";
+    }, undefined, { timeout: 8_000 }).catch(() => undefined);
+  }
+  if (!(await recovery.isVisible().catch(() => false))) return;
+
+  const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
+  if (await more.count() === 0 || !(await more.isVisible().catch(() => false))) return;
+  if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+  const remove = recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true });
+  if (await remove.count() === 0 || !(await remove.isVisible().catch(() => false))) return;
+  await remove.click();
+  const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
+  await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
+  await confirmation.waitFor({ state: "hidden" });
+  await recovery.waitFor({ state: "hidden" });
+}
+
+async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): Promise<void> {
+  const origin = new URL(studioUrl).origin;
+  // Navigating away first releases the editor's OPFS/SQLite workers and document lease. Clearing
+  // localStorage alone is insufficient: the durable journal would resurrect the failed case on
+  // the next page and turn survey recovery into a second unrelated failure.
+  await page.goto("about:blank", { waitUntil: "load", timeout: 10_000 }).catch(() => undefined);
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Storage.clearDataForOrigin", {
+      origin,
+      storageTypes: "all",
+    });
+  } finally {
+    await session.detach().catch(() => undefined);
   }
 }
 
@@ -2424,6 +2453,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         const message = error instanceof Error ? error.message : String(error);
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${DESKTOP_STABILITY_CASES.length} ${message}`);
+        await clearStudioVerifierOriginStorage(page, studioUrl);
         await installCleanStudioState(page);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
