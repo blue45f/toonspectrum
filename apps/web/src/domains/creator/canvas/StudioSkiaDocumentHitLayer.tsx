@@ -1,6 +1,7 @@
+import { useEffect, useMemo, useRef } from "react";
 import { Shape } from "react-konva/lib/ReactKonvaCore";
 
-import { elBounds } from "../studio-element-geometry";
+import { createStudioSkiaDocumentHitIndex } from "./studio-skia-document-hit-index";
 
 import type { El } from "../studio-element-model";
 import type Konva from "konva";
@@ -14,91 +15,67 @@ export interface StudioSkiaDocumentHitLayerProps {
   ) => void;
 }
 
-function rotationOf(element: El): number {
-  return "rotation" in element && typeof element.rotation === "number"
-    ? element.rotation
-    : 0;
+function localPointer(
+  event: Konva.KonvaEventObject<Event>,
+): { x: number; y: number } | null {
+  const stage = event.target.getStage();
+  const pointer = stage?.getPointerPosition();
+  if (!stage || !pointer) return null;
+  return event.target.getAbsoluteTransform().copy().invert().point(pointer);
 }
 
-function hitRect(
-  context: Konva.Context,
-  element: El,
-): void {
-  const bounds = elBounds(element);
-  const angle = rotationOf(element) * Math.PI / 180;
-  if (!angle) {
-    context.rect(bounds.x, bounds.y, Math.max(0.1, bounds.w), Math.max(0.1, bounds.h));
-    return;
-  }
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const corners = [
-    [0, 0],
-    [bounds.w, 0],
-    [bounds.w, bounds.h],
-    [0, bounds.h],
-  ] as const;
-  corners.forEach(([x, y], index) => {
-    const px = bounds.x + x * cos - y * sin;
-    const py = bounds.y + x * sin + y * cos;
-    if (index === 0) context.moveTo(px, py);
-    else context.lineTo(px, py);
-  });
-  context.closePath();
-}
-
-function hitDraw(
-  context: Konva.Context,
-  element: Extract<El, { type: "draw" }>,
-): void {
-  const points = element.points;
-  if (points.length < 2) return;
-  const kind = element.kind ?? "freehand";
-  if (kind !== "freehand" && kind !== "line" && kind !== "arrow") {
-    hitRect(context, element);
-    context.closePath();
-    return;
-  }
-  context.moveTo(points[0]!, points[1]!);
-  for (let index = 2; index + 1 < points.length; index += 2) {
-    context.lineTo(points[index]!, points[index + 1]!);
-  }
-}
-
+/** One Konva hit node regardless of document size; Skia remains the only paint owner. */
 export function StudioSkiaDocumentHitLayer({
   elements,
   effectiveScale,
   onSelect,
 }: StudioSkiaDocumentHitLayerProps) {
-  const hitWidth = 16 / Math.max(effectiveScale, 0.001);
+  const runtimeRef = useRef<
+    ReturnType<typeof createStudioSkiaDocumentHitIndex> | null
+  >(null);
+  if (!runtimeRef.current) {
+    runtimeRef.current = createStudioSkiaDocumentHitIndex();
+  }
+  const runtime = runtimeRef.current;
+  const regions = useMemo(
+    () => runtime.sync(elements),
+    [elements, runtime],
+  );
+
+  useEffect(() => () => runtime.dispose(), [runtime]);
+
+  const resolveEvent = (
+    event: Konva.KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>,
+    select: boolean,
+  ) => {
+    const point = localPointer(event as Konva.KonvaEventObject<Event>);
+    const element = point ? runtime.resolve(point, effectiveScale) : null;
+    event.target.setAttrs({
+      studioElementId: element?.id,
+      // The existing Stage background path owns empty-click deselection and marquee start.
+      name: element ? "skia-document-hit-proxy" : "bg",
+    });
+    if (element && select) onSelect(element.id, event);
+  };
+
   return (
-    <>
-      {elements.map((element) => {
-        if (element.hidden || (element.opacity ?? 1) <= 0) return null;
-        return (
-          <Shape
-            key={element.id}
-            name="skia-document-hit-proxy"
-            studioElementId={element.id}
-            sceneFunc={() => undefined}
-            hitFunc={(context, shape) => {
-              context.beginPath();
-              if (element.type === "draw") hitDraw(context, element);
-              else hitRect(context, element);
-              context.fillStrokeShape(shape);
-            }}
-            fill="#000"
-            stroke="#000"
-            strokeWidth={element.type === "draw"
-              ? Math.max(element.strokeWidth ?? 1, hitWidth)
-              : hitWidth}
-            perfectDrawEnabled={false}
-            shadowForStrokeEnabled={false}
-            onMouseDown={(event) => onSelect(element.id, event)}
-            onTap={(event) => onSelect(element.id, event)}
-          />
-        );
-      })}
-    </>
+    <Shape
+      name="skia-document-hit-proxy"
+      sceneFunc={() => undefined}
+      hitFunc={(context, shape) => {
+        context.beginPath();
+        for (const region of regions) {
+          context.rect(region.x, region.y, region.w, region.h);
+        }
+        context.fillStrokeShape(shape);
+      }}
+      fill="#000"
+      strokeEnabled={false}
+      perfectDrawEnabled={false}
+      shadowForStrokeEnabled={false}
+      onPointerDown={(event) => resolveEvent(event, true)}
+      onPointerUp={(event) => resolveEvent(event, false)}
+      onContextMenu={(event) => resolveEvent(event, false)}
+    />
   );
 }

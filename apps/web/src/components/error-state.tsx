@@ -35,7 +35,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 gap-1.5" })}
+          className={buttonClass({ size: "sm", variant: "outline", className: "mt-4 min-h-11 gap-1.5" })}
         >
           <RefreshCw size={14} />
           {t("common.retry.short")}

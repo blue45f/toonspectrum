@@ -252,3 +252,107 @@ html {
 [data-studio-document-window-hub-bar="true"] button {
   min-inline-size: var(--site-control-size);
 }
+
+/* Theme-safe native controls and text selection. These rules target browser chrome only;
+   manuscript/canvas pixels and user-selected drawing colours stay untouched. */
+:root[data-design-theme] {
+  accent-color: var(--color-accent);
+  caret-color: var(--color-accent);
+}
+:root[data-design-theme] ::selection {
+  background: var(--color-selection-bg);
+  color: var(--color-selection-fg);
+  text-shadow: none;
+}
+:root[data-design-theme] :where(
+  input:not([type]),
+  input[type="text"], input[type="search"], input[type="email"],
+  input[type="password"], input[type="url"], input[type="tel"],
+  input[type="number"], input[type="date"], input[type="datetime-local"],
+  input[type="month"], input[type="week"], input[type="time"],
+  select, textarea
+) {
+  border-color: var(--color-control-border);
+  background-color: var(--color-control-fill);
+  color: var(--color-fg);
+}
+:root[data-design-theme] :where(
+  input:not([type]),
+  input[type="text"], input[type="search"], input[type="email"],
+  input[type="password"], input[type="url"], input[type="tel"],
+  input[type="number"], input[type="date"], input[type="datetime-local"],
+  input[type="month"], input[type="week"], input[type="time"],
+  select, textarea
+):hover:not(:disabled) {
+  border-color: var(--color-control-border-hover);
+}
+:root[data-design-theme] :where(input, textarea)::placeholder {
+  color: var(--color-fg-3);
+  opacity: 1;
+}
+:root[data-design-theme] :where(input, select, textarea):disabled {
+  color: var(--color-disabled-fg);
+  cursor: not-allowed;
+}
+
+:root[data-design-theme] :where(
+  a[href], button, input, select, textarea,
+  [role="button"], [role="link"], [role="tab"], [role="option"], [tabindex]
+):focus-visible {
+  outline: var(--site-focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+:root[data-design-theme] :where(
+  dialog, [role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]
+) {
+  color: var(--color-fg);
+}
+:root[data-design-theme] :where(hr, [role="separator"]) { border-color: var(--color-line-strong); }
+:root[data-design-theme] :where(:disabled, [aria-disabled="true"]) { color: var(--color-disabled-fg); }
+
+:root[data-contrast="more"] :where(
+  button, input, select, textarea,
+  [role="button"], [role="tab"], [role="option"], [role="menuitem"]
+) {
+  border-color: var(--color-line-strong);
+}
+:root[data-contrast="more"] :where([role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"]) {
+  border-width: 2px;
+  border-color: var(--color-line-strong);
+  background-color: var(--color-panel);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Readability floor: dense creator tools historically used 7–9px labels. Keep their compact
+   layout, but never render meaningful UI copy below 10px on any theme or viewport. */
+:root[data-design-theme] small:not(.sr-only),
+:root[data-design-theme] :where(
+  [class*="text-[0.4"],
+  [class*="text-[0.5"],
+  [class~="text-[0.6rem]"],
+  [class~="text-[0.60rem]"],
+  [class~="text-[0.61rem]"],
+  [class~="text-[0.62rem]"],
+  [class~="text-[8px]"],
+  [class~="text-[9px]"]
+):not(.sr-only) {
+  font-size: 0.625rem !important;
+  line-height: 1.35;
+}
+
+:root[data-contrast="more"] small:not(.sr-only),
+:root[data-contrast="more"] :where(
+  [class*="text-[0.4"],
+  [class*="text-[0.5"],
+  [class~="text-[0.6rem]"],
+  [class~="text-[0.60rem]"],
+  [class~="text-[0.61rem]"],
+  [class~="text-[0.62rem]"],
+  [class~="text-[8px]"],
+  [class~="text-[9px]"]
+):not(.sr-only) {
+  font-size: 0.6875rem !important;
+  font-weight: 600;
+  letter-spacing: normal;
+}

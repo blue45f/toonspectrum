@@ -37,7 +37,7 @@
 .workspace-focused-location>span{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650;color:var(--color-fg-2)}
 .workspace-focused-location>svg{flex:none}
 .workspace-focused-utilities{margin-left:auto;display:flex;flex:none;align-items:center;gap:4px}
-.workspace-focused-search{display:grid;width:40px;height:40px;place-items:center;border-radius:10px;color:var(--color-fg-2)}
+.workspace-focused-search{display:grid;width:44px;height:44px;place-items:center;border-radius:10px;color:var(--color-fg-2)}
 .workspace-focused-search:hover{background:var(--color-raised);color:var(--color-fg)}
 .workspace-focused-main.workspace-task-content{height:calc(100dvh - 57px);min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0}
 .workspace-focused-shell .workspace-task-route-content{min-height:100%}

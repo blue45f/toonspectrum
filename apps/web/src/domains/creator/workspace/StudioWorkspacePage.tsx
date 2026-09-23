@@ -117,7 +117,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
   if (surface === "home" && mode === "virtual-studio" && !blocked) {
     const recovery = <div className="workspace-runtime-recovery">{workspaceHeader}
       <section role="status"><p>{bt("가상 스튜디오 준비 중", "Preparing your virtual studio")}</p>
-        <button type="button" onClick={() => setMode("classic")}>{bt("목록 보기로 전환", "Switch to list view")}</button>
+        <button type="button" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-line bg-panel px-5 py-3 font-semibold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" onClick={() => setMode("classic")}>{bt("목록 보기로 전환", "Switch to list view")}</button>
       </section>
     </div>;
     return <div onClickCapture={verifyResumeClick} onAuxClickCapture={verifyResumeClick} data-workspace-runtime="true" data-workspace-surface="home" data-workspace-view={mode}>

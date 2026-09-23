@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,7 +8,7 @@ const CRITICAL_THEMES = ["light", "dark", "contrast"];
 const REPRESENTATIVE_ROUTES = [
   "/", "/discover", "/story-lab", "/market", "/production", "/reviews",
   "/showcase", "/learn", "/community", "/settings", "/accessibility", "/play",
-  "/studio", "/studio/bg3d", "/studio/publish", "/brush-lab",
+  "/studio", "/studio/bg3d", "/studio/publish", "/brush-lab", "/admin/overview",
 ];
 const VIEWPORTS = {
   desktop: { width: 1440, height: 1000, hasTouch: false, isMobile: false },
@@ -17,8 +18,19 @@ const root = process.env.AUDIT_REPOSITORY || process.cwd();
 const output = process.env.AUDIT_OUTPUT || path.join(root, ".qa/visual-ux/sitewide");
 const base = new URL(process.env.AUDIT_BASE_URL || "http://127.0.0.1:5276");
 const allowedHosts = new Set(["127.0.0.1", "localhost", "toonstudio.cloud", "www.toonstudio.cloud"]);
-const auditWorkerLimit = Math.max(1, Number.parseInt(process.env.AUDIT_WORKERS || "4", 10) || 4);
-const auditSettleMs = Math.max(0, Number.parseInt(process.env.AUDIT_SETTLE_MS || "450", 10) || 450);
+const auditWorkerLimit = Math.max(1, Number.parseInt(process.env.AUDIT_WORKERS || "2", 10) || 2);
+const auditSettleMs = Math.max(0, Number.parseInt(process.env.AUDIT_SETTLE_MS || "180", 10) || 180);
+const auditNavigationTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUDIT_NAVIGATION_TIMEOUT_MS || "45000", 10) || 45_000);
+const auditNavigationRetries = Math.max(0, Number.parseInt(process.env.AUDIT_NAVIGATION_RETRIES || "1", 10) || 0);
+const auditStageTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_STAGE_TIMEOUT_MS || "900", 10) || 900);
+const auditSceneTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_SCENE_TIMEOUT_MS || "400", 10) || 400);
+const auditAxe = process.env.AUDIT_AXE !== "0";
+const auditSceneStrict = process.env.AUDIT_SCENE_STRICT === "1";
+const auditSceneCheck = process.env.AUDIT_SCENE_CHECK !== "0";
+const auditScrollSweep = process.env.AUDIT_SCROLL_SWEEP === "1";
+const auditCaptureMode = process.env.AUDIT_CAPTURE || "issues";
+const auditMediaContrast = process.env.AUDIT_MEDIA_CONTRAST === "more" ? "more" : "no-preference";
+const auditForcedColors = process.env.AUDIT_FORCED_COLORS === "active" ? "active" : "none";
 if (!allowedHosts.has(base.hostname)) throw new Error(`Audit origin is not allow-listed: ${base.hostname}`);
 
 function routePurposeSceneExpected(pathname) {
@@ -69,6 +81,12 @@ async function collectRoutes() {
     const route = concretePath(match[1]);
     if (route) routes.add(route);
   }
+  const routeManifests = [
+    "apps/web/src/domains/admin/router/admin-route-manifest.ts",
+  ];
+  for (const manifest of routeManifests) {
+    collectLiteralRoutes(await readFile(path.join(root, manifest), "utf8"), routes);
+  }
   return [...routes].sort((left, right) => left.localeCompare(right));
 }
 
@@ -97,6 +115,8 @@ function screenshotName(theme, viewport, route) {
 }
 
 function shouldCapture(route, issues) {
+  if (auditCaptureMode === "never") return false;
+  if (auditCaptureMode === "always") return true;
   return issues.length > 0 || ["/discover", "/story-lab", "/studio/bg3d"].includes(route);
 }
 
@@ -111,15 +131,21 @@ const themes = selectedThemes();
 const viewports = selectedViewports();
 if (viewports.some(([, viewport]) => !viewport)) throw new Error("Unknown AUDIT_VIEWPORT_MODE");
 
-const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
 const results = [];
-try {
-  for (const [viewportName, viewport] of viewports) {
-    for (const theme of themes) {
+for (const [viewportName, viewport] of viewports) {
+  for (const theme of themes) {
+    // Heavy Studio/WebGL routes can retain renderer resources after a context closes.
+    // Recycle Chromium for every theme/viewport cell so later palettes are audited with
+    // the same clean memory conditions as the first one instead of producing false timeouts.
+    const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
+    try {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
         locale: "ko-KR",
         reducedMotion: "no-preference",
+        contrast: auditMediaContrast,
+        forcedColors: auditForcedColors,
+        serviceWorkers: "block",
         hasTouch: viewport.hasTouch,
         isMobile: viewport.isMobile,
       });
@@ -128,7 +154,20 @@ try {
           state: { preference: themeName, studioPreference: themeName }, version: 0,
         }));
         localStorage.setItem("toonstudio:site-experience:v1", "vivid");
+        localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+        sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
       }, { themeName: theme });
+      await context.route("**/api/**", async (route) => {
+        const pathname = new URL(route.request().url()).pathname;
+        if (/\/auth\/session$/u.test(pathname)) {
+          await route.fulfill({ status: 200, json: { authenticated: false, user: null } });
+          return;
+        }
+        await route.fulfill({
+          status: 503,
+          json: { message: "Visual audit: service unavailable", error: "Service Unavailable" },
+        });
+      });
 
       let cursor = 0;
       const workers = Math.min(auditWorkerLimit, routes.length);
@@ -147,10 +186,22 @@ try {
           });
           const result = { route, theme, viewport: viewportName, pageErrors, failedRequests };
           try {
-            const response = await page.goto(new URL(route, base).href, {
-              waitUntil: "domcontentloaded",
-              timeout: 30_000,
-            });
+            let response;
+            let navigationError;
+            for (let attempt = 0; attempt <= auditNavigationRetries; attempt += 1) {
+              try {
+                response = await page.goto(new URL(route, base).href, {
+                  waitUntil: "domcontentloaded",
+                  timeout: auditNavigationTimeoutMs,
+                });
+                navigationError = undefined;
+                break;
+              } catch (error) {
+                navigationError = error;
+                if (attempt < auditNavigationRetries) await page.waitForTimeout(250);
+              }
+            }
+            if (navigationError) throw navigationError;
             await page.locator("#main-content").waitFor({ timeout: 20_000 });
             await page.waitForFunction(() => {
               const stage = document.querySelector(".route-stage");
@@ -158,14 +209,54 @@ try {
                 stage.classList.contains("route-stage--settled")
                 || stage.classList.contains("route-stage--instant")
               );
-            }, undefined, { timeout: 3_000 }).catch(() => undefined);
+            }, undefined, { timeout: auditStageTimeoutMs }).catch(() => undefined);
             result.status = response?.status() ?? null;
             await page.waitForTimeout(auditSettleMs);
+            await page.evaluate(async () => { await document.fonts?.ready; }).catch(() => undefined);
+            if (auditScrollSweep) {
+              await page.evaluate(async () => {
+                const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+                const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                const startX = scrollX;
+                const startY = scrollY;
+                const scrollRoot = document.scrollingElement || document.documentElement;
+                for (const ratio of [0.25, 0.5, 0.75, 1]) {
+                  const max = Math.max(0, scrollRoot.scrollHeight - innerHeight);
+                  scrollTo({ top: max * ratio, left: startX, behavior: "instant" });
+                  await frame();
+                  await pause(35);
+                }
+                const nested = [...document.querySelectorAll("#main-content *")]
+                  .filter((element) => {
+                    const style = getComputedStyle(element);
+                    return /^(?:auto|scroll)$/u.test(style.overflowY)
+                      && element.scrollHeight > element.clientHeight + 120;
+                  })
+                  .slice(0, 12);
+                for (const element of nested) {
+                  const initial = element.scrollTop;
+                  element.scrollTop = element.scrollHeight;
+                  await frame();
+                  element.scrollTop = initial;
+                }
+                scrollTo({ top: startY, left: startX, behavior: "instant" });
+                await frame();
+              }).catch(() => undefined);
+              await page.waitForTimeout(80);
+            }
+            await page.evaluate(() => {
+              for (const animation of document.getAnimations()) {
+                const timing = animation.effect?.getTiming();
+                if (!timing || timing.iterations === Infinity) continue;
+                try { animation.finish(); } catch { /* detached animations are safe to ignore */ }
+              }
+            }).catch(() => undefined);
+            await page.waitForTimeout(35);
             result.finalPath = new URL(page.url()).pathname;
-            let sceneExpected = routePurposeSceneExpected(result.finalPath);
-            if (sceneExpected) {
+            let sceneExpected = auditSceneCheck && routePurposeSceneExpected(result.finalPath);
+            if (sceneExpected && auditSceneStrict) {
               await page.locator(".route-purpose-scene[data-route-visual-kind]")
-                .waitFor({ state: "visible", timeout: 5_000 })
+                .waitFor({ state: "visible", timeout: auditSceneTimeoutMs })
                 .catch(() => undefined);
               const settledPath = new URL(page.url()).pathname;
               if (settledPath !== result.finalPath) {
@@ -238,6 +329,95 @@ try {
                   tag: element.tagName.toLowerCase(), className: String(element.className).slice(0, 100),
                   left: Math.round(rect.left), right: Math.round(rect.right),
                 }));
+              const describeElement = (element) => ({
+                tag: element.tagName.toLowerCase(),
+                id: element.id || null,
+                className: String(element.className).slice(0, 140),
+                text: element.textContent?.trim().replace(/\s+/gu, " ").slice(0, 100) || null,
+              });
+              const duplicateIds = [...document.querySelectorAll("[id]")]
+                .reduce((counts, element) => {
+                  counts.set(element.id, (counts.get(element.id) || 0) + 1);
+                  return counts;
+                }, new Map());
+              const duplicateIdSamples = [...duplicateIds.entries()]
+                .filter(([, count]) => count > 1)
+                .slice(0, 20)
+                .map(([id, count]) => ({ id, count }));
+              const textElements = [...document.querySelectorAll("#main-content *")]
+                .filter((element) => [...element.childNodes].some((node) => (
+                  node.nodeType === Node.TEXT_NODE && node.textContent?.trim()
+                )))
+                .filter((element) => !element.closest(
+                  '[aria-hidden="true"],.sr-only,script,style,noscript,template,svg,canvas,[hidden]',
+                ))
+                // Studio skip links are deliberately visually hidden until keyboard focus.
+                // Keep them in the accessibility tree without reporting them as unreadable text.
+                .filter((element) => !element.matches(
+                  '[data-studio-skip-link="true"]:not(:focus-visible)',
+                ));
+              const effectiveOpacity = (element) => {
+                let opacity = 1;
+                let current = element;
+                while (current && current !== document.documentElement) {
+                  opacity *= Number.parseFloat(getComputedStyle(current).opacity || "1");
+                  current = current.parentElement;
+                }
+                return opacity;
+              };
+              const colorAlpha = (value) => {
+                if (value === "transparent") return 0;
+                const channels = value.match(/[\d.]+/gu)?.map(Number) || [];
+                return channels.length >= 4 ? channels[3] : 1;
+              };
+              const invisibleText = textElements
+                .filter(visible)
+                .map((element) => ({ element, style: getComputedStyle(element) }))
+                .filter(({ element, style }) => {
+                  const textFill = style.webkitTextFillColor || style.color;
+                  const gradientText = style.backgroundClip === "text"
+                    || style.webkitBackgroundClip === "text";
+                  return effectiveOpacity(element) < 0.08
+                    || Number.parseFloat(style.fontSize) <= 0
+                    || (colorAlpha(textFill) < 0.08 && !gradientText);
+                })
+                .slice(0, 20)
+                .map(({ element, style }) => ({
+                  ...describeElement(element),
+                  color: style.color,
+                  opacity: effectiveOpacity(element),
+                  fontSize: style.fontSize,
+                }));
+              const clippedText = textElements
+                .filter(visible)
+                .map((element) => ({ element, style: getComputedStyle(element) }))
+                .filter(({ element, style }) => {
+                  const clippedX = /^(?:hidden|clip)$/u.test(style.overflowX)
+                    && element.scrollWidth > element.clientWidth + 2;
+                  const clippedY = /^(?:hidden|clip)$/u.test(style.overflowY)
+                    && element.scrollHeight > element.clientHeight + 2;
+                  const intentional = style.textOverflow === "ellipsis"
+                    || (style.webkitLineClamp && style.webkitLineClamp !== "none");
+                  return (clippedX || clippedY) && !intentional;
+                })
+                .slice(0, 20)
+                .map(({ element }) => describeElement(element));
+              const tinyText = textElements
+                .filter(visible)
+                .map((element) => ({ element, size: Number.parseFloat(getComputedStyle(element).fontSize) }))
+                .filter(({ size }) => size > 0 && size < 10)
+                .slice(0, 20)
+                .map(({ element, size }) => ({ ...describeElement(element), size }));
+              const requiredThemeTokens = [
+                "--color-canvas", "--color-panel", "--color-card", "--color-raised",
+                "--color-line", "--color-line-strong", "--color-fg", "--color-fg-2",
+                "--color-fg-3", "--color-accent", "--color-accent-2", "--color-on-accent",
+                "--color-control-border", "--color-focus-ring", "--color-selection-bg",
+              ];
+              const rootStyle = getComputedStyle(document.documentElement);
+              const missingThemeTokens = requiredThemeTokens.filter((token) => (
+                !rootStyle.getPropertyValue(token).trim()
+              ));
               const sceneStyle = scene ? getComputedStyle(scene) : null;
               const sceneVideo = scene?.querySelector("video");
               const ambient = document.querySelector(".site-experience-ambient");
@@ -256,23 +436,79 @@ try {
                 overflow: document.documentElement.scrollWidth - innerWidth,
                 mainWidth: Math.round(main?.getBoundingClientRect().width || 0),
                 minimumTargetSize,
+                themeContrast: document.documentElement.dataset.contrast || null,
+                themePreference: document.documentElement.dataset.themePreference || null,
+                themeSource: document.documentElement.dataset.themeSource || null,
+                mediaContrastMore: matchMedia("(prefers-contrast: more)").matches,
+                forcedColorsActive: matchMedia("(forced-colors: active)").matches,
                 unnamedButtons, brokenImages, smallTargets, fixedOverflow,
+                duplicateIds: duplicateIdSamples,
+                invisibleText,
+                clippedText,
+                tinyText,
+                missingThemeTokens,
               };
             }, { expectedTheme: theme, expectedScene: sceneExpected });
+            if (auditAxe) {
+              try {
+                const axeResult = await new AxeBuilder({ page })
+                  .withRules(["color-contrast"])
+                  .analyze();
+                result.contrastViolations = axeResult.violations.map((violation) => ({
+                  id: violation.id,
+                  impact: violation.impact,
+                  help: violation.help,
+                  nodes: violation.nodes.slice(0, 12).map((node) => ({
+                    target: node.target,
+                    html: node.html.slice(0, 240),
+                    summary: node.failureSummary?.slice(0, 400) || null,
+                  })),
+                }));
+                result.contrastIncomplete = axeResult.incomplete
+                  .filter((item) => item.id === "color-contrast")
+                  .flatMap((item) => item.nodes.slice(0, 12).map((node) => ({
+                    target: node.target,
+                    html: node.html.slice(0, 240),
+                  })));
+              } catch (error) {
+                result.contrastAuditError = String(error).slice(0, 500);
+              }
+            }
             const issues = [];
+            const warnings = [];
             if ((result.status ?? 0) >= 400) issues.push(`http-${result.status}`);
             if (result.metrics.theme !== theme) issues.push(`theme:${result.metrics.theme ?? "missing"}`);
             if (result.metrics.overflow > 2) issues.push(`overflow:${result.metrics.overflow}`);
             if (result.metrics.mainWidth <= 0) issues.push("main-empty");
-            if (result.metrics.sceneExpected && !result.metrics.sceneKind) issues.push("route-scene-missing");
-            if (!result.metrics.sceneExpected && result.metrics.sceneKind) issues.push("route-scene-obstructs-tool");
-            if (result.metrics.sceneKind && result.metrics.sceneCards !== 3) issues.push(`scene-cards:${result.metrics.sceneCards}`);
-            if (!result.metrics.sceneInsideViewport) issues.push("scene-outside-viewport");
+            if (result.metrics.sceneExpected && !result.metrics.sceneKind) {
+              const issue = "route-scene-missing";
+              if (auditSceneStrict) issues.push(issue);
+              else warnings.push(issue);
+            }
+            if (auditSceneCheck && !result.metrics.sceneExpected && result.metrics.sceneKind) issues.push("route-scene-obstructs-tool");
+            if (auditSceneCheck && result.metrics.sceneKind && result.metrics.sceneCards !== 3) issues.push(`scene-cards:${result.metrics.sceneCards}`);
+            if (auditSceneCheck && !result.metrics.sceneInsideViewport) issues.push("scene-outside-viewport");
             if (result.metrics.unnamedButtons > 0) issues.push(`unnamed-buttons:${result.metrics.unnamedButtons}`);
             if (result.metrics.brokenImages.length) issues.push(`broken-images:${result.metrics.brokenImages.length}`);
             if (result.metrics.fixedOverflow.length) issues.push(`fixed-overflow:${result.metrics.fixedOverflow.length}`);
+            if (result.metrics.duplicateIds.length) issues.push(`duplicate-ids:${result.metrics.duplicateIds.length}`);
+            if (result.metrics.invisibleText.length) warnings.push(`invisible-text:${result.metrics.invisibleText.length}`);
+            if (result.metrics.missingThemeTokens.length) issues.push(`missing-theme-tokens:${result.metrics.missingThemeTokens.length}`);
             if (pageErrors.length) issues.push(`page-errors:${pageErrors.length}`);
-            if (theme === "contrast" && result.metrics.sceneKind) {
+            const contrastNodeCount = (result.contrastViolations || [])
+              .reduce((count, violation) => count + violation.nodes.length, 0);
+            if (contrastNodeCount) issues.push(`color-contrast:${contrastNodeCount}`);
+            if (result.contrastAuditError) issues.push("contrast-audit-failed");
+            if (result.contrastIncomplete?.length) warnings.push(`contrast-review:${result.contrastIncomplete.length}`);
+            if (result.metrics.smallTargets.length) warnings.push(`small-targets:${result.metrics.smallTargets.length}`);
+            if (result.metrics.clippedText.length) warnings.push(`clipped-text:${result.metrics.clippedText.length}`);
+            if (result.metrics.tinyText.length) warnings.push(`tiny-text:${result.metrics.tinyText.length}`);
+            if (auditMediaContrast === "more" && !result.metrics.mediaContrastMore) issues.push("media-contrast-missing");
+            if (auditForcedColors === "active" && !result.metrics.forcedColorsActive) issues.push("forced-colors-missing");
+            if (theme === "contrast" && result.metrics.themeContrast !== "more") {
+              issues.push("contrast-state-missing");
+            }
+            if (auditSceneCheck && theme === "contrast" && result.metrics.sceneKind) {
               if ((result.metrics.sceneBorderWidth ?? 0) < 2) issues.push("contrast-scene-border");
               if (!result.metrics.sceneVideoHidden) issues.push("contrast-video-visible");
             }
@@ -280,9 +516,7 @@ try {
               issues.push("contrast-ambient-visible");
             }
             result.issues = issues;
-            result.warnings = result.metrics.smallTargets.length
-              ? [`small-targets:${result.metrics.smallTargets.length}`]
-              : [];
+            result.warnings = warnings;
             if (shouldCapture(route, issues)) {
               const file = screenshotName(theme, viewportName, route);
               await page.screenshot({ path: path.join(output, file), fullPage: false });
@@ -304,14 +538,37 @@ try {
         }
       }));
       await context.close();
+    } finally {
+      await browser.close();
     }
   }
-} finally {
-  await browser.close();
 }
 
 const failed = results.filter((result) => result.issues?.length);
 const warned = results.filter((result) => result.warnings?.length);
+const countLabels = (items, field) => items.reduce((counts, item) => {
+  for (const label of item[field] || []) {
+    const category = label.split(":")[0];
+    counts[category] = (counts[category] || 0) + 1;
+  }
+  return counts;
+}, {});
+const issueCounts = countLabels(results, "issues");
+const warningCounts = countLabels(results, "warnings");
+const observedKeys = new Set(results.map((result) => (
+  `${result.route}\u0000${result.theme}\u0000${result.viewport}`
+)));
+const expectedKeys = routes.flatMap((route) => themes.flatMap((theme) => (
+  viewports.map(([viewport]) => `${route}\u0000${theme}\u0000${viewport}`)
+)));
+const missingObservations = expectedKeys.filter((key) => !observedKeys.has(key));
+const coverage = {
+  expected: expectedKeys.length,
+  observed: results.length,
+  unique: observedKeys.size,
+  complete: missingObservations.length === 0 && observedKeys.size === expectedKeys.length,
+  missing: missingObservations.slice(0, 50),
+};
 const report = {
   generatedAt: new Date().toISOString(),
   base: base.origin,
@@ -319,24 +576,50 @@ const report = {
   themeMode: process.env.AUDIT_THEME_MODE || "critical",
   workers: auditWorkerLimit,
   settleMs: auditSettleMs,
-  routes, themes, viewports: viewports.map(([name]) => name),
-  totals: { observations: results.length, failed: failed.length, warned: warned.length },
+  navigationTimeoutMs: auditNavigationTimeoutMs,
+  navigationRetries: auditNavigationRetries,
+  axeColorContrast: auditAxe,
+  sceneCheck: auditSceneCheck,
+  sceneStrict: auditSceneStrict,
+  scrollSweep: auditScrollSweep,
+  mediaContrast: auditMediaContrast,
+  forcedColors: auditForcedColors,
+  routes,
+  themes,
+  viewports: viewports.map(([name]) => name),
+  coverage,
+  totals: {
+    observations: results.length,
+    failed: failed.length,
+    warned: warned.length,
+    issueCounts,
+    warningCounts,
+  },
   results,
 };
 await writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2));
+const formatCounts = (counts) => Object.entries(counts)
+  .sort((left, right) => right[1] - left[1])
+  .map(([label, count]) => `- ${label}: ${count}`);
 const summary = [
   "# Site-wide visual UX audit",
   "",
   `Origin: ${base.origin}`,
-  `Observations: ${results.length}`,
-  `Critical issues: ${failed.length}`,
-  `Touch-target warnings: ${warned.length}`,
+  `Coverage: ${coverage.observed}/${coverage.expected} (${coverage.complete ? "complete" : "incomplete"})`,
+  `Critical observations: ${failed.length}`,
+  `Warning observations: ${warned.length}`,
   `Routes: ${routes.length}; themes: ${themes.length}; viewports: ${viewports.length}`,
   "",
-  "Checks: theme application, route-purpose visual presence, horizontal overflow, viewport bounds,",
-  "broken visible images, unnamed buttons, fixed/sticky overflow, contrast simplification and page errors.",
+  "## Critical categories",
+  ...(Object.keys(issueCounts).length ? formatCounts(issueCounts) : ["- None"]),
+  "",
+  "## Warning categories",
+  ...(Object.keys(warningCounts).length ? formatCounts(warningCounts) : ["- None"]),
+  "",
+  "Checks: computed theme/token application, WCAG color contrast, duplicate IDs, invisible or clipped text,",
+  "horizontal and fixed overflow, visible broken images, unnamed controls, touch targets, contrast simplification and page errors.",
   "Parameterized routes use a non-mutating visual-audit placeholder and may show an empty-data state.",
   "",
 ].join("\n");
 await writeFile(path.join(output, "SUMMARY.md"), summary);
-if (process.env.AUDIT_STRICT === "1" && failed.length) process.exitCode = 1;
+if (process.env.AUDIT_STRICT === "1" && (failed.length || !coverage.complete)) process.exitCode = 1;

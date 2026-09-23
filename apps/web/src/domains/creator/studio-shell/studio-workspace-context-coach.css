@@ -2,16 +2,16 @@
 .studio-context-coach__visual { overflow: hidden; border: 1px solid var(--color-line, #39443f); border-radius: 13px; background: #111; }
 .studio-context-coach__visual img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .studio-context-coach__body { min-width: 0; align-self: center; }
-.studio-context-coach__body > p { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--color-accent, #8b5cf6); font-size: 8px; font-weight: 850; letter-spacing: .12em; }
+.studio-context-coach__body > p { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--color-accent, #8b5cf6); font-size: 11px; font-weight: 850; letter-spacing: .12em; }
 .studio-context-coach__body > strong { display: block; margin-top: 6px; color: var(--color-fg, #f5f5ed); font-size: 14px; line-height: 1.45; }
-.studio-context-coach__body > span { display: block; margin-top: 4px; color: var(--color-fg-3, #929d96); font-size: 10px; line-height: 1.55; word-break: keep-all; }
+.studio-context-coach__body > span { display: block; margin-top: 4px; color: var(--color-fg-3, #929d96); font-size: 11px; line-height: 1.55; word-break: keep-all; }
 .studio-context-coach ol { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
-.studio-context-coach li { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 5px 8px; border: 1px solid var(--color-line, #39443f); border-radius: 999px; color: var(--color-fg-2, #bdc5c0); background: color-mix(in srgb, var(--color-card, #1a231f) 82%, transparent); font-size: 9px; font-weight: 700; }
-.studio-context-coach li > span { color: var(--color-accent, #8b5cf6); font-size: 8px; }
+.studio-context-coach li { display: inline-flex; align-items: center; gap: 5px; min-height: 28px; padding: 5px 8px; border: 1px solid var(--color-line, #39443f); border-radius: 999px; color: var(--color-fg-2, #bdc5c0); background: color-mix(in srgb, var(--color-card, #1a231f) 82%, transparent); font-size: 11px; font-weight: 700; }
+.studio-context-coach li > span { color: var(--color-accent, #8b5cf6); font-size: 11px; }
 .studio-context-coach li svg { color: var(--color-accent, #8b5cf6); }
-.studio-context-coach > button { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--color-line, #39443f); border-radius: 11px; color: var(--color-fg-3, #929d96); background: var(--color-card, #1a231f); cursor: pointer; }
+.studio-context-coach > button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid var(--color-line, #39443f); border-radius: 11px; color: var(--color-fg-3, #929d96); background: var(--color-card, #1a231f); cursor: pointer; }
 .studio-context-coach > button:hover { color: var(--color-fg, #f5f5ed); border-color: color-mix(in srgb, var(--color-accent, #8b5cf6) 46%, var(--color-line, #39443f)); }
-@media (max-width: 650px) { .studio-context-coach { top: max(126px, env(safe-area-inset-top)); right: 8px; grid-template-columns: 74px minmax(0,1fr) auto; width: min(520px,calc(100vw - 16px)); min-height: 108px; gap: 10px; padding: 9px; border-radius: 15px; } .studio-context-coach__body > span { display: none; } .studio-context-coach ol { gap: 4px; margin-top: 7px; } .studio-context-coach li { min-height: 25px; padding: 4px 6px; font-size: 8px; } }
+@media (max-width: 650px) { .studio-context-coach { top: max(126px, env(safe-area-inset-top)); right: 8px; grid-template-columns: 74px minmax(0,1fr) auto; width: min(520px,calc(100vw - 16px)); min-height: 108px; gap: 10px; padding: 9px; border-radius: 15px; } .studio-context-coach__body > span { display: none; } .studio-context-coach ol { gap: 4px; margin-top: 7px; } .studio-context-coach li { min-height: 30px; padding: 4px 7px; font-size: 11px; } }
 @media (max-width: 430px) { .studio-context-coach { grid-template-columns: minmax(0,1fr) auto; } .studio-context-coach__visual { display: none; } .studio-context-coach ol { display: grid; grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .studio-context-coach * { transition: none !important; } }
 @media (forced-colors: active) { .studio-context-coach,.studio-context-coach li,.studio-context-coach > button { border: 1px solid CanvasText; } }

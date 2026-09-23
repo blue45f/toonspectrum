@@ -71,7 +71,7 @@ export function StudioModeWorkspacePreview({
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex items-center gap-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-accent">
+          <p className="flex items-center gap-2 text-[0.65rem] font-black uppercase tracking-[0.16em] text-accent">
             <Icon size={13} aria-hidden="true" />
             {studioModeLabel(profile, locale)} workspace
           </p>
@@ -133,7 +133,7 @@ export function StudioModeWorkspacePreview({
       {!compact ? (
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <div>
-            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">{locale === "ko" ? "제작 흐름" : "Workflow"}</p>
+            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-3">{locale === "ko" ? "제작 흐름" : "Workflow"}</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {profile.workflow.map((item, index) => (
                 <span key={item.id} className="rounded-full border border-line bg-card px-2 py-1 text-[0.65rem] font-semibold text-fg-2">
@@ -143,11 +143,11 @@ export function StudioModeWorkspacePreview({
             </div>
           </div>
           <div>
-            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">{locale === "ko" ? "주요 도구" : "Key tools"}</p>
+            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-3">{locale === "ko" ? "주요 도구" : "Key tools"}</p>
             <p className="mt-1.5 text-xs leading-5 text-fg-2">{profile.keyTools.map((tool) => tool[locale]).join(" · ")}</p>
           </div>
           <div>
-            <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">AI</p>
+            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-3">AI</p>
             <p className="mt-1.5 text-xs leading-5 text-fg-2">
               {profile.aiActions.slice(0, 4).map((action) => action.replaceAll("-", " ")).join(" · ")}
             </p>

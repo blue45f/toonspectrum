@@ -3,6 +3,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
 
+import {
+  createStudioPointerStrokePoints,
+  dispatchStudioPointerStroke,
+} from './lib/studio-pointer-input-driver.mjs';
+
 const origin = process.argv[2] ?? 'http://127.0.0.1:5299';
 const target = new URL(origin);
 if (!['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname)) {
@@ -11,7 +16,14 @@ if (!['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname)) {
 const output = path.resolve('artifacts/skia-multitab-mobile');
 await fs.mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, channel: 'chromium' });
-const report = { checks: [], errors: [], desktopDriver: null, mobileDriver: null };
+const report = {
+  checks: [],
+  errors: [],
+  desktopDriver: null,
+  mobileDriver: null,
+  pointerInputs: [],
+  physicalDeviceCertified: false,
+};
 const deadline = setTimeout(() => {
   report.errors.push('Skia multitab/mobile verification exceeded 180 seconds');
   void browser.close();
@@ -68,51 +80,23 @@ async function openEditor(page) {
   return bounds;
 }
 
-async function drawStrokes(page, bounds, count) {
-  for (let index = 0; index < count; index++) {
-    const y = bounds.y + Math.min(bounds.height - 60, 110 + index * 35);
-    await page.mouse.move(bounds.x + bounds.width * 0.28, y);
-    await page.mouse.down();
-    await page.mouse.move(bounds.x + bounds.width * 0.62, y + 24, { steps: 10 });
-    await page.mouse.up();
-  }
-  await page.mouse.move(12, 12);
-}
-
-async function drawTouchStrokes(context, page, bounds, count) {
-  const cdp = await context.newCDPSession(page);
+async function drawPointerStrokes(context, page, bounds, count, mode, label) {
+  const cdp = mode === 'mouse' ? null : await context.newCDPSession(page);
   try {
     for (let index = 0; index < count; index++) {
-      const startX = bounds.x + bounds.width * 0.28;
-      const startY = bounds.y + Math.min(bounds.height - 60, 110 + index * 35);
-      const endX = bounds.x + bounds.width * 0.62;
-      const endY = startY + 24;
-      const point = (step) => ({
-        x: startX + (endX - startX) * (step / 10),
-        y: startY + (endY - startY) * (step / 10),
-        radiusX: 2,
-        radiusY: 2,
-        force: 0.5,
-        id: 1,
+      const points = createStudioPointerStrokePoints(bounds, index + 1, { steps: 18 });
+      const telemetry = await dispatchStudioPointerStroke({
+        page,
+        cdp,
+        mode,
+        points,
+        stepDelayMs: mode === 'mouse' ? 0 : 2,
       });
-      await cdp.send('Input.dispatchTouchEvent', {
-        type: 'touchStart',
-        touchPoints: [point(0)],
-      });
-      for (let step = 1; step <= 10; step++) {
-        await cdp.send('Input.dispatchTouchEvent', {
-          type: 'touchMove',
-          touchPoints: [point(step)],
-        });
-      }
-      await cdp.send('Input.dispatchTouchEvent', {
-        type: 'touchEnd',
-        touchPoints: [],
-      });
+      report.pointerInputs.push({ label, stroke: index + 1, ...telemetry });
       await page.waitForTimeout(40);
     }
   } finally {
-    await cdp.detach();
+    await cdp?.detach();
   }
 }
 
@@ -158,14 +142,14 @@ async function desktopMultitabCheck() {
     console.log('multitab: opening tab A');
     await first.bringToFront();
     const firstBounds = await openEditor(first);
-    await drawStrokes(first, firstBounds, 2);
+    await drawPointerStrokes(context, first, firstBounds, 2, 'pen', 'tab-a');
     const firstReady = await waitForGpu(first, 2);
     console.log('multitab: tab A GPU ready; opening tab B');
     second = await context.newPage();
     observe(second, 'tab-b');
     await second.bringToFront();
     const secondBounds = await openEditor(second);
-    await drawStrokes(second, secondBounds, 3);
+    await drawPointerStrokes(context, second, secondBounds, 3, 'pen', 'tab-b');
     console.log('multitab: tab B strokes submitted');
     const secondState = await waitForGpu(second, 3);
     report.desktopDriver = firstReady.driver;
@@ -194,7 +178,7 @@ async function desktopMultitabCheck() {
     }).click();
     await waitForGpu(first, 2);
     report.checks.push(
-      'Two tabs retain independent GPU recovery state without cross-tab pixel loss',
+      'Two pressure-aware pen tabs retain independent GPU recovery state without cross-tab pixel loss',
     );
   } catch (error) {
     for (const [index, page] of [first, second].filter(Boolean).entries()) {
@@ -227,7 +211,7 @@ async function mobileViewportCheck() {
     console.log('mobile: opening 390x844 editor');
     await page.bringToFront();
     const bounds = await openEditor(page);
-    await drawTouchStrokes(context, page, bounds, 2);
+    await drawPointerStrokes(context, page, bounds, 2, 'touch', 'mobile');
     const state = await waitForGpu(page, 2);
     report.mobileDriver = state.driver;
     const surfaceBounds = await page
@@ -242,7 +226,7 @@ async function mobileViewportCheck() {
     );
     await page.screenshot({ path: path.join(output, 'mobile-390x844.png') });
     report.checks.push(
-      '390x844 touch emulation draws and publishes one bounded Skia document surface',
+      '390x844 CDP touch contact draws and publishes one bounded Skia document surface',
     );
   } catch (error) {
     if (!page.isClosed()) {

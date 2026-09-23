@@ -4,9 +4,12 @@ import type { SceneNodeIR } from "@toonspectrum/studio-project-model";
 import { isDirectLiveDraftEl, resolveStudioCausalInkDrawContract } from "../brush/studio-draw-rendering";
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { planStudioCausalInk } from "../studio-causal-ink";
-import type { DrawEl, El, FrameEl, ImageEl } from "../studio-element-model";
+import type { DrawEl, El, FrameEl, ImageEl, TextEl } from "../studio-element-model";
 import { createStudioPanelResolver } from "../studio-element-geometry";
+import { skewDegToKonva } from "../studio-skew";
+import { isStudioStandardBlendMode } from "../studio-standard-blend";
 import { hasActiveImageFilters } from "./studio-konva-filter-fields";
+import { resolveStudioSkiaDocumentFontSource } from "./studio-skia-document-font-contract";
 import { isStudioVelloDocumentVectorElement, lowerStudioElementsToRenderScene, parseSupportedCssColorToIR } from "./studio-document-scene-lower";
 
 export interface StudioSkiaDocumentPlan {
@@ -31,6 +34,8 @@ export function isStudioSkiaCausalInk(element: El): element is DrawEl & El {
 
 export type StudioSkiaFrameTheme = "classic" | "soft" | "vivid";
 
+const STUDIO_SKIA_STRONG_RTL_TEXT = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/u;
+
 function isStudioSkiaDocumentFrame(element: El): boolean {
   return element.type === "frame"
     && !element.bg
@@ -43,15 +48,97 @@ function isStudioSkiaDocumentFrame(element: El): boolean {
     && (!element.stroke || parseSupportedCssColorToIR(element.stroke) !== null);
 }
 
+function isStudioSkiaDocumentText(element: El): element is TextEl & El {
+  if (element.type !== "text" || !element.text || element.text.length > 200_000
+    || STUDIO_SKIA_STRONG_RTL_TEXT.test(element.text)) return false;
+  if (element.vertical || element.textPath || element.rubySpans?.length || element.rangeFormats?.length) return false;
+  if (element.fillType === "gradient" || element.gradient || element.gradientColorStart || element.gradientColorEnd) return false;
+  if (element.stroke && (element.strokeWidth ?? 0) > 0) return false;
+  if (element.shadowColor && (element.shadowOpacity ?? 0) > 0) return false;
+  if (element.stickyNotePresetId || element.stickyNoteFill) return false;
+  if ((element.skewX ?? 0) !== 0 || (element.skewY ?? 0) !== 0) return false;
+  const opacity = element.opacity ?? 1;
+  const lineHeight = element.lineHeight ?? 1;
+  const letterSpacing = element.letterSpacing ?? 0;
+  return [
+    element.x,
+    element.y,
+    element.width,
+    element.fontSize,
+    element.rotation,
+    opacity,
+    lineHeight,
+    letterSpacing,
+  ].every(Number.isFinite)
+    && element.width > 0
+    && element.fontSize > 0
+    && opacity >= 0
+    && opacity <= 1
+    && lineHeight > 0
+    && parseSupportedCssColorToIR(element.fill) !== null;
+}
+
+function resolveImageBlendMode(
+  value: string | undefined,
+): NonNullable<SkiaDocumentItem["image"]>["blendMode"] | null {
+  if (!value || value === "normal" || value === "source-over") {
+    return "source-over";
+  }
+  return isStudioStandardBlendMode(value) && value !== "normal" ? value : null;
+}
+
+function resolveImageShadow(
+  element: ImageEl & El,
+): NonNullable<NonNullable<SkiaDocumentItem["image"]>["shadow"]> | null | undefined {
+  if (!element.shadowColor || (element.shadowOpacity ?? 1) <= 0) {
+    return undefined;
+  }
+  const color = parseSupportedCssColorToIR(element.shadowColor);
+  const blur = element.shadowBlur ?? 0;
+  const offsetX = element.shadowOffsetX ?? 0;
+  const offsetY = element.shadowOffsetY ?? 0;
+  const opacity = element.shadowOpacity ?? 1;
+  if (!color
+    || [blur, offsetX, offsetY, opacity].some((value) => !Number.isFinite(value))
+    || blur < 0
+    || opacity < 0
+    || opacity > 1) {
+    return null;
+  }
+  return { color, blur, offsetX, offsetY, opacity };
+}
+
 function isStudioSkiaDocumentImage(element: El): element is ImageEl & El {
   if (element.type !== "image" || !element.src || element.isAnimatedGif || (element.frames?.length ?? 0) > 1) return false;
   if (element.filterPageComposite || element.adjustmentLayer || hasActiveImageFilters(element)) return false;
   if (element.filterMaskSrc || element.filterMaskEnabled || element.maskSrc || element.maskEnabled
-    || element.clipBelow || element.alphaLocked || (element.blendMode && element.blendMode !== "source-over")) return false;
-  if (element.shadowColor || (element.cornerRadius ?? 0) !== 0 || (element.skewX ?? 0) !== 0 || (element.skewY ?? 0) !== 0) return false;
+    || element.clipBelow || element.alphaLocked) return false;
+  const blendMode = resolveImageBlendMode(element.blendMode);
+  const shadow = resolveImageShadow(element);
   const opacity = element.opacity ?? 1;
-  return [element.x, element.y, element.width, element.height, element.rotation, opacity].every(Number.isFinite)
-    && element.width > 0 && element.height > 0 && opacity >= 0 && opacity <= 1
+  const cornerRadius = element.cornerRadius ?? 0;
+  const skewX = element.skewX ?? 0;
+  const skewY = element.skewY ?? 0;
+  return blendMode !== null
+    && shadow !== null
+    && [
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      element.rotation,
+      opacity,
+      cornerRadius,
+      skewX,
+      skewY,
+    ].every(Number.isFinite)
+    && element.width > 0
+    && element.height > 0
+    && opacity >= 0
+    && opacity <= 1
+    && cornerRadius >= 0
+    && Math.abs(skewX) <= 60
+    && Math.abs(skewY) <= 60
     && element.src.length <= 48 * 1024 * 1024
     && /^(?:data:image\/(?:png|jpeg);base64,|blob:|https?:\/\/|\/)/iu.test(element.src);
 }
@@ -60,6 +147,7 @@ export function isStudioSkiaDocumentElement(element: El): boolean {
   return isStudioSkiaCausalInk(element)
     || isStudioVelloDocumentVectorElement(element)
     || isStudioSkiaDocumentFrame(element)
+    || isStudioSkiaDocumentText(element)
     || isStudioSkiaDocumentImage(element);
 }
 
@@ -93,7 +181,36 @@ export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSki
       ...(contract.nib ? { nib: contract.nib } : {}),
     } };
   }
+  if (isStudioSkiaDocumentText(element)) {
+    const color = parseSupportedCssColorToIR(element.fill);
+    if (!color) return null;
+    const style = element.fontStyle ?? "bold";
+    const weight = style.includes("bold") ? 700 : 400;
+    return {
+      id: element.id,
+      revision: element,
+      text: {
+        text: element.text,
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        fontSize: element.fontSize,
+        rotation: element.rotation,
+        opacity: element.opacity ?? 1,
+        color,
+        align: element.align ?? "left",
+        letterSpacing: element.letterSpacing ?? 0,
+        lineHeight: element.lineHeight ?? 1,
+        weight,
+        italic: style.includes("italic"),
+        font: resolveStudioSkiaDocumentFontSource(element.font, weight),
+      },
+    };
+  }
   if (isStudioSkiaDocumentImage(element)) {
+    const blendMode = resolveImageBlendMode(element.blendMode);
+    const shadow = resolveImageShadow(element);
+    if (!blendMode || shadow === null) return null;
     return {
       id: element.id,
       revision: element,
@@ -107,6 +224,11 @@ export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSki
         opacity: element.opacity ?? 1,
         flipX: Boolean(element.flipped),
         flipY: Boolean(element.flippedY),
+        skewX: skewDegToKonva(element.skewX ?? 0),
+        skewY: skewDegToKonva(element.skewY ?? 0),
+        cornerRadius: element.cornerRadius ?? 0,
+        blendMode,
+        ...(shadow ? { shadow } : {}),
       },
     };
   }

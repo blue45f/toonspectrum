@@ -1,9 +1,9 @@
 /* Workspace chrome uses the same semantic tokens as the rest of the product. */
 .workspace-shell{display:grid;grid-template-columns:88px minmax(0,1fr);grid-template-rows:64px minmax(0,1fr) auto;grid-template-areas:"top top" "nav main" "nav status";min-height:100dvh;background:var(--color-canvas);color:var(--color-fg);font-family:var(--font-sans);font-size:14px;line-height:1.5}
 .workspace-shell *,.workspace-inspector *{box-sizing:border-box}
-.workspace-shell a,.workspace-inspector a{color:inherit;text-decoration:none}
-.workspace-shell button,.workspace-shell select,.workspace-inspector button{font:inherit;color:inherit}
-.workspace-shell button,.workspace-inspector button{cursor:pointer}
+:where(.workspace-shell,.workspace-inspector) :where(a){color:inherit;text-decoration:none}
+:where(.workspace-shell,.workspace-inspector) :where(button,select){font:inherit;color:inherit}
+:where(.workspace-shell,.workspace-inspector) :where(button){cursor:pointer}
 .workspace-shell :is(a,button,select):focus-visible,.workspace-inspector :is(a,button,select):focus-visible{outline:2px solid var(--color-accent);outline-offset:3px}
 .workspace-shell :is(button,select):disabled{opacity:.6;cursor:not-allowed}
 .workspace-topbar{grid-area:top;display:flex;align-items:center;gap:28px;min-width:0;padding:8px 24px;border-bottom:1px solid var(--color-line);background:var(--color-panel)}

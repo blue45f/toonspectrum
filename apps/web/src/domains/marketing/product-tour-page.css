@@ -1,4 +1,5 @@
 .product-tour-page {
+  --product-tour-accent-strong: #b54a20;
   min-height: 100vh;
   overflow-x: clip;
   padding-bottom: clamp(52px, 8vw, 112px);
@@ -420,7 +421,7 @@
   gap: clamp(34px, 5vw, 72px);
 }
 
-.product-tour-page__hero .ch-eyebrow { color: #d75f2e; }
+.product-tour-page__hero .ch-eyebrow { color: var(--product-tour-accent-strong); }
 .product-tour-page__hero h1 span { color: #f36f36; }
 
 .product-tour-page__hero-visual {
@@ -478,7 +479,7 @@
 .product-tour-page__journey > header .ch-eyebrow {
   grid-column: 1 / -1;
   margin: 0 0 -6px;
-  color: #d75f2e;
+  color: var(--product-tour-accent-strong);
 }
 
 .product-tour-page__journey > header > p:last-child {
@@ -560,7 +561,7 @@
   align-items: center;
   gap: 7px;
   margin-top: 18px;
-  color: #d75f2e;
+  color: var(--product-tour-accent-strong);
   font-size: 12px;
   font-weight: 780;
 }
@@ -568,9 +569,9 @@
 .product-tour-page__capability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .product-tour-page__capability:hover { border-color: #df7b50; }
 .product-tour-page__capability > span,
-.product-tour-page__role-grid > a > span { color: #d96231; }
+.product-tour-page__role-grid > a > span { color: var(--product-tour-accent-strong); }
 .product-tour-page__capabilities > header .ch-eyebrow,
-.product-tour-page__roles .ch-eyebrow { color: #d75f2e; }
+.product-tour-page__roles .ch-eyebrow { color: var(--product-tour-accent-strong); }
 
 .product-tour-page__advantages::after {
   background: radial-gradient(circle at 90% 8%, rgb(255 119 58 / 13%), transparent 25rem), #20140f;
@@ -609,7 +610,7 @@
   }
   .product-tour-page__facts > div:last-child { border-bottom: 0; }
   .product-tour-page__capability-grid { grid-template-columns: 1fr; }
-  .product-tour-page__hero-visual span { right: 10px; bottom: 10px; font-size: 9px; }
+  .product-tour-page__hero-visual span { right: 10px; bottom: 10px; font-size: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -633,3 +634,5 @@
 .product-tour-page__interactive-heading > p:last-child { color: var(--ch-muted); font-size: 15px; line-height: 1.85; }
 @media (max-width: 900px) { .product-tour-page__interactive-heading { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .product-tour-page__interactive { padding: 56px 18px; } }
+
+:root[data-theme="dark"] .product-tour-page { --product-tour-accent-strong: #ff9a69; }

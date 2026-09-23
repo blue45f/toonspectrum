@@ -9,12 +9,12 @@ import { DEFAULT_APPEARANCE, THEME_IDS, THEME_PRESETS, getThemePreset, normalize
 const bootstrap = readFileSync(new URL("../../../public/bootstrap-theme.js", import.meta.url), "utf8");
 const css = readFileSync(new URL("../../styles/design-themes.css", import.meta.url), "utf8");
 
-function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocked = false) {
+function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocked = false, contrast = false) {
   const attributes: Record<string, string> = {};
   runInNewContext(bootstrap, {
     localStorage: { getItem: () => { if (blocked) throw new Error("blocked"); return JSON.stringify({ state }); } },
-    location: { pathname }, window: { matchMedia: () => ({ matches: dark }) },
-    document: { documentElement: { setAttribute: (key: string, value: string) => { attributes[key] = value; }, style: {} } },
+    location: { pathname }, window: { matchMedia: (query: string) => ({ matches: query.includes("color-scheme") ? dark : contrast }) },
+    document: { documentElement: { setAttribute: (key: string, value: string) => { attributes[key] = value; }, style: {} }, querySelector: () => null },
   });
   return attributes;
 }
@@ -52,6 +52,25 @@ describe("appearance preferences and first paint", () => {
   it("boots safely with unavailable storage", () => {
     expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("dark");
   });
+  it("lets system appearance prioritize OS high contrast at first paint and runtime", () => {
+    const state = { preference: "system", studioPreference: "inherit" } as const;
+    expect(resolveDesignTheme(state, "site", false, true)).toBe("contrast");
+    const boot = bootstrapResult(state, "/settings", false, false, true);
+    expect(boot["data-design-theme"]).toBe("contrast");
+    expect(boot["data-contrast"]).toBe("more");
+    expect(boot["data-theme-source"]).toBe("system");
+  });
+  it("preserves Studio inheritance metadata when the site follows the system", () => {
+    const boot = bootstrapResult(
+      { preference: "system", studioPreference: "inherit" },
+      "/studio",
+      true,
+    );
+    expect(boot["data-design-theme"]).toBe("dark");
+    expect(boot["data-theme-preference"]).toBe("system");
+    expect(boot["data-theme-source"]).toBe("inherit");
+    expect(boot["data-theme-scope"]).toBe("studio");
+  });
 });
 
 describe("palette text contrast", () => {
@@ -65,6 +84,23 @@ describe("palette text contrast", () => {
     }
     for (const accent of ["accent", "accent-2"]) {
       expect(new Color(tokens["on-accent"]).contrast(new Color(tokens[accent]), "WCAG21"), `${id}: button ${accent}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+  it.each(THEME_PRESETS)("$id essential control boundaries meet 3:1", ({ id }) => {
+    const block = css.split(`[data-appearance-preview="${id}"] {`)[1]?.split("}")[0] ?? "";
+    const tokens = Object.fromEntries([...block.matchAll(/--color-([\w-]+):\s*([^;]+);/gu)].map((match) => [match[1], match[2]]));
+    const boundary = new Color(tokens.fg).mix(new Color(tokens.card), 0.45, { space: "oklch" });
+    for (const surface of ["canvas", "panel", "card", "raised"]) {
+      expect(boundary.contrast(new Color(tokens[surface]), "WCAG21"), `${id}: control/${surface}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("keeps maximum-contrast text and strong boundaries above 7:1", () => {
+    const block = css.split(`[data-appearance-preview="contrast"] {`)[1]?.split("}")[0] ?? "";
+    const tokens = Object.fromEntries([...block.matchAll(/--color-([\w-]+):\s*([^;]+);/gu)].map((match) => [match[1], match[2]]));
+    for (const surface of ["canvas", "panel", "card", "raised"]) {
+      expect(new Color(tokens["fg-3"]).contrast(new Color(tokens[surface]), "WCAG21")).toBeGreaterThanOrEqual(7);
+      expect(new Color(tokens["line-strong"]).contrast(new Color(tokens[surface]), "WCAG21")).toBeGreaterThanOrEqual(7);
     }
   });
 });

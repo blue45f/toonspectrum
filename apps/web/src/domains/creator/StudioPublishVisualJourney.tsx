@@ -79,8 +79,8 @@ export function StudioPublishVisualJourney({
               aria-pressed={active}
               disabled={disabled}
               onClick={() => onSelect(step.id)}
-              initial={reducedMotion ? false : { opacity: 0, y: 12 }}
-              animate={reducedMotion ? undefined : { opacity: 1, y: 0 }}
+              initial={reducedMotion ? false : { y: 12 }}
+              animate={reducedMotion ? undefined : { y: 0 }}
               transition={{ duration: .36, delay: index * .055, ease: [0.16, 1, 0.3, 1] }}
             >
               <span className="studio-publish-visual-journey__media"><Visual step={step} /><span className="studio-publish-visual-journey__icon"><Icon size={18} aria-hidden="true" /></span></span>

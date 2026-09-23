@@ -125,8 +125,8 @@ export function AccessibilityLab() {
             )}
             style={{ fontSize: `${textScale}%` }}
           >
-            <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-good/40 bg-good/10 px-3 text-[0.75em] font-bold text-good">
-              <CheckCircle2 size="1em" aria-hidden="true" />{translateCurrentStaticSourceText("domains.legal.AccessibilityLab", "en", "SAVE COMPLETE")}</span>
+            <span className="inline-flex min-h-8 items-center gap-2 rounded-full border border-good/40 bg-good/10 px-3 text-[0.75em] font-bold text-fg">
+              <CheckCircle2 size="1em" className="text-good" aria-hidden="true" />{translateCurrentStaticSourceText("domains.legal.AccessibilityLab", "en", "SAVE COMPLETE")}</span>
             <h3 className="mt-5 text-[1.2em] font-bold text-fg">{copy.previewTitle}</h3>
             <p className="mt-2 max-w-2xl text-[0.9em] leading-7 text-fg-2">{copy.previewBody}</p>
             <button

@@ -90,7 +90,7 @@ export function ReviewsPage() {
               <button
                 type="button"
                 onClick={reload}
-                className={buttonClass({ size: "sm", variant: "quiet", className: "gap-1.5" })}
+                className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-11 gap-1.5" })}
               >
                 <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                 갱신

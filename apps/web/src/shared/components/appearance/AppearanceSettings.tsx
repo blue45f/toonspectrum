@@ -5,7 +5,10 @@ import { CreatorExperienceModeSwitch } from "@/shared/components/CreatorExperien
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 import { getThemeSceneAsset } from "@/shared/lib/theme-scene-assets";
-import { THEME_PRESETS, type AppearanceScope, type ThemeGroup } from "@/shared/lib/theme-presets";
+import {
+  THEME_PRESETS, getThemePreset, resolveDesignTheme,
+  type AppearanceScope, type ThemeGroup,
+} from "@/shared/lib/theme-presets";
 
 const GROUPS: readonly ThemeGroup[] = ["signature", "classic", "accessibility"];
 
@@ -19,7 +22,14 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
   const setStudioPreference = useTheme((state) => state.setStudioPreference);
   const resetScope = useTheme((state) => state.resetScope);
   const storageAvailable = useTheme((state) => state.storageAvailable);
+  const systemDark = useTheme((state) => state.systemDark);
+  const systemContrast = useTheme((state) => state.systemContrast);
   const selected = scope === "studio" ? studioPreference : preference;
+  const resolvedTheme = resolveDesignTheme(
+    { preference, studioPreference }, scope, systemDark, systemContrast,
+  );
+  const resolvedPreset = getThemePreset(resolvedTheme);
+  const resolvedLabel = korean ? resolvedPreset.ko : resolvedPreset.en;
   const choose = (value: typeof preference) => {
     if (scope === "studio") setStudioPreference(value);
     else setPreference(value);
@@ -48,19 +58,25 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
         </div>
         <CreatorExperienceModeSwitch />
       </section>
-      <section className="appearance-experience-mode" aria-labelledby={`${id}-experience`}>
-        <div>
-          <h3 id={`${id}-experience`}>{korean ? "홈 경험" : "Home experience"}</h3>
-          <p>{korean ? "현재 메인을 유지하거나 협업 공간 중심의 Virtual Studio 홈으로 전환합니다. 기능과 데이터는 동일하게 연결됩니다." : "Keep the current home or switch to the collaboration-first Virtual Studio home. Both views share the same tools and data."}</p>
-        </div>
-        <CreatorExperienceModeSwitch />
-      </section>
       <div className="appearance-scope" role="group" aria-label={korean ? "테마 적용 범위" : "Theme scope"}>
         {(["site", "studio"] as const).map((value) => (
           <button key={value} type="button" aria-pressed={scope === value} onClick={() => setScope(value)}>
             {value === "site" ? korean ? "사이트" : "Site" : korean ? "스튜디오" : "Studio"}
           </button>
         ))}
+      </div>
+      <div className="appearance-current" aria-live="polite" aria-atomic="true">
+        <span>{korean ? "현재 적용" : "Applied now"}</span>
+        <strong>{resolvedLabel}</strong>
+        <small>{selected === "system"
+          ? korean ? "OS의 밝기·고대비 설정을 자동으로 반영합니다." : "Automatically follows the OS color and contrast preferences."
+          : scope === "studio" && selected === "inherit"
+            ? korean ? "사이트 테마를 그대로 사용합니다." : "Uses the current site theme."
+            : resolvedTheme === "contrast"
+              ? korean ? "최대 가독성" : "Maximum legibility"
+              : resolvedPreset.mode === "light"
+                ? korean ? "밝은 화면" : "Light appearance"
+                : korean ? "어두운 화면" : "Dark appearance"}</small>
       </div>
       <p id={`${id}-hint`} className="appearance-hint">
         {scope === "studio"
@@ -79,7 +95,10 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
           <label className="appearance-option-row">
             <input type="radio" name={`${id}-theme`} checked={selected === "system"} onChange={() => choose("system")} />
             <Monitor size={16} aria-hidden />
-            <span>{korean ? "시스템 설정 따르기" : "Follow system appearance"}</span>
+            <span className="appearance-option-copy">
+              <span>{korean ? "시스템 설정 따르기" : "Follow system appearance"}</span>
+              <small>{korean ? "라이트·다크·고대비 자동 감지" : "Detects light, dark and high contrast"}</small>
+            </span>
           </label>
         </div>
         <div className="appearance-theme-groups">
@@ -97,7 +116,14 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
                     const label = korean ? preset.ko : preset.en;
                     const scene = getThemeSceneAsset(preset.id);
                     return (
-                      <label className="appearance-card" key={preset.id} data-selected={selected === preset.id} data-featured={preset.group === "signature" || undefined}>
+                      <label
+                        className="appearance-card"
+                        key={preset.id}
+                        data-selected={selected === preset.id}
+                        data-featured={preset.group === "signature" || undefined}
+                        data-theme-mode={preset.mode}
+                        data-theme-contrast={preset.id === "contrast" ? "enhanced" : undefined}
+                      >
                         <input className="sr-only" type="radio" name={`${id}-theme`} aria-label={label}
                           checked={selected === preset.id} onChange={() => choose(preset.id)} />
                         <span className="appearance-preview" data-appearance-preview={preset.id} aria-hidden="true">
@@ -117,7 +143,15 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
                           <span className="appearance-preview-art" data-motif={preset.motif}><i /><i /><i /><i /></span>
                         </span>
                         <span className="appearance-card-title">
-                          <span>{label}{preset.group === "signature" && <small>{korean ? "시그니처" : "Signature"}</small>}</span>
+                          <span>
+                            {label}
+                            {preset.group === "signature" && <small>{korean ? "시그니처" : "Signature"}</small>}
+                            <small className="appearance-card-mode">{preset.id === "contrast"
+                              ? korean ? "최대 대비" : "Maximum contrast"
+                              : preset.mode === "light"
+                                ? korean ? "밝음" : "Light"
+                                : korean ? "어두움" : "Dark"}</small>
+                          </span>
                           {selected === preset.id && <Check size={16} aria-hidden />}
                         </span>
                         <span className="appearance-card-description">{korean ? preset.descriptionKo : preset.descriptionEn}</span>
@@ -134,7 +168,10 @@ export function AppearanceSettings({ initialScope = "site" }: { initialScope?: A
         <p role="status">{storageAvailable
           ? korean ? "선택 즉시 적용 · 이 브라우저에 자동 저장" : "Applied immediately · saved in this browser"
           : korean ? "브라우저 저장이 차단되어 이번 세션에만 적용됩니다." : "Browser storage is unavailable. Applied for this session only."}</p>
-        <button type="button" onClick={() => resetScope(scope)}><RotateCcw size={14} aria-hidden />{korean ? "기본값 복원" : "Restore default"}</button>
+        <button type="button" onClick={() => resetScope(scope)}>
+          <RotateCcw size={14} aria-hidden />
+          {korean ? "기본값 복원" : "Restore default"}
+        </button>
       </div>
     </div>
   );

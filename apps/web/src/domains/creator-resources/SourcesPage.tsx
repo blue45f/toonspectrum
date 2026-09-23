@@ -6,7 +6,7 @@ import { ResourceLayout } from "./ResourceLayout";
 import { isFreeResourceSource, resourceSourceCostLabel, RESOURCE_SOURCES } from "./sources";
 
 const COMMERCIAL_STYLE: Record<string, string> = {
-  "상업 핵심 후보": "border-good/30 bg-good/10 text-good",
+  "상업 핵심 후보": "border-good/30 bg-good/10 text-fg",
   "조건부 상업 이용": "border-accent/30 bg-accent-soft text-accent",
   "계약 후 이용": "border-warn/30 bg-warn/10 text-warn",
   "비상업·내부 검토": "border-line bg-raised text-fg-2",
@@ -14,7 +14,7 @@ const COMMERCIAL_STYLE: Record<string, string> = {
 };
 
 function sourceCostStyle(label: string): string {
-  if (label.startsWith("무료")) return "border-good/30 bg-good/10 text-good";
+  if (label.startsWith("무료")) return "border-good/30 bg-good/10 text-fg";
   if (label === "유료·계약 필요") return "border-warn/30 bg-warn/10 text-warn";
   if (label === "운영 제외") return "border-danger/30 bg-danger/10 text-danger";
   return "border-line bg-raised text-fg-2";
