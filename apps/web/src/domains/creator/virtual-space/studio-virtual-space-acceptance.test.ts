@@ -22,7 +22,7 @@ import { studioCharacterSkinForAvatarIndex } from "./studio-virtual-space-charac
 import { loadStudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-loader";
 
 const map = (layers: StudioTiledMapLike["layers"]): StudioTiledMapLike => ({
-  width: 850, height: 798, tilewidth: 1, tileheight: 1, layers,
+  width: 1280, height: 960, tilewidth: 1, tileheight: 1, layers,
 });
 
 describe("Virtual Studio world replacement acceptance", () => {

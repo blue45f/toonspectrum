@@ -11,10 +11,10 @@ describe("Virtual Studio directory", () => {
     const onMove = vi.fn(), onOpen = vi.fn();
     render(<StudioVirtualSpaceDirectory manifest={DEFAULT_STUDIO_WORLD_MANIFEST} peers={[]} onMove={onMove} onOpen={onOpen} onSelectPeer={vi.fn()} />);
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "ＤＲＡＷＩＮＧ" } });
-    fireEvent.click(screen.getByRole("button", { name: "드로잉 스튜디오 도구 바로 열기" }));
+    fireEvent.click(screen.getByRole("button", { name: "드로잉 아틀리에 도구 바로 열기" }));
     expect(onOpen).toHaveBeenCalledExactlyOnceWith("canvas");
     expect(onMove).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "드로잉 스튜디오로 걷기" }));
+    fireEvent.click(screen.getByRole("button", { name: "드로잉 아틀리에로 걷기" }));
     expect(onMove).toHaveBeenCalledWith(DEFAULT_STUDIO_WORLD_MANIFEST.interactions.find((item) => item.zoneId === "drawing")?.point);
   });
   it("selects an authenticated teammate without starting an activity, and never invents a result", () => {

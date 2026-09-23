@@ -11,7 +11,8 @@ import {
   STUDIO_VIRTUAL_ART_STYLES,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
-import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
+import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "./studio-virtual-space-character-skins";
+import { StudioVirtualSpaceRtcPanel } from "./StudioVirtualSpaceRtcPanel";
 import { STUDIO_VIRTUAL_SPACE_AUTO_AVATAR } from "./studio-virtual-space-model";
 
 export function StudioVirtualSpaceEntryLobby({
@@ -32,7 +33,7 @@ export function StudioVirtualSpaceEntryLobby({
   readonly onEnter: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceEntryLobby");
-  const previewCharacter = STUDIO_CHARACTER_SKINS[0]!;
+  const previewCharacter = studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[0]!, artStyle);
   return <div className="studio-vspace-entry" data-route-ready="studio-virtual-entry" data-art-style={artStyle}>
     <Container size="wide" className="studio-vspace-entry-container">
       <section className="studio-vspace-entry-card" aria-labelledby="studio-vspace-entry-title">
@@ -63,7 +64,9 @@ export function StudioVirtualSpaceEntryLobby({
             <strong>{bt("자동 선택", "Automatic")}</strong>
             <span>{bt("내 식별자에 맞춘 안정적인 캐릭터", "A stable character selected from your identity")}</span>
           </button>
-          {STUDIO_CHARACTER_SKINS.map((character, index) => <button key={character.key} type="button"
+          {STUDIO_CHARACTER_SKINS.map((sourceCharacter, index) => {
+            const character = studioCharacterSkinForArtStyle(sourceCharacter, artStyle);
+            return <button key={sourceCharacter.key} type="button"
             className={cn("studio-vspace-entry-avatar", avatarIndex === index && "is-selected")}
             aria-label={bt(`${character.labelKo} 캐릭터 선택`, `Select ${character.labelEn} character`)}
             aria-pressed={avatarIndex === index}
@@ -74,7 +77,8 @@ export function StudioVirtualSpaceEntryLobby({
             <strong>{bt(character.labelKo, character.labelEn)}</strong>
             <span>{bt("걷기·앉기·인사 지원", "Walk, sit and wave")}</span>
             {avatarIndex === index ? <b aria-hidden>✓</b> : null}
-          </button>)}
+          </button>;
+          })}
         </fieldset>
 
         <fieldset className="studio-vspace-entry-art-styles">
@@ -101,6 +105,8 @@ export function StudioVirtualSpaceEntryLobby({
             </button>)}
           </div>
         </fieldset>
+
+        <StudioVirtualSpaceRtcPanel entryOnly />
 
         <div className="studio-vspace-entry-actions">
           <Link href="/studio" className={buttonClass({ variant: "outline" })}>{bt("작업 목록으로", "Back to work list")}</Link>

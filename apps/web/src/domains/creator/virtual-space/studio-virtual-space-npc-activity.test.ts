@@ -6,17 +6,17 @@ import { studioWorldManifestToTiledMap, parseStudioWorldAuthoringImport } from "
 import { studioWorldManifestFromTiled, type StudioTiledMapLike } from "./studio-virtual-space-tiled-adapter";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 
-const anchor: StudioWorldNpcActivityAnchor = { id: "local-chair", roomId: "lounge", approachPoint: { x: 140, y: 120 },
+const anchor: StudioWorldNpcActivityAnchor = { id: "local-chair", roomId: "lobby", approachPoint: { x: 140, y: 120 },
   anchorPoint: { x: 166, y: 120 }, exitPoint: { x: 198, y: 120 },
   facing: "up", activity: "rest", animation: "idle", minDurationMs: 2500, maxDurationMs: 2500 };
 function fixture(): StudioVirtualSpaceWorldManifest {
   return { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 360, height: 260, props: [], colliders: [], portals: [],
-    rooms: [{ id: "lounge", labelKo: "라운지", labelEn: "Lounge", x: 0, y: 0, width: 360, height: 260 }],
+    rooms: [{ id: "lobby", labelKo: "로비", labelEn: "Lobby", x: 0, y: 0, width: 360, height: 260 }],
     spawns: [{ id: "main", point: { x: 40, y: 220 } }], interactionSlots: [], occlusionLayers: [], acousticZones: [],
-    interactions: [{ id: "story", zoneId: "lounge", action: "story", point: { x: 260, y: 90 }, radius: 45, labelKo: "대본", labelEn: "Story" },
-      { id: "canvas", zoneId: "lounge", action: "canvas", point: { x: 270, y: 210 }, radius: 45, labelKo: "그림", labelEn: "Canvas" }],
+    interactions: [{ id: "story", zoneId: "lobby", action: "story", point: { x: 260, y: 90 }, radius: 45, labelKo: "대본", labelEn: "Story" },
+      { id: "canvas", zoneId: "lobby", action: "canvas", point: { x: 270, y: 210 }, radius: 45, labelKo: "그림", labelEn: "Canvas" }],
     npcActivityAnchors: [anchor],
-    npcs: [{ id: "guide", skinKey: "npc-concierge", roomId: "lounge", point: { x: 60, y: 120 }, speed: 62, activityAnchorIds: [anchor.id] }] };
+    npcs: [{ id: "guide", skinKey: "npc-concierge", roomId: "lobby", point: { x: 60, y: 120 }, speed: 62, activityAnchorIds: [anchor.id] }] };
 }
 const balanced: StudioNpcEnvironment = { atmosphere: "balanced", people: [] };
 const advance = (director: StudioNpcDirector, seconds: number, env = balanced) => {
@@ -29,7 +29,7 @@ describe("authored NPC activities", () => {
     for (const facing of ["down", "left", "right", "up"] as const) {
       const m = fixture();
       const drawing = { ...anchor, facing, activity: "work" as const, animation: "draw" as const, seatAttachmentPoint: undefined };
-      const world = { ...m, npcActivityAnchors: [drawing], npcs: [{ ...m.npcs[0]!, skinKey: "npc-atelier" }] };
+      const world = { ...m, npcActivityAnchors: [drawing], npcs: [{ ...m.npcs[0]!, skinKey: "npc-artist" }] };
       expect(validateStudioWorldManifest(world)).toEqual([]);
       const director = new StudioNpcDirector(world);
       let performed = false, exited = false;
@@ -68,8 +68,8 @@ describe("authored NPC activities", () => {
       }
       expect(performed).toBe(true); expect(exited).toBe(true); director.dispose();
     }
-    const writer = DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors!.filter((activity) => activity.id.startsWith("studio-writer-"));
-    expect(writer.map((activity) => activity.animation)).toEqual(["review", "review", "idle"]);
+    const editor = DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors!.filter((activity) => activity.id.startsWith("studio-editor-"));
+    expect(editor.map((activity) => activity.animation)).toEqual(["review", "review", "idle"]);
   });
   it("validates real floor reachability, durations, furniture attachment and available cast clips", () => {
     const m = fixture(); expect(validateStudioWorldManifest(m)).toEqual([]);
@@ -87,7 +87,7 @@ describe("authored NPC activities", () => {
 
   it("keeps local decorative reservations separate from human shared seats", () => {
     const m = fixture();
-    expect(validateStudioWorldManifest({ ...m, interactionSlots: [{ id: "human", roomId: "lounge", labelKo: "좌석", labelEn: "Seat",
+    expect(validateStudioWorldManifest({ ...m, interactionSlots: [{ id: "human", roomId: "lobby", labelKo: "좌석", labelEn: "Seat",
       approachPoint: anchor.approachPoint, anchorPoint: anchor.anchorPoint, exitPoint: anchor.exitPoint, facing: "up", radius: 9 }] }))
       .toContain("NPC activity overlaps a human shared seat: local-chair");
     const a = new StudioNpcActivityReservations(), b = new StudioNpcActivityReservations();
@@ -177,7 +177,7 @@ describe("authored NPC activities", () => {
         previousStage.set(view.id, view.activityStage);
       }
     }
-    expect(completed.size).toBe(4);
+    expect(completed.size).toBe(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.length);
     expect(director.views.every((view) => view.distance > 250)).toBe(true);
   });
 });
