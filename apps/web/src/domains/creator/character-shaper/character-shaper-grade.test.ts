@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  SHAPER_HIGHLIGHT_OMISSION_REASON,
+  SHAPER_PRODUCTION_CHARACTER_ID,
   SHAPER_REST_UPPER_ARM,
   applyShaperPose,
   applyShaperPresetSuggestion,
@@ -73,6 +75,7 @@ describe("Shaper-grade character session", () => {
       hair: "hair:long",
       clothes: "top:coat",
     }), { id: "mark", region: "left-upper-arm", u: 0.7, v: 0.5, rgba: [240, 32, 48, 255] });
+    expect(drawn.characterId).toBe(SHAPER_PRODUCTION_CHARACTER_ID);
     const before = shaperDrawingPoint(drawn, drawn.drawings[0]!, 96, 128);
     const posed = applyShaperPose(drawn, { leftUpperArm: 0.15, rightUpperArm: 2.6 });
     expect(posed.face).toBe("face-shape:round");
@@ -146,7 +149,7 @@ describe("Shaper-grade character session", () => {
     const names = exported.layers.map((layer) => layer.name);
     expect(names).toEqual(expect.arrayContaining(["밑색-얼굴", "밑색-헤어", "밑색-의상", "음영", "주선"]));
     expect(names).not.toContain("하이라이트");
-    expect(exported.omissions).toContainEqual({ name: "하이라이트", reason: "이 모델은 분리된 하이라이트 픽셀을 만들지 않습니다." });
+    expect(exported.omissions).toContainEqual({ name: "하이라이트", reason: SHAPER_HIGHLIGHT_OMISSION_REASON });
     const clothes = exported.layers.find((layer) => layer.name === "밑색-의상");
     expect(clothes).toBeTruthy();
     let dark = false;
