@@ -984,6 +984,7 @@ export function StudioBrushLibrarySheet({
   );
   const [focusedBrushId, setFocusedBrushId] = useState<string | null>(null);
   const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
+  const [awaitingActivationId, setAwaitingActivationId] = useState<string | null>(null);
   const [selectionError, setSelectionError] = useState<string | null>(null);
   const panelId = `${tabsId}-panel`;
   const catalogTabs = operation === "erase"
@@ -1011,6 +1012,13 @@ export function StudioBrushLibrarySheet({
       selectionRequestEpochRef.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    if (!awaitingActivationId || activeBrushId !== awaitingActivationId) return;
+    selectionRequestEpochRef.current += 1;
+    setAwaitingActivationId(null);
+    setPendingSelectionId(null);
+  }, [activeBrushId, awaitingActivationId]);
 
   // The place to return to is reported ONCE, on teardown, rather than per keystroke: each report
   // becomes a durable SQLite intent, and the catalogue closes on every exit path (escape, outside
@@ -1228,15 +1236,22 @@ export function StudioBrushLibrarySheet({
     const requestIsCurrent = () =>
       mountedRef.current && requestEpoch === selectionRequestEpochRef.current;
     setSelectionError(null);
+    setAwaitingActivationId(null);
     setPendingSelectionId(item.id);
+    let waitForActivation = false;
     try {
       const selection = await materializeStudioBrushCatalogSelection(item.id);
       if (!requestIsCurrent()) return;
       if (!selection) throw new Error("브러시 프로필을 찾을 수 없습니다.");
+      waitForActivation = !closeOnSelection && item.id !== activeBrushId;
+      if (waitForActivation) setAwaitingActivationId(item.id);
       onSelect(selection);
       if (!requestIsCurrent()) return;
-      selectionRequestEpochRef.current += 1;
-      setPendingSelectionId(null);
+      if (closeOnSelection || !waitForActivation) {
+        selectionRequestEpochRef.current += 1;
+        setAwaitingActivationId(null);
+        setPendingSelectionId(null);
+      }
       if (closeOnSelection) onClose("selection");
     } catch (error) {
       if (!requestIsCurrent()) return;
@@ -1246,7 +1261,7 @@ export function StudioBrushLibrarySheet({
           : "브러시를 불러오지 못했습니다. 다시 시도해 주세요."
       );
     } finally {
-      if (requestIsCurrent()) setPendingSelectionId(null);
+      if (requestIsCurrent() && !waitForActivation) setPendingSelectionId(null);
     }
   }
 
@@ -1331,6 +1346,7 @@ export function StudioBrushLibrarySheet({
       data-studio-brush-workbench={workbench ? "true" : undefined}
       data-studio-brush-catalog="built-in"
       data-studio-brush-catalog-session="true"
+      data-studio-brush-selection-pending={pendingSelectionId ? "true" : undefined}
       data-studio-brush-surface-role="full-catalog-management"
       data-studio-brush-compact={compact ? "true" : undefined}
       style={style}

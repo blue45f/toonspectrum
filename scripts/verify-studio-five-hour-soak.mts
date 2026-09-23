@@ -223,6 +223,9 @@ async function closeBrushSurfaces(page: Page): Promise<boolean> {
   ];
   for (const surface of surfaces) {
     if (!(await surface.isVisible().catch(() => false))) continue;
+    const docked = await surface.evaluate((element) => Boolean(element.closest('[data-studio-brush-workbench-dock="true"]')))
+      .catch(() => false);
+    if (docked) continue;
     await page.keyboard.press("Escape").catch(() => undefined);
     const closed = await surface.waitFor({ state: "hidden", timeout: 3_000 })
       .then(() => true)
@@ -276,6 +279,21 @@ async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<bo
   }
 
   if (!(await closeBrushSurfaces(page))) return false;
+  const dockedLibrary = page.locator('[data-studio-brush-workbench-dock="true"] [data-studio-brush-library="true"]').first();
+  const dockedLibraryVisible = await dockedLibrary.isVisible({ timeout: 500 }).catch(() => false);
+  if (dockedLibraryVisible) {
+    await dockedLibrary.getByRole("searchbox").fill(item.name);
+    const option = dockedLibrary.getByRole("button", { name: `${item.name} 선택`, exact: true });
+    if (!(await option.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false))) return false;
+    await option.scrollIntoViewIfNeeded();
+    await option.click({ force: true });
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      if (await option.getAttribute("aria-pressed") === "true") return true;
+      await page.waitForTimeout(50);
+    }
+    return false;
+  }
+
   await page.keyboard.press("b");
   const toolbar = page.locator('[data-studio-draw-options="true"]');
   if (!(await toolbar.waitFor({ state: "visible", timeout: 5_000 })
@@ -462,7 +480,7 @@ try {
   if (inputMode !== "mouse" && !cdp) {
     throw new Error(`${inputMode} soak input requires Chromium CDP; refusing a mouse downgrade.`);
   }
-  await page.goto(`${preview.origin}/studio`, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  await page.goto(`${preview.origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 90_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 90_000 });
   await page.waitForTimeout(3_000);
 

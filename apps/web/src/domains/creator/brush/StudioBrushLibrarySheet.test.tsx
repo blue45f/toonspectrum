@@ -1211,6 +1211,47 @@ it("keeps a persistent drawing dock non-modal without stealing canvas focus or E
   expect(screen.getByRole("region", { name: "브러시 전체 라이브러리" })).toBeTruthy();
 });
 
+it("keeps the persistent dock pending until the selected brush becomes active", async () => {
+  const onClose = vi.fn();
+  const onSelect = vi.fn();
+  const props = {
+    open: true,
+    embedded: true,
+    workbench: true,
+    autoFocusSearch: false,
+    dismissOnEscape: false,
+    dismissOnOutsidePointer: false,
+    closeOnSelection: false,
+    onClose,
+    onSelect,
+  };
+  const view = render(
+    <StudioBrushLibrarySheet {...props} activeBrushId="pen" />,
+  );
+
+  const gpen = screen.getByRole("button", { name: "G펜(필압) 선택" });
+  fireEvent.click(gpen);
+  await waitFor(() => expect(onSelect).toHaveBeenCalledOnce());
+  expect(gpen.getAttribute("aria-busy")).toBe("true");
+  expect((gpen as HTMLButtonElement).disabled).toBe(true);
+  expect(
+    screen.getByRole("region", { name: "브러시 전체 라이브러리" })
+      .getAttribute("data-studio-brush-selection-pending"),
+  ).toBe("true");
+
+  view.rerender(
+    <StudioBrushLibrarySheet {...props} activeBrushId="gpen" />,
+  );
+  await waitFor(() => expect(gpen.getAttribute("aria-busy")).toBeNull());
+  expect((gpen as HTMLButtonElement).disabled).toBe(false);
+  expect(gpen.getAttribute("aria-pressed")).toBe("true");
+  expect(
+    screen.getByRole("region", { name: "브러시 전체 라이브러리" })
+      .getAttribute("data-studio-brush-selection-pending"),
+  ).toBeNull();
+  expect(onClose).not.toHaveBeenCalled();
+});
+
 it("hydrates an untouched dock's saved search but never replaces an artist's in-session search", async () => {
   const props = { open: true, embedded: true, autoFocusSearch: false,
     activeBrushId: "pen", onClose: vi.fn(), onSelect: vi.fn() };

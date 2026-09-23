@@ -21,6 +21,8 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(close).toContain('[data-studio-brush-library="true"]');
     expect(close).toContain('[data-studio-mobile-sheet="draw"]');
     expect(close).toContain('page.keyboard.press("Escape")');
+    expect(close).toContain('data-studio-brush-workbench-dock="true"');
+    expect(close).toContain('if (docked) continue');
     expect(close).toContain('state: "hidden"');
     expect(close).toContain(".catch(() => false)");
   });
@@ -39,6 +41,8 @@ describe("Studio five-hour soak browser state isolation", () => {
     const select = sliceFunction("selectBrush", "ensurePenReady");
     expect(select).toContain("await openMobileBrushLibrary(page)");
     expect(select).toContain('library.getByRole("searchbox")');
+    expect(select).toContain('[data-studio-brush-workbench-dock="true"] [data-studio-brush-library="true"]');
+    expect(select).toContain('dockedLibrary.getByRole("searchbox")');
     expect(select).toContain('page.keyboard.press("b")');
     expect(select).toContain('[data-studio-brush-active-pill="true"]');
     expect(select).toContain("return closeBrushSurfaces(page)");
@@ -68,6 +72,11 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(draw).toContain("mode: inputMode");
     expect(draw).toContain("cdp");
     expect(draw).not.toContain("page.mouse.down()");
+  });
+
+  it("enters the current drawing canvas route before waiting for the editor", () => {
+    expect(source).toContain('page.goto(`${preview.origin}/studio/canvas`');
+    expect(source).toContain('page.locator(\'[data-studio-editor="true"]\').waitFor');
   });
 
   it("refuses to downgrade pen or touch soak evidence when CDP is unavailable", () => {
