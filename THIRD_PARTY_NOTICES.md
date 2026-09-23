@@ -28,6 +28,8 @@ obscure, or claim ownership of these libraries.
 | `perfect-freehand` | 1.2.3 | MIT | <https://github.com/steveruizok/perfect-freehand> |
 | `p5.brush` standalone entry | 2.2.1 | MIT | <https://github.com/acamposuribe/p5.brush> |
 | `mixbox` | 2.0.0 | CC BY-NC 4.0 — non-commercial use only | <https://github.com/scrtwpns/mixbox> |
+| `remotion` | 4.0.514 | Remotion License — eligibility-based free use or Company License | <https://github.com/remotion-dev/remotion> |
+| `@remotion/player` | 4.0.514 | Remotion License — eligibility-based free use or Company License | <https://github.com/remotion-dev/remotion/tree/main/packages/player> |
 | `p5` peer resolution for `p5.brush` | 2.3.1 | LGPL-2.1 | <https://github.com/processing/p5.js> |
 | `libtess` dependency of the resolved `p5` peer | 1.2.2 | SGI-B-2.0 | <https://github.com/brendankenny/libtess.js> |
 | `hokusai-brush`, `hokusai-core`, and `hokusai-tile-mem` | 0.3.0 | MIT OR Apache-2.0 | <https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00> |
@@ -62,6 +64,22 @@ separate commercial license from Secret Weapons before release. The runtime
 marks this provider as `noncommercial`, the default Brush Studio V6 profile is
 `noncommercial-full`, and the exact package/version/license boundary is pinned
 by the release audit. See `third_party/mixbox/README.md`.
+
+The Product Tour runtime uses `remotion` and `@remotion/player` at exactly
+`4.0.514`. These packages use the custom Remotion License rather than a standard
+SPDX license. The Free License applies only to eligible individuals, non-profit
+or not-for-profit organizations, for-profit organizations with up to three
+employees, and qualifying evaluation use. Other for-profit organizations must
+obtain a Remotion Company License before commercial use. The
+`acknowledgeRemotionLicense` player option is a technical runtime acknowledgement
+and does not itself grant a license. Release owners must confirm that the
+deploying legal entity is eligible or holds the required Company License.
+
+The release audit pins both package names and versions, requires the known
+metadata shape, and verifies the exact Remotion License text SHA-256
+`9830440ed5c55fbbbc0afcf58f292dc1c1522e9e691264a78733f1e11b2841b9`.
+Any package, version, metadata, or license-text change fails the production
+notice build for fresh review.
 
 ToonSpectrum imports `p5.brush/standalone`; that entry is self-contained and
 does not statically import the resolved `p5` peer. The production dependency

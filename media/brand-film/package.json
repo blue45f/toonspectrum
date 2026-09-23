@@ -2,20 +2,23 @@
   "name": "@toonstudio/brand-film",
   "version": "1.0.0",
   "private": true,
-  "description": "Isolated Remotion authoring toolchain; never imported by the website",
+  "description": "Remotion authoring toolchain sharing the reviewed product-tour composition with the website runtime",
   "scripts": {
     "studio": "remotion studio src/index.tsx --public-dir=../../apps/web/public",
     "render": "node render.mjs",
     "render:product-tour": "node render-product-tour.mjs",
     "generate:product-tour-narration": "node generate-product-tour-narration.mjs",
     "verify:product-tour-narration": "node generate-product-tour-narration.mjs --check",
+    "generate:product-tour-runtime-audio": "node generate-product-tour-runtime-audio.mjs",
+    "verify:product-tour-runtime-audio": "node generate-product-tour-runtime-audio.mjs --check",
     "mix:product-tour": "node mix-product-tour-audio.mjs",
-    "verify:product-tour": "node generate-product-tour-narration.mjs --check && node mix-product-tour-audio.mjs --check",
+    "verify:product-tour": "node generate-product-tour-narration.mjs --check && node generate-product-tour-runtime-audio.mjs --check && node mix-product-tour-audio.mjs --check",
     "render:technology": "node render-technology.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@remotion/cli": "4.0.514",
+    "@toonspectrum/product-tour-film": "file:../../packages/product-tour-film",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "remotion": "4.0.514"

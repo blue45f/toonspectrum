@@ -1,3 +1,4 @@
+import { Player, type PlayerRef } from "@remotion/player";
 import { resumeBgmForContext, suspendBgmForContext } from "@toonspectrum/core/fx";
 import {
   formatI18nTemplate,
@@ -5,21 +6,33 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { ArrowRight, Captions, LoaderCircle, Play, RotateCcw, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowRight,
+  AudioLines,
+  Captions,
+  LoaderCircle,
+  Music2,
+  Play,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import type { SyntheticEvent } from "react";
+import type { AnyZodObject } from "remotion";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import Link from "@/compat/router-link";
 
-import { clampCreatorFilmTime, creatorFilmChapterAt } from "./creator-film-playback";
-import {
-  PRODUCT_TOUR_MAX_AUTOMATIC_RECOVERIES,
-  PRODUCT_TOUR_STALL_TIMEOUT_MS,
-  canAutomaticallyRecoverProductTour,
-  isExpectedMediaPlayRejection,
-  productTourRecoveryLabel,
-  productTourSourceForAttempt,
-} from "./product-tour-media-recovery";
+import { creatorFilmChapterAt } from "./creator-film-playback";
+import { PRODUCT_TOUR_RUNTIME_AUDIO } from "./product-tour-audio.generated";
 import { PRODUCT_TOUR, PRODUCT_TOUR_COPY, type ProductTourLocale } from "./product-tour-content";
+import { ProductTourMp4Player } from "./ProductTourMp4Player";
+import {
+  ProductTourRemotionComposition,
+  type ProductTourAudioIssue,
+  type ProductTourRemotionCompositionProps,
+} from "./ProductTourRemotionComposition";
 
 import "./product-tour-player.css";
 
@@ -27,8 +40,7 @@ const TOUR_AUDIO_CONTEXT = "product-tour-video";
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("ProductTourPlayer", ko, en);
 
-type PlayerPhase = "idle" | "loading" | "ready" | "recovering" | "failed";
-type RecoveryReason = "decode" | "network" | "stall" | "online" | "manual";
+type PlayerPhase = "idle" | "loading" | "ready" | "failed";
 
 function formatTime(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -37,12 +49,17 @@ function formatTime(seconds: number): string {
 }
 
 function formatMegabytes(bytes: number): string {
-  return `${Math.ceil(bytes / (1024 * 1024))} MB`;
+  const value = bytes / (1024 * 1024);
+  return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} MB`;
 }
 
-function browserIsOnline(): boolean {
-  return typeof navigator === "undefined" || navigator.onLine;
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return bi("Remotion 재생 중 알 수 없는 오류가 발생했습니다.", "An unknown Remotion playback error occurred.");
 }
+
+const runtimeAudioBytes = PRODUCT_TOUR_RUNTIME_AUDIO.narration.bytes
+  + PRODUCT_TOUR_RUNTIME_AUDIO.bgm.bytes;
 
 export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLocale }) {
   useBilingualI18nRevision();
@@ -51,231 +68,212 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
     () => PRODUCT_TOUR.chapters.map((chapter) => chapter.start),
     [],
   );
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const stallTimerRef = useRef<number | null>(null);
+  const playerRef = useRef<PlayerRef>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const fallbackReasonRef = useRef("");
+  const firstAudibleStartRef = useRef(true);
   const requestedStartRef = useRef(0);
-  const resumeAfterLoadRef = useRef(false);
-  const recoveryCountRef = useRef(0);
-  const recoveryBaselineRef = useRef(0);
-  const recoveringRef = useRef(false);
-  const waitingForOnlineRef = useRef(false);
-  const lastPlaybackTimeRef = useRef(0);
-  const mountedRef = useRef(false);
   const [activeChapter, setActiveChapter] = useState(0);
-  const [mounted, setMounted] = useState(false);
-  const [sourceAttempt, setSourceAttempt] = useState(0);
   const [phase, setPhase] = useState<PlayerPhase>("idle");
-  const [recoveryDetail, setRecoveryDetail] = useState("");
-  const source = useMemo(
-    () => productTourSourceForAttempt(PRODUCT_TOUR.src, sourceAttempt),
-    [sourceAttempt],
-  );
-
-  const clearStallTimer = useCallback(() => {
-    if (stallTimerRef.current === null) return;
-    window.clearTimeout(stallTimerRef.current);
-    stallTimerRef.current = null;
-  }, []);
+  const [started, setStarted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [masterVolume, setMasterVolume] = useState(1);
+  const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [narrationEnabled, setNarrationEnabled] = useState(true);
+  const [bgmEnabled, setBgmEnabled] = useState(true);
+  const [narrationVolume, setNarrationVolume] = useState(1);
+  const [bgmVolume, setBgmVolume] = useState(0.48);
+  const [fallbackStart, setFallbackStart] = useState(0);
+  const [useFallback, setUseFallback] = useState(false);
 
   const releaseSiteMusic = useCallback(() => {
     resumeBgmForContext(TOUR_AUDIO_CONTEXT);
   }, []);
 
-  const failPlayback = useCallback(() => {
-    clearStallTimer();
-    recoveringRef.current = false;
-    waitingForOnlineRef.current = false;
-    resumeAfterLoadRef.current = false;
-    setPhase("failed");
+  const switchToFallback = useCallback((reason: string) => {
+    const player = playerRef.current;
+    const frame = player?.getCurrentFrame();
+    const currentTime = frame === undefined
+      || (frame === 0 && requestedStartRef.current > 0)
+      ? requestedStartRef.current
+      : frame / PRODUCT_TOUR.fps;
+    fallbackReasonRef.current = reason;
+    setFallbackStart(currentTime);
+    player?.pause();
     releaseSiteMusic();
-  }, [clearStallTimer, releaseSiteMusic]);
+    setUseFallback(true);
+  }, [releaseSiteMusic]);
 
-  const recoverPlayback = useCallback((reason: RecoveryReason) => {
-    if (!mountedRef.current || recoveringRef.current) return;
-    const video = videoRef.current;
-    const currentTime = video
-      && video.readyState >= HTMLMediaElement.HAVE_METADATA
-      && Number.isFinite(video.currentTime)
-      ? video.currentTime
-      : requestedStartRef.current;
-    requestedStartRef.current = currentTime;
-    recoveryBaselineRef.current = currentTime;
-    resumeAfterLoadRef.current = resumeAfterLoadRef.current
-      || Boolean(video && !video.paused && !video.ended);
-    clearStallTimer();
+  const handleAudioIssue = useCallback((issue: ProductTourAudioIssue) => {
+    const channel = issue.channel === "narration"
+      ? bi("내레이션", "narration")
+      : "BGM";
+    switchToFallback(`${channel} runtime audio failed: ${issue.message}`);
+  }, [switchToFallback]);
 
-    if (!browserIsOnline()) {
-      recoveringRef.current = true;
-      waitingForOnlineRef.current = true;
-      setRecoveryDetail(bi(
-        "인터넷 연결을 기다리고 있습니다. 연결되면 현재 위치에서 자동으로 이어집니다.",
-        "Waiting for the network. Playback will resume from the current position when it returns.",
-      ));
-      setPhase("recovering");
-      return;
-    }
+  const compositionProps = useMemo<ProductTourRemotionCompositionProps>(() => ({
+    locale,
+    captionsEnabled,
+    narrationEnabled,
+    bgmEnabled,
+    narrationVolume,
+    bgmVolume,
+    onAudioIssue: handleAudioIssue,
+  }), [
+    bgmEnabled,
+    bgmVolume,
+    captionsEnabled,
+    handleAudioIssue,
+    locale,
+    narrationEnabled,
+    narrationVolume,
+  ]);
 
-    if (!canAutomaticallyRecoverProductTour(recoveryCountRef.current, true)) {
-      failPlayback();
-      return;
-    }
+  useLayoutEffect(() => {
+    const player = playerRef.current;
+    if (!player || !started || useFallback) return;
 
-    recoveryCountRef.current += 1;
-    recoveringRef.current = true;
-    waitingForOnlineRef.current = false;
-    setRecoveryDetail(`${productTourRecoveryLabel(reason, locale)} ${recoveryCountRef.current}/${PRODUCT_TOUR_MAX_AUTOMATIC_RECOVERIES}`);
-    setPhase("recovering");
-    setSourceAttempt((attempt) => attempt + 1);
-  }, [clearStallTimer, failPlayback, locale]);
-
-  const playFrom = useCallback((video: HTMLVideoElement, seconds: number, autoplay: boolean) => {
-    requestedStartRef.current = seconds;
-    resumeAfterLoadRef.current = autoplay;
-    if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
-      setPhase("loading");
-      video.load();
-      return;
-    }
-
-    try {
-      video.currentTime = clampCreatorFilmTime(seconds, video.duration || PRODUCT_TOUR.duration);
-    } catch {
-      recoveringRef.current = false;
-      recoverPlayback("decode");
-      return;
-    }
-
-    if (!autoplay) {
-      setPhase("ready");
-      return;
-    }
-
-    setPhase(video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
-    void Promise.resolve(video.play()).catch((reason: unknown) => {
-      if (isExpectedMediaPlayRejection(reason)) {
+    const handlePlay = () => {
+      setStarted(true);
         setPhase("ready");
-        return;
-      }
-      recoveringRef.current = false;
-      recoverPlayback("decode");
-    });
-  }, [recoverPlayback]);
-
-  useEffect(() => {
-    mountedRef.current = mounted;
-  }, [mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    recoveringRef.current = false;
-  }, [mounted, sourceAttempt]);
-
-  useEffect(() => {
-    const handleOnline = () => {
-      if (!waitingForOnlineRef.current) return;
-      waitingForOnlineRef.current = false;
-      recoveringRef.current = false;
-      recoverPlayback("online");
+      suspendBgmForContext(TOUR_AUDIO_CONTEXT);
     };
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  }, [recoverPlayback]);
+    const handlePause = () => {
+      setPhase((current) => current === "failed" ? current : "ready");
+      releaseSiteMusic();
+    };
+    const handleEnded = () => {
+      setPhase("ready");
+      releaseSiteMusic();
+    };
+    const handleWaiting = () => setPhase("loading");
+    const handleResume = () => {
+        setPhase("ready");
+    };
+    const handleTimeUpdate = (event: { readonly detail: { readonly frame: number } }) => {
+      sectionRef.current?.setAttribute("data-current-frame", String(event.detail.frame));
+      requestedStartRef.current = event.detail.frame / PRODUCT_TOUR.fps;
+      const next = creatorFilmChapterAt(requestedStartRef.current, chapterStarts);
+      setActiveChapter((current) => current === next ? current : next);
+    };
+    const handleMuteChange = (event: { readonly detail: { readonly isMuted: boolean } }) => {
+      setIsMuted(event.detail.isMuted);
+    };
+    const handleVolumeChange = (event: { readonly detail: { readonly volume: number } }) => {
+      setMasterVolume(event.detail.volume);
+    };
+    const handleError = (event: { readonly detail: { readonly error: Error } }) => {
+      setPhase("failed");
+      switchToFallback(errorMessage(event.detail.error));
+    };
+
+    player.addEventListener("play", handlePlay);
+    player.addEventListener("pause", handlePause);
+    player.addEventListener("ended", handleEnded);
+    player.addEventListener("waiting", handleWaiting);
+    player.addEventListener("resume", handleResume);
+    player.addEventListener("timeupdate", handleTimeUpdate);
+    player.addEventListener("mutechange", handleMuteChange);
+    player.addEventListener("volumechange", handleVolumeChange);
+    player.addEventListener("error", handleError);
+
+    return () => {
+      player.removeEventListener("play", handlePlay);
+      player.removeEventListener("pause", handlePause);
+      player.removeEventListener("ended", handleEnded);
+      player.removeEventListener("waiting", handleWaiting);
+      player.removeEventListener("resume", handleResume);
+      player.removeEventListener("timeupdate", handleTimeUpdate);
+      player.removeEventListener("mutechange", handleMuteChange);
+      player.removeEventListener("volumechange", handleVolumeChange);
+      player.removeEventListener("error", handleError);
+    };
+  }, [
+    chapterStarts,
+    releaseSiteMusic,
+    started,
+    switchToFallback,
+    useFallback,
+  ]);
 
   useEffect(() => () => {
-    mountedRef.current = false;
-    clearStallTimer();
-    videoRef.current?.pause();
+    playerRef.current?.pause();
     releaseSiteMusic();
-  }, [clearStallTimer, releaseSiteMusic]);
+  }, [releaseSiteMusic]);
 
-  const armStallRecovery = useCallback((video: HTMLVideoElement) => {
-    if (video.paused || video.ended || recoveringRef.current) return;
-    clearStallTimer();
-    setPhase("loading");
-    stallTimerRef.current = window.setTimeout(() => {
-      stallTimerRef.current = null;
-      if (videoRef.current !== video || video.paused || video.ended) return;
-      if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return;
-      recoverPlayback("stall");
-    }, PRODUCT_TOUR_STALL_TIMEOUT_MS);
-  }, [clearStallTimer, recoverPlayback]);
+  const enableSound = useCallback((event?: SyntheticEvent) => {
+    const player = playerRef.current;
+    if (!player) return;
+    player.setVolume(1);
+    player.unmute();
+    setMasterVolume(1);
+    setIsMuted(false);
+    if (!player.isPlaying()) player.play(event);
+  }, []);
 
-  const seekTo = (seconds: number, autoplay = true) => {
+  const playFrom = useCallback((seconds: number, event?: SyntheticEvent) => {
     requestedStartRef.current = seconds;
-    resumeAfterLoadRef.current = autoplay;
-    recoveryCountRef.current = 0;
-    recoveryBaselineRef.current = seconds;
-    waitingForOnlineRef.current = false;
-    recoveringRef.current = false;
-    setRecoveryDetail("");
-    setActiveChapter(creatorFilmChapterAt(seconds, chapterStarts));
-
-    if (!mounted) {
-      mountedRef.current = true;
-      setPhase("loading");
-      setMounted(true);
-      return;
-    }
-
-    if (phase === "failed") {
-      recoveringRef.current = true;
-      setRecoveryDetail(productTourRecoveryLabel("manual", locale));
-      setPhase("recovering");
-      setSourceAttempt((attempt) => attempt + 1);
-      return;
-    }
-
-    const video = videoRef.current;
-    if (video) playFrom(video, seconds, autoplay);
-  };
-
-  const retry = () => {
-    const video = videoRef.current;
-    requestedStartRef.current = video && Number.isFinite(video.currentTime)
-      ? video.currentTime
-      : PRODUCT_TOUR.chapters[activeChapter]?.start ?? 0;
-    resumeAfterLoadRef.current = true;
-    recoveryCountRef.current = 0;
-    recoveryBaselineRef.current = requestedStartRef.current;
-    waitingForOnlineRef.current = false;
-    recoveringRef.current = true;
-    setRecoveryDetail(productTourRecoveryLabel("manual", locale));
-    setPhase("recovering");
-    if (!mounted) {
-      mountedRef.current = true;
-      setMounted(true);
+    const firstStart = !started;
+    const frame = Math.round(seconds * PRODUCT_TOUR.fps);
+    if (firstStart) {
+      flushSync(() => {
+        setStarted(true);
+        setPhase("loading");
+            setActiveChapter(creatorFilmChapterAt(seconds, chapterStarts));
+      });
     } else {
-      setSourceAttempt((attempt) => attempt + 1);
+      setPhase("loading");
+        setActiveChapter(creatorFilmChapterAt(seconds, chapterStarts));
     }
-  };
 
-  const handleLoadedMetadata = (video: HTMLVideoElement) => {
-    recoveringRef.current = false;
-    clearStallTimer();
-    playFrom(video, requestedStartRef.current, resumeAfterLoadRef.current);
-  };
-
-  const handleTimeUpdate = (video: HTMLVideoElement) => {
-    const currentTime = video.currentTime;
-    setActiveChapter(creatorFilmChapterAt(currentTime, chapterStarts));
-    if (currentTime > lastPlaybackTimeRef.current + 0.05) clearStallTimer();
-    lastPlaybackTimeRef.current = currentTime;
-    if (
-      recoveryCountRef.current > 0
-      && currentTime >= recoveryBaselineRef.current + 30
-    ) {
-      recoveryCountRef.current = 0;
+    const player = playerRef.current;
+    if (!player) {
+      switchToFallback(errorMessage(new Error("Remotion player did not mount")));
+      return;
     }
-  };
 
-  const loading = phase === "loading" || phase === "recovering";
-  const loadingMessage = phase === "recovering"
-    ? recoveryDetail
-    : bi("제품 투어와 오디오를 불러오는 중", "Loading the product tour and audio");
-  const downloadSize = formatMegabytes(PRODUCT_TOUR.bytes);
+    player.seekTo(frame);
+    if (firstAudibleStartRef.current) {
+      player.setVolume(1);
+      player.unmute();
+      setMasterVolume(1);
+      setIsMuted(false);
+      firstAudibleStartRef.current = false;
+    }
+    suspendBgmForContext(TOUR_AUDIO_CONTEXT);
+    player.play(event);
+  }, [chapterStarts, started, switchToFallback]);
+
+  if (useFallback) {
+    return (
+      <ProductTourMp4Player
+        locale={locale}
+        initialTime={fallbackStart}
+        fallbackNotice={fallbackReasonRef.current}
+        autoPlayOnMount
+      />
+    );
+  }
+
+  const loading = phase === "loading";
+  const soundExpected = narrationEnabled || bgmEnabled;
+  const soundOff = started && soundExpected && (isMuted || masterVolume <= 0.01);
+  const audioDownloadSize = formatMegabytes(runtimeAudioBytes);
 
   return (
-    <section className="product-tour-player" id="product-tour-video" aria-labelledby="product-tour-video-title">
+    <section
+      ref={sectionRef}
+      className="product-tour-player"
+      id="product-tour-video"
+      aria-labelledby="product-tour-video-title"
+      data-player-engine="remotion"
+      data-player-phase={phase}
+      data-player-started={started ? "true" : "false"}
+      data-player-muted={isMuted ? "true" : "false"}
+      data-player-volume={masterVolume.toFixed(2)}
+      data-audio-revision={PRODUCT_TOUR_RUNTIME_AUDIO.revision}
+      data-current-frame="0"
+    >
       <header className="product-tour-player__heading">
         <div>
           <p>{copy.videoEyebrow}</p>
@@ -288,101 +286,135 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
       </header>
 
       <div className="product-tour-player__screen" aria-busy={loading || undefined}>
-        {mounted ? (
-          <video
-            key={source}
-            ref={videoRef}
-            src={source}
-            poster={PRODUCT_TOUR.poster}
+        {started ? (
+          <Player<AnyZodObject, ProductTourRemotionCompositionProps>
+            ref={playerRef}
+            component={ProductTourRemotionComposition}
+            inputProps={compositionProps}
+            durationInFrames={PRODUCT_TOUR.duration * PRODUCT_TOUR.fps}
+            compositionWidth={1280}
+            compositionHeight={720}
+            fps={PRODUCT_TOUR.fps}
+            className="product-tour-player__remotion"
+            style={{ width: "100%", height: "100%" }}
             controls
-            playsInline
-            preload="metadata"
-            aria-label={copy.videoTitle}
-            onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
-            onPlay={(event) => {
-              resumeAfterLoadRef.current = true;
-              suspendBgmForContext(TOUR_AUDIO_CONTEXT);
-              setPhase(event.currentTarget.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
-            }}
-            onPlaying={() => {
-              clearStallTimer();
-              recoveringRef.current = false;
-              waitingForOnlineRef.current = false;
-              setRecoveryDetail("");
-              setPhase("ready");
-              suspendBgmForContext(TOUR_AUDIO_CONTEXT);
-            }}
-            onPause={() => {
-              if (recoveringRef.current || waitingForOnlineRef.current) return;
-              resumeAfterLoadRef.current = false;
-              clearStallTimer();
-              releaseSiteMusic();
-              if (phase !== "failed") setPhase("ready");
-            }}
-            onEnded={() => {
-              resumeAfterLoadRef.current = false;
-              recoveryCountRef.current = 0;
-              clearStallTimer();
-              releaseSiteMusic();
-              setPhase("ready");
-            }}
-            onCanPlay={() => {
-              clearStallTimer();
-              if (phase === "loading") setPhase("ready");
-            }}
-            onSeeked={() => {
-              clearStallTimer();
-              if (phase === "loading") setPhase("ready");
-            }}
-            onWaiting={(event) => armStallRecovery(event.currentTarget)}
-            onStalled={(event) => armStallRecovery(event.currentTarget)}
-            onError={(event) => {
-              recoveringRef.current = false;
-              recoverPlayback(event.currentTarget.error?.code === 2 ? "network" : "decode");
-            }}
-            onTimeUpdate={(event) => handleTimeUpdate(event.currentTarget)}
+            showVolumeControls
+            showPlaybackRateControl={[0.75, 1, 1.25]}
+            initiallyMuted={false}
+            initialVolume={1}
+            clickToPlay
+            doubleClickToFullscreen
+            spaceKeyToPlayOrPause
+            allowFullscreen
+            moveToBeginningWhenEnded={false}
+            numberOfSharedAudioTags={2}
+            bufferStateDelayInMilliseconds={250}
+            audioLatencyHint="playback"
+            sampleRate={48_000}
+            acknowledgeRemotionLicense
+          />
+        ) : null}
+        {!started ? (
+          <button
+            type="button"
+            className="product-tour-player__poster"
+            onClickCapture={(event) => playFrom(0, event)}
+            aria-label={bi("소리와 함께 제품 투어 재생", "Play the product tour with sound")}
           >
-            <track
-              kind="captions"
-              src={PRODUCT_TOUR.captionsKo}
-              srcLang="ko"
-              label="한국어"
-              default={locale === "ko"}
-            />
-            <track
-              kind="captions"
-              src={PRODUCT_TOUR.captionsEn}
-              srcLang="en"
-              label="English"
-              default={locale === "en"}
-            />
-          </video>
-        ) : (
-          <button type="button" className="product-tour-player__poster" onClick={() => seekTo(0)} aria-label={copy.watch}>
             <img src={PRODUCT_TOUR.poster} width={1280} height={720} alt="" decoding="async" />
             <span><Play size={24} fill="currentColor" aria-hidden="true" /></span>
-            <strong>{copy.watch}</strong>
+            <strong>{bi("소리와 함께 8분 제품 투어 재생", "Play the 8-minute tour with sound")}</strong>
             <small>{bi(
-              `재생할 때만 약 ${downloadSize}의 내레이션·BGM 포함 본편을 불러옵니다`,
-              `The ${downloadSize} narrated film loads only after you press play`,
+              `Remotion 장면과 약 ${audioDownloadSize}의 내레이션·BGM을 직접 동기화합니다`,
+              `Remotion synchronizes the scene with about ${audioDownloadSize} of narration and music`,
             )}</small>
           </button>
-        )}
-        {loading && (
+        ) : null}
+        {loading && started ? (
           <div className="product-tour-player__status" role="status" aria-live="polite">
-            <LoaderCircle size={22} aria-hidden="true" />{loadingMessage}
+            <LoaderCircle size={22} aria-hidden="true" />
+            {bi("Remotion 장면과 오디오를 동기화하는 중", "Synchronizing the Remotion scene and audio")}
           </div>
-        )}
-        {phase === "failed" && (
-          <div className="product-tour-player__error" role="alert">
-            <strong>{bi("영상을 안정적으로 이어 재생하지 못했습니다.", "Playback could not be recovered reliably.")}</strong>
-            <p>{bi(
-              "자동 복구를 두 번 시도했습니다. 현재 챕터에서 다시 시도하거나 아래 실제 제품 화면으로 계속 살펴볼 수 있습니다.",
-              "Two automatic recovery attempts were made. Try this chapter again or continue through the real product screens below.",
-            )}</p>
-            <button type="button" onClick={retry}><RotateCcw size={15} aria-hidden="true" />{bi("현재 위치에서 다시 시도", "Retry from here")}</button>
-          </div>
-        )}
+        ) : null}
+        {soundOff ? (
+          <button
+            type="button"
+            className="product-tour-player__sound-recovery"
+            onClickCapture={enableSound}
+          >
+            <VolumeX size={16} aria-hidden="true" />
+            {bi("소리가 꺼져 있습니다 · 클릭해서 켜기", "Sound is off · Click to enable")}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="product-tour-player__mix" aria-label={bi("제품 투어 오디오와 자막", "Product tour audio and captions")}>
+        <div className="product-tour-player__mix-track">
+          <button
+            type="button"
+            aria-pressed={narrationEnabled}
+            onClick={() => setNarrationEnabled((current) => !current)}
+          >
+            <AudioLines size={15} aria-hidden="true" />
+            {bi("내레이션", "Narration")}
+          </button>
+          <label>
+            <span className="sr-only">{bi("내레이션 음량", "Narration volume")}</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={narrationVolume}
+              disabled={!narrationEnabled}
+              onChange={(event) => setNarrationVolume(Number(event.currentTarget.value))}
+            />
+          </label>
+        </div>
+        <div className="product-tour-player__mix-track">
+          <button
+            type="button"
+            aria-pressed={bgmEnabled}
+            onClick={() => setBgmEnabled((current) => !current)}
+          >
+            <Music2 size={15} aria-hidden="true" />
+            BGM
+          </button>
+          <label>
+            <span className="sr-only">{bi("BGM 음량", "Background music volume")}</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={bgmVolume}
+              disabled={!bgmEnabled}
+              onChange={(event) => setBgmVolume(Number(event.currentTarget.value))}
+            />
+          </label>
+        </div>
+
+        <button
+          type="button"
+          className="product-tour-player__mix-button"
+          aria-pressed={captionsEnabled}
+          onClick={() => setCaptionsEnabled((current) => !current)}
+        >
+          <Captions size={15} aria-hidden="true" />
+          {bi("자막", "Captions")}
+        </button>
+
+        <button
+          type="button"
+          className="product-tour-player__mix-button"
+          onClick={() => switchToFallback(bi(
+            "사용자가 호환 MP4 재생으로 전환했습니다.",
+            "The user switched to compatible MP4 playback.",
+          ))}
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+          {bi("호환 재생", "Compatibility playback")}
+        </button>
       </div>
 
       <nav className="product-tour-player__chapters" aria-label={bi("제품 투어 챕터", "Product tour chapters")}>
@@ -390,7 +422,11 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
           const active = index === activeChapter;
           return (
             <div className="product-tour-player__chapter" data-active={active || undefined} key={chapter.id}>
-              <button type="button" onClick={() => seekTo(chapter.start)} aria-pressed={active}>
+              <button
+                type="button"
+                onClickCapture={(event) => playFrom(chapter.start, event)}
+                aria-pressed={active}
+              >
                 <span>{String(index + 1).padStart(2, "0")}</span>
                 <strong>{bi((chapter).ko, (chapter).en)}</strong>
                 <small>{formatTime(chapter.start)}</small>
@@ -407,8 +443,22 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         <summary><Captions size={15} aria-hidden="true" />{copy.transcript}</summary>
         <ol>
           {PRODUCT_TOUR.chapters.map((chapter) => (
-            <li key={formatI18nTemplate(translateCurrentStaticSourceText("domains.marketing.ProductTourPlayer", "en", "{v0}-transcript"), { v0: String(chapter.id) })}>
-              <button type="button" onClick={() => seekTo(chapter.start)}>{formatTime(chapter.start)}</button>
+            <li
+              key={formatI18nTemplate(
+                translateCurrentStaticSourceText(
+                  "domains.marketing.ProductTourPlayer",
+                  "en",
+                  "{v0}-transcript",
+                ),
+                { v0: String(chapter.id) },
+              )}
+            >
+              <button
+                type="button"
+                onClickCapture={(event) => playFrom(chapter.start, event)}
+              >
+                {formatTime(chapter.start)}
+              </button>
               <div>
                 <strong>{bi((chapter).ko, (chapter).en)}</strong>
                 <span>{bi((chapter.summary).ko, (chapter.summary).en)}</span>
