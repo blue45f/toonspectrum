@@ -462,6 +462,20 @@ function log(msg: string) {
   console.log(`[verify-menus] ${msg}`);
 }
 
+async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
+  const notice = page.locator('[data-studio-beta-notice="true"]');
+  const visible = await notice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return false;
+
+  const action = notice.getByRole("button").first();
+  await action.click({ timeout: 10_000 });
+  await notice.waitFor({ state: "hidden", timeout: 10_000 });
+  return true;
+}
+
 async function dismissOverlays(page: Page) {
   for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
     try {
@@ -1336,6 +1350,7 @@ async function main() {
     }, { key: QUICKSTART_KEY });
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await acknowledgeStudioBetaNoticeIfPresent(page);
     await page.waitForTimeout(900);
     await dismissOverlays(page);
 

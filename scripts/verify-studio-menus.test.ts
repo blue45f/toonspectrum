@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -40,6 +43,8 @@ import type {
   StudioMainMenuEditorActions,
   StudioMainMenuUiActions,
 } from "../apps/web/src/domains/creator/studio-main-menu-contract";
+
+const verifierSource = readFileSync(resolve(process.cwd(), "scripts/verify-studio-menus.mts"), "utf8");
 
 vi.mock("@/shared/lib/i18n", () => ({
   useT: () => (key: string) => (ko as Record<string, string>)[key] ?? key,
@@ -220,4 +225,26 @@ it("closes persistent Quick Access explicitly without clicking canvas coordinate
   expect(click).toHaveBeenCalledOnce();
   expect(waitFor).toHaveBeenCalledWith({ state: "hidden", timeout: 5000 });
   expect(page.mouse.click).not.toHaveBeenCalled();
+});
+
+
+describe("production menu verifier beta notice admission", () => {
+  it("acknowledges the visible beta notice before menu interactions", () => {
+    expect(verifierSource).toContain("acknowledgeStudioBetaNoticeIfPresent(page)");
+    expect(verifierSource).toContain("data-studio-beta-notice");
+    expect(verifierSource).toContain('notice.getByRole("button").first()');
+    expect(verifierSource).toContain('notice.waitFor({ state: "hidden"');
+
+    const navigation = verifierSource.indexOf("await page.goto(url");
+    const acknowledgement = verifierSource.lastIndexOf(
+      "await acknowledgeStudioBetaNoticeIfPresent(page)",
+    );
+    const menuWait = verifierSource.indexOf(
+      "await page.locator('[data-studio-main-menu=\"true\"]')",
+      acknowledgement,
+    );
+    expect(navigation).toBeGreaterThanOrEqual(0);
+    expect(acknowledgement).toBeGreaterThan(navigation);
+    expect(menuWait).toBeGreaterThan(acknowledgement);
+  });
 });
