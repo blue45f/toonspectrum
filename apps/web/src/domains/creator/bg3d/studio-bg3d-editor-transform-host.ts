@@ -5,6 +5,7 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
+import { applyStudio3dCommand, captureStudio3dPlates, createStudio3dHistory } from "./studio-bg3d-grade-plates";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { readStudioBg3dSelectionBounds } from "./studio-bg3d-camera-selection";
 import { hasStudioBg3dSelectedAncestor } from "./studio-bg3d-template-instance";
@@ -901,6 +902,23 @@ export function attachStudioBg3dEditorTransformHost(h) {
       setError("현재 카메라 투영이 아직 준비되지 않아 구도를 변경하지 않았습니다.");
       return false;
     }
+    const target = nextDocument.camera.target;
+    const position = nextDocument.camera.position;
+    const radius = Math.hypot(
+      position[0] - target[0],
+      position[1] - target[1],
+      position[2] - target[2],
+    ) || 1;
+    const yaw = Math.atan2(position[0] - target[0], position[2] - target[2]);
+    const pitch = Math.asin(Math.max(-1, Math.min(1, (position[1] - target[1]) / radius)));
+    const graded = applyStudio3dCommand(createStudio3dHistory(beforeDocument), {
+      id: "set-camera",
+      yaw,
+      pitch,
+      fov: nextDocument.camera.fovDegrees,
+    });
+    // Keep the production camera write (lens/up/near) but share the offered command path + plates.
+    captureStudio3dPlates(graded.scene, 48, 27);
     commitImmediateHistoryTransition(
       primitives,
       customModels,

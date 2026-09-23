@@ -82,7 +82,28 @@ export interface CharacterShaperBinding {
   commitSemanticMorphs(morphs: CharacterHostSnapshot["semanticMorphs"], label: string): void;
   commitHairParams(hair: Record<string, unknown>, label: string): void;
   commitColor(target: keyof CharacterRecipe["colors"], color: string | null): void;
+  /**
+   * Shaper-grade pure session twin (recommend / photo pose / mirror / save).
+   * Optional so lightweight test harnesses stay small; production binding always provides these.
+   */
+  applyGradeRecommend?(image: {
+    readonly width: number;
+    readonly height: number;
+    readonly rgba: Uint8ClampedArray;
+  }): { readonly ok: boolean; readonly reason: string | null };
+  applyGradePoseFromImage?(
+    image: {
+      readonly width: number;
+      readonly height: number;
+      readonly rgba: Uint8ClampedArray;
+    },
+    source?: "photo" | "camera",
+  ): { readonly ok: boolean; readonly reason: string | null };
+  mirrorGradePose?(): void;
+  exportGradeSession?(): string;
+  importGradeSession?(raw: string): boolean;
 }
+
 
 /* -------------------------------------------------------------------------- */
 /* Shell state                                                                  */

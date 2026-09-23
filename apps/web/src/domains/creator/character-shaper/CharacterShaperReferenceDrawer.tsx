@@ -142,6 +142,7 @@ export function CharacterShaperReferenceDrawer({
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [applied, setApplied] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [gradeImage, setGradeImage] = useState<{ width: number; height: number; rgba: Uint8ClampedArray } | null>(null);
 
   useEffect(() => {
     hostRef.current = h;
@@ -182,11 +183,13 @@ export function CharacterShaperReferenceDrawer({
   const readFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
       setPickedImage(null);
+      setGradeImage(null);
       setPalette({ status: "error", palette: null, fileName: file.name, message: "이미지 파일만 읽을 수 있습니다." });
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
       setPickedImage(null);
+      setGradeImage(null);
       setPalette({ status: "error", palette: null, fileName: file.name, message: "24MB 이하 이미지를 올려 주세요." });
       return;
     }
@@ -199,6 +202,7 @@ export function CharacterShaperReferenceDrawer({
         const image = await decodeReferenceImageData(file);
         if (requestRef.current !== request) return;
         if (!image) {
+          setGradeImage(null);
           setPalette({
             status: "error",
             palette: null,
@@ -207,6 +211,7 @@ export function CharacterShaperReferenceDrawer({
           });
           return;
         }
+        setGradeImage({ width: image.width, height: image.height, rgba: image.data });
         const extracted = extractCharacterReferencePalette(image);
         setPalette({ status: "ready", palette: extracted, fileName: file.name, message: null });
         setSelectedColor(extracted.hair ?? extracted.swatches[0] ?? null);
@@ -436,6 +441,21 @@ export function CharacterShaperReferenceDrawer({
         </section>
       ) : null}
 
+      {gradeImage ? (
+        <button
+          type="button"
+          className={cn(PRIMARY_BUTTON, "w-full")}
+          disabled={binding.busyReason !== null}
+          onClick={() => {
+            const result = binding.applyGradeRecommend?.(gradeImage);
+            if (result?.ok) setApplied("참고 이미지 프리셋 추천을 적용했습니다.");
+            else if (result?.reason) setApplied(result.reason);
+          }}
+        >
+          참고 실루엣으로 프리셋 추천 적용
+        </button>
+      ) : null}
+
       <StudioVrmAvatarReferenceRecommendationsPanel
         catalogue={catalogue?.catalogue ?? null}
         catalogueStatus={catalogue?.status ?? "idle"}
@@ -467,7 +487,10 @@ export function CharacterShaperReferenceDrawer({
     <StudioVrmPhotoPoseScanner
       disabled={!h.vrm || binding.busyReason !== null}
       handoff={photoHandoff}
-      onApply={(payload: StudioVrmPhotoPoseApplyPayload) => Boolean(h.handlePhotoPoseApply?.(payload))}
+      onApply={(payload: StudioVrmPhotoPoseApplyPayload) => {
+        if (gradeImage) binding.applyGradePoseFromImage?.(gradeImage, "photo");
+        return Boolean(h.handlePhotoPoseApply?.(payload));
+      }}
     />
   );
 

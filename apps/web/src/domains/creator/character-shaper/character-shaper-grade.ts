@@ -22,6 +22,12 @@ import {
   parseCharacterRecipe,
   serializeCharacterRecipe,
 } from "./character-shaper-recipe";
+import {
+  EXTRA_POSE_PRESETS,
+  NATURAL_IDLE_POSES,
+  type PoseBoneSpec,
+  type StudioPosePreset,
+} from "../studio-pose-presets";
 
 import type { CharacterRecipe } from "./character-shaper-contract";
 
@@ -176,18 +182,68 @@ export function applyShaperPose(character: ShaperCharacter, pose: ShaperPose): S
   };
 }
 
+const SHAPER_POSE_PRESETS: readonly StudioPosePreset[] = [
+  ...NATURAL_IDLE_POSES,
+  ...EXTRA_POSE_PRESETS,
+];
+
+function normalizeShaperPosePresetId(presetId: string): string {
+  return presetId.startsWith("pose:") ? presetId.slice("pose:".length) : presetId;
+}
+
+export function findShaperPosePreset(presetId: string): StudioPosePreset | null {
+  const id = normalizeShaperPosePresetId(presetId);
+  return SHAPER_POSE_PRESETS.find((preset) => preset.id === id) ?? null;
+}
+
+/** Map a VRM upper-arm bone aim/rotation into the grade session's 2D arm angle. */
+function upperArmAngleFromBone(bone: PoseBoneSpec | undefined): number {
+  if (!bone) return SHAPER_REST_UPPER_ARM;
+  if (bone.direction) {
+    const dir = bone.direction;
+    const y = "sideX" in dir ? dir.y : dir[1];
+    const horizontal =
+      "sideX" in dir ? Math.hypot(dir.sideX, dir.z ?? 0) : Math.hypot(dir[0], dir[2]);
+    const fromDown = Math.atan2(horizontal, Math.max(-y, 1e-6));
+    if (y >= 0) {
+      return Math.max(0.18, Math.min(1.1, 0.55 - y * 0.35 - fromDown * 0.08));
+    }
+    return Math.min(2.6, Math.max(0.25, SHAPER_REST_UPPER_ARM - fromDown * 0.85));
+  }
+  if (bone.rotation) {
+    // Positive pitch lifts the arm in most poser rotations.
+    const pitch = bone.rotation[0] ?? 0;
+    return Math.min(2.6, Math.max(0.18, SHAPER_REST_UPPER_ARM - pitch));
+  }
+  return SHAPER_REST_UPPER_ARM;
+}
+
 /**
- * Applies a workshop pose-preset id. Pure — UI/binding must keep the returned character.
- * Replaces the old unread module global.
+ * Applies a workshop pose-preset id from NATURAL_IDLE_POSES / EXTRA_POSE_PRESETS.
+ * Unknown ids fall back to a standing rest pose. Pure — UI/binding must keep the returned character.
  */
 export function applyShaperPosePreset(
   character: ShaperCharacter,
   presetId: string,
 ): ShaperCharacter {
-  const raised = presetId.length % 2 === 0;
+  const preset = findShaperPosePreset(presetId);
+  if (!preset) {
+    return applyShaperPose(character, {
+      leftUpperArm: SHAPER_REST_UPPER_ARM,
+      rightUpperArm: SHAPER_REST_UPPER_ARM,
+    });
+  }
   return applyShaperPose(character, {
-    leftUpperArm: raised ? 0.4 : SHAPER_REST_UPPER_ARM,
-    rightUpperArm: raised ? SHAPER_REST_UPPER_ARM : 2.2,
+    leftUpperArm: upperArmAngleFromBone(preset.bones.leftUpperArm),
+    rightUpperArm: upperArmAngleFromBone(preset.bones.rightUpperArm),
+  });
+}
+
+/** Swap left/right upper-arm angles (Clip/SHAPER-style pose mirror). */
+export function mirrorShaperPose(character: ShaperCharacter): ShaperCharacter {
+  return applyShaperPose(character, {
+    leftUpperArm: character.pose.rightUpperArm,
+    rightUpperArm: character.pose.leftUpperArm,
   });
 }
 

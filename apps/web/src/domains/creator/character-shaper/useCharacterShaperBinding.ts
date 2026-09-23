@@ -42,11 +42,21 @@ import {
   createCharacterCapabilityProfile,
   evaluateCharacterSlotEntry,
 } from "./character-shaper-capability";
-import { CHARACTER_SLOT_CATALOG, characterSlotMeta } from "./character-shaper-catalog";
+import { CHARACTER_SLOT_CATALOG, characterSlotMeta, findCharacterSlotEntry } from "./character-shaper-catalog";
 import { characterPresetWornSlots, planCharacterPresetApplication } from "./character-shaper-preset-plan";
 import { applyCharacterIrisTint } from "./character-shaper-iris-tint";
 import { createEmptyCharacterRecipe, deriveCharacterRecipe } from "./character-shaper-recipe";
+import {
+  planShaperGradeMirror,
+  planShaperGradePoseFromImage,
+  planShaperGradeRecommend,
+  restoreShaperSession,
+  serializeShaperSession,
+  shaperCharacterFromRecipe,
+} from "./character-shaper-grade-bridge";
 import { useCharacterShaperHistory } from "./useCharacterShaperHistory";
+
+import type { ShaperCharacter, ShaperImage } from "./character-shaper-grade";
 
 import type {
   CharacterApplyPlan,
@@ -898,6 +908,66 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     }
   }, [profile, planContext, captureHostState, runSteps, restoreHostState, pushHistory]);
 
+  const gradeCharacterRef = useRef<ShaperCharacter>(shaperCharacterFromRecipe(recipe));
+  useEffect(() => {
+    gradeCharacterRef.current = shaperCharacterFromRecipe(recipe, gradeCharacterRef.current.pose);
+  }, [recipe]);
+
+  const applyGradeRecommend = useCallback((image: ShaperImage) => {
+    if (busyRef.current !== null || previewRef.current !== null) {
+      return { ok: false, reason: busyRef.current ?? "미리보기 중에는 추천을 적용할 수 없습니다." };
+    }
+    const planned = planShaperGradeRecommend(image, gradeCharacterRef.current);
+    if (!planned.ok) return { ok: false, reason: planned.reason };
+    const before = captureHostState();
+    let appliedAny = false;
+    for (const entryId of planned.entryIds) {
+      const entry = findCharacterSlotEntry(entryId);
+      if (!entry) continue;
+      const prepared = planForContext(entry, {
+        snapshot,
+        handSide: sessionRef.current.handSide,
+      });
+      if (prepared.steps.length === 0 && prepared.availability.status === "unavailable") continue;
+      runSteps(prepared.steps);
+      appliedAny = true;
+    }
+    gradeCharacterRef.current = planned.character;
+    if (appliedAny) pushHistory(planned.label, before);
+    return { ok: true, reason: null };
+  }, [captureHostState, planForContext, pushHistory, runSteps, snapshot]);
+
+  const applyGradePoseFromImage = useCallback((image: ShaperImage, source: "photo" | "camera" = "photo") => {
+    if (busyRef.current !== null || previewRef.current !== null) {
+      return { ok: false, reason: busyRef.current ?? "미리보기 중에는 포즈를 적용할 수 없습니다." };
+    }
+    const planned = planShaperGradePoseFromImage(image, gradeCharacterRef.current, source);
+    if (!planned.ok) return { ok: false, reason: planned.reason };
+    gradeCharacterRef.current = planned.character;
+    // Host photo/camera apply remains the bone applicator; grade session tracks the twin pose.
+    return { ok: true, reason: null };
+  }, []);
+
+  const mirrorGradePose = useCallback(() => {
+    if (busyRef.current !== null || previewRef.current !== null) return;
+    const planned = planShaperGradeMirror(gradeCharacterRef.current);
+    const before = captureHostState();
+    hostRef.current.handleMirrorPose?.("all");
+    gradeCharacterRef.current = planned.character;
+    pushHistory(planned.label, before);
+  }, [captureHostState, pushHistory]);
+
+  const exportGradeSession = useCallback(() => serializeShaperSession(gradeCharacterRef.current), []);
+
+  const importGradeSession = useCallback((raw: string) => {
+    try {
+      gradeCharacterRef.current = restoreShaperSession(raw);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   return useMemo<CharacterShaperBinding>(() => ({
     catalog: CHARACTER_SLOT_CATALOG,
     profile,
@@ -927,6 +997,11 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     commitSemanticMorphs,
     commitHairParams,
     commitColor,
+    applyGradeRecommend,
+    applyGradePoseFromImage,
+    mirrorGradePose,
+    exportGradeSession,
+    importGradeSession,
   }), [
     profile,
     snapshot,
@@ -955,5 +1030,10 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     commitSemanticMorphs,
     commitHairParams,
     commitColor,
+    applyGradeRecommend,
+    applyGradePoseFromImage,
+    mirrorGradePose,
+    exportGradeSession,
+    importGradeSession,
   ]);
 }

@@ -16,8 +16,16 @@ import {
   type StudioBg3dSceneDocument,
 } from "./studio-bg3d-scene-document";
 
+export type Studio3dOfferedCommandId =
+  | "set-camera"
+  | "set-light"
+  | "place-prop"
+  | "set-fill-light"
+  | "set-background"
+  | "remove-prop";
+
 export interface Studio3dCommandSpec {
-  readonly id: "set-camera" | "set-light" | "place-prop";
+  readonly id: Studio3dOfferedCommandId;
   readonly label: string;
 }
 
@@ -26,6 +34,7 @@ export type Studio3dScene = StudioBg3dSceneDocument;
 export interface Studio3dHistory {
   readonly scene: Studio3dScene;
   readonly past: readonly Studio3dScene[];
+  readonly future: readonly Studio3dScene[];
 }
 
 export interface Studio3dPlates {
@@ -38,13 +47,24 @@ export interface Studio3dPlates {
 export type Studio3dCommand =
   | { readonly id: "set-camera"; readonly yaw: number; readonly pitch: number; readonly fov: number }
   | { readonly id: "set-light"; readonly azimuth: number; readonly elevation: number; readonly intensity: number }
-  | { readonly id: "place-prop"; readonly propId: string; readonly x: number; readonly y: number; readonly z: number };
+  | { readonly id: "place-prop"; readonly propId: string; readonly x: number; readonly y: number; readonly z: number }
+  | { readonly id: "set-fill-light"; readonly azimuth: number; readonly elevation: number; readonly intensity: number }
+  | {
+      readonly id: "set-background";
+      readonly mode?: Studio3dScene["background"]["mode"];
+      readonly color?: string;
+      readonly skyPresetId?: Studio3dScene["background"]["skyPresetId"];
+    }
+  | { readonly id: "remove-prop"; readonly propId: string };
 
 export function listOfferedStudio3dCommands(): readonly Studio3dCommandSpec[] {
   return [
     { id: "set-camera", label: "카메라" },
-    { id: "set-light", label: "라이트" },
+    { id: "set-light", label: "키 라이트" },
+    { id: "set-fill-light", label: "필 라이트" },
+    { id: "set-background", label: "배경" },
     { id: "place-prop", label: "소품 배치" },
+    { id: "remove-prop", label: "소품 제거" },
   ];
 }
 
@@ -53,7 +73,7 @@ export function createStudio3dScene(): Studio3dScene {
 }
 
 export function createStudio3dHistory(scene: Studio3dScene = createStudio3dScene()): Studio3dHistory {
-  return { scene, past: [] };
+  return { scene, past: [], future: [] };
 }
 
 /** Editor lighting panel — same document applyStudio3dCommand mutates for set-light. */
@@ -154,6 +174,56 @@ function upsertProp(
   return normalizeStudioBg3dSceneDocument({ ...scene, nodes });
 }
 
+function fillLightFromSpherical(
+  scene: Studio3dScene,
+  azimuth: number,
+  elevation: number,
+  intensity: number,
+): Studio3dScene {
+  const direction = [
+    Math.cos(elevation) * Math.sin(azimuth),
+    Math.sin(elevation),
+    Math.cos(elevation) * Math.cos(azimuth),
+  ] as const;
+  return normalizeStudioBg3dSceneDocument({
+    ...scene,
+    lighting: {
+      ...scene.lighting,
+      fill: {
+        ...scene.lighting.fill,
+        direction,
+        intensity,
+      },
+    },
+  });
+}
+
+function patchBackground(
+  scene: Studio3dScene,
+  patch: {
+    readonly mode?: Studio3dScene["background"]["mode"];
+    readonly color?: string;
+    readonly skyPresetId?: Studio3dScene["background"]["skyPresetId"];
+  },
+): Studio3dScene {
+  return normalizeStudioBg3dSceneDocument({
+    ...scene,
+    background: {
+      ...scene.background,
+      ...(patch.mode ? { mode: patch.mode } : {}),
+      ...(patch.color ? { color: patch.color } : {}),
+      ...(patch.skyPresetId ? { skyPresetId: patch.skyPresetId } : {}),
+    },
+  });
+}
+
+function removeProp(scene: Studio3dScene, propId: string): Studio3dScene {
+  return normalizeStudioBg3dSceneDocument({
+    ...scene,
+    nodes: scene.nodes.filter((node) => node.id !== propId),
+  });
+}
+
 /** Production lighting host calls this so offered light edits share the grade command document. */
 export function patchStudio3dSceneLighting(
   scene: Studio3dScene,
@@ -190,6 +260,39 @@ export function patchStudio3dSceneProp(
   return upsertProp(scene, patch.propId, patch.x, patch.y, patch.z);
 }
 
+/** Production fill-light edits share the grade command document. */
+export function patchStudio3dSceneFillLight(
+  scene: Studio3dScene,
+  patch: {
+    readonly azimuth?: number;
+    readonly elevation?: number;
+    readonly intensity?: number;
+  },
+): Studio3dScene {
+  const current = scene.lighting.fill.direction;
+  const azimuth = patch.azimuth ?? Math.atan2(current[0], current[2]);
+  const elevation = patch.elevation ?? Math.asin(Math.max(-1, Math.min(1, current[1])));
+  const intensity = patch.intensity ?? scene.lighting.fill.intensity;
+  return fillLightFromSpherical(scene, azimuth, elevation, intensity);
+}
+
+/** Production background panel calls this for offered background commands. */
+export function patchStudio3dSceneBackground(
+  scene: Studio3dScene,
+  patch: {
+    readonly mode?: Studio3dScene["background"]["mode"];
+    readonly color?: string;
+    readonly skyPresetId?: Studio3dScene["background"]["skyPresetId"];
+  },
+): Studio3dScene {
+  return patchBackground(scene, patch);
+}
+
+/** Production placement host calls this to remove an offered prop. */
+export function patchStudio3dSceneRemoveProp(scene: Studio3dScene, propId: string): Studio3dScene {
+  return removeProp(scene, propId);
+}
+
 export function applyStudio3dCommand(
   history: Studio3dHistory,
   command: Studio3dCommand,
@@ -199,14 +302,34 @@ export function applyStudio3dCommand(
       ? patchStudio3dSceneCamera(history.scene, command)
       : command.id === "set-light"
         ? patchStudio3dSceneLighting(history.scene, command)
-        : patchStudio3dSceneProp(history.scene, command);
-  return { scene: next, past: [...history.past, history.scene] };
+        : command.id === "set-fill-light"
+          ? patchStudio3dSceneFillLight(history.scene, command)
+          : command.id === "set-background"
+            ? patchStudio3dSceneBackground(history.scene, command)
+            : command.id === "remove-prop"
+              ? patchStudio3dSceneRemoveProp(history.scene, command.propId)
+              : patchStudio3dSceneProp(history.scene, command);
+  return { scene: next, past: [...history.past, history.scene], future: [] };
 }
 
 export function undoStudio3d(history: Studio3dHistory): Studio3dHistory {
   const previous = history.past[history.past.length - 1];
   if (!previous) return history;
-  return { scene: previous, past: history.past.slice(0, -1) };
+  return {
+    scene: previous,
+    past: history.past.slice(0, -1),
+    future: [history.scene, ...history.future],
+  };
+}
+
+export function redoStudio3d(history: Studio3dHistory): Studio3dHistory {
+  const next = history.future[0];
+  if (!next) return history;
+  return {
+    scene: next,
+    past: [...history.past, history.scene],
+    future: history.future.slice(1),
+  };
 }
 
 export function serializeStudio3dScene(scene: Studio3dScene): string {
@@ -256,7 +379,9 @@ export function captureStudio3dPlates(
   height: number,
 ): Studio3dPlates {
   const fill = new Uint8ClampedArray(width * height * 4);
-  const light = Math.max(0.25, Math.min(1.6, scene.lighting.key.intensity));
+  const keyIntensity = Number.isFinite(scene.lighting.key.intensity) ? scene.lighting.key.intensity : 1;
+  const fillIntensity = Number.isFinite(scene.lighting.fill.intensity) ? scene.lighting.fill.intensity : 0.35;
+  const light = Math.max(0.2, Math.min(1.8, keyIntensity * 0.72 + fillIntensity * 0.28));
   const sky = [
     Math.round(168 * light),
     Math.round(188 * light),
@@ -282,14 +407,27 @@ export function captureStudio3dPlates(
     ),
   );
   const horizon = Math.round(height * (0.58 - pitch * 0.08));
+  const bgMode = scene.background.mode;
+  const bgRgb = parseCssHexColor(scene.background.color);
   for (let y = 0; y < height; y += 1) {
-    const color = y < horizon ? sky : ground;
+    let color: readonly [number, number, number];
+    if (bgMode === "color" && bgRgb) {
+      color = [
+        Math.round(bgRgb[0] * Math.min(1.4, light)),
+        Math.round(bgRgb[1] * Math.min(1.4, light)),
+        Math.round(bgRgb[2] * Math.min(1.4, light)),
+      ] as const;
+    } else if (bgMode === "transparent") {
+      color = [0, 0, 0];
+    } else {
+      color = y < horizon ? sky : ground;
+    }
     for (let x = 0; x < width; x += 1) {
       const i = (y * width + x) * 4;
       fill[i] = color[0];
       fill[i + 1] = color[1];
       fill[i + 2] = color[2];
-      fill[i + 3] = 255;
+      fill[i + 3] = bgMode === "transparent" ? 0 : 255;
     }
   }
 
@@ -309,27 +447,70 @@ export function captureStudio3dPlates(
     }
   }
 
+  const lineSettings = scene.output.line;
+  const lineEnabled = lineSettings.enabled !== false;
+  const lineWidth = Math.max(1, Math.round(lineSettings.widthPx || 1));
+  const lineStrength = Math.max(0, Math.min(1, lineSettings.strength ?? 0.8));
+  const lineRgb = parseCssHexColor(lineSettings.color) ?? ([20, 16, 16] as const);
+  const lineAlpha = Math.round(255 * lineStrength);
+  const edge = new Uint8ClampedArray(width * height);
+  if (lineEnabled && lineStrength > 0) {
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        const i = (y * width + x) * 4;
+        const right = (y * width + x + 1) * 4;
+        const below = ((y + 1) * width + x) * 4;
+        const delta =
+          Math.abs(fill[i] - fill[right]) +
+          Math.abs(fill[i] - fill[below]) +
+          Math.abs(fill[i + 1] - fill[right + 1]) +
+          Math.abs(fill[i + 1] - fill[below + 1]);
+        if (delta > 12) edge[y * width + x] = 1;
+      }
+    }
+  }
   const line = new Uint8ClampedArray(width * height * 4);
-  for (let y = 1; y < height - 1; y += 1) {
-    for (let x = 1; x < width - 1; x += 1) {
-      const i = (y * width + x) * 4;
-      const right = (y * width + x + 1) * 4;
-      const below = ((y + 1) * width + x) * 4;
-      const delta =
-        Math.abs(fill[i] - fill[right]) +
-        Math.abs(fill[i] - fill[below]) +
-        Math.abs(fill[i + 1] - fill[right + 1]) +
-        Math.abs(fill[i + 1] - fill[below + 1]);
-      if (delta > 12) {
-        line[i] = 20;
-        line[i + 1] = 16;
-        line[i + 2] = 16;
-        line[i + 3] = 255;
+  const radius = Math.max(0, lineWidth - 1);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (!edge[y * width + x]) continue;
+      for (let oy = -radius; oy <= radius; oy += 1) {
+        for (let ox = -radius; ox <= radius; ox += 1) {
+          const nx = x + ox;
+          const ny = y + oy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const i = (ny * width + nx) * 4;
+          line[i] = lineRgb[0];
+          line[i + 1] = lineRgb[1];
+          line[i + 2] = lineRgb[2];
+          line[i + 3] = Math.max(line[i + 3], lineAlpha);
+        }
       }
     }
   }
   return { width, height, line, fill };
 }
+
+function parseCssHexColor(color: string | undefined): readonly [number, number, number] | null {
+  if (!color || typeof color !== "string") return null;
+  const raw = color.trim();
+  const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/u.exec(raw);
+  if (!match) return null;
+  const hex = match[1]!;
+  if (hex.length === 3) {
+    return [
+      Number.parseInt(hex[0]! + hex[0]!, 16),
+      Number.parseInt(hex[1]! + hex[1]!, 16),
+      Number.parseInt(hex[2]! + hex[2]!, 16),
+    ] as const;
+  }
+  return [
+    Number.parseInt(hex.slice(0, 2), 16),
+    Number.parseInt(hex.slice(2, 4), 16),
+    Number.parseInt(hex.slice(4, 6), 16),
+  ] as const;
+}
+
 
 export function plateCoverage(
   plate: Uint8ClampedArray,
