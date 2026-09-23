@@ -160,6 +160,7 @@ interface StudioBg3dViewPanelContext {
   readonly appliedMoodRig: import("./studio-bg3d-mood-rigs").StudioBg3dMoodRig | null;
   readonly applyMoodRig: (rigId: string) => void;
   readonly updateLightingSettings: (patch: Partial<StudioBg3dLightingSettings>) => void;
+  readonly finishLtDocumentGesture: () => void;
   readonly updateRenderExposure: (exposure: number) => void;
   readonly sunLightState: import("./studio-bg3d-sun-rig").StudioBg3dSunLightState;
   readonly STUDIO_BG3D_SUN_TIME_PRESETS: readonly import("./studio-bg3d-sun-rig").StudioBg3dSunTimePreset[];
@@ -515,6 +516,7 @@ export function StudioBg3dViewPanel({
     appliedMoodRig,
     applyMoodRig,
     updateLightingSettings,
+    finishLtDocumentGesture,
     updateRenderExposure,
     sunLightState,
     STUDIO_BG3D_SUN_TIME_PRESETS,
@@ -1250,6 +1252,7 @@ export function StudioBg3dViewPanel({
                   }
                   onUpdateLighting={updateLightingSettings}
                   onUpdateExposure={updateRenderExposure}
+                  onCommitLightingHistory={finishLtDocumentGesture}
                 />
 
                 <div className="mt-5 border-t border-line pt-4">
@@ -1347,6 +1350,7 @@ export function StudioBg3dViewPanel({
                             color: sky.clearColor,
                             skyPresetId: sky.id,
                           });
+                          finishLtDocumentGesture();
                         }}
                       >
                         <span
@@ -1376,12 +1380,16 @@ export function StudioBg3dViewPanel({
                         onChange={(value) => updateBackgroundSettings({
                           panoramaRotation: normalizePanoramaRotationDegrees(value),
                         })}
+                        onChangeEnd={finishLtDocumentGesture}
                       />
                       <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                         <PanoramaRotationNumberField
                           disabled={isCapturing}
                           value={panoramaRotation}
-                          onCommit={(value) => updateBackgroundSettings({ panoramaRotation: value })}
+                          onCommit={(value) => {
+                            updateBackgroundSettings({ panoramaRotation: value });
+                            finishLtDocumentGesture();
+                          }}
                         />
                         <button
                           type="button"
@@ -1390,7 +1398,10 @@ export function StudioBg3dViewPanel({
                             "border-line bg-panel px-3 text-fg-2 hover:bg-raised hover:text-fg",
                           )}
                           disabled={isCapturing || panoramaRotation === 0}
-                          onClick={() => updateBackgroundSettings({ panoramaRotation: 0 })}
+                          onClick={() => {
+                            updateBackgroundSettings({ panoramaRotation: 0 });
+                            finishLtDocumentGesture();
+                          }}
                         >
                           <RotateCcw size={14} aria-hidden />
                           {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "정면 초기화")}</button>
@@ -1413,7 +1424,10 @@ export function StudioBg3dViewPanel({
                         type="checkbox"
                         aria-label={translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "3D 공간 안개 사용")}
                         checked={sceneBaseDocument.background.fogEnabled ?? false}
-                        onChange={(event) => updateBackgroundSettings({ fogEnabled: event.target.checked })}
+                        onChange={(event) => {
+                          updateBackgroundSettings({ fogEnabled: event.target.checked });
+                          finishLtDocumentGesture();
+                        }}
                         className="size-4 accent-accent"
                       />
                       {sceneBaseDocument.background.fogEnabled ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "켜짐") : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "꺼짐")}
@@ -1440,12 +1454,15 @@ export function StudioBg3dViewPanel({
                               sceneBaseDocument.background.fogFar === preset.far &&
                               "border-accent/60 bg-accent-soft text-accent",
                           )}
-                          onClick={() => updateBackgroundSettings({
-                            fogEnabled: true,
-                            fogColor: getSkyPreset(skyPresetId).clearColor,
-                            fogNear: preset.near,
-                            fogFar: preset.far,
-                          })}
+                          onClick={() => {
+                            updateBackgroundSettings({
+                              fogEnabled: true,
+                              fogColor: getSkyPreset(skyPresetId).clearColor,
+                              fogNear: preset.near,
+                              fogFar: preset.far,
+                            });
+                            finishLtDocumentGesture();
+                          }}
                         >
                           {preset.label}
                           <span className="text-[0.62rem] font-normal text-fg-3">
@@ -1462,6 +1479,8 @@ export function StudioBg3dViewPanel({
                         value={sceneBaseDocument.background.fogColor ?? sceneBaseDocument.background.color}
                         disabled={!sceneBaseDocument.background.fogEnabled}
                         onChange={(event) => updateBackgroundSettings({ fogColor: event.target.value })}
+                        onBlur={finishLtDocumentGesture}
+                        onPointerUp={finishLtDocumentGesture}
                         className="size-11 cursor-pointer rounded-lg border border-line bg-transparent p-1 sm:size-9"
                       />
                     </label>
@@ -1489,6 +1508,9 @@ export function StudioBg3dViewPanel({
                             ),
                           });
                         }}
+                        onPointerUp={finishLtDocumentGesture}
+                        onPointerCancel={finishLtDocumentGesture}
+                        onBlur={finishLtDocumentGesture}
                         className="mt-2 w-full accent-accent"
                       />
                     </label>
@@ -1512,6 +1534,9 @@ export function StudioBg3dViewPanel({
                             (sceneBaseDocument.background.fogNear ?? 10) + STUDIO_BG3D_FOG_MIN_GAP,
                           ),
                         })}
+                        onPointerUp={finishLtDocumentGesture}
+                        onPointerCancel={finishLtDocumentGesture}
+                        onBlur={finishLtDocumentGesture}
                         className="mt-2 w-full accent-accent"
                       />
                     </label>

@@ -43,7 +43,7 @@ describe("Studio BG3D command integration boundary", () => {
     const state = readCreatorSource("bg3d/useStudioBg3dEditorState.ts");
 
     expect(sceneOps).toContain("commitStudioBg3dHistoryTransition(commandHistoryRefs");
-    expect(sceneOps).toContain("stepStudioBg3dCommandHistory(commandHistoryRefs, direction)");
+    expect(sceneOps).toContain("stepUnifiedStudio3dHistory(commandHistoryRefs, grade, direction)");
     expect(sceneOps).toContain("resetStudioBg3dCommandHistory(");
     expect(restore).toContain("commitStudioBg3dDebouncedHistory(commandHistoryRefs");
     expect(restore).toContain("clearStudioBg3dCommandHistory(commandHistoryRefs)");

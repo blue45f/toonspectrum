@@ -194,7 +194,7 @@ export function bindStudioBg3dEditorViewModel(h) {
     reportLtUserPresetMutationFailure, persistLtUserPresetMutation, currentLtUserPresetDraft, saveCurrentLtAsUserPreset,
     updateManagedLtUserPreset, renameManagedLtUserPreset, deleteManagedLtUserPreset, applyLtPreset,
     updateLtLineSettings, updateLtToneSettings, updateLtExportHeight, updateLtExportAspectRatio,
-    updateBackgroundSettings, updateLightingSettings, updateRenderExposure, applyMoodRig,
+    updateBackgroundSettings, updateLightingSettings, finishLtDocumentGesture, updateRenderExposure, applyMoodRig,
     applySunRigConfig, cameraLensInteractionLocked, commitCameraLensView, finishCameraLensGesture,
     previewCameraLens, updateCameraLens, applyTwoPointPerspective, resetTwoPointPerspective,
     readCurrentCanonicalSceneForShot, commitAppliedShot, captureCurrentShot, applySavedShot,

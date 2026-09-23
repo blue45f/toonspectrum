@@ -12,5 +12,4 @@ Base: `origin/main` @ post-#2005 (`c274b34b9`)
 5. scene-3d / lift3d audit: linked-layer diverged scenes now fail as `scene-revision-diverged`; delete/add dual-write history
 
 ## Residual gaps
-- LT lighting/background still enter production undo via the existing debounce path (not every slider tick as an immediate `bg3d.grade.*` adapter commit) — grade past/future is dual-written on the shared `gradeHistoryRef`.
-- GPU plate path requires a live capture adapter at call sites; hosts still invoke the pure CPU path by default via `captureStudio3dPlatesFromSource`.
+- Closed on `feat/studio-3d-residual-20260923` — see `_research/studio-3d-residual-20260923.md`.

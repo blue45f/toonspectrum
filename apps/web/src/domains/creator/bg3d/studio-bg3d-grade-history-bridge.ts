@@ -170,3 +170,89 @@ export function alignStudio3dGradeHistoryToDocument(
   if (grade.scene === document) return grade;
   return { ...grade, scene: document };
 }
+
+/**
+ * Coalesce continuous LT light/background slider ticks into one dual-write at
+ * pointer-up / change-end. Preview ticks mutate the live document only; the
+ * gesture keeps the pre-edit grade + document so undo reverses the whole drag.
+ */
+export interface Studio3dGradeDocumentGesture {
+  readonly beforeDocument: Studio3dScene;
+  readonly beforeGrade: Studio3dHistory;
+  readonly primaryCommandId: Studio3dOfferedCommandId;
+}
+
+export function beginStudio3dGradeDocumentGesture(
+  current: Studio3dGradeDocumentGesture | null,
+  input: {
+    readonly grade: Studio3dHistory | null | undefined;
+    readonly beforeDocument: Studio3dScene;
+    readonly primaryCommandId: Studio3dOfferedCommandId;
+  },
+): Studio3dGradeDocumentGesture {
+  if (current) return current;
+  return {
+    beforeDocument: input.beforeDocument,
+    beforeGrade: ensureStudio3dGradeHistory(input.grade, input.beforeDocument),
+    primaryCommandId: input.primaryCommandId,
+  };
+}
+
+/**
+ * Dual-write one coalesced light/background edit. Uses full before/after
+ * documents so ambient/fog extras survive even when the offered command only
+ * names key/fill/background identity.
+ */
+export function commitStudio3dGradeDocumentGesture(input: {
+  readonly gesture: Studio3dGradeDocumentGesture;
+  readonly refs: StudioBg3dHistoryCommandRefs;
+  readonly primitives: readonly BgPrimitive[];
+  readonly customModels: readonly BgCustomModelInstance[];
+  readonly afterDocument: Studio3dScene;
+  readonly label?: string;
+  readonly source?: CommitGradeRoutedHistoryInput["source"];
+}): CommitGradeRoutedHistoryResult | null {
+  if (input.gesture.beforeDocument === input.afterDocument) return null;
+  const before = createStudioBg3dHistorySnapshot({
+    primitives: input.primitives,
+    customModels: input.customModels,
+    document: input.gesture.beforeDocument,
+  });
+  const after = createStudioBg3dHistorySnapshot({
+    primitives: input.primitives,
+    customModels: input.customModels,
+    document: input.afterDocument,
+  });
+  return commitGradeRoutedHistoryTransition({
+    grade: {
+      ...input.gesture.beforeGrade,
+      scene: input.gesture.beforeDocument,
+    },
+    refs: input.refs,
+    before,
+    after,
+    commandIds: [input.gesture.primaryCommandId],
+    label: input.label,
+    source: input.source ?? "inspector",
+  });
+}
+
+/** Classify which offered command should label a lighting patch gesture. */
+export function classifyStudio3dLightingGestureCommandId(
+  before: Studio3dScene,
+  after: Studio3dScene,
+): Studio3dOfferedCommandId {
+  const keyChanged =
+    after.lighting.key.intensity !== before.lighting.key.intensity ||
+    after.lighting.key.direction[0] !== before.lighting.key.direction[0] ||
+    after.lighting.key.direction[1] !== before.lighting.key.direction[1] ||
+    after.lighting.key.direction[2] !== before.lighting.key.direction[2];
+  if (keyChanged) return "set-light";
+  const fillChanged =
+    after.lighting.fill.intensity !== before.lighting.fill.intensity ||
+    after.lighting.fill.direction[0] !== before.lighting.fill.direction[0] ||
+    after.lighting.fill.direction[1] !== before.lighting.fill.direction[1] ||
+    after.lighting.fill.direction[2] !== before.lighting.fill.direction[2];
+  if (fillChanged) return "set-fill-light";
+  return "set-light";
+}

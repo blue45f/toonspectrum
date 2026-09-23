@@ -656,6 +656,8 @@ export function useStudioBg3dEditorRestoreEffects(h) {
       // Range gestures own an explicit before/after camera transaction. Let that transaction
       // publish one exact history entry instead of rebasing its pre-gesture camera away here.
       if (cameraLensGestureBeforeViewRef.current) return;
+      // LT light/background gestures dual-write as bg3d.grade.* on pointer-up; skip debounce.
+      if (h.ltGradeDocumentGestureRef?.current) return;
       // 캡처 트랜잭션 중에는 카메라 view 창이 캡처 프레임으로 잠깐 잡혀 있다. 그 순간의 라이브
       // 시점을 히스토리에 적으면 렌즈 시프트가 크롭 값으로 오염되므로 문서 카메라를 쓴다.
       const liveView = captureInFlightRef.current

@@ -11,7 +11,7 @@ import {
   stepUnifiedStudio3dHistory,
 } from "./studio-bg3d-grade-history-bridge";
 import { applyStudio3dCommand } from "./studio-bg3d-grade-plates";
-import { captureStudio3dPlatesFromSource } from "./studio-bg3d-grade-plates-production";
+import { captureStudio3dPlatesFromAdapter } from "./studio-bg3d-grade-plates-production";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import {
   commitStudioBg3dHistoryTransition,
@@ -488,7 +488,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     setCanUndo(committed.receipt.canUndo);
     setCanRedo(committed.receipt.canRedo);
     setSelectedIds(new Set([next.id]));
-    captureStudio3dPlatesFromSource(graded.scene, 48, 27);
+    void captureStudio3dPlatesFromAdapter(graded.scene, 48, 27, captureRef?.current?.adapter ?? null);
   };
   h.addPrimitive = addPrimitive;
   const addComposite = (presetId: string) => {
@@ -657,7 +657,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     commitSceneEntityRemoval(plan);
     setCanUndo(committed.receipt.canUndo);
     setCanRedo(committed.receipt.canRedo);
-    captureStudio3dPlatesFromSource(graded.scene, 48, 27);
+    void captureStudio3dPlatesFromAdapter(graded.scene, 48, 27, captureRef?.current?.adapter ?? null);
     setError(null);
     return true;
   };

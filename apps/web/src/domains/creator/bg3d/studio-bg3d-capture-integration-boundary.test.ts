@@ -131,7 +131,8 @@ describe("Studio 3D asynchronous capture integration boundary", () => {
     // Undo and redo now share one atomic canonical-state owner, not independent setters.
     expect(history).toContain('const doUndo = () => applyCommandHistoryStep("undo")');
     expect(history).toContain('const doRedo = () => applyCommandHistoryStep("redo")');
-    expect(history).toContain("stepStudioBg3dCommandHistory(commandHistoryRefs, direction)");
+    expect(history).toContain("stepUnifiedStudio3dHistory(commandHistoryRefs, grade, direction)");
+    expect(history).toContain("if (h.ltGradeDocumentGestureRef?.current) return;");
     expect(history).toMatch(
       /replaceCanonicalDocumentState\(\{\s*primitives: nextPrimitives,\s*customModels: nextCustomModels,\s*document: snap\.document,\s*\}\)/u,
     );
