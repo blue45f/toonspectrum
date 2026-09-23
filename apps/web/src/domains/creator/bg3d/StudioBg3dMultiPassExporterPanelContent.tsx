@@ -112,7 +112,7 @@ export function StudioBg3dMultiPassExporterPanel({
               onClick={() => applyPreset(preset)}
               className={`min-h-8 rounded border px-1.5 text-[0.6rem] font-bold transition-colors disabled:opacity-45 ${
                 activePreset === preset
-                  ? "border-accent bg-accent text-accent-fg"
+                  ? "border-accent bg-accent text-on-accent"
                   : "border-line bg-raised text-fg-2 hover:text-fg"
               }`}
             >
@@ -195,7 +195,7 @@ export function StudioBg3dMultiPassExporterPanel({
                 }))}
                 className={`min-h-7 rounded px-1.5 text-[0.58rem] font-bold disabled:opacity-45 ${
                   config.resolutionWidth === resolution.width && config.resolutionHeight === resolution.height
-                    ? "bg-accent text-accent-fg"
+                    ? "bg-accent text-on-accent"
                     : "border border-line bg-raised text-fg-2 hover:text-fg"
                 }`}
               >
@@ -260,7 +260,7 @@ export function StudioBg3dMultiPassExporterPanel({
                 onClick={() => setConfig((current) => ({ ...current, format }))}
                 className={`min-h-7 rounded px-1.5 font-mono text-[0.58rem] uppercase disabled:opacity-45 ${
                   config.format === format
-                    ? "bg-accent font-bold text-accent-fg"
+                    ? "bg-accent font-bold text-on-accent"
                     : "border border-line bg-raised text-fg-2 hover:text-fg"
                 }`}
               >
@@ -301,7 +301,7 @@ export function StudioBg3dMultiPassExporterPanel({
         type="button"
         disabled={disabled || planned.totalPasses === 0}
         onClick={() => onStartMultiPassExport?.(config)}
-        className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.68rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90 disabled:opacity-45"
+        className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.68rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90 disabled:opacity-45"
       >
         <Download className="size-3.5" />
         <span>레이어별 패스 렌더링 & 다운로드 시작</span>

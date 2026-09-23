@@ -938,7 +938,7 @@ export function StudioInsertBatchPreflight({
               type="button"
               className={cn(
                 CONTROL,
-                "ml-auto inline-flex items-center gap-1.5 border-accent bg-accent px-4 text-accent-fg hover:bg-accent/90",
+                "ml-auto inline-flex items-center gap-1.5 border-accent bg-accent px-4 text-on-accent hover:bg-accent/90",
               )}
               disabled={!canInsert}
               onClick={() => void insertReadyItems()}

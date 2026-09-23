@@ -45,11 +45,11 @@ const STATUS_LABELS: Readonly<Record<StudioProductionJob["status"], string>> = {
 type PersistenceState = "loading" | "durable" | "memory";
 
 function statusTone(status: StudioProductionJob["status"]): string {
-  if (status === "completed") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+  if (status === "completed") return "border border-good/40 bg-good/15 text-fg";
   if (status === "failed") return "bg-red-500/15 text-red-700 dark:text-red-300";
   if (status === "cancelled") return "bg-raised text-fg-3";
   if (status === "running") return "bg-blue-500/15 text-blue-700 dark:text-blue-300";
-  return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+  return "border border-warn/40 bg-warn/15 text-fg";
 }
 
 function formatBytes(bytes: number): string {
@@ -352,9 +352,9 @@ export function StudioProductionJobWorkspace({
         </div>
         <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
           persistence === "durable"
-            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+            ? "border border-good/40 bg-good/15 text-fg"
             : persistence === "memory"
-              ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              ? "border border-warn/40 bg-warn/15 text-fg"
               : "bg-raised text-fg-3"
         }`}>
           {persistence === "durable" ? "이 기기에 이력 저장" : persistence === "memory" ? "현재 탭 임시" : "이력 확인 중"}

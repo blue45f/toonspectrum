@@ -450,7 +450,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
               onClick={() => setKind(kind)}
               className={`min-h-10 rounded-full border px-4 text-sm font-medium transition-colors motion-reduce:transition-none ${
                 normalized.kind === kind
-                  ? "border-accent bg-accent text-accent-fg"
+                  ? "border-accent bg-accent text-on-accent"
                   : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg"
               }`}
             >
@@ -644,7 +644,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
                   <button
                     type="button"
                     onClick={addEngine}
-                    className="min-h-11 rounded-lg bg-accent px-5 text-sm font-bold text-accent-fg"
+                    className="min-h-11 rounded-lg bg-accent px-5 text-sm font-bold text-on-accent"
                     data-testid="market-authoring-add-engine"
                   >
                     엔진 패스 추가
@@ -1407,7 +1407,7 @@ export function MarketplaceAuthoringWorkshop(): ReactElement {
           <button
             type="button"
             onClick={applyToForm}
-            className="min-h-11 rounded-lg bg-accent px-5 text-sm font-bold text-accent-fg disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-11 rounded-lg bg-accent px-5 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="market-authoring-apply"
             disabled={errors.length > 0}
           >등록 폼에 적용</button>

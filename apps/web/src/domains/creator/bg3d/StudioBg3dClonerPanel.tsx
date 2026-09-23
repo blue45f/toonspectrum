@@ -308,7 +308,7 @@ export function StudioBg3dClonerPanel({
         type="button"
         disabled={disabled}
         onClick={handleGenerate}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90 disabled:opacity-50"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90 disabled:opacity-50"
       >
         <Sparkles className="size-3.5" />
         <span>3D 클로너 인스턴스 배열 생성</span>

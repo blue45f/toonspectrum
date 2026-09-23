@@ -475,7 +475,7 @@ export function StudioBg3dCinematicDirectorPanel({
                     setActiveDeckIndex(index);
                     applyDeckShot(index);
                   }}
-                  className="flex min-h-7 items-center gap-1 rounded bg-raised px-2 text-[0.6rem] text-accent hover:bg-accent hover:text-accent-fg disabled:opacity-40"
+                  className="flex min-h-7 items-center gap-1 rounded bg-raised px-2 text-[0.6rem] text-accent hover:bg-accent hover:text-on-accent disabled:opacity-40"
                 >
                   <Play className="size-2.5" />
                   이동
@@ -546,7 +546,7 @@ export function StudioBg3dCinematicDirectorPanel({
               onClick={() => handleTriggerShake(shake.id)}
               className={`min-h-8 rounded border px-1.5 py-1 text-[0.62rem] font-medium transition-all disabled:opacity-45 ${
                 selectedShake === shake.id
-                  ? "border-accent bg-accent text-accent-fg"
+                  ? "border-accent bg-accent text-on-accent"
                   : "border-line bg-raised text-fg-2 hover:text-fg"
               }`}
             >

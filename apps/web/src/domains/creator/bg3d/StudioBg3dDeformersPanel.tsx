@@ -125,7 +125,7 @@ export function StudioBg3dDeformersPanel({
                 onClick={() => handleAxisSelect(a)}
                 className={`w-7 rounded py-0.5 font-mono text-[0.68rem] font-bold uppercase transition-all ${
                   axis === a
-                    ? "bg-accent text-accent-fg"
+                    ? "bg-accent text-on-accent"
                     : "border border-line bg-raised text-fg-2 hover:text-fg"
                 }`}
               >
@@ -147,7 +147,7 @@ export function StudioBg3dDeformersPanel({
             maxBound: 1.0,
           })
         }
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
         <span>선택 3D 메쉬에 디포머 변형 적용</span>
