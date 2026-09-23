@@ -13,7 +13,7 @@ describe("shared workspace panel", () => {
     const onSelect = vi.fn();
     render(<StudioVirtualSpaceSeatsPanel slots={slots} snapshot={{ ...idle, available: false }} approachingSlotId={null} onSelect={onSelect} onRelease={vi.fn()} />);
     expect(screen.queryByText("비어 있음")).toBeNull();
-    expect(screen.getAllByText("확인 필요")).toHaveLength(2);
+    expect(screen.getAllByText("확인 필요")).toHaveLength(slots.length);
     for (const button of screen.getAllByRole("button")) { expect((button as HTMLButtonElement).disabled).toBe(true); fireEvent.click(button); }
     expect(onSelect).not.toHaveBeenCalled();
   });

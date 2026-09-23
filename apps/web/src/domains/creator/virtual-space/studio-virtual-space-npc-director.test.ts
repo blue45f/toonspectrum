@@ -31,12 +31,15 @@ const run = (director: StudioNpcDirector, seconds: number, environment = balance
 };
 
 describe("living studio NPC director", () => {
-  it("registers four small, collision-valid roles connected only to real tool interactions", () => {
+  it("registers the expanded collision-valid role cast connected only to real tool interactions", () => {
     expect(validateStudioWorldManifest(DEFAULT_STUDIO_WORLD_MANIFEST)).toEqual([]);
-    expect(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.map(studioNpcRole)).toEqual(["guide", "writer", "artist", "librarian"]);
-    expect(new Set(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.map((actor) => actor.skinKey)).size).toBe(4);
+    expect(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.map(studioNpcRole)).toEqual([
+      "guide", "producer", "editor", "artist", "librarian", "cafe", "security", "host",
+    ]);
+    expect(new Set(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.map((actor) => actor.skinKey)).size)
+      .toBe(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.length);
     expect(DEFAULT_STUDIO_WORLD_MANIFEST.npcs.map((actor) => studioNpcInteraction(DEFAULT_STUDIO_WORLD_MANIFEST, actor)?.action))
-      .toEqual(["community", "story", "canvas", "assets"]);
+      .toEqual(["assistant", "assistant", "review", "canvas", "assets", "community", "live", "live"]);
     for (const actor of DEFAULT_STUDIO_WORLD_MANIFEST.npcs) expect(studioNpcLabel(actor).en).toMatch(/^NPC · /u);
     expect(studioNpcInteraction(fixture(), npc)).toBeNull();
   });

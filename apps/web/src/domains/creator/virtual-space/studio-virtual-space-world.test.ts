@@ -32,9 +32,9 @@ function property(name: string, value: unknown) {
 describe("Virtual Studio world manifest", () => {
   it("keeps the default approved-art world valid", () => {
     expect(validateStudioWorldManifest(DEFAULT_STUDIO_WORLD_MANIFEST)).toEqual([]);
-    expect(DEFAULT_STUDIO_WORLD_MANIFEST.width).toBe(850);
-    expect(DEFAULT_STUDIO_WORLD_MANIFEST.height).toBe(798);
-    expect(DEFAULT_STUDIO_WORLD_MANIFEST.rooms).toHaveLength(8);
+    expect(DEFAULT_STUDIO_WORLD_MANIFEST.width).toBe(1280);
+    expect(DEFAULT_STUDIO_WORLD_MANIFEST.height).toBe(960);
+    expect(DEFAULT_STUDIO_WORLD_MANIFEST.rooms).toHaveLength(14);
     expect(DEFAULT_STUDIO_WORLD_MANIFEST.colliders.length).toBeGreaterThan(30);
     expect(studioWorldInteractions(DEFAULT_STUDIO_WORLD_MANIFEST).length).toBeGreaterThanOrEqual(8);
   });
@@ -237,16 +237,16 @@ describe("Virtual Studio world manifest", () => {
 });
 
 describe("Virtual Studio Tiled adapter", () => {
-  it("uses the clean plate as the Tiled authoring reference", () => {
+  it("uses the generated sky-island base as the Tiled authoring reference", () => {
     const background = tiledWorld.layers.find((layer) => layer.name === "background");
     expect(background).toMatchObject({
       type: "imagelayer",
-      image: "../living-world/master-clean-plate.webp",
-      imagewidth: 1296,
-      imageheight: 1213,
+      image: "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp",
+      imagewidth: 1280,
+      imageheight: 960,
     });
     expect(tiledWorld.properties.find((item) => item.name === "backgroundUrl")?.value)
-      .toBe("/assets/virtual-studio/living-world/master-clean-plate.webp");
+      .toBe("/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp");
   });
 
   it("supports new rooms, props, portals, spawns and NPCs from data", () => {
@@ -417,7 +417,7 @@ describe("Virtual Studio Tiled adapter", () => {
 describe("Virtual Studio manifest pathfinding", () => {
   it("routes to a walkable position when a click lands on furniture", () => {
     const start = DEFAULT_STUDIO_WORLD_MANIFEST.spawns.find((spawn) => spawn.id === "main")!.point;
-    const sofa = DEFAULT_STUDIO_WORLD_MANIFEST.props.find((prop) => prop.id === "lounge-sofa")!;
+    const sofa = DEFAULT_STUDIO_WORLD_MANIFEST.props.find((prop) => prop.id === "cafe-community-table")!;
     const path = findStudioWorldPath(DEFAULT_STUDIO_WORLD_MANIFEST, start, {
       x: sofa.collider!.x + sofa.collider!.width / 2,
       y: sofa.collider!.y + sofa.collider!.height / 2,
@@ -460,8 +460,8 @@ describe("Virtual Studio manifest pathfinding", () => {
 describe("Virtual Studio world loader", () => {
   it("loads a valid Tiled manifest and falls back safely on malformed data", async () => {
     const valid: StudioTiledMapLike = {
-      width: 425,
-      height: 399,
+      width: 640,
+      height: 480,
       tilewidth: 2,
       tileheight: 2,
       layers: [],
@@ -470,8 +470,8 @@ describe("Virtual Studio world loader", () => {
       "/virtual-world.json",
       async () => ({ ok: true, json: async () => valid }),
     );
-    expect(loaded.width).toBe(850);
-    expect(loaded.height).toBe(798);
+    expect(loaded.width).toBe(1280);
+    expect(loaded.height).toBe(960);
 
     const fallback = await loadStudioVirtualSpaceWorldManifest(
       "/broken-world.json",

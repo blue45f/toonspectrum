@@ -2,7 +2,7 @@ import type { StudioLiveDirectPort } from "../studio-live-direct-port";
 import type { StudioLiveCollaborationContextValue } from "../studio-live-collaboration-context";
 
 export type StudioHuddleAvailability =
-  | "ready" | "access-denied" | "recovery-required" | "session-unavailable"
+  | "ready" | "workspace-read-only" | "admission-denied" | "access-revoked" | "recovery-required" | "session-unavailable"
   | "insecure-context" | "webrtc-unsupported" | "local-only"
   | "connecting" | "connection-error" | "server-unavailable" | "direct-unavailable";
 
@@ -14,11 +14,12 @@ export function resolveStudioHuddleAvailability(
   live: HuddleLiveState,
   direct: StudioLiveDirectPort | null = live.room?.direct ?? null,
 ): StudioHuddleAvailability {
-  if (!live.canChat || live.sync.phase === "revoked" || live.sync.phase === "admission-denied") {
-    return "access-denied";
-  }
-  if (live.recovery || live.sync.phase === "recovery-required") return "recovery-required";
-  if (live.sync.phase === "unsupported-jam") return "session-unavailable";
+  const phase = live.sync?.phase;
+  if (phase === "revoked") return "access-revoked";
+  if (phase === "admission-denied") return "admission-denied";
+  if (!live.canChat) return "workspace-read-only";
+  if (live.recovery || phase === "recovery-required") return "recovery-required";
+  if (phase === "unsupported-jam") return "session-unavailable";
   if (globalThis.isSecureContext !== true) return "insecure-context";
   if (typeof globalThis.RTCPeerConnection !== "function") return "webrtc-unsupported";
   const mode = live.room?.mode ?? live.mode;
@@ -40,7 +41,9 @@ export function canRetryStudioHuddleConnection(
 }
 
 export const STUDIO_HUDDLE_AVAILABILITY_COPY: Record<Exclude<StudioHuddleAvailability, "ready">, readonly [string, string]> = {
-  "access-denied": ["이 작업실의 대화 참여 권한이 없습니다. 작업실 소유자에게 초대를 요청해 주세요.", "You do not have access to this conversation. Ask the workspace owner for an invitation."],
+  "workspace-read-only": ["현재 역할은 공간을 볼 수 있지만 대화에는 참여할 수 없습니다. 팀 관리에서 멤버 역할을 확인해 주세요.", "Your current role can view the space but cannot join conversations. Check the member role in Team management."],
+  "admission-denied": ["이 실시간 작업실 입장이 허용되지 않았습니다. 프로젝트 팀 초대 또는 회의실 입장 허가를 확인해 주세요.", "Admission to this live workspace was denied. Check the project-team invitation or meeting-room admission."],
+  "access-revoked": ["실시간 작업실 권한이 변경되어 연결을 안전하게 종료했습니다. 팀 관리자에게 현재 권한을 확인해 주세요.", "The live workspace connection ended safely because access changed. Ask a team manager to verify your current access."],
   "recovery-required": ["원고 복구가 끝날 때까지 대화 참여를 일시 중지했습니다.", "Conversation participation is paused until manuscript recovery is complete."],
   "session-unavailable": ["이 작업실에서는 아직 채팅·통화를 사용할 수 없습니다.", "Chat and calls are not available in this workspace yet."],
   "insecure-context": ["현재 주소에서는 보안상 통화를 사용할 수 없습니다. 서비스의 HTTPS 주소로 접속해 주세요.", "Calls are unavailable at this address for security reasons. Open the service over HTTPS."],

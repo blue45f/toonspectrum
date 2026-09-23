@@ -1,0 +1,1285 @@
+{
+  "version": 3,
+  "style": "retro",
+  "generatedAt": "2026-09-24",
+  "files": [
+    {
+      "file": "drawn-characters-v1/player-dark-sit.webp",
+      "bytes": 151344,
+      "sha256": "7ff1ed6dfdfd066a5d54956103932c512e9c63f1ddbab5c6b1cacb82ade1e9a0",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-dark-walk-down.webp",
+      "bytes": 139910,
+      "sha256": "0ac9abb7f53bf6f0c36834010e2b64b2534cc3051efee79cae22ff8f2162790e",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-dark-walk-left.webp",
+      "bytes": 135820,
+      "sha256": "d939f863cf2ccec72472938fd4195a53fac47af24a10d9475d3450a0144de044",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-dark-walk-right.webp",
+      "bytes": 138162,
+      "sha256": "7ed22cd736d41cb2b260b9d74f9b6ff6104ef10e9000c91cb247a5c09bea3d78",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-dark-walk-up.webp",
+      "bytes": 109730,
+      "sha256": "475cc990282246923909738a23bf6ff9bffb476bf96fe275e34b268a10bc53c1",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-dark-wave.webp",
+      "bytes": 133128,
+      "sha256": "197fb8d962f124c7ac37a83db0d29a66048c5e350838f9e5b0578bd987364478",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-draw-down.webp",
+      "bytes": 155780,
+      "sha256": "db901805cb39ff3fda9862d832bd1ea370a072c9d146d74e5410912bf110b3fb",
+      "size": [
+        1121,
+        1403
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-draw-left.webp",
+      "bytes": 130582,
+      "sha256": "77b0b9fa0052709f7c05bd0dac795d3e9b2db36feeea5472c5547af54a44e02f",
+      "size": [
+        1072,
+        1467
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-draw-right.webp",
+      "bytes": 144642,
+      "sha256": "7ea6bfad4b5d0a9c3ff37945e73e202f98ff8ec6e24a186f3f2fb4cde7c13ec8",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-draw-up.webp",
+      "bytes": 94612,
+      "sha256": "5b1804f6332a47db12f70bcfceeeeafccf8735c7b5ad6a20a179f5cadaa87752",
+      "size": [
+        1072,
+        1467
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-sit.webp",
+      "bytes": 152774,
+      "sha256": "02f1e32d6229362dd35db205e2bb76dc9a8a1aa6b30e1461410f159a658c1fec",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-walk-down.webp",
+      "bytes": 143986,
+      "sha256": "c109eb25e4746fce34dd41de031f347757697da3724e55cf76ddf5f392619635",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-walk-left.webp",
+      "bytes": 165240,
+      "sha256": "b58fc9fb7cd16a2d2d795337a828b0a11e785d41f1b6d91292c81148c2027828",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-walk-right.webp",
+      "bytes": 164056,
+      "sha256": "e67486110e893f9f2676d1834be4a891275b7776df912287075b63e22a20aed5",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-walk-up.webp",
+      "bytes": 119754,
+      "sha256": "2a8de51dc9df7d6905dbf3b1642ce87e53b3567a897a02fdec29d30380f918fc",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-pink-wave.webp",
+      "bytes": 158130,
+      "sha256": "b58dd65f41aa5f1c6ceb60a09fdfc8f1112a43f5921795fa6ce83e7c5b8c1c96",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-purple-sit.webp",
+      "bytes": 151672,
+      "sha256": "337da932d47c5b40381ee2183e4e99642b8bc2378c053401f266f90b750dd22b",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-purple-walk-down.webp",
+      "bytes": 141486,
+      "sha256": "7299cd5dfcee68e2784fc76320ea685a66aee006ce8866c29d9c974aef8d831a",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-purple-walk-left.webp",
+      "bytes": 155396,
+      "sha256": "4fd3869eed905bfec7a45dab20a06eed4379bdc4dbb1b760bf6788a7a576a50d",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-purple-walk-right.webp",
+      "bytes": 144142,
+      "sha256": "e918da7f20229de93ff4c92c589e6b46fb2fb857ed3fd4f57d25aaac136487f8",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-purple-walk-up.webp",
+      "bytes": 103786,
+      "sha256": "c8c15f241789f982869575c7e8f64793b808a2876b2aa57b88b8243138f9d27b",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-purple-wave.webp",
+      "bytes": 149840,
+      "sha256": "d69e82a78f4341e5aadab62f537d049b3e9df303f7985538a5983302dab4d8db",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-review-down.webp",
+      "bytes": 138878,
+      "sha256": "24994f97768856ec8862124c87061bdf081f0d2b61ada4e258fd54e5246bae59",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-review-left.webp",
+      "bytes": 129690,
+      "sha256": "dd27233829fd9e6c88b67a68e426a2c69ee703bcad4a63661418541994952973",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-review-right.webp",
+      "bytes": 125744,
+      "sha256": "efc0362c5560e8ba86733376cc4839ba0a69bc2c2e237518a1eb13060d784fb8",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-review-up.webp",
+      "bytes": 112094,
+      "sha256": "cfe9a320678c5923fc68bccf220786587f954a9c9af76a2746992891eab89116",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-sit.webp",
+      "bytes": 147098,
+      "sha256": "3e5e191971b2b547b8f3d1d8584271e544a18d49bc805abe8b291ffb52109171",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-walk-down.webp",
+      "bytes": 130048,
+      "sha256": "c745d7848d2bf40b08c4592643f1d7c4e31eb1d30aafdf3878356b1282744826",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-walk-left.webp",
+      "bytes": 144112,
+      "sha256": "264a6cd033f437c6b38bdbf7750e259a8ae5d7540d57a3e4f7cd497c63fdbb24",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-walk-right.webp",
+      "bytes": 135830,
+      "sha256": "118439168dbc09c97834a9f74fa55f1f70806d57f1fe6e0b930981b44e2aac47",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-walk-up.webp",
+      "bytes": 100024,
+      "sha256": "9bbee979ae5f7a77bbe6aab184b63013cef58e6a12a5cc76ff081e0980d7dfc8",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "drawn-characters-v1/player-silver-wave.webp",
+      "bytes": 104806,
+      "sha256": "d0a07c675933b39f8ea3cc99f87236604e0e43e5d856dd25923d61afd936d916",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-direction-down.webp",
+      "bytes": 14738,
+      "sha256": "bcd00e3afbba3bc02033062094a78df2d9d427aeaf18b03529f06eb88fde1cf7",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-direction-left.webp",
+      "bytes": 13494,
+      "sha256": "96ae22a9902add91617007cd04344ff474ce51bd406d76420505ef869973489a",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-direction-right.webp",
+      "bytes": 12900,
+      "sha256": "0b030970f5e8ec44209d7216efb271988563f2063ddf4787824bdde6e0e16651",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-direction-up.webp",
+      "bytes": 12128,
+      "sha256": "a1bbb8c9c56e5ff7e57cad406ec6caf6dda468a55d86ba80868c3ba4ee53d177",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-state-review.webp",
+      "bytes": 153972,
+      "sha256": "4514e275c2afaa021f6dae9099d29a9afdf6b62e74cf5e0e57dcd876723badc5",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-walk-down.webp",
+      "bytes": 151068,
+      "sha256": "88c695383730f6cbf43104e78b1249230eeb646fe0c3aefbc835c66a0a90c23c",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-walk-left.webp",
+      "bytes": 169756,
+      "sha256": "e1b95cb5f6f1edcf9ea977ed7521b25b0d1d8d938629e3c8f65e80b7cdfd08b0",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-walk-right.webp",
+      "bytes": 160440,
+      "sha256": "945a405c4446276cf886878f66abe0bccd826252414731c196ffe844b4c5342b",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-archivist-walk-up.webp",
+      "bytes": 111362,
+      "sha256": "0d852aafd803ae36913cbc70943549ec0989a4c1044c948208e991d547674fe4",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-direction-down.webp",
+      "bytes": 14674,
+      "sha256": "e52c6b9cae7c37ea9a29efca3a7476291a7d801673076407ce1e79f1a7c0b09e",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-direction-left.webp",
+      "bytes": 15578,
+      "sha256": "6dee0dccb547ea3f877911fe1586d6fb7fc6a2f49dc4db879872936f082753e2",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-direction-right.webp",
+      "bytes": 15346,
+      "sha256": "7d7e50489b15664f25ad03fad51c84fc9149c3f2400d9e2f593e0441976c20da",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-direction-up.webp",
+      "bytes": 13592,
+      "sha256": "d429d4bdaec0a87649411948e5fe412e0d3af12a5639c184727db65f1b665d27",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-state-draw.webp",
+      "bytes": 170582,
+      "sha256": "ec1702e477d8bead6b4d3e086352abe85f2068440932bb7738a3f06a7bd91bde",
+      "size": [
+        1121,
+        1403
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-walk-down.webp",
+      "bytes": 153848,
+      "sha256": "b11cc86c28ada434dc2114d31d9a979f395bf37b25ad5f0c1c9f61d3f4975bd8",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-walk-left.webp",
+      "bytes": 180264,
+      "sha256": "3fc21d1f5677de60ee58e13ce3dec295979745ca55573d417d2457c542504076",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-walk-right.webp",
+      "bytes": 175824,
+      "sha256": "23684a388168e797ba0b15fdd8384d09c160731adcb75ba3b337bfb8df927b3c",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-artist-walk-up.webp",
+      "bytes": 132582,
+      "sha256": "c80e6a40b366eb400da388205e4ca39cf5391e94264f2d8a78ae1c60c50ab887",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-direction-down.webp",
+      "bytes": 13542,
+      "sha256": "8b4244c71c6117a6404c4c49b869e6c105c6b799555373608074c034a5ef1d71",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-direction-left.webp",
+      "bytes": 14320,
+      "sha256": "b5f8dd04abc9c982cfccad071583c40a2d097d798ff7281044f55762d597dc66",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-direction-right.webp",
+      "bytes": 11820,
+      "sha256": "9d7b1ca59897ddc8575c9472053e10a2d9fb2df4ac12eade89bbabaa5c1428d4",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-direction-up.webp",
+      "bytes": 12816,
+      "sha256": "2d1a56fc7cfa73095a3fdd5a4c1e1ca1e247cd948cdb320487aa1cd9e5ae7a92",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-walk-down.webp",
+      "bytes": 139994,
+      "sha256": "fc41f4f1bb5c06d3bb76fbf315b294ef42403c3fe4dc6e083ec26c73b3bc2873",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-walk-left.webp",
+      "bytes": 138024,
+      "sha256": "a45d79febc6797dd750e4a8019124e1b0e49d10fa6e2311c0447dc14164beda9",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-walk-right.webp",
+      "bytes": 150018,
+      "sha256": "2547beb038de540e3ec2083637be3aa9b7dff2e9e6c80b72eb464f06959477e5",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-cafe-walk-up.webp",
+      "bytes": 116592,
+      "sha256": "f4b98116058b12262a19c77049d66510426859da83f74b0dc05700605b94fc93",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-direction-down.webp",
+      "bytes": 16160,
+      "sha256": "cfd2d761323a321b9ddcf168f19055358b02648d606bdd0544fd677d581c8b79",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-direction-left.webp",
+      "bytes": 13944,
+      "sha256": "4a2e96cf376ae9e97ffc404d599c6192a926605343eb9b3a1bcc86d84f0274b2",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-direction-right.webp",
+      "bytes": 13960,
+      "sha256": "9fe542aa39e2a47dd0bfee34cec1b19ddaa485ba0071eb70edb98a99ecfae0a6",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-direction-up.webp",
+      "bytes": 14438,
+      "sha256": "be7552cdcbcd285196567da7cf3387b7097aca0b07293f3036831e77de0d07e9",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-walk-down.webp",
+      "bytes": 162766,
+      "sha256": "c146a5e133bb860aa39179a9b198db1eb4fe8b1835a8984bd807a4f7015edd4d",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-walk-left.webp",
+      "bytes": 189014,
+      "sha256": "8bd51118d40e4f5b378d5c2a8ce20383ce070a2a48dcfc13c363b7d91c58e6c6",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-walk-right.webp",
+      "bytes": 178412,
+      "sha256": "32ece6158c82663be9cb7b18e4d13062c345e8d8068a839eef14b3ce3892faf9",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-concierge-walk-up.webp",
+      "bytes": 134142,
+      "sha256": "f19987d2b9bf3336ed0a67bbdc82f5cf574c5568f242496d8fd5df139aea0c74",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-direction-down.webp",
+      "bytes": 15394,
+      "sha256": "84dfd89258013c8505289ddb7278c134d48a3d6b832fb6317a99d6517ce66ec9",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-direction-left.webp",
+      "bytes": 13980,
+      "sha256": "61fd6fc65ef85575f395ec2bb101e4bb45efa291a1c5dd4c88b19962f691dfae",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-direction-right.webp",
+      "bytes": 13712,
+      "sha256": "bbd4b6e6c6315d00fde74b9b8430cefb80bb89c63dec92dd4b1e5e9a062af274",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-direction-up.webp",
+      "bytes": 12612,
+      "sha256": "7475c4713ebae541fddf55f789d3f1e410b04e0ef9e84fb7a2ed9b59a420dbcb",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-state-review.webp",
+      "bytes": 172218,
+      "sha256": "264e7dc8c9a503890509a5228f255a0ae46dfc357cb2fbf5db8afa382023d5db",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-walk-down.webp",
+      "bytes": 160974,
+      "sha256": "a99663fa8fd45f9b301d0396463e8a3a03bf2bda0e7ddf3570442a92f0b0c729",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-walk-left.webp",
+      "bytes": 178466,
+      "sha256": "6fe2eeee9ca5a46b2faf269cc58bf554ff9b6677a4ac8d7964070fd02d30290a",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-walk-right.webp",
+      "bytes": 167394,
+      "sha256": "721a4298348e44bbf50a339ffb8237fb4264d3c7b07e52f8fb03b2111cae7ad0",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-editor-walk-up.webp",
+      "bytes": 122106,
+      "sha256": "b8fec6b81df9547b49d509bb59333881b9776bb0da4d6bf1e33e84ca2ca03f16",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-direction-down.webp",
+      "bytes": 14836,
+      "sha256": "715a742f647eb80285f196fafa460e9473f32c3a54903d8a24afbfa877c4313a",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-direction-left.webp",
+      "bytes": 15114,
+      "sha256": "6ab6762ebbbc0c143143ab5c4d8e6540250fc832bc3a0aa21f473845e0149a4c",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-direction-right.webp",
+      "bytes": 15284,
+      "sha256": "cae93507f5fabc6ff134cdfb62800c379c7532f3d113da5897451efda337890e",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-direction-up.webp",
+      "bytes": 13404,
+      "sha256": "aaefe42d95f156c08b3dbbe99b87dfc3cf715d7038e2dc2b8fd6a4ba9e782fa6",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-state-draw.webp",
+      "bytes": 174300,
+      "sha256": "bd89a192e136f8ada8bb8f6a72cb28f46d7df8712d31082edb90cc9b0b836971",
+      "size": [
+        1121,
+        1403
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-walk-down.webp",
+      "bytes": 150794,
+      "sha256": "625c23a163e352eab0448b292cd4bdf7eb66adb72448ee013d03545f312286d1",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-walk-left.webp",
+      "bytes": 185004,
+      "sha256": "a125e0608e5c5a66622f6200ecfab4beb6f64002704af475805a5ccf5cc529b6",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-walk-right.webp",
+      "bytes": 182058,
+      "sha256": "060bc9abb3bb82376be7526fe7f2c62319bdde70c7f269e2eaaefd3949591258",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-host-walk-up.webp",
+      "bytes": 139808,
+      "sha256": "0842c94c57fab94e62d74ac6c1003765241182c764425d6d7043eb2860b62d0a",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-direction-down.webp",
+      "bytes": 15094,
+      "sha256": "46f9466cee90f020d082c86fe6104aec00cd117803579ccb1d4ddc7ffb18dc3e",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-direction-left.webp",
+      "bytes": 16154,
+      "sha256": "a789f28cff8d14813142e81570f3fbbd3eeff6a6ed32c7658ec77ff56bda2e06",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-direction-right.webp",
+      "bytes": 13894,
+      "sha256": "4b36eb4ff4560da8ecf1cdcd064aa5f3479dbd500d65d0c48fdf7304d6e8f3d8",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-direction-up.webp",
+      "bytes": 14262,
+      "sha256": "edab4ef45891f423ae1fa5c7cfffa4c7d3a39a1f3df4077659c46f887a4f7ef7",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-state-review.webp",
+      "bytes": 173544,
+      "sha256": "f2138217f3cb6eadef4f0970893381840033497c40c5a4826bc44011a60fc646",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-walk-down.webp",
+      "bytes": 171106,
+      "sha256": "7cd5ec4443a2fad02ef0bfe5933f4310a0f9b0379219d1cc4437383a0012ac5b",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-walk-left.webp",
+      "bytes": 178588,
+      "sha256": "b0b2fcfba9bf58e6badd94174ec4ba333b851139cecb9d5ebd35e4ad23d8ff16",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-walk-right.webp",
+      "bytes": 187100,
+      "sha256": "d288ab5b58e860579b5c8f87eb70d873977a7b54f8813e851b54a07642254e11",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-producer-walk-up.webp",
+      "bytes": 139744,
+      "sha256": "427ba44b3a56813e2360d1c788cface67a1a70ec60f2beaf7277c63de17c8e41",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-direction-down.webp",
+      "bytes": 14186,
+      "sha256": "420f4a5795d23f9f5cd1408564d72b3a7429947a65e156ee3cd1afee5793d48d",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-direction-left.webp",
+      "bytes": 12786,
+      "sha256": "4c9ca6b69a41d702deaf08f17266a96de56ad9f9ffa9a1e0fe11f2e5d353d77c",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-direction-right.webp",
+      "bytes": 12824,
+      "sha256": "1ec737083a5a1336bade2c3779b7be28c84108c6d96d918a5d6e5bd1e7f9d2b6",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-direction-up.webp",
+      "bytes": 13134,
+      "sha256": "b4ac325534f06199380bb6262b21922e8de4ad16827b6d300fff1246411680a1",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-walk-down.webp",
+      "bytes": 148896,
+      "sha256": "219b54ceab9055ce44cb6ce7d4f9be60ceecab3edd5d7019039d6285f885c44f",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-walk-left.webp",
+      "bytes": 170596,
+      "sha256": "d12e4a847a389be230ebd835e7a202ae2d534a393ea9307b217c58c5076504fd",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-walk-right.webp",
+      "bytes": 155944,
+      "sha256": "80038d890c34b04bcbc9b58212a36c01e625b22955772c6c9b66f2cb571e9a70",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-cast-v3/npc-security-walk-up.webp",
+      "bytes": 120068,
+      "sha256": "d53f5572ace1cf2f4013a37121264e73335a2c7cb0693e448848d8e353a49d02",
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "production-v2/master-central-lossless.webp",
+      "bytes": 153674,
+      "sha256": "eb491feb22c32ce68f884b92bb40256174e23d1676b81b21e1c35e2c2714b597",
+      "size": [
+        869,
+        813
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-direction-down.webp",
+      "bytes": 10876,
+      "sha256": "2ef691cfdab1b9e749e19a0474ccdd13102edb05dcec226839466726b89c86a4",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-direction-left.webp",
+      "bytes": 10386,
+      "sha256": "e8346cf5067aacbc0c102b1ca571562508f81b22a72163c22cfc268ad3f39077",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-direction-right.webp",
+      "bytes": 10052,
+      "sha256": "f559a0c067c40f08912f86f3b40adef36000a443f18d6fefd92f3ca918148160",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-direction-up.webp",
+      "bytes": 10382,
+      "sha256": "f855b70239c13d6db656c71c3f07794045358228df7e9dca7a251801a122bf9c",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-walk-down.webp",
+      "bytes": 85258,
+      "sha256": "a6cf1e3e5011919a3dcfa5490f546f70e0ebefa34c7fd8f69c4d84c2974fa4ee",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-walk-left.webp",
+      "bytes": 80666,
+      "sha256": "5d16831d3fa38c9bfb14050450e983eec8047c8884087e023a077fb19b83e59a",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-walk-right.webp",
+      "bytes": 77884,
+      "sha256": "593e3c8cabf47d193a93bfa0520a0d47bff6ec6021ea9fba53ad351c91c06e94",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-dark-walk-up.webp",
+      "bytes": 81298,
+      "sha256": "e7f6540e50533760746aeacf6534d7ce3dff4c0e0596143080ec95c2f8f0b1db",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-direction-down.webp",
+      "bytes": 12680,
+      "sha256": "725bcefd74128e80f430c9d77625a4be7398001edf415286140e5871ab896441",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-direction-left.webp",
+      "bytes": 13008,
+      "sha256": "1a14e0be3dd081e98d580fecc82c79063fdaeb5711c7bd585128b3b06915f231",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-direction-right.webp",
+      "bytes": 12840,
+      "sha256": "3933804f8d2216e748925d95f788465601d3c40ac86c6ddf48cd3ba3ea2d0cc0",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-direction-up.webp",
+      "bytes": 11186,
+      "sha256": "ba0bb35fc50fc4d57f9d948cf9d1bc4a1fb9cbbb6736a5dbd73bec7c56cae344",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-state-draw.webp",
+      "bytes": 12830,
+      "sha256": "7fe887b28da7d32fe1d167e70ad8235bef0e9812c256b97048b5a5fe4ee96055",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-state-review.webp",
+      "bytes": 12526,
+      "sha256": "91bb0854cc19f442b4d1c4a61257499058966d37618b1157e61abdd11e022274",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-state-talk.webp",
+      "bytes": 13824,
+      "sha256": "7f9d81ccc6554c2a9576cce5c02356bcf16fef0f7bd159de3aa77b5534162169",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-walk-down.webp",
+      "bytes": 97386,
+      "sha256": "b5f0f14cc02593c238884c03035337a42feb8a4df60f0d8f29cbe51006a568dc",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-walk-left.webp",
+      "bytes": 101062,
+      "sha256": "d4a4935aec5464da9c6d64fcc1b964b99d8fe257dc7cad7313eaf8dd51054c71",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-walk-right.webp",
+      "bytes": 99068,
+      "sha256": "e152768d4e41177b63bbcaf7daf437138e67f6b0f0149996273489b814570128",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-pink-walk-up.webp",
+      "bytes": 83750,
+      "sha256": "a53c77aa60bed84fc13044963b829926e913f8a4223f60f677d0a371710b079a",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-direction-down.webp",
+      "bytes": 12638,
+      "sha256": "d5a4c2030481a038b21ad743a44f570e4b9ed78d2b972ded81ac9c5b065338c6",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-direction-left.webp",
+      "bytes": 11346,
+      "sha256": "8d592ee809181d915faa3c3c8a8bc61fc61473337ba4debb923e5b7aa4da2454",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-direction-right.webp",
+      "bytes": 10974,
+      "sha256": "ef2c0244b8ddd545f3eac7495cea57dd88d15c8e821c2dde03e929f69aa305d9",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-direction-up.webp",
+      "bytes": 9850,
+      "sha256": "edb7627c1c061efac38eb81da78ade88a3e5e1a401cab00616dd73dd7c15cd4a",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-walk-down.webp",
+      "bytes": 98624,
+      "sha256": "c95cbd98fc78fe36b1ad2ab930a138df7a72fbff31f74946e13e5ec0ad23d15e",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-walk-left.webp",
+      "bytes": 86772,
+      "sha256": "d0127be19f2209bbe827b90c4e39eb8939519f8433918a76a4121e82dbb6ea5f",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-walk-right.webp",
+      "bytes": 84224,
+      "sha256": "fc908b2e9e707c64da7e472d44f92b8e1788ccc256ae08bd624e3ac21ac41cd8",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-purple-walk-up.webp",
+      "bytes": 74706,
+      "sha256": "f46f913b5e4a258c7b7f199d2283414d2cdfaeb0f5fe82c2c312e8ba6f7a5e94",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-direction-down.webp",
+      "bytes": 10670,
+      "sha256": "d1bd208aea899ee68d6a3abe2fd369409141b99f9fce812f19eae84d6bc9dbf8",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-direction-left.webp",
+      "bytes": 9064,
+      "sha256": "b083320d49e24319916d49f2f0c291644e008986194f006f1c130cec87cc7f5f",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-direction-right.webp",
+      "bytes": 10404,
+      "sha256": "cae50ab0d2545557523f1af0efe4e355c3e8909586fab907109040c89ab816e3",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-direction-up.webp",
+      "bytes": 9522,
+      "sha256": "0d14fc2199fbb7a9972076f49c1c2a494acd57970f460c88c00c07ab1e760338",
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-walk-down.webp",
+      "bytes": 82052,
+      "sha256": "2bd64d894dfdb2db162c11e317eb4737e2bea2a624d9b5d4e8979d47df7aa7d0",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-walk-left.webp",
+      "bytes": 72726,
+      "sha256": "20972367f17b54d312108211caca30dde4a3aae13df542ab93b850f07f2681a0",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-walk-right.webp",
+      "bytes": 71072,
+      "sha256": "fa5e0595368e51b8274f67e7bded83fb1a1b06377779af3131c75032bf1d1d46",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "production-v2/player-silver-walk-up.webp",
+      "bytes": 74924,
+      "sha256": "d7fbb8e7e6606fae38e8b2a877f78234085a345ec467ed2e594d0a845a39e2af",
+      "size": [
+        1536,
+        1024
+      ]
+    },
+    {
+      "file": "tiles/cloud-texture.png",
+      "bytes": 9179,
+      "sha256": "03393513aef52b884646a4b1e5a06257d630f6bfa735cc220f96b22d5ab75d5d",
+      "size": [
+        256,
+        256
+      ]
+    },
+    {
+      "file": "tiles/floor-texture.png",
+      "bytes": 6403,
+      "sha256": "5a5ee218ce9c490a343d732283dfaf0dca00693762c88f56c2b182c7b02424c3",
+      "size": [
+        256,
+        256
+      ]
+    },
+    {
+      "file": "tiles/path-texture.png",
+      "bytes": 8318,
+      "sha256": "e5650540151ebfca3d747449a528d10d7d73cdc5df5933c4093d6df79ccdc651",
+      "size": [
+        256,
+        256
+      ]
+    },
+    {
+      "file": "tiles/water-texture.png",
+      "bytes": 8002,
+      "sha256": "0f20fbf08574d2d1685f2641cd2838a0a4edc2b391d6e05225653cec31be85ff",
+      "size": [
+        256,
+        256
+      ]
+    },
+    {
+      "file": "tiles/world-base.webp",
+      "bytes": 34842,
+      "sha256": "281172fc05d766c46ca7deabcedfafb1833874599708985bc9651bbbb9f4088a",
+      "size": [
+        1280,
+        960
+      ]
+    }
+  ]
+}
