@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { createLayerGroup, type LayerGroup } from "../studio-layers";
 
-import { StudioLayerNavigator, type StudioLayerNavigatorProps } from "./StudioLayerNavigator";
+import {
+  StudioLayerNavigator,
+  type StudioLayerNavigatorProps,
+} from "./StudioLayerNavigator";
+import {
+  STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+  STUDIO_LAYER_NAVIGATOR_RENDER_STEP,
+} from "./studio-layer-navigator-window";
 
 import type { StudioLayerNavigatorItem } from "./studio-layer-navigator";
 
@@ -265,8 +272,9 @@ describe("StudioLayerNavigator", () => {
     expect(rasterOnly).toContain('aria-label="선택 레이어 병합"');
   });
 
-  it("renders 500 independently contained rows without truncating the professional layer document", () => {
-    const items = Array.from({ length: 500 }, (_, index) =>
+  it("keeps a 500-layer professional document complete while mounting only the safe window", () => {
+    const itemCount = 500;
+    const items = Array.from({ length: itemCount }, (_, index) =>
       layer(`layer-${index}`, index % 2 === 0 ? "image" : "draw", index, {
         label: `상업 원고 레이어 ${index + 1}`,
       })
@@ -274,15 +282,89 @@ describe("StudioLayerNavigator", () => {
     const html = renderNavigator(items);
 
     expect(html).toContain("레이어 500");
-    expect(html.match(/role="treeitem"/g)).toHaveLength(500);
-    expect(html.match(/content-visibility:auto/g)).toHaveLength(500);
-    // 표시 · 잠금 · 불투명도 · … · drag — five inline controls per row.
-    expect(html.match(/data-layer-row-control="true"/g)).toHaveLength(2_500);
-    expect(html.match(/data-studio-layer-drag-handle="item"/g)).toHaveLength(500);
-    expect(html.match(/data-studio-layer-row-action="lock"/g)).toHaveLength(500);
-    expect(html.match(/data-studio-layer-row-action="opacity"/g)).toHaveLength(500);
-    expect(html.match(/tabindex="-1"/g)?.length ?? 0).toBeGreaterThanOrEqual(2_000);
+    expect(html).toContain(`data-studio-layer-available-count="${itemCount}"`);
+    expect(html.match(/role="treeitem"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
+    expect(html.match(/content-visibility:auto/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
+    // 표시 · 잠금 · 불투명도 · … · drag — five inline controls per mounted row.
+    expect(html.match(/data-layer-row-control="true"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT * 5,
+    );
+    expect(html.match(/data-studio-layer-drag-handle="item"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
+    expect(html.match(/data-studio-layer-row-action="lock"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
+    expect(html.match(/data-studio-layer-row-action="opacity"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
     expect(html).toContain("상업 원고 레이어 500");
-    expect(html).toContain("상업 원고 레이어 1");
+    expect(html).not.toContain('aria-label="상업 원고 레이어 1,');
+  });
+
+  it("keeps a long-session document complete while bounding mounted layer rows", () => {
+    const itemCount = STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT + 700;
+    const items = Array.from({ length: itemCount }, (_, index) =>
+      layer(`long-layer-${index}`, "draw", index, {
+        label: `장시간 원고 레이어 ${index + 1}`,
+      })
+    );
+    const html = renderNavigator(items);
+
+    expect(html).toContain(`레이어 ${itemCount.toLocaleString("ko-KR")}`);
+    expect(html).toContain(
+      `data-studio-layer-rendered-count="${STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT}"`,
+    );
+    expect(html).toContain(`data-studio-layer-available-count="${itemCount}"`);
+    expect(html.match(/data-studio-layer-row="true"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
+    expect(html).toContain('data-studio-layer-render-window="true"');
+    expect(html).toContain("장시간 작업 보호");
+    expect(html).toContain(
+      `다음 ${STUDIO_LAYER_NAVIGATOR_RENDER_STEP.toLocaleString("ko-KR")}개 행 표시`,
+    );
+    expect(html).toContain(`장시간 원고 레이어 ${itemCount}`);
+    expect(html).not.toContain('aria-label="장시간 원고 레이어 1,');
+  });
+
+  it("windows expanded group rows without weakening whole-group semantics", () => {
+    const group = createLayerGroup("long-session", "장시간 선화");
+    const itemCount = STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT + 100;
+    const items = Array.from({ length: itemCount }, (_, index) =>
+      layer(`group-layer-${index}`, "draw", index, {
+        groupId: group.id,
+        label: `그룹 선화 ${index + 1}`,
+      })
+    );
+    const html = renderNavigator(items, [group]);
+
+    expect(html).toContain(`장시간 선화, 그룹, ${itemCount}개 레이어`);
+    expect(html.match(/data-studio-layer-row="true"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT - 1,
+    );
+    expect(html).toContain(`data-studio-layer-available-count="${itemCount}"`);
+    expect(html).toContain(
+      `data-studio-layer-rendered-row-count="${STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT}"`,
+    );
+  });
+
+  it("counts empty group headers against the same mounted-row stability budget", () => {
+    const groupCount = STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT + 80;
+    const groups = Array.from({ length: groupCount }, (_, index) =>
+      createLayerGroup(`empty-${index}`, `빈 그룹 ${index + 1}`)
+    );
+    const html = renderNavigator([], groups);
+
+    expect(html.match(/role="treeitem"/g)).toHaveLength(
+      STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+    );
+    expect(html).toContain(`data-studio-layer-available-row-count="${groupCount}"`);
+    expect(html).toContain('data-studio-layer-render-window="true"');
+    expect(html).not.toContain(`빈 그룹 ${groupCount}`);
   });
 });
