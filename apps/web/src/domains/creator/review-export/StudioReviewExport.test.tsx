@@ -39,6 +39,37 @@ describe("approved review export action", () => {
     await act(async () => { resolve({ blob: new Blob(["stale"]), fileName: "stale.zip" }); });
     expect(f.download).not.toHaveBeenCalled(); expect(f.prepare).toHaveBeenCalledOnce();
   });
+  it("aborts private archive preparation offline and requires reconnection before retrying", async () => {
+    let online = true;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    let reject!: (error: unknown) => void;
+    f.prepare.mockImplementationOnce((_subject, options) => new Promise((_resolve, done) => {
+      reject = done;
+      options.signal.addEventListener("abort", () => done(new DOMException("aborted", "AbortError")), { once: true });
+    })).mockResolvedValueOnce({ blob: new Blob(["zip"]), fileName: "reconnected.zip" });
+    render(<StudioReviewExport verified={approved()} />);
+    const save = screen.getByRole("button", { name: "승인 검수본 ZIP 저장" });
+    fireEvent.click(save);
+    await waitFor(() => expect(f.prepare).toHaveBeenCalledOnce());
+    const options = f.prepare.mock.calls[0]![1];
+
+    online = false;
+    act(() => globalThis.dispatchEvent(new Event("offline")));
+    expect(options.signal.aborted).toBe(true);
+    expect((await screen.findByRole("alert")).textContent).toContain("연결이 복구되기 전에는");
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => { reject(new DOMException("aborted", "AbortError")); });
+    expect(f.download).not.toHaveBeenCalled();
+
+    online = true;
+    act(() => globalThis.dispatchEvent(new Event("online")));
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(save);
+    await screen.findByText("브라우저에 승인된 검수본의 ZIP 다운로드를 요청했어요.");
+    expect(f.prepare).toHaveBeenCalledTimes(2);
+    expect(f.download).toHaveBeenCalledExactlyOnceWith(expect.any(Blob), "reconnected.zip");
+  });
+
   it("explains a failed preparation and allows an explicit new attempt", async () => {
     f.prepare.mockRejectedValueOnce(new Error("private server detail"));
     render(<StudioReviewExport verified={approved()} />);
