@@ -139,6 +139,26 @@ describe("background 3D plates and offered commands", () => {
     );
   });
 
+  it("normalizes partial restored documents before offered commands mutate them", () => {
+    const partialScene = {
+      camera: {},
+      attachments: [],
+      budgets: { complexity: { maxNodes: 100 } },
+    } as unknown as Parameters<typeof createStudio3dHistory>[0];
+    const history = createStudio3dHistory(partialScene);
+    const next = applyStudio3dCommand(history, {
+      id: "place-prop",
+      propId: "restored-prop",
+      x: 0.25,
+      y: 0.5,
+      z: -0.75,
+    });
+
+    expect(history.scene.nodes).toEqual([]);
+    expect(next.scene.nodes).toContainEqual(expect.objectContaining({ id: "restored-prop" }));
+    expect(next.scene.lighting.key.intensity).toBeGreaterThan(0);
+  });
+
   it("persists, undoes, redoes, and reloads every offered 3D command", () => {
     const offered = listOfferedStudio3dCommands();
     expect(offered.map((command) => command.id)).toEqual([
