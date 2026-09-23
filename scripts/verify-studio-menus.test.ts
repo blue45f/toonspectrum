@@ -1,8 +1,5 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -29,6 +26,7 @@ import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBac
 import {
   CATALOGUE_GROUPS,
   closeFloatingUi,
+  dismissOverlays,
   IMAGE_RAIL_ENTRY,
   QUICK_ACCESS_CLOSE_LABEL,
   DESKTOP_FLOATING_LAYOUT_DIALOG,
@@ -43,8 +41,6 @@ import type {
   StudioMainMenuEditorActions,
   StudioMainMenuUiActions,
 } from "../apps/web/src/domains/creator/studio-main-menu-contract";
-
-const verifierSource = readFileSync(resolve(process.cwd(), "scripts/verify-studio-menus.mts"), "utf8");
 
 vi.mock("@/shared/lib/i18n", () => ({
   useT: () => (key: string) => (ko as Record<string, string>)[key] ?? key,
@@ -210,6 +206,37 @@ describe("production menu verifier follows shipped feature entry points", () => 
 });
 
 
+it("acknowledges the blocking Studio beta notice before menu interactions", async () => {
+  const acknowledgeClick = vi.fn(async () => undefined);
+  const noticeWaitFor = vi.fn(async () => undefined);
+  const notice = {
+    getByRole: vi.fn(() => ({ click: acknowledgeClick })),
+    waitFor: noticeWaitFor,
+  };
+  const optionalOverlay = {
+    first: () => ({ isVisible: vi.fn(async () => false), click: vi.fn(async () => undefined) }),
+  };
+  const keyboardPress = vi.fn(async () => undefined);
+  const page = {
+    locator: vi.fn(() => notice),
+    getByRole: vi.fn(() => optionalOverlay),
+    waitForTimeout: vi.fn(async () => undefined),
+    keyboard: { press: keyboardPress },
+  };
+
+  await dismissOverlays(page as unknown as import("playwright").Page);
+
+  expect(page.locator).toHaveBeenCalledWith('[data-studio-beta-notice="true"]');
+  expect(noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 3000 });
+  expect(notice.getByRole).toHaveBeenCalledWith("button", {
+    name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
+  });
+  expect(acknowledgeClick).toHaveBeenCalledWith({ timeout: 3000 });
+  expect(noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 3000 });
+  expect(acknowledgeClick.mock.invocationCallOrder[0]).toBeLessThan(keyboardPress.mock.invocationCallOrder[0]!);
+});
+
+
 it("pins the localized image action rather than a retired hidden caption", () => {
   expect(STUDIO_RAIL_TOOL_CATALOG.find((tool) => tool.id === IMAGE_RAIL_ENTRY.id)?.label).toBe(IMAGE_RAIL_ENTRY.label);
 });
@@ -225,26 +252,4 @@ it("closes persistent Quick Access explicitly without clicking canvas coordinate
   expect(click).toHaveBeenCalledOnce();
   expect(waitFor).toHaveBeenCalledWith({ state: "hidden", timeout: 5000 });
   expect(page.mouse.click).not.toHaveBeenCalled();
-});
-
-
-describe("production menu verifier beta notice admission", () => {
-  it("acknowledges the visible beta notice before menu interactions", () => {
-    expect(verifierSource).toContain("acknowledgeStudioBetaNoticeIfPresent(page)");
-    expect(verifierSource).toContain("data-studio-beta-notice");
-    expect(verifierSource).toContain('notice.getByRole("button").first()');
-    expect(verifierSource).toContain('notice.waitFor({ state: "hidden"');
-
-    const navigation = verifierSource.indexOf("await page.goto(url");
-    const acknowledgement = verifierSource.lastIndexOf(
-      "await acknowledgeStudioBetaNoticeIfPresent(page)",
-    );
-    const menuWait = verifierSource.indexOf(
-      "await page.locator('[data-studio-main-menu=\"true\"]')",
-      acknowledgement,
-    );
-    expect(navigation).toBeGreaterThanOrEqual(0);
-    expect(acknowledgement).toBeGreaterThan(navigation);
-    expect(menuWait).toBeGreaterThan(acknowledgement);
-  });
 });

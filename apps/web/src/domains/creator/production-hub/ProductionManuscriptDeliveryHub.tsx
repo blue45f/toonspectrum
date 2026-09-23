@@ -15,6 +15,13 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  getAuthSessionRevision,
+  getAuthUserId,
+  listeners as sessionListeners,
+  type Session,
+} from "@/compat/auth-session-state";
+import { useAuthActorId } from "@/compat/use-auth-actor-id";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
@@ -38,6 +45,16 @@ interface Props {
   readonly subject: StudioVirtualSpaceReviewSubject | null;
   readonly process: ProductionManuscriptProcess | null;
   readonly onOpenFeedback: () => void;
+}
+
+type DeliveryGateReason = "offline" | "signed-out" | "expired" | null;
+
+function browserOnline(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function documentVisible(): boolean {
+  return typeof document === "undefined" || document.visibilityState !== "hidden";
 }
 
 async function copyPlainText(value: string): Promise<boolean> {
@@ -97,33 +114,151 @@ function ToolCard({ icon: Icon, eyebrow, title, description, children }: {
   </section>;
 }
 
-export function ProductionManuscriptDeliveryHub({ projectId, subject, process, onOpenFeedback }: Props) {
+/**
+ * Actor identity is part of this private surface's React identity. An account
+ * switch therefore removes verified review metadata and one-time share tools in
+ * the same commit instead of waiting for an async permission read to finish.
+ */
+export function ProductionManuscriptDeliveryHub(props: Props) {
+  const actorId = useAuthActorId();
+  return <ProductionManuscriptDeliveryHubForActor
+    key={JSON.stringify([actorId, props.subject])}
+    actorId={actorId}
+    {...props}
+  />;
+}
+
+function ProductionManuscriptDeliveryHubForActor({
+  actorId,
+  projectId,
+  subject,
+  process,
+  onOpenFeedback,
+}: Props & { readonly actorId: string | null }) {
   const [verification, setVerification] = useState<StudioVirtualSpaceReviewVerification | null>(null);
   const [checking, setChecking] = useState(false);
+  const [online, setOnline] = useState(browserOnline);
+  const [gateReason, setGateReason] = useState<DeliveryGateReason>(() => actorId ? null : "signed-out");
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const generation = useRef(0);
-  const verify = useCallback(async () => {
-    const own = ++generation.current;
+
+  const invalidateAuthority = useCallback((reason: DeliveryGateReason = null) => {
+    generation.current += 1;
     setVerification(null);
+    setChecking(false);
+    setGateReason(reason);
+  }, []);
+
+  const verify = useCallback(async (retainCurrent = false) => {
+    const own = ++generation.current;
+    const sessionRevision = getAuthSessionRevision();
     if (!subject) {
+      setVerification(null);
       setChecking(false);
+      setGateReason(null);
       return;
     }
+    if (!actorId) {
+      setVerification(null);
+      setChecking(false);
+      setGateReason("signed-out");
+      return;
+    }
+    if (!documentVisible()) {
+      setVerification(null);
+      setChecking(false);
+      setGateReason(null);
+      return;
+    }
+    if (!browserOnline()) {
+      setOnline(false);
+      setVerification(null);
+      setChecking(false);
+      setGateReason("offline");
+      return;
+    }
+    setOnline(true);
+    setGateReason(null);
+    if (!retainCurrent) setVerification(null);
     setChecking(true);
     try {
       const result = await verifyStudioVirtualSpaceReviewSubject(subject, "view");
-      if (own === generation.current) setVerification(result);
+      if (own !== generation.current || sessionRevision !== getAuthSessionRevision()
+        || !documentVisible() || !browserOnline()) return;
+      if (getAuthUserId() !== actorId) return;
+      if (result.ok && result.expiresAt <= Date.now()) {
+        setVerification(null);
+        setGateReason("expired");
+      } else {
+        setVerification(result);
+      }
     } catch {
-      if (own === generation.current) setVerification({ ok: false, reason: "unavailable" });
+      if (own === generation.current && sessionRevision === getAuthSessionRevision()
+        && documentVisible() && browserOnline()) {
+        setVerification({ ok: false, reason: "unavailable" });
+      }
     } finally {
       if (own === generation.current) setChecking(false);
     }
-  }, [subject]);
+  }, [actorId, subject]);
 
   useEffect(() => {
     void verify();
-    return () => { generation.current += 1; };
-  }, [verify]);
+    const focus = () => {
+      invalidateAuthority();
+      void verify();
+    };
+    const visibility = () => {
+      if (!documentVisible()) invalidateAuthority();
+      else void verify();
+    };
+    const offline = () => {
+      setOnline(false);
+      invalidateAuthority("offline");
+    };
+    const backOnline = () => {
+      setOnline(true);
+      invalidateAuthority();
+      void verify();
+    };
+    const sessionPublished = (next: Session) => {
+      const nextActor = next?.user.id ?? null;
+      if (nextActor !== actorId) {
+        invalidateAuthority(nextActor ? null : "signed-out");
+        return;
+      }
+      invalidateAuthority();
+      void verify();
+    };
+    sessionListeners.add(sessionPublished);
+    globalThis.addEventListener("focus", focus);
+    globalThis.addEventListener("online", backOnline);
+    globalThis.addEventListener("offline", offline);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      generation.current += 1;
+      sessionListeners.delete(sessionPublished);
+      globalThis.removeEventListener("focus", focus);
+      globalThis.removeEventListener("online", backOnline);
+      globalThis.removeEventListener("offline", offline);
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [actorId, invalidateAuthority, verify]);
+
+  useEffect(() => {
+    if (!verification?.ok) return undefined;
+    const ttl = verification.expiresAt - Date.now();
+    if (ttl <= 0) {
+      invalidateAuthority("expired");
+      return undefined;
+    }
+    const renew = globalThis.setTimeout(() => { void verify(true); }, Math.max(0, ttl - 5_000));
+    const expiry = globalThis.setTimeout(() => invalidateAuthority("expired"), ttl);
+    return () => {
+      globalThis.clearTimeout(renew);
+      globalThis.clearTimeout(expiry);
+    };
+  }, [invalidateAuthority, verification, verify]);
 
   useEffect(() => {
     if (copyStatus === "idle") return undefined;
@@ -152,7 +287,7 @@ export function ProductionManuscriptDeliveryHub({ projectId, subject, process, o
             현재 화면 URL은 내부 탐색 위치만 전달합니다. 외부 검토는 고정 snapshot, 공식 전달은 승인 원본과 manifest, 일반 내보내기는 목적별 변환 규칙을 사용합니다.
           </p>
         </div>
-        <button type="button" onClick={() => void verify()} disabled={checking || !subject} className={buttonClass({ variant: "outline", size: "sm" })}>
+        <button type="button" onClick={() => void verify()} disabled={checking || !subject || !actorId || !online} className={buttonClass({ variant: "outline", size: "sm" })}>
           <RefreshCcw className={cn("size-4", checking && "animate-spin")} aria-hidden="true" /> 권한 다시 확인
         </button>
       </div>
@@ -242,7 +377,20 @@ export function ProductionManuscriptDeliveryHub({ projectId, subject, process, o
       <button type="button" onClick={onOpenFeedback} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4" })}>검수본 선택</button>
     </section> : null}
 
-    {!checking && subject && verification && !verification.ok ? <section className="rounded-2xl border border-warn/35 bg-warn/10 p-5" role="alert">
+    {!checking && subject && gateReason ? <section className="rounded-2xl border border-warn/35 bg-warn/10 p-5" role="alert">
+      <h3 className="font-black text-fg">{gateReason === "offline"
+        ? "연결이 끊겨 공유·전달 권한을 숨겼습니다"
+        : gateReason === "signed-out"
+          ? "로그인한 계정으로 다시 확인해야 합니다"
+          : "권한 확인 시간이 지나 공유·전달 도구를 닫았습니다"}</h3>
+      <p className="mt-1 text-sm text-fg-2">{gateReason === "offline"
+        ? "현재 화면 링크는 복사할 수 있지만, 연결이 복구되어 서버 권한을 다시 읽기 전에는 외부 공유와 공식 전달을 실행하지 않습니다."
+        : gateReason === "signed-out"
+          ? "고정 검수본의 페이지, 공유 목록과 전달 기록은 로그인 후 서버에서 다시 확인합니다."
+          : "고정 revision과 현재 계정 권한을 다시 확인하면 안전하게 이어서 작업할 수 있습니다."}</p>
+    </section> : null}
+
+    {!checking && subject && !gateReason && verification && !verification.ok ? <section className="rounded-2xl border border-warn/35 bg-warn/10 p-5" role="alert">
       <h3 className="font-black text-fg">선택한 검수본을 다시 확인해야 합니다</h3>
       <p className="mt-1 text-sm text-fg-2">현재 권한, 고정 revision 또는 원고 해시가 달라 다른 버전으로 자동 대체하지 않았습니다.</p>
     </section> : null}

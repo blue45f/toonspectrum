@@ -276,4 +276,54 @@ empty → editing → submitted → in-review → changes-requested
 
 이번 증분은 기존 ProjectGraph revision blob과 review preview manifest를 사용한다. 페이지별 중복 저장 감소량이나 외부 전송 성능을 새로 측정하지 않았으며, 새로운 서버 dedup 알고리즘을 추가한 것으로 해석하지 않는다.
 
-운영 배포, 실제 외부 수신자 기기, WAN 장애, 대형 원고 장시간 세션, 다중 계정 동시 충돌은 별도의 release acceptance 대상이다. 구현 완료와 운영 환경 검증 완료를 같은 상태로 표시하지 않는다.
+운영 배포와 실제 외부 수신자 기기·통신사 WAN 검증은 별도의 운영 release acceptance 대상이다. 브라우저 계정 분리, 네트워크 단절·복구, 대형 원고, 장시간 반복, 동시 명령 충돌은 아래 2026-09-24 후속 acceptance에서 자동화한다. 구현 완료와 물리·운영 환경 검증 완료를 같은 상태로 표시하지 않는다.
+
+## 10. 2026-09-24 병합 후 release acceptance
+
+PR `#2018`의 사용성 구현은 merge commit `cb83ba49ab75ff8afb5a9d83b0b8526148a44e69`로 `main`에 병합했다. 후속 acceptance는 새 기능을 추가하기보다 민감한 공유·전달 동작이 계정, 권한 lease, 네트워크, 재시도, 동시 실행 경계에서 fail-closed인지 검증한다.
+
+### 계정·권한 lease 경계
+
+- `ProductionManuscriptDeliveryHub`, 외부 공유 관리자, 승인본 ZIP, 공식 전달 화면은 현재 actor를 React identity에 포함한다.
+- 로그아웃 또는 계정 전환 시 기존 검수 metadata, 공유 목록, 일회성 링크, 전달 기록과 action을 비동기 재검증보다 먼저 제거한다.
+- 지연된 이전 계정 응답은 session revision과 actor fence를 통과하지 못하므로 화면을 다시 채우지 못한다.
+- 고정 검수 권한 lease가 만료되면 갱신 요청이 멈춰 있어도 외부 공유·공식 전달 도구를 제거한다.
+- focus, visibility 복귀, session publication, online 복귀마다 서버 권한을 다시 읽는다.
+
+### WAN 단절·모호한 응답 재시도
+
+- offline 이벤트가 발생하면 in-flight ZIP 요청을 abort하고 private 목록과 action을 숨긴다.
+- online 복귀 후 새 목록을 받아오기 전에는 공유·전달을 재개하지 않는다.
+- 준비, 발행, 다운로드, 수신 확인은 입력 fingerprint별 `id`와 `operationId`를 유지한다.
+- 서버가 처리를 완료했지만 응답을 받지 못한 경우 같은 버튼을 다시 누르면 같은 operation identity를 재사용한다.
+- 성공을 확정했을 때만 retry identity를 폐기한다. 계정 전환 후에는 이전 계정의 모호한 identity를 재사용하지 않는다.
+
+### 동시 명령·수신자 binding
+
+- PostgreSQL integration에 같은 operation의 동시 replay가 이벤트 하나만 남기는 검증을 추가한다.
+- 서로 다른 operation이 같은 expected version을 동시에 발행하면 하나만 성공하고 다른 하나는 CAS conflict로 종료한다.
+- 수신자 collaborator invitation이 폐기·재발급되면 과거 binding의 다운로드·수신 완료 권한은 복구되지 않는다.
+- 브라우저 acceptance에서는 stale owner tab과 primary owner tab의 동시 발행을 재현하고, 독립 operation identity와 충돌 안내를 확인한다.
+
+### 대형 원고·장시간 반복
+
+- 서버 archive test는 허용 상한인 100페이지의 원본 bytes와 SHA-256을 빠짐없이 ZIP에 포함한다.
+- 같은 입력으로 두 번 생성한 100페이지 archive의 bytes와 archive evidence가 동일한지 확인한다.
+- 브라우저 acceptance fixture도 100페이지 manifest를 사용한다.
+- 60초 동안 225회의 offline/online 반복을 수행했고 DOM node 수는 48–56 범위로 유지됐다.
+- 1440, 820, 390, 320px viewport에서 overflow와 44px 미만 action을 검사했다.
+
+### 자동 검증 도구
+
+- `verify:studio-manuscript-delivery-acceptance`
+  - 실제 `StudioReviewDelivery` React component를 사용한다.
+  - owner primary tab, stale owner tab, recipient context를 분리한다.
+  - 준비·발행·다운로드의 응답 유실, exact operation replay, stale expected-version conflict를 검증한다.
+  - offline/online 복구, 100페이지 manifest, responsive viewport, DOM growth를 검사한다.
+  - `.qa/review-delivery-release-acceptance/report.json`과 viewport screenshot을 생성한다.
+- focused Vitest는 Production manuscript, pinned review, share manager, approved export, official delivery, archive service/model을 함께 실행한다.
+- PostgreSQL URL이 있는 CI에서는 immutable capture·delivery integration의 동시 명령 검증도 실행한다.
+
+### 증거의 범위
+
+브라우저 acceptance의 기기와 WAN은 Playwright viewport 및 offline emulation이다. 실제 휴대전화·태블릿, 통신사망, 운영 인증, 운영 object storage, 운영 배포 자체를 통과했다는 의미는 아니다. 운영 환경에서는 실제 수신자 계정과 기기, 실제 네트워크 단절, 관측 지표와 rollback 기준을 포함한 별도 release sign-off가 필요하다.

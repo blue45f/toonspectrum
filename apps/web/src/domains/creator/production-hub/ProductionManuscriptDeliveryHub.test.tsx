@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { persistSession } from "@/compat/auth-session-state";
 
 import type {
   StudioArtifactRecord,
@@ -11,6 +13,7 @@ import type {
 } from "../project-graph/studio-project-graph-contract";
 import type {
   StudioVirtualSpaceReviewSubject,
+  StudioVirtualSpaceReviewVerification,
   StudioVirtualSpaceVerifiedReview,
 } from "../virtual-space/studio-virtual-space-review-invitation";
 import type { ProductionManuscriptProcess } from "./production-manuscript-model";
@@ -148,7 +151,8 @@ const process: ProductionManuscriptProcess = {
 };
 
 beforeEach(() => {
-  f.verify.mockResolvedValue(verified);
+  persistSession({ user: { id: "owner" }, token: null });
+  f.verify.mockImplementation(async () => ({ ...verified, verifiedAt: Date.now(), expiresAt: Date.now() + 15_000 }));
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: { writeText: vi.fn(async () => undefined) },
@@ -157,6 +161,9 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  persistSession(null);
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.clearAllMocks();
 });
 
@@ -204,6 +211,72 @@ describe("ProductionManuscriptDeliveryHub", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("다른 버전으로 자동 대체하지 않았습니다");
     expect(screen.queryByText("SHARE MANAGER review-1")).toBeNull();
     expect(screen.queryByText("OFFICIAL DELIVERY review-1")).toBeNull();
+  });
+
+
+  it("removes the prior account's private tools before delayed authority reads can settle", async () => {
+    let resolveOld!: (value: StudioVirtualSpaceVerifiedReview) => void;
+    let resolveNew!: (value: StudioVirtualSpaceReviewVerification) => void;
+    render(<ProductionManuscriptDeliveryHub
+      projectId="work-1"
+      subject={subject}
+      process={process}
+      onOpenFeedback={vi.fn()}
+    />);
+    await screen.findByText("SHARE MANAGER review-1");
+
+    f.verify
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveNew = resolve; }));
+    fireEvent.click(screen.getByRole("button", { name: "권한 다시 확인" }));
+    await act(async () => { persistSession({ user: { id: "other" }, token: null }); });
+
+    expect(screen.queryByText("SHARE MANAGER review-1")).toBeNull();
+    expect(screen.queryByText("OFFICIAL DELIVERY review-1")).toBeNull();
+    await act(async () => { resolveOld({ ...verified, verifiedAt: Date.now(), expiresAt: Date.now() + 15_000 }); });
+    expect(screen.queryByText("SHARE MANAGER review-1")).toBeNull();
+    await act(async () => { resolveNew({ ok: false, reason: "access-denied" }); });
+    expect((await screen.findByRole("alert")).textContent).toContain("다른 버전으로 자동 대체하지 않았습니다");
+  });
+
+  it("hides share and delivery authority while offline and re-verifies after reconnection", async () => {
+    let online = true;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    render(<ProductionManuscriptDeliveryHub
+      projectId="work-1"
+      subject={subject}
+      process={process}
+      onOpenFeedback={vi.fn()}
+    />);
+    await screen.findByText("SHARE MANAGER review-1");
+
+    online = false;
+    act(() => globalThis.dispatchEvent(new Event("offline")));
+    expect(screen.queryByText("SHARE MANAGER review-1")).toBeNull();
+    expect(screen.queryByText("OFFICIAL DELIVERY review-1")).toBeNull();
+    expect((await screen.findByRole("alert")).textContent).toContain("연결이 끊겨");
+
+    online = true;
+    act(() => globalThis.dispatchEvent(new Event("online")));
+    expect(await screen.findByText("SHARE MANAGER review-1")).toBeTruthy();
+    expect(f.verify.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("removes private actions when the verification lease expires during a stalled renewal", async () => {
+    f.verify
+      .mockResolvedValueOnce({ ...verified, verifiedAt: Date.now(), expiresAt: Date.now() + 80 })
+      .mockImplementationOnce(() => new Promise(() => undefined));
+    render(<ProductionManuscriptDeliveryHub
+      projectId="work-1"
+      subject={subject}
+      process={process}
+      onOpenFeedback={vi.fn()}
+    />);
+    await screen.findByText("SHARE MANAGER review-1");
+    await act(async () => { await new Promise((resolve) => globalThis.setTimeout(resolve, 120)); });
+    expect(screen.queryByText("SHARE MANAGER review-1")).toBeNull();
+    expect(screen.queryByText("OFFICIAL DELIVERY review-1")).toBeNull();
+    expect((await screen.findByRole("alert")).textContent).toContain("권한 확인 시간이 지나");
   });
 
   it("requires a pinned review before offering external share or delivery", () => {

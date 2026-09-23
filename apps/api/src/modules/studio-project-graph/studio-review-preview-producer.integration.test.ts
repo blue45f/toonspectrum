@@ -790,6 +790,54 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
     await expect(pool.query('DELETE FROM studio_review_delivery WHERE id=$1', [id])).rejects.toThrow("retained");
   });
 
+  it("serializes concurrent delivery issue commands and replays only the exact operation", async () => {
+    const f = await capture(1), captured = await completeCapture(f.actor, f.intent), recipient = randomUUID(); users.push(recipient);
+    await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [recipient, "Concurrent delivery recipient"]);
+    await pool.query(`INSERT INTO creator_work_collaborator ("workId","userId",role,status,"invitationId","respondedAt")
+      VALUES ($1,$2,'commenter','active',$3,now())`, [f.input.workId, recipient, randomUUID()]);
+    await graph.decideReview(f.actor, captured.subject.reviewId, { status: "approved" });
+    const Repository = (await import("./review-delivery/review-delivery.repository")).StudioReviewDeliveryRepository;
+    const deliveries = new Repository(pool), mode = "free" as const;
+    const profile = { contract: "studio-review-delivery-profile-v1" as const, id: "approved-review-original-zip" as const,
+      version: 1 as const, container: "zip-store" as const, includeReadme: true as const };
+    const statement = "Owner attests the exact approved review for concurrent command verification.";
+    const rightsGraphDigest = createHash("sha256").update(canonicalJson({ subject: captured.subject, recipient, mode, statement, profile })).digest("hex");
+    const prepare = async (title: string) => {
+      const id = randomUUID();
+      const created = await deliveries.prepare(f.actor, f.input.workId, { id, operationId: randomUUID(), subject: captured.subject,
+        title, recipientUserId: recipient, profile, rights: { contract: "studio-review-delivery-rights-v1" as const,
+          statementVersion: 1 as const, mode, rightsGraphDigest, confirmed: true as const, statement } });
+      return { id, created };
+    };
+
+    const exact = await prepare("Exact replay delivery"), exactOperation = randomUUID();
+    const exactInput = { operationId: exactOperation, expectedVersion: 0, manifestDigest: exact.created.manifestDigest };
+    const [first, replay] = await Promise.all([
+      deliveries.issue(f.actor, f.input.workId, exact.id, exactInput),
+      deliveries.issue(f.actor, f.input.workId, exact.id, exactInput),
+    ]);
+    expect(replay).toEqual(first);
+    expect(first).toMatchObject({ state: "issued", version: 1 });
+    expect(Number((await pool.query(`SELECT count(*) AS count FROM studio_review_delivery_event
+      WHERE "deliveryId"=$1 AND "actorUserId"=$2 AND "operationId"=$3 AND action='issue'`,
+    [exact.id, f.actor, exactOperation])).rows[0]!.count)).toBe(1);
+
+    const raced = await prepare("Conflicting concurrent delivery"), leftOperation = randomUUID(), rightOperation = randomUUID();
+    const racedInput = { expectedVersion: 0, manifestDigest: raced.created.manifestDigest };
+    const results = await Promise.allSettled([
+      deliveries.issue(f.actor, f.input.workId, raced.id, { ...racedInput, operationId: leftOperation }),
+      deliveries.issue(f.actor, f.input.workId, raced.id, { ...racedInput, operationId: rightOperation }),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const rejected = results.find((result) => result.status === "rejected");
+    if (!rejected || rejected.status !== "rejected") throw new Error("missing rejected concurrent issue");
+    expect(rejected.reason).toMatchObject({ response: { code: "studio_review_delivery_conflict" } });
+    expect((await deliveries.list(f.actor, f.input.workId)).items.find((item) => item.id === raced.id)).toMatchObject({ state: "issued", version: 1 });
+    expect(Number((await pool.query(`SELECT count(*) AS count FROM studio_review_delivery_event
+      WHERE "deliveryId"=$1 AND action='issue'`, [raced.id])).rows[0]!.count)).toBe(1);
+  });
+
   it("invalidates delivery receipt authority after collaborator revocation and reinvitation", async () => {
     const f = await capture(1), captured = await completeCapture(f.actor, f.intent), recipient = randomUUID(); users.push(recipient);
     await pool.query('INSERT INTO "user" (id,name) VALUES ($1,$2)', [recipient, "Revoked delivery recipient"]);
