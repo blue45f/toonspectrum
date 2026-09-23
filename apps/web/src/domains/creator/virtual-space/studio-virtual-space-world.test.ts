@@ -66,7 +66,7 @@ describe("Virtual Studio world manifest", () => {
     expect(derived?.zoneId).toBe(studioWorldRoomAt(manifest, { x: 410, y: 410 }));
   });
 
-  it("rejects an authored NPC whose skin is not in the production registry", () => {
+  it("rejects an authored NPC whose cast key is not in the production registry", () => {
     const manifest: StudioVirtualSpaceWorldManifest = {
       ...DEFAULT_STUDIO_WORLD_MANIFEST,
       npcs: [{
@@ -78,7 +78,7 @@ describe("Virtual Studio world manifest", () => {
     };
 
     expect(validateStudioWorldManifest(manifest)).toContain(
-      "npc references missing skin: unknown-skin-npc",
+      "npc references missing cast: unknown-skin-npc",
     );
   });
 
@@ -95,7 +95,7 @@ describe("Virtual Studio world manifest", () => {
       colliders: [{ x: 95, y: 0, width: 10, height: 160 }],
       npcs: [{
         id: "blocked-patrol",
-        skinKey: "silver",
+        skinKey: "npc-editor",
         roomId: "room",
         point: { x: 40, y: 80 },
         behavior: "patrol",
@@ -369,7 +369,7 @@ describe("Virtual Studio Tiled adapter", () => {
               x: 230,
               y: 280,
               properties: [
-                property("skinKey", "dark"),
+                property("skinKey", "npc-concierge"),
                 property("roomId", "meeting-room"),
                 property("behavior", "patrol"),
                 property("speed", 64),
@@ -405,7 +405,7 @@ describe("Virtual Studio Tiled adapter", () => {
     expect(manifest.spawns[0]).toMatchObject({ id: "meeting-room", facing: "up" });
     expect(manifest.npcs[0]).toMatchObject({
       id: "producer-npc",
-      skinKey: "dark",
+      skinKey: "npc-concierge",
       behavior: "patrol",
       speed: 64,
       patrol: [{ x: 230, y: 280 }, { x: 300, y: 280 }, { x: 300, y: 320 }],

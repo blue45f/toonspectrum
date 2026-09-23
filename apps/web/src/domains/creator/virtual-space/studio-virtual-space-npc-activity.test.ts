@@ -7,8 +7,8 @@ import { studioWorldManifestFromTiled, type StudioTiledMapLike } from "./studio-
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 
 const anchor: StudioWorldNpcActivityAnchor = { id: "local-chair", roomId: "lounge", approachPoint: { x: 140, y: 120 },
-  anchorPoint: { x: 166, y: 120 }, exitPoint: { x: 198, y: 120 }, seatAttachmentPoint: { x: 166, y: 80 },
-  facing: "up", activity: "rest", animation: "sit", minDurationMs: 2500, maxDurationMs: 2500 };
+  anchorPoint: { x: 166, y: 120 }, exitPoint: { x: 198, y: 120 },
+  facing: "up", activity: "rest", animation: "idle", minDurationMs: 2500, maxDurationMs: 2500 };
 function fixture(): StudioVirtualSpaceWorldManifest {
   return { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 360, height: 260, props: [], colliders: [], portals: [],
     rooms: [{ id: "lounge", labelKo: "라운지", labelEn: "Lounge", x: 0, y: 0, width: 360, height: 260 }],
@@ -16,7 +16,7 @@ function fixture(): StudioVirtualSpaceWorldManifest {
     interactions: [{ id: "story", zoneId: "lounge", action: "story", point: { x: 260, y: 90 }, radius: 45, labelKo: "대본", labelEn: "Story" },
       { id: "canvas", zoneId: "lounge", action: "canvas", point: { x: 270, y: 210 }, radius: 45, labelKo: "그림", labelEn: "Canvas" }],
     npcActivityAnchors: [anchor],
-    npcs: [{ id: "guide", skinKey: "dark", roomId: "lounge", point: { x: 60, y: 120 }, speed: 62, activityAnchorIds: [anchor.id] }] };
+    npcs: [{ id: "guide", skinKey: "npc-concierge", roomId: "lounge", point: { x: 60, y: 120 }, speed: 62, activityAnchorIds: [anchor.id] }] };
 }
 const balanced: StudioNpcEnvironment = { atmosphere: "balanced", people: [] };
 const advance = (director: StudioNpcDirector, seconds: number, env = balanced) => {
@@ -25,11 +25,11 @@ const advance = (director: StudioNpcDirector, seconds: number, env = balanced) =
 };
 
 describe("authored NPC activities", () => {
-  it("performs pink drawing on each authored facing before restoring exit walking", () => {
+  it("performs the atelier cast drawing action on each authored facing before restoring exit walking", () => {
     for (const facing of ["down", "left", "right", "up"] as const) {
       const m = fixture();
       const drawing = { ...anchor, facing, activity: "work" as const, animation: "draw" as const, seatAttachmentPoint: undefined };
-      const world = { ...m, npcActivityAnchors: [drawing], npcs: [{ ...m.npcs[0]!, skinKey: "pink" }] };
+      const world = { ...m, npcActivityAnchors: [drawing], npcs: [{ ...m.npcs[0]!, skinKey: "npc-atelier" }] };
       expect(validateStudioWorldManifest(world)).toEqual([]);
       const director = new StudioNpcDirector(world);
       let performed = false, exited = false;
@@ -47,11 +47,11 @@ describe("authored NPC activities", () => {
     }
     expect(DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors!.find((activity) => activity.id === "studio-artist-0")?.animation).toBe("draw");
   });
-  it("performs silver's real review action in every authored direction and returns to floor movement on exit", () => {
+  it("performs the editor cast review action in every authored direction and returns to floor movement on exit", () => {
     for (const facing of ["down", "left", "right", "up"] as const) {
       const m = fixture();
       const review = { ...anchor, facing, activity: "inspect" as const, animation: "review" as const, seatAttachmentPoint: undefined };
-      const world = { ...m, npcActivityAnchors: [review], npcs: [{ ...m.npcs[0]!, skinKey: "silver" }] };
+      const world = { ...m, npcActivityAnchors: [review], npcs: [{ ...m.npcs[0]!, skinKey: "npc-editor" }] };
       expect(validateStudioWorldManifest(world)).toEqual([]);
       const director = new StudioNpcDirector(world);
       let performed = false, exited = false;
@@ -71,11 +71,12 @@ describe("authored NPC activities", () => {
     const writer = DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors!.filter((activity) => activity.id.startsWith("studio-writer-"));
     expect(writer.map((activity) => activity.animation)).toEqual(["review", "review", "idle"]);
   });
-  it("validates real floor reachability, durations, furniture attachment and available skin clips", () => {
+  it("validates real floor reachability, durations, furniture attachment and available cast clips", () => {
     const m = fixture(); expect(validateStudioWorldManifest(m)).toEqual([]);
     for (const changed of [
       { ...anchor, approachPoint: { x: -2, y: 120 } }, { ...anchor, minDurationMs: 0 },
-      { ...anchor, seatAttachmentPoint: undefined }, { ...anchor, seatAttachmentPoint: { x: 900, y: 80 } },
+      { ...anchor, animation: "sit" as const },
+      { ...anchor, animation: "sit" as const, seatAttachmentPoint: { x: 900, y: 80 } },
       { ...anchor, roomId: "missing" }, { ...anchor, script: "alert(1)" },
     ]) expect(validateStudioWorldManifest({ ...m, npcActivityAnchors: [changed] }).length).toBeGreaterThan(0);
     expect(validateStudioWorldManifest({ ...m, npcActivityAnchors: [anchor, anchor] })).toContain("NPC activity anchor id is invalid or duplicate: local-chair");
@@ -99,10 +100,14 @@ describe("authored NPC activities", () => {
   });
 
   it("roundtrips anchor references and relative attachment geometry through Tiled groups", () => {
-    const m = fixture(), tiled = studioWorldManifestToTiledMap(m) as unknown as StudioTiledMapLike;
+    const resting = { ...anchor, id: "local-rest" };
+    const seated = { ...anchor, animation: "sit" as const, seatAttachmentPoint: { x: 166, y: 80 } };
+    const base = fixture();
+    const m = { ...base, npcActivityAnchors: [seated, resting], npcs: [{ ...base.npcs[0]!, activityAnchorIds: [resting.id] }] };
+    const tiled = studioWorldManifestToTiledMap(m) as unknown as StudioTiledMapLike;
     const imported = parseStudioWorldAuthoringImport(JSON.stringify(tiled), m);
     expect(imported.npcActivityAnchors).toEqual(m.npcActivityAnchors);
-    expect(imported.npcs[0]?.activityAnchorIds).toEqual([anchor.id]);
+    expect(imported.npcs[0]?.activityAnchorIds).toEqual([resting.id]);
     const activity = tiled.layers!.find((layer) => layer.name === "npc-activity-anchors")!;
     const shifted = studioWorldManifestFromTiled({ ...tiled, layers: [{ type: "group", name: "moved", offsetx: 8, offsety: 12, layers: [activity] }] }, m);
     expect(shifted.npcActivityAnchors?.[0]?.anchorPoint).toEqual({ x: 174, y: 132 });
@@ -111,19 +116,19 @@ describe("authored NPC activities", () => {
     expect(studioWorldManifestFromTiled({ ...tiled, layers: [] }, m).npcActivityAnchors).toEqual([]);
   });
 
-  it("approaches, aligns, performs a real sit pose at separate visual hips and exits on the floor", () => {
+  it("approaches, aligns, performs an authored idle activity and exits on the floor", () => {
     const m = fixture(), director = new StudioNpcDirector(m), stages = new Set<string>();
-    let sitting = false, exited = false;
+    let performed = false, exited = false;
     for (let i = 0; i < 18 * 60; i++) {
       const view = director.advance(1 / 60, balanced)[0]!;
       if (view.activityStage) stages.add(view.activityStage);
       expect(studioWorldCanOccupy(m, view.point)).toBe(true);
       if (view.activityStage === "perform") {
-        sitting = true; expect(view.animation).toBe("sit"); expect(view.facing).toBe("up"); expect(view.moving).toBe(false);
-        expect(view.seatAttachmentPoint).toEqual(anchor.seatAttachmentPoint);
+        performed = true; expect(view.animation).toBe("idle"); expect(view.facing).toBe("up"); expect(view.moving).toBe(false);
+        expect(view.seatAttachmentPoint).toBeUndefined();
         expect(Math.hypot(view.point.x - anchor.anchorPoint.x, view.point.y - anchor.anchorPoint.y)).toBeLessThan(3);
-      } else expect(view.seatAttachmentPoint).toBeUndefined();
-      if (sitting && !view.activityStage && view.point.x > 195) exited = true;
+      }
+      if (performed && !view.activityStage && view.point.x > 195) exited = true;
     }
     expect(stages).toEqual(new Set(["approach", "align", "perform", "exit"])); expect(exited).toBe(true);
   });

@@ -1,5 +1,5 @@
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import { studioCharacterSkinByKey } from "./studio-virtual-space-character-skins";
+import { studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
 import { studioNpcInteraction, studioNpcLabel } from "./studio-virtual-space-npc-director";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 import type { StudioVirtualSpaceWorldManifest, StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
@@ -17,7 +17,7 @@ export function StudioVirtualSpaceNpcPanel({ manifest, onInteract }: StudioVirtu
     .flatMap((npc) => {
       const interaction = studioNpcInteraction(manifest, npc);
       if (!interaction) return [];
-      return [{ npc, interaction, skin: studioCharacterSkinByKey(npc.skinKey), role: studioNpcLabel(npc) }];
+      return [{ npc, interaction, skin: studioNpcCastSkinByKey(npc.skinKey), role: studioNpcLabel(npc) }];
     });
   if (!assistants.length) return null;
 

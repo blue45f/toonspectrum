@@ -188,6 +188,11 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/production-v2/player-pink-walk-down.webp",
     "apps/web/public/assets/virtual-studio/living-world/art-manifest.json",
     "apps/web/public/assets/virtual-studio/living-world/master-clean-plate.webp",
+    "apps/web/public/assets/virtual-studio/npc-cast-v1/art-manifest.json",
+    "apps/web/public/assets/virtual-studio/npc-cast-v1/npc-concierge-direction-down.png",
+    "apps/web/public/assets/virtual-studio/npc-cast-v1/npc-editor-state-review.png",
+    "apps/web/public/assets/virtual-studio/npc-cast-v1/npc-atelier-state-draw.png",
+    "apps/web/public/assets/virtual-studio/npc-cast-v1/npc-archivist-walk-up.png",
     "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
     ...["gentle-window-rain.ogg", "window-rain.ogg", "provenance.json", "CC0-1.0.txt"].map((name) =>
       `apps/web/public/assets/virtual-studio/ambient-audio/${name}`),
@@ -212,6 +217,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/living-world/",
     "/apps/web/public/assets/virtual-studio/drawn-characters-v1/",
     "/apps/web/public/assets/virtual-studio/ambient-audio/",
+    "/apps/web/public/assets/virtual-studio/npc-cast-v1/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");

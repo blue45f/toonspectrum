@@ -207,7 +207,7 @@ describe("Virtual Studio game-engine foundation", () => {
             x: 180,
             y: 210,
             properties: [
-              { name: "skinKey", value: "silver" },
+              { name: "skinKey", value: "npc-editor" },
               { name: "roomId", value: "sound-booth" },
               { name: "behavior", value: "patrol" },
               { name: "patrol", value: "180,210;260,210;260,240" },
@@ -229,7 +229,7 @@ describe("Virtual Studio game-engine foundation", () => {
     });
     expect(manifest.npcs[0]).toMatchObject({
       id: "assistant-npc",
-      skinKey: "silver",
+      skinKey: "npc-editor",
       behavior: "patrol",
     });
     expect(manifest.npcs[0]?.patrol).toHaveLength(3);
