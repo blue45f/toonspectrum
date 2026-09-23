@@ -49,6 +49,7 @@ import { createEmptyCharacterRecipe, deriveCharacterRecipe } from "./character-s
 import {
   planShaperGradeMirror,
   planShaperGradePoseFromImage,
+  planShaperGradePosePreset,
   planShaperGradeRecommend,
   restoreShaperSession,
   serializeShaperSession,
@@ -484,6 +485,11 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
   /* Step execution                                                          */
   /* ---------------------------------------------------------------------- */
 
+  const gradeCharacterRef = useRef<ShaperCharacter>(shaperCharacterFromRecipe(recipe));
+  useEffect(() => {
+    gradeCharacterRef.current = shaperCharacterFromRecipe(recipe, gradeCharacterRef.current.pose);
+  }, [recipe]);
+
   const runSteps = useCallback((steps: readonly CharacterApplyStep[], colorChanges: Partial<CharacterRecipe["colors"]> = {}) => {
     const host = hostRef.current;
     let mergedForge: AvatarForgeState | null = null;
@@ -590,11 +596,19 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
         }
         case "pose-preset":
           host.handlePoseSelect?.(step.presetId);
+          // Keep the grade twin aligned with shelf pose commits (bridge was unused).
+          gradeCharacterRef.current = planShaperGradePosePreset(
+            gradeCharacterRef.current,
+            step.presetId,
+          ).character;
           break;
         case "hand-pose": {
+          const applyHand = host.applyHandPosePreset;
+          // Do not record a hand-pose apply when the host cannot actually change fingers.
+          if (typeof applyHand !== "function") break;
           const sides: readonly ("left" | "right")[] = step.side === "both" ? ["left", "right"] : [step.side];
           for (const side of sides) {
-            host.applyHandPosePreset?.(side, step.poseType);
+            applyHand.call(host, side, step.poseType);
             updatedHands[side] = step.poseType;
           }
           nextHandPose = step.poseType;
@@ -908,10 +922,6 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     }
   }, [profile, planContext, captureHostState, runSteps, restoreHostState, pushHistory]);
 
-  const gradeCharacterRef = useRef<ShaperCharacter>(shaperCharacterFromRecipe(recipe));
-  useEffect(() => {
-    gradeCharacterRef.current = shaperCharacterFromRecipe(recipe, gradeCharacterRef.current.pose);
-  }, [recipe]);
 
   const applyGradeRecommend = useCallback((image: ShaperImage) => {
     if (busyRef.current !== null || previewRef.current !== null) {
@@ -950,9 +960,12 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
 
   const mirrorGradePose = useCallback(() => {
     if (busyRef.current !== null || previewRef.current !== null) return;
+    const mirror = hostRef.current.handleMirrorPose;
+    // Avoid advancing grade history when the host cannot mirror bones.
+    if (typeof mirror !== "function") return;
     const planned = planShaperGradeMirror(gradeCharacterRef.current);
     const before = captureHostState();
-    hostRef.current.handleMirrorPose?.("all");
+    mirror.call(hostRef.current, "all");
     gradeCharacterRef.current = planned.character;
     pushHistory(planned.label, before);
   }, [captureHostState, pushHistory]);

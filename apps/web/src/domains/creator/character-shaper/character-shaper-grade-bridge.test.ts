@@ -82,4 +82,13 @@ describe("character-shaper-grade-bridge", () => {
     expect(preset.steps).toEqual([{ kind: "pose-preset", presetId: "xp_wave_greeting" }]);
     expect(preset.character.pose.rightUpperArm).toBeLessThan(SHAPER_REST_UPPER_ARM);
   });
+
+  it("binding shelf pose-preset keeps grade twin arm angles deterministic", () => {
+    const start = createShaperCharacter();
+    const preset = planShaperGradePosePreset(start, "pose:xp_wave_greeting");
+    expect(preset.steps).toEqual([{ kind: "pose-preset", presetId: "xp_wave_greeting" }]);
+    expect(preset.character.pose.rightUpperArm).toBeLessThan(SHAPER_REST_UPPER_ARM);
+    const again = planShaperGradePosePreset(start, "xp_wave_greeting");
+    expect(again.character.pose).toEqual(preset.character.pose);
+  });
 });

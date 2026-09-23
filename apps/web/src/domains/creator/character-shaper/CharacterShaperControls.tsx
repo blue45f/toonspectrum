@@ -528,6 +528,8 @@ export function CharacterMirrorPoseToggle({
       type="button"
       disabled={disabled}
       onClick={onMirror}
+      data-testid="character-shaper-mirror-pose"
+      aria-label={label}
       className={cn(
         "inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-card px-3 text-[0.72rem] font-semibold text-fg-2",
         "transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
