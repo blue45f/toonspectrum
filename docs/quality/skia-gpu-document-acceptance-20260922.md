@@ -104,7 +104,7 @@ The real `/studio/canvas` verifier passed five checks: draw activation, Konva pa
 
 A synthetic long-session soak started from 10,000 retained strokes and completed **5,000 append/Undo cycles** on Chromium/ANGLE Metal. Picture records stayed fixed at 5,130,876 bytes, retained viewport snapshots stayed within 3,686,400 bytes, submission P95/P99 were about 3.6/4.1 ms, worst observed submission was 9 ms, and forced-GC JS heap delta was about +1.05 MiB. This is useful stability evidence but is not a substitute for 30/120-minute physical pen, OS memory-pressure or battery/thermal certification.
 
-Automerge remains deferred. Yjs, source document/Undo, SQLite/OPFS, authorization, persistence and export authority are unchanged. No production deployment was performed.
+At this continuation point Automerge was still deferred. Yjs, source document/Undo, SQLite/OPFS, authorization, persistence and export authority were unchanged, and no production deployment was performed.
 
 ## Settled live-ink handoff continuation — 2026-09-23
 
@@ -116,7 +116,7 @@ The focused bridge, surface, coordinator and source-boundary suite passed 5 file
 
 The real `/studio/canvas` Chromium run on ANGLE Metal / Apple M2 Max confirmed `data-studio-skia-source-fence="settled-ink"` for three pointer strokes, followed by exact GPU visibility, selection compatibility restoration, zoom/90-degree rotation, Undo/Redo and explicit same-engine recovery after real context loss.
 
-This does not move document authority, Undo, Yjs, SQLite/OPFS, permission checks or export. Automerge remains deferred and no production deployment was performed.
+This continuation did not move document authority, Undo, Yjs, SQLite/OPFS, permission checks or export. Automerge was still deferred at that point and no production deployment was performed.
 
 ## Host runtime, multitab and mobile-emulation continuation — 2026-09-23
 

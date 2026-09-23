@@ -90,7 +90,7 @@ describe("createStudioOfflineCapableResourceLeaseController", () => {
       reportNotice,
     } = await setup(true);
 
-    expect(room.canvasLockPolicy).toBe("append-only");
+    expect(room.canvasLockPolicy).toBe("cooperative");
     expect(room.serverLockSupported).toBe(false);
     expect(controller.begin(["existing-element"], "drag")).toBe(true);
     expect(beginProposal).toHaveBeenCalledWith({
@@ -115,10 +115,13 @@ describe("createStudioOfflineCapableResourceLeaseController", () => {
   });
 
   it("fails closed for destructive edits when the offline branch is unavailable", async () => {
-    const { controller, beginProposal } = await setup(false);
+    const { controller, beginProposal, reportError } = await setup(false);
 
     expect(controller.begin(["existing-element"], "transform")).toBe(false);
     expect(await controller.beginAsync(["existing-element"], "transform")).toBe(false);
     expect(beginProposal).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenLastCalledWith(
+      expect.stringContaining("오프라인 제안 권위"),
+    );
   });
 });
