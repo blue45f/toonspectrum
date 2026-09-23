@@ -123,7 +123,6 @@ jobs:
           AUDIT_SCROLL_SWEEP: 1
           AUDIT_STRICT: 1
           AUDIT_CAPTURE: issues
-          AUDIT_AXE: 1
           AUDIT_NAVIGATION_RETRIES: 1
         run: |
           set -euo pipefail
@@ -135,16 +134,20 @@ jobs:
               export AUDIT_THEME_MODE=all
               export AUDIT_MEDIA_CONTRAST=no-preference
               export AUDIT_FORCED_COLORS=none
+              export AUDIT_AXE=1
               ;;
             preferred-contrast)
               export AUDIT_THEME_MODE=all
               export AUDIT_MEDIA_CONTRAST=more
               export AUDIT_FORCED_COLORS=none
+              export AUDIT_AXE=1
               ;;
             forced-colors)
               export AUDIT_THEMES=contrast
               export AUDIT_MEDIA_CONTRAST=more
               export AUDIT_FORCED_COLORS=active
+              # System colors replace authored colors, so axe color-contrast ratios are not meaningful here.
+              export AUDIT_AXE=0
               ;;
             *)
               echo "Unknown profile: ${PROFILE}" >&2
