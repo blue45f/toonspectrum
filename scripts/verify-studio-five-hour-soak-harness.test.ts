@@ -206,3 +206,19 @@ describe("Studio five-hour soak local-preview runtime noise", () => {
     expect(source).toContain("report.environmentNoise.push(error)");
   });
 });
+
+describe("Studio five-hour soak beta notice admission", () => {
+  it("acknowledges the visible product notice through its action before drawing", () => {
+    expect(source).toContain("acknowledgeStudioBetaNoticeIfPresent(page)");
+    expect(source).toContain("data-studio-beta-notice");
+    expect(source).toContain('notice.getByRole("button").first()');
+    expect(source).toContain('notice.waitFor({ state: "hidden"');
+
+    const navigation = source.indexOf("page.goto(`${preview.origin}/studio/canvas`");
+    const acknowledgement = source.lastIndexOf("await acknowledgeStudioBetaNoticeIfPresent(page)");
+    const editorWait = source.indexOf('page.locator(\'[data-studio-editor="true"]\')');
+    expect(navigation).toBeGreaterThanOrEqual(0);
+    expect(acknowledgement).toBeGreaterThan(navigation);
+    expect(editorWait).toBeGreaterThan(acknowledgement);
+  });
+});

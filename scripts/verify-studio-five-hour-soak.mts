@@ -345,6 +345,20 @@ async function ensurePenReady(page: Page): Promise<boolean> {
     .catch(() => false);
 }
 
+async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
+  const notice = page.locator('[data-studio-beta-notice="true"]');
+  const visible = await notice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return false;
+
+  const action = notice.getByRole("button").first();
+  await action.click({ timeout: 10_000 });
+  await notice.waitFor({ state: "hidden", timeout: 10_000 });
+  return true;
+}
+
 async function waitForPenReady(page: Page, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + Math.max(1_000, timeoutMs);
   do {
@@ -509,6 +523,7 @@ try {
     throw new Error(`${inputMode} soak input requires Chromium CDP; refusing a mouse downgrade.`);
   }
   await page.goto(`${preview.origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  await acknowledgeStudioBetaNoticeIfPresent(page);
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 90_000 });
   await page.waitForTimeout(3_000);
   if (!(await waitForPenReady(page))) {
