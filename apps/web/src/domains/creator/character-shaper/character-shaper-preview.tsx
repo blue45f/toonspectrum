@@ -1738,7 +1738,7 @@ function defaultPreviewLabel(spec: CharacterSlotPreviewSpec): string {
     case "pose":
       return "포즈 미리보기";
     case "hand-pose":
-      return "손 포즈 미리보기";
+      return `손 포즈 미리보기 (${spec.poseType})`;
     case "glyph":
     default:
       return spec.caption.trim() || "미리보기";
@@ -1749,6 +1749,7 @@ function defaultPreviewLabel(spec: CharacterSlotPreviewSpec): string {
 function previewTitle(spec: CharacterSlotPreviewSpec, label: string): string | null {
   if (spec.kind === "expression") return spec.emoji ? `${label} ${spec.emoji}` : label;
   if (spec.kind === "pose") return spec.tone ? `${label} · ${spec.tone}` : label;
+  if (spec.kind === "hand-pose") return `${label} · ${spec.poseType}`;
   return null;
 }
 
@@ -1821,6 +1822,7 @@ export function CharacterSlotPreview({ spec, size = 80, selected = false, classN
       aria-label={label}
       className={cn("block shrink-0 select-none overflow-hidden", className)}
       data-character-preview={spec.kind}
+      data-character-preview-hand-pose={spec.kind === "hand-pose" ? spec.poseType : undefined}
       data-character-preview-selected={selected ? "true" : undefined}
       focusable="false"
       height={width * 1.25}

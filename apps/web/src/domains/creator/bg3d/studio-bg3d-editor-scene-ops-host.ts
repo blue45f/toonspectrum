@@ -5,7 +5,13 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
-import { applyStudio3dCommand, captureStudio3dPlates, createStudio3dHistory } from "./studio-bg3d-grade-plates";
+import {
+  commitGradeRoutedHistoryTransition,
+  ensureStudio3dGradeHistory,
+  stepUnifiedStudio3dHistory,
+} from "./studio-bg3d-grade-history-bridge";
+import { applyStudio3dCommand } from "./studio-bg3d-grade-plates";
+import { captureStudio3dPlatesFromSource } from "./studio-bg3d-grade-plates-production";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import {
   commitStudioBg3dHistoryTransition,
@@ -349,6 +355,10 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     historyIndexRef,
     historyCommandTimelineRef,
   };
+  if (!h.gradeHistoryRef) {
+    h.gradeHistoryRef = { current: null };
+  }
+  const gradeHistoryRef = h.gradeHistoryRef;
   function commitImmediateHistoryTransition(
     nextPrimitives: readonly BgPrimitive[],
     nextCustomModels: readonly BgCustomModelInstance[],
@@ -396,9 +406,11 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
   const applyCommandHistoryStep = (direction: "undo" | "redo"): void => {
     if (!isStudioBg3dSceneEditReady(h)) return;
     if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
-    const receipt = stepStudioBg3dCommandHistory(commandHistoryRefs, direction);
-    if (!receipt || receipt.status !== "applied") return;
-    const snap = receipt.state;
+    const grade = ensureStudio3dGradeHistory(gradeHistoryRef.current, sceneBaseDocument);
+    const unified = stepUnifiedStudio3dHistory(commandHistoryRefs, grade, direction);
+    gradeHistoryRef.current = unified.grade;
+    if (!unified.snapshot) return;
+    const snap = unified.snapshot;
     const nextPrimitives = clonePrimitives(snap.primitives);
     const nextCustomModels = cloneBgCustomModelInstances(snap.customModels);
     replaceCanonicalDocumentState({
@@ -442,17 +454,41 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     const live = physicsRuntimeSourceRef.current;
     const next = createPrimitive(kind, live.primitives.length);
     const nextPrimitives = [...live.primitives, next];
-    replaceCanonicalDocumentState({ primitives: nextPrimitives });
-    setSelectedIds(new Set([next.id]));
     const position = next.position ?? next.transform?.position ?? [0, 0, 0];
-    const graded = applyStudio3dCommand(createStudio3dHistory(live.document ?? sceneBaseDocument), {
-      id: "place-prop",
+    const grade = ensureStudio3dGradeHistory(gradeHistoryRef.current, live.document ?? sceneBaseDocument);
+    const command = {
+      id: "place-prop" as const,
       propId: next.id,
       x: position[0] ?? 0,
       y: position[1] ?? 0,
       z: position[2] ?? 0,
+    };
+    const graded = applyStudio3dCommand(grade, command);
+    const before = createStudioBg3dHistorySnapshot(live);
+    replaceCanonicalDocumentState({ primitives: nextPrimitives });
+    const after = createStudioBg3dHistorySnapshot({
+      primitives: nextPrimitives,
+      customModels: live.customModels,
+      document: live.document ?? sceneBaseDocument,
     });
-    captureStudio3dPlates(graded.scene, 48, 27);
+    const committed = commitGradeRoutedHistoryTransition({
+      grade,
+      refs: commandHistoryRefs,
+      before,
+      after,
+      commandIds: ["place-prop"],
+      label: "소품 배치",
+      source: "palette",
+    });
+    gradeHistoryRef.current = {
+      scene: graded.scene,
+      past: committed.grade.past,
+      future: committed.grade.future,
+    };
+    setCanUndo(committed.receipt.canUndo);
+    setCanRedo(committed.receipt.canRedo);
+    setSelectedIds(new Set([next.id]));
+    captureStudio3dPlatesFromSource(graded.scene, 48, 27);
   };
   h.addPrimitive = addPrimitive;
   const addComposite = (presetId: string) => {
@@ -595,14 +631,33 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
       setError("부모를 삭제해도 자식의 월드 변환을 보존할 수 없어 삭제를 취소했습니다.");
       return false;
     }
-    // Capture the pre-removal document so offered remove-prop commands stay on the same
-    // grade path as place-prop (sidebar advertises both; plates must react to delete too).
-    let graded = createStudio3dHistory(live.document ?? sceneBaseDocument);
+    // Dual-write: offered remove-prop grade past/future + production adapter undo spine
+    // (template organizer already committed history here; deleteSelected previously did not).
+    const grade = ensureStudio3dGradeHistory(gradeHistoryRef.current, live.document ?? sceneBaseDocument);
+    let graded = grade;
     for (const propId of ids) {
       graded = applyStudio3dCommand(graded, { id: "remove-prop", propId });
     }
+    const before = createStudioBg3dHistorySnapshot(live);
+    const after = createStudioBg3dHistorySnapshot(plan.snapshot);
+    const committed = commitGradeRoutedHistoryTransition({
+      grade,
+      refs: commandHistoryRefs,
+      before,
+      after,
+      commandIds: ["remove-prop"],
+      label: "소품 제거",
+      source: "keyboard",
+    });
+    gradeHistoryRef.current = {
+      scene: graded.scene,
+      past: committed.grade.past,
+      future: committed.grade.future,
+    };
     commitSceneEntityRemoval(plan);
-    captureStudio3dPlates(graded.scene, 48, 27);
+    setCanUndo(committed.receipt.canUndo);
+    setCanRedo(committed.receipt.canRedo);
+    captureStudio3dPlatesFromSource(graded.scene, 48, 27);
     setError(null);
     return true;
   };

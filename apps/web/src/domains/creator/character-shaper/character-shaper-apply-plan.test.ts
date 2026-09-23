@@ -228,3 +228,37 @@ describe("planCharacterSlotRemove", () => {
     expect(planCharacterSlotRemove("accessory", "accessory:nope", context)).toBeNull();
   });
 });
+
+describe("hand-pose apply-plan coverage expansion", () => {
+  const HAND_POSE_TYPES = [
+    "fist", "open", "point", "peace", "thumbsUp", "holding",
+    "phoneGrip", "penGrip", "fingerHeart", "cupGrip", "rockRoll", "okSign", "relaxed",
+  ] as const;
+
+  it("plans every catalog hand pose for left, right, and both sides", () => {
+    for (const poseType of HAND_POSE_TYPES) {
+      for (const side of ["left", "right", "both"] as const) {
+        const planned = plan(`hand-pose:${poseType}`, snapshotWith(), FULL_PROFILE, side);
+        expect(planned.steps).toEqual([{ kind: "hand-pose", poseType, side }]);
+        expect(planned.availability.status).toBe("available");
+      }
+    }
+  });
+
+  it("clears hand-pose back to relaxed on the active side", () => {
+    for (const side of ["left", "right", "both"] as const) {
+      const cleared = planCharacterSlotClear("hand-pose", {
+        snapshot: snapshotWith({ lastHandPoseType: "fist", handSide: side }),
+        handSide: side,
+      });
+      expect(cleared?.steps).toEqual([{ kind: "hand-pose", poseType: "relaxed", side }]);
+    }
+  });
+
+  it("does not treat hand-pose as a multi-slot remove target", () => {
+    expect(planCharacterSlotRemove("hand-pose", "hand-pose:fist", {
+      snapshot: snapshotWith(),
+      handSide: "both",
+    })).toBeNull();
+  });
+});

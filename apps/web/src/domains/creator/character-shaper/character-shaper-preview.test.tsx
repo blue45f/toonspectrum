@@ -163,6 +163,7 @@ describe("CharacterSlotPreview", () => {
     for (const poseType of CHARACTER_HAND_GLYPH_POSE_TYPES) {
       const html = markup({ kind: "hand-pose", poseType });
       expect(html, poseType).toContain('data-character-preview="hand-pose"');
+      expect(html, poseType).toContain(`data-character-preview-hand-pose="${poseType}"`);
       expect((html.match(/stroke-width="6.4"/g) ?? []).length, poseType).toBe(5);
     }
     expect(markup({ kind: "hand-pose", poseType: "fist" })).not.toBe(markup({ kind: "hand-pose", poseType: "open" }));

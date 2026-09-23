@@ -141,4 +141,11 @@ describe("Studio Lift 3D 대칭 축", () => {
     expect(out[3]).toBeCloseTo(0.4, 6);
     expect(out[6]).toBeCloseTo(0.8, 6);
   });
+
+  it("returns the input unchanged when height buffer length mismatches the mask", () => {
+    const mask = maskFrom(4, 4, new Uint8Array(16).fill(1));
+    const heights = new Float64Array(8).fill(0.5);
+    expect(symmetrizeStudioLift3dHeights(heights, mask, 1.5, 1)).toBe(heights);
+  });
+
 });

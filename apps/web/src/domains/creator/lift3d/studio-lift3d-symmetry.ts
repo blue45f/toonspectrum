@@ -117,6 +117,11 @@ export function symmetrizeStudioLift3dHeights(
   const mix = clampStudioLift3dUnit(strength);
   if (mix <= 0) return heights;
   const { cells, width, height } = mask;
+  const expected = width * height;
+  // Fail closed on length mismatch — reading past the buffer would invent thickness.
+  if (heights.length !== expected || cells.length !== expected) {
+    return heights;
+  }
   const out = new Float64Array(heights);
   for (let y = 0; y < height; y += 1) {
     const row = y * width;

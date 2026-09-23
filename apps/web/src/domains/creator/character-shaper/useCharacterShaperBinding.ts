@@ -84,7 +84,7 @@ import type {
 import type { CostumeSlot } from "../vrm/studio-vrm-costume";
 import type { PropInstance } from "../vrm/studio-vrm-props";
 import type { WardrobeEquip, WardrobeSlot, WardrobeState } from "../vrm/studio-vrm-wardrobe";
-import type { StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
+import { readStudioVrmPoserShaperSurface, type StudioVrmPoserHost } from "../vrm/StudioVrmPoserHost";
 import type { VRM } from "@pixiv/three-vrm";
 
 /* -------------------------------------------------------------------------- */
@@ -603,12 +603,12 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
           ).character;
           break;
         case "hand-pose": {
-          const applyHand = host.applyHandPosePreset;
+          const applyHand = readStudioVrmPoserShaperSurface(host).applyHandPosePreset;
           // Do not record a hand-pose apply when the host cannot actually change fingers.
           if (typeof applyHand !== "function") break;
           const sides: readonly ("left" | "right")[] = step.side === "both" ? ["left", "right"] : [step.side];
           for (const side of sides) {
-            applyHand.call(host, side, step.poseType);
+            applyHand(side, step.poseType);
             updatedHands[side] = step.poseType;
           }
           nextHandPose = step.poseType;

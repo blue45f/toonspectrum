@@ -6,12 +6,15 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import {
-  applyStudio3dCommand,
+  ensureStudio3dGradeHistory,
+  pushStudio3dGradeCommand,
+} from "./studio-bg3d-grade-history-bridge";
+import {
   applyStudio3dLightingSettings,
   captureStudio3dPlates,
-  createStudio3dHistory,
   patchStudio3dSceneBackground,
 } from "./studio-bg3d-grade-plates";
+import { captureStudio3dPlatesFromSource } from "./studio-bg3d-grade-plates-production";
 
 export function attachStudioBg3dEditorLtHost(h) {
   const {
@@ -551,7 +554,9 @@ export function attachStudioBg3dEditorLtHost(h) {
   h.updateLtExportAspectRatio = updateLtExportAspectRatio;
   function updateBackgroundSettings(patch: Partial<StudioBg3dBackgroundSettings>) {
     setSceneBaseDocument((current) => {
-      const history = applyStudio3dCommand(createStudio3dHistory(current), {
+      if (!h.gradeHistoryRef) h.gradeHistoryRef = { current: null };
+      const grade = ensureStudio3dGradeHistory(h.gradeHistoryRef.current, current);
+      const history = pushStudio3dGradeCommand(grade, {
         id: "set-background",
         mode: patch.mode,
         color: patch.color,
@@ -563,7 +568,8 @@ export function attachStudioBg3dEditorLtHost(h) {
         ...merged,
         background: { ...merged.background, ...patch },
       };
-      captureStudio3dPlates(withExtras, 48, 27);
+      h.gradeHistoryRef.current = { ...history, scene: withExtras };
+      captureStudio3dPlatesFromSource(withExtras, 48, 27);
       return canonicalSceneDocument(withExtras) ?? current;
     });
     setError(null);
@@ -589,8 +595,10 @@ export function attachStudioBg3dEditorLtHost(h) {
         merged.lighting.fill.direction[2] !== current.lighting.fill.direction[2];
 
       let next = merged;
+      if (!h.gradeHistoryRef) h.gradeHistoryRef = { current: null };
+      const grade = ensureStudio3dGradeHistory(h.gradeHistoryRef.current, current);
       if (keyIntensityChanged || keyDirectionChanged) {
-        const history = applyStudio3dCommand(createStudio3dHistory(current), {
+        const history = pushStudio3dGradeCommand(grade, {
           id: "set-light",
           azimuth: Math.atan2(merged.lighting.key.direction[0], merged.lighting.key.direction[2]),
           elevation: Math.asin(Math.max(-1, Math.min(1, merged.lighting.key.direction[1]))),
@@ -601,8 +609,9 @@ export function attachStudioBg3dEditorLtHost(h) {
           ...patch,
           key: merged.lighting.key,
         });
+        h.gradeHistoryRef.current = { ...history, scene: next };
       } else if (fillIntensityChanged || fillDirectionChanged) {
-        const history = applyStudio3dCommand(createStudio3dHistory(current), {
+        const history = pushStudio3dGradeCommand(grade, {
           id: "set-fill-light",
           azimuth: Math.atan2(merged.lighting.fill.direction[0], merged.lighting.fill.direction[2]),
           elevation: Math.asin(Math.max(-1, Math.min(1, merged.lighting.fill.direction[1]))),
@@ -612,8 +621,9 @@ export function attachStudioBg3dEditorLtHost(h) {
           ...patch,
           fill: merged.lighting.fill,
         });
+        h.gradeHistoryRef.current = { ...history, scene: next };
       }
-      captureStudio3dPlates(next, 48, 27);
+      captureStudio3dPlatesFromSource(next, 48, 27);
       return canonicalSceneDocument(next) ?? current;
     });
     setError(null);
