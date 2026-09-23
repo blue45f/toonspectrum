@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  getAuthSessionRevision,
+  getAuthUserId,
+  listeners as sessionListeners,
+} from "@/compat/auth-session-state";
+import { useAuthActorId } from "@/compat/use-auth-actor-id";
 import type {
   PinnedShareCreate,
   PinnedShareOwnerView,
@@ -47,6 +54,18 @@ function absoluteShareUrl(share: PinnedShareOwnerView, token: string | null): st
 export function StudioPinnedReviewShareManager({ verified }: {
   readonly verified: StudioVirtualSpaceVerifiedReview;
 }) {
+  const actorId = useAuthActorId();
+  return <StudioPinnedReviewShareManagerForActor
+    key={JSON.stringify([actorId, verified.subject])}
+    actorId={actorId}
+    verified={verified}
+  />;
+}
+
+function StudioPinnedReviewShareManagerForActor({ actorId, verified }: {
+  readonly actorId: string | null;
+  readonly verified: StudioVirtualSpaceVerifiedReview;
+}) {
   const bt = useBilingual("StudioPinnedReviewShareManager");
   const key = JSON.stringify(verified.subject);
   const [open, setOpen] = useState(false);
@@ -68,22 +87,35 @@ export function StudioPinnedReviewShareManager({ verified }: {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [oneTimeLink, setOneTimeLink] = useState<OneTimeLink | null>(null);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine !== false);
+  const [authorityEpoch, setAuthorityEpoch] = useState(0);
   const generation = useRef<object>({});
   const attempted = useRef<{ fingerprint: string; id: string; operationId: string } | null>(null);
 
+  const currentAuthority = useCallback((own: object, sessionRevision: number): boolean => {
+    const publishedActor = getAuthUserId();
+    return own === generation.current
+      && sessionRevision === getAuthSessionRevision()
+      && publishedActor === actorId
+      && document.visibilityState !== "hidden"
+      && (typeof navigator === "undefined" || navigator.onLine !== false);
+  }, [actorId]);
+
   const refreshShares = async (append = false) => {
-    const own = generation.current;
+    const own = generation.current, sessionRevision = getAuthSessionRevision();
+    if (!actorId || !online || document.visibilityState === "hidden") return;
     const cursor = append ? nextCursor : null;
     const result = await listPinnedReviewShares(verified.subject.workId, cursor);
-    if (own !== generation.current) return;
+    if (!currentAuthority(own, sessionRevision)) return;
     setShares((current) => append ? [...current, ...result.items] : result.items);
     setNextCursor(result.nextCursor);
   };
 
   const loadSources = async (offset: number, append = false) => {
-    const own = generation.current;
+    const own = generation.current, sessionRevision = getAuthSessionRevision();
+    if (!actorId || !online || document.visibilityState === "hidden") return;
     const result = await listPinnedReviewShareSources(verified.subject.workId, verified.subject, offset);
-    if (own !== generation.current) return;
+    if (!currentAuthority(own, sessionRevision)) return;
     setSources((current) => {
       const combined = append ? [...current, ...result.pages] : result.pages;
       return [...new Map(combined.map((page) => [page.ordinal, page])).values()].sort((a, b) => a.ordinal - b.ordinal);
@@ -98,15 +130,25 @@ export function StudioPinnedReviewShareManager({ verified }: {
       generation.current = {};
       return;
     }
-    const own = {};
+    const own = {}, sessionRevision = getAuthSessionRevision();
     generation.current = own;
     setLoading(true); setNotice(""); setOneTimeLink(null); setSources([]); setShares([]); setSelected([]);
     setSourceOffset(0); setSourceApproved(false); setNextCursor(null); setTitle(verified.review.title);
+    if (!actorId) {
+      setLoading(false);
+      setNotice(bt("로그인한 계정으로 공유 권한을 다시 확인해 주세요.", "Sign in and verify share access again."));
+      return () => { generation.current = {}; };
+    }
+    if (!online || document.visibilityState === "hidden") {
+      setLoading(false);
+      setNotice(bt("연결이 복구되고 화면이 활성화되면 공유 범위를 다시 확인합니다.", "Share scope will be checked again after reconnection and focus."));
+      return () => { generation.current = {}; };
+    }
     void Promise.all([
       listPinnedReviewShareSources(verified.subject.workId, verified.subject, 0),
       listPinnedReviewShares(verified.subject.workId, null),
     ]).then(([sourceResult, shareResult]) => {
-      if (own !== generation.current) return;
+      if (!currentAuthority(own, sessionRevision)) return;
       setSources(sourceResult.pages);
       setSelected(sourceResult.pages.map((page) => page.ordinal));
       setSourceOffset(sourceResult.nextOffset);
@@ -114,14 +156,35 @@ export function StudioPinnedReviewShareManager({ verified }: {
       setShares(shareResult.items);
       setNextCursor(shareResult.nextCursor);
     }).catch(() => {
-      if (own === generation.current) {
+      if (currentAuthority(own, sessionRevision)) {
         setNotice(bt("공유 가능한 검수본을 불러오지 못했어요.", "Could not load shareable review pages."));
       }
     }).finally(() => {
-      if (own === generation.current) setLoading(false);
+      if (currentAuthority(own, sessionRevision)) setLoading(false);
     });
     return () => { generation.current = {}; };
-  }, [bt, key, open, verified.review.title, verified.subject, verified.subject.workId]);
+  }, [actorId, authorityEpoch, bt, currentAuthority, key, online, open, verified.review.title, verified.subject, verified.subject.workId]);
+
+  useEffect(() => {
+    const refreshAuthority = () => setAuthorityEpoch((value) => value + 1);
+    const onlineChanged = () => {
+      setOnline(typeof navigator === "undefined" || navigator.onLine !== false);
+      refreshAuthority();
+    };
+    const visibilityChanged = () => refreshAuthority();
+    sessionListeners.add(refreshAuthority);
+    globalThis.addEventListener("focus", refreshAuthority);
+    globalThis.addEventListener("online", onlineChanged);
+    globalThis.addEventListener("offline", onlineChanged);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    return () => {
+      sessionListeners.delete(refreshAuthority);
+      globalThis.removeEventListener("focus", refreshAuthority);
+      globalThis.removeEventListener("online", onlineChanged);
+      globalThis.removeEventListener("offline", onlineChanged);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (purpose === "showcase") {
@@ -133,7 +196,7 @@ export function StudioPinnedReviewShareManager({ verified }: {
 
   const selectedSet = useMemo(() => new Set(selected), [selected]);
   const showcaseAllowed = sourceApproved && verified.review.status === "approved";
-  const canCreate = selected.length > 0 && title.trim().length > 0 && !busy
+  const canCreate = Boolean(actorId) && online && selected.length > 0 && title.trim().length > 0 && !busy
     && (purpose !== "showcase" || (showcaseAllowed && publicationConsent && rightsStatement.trim().length > 0));
 
   const togglePage = (ordinal: number) => {
@@ -162,11 +225,11 @@ export function StudioPinnedReviewShareManager({ verified }: {
       attempted.current = { fingerprint, id: crypto.randomUUID(), operationId: crypto.randomUUID() };
     }
     const identity = attempted.current;
-    const own = generation.current;
+    const own = generation.current, sessionRevision = getAuthSessionRevision();
     setBusy(true); setNotice(""); setOneTimeLink(null);
     try {
       const result = await createPinnedReviewShare(verified.subject.workId, { ...inputWithoutIdentity, ...identity });
-      if (own !== generation.current) return;
+      if (!currentAuthority(own, sessionRevision)) return;
       attempted.current = null;
       const url = absoluteShareUrl(result.share, result.token);
       if (url) setOneTimeLink({ url, purpose: result.share.input.purpose, replayed: result.replayed });
@@ -175,25 +238,25 @@ export function StudioPinnedReviewShareManager({ verified }: {
         : bt("선택한 고정 검수본으로 공유 링크를 만들었어요.", "Created a link for the selected immutable review pages."));
       await refreshShares();
     } catch {
-      if (own === generation.current) setNotice(bt("공유 생성 결과를 확인하지 못했어요. 같은 입력으로 다시 시도하면 중복 생성하지 않습니다.", "Could not confirm share creation. Retrying the same input will not create a duplicate."));
+      if (currentAuthority(own, sessionRevision)) setNotice(bt("공유 생성 결과를 확인하지 못했어요. 같은 입력으로 다시 시도하면 중복 생성하지 않습니다.", "Could not confirm share creation. Retrying the same input will not create a duplicate."));
     } finally {
-      if (own === generation.current) setBusy(false);
+      if (currentAuthority(own, sessionRevision)) setBusy(false);
     }
   };
 
   const revoke = async (share: PinnedShareOwnerView) => {
     if (busy || !activeShare(share)) return;
-    const own = generation.current;
+    const own = generation.current, sessionRevision = getAuthSessionRevision();
     setBusy(true); setNotice(""); setOneTimeLink(null);
     try {
       const updated = await revokePinnedReviewShare(verified.subject.workId, share.id);
-      if (own !== generation.current) return;
+      if (!currentAuthority(own, sessionRevision)) return;
       setShares((current) => current.map((item) => item.id === updated.id ? updated : item));
       setNotice(bt("공유 링크를 철회했어요.", "Revoked the share link."));
     } catch {
-      if (own === generation.current) setNotice(bt("철회 결과를 확인하지 못했어요. 목록을 새로 확인해 주세요.", "Could not confirm revocation. Refresh the list before retrying."));
+      if (currentAuthority(own, sessionRevision)) setNotice(bt("철회 결과를 확인하지 못했어요. 목록을 새로 확인해 주세요.", "Could not confirm revocation. Refresh the list before retrying."));
     } finally {
-      if (own === generation.current) setBusy(false);
+      if (currentAuthority(own, sessionRevision)) setBusy(false);
     }
   };
 
@@ -212,7 +275,7 @@ export function StudioPinnedReviewShareManager({ verified }: {
               <span className="ml-auto text-xs text-fg-3">{Math.ceil(page.byteLength / 1024)} KB</span>
             </label>)}
           </div>
-          {sourceOffset !== null ? <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-3 text-sm" disabled={busy}
+          {sourceOffset !== null ? <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-3 text-sm" disabled={busy || !online}
             onClick={() => { setBusy(true); void loadSources(sourceOffset, true).catch(() => setNotice(bt("다음 페이지를 불러오지 못했어요.", "Could not load more pages."))).finally(() => setBusy(false)); }}>
             {bt("페이지 더 불러오기", "Load more pages")}</button> : null}
         </fieldset>
@@ -291,13 +354,13 @@ export function StudioPinnedReviewShareManager({ verified }: {
                   <span className="rounded-full border border-line px-2 py-1 text-xs">{share.revokedAt ? bt("철회됨", "Revoked") : active ? bt("사용 가능", "Active") : bt("만료됨", "Expired")}</span>
                 </div>
                 <p className="mt-2 text-xs text-fg-3">{bt("만료", "Expires")} · <time dateTime={share.expiresAt}>{new Date(share.expiresAt).toLocaleString()}</time></p>
-                {active ? <button type="button" className="mt-2 min-h-11 rounded-lg border border-bad/50 px-3 text-sm text-bad" disabled={busy}
+                {active ? <button type="button" className="mt-2 min-h-11 rounded-lg border border-bad/50 px-3 text-sm text-bad" disabled={busy || !online}
                   onClick={() => { void revoke(share); }}>{bt("링크 철회", "Revoke link")}</button> : null}
               </article>;
             })}
             {!shares.length ? <p className="text-sm text-fg-3">{bt("아직 만든 공유가 없어요.", "No shares have been created yet.")}</p> : null}
           </div>
-          {nextCursor ? <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-3 text-sm" disabled={busy}
+          {nextCursor ? <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-3 text-sm" disabled={busy || !online}
             onClick={() => { setBusy(true); void refreshShares(true).catch(() => setNotice(bt("공유 목록을 더 불러오지 못했어요.", "Could not load more shares."))).finally(() => setBusy(false)); }}>
             {bt("공유 더 불러오기", "Load more shares")}</button> : null}
         </div>
