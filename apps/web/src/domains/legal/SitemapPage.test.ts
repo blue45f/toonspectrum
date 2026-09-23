@@ -38,6 +38,8 @@ const INTENTIONAL_NON_DIRECTORY_ROUTES = new Set([
   "/challenges",
   "/creator-hub",
   "/creator-hub/references",
+  // Token-bearing immutable review links require a fragment lease and are not a standalone destination.
+  "/production/pinned-review",
   "/production/projects",
   "/showcase",
   "/sitemap",

@@ -72,11 +72,9 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-assets-audio", path: studioRoutePath("asset-audio"), element: <StudioMusicPage /> },
   { id: "creator-studio-assets-3d", path: studioRoutePath("asset-3d"), element: <Navigate to="/studio/bg3d" replace /> },
   { id: "creator-studio-templates", path: studioRoutePath("templates"), element: <StudioTemplatesPage /> },
-
   // Canonical document identities bridge losslessly into the established editor authority.
   { id: "creator-studio-project-document", path: studioRoutePath("project-document"), element: <StudioDocumentWorkspaceRoute /> },
   { id: "creator-studio-draft-document", path: studioRoutePath("draft-document"), element: <StudioDocumentWorkspaceRoute /> },
-
   { id: "creator-studio-project-root", path: studioRoutePath("project-root"), element: <Navigate to="overview" replace /> },
   { id: "creator-studio-project-overview", path: studioRoutePath("project-overview"), element: <StudioProjectShellPage section="overview" /> },
   { id: "creator-studio-project-story", path: studioRoutePath("project-story"), element: <StudioProjectShellPage section="story" /> },
@@ -87,7 +85,6 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-studio-project-settings", path: studioRoutePath("project-settings"), element: <StudioProjectShellPage section="settings" /> },
   { id: "creator-studio-project-space", path: studioRoutePath("project-space"), element: <StudioVirtualSpacePage /> },
 
-  // Canonical showcase routes retain the existing gallery implementation.
   { id: "creator-showcase", path: "/showcase", element: <CreateGalleryPage /> },
   { id: "creator-showcase-reviews", path: "/showcase/reviews", element: <StudioPinnedReviewShowcasePage /> },
   { id: "creator-showcase-review", path: "/showcase/reviews/:shareId", element: <StudioPinnedReviewShowcaseDetailPage /> },
