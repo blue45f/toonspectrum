@@ -7,10 +7,6 @@ import {
   STUDIO_VIRTUAL_SPACE_HEIGHT,
   STUDIO_VIRTUAL_SPACE_WIDTH,
   STUDIO_VIRTUAL_SPACE_ZONES,
-  studioVirtualSpaceScaleLegacyDistance,
-  studioVirtualSpaceScaleLegacyPoint,
-  studioVirtualSpaceScaleLegacyX,
-  studioVirtualSpaceScaleLegacyY,
   studioVirtualSpaceState,
   type StudioVirtualSpacePresenceState,
   type StudioVirtualSpaceFacing,
@@ -155,67 +151,53 @@ export interface StudioVirtualSpaceWorldManifest {
   readonly acousticZones?: readonly StudioWorldAcousticZoneDefinition[];
 }
 
-function legacyProp(
-  prop: Omit<StudioWorldPropDefinition, "x" | "y" | "collider" | "interactionRadius"> & {
-    readonly x: number;
-    readonly y: number;
-    readonly collider?: StudioWorldRect;
-    readonly interactionRadius?: number;
-  },
-): StudioWorldPropDefinition {
-  return Object.freeze({
-    ...prop,
-    x: studioVirtualSpaceScaleLegacyX(prop.x),
-    y: studioVirtualSpaceScaleLegacyY(prop.y),
-    interactionRadius: prop.interactionRadius == null
-      ? undefined
-      : studioVirtualSpaceScaleLegacyDistance(prop.interactionRadius),
-    collider: prop.collider
-      ? {
-          x: studioVirtualSpaceScaleLegacyX(prop.collider.x),
-          y: studioVirtualSpaceScaleLegacyY(prop.collider.y),
-          width: studioVirtualSpaceScaleLegacyX(prop.collider.width),
-          height: studioVirtualSpaceScaleLegacyY(prop.collider.height),
-        }
-      : undefined,
-  });
+function worldProp(prop: StudioWorldPropDefinition): StudioWorldPropDefinition {
+  return Object.freeze(prop);
 }
 
 const DEFAULT_PROPS: readonly StudioWorldPropDefinition[] = [
-  legacyProp({ id: "lounge-sofa", kind: "solid", x: 165, y: 152, depth: "y-sort", collider: { x: 70, y: 132, width: 190, height: 48 } }),
-  legacyProp({ id: "writers-desk", kind: "solid", x: 547, y: 152, depth: "y-sort", collider: { x: 452, y: 135, width: 190, height: 48 } }),
-  legacyProp({ id: "storyboard-wall", kind: "interactive", x: 985, y: 145, depth: "fixed", action: "comic", interactionRadius: 84, labelKo: "콘티 보드", labelEn: "Storyboard Wall", collider: { x: 870, y: 118, width: 230, height: 62 } }),
-  legacyProp({ id: "asset-shelf", kind: "interactive", x: 160, y: 365, depth: "fixed", action: "assets", interactionRadius: 76, labelKo: "에셋 라이브러리", labelEn: "Asset Library", collider: { x: 68, y: 336, width: 185, height: 56 } }),
-  legacyProp({ id: "drawing-desk", kind: "interactive", x: 1000, y: 365, depth: "y-sort", action: "canvas", interactionRadius: 76, labelKo: "드로잉 데스크", labelEn: "Drawing Desk", collider: { x: 914, y: 334, width: 184, height: 58 } }),
-  legacyProp({ id: "review-monitor", kind: "interactive", x: 225, y: 620, depth: "y-sort", action: "review", interactionRadius: 80, labelKo: "리뷰 데스크", labelEn: "Review Desk", collider: { x: 95, y: 586, width: 260, height: 64 } }),
-  legacyProp({ id: "ai-producer-desk", kind: "interactive", x: 925, y: 620, depth: "y-sort", action: "assistant", interactionRadius: 82, labelKo: "어시스트 데스크", labelEn: "Assistant Desk", collider: { x: 794, y: 582, width: 266, height: 68 } }),
-  legacyProp({ id: "creator-plaza", kind: "solid", x: 590, y: 365, depth: "fixed", collider: { x: 520, y: 302, width: 140, height: 118 } }),
+  worldProp({ id: "lounge-sofa", kind: "solid", x: 145, y: 330, depth: "y-sort", collider: { x: 90, y: 308, width: 112, height: 30 } }),
+  worldProp({ id: "writers-desk", kind: "solid", x: 195, y: 135, depth: "y-sort", collider: { x: 137, y: 112, width: 116, height: 34 } }),
+  worldProp({ id: "storyboard-wall", kind: "interactive", x: 655, y: 135, depth: "fixed", action: "comic", interactionRadius: 76, labelKo: "콘티 보드", labelEn: "Storyboard Wall", collider: { x: 585, y: 94, width: 142, height: 32 } }),
+  worldProp({ id: "asset-shelf", kind: "interactive", x: 145, y: 505, depth: "fixed", action: "assets", interactionRadius: 72, labelKo: "에셋 라이브러리", labelEn: "Asset Library", collider: { x: 75, y: 474, width: 116, height: 32 } }),
+  worldProp({ id: "drawing-desk", kind: "interactive", x: 705, y: 330, depth: "y-sort", action: "canvas", interactionRadius: 74, labelKo: "드로잉 데스크", labelEn: "Drawing Desk", collider: { x: 635, y: 304, width: 116, height: 34 } }),
+  worldProp({ id: "review-monitor", kind: "interactive", x: 185, y: 690, depth: "y-sort", action: "review", interactionRadius: 78, labelKo: "리뷰 데스크", labelEn: "Review Desk", collider: { x: 82, y: 666, width: 148, height: 36 } }),
+  worldProp({ id: "ai-producer-desk", kind: "interactive", x: 665, y: 690, depth: "y-sort", action: "assistant", interactionRadius: 80, labelKo: "어시스트 데스크", labelEn: "Assistant Desk", collider: { x: 590, y: 666, width: 148, height: 36 } }),
+  worldProp({ id: "creator-plaza", kind: "solid", x: 425, y: 394, depth: "fixed", collider: { x: 390, y: 357, width: 70, height: 74 } }),
 ] as const;
 
-const DEFAULT_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] = [
-  { id: "studio-guide", roomId: "lounge", points: [[505, 485], [455, 445], [500, 550]], facing: "down" },
-  { id: "studio-writer", roomId: "writers", points: [[435, 198], [660, 198], [475, 235]], facing: "up" },
-  { id: "studio-artist", roomId: "drawing", points: [[885, 410], [890, 310], [870, 450]], facing: "right" },
-  { id: "studio-librarian", roomId: "assets", points: [[290, 410], [285, 300], [305, 450]], facing: "left" },
-].flatMap((profile) => profile.points.map(([x, y], index): StudioWorldNpcActivityAnchor => {
-  const anchorPoint = studioVirtualSpaceScaleLegacyPoint({ x: x!, y: y! });
-  return { id: `${profile.id}-${index}`, roomId: profile.roomId,
-    approachPoint: { x: anchorPoint.x - 16, y: anchorPoint.y }, anchorPoint,
-    exitPoint: { x: anchorPoint.x + 16, y: anchorPoint.y },
-    facing: (index === 2 ? "down" : profile.facing) as StudioVirtualSpaceFacing,
-    activity: index === 0 ? "work" : index === 1 ? "inspect" : "rest",
-    // Pink retains its work artwork; silver has a real directional review loop.
-    animation: index < 2 && profile.id === "studio-writer" ? "review"
-      : profile.id === "studio-artist" && index < 2 ? index === 0 ? "draw" : "review" : "idle",
-    minDurationMs: index === 0 ? 20000 : 7000, maxDurationMs: index === 0 ? 38000 : 16000 };
-}));
+const DEFAULT_NPC_ACTIVITY_PROFILES = [
+  { id: "studio-guide", roomId: "lounge", points: [[220, 365], [78, 365], [220, 275]], facing: "down" },
+  { id: "studio-writer", roomId: "writers", points: [[300, 175], [70, 175], [300, 70]], facing: "left" },
+  { id: "studio-artist", roomId: "drawing", points: [[780, 365], [638, 365], [780, 275]], facing: "left" },
+  { id: "studio-librarian", roomId: "assets", points: [[220, 545], [78, 545], [220, 450]], facing: "left" },
+] as const;
+
+const DEFAULT_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] =
+  DEFAULT_NPC_ACTIVITY_PROFILES.flatMap((profile) => profile.points.map(([x, y], index): StudioWorldNpcActivityAnchor => {
+    const anchorPoint = { x, y };
+    return {
+      id: profile.id + "-" + index,
+      roomId: profile.roomId,
+      approachPoint: { x: x - 16, y },
+      anchorPoint,
+      exitPoint: { x: x + 16, y },
+      facing: (index === 2 ? "down" : profile.facing) as StudioVirtualSpaceFacing,
+      activity: index === 0 ? "work" : index === 1 ? "inspect" : "rest",
+      animation: profile.id === "studio-writer" && index < 2 ? "review"
+        : profile.id === "studio-artist" && index < 2 ? index === 0 ? "draw" : "review"
+          : "idle",
+      minDurationMs: index === 0 ? 20000 : 7000,
+      maxDurationMs: index === 0 ? 38000 : 16000,
+    };
+  }));
 
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
-  version: 5,
+  version: 6,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,
-  backgroundAssetKey: "studio-master-background",
+  backgroundAssetKey: "studio-modular-campus-base",
   backgroundUrl: "/assets/virtual-studio/living-world/master-clean-plate.webp",
   rooms: STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => ({
     id: zone.id,
@@ -229,7 +211,9 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     width: zone.width,
     height: zone.height,
   })),
-  acousticZones: STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height }) => ({ id: `public-${id}`, roomId: id, x, y, width, height, policy: "public" })),
+  acousticZones: STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height }) => ({
+    id: "public-" + id, roomId: id, x, y, width, height, policy: "public",
+  })),
   props: DEFAULT_PROPS,
   colliders: STUDIO_VIRTUAL_SPACE_COLLIDERS.map(({ x, y, width, height }) => ({ x, y, width, height })),
   interactions: STUDIO_VIRTUAL_SPACE_INTERACTIONS.map((interaction) => ({
@@ -243,46 +227,50 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
   })),
   portals: [],
   spawns: [
-    { id: "main", point: studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 }), facing: "up" as const },
-    { id: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 180, y: 210 }), facing: "up" as const },
-    { id: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 995, y: 430 }), facing: "up" as const },
+    { id: "main", point: { x: 425, y: 744 }, facing: "up" as const },
+    { id: "lounge", point: { x: 220, y: 365 }, facing: "left" as const },
+    { id: "drawing", point: { x: 780, y: 365 }, facing: "left" as const },
+    { id: "writers", point: { x: 300, y: 175 }, facing: "left" as const },
+    { id: "storyboard", point: { x: 780, y: 175 }, facing: "left" as const },
+    { id: "assets", point: { x: 220, y: 545 }, facing: "left" as const },
+    { id: "review", point: { x: 280, y: 740 }, facing: "up" as const },
+    { id: "assistant", point: { x: 570, y: 740 }, facing: "up" as const },
   ],
-  // Exact clean-plate pixels behind the review sofa occupants; no replacement artwork.
-  occlusionLayers: [{ id: "review-sofa-front", depth: 1720, polygon: [
-    { x: 101.326, y: 692.082 }, { x: 107.905, y: 690.767 }, { x: 134.878, y: 710.503 }, { x: 208.560, y: 679.583 }, { x: 210.533, y: 667.083 }, { x: 242.769, y: 648.663 }, { x: 251.979, y: 649.979 }, { x: 254.611, y: 685.504 }, { x: 253.295, y: 702.608 }, { x: 136.852, y: 752.607 }, { x: 119.747, y: 748.002 }, { x: 101.326, y: 734.186 }
-  ] }],
+  occlusionLayers: [],
   interactionSlots: [
-    { id: "review-left", roomId: "review", labelKo: "리뷰 소파 왼쪽", labelEn: "Review sofa · left",
-      approachPoint: studioVirtualSpaceScaleLegacyPoint({ x: 210, y: 665 }),
-      anchorPoint: studioVirtualSpaceScaleLegacyPoint({ x: 210, y: 665 }),
-      seatAttachmentPoint: { x: 154, y: 690 },
-      exitPoint: studioVirtualSpaceScaleLegacyPoint({ x: 75, y: 665 }), facing: "up", radius: 10 },
-    { id: "review-right", roomId: "review", labelKo: "리뷰 소파 오른쪽", labelEn: "Review sofa · right",
-      approachPoint: studioVirtualSpaceScaleLegacyPoint({ x: 310, y: 665 }),
-      anchorPoint: studioVirtualSpaceScaleLegacyPoint({ x: 310, y: 665 }),
-      seatAttachmentPoint: { x: 220, y: 664 },
-      exitPoint: studioVirtualSpaceScaleLegacyPoint({ x: 390, y: 665 }), facing: "up", radius: 10 },
+    {
+      id: "review-left", roomId: "review", labelKo: "리뷰 테이블 왼쪽", labelEn: "Review table · left",
+      approachPoint: { x: 145, y: 735 }, anchorPoint: { x: 145, y: 735 },
+      seatAttachmentPoint: { x: 160, y: 690 }, exitPoint: { x: 105, y: 740 }, facing: "up", radius: 10,
+    },
+    {
+      id: "review-right", roomId: "review", labelKo: "리뷰 테이블 오른쪽", labelEn: "Review table · right",
+      approachPoint: { x: 225, y: 735 }, anchorPoint: { x: 225, y: 735 },
+      seatAttachmentPoint: { x: 210, y: 690 }, exitPoint: { x: 265, y: 740 }, facing: "up", radius: 10,
+    },
   ],
-  // A small ambient cast. These actors are local decoration and never count as online peers.
-  // The first point is a work approach; patrol points alternate reference checks and breaks.
   npcActivityAnchors: DEFAULT_NPC_ACTIVITY_ANCHORS,
   npcs: [
-    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"], skinKey: "npc-concierge", roomId: "lounge", point: studioVirtualSpaceScaleLegacyPoint({ x: 505, y: 485 }), facing: "down", scale: 0.68, speed: 58, behavior: "patrol", patrol: [
-      studioVirtualSpaceScaleLegacyPoint({ x: 455, y: 445 }),
-      studioVirtualSpaceScaleLegacyPoint({ x: 500, y: 550 }),
-    ] },
-    { id: "studio-writer", activityAnchorIds: ["studio-writer-0", "studio-writer-1", "studio-writer-2"], skinKey: "npc-editor", roomId: "writers", point: studioVirtualSpaceScaleLegacyPoint({ x: 435, y: 198 }), facing: "up", scale: 0.68, speed: 54, behavior: "patrol", patrol: [
-      studioVirtualSpaceScaleLegacyPoint({ x: 660, y: 198 }),
-      studioVirtualSpaceScaleLegacyPoint({ x: 475, y: 235 }),
-    ] },
-    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"], skinKey: "npc-atelier", roomId: "drawing", point: studioVirtualSpaceScaleLegacyPoint({ x: 885, y: 410 }), facing: "right", scale: 0.68, speed: 60, behavior: "patrol", patrol: [
-      studioVirtualSpaceScaleLegacyPoint({ x: 890, y: 310 }),
-      studioVirtualSpaceScaleLegacyPoint({ x: 870, y: 450 }),
-    ] },
-    { id: "studio-librarian", activityAnchorIds: ["studio-librarian-0", "studio-librarian-1", "studio-librarian-2"], skinKey: "npc-archivist", roomId: "assets", point: studioVirtualSpaceScaleLegacyPoint({ x: 290, y: 410 }), facing: "left", scale: 0.68, speed: 52, behavior: "patrol", patrol: [
-      studioVirtualSpaceScaleLegacyPoint({ x: 285, y: 300 }),
-      studioVirtualSpaceScaleLegacyPoint({ x: 305, y: 450 }),
-    ] },
+    {
+      id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"],
+      skinKey: "npc-concierge", roomId: "lounge", point: { x: 220, y: 365 }, facing: "down",
+      scale: 0.94, speed: 58, behavior: "patrol", patrol: [{ x: 78, y: 365 }, { x: 220, y: 275 }],
+    },
+    {
+      id: "studio-writer", activityAnchorIds: ["studio-writer-0", "studio-writer-1", "studio-writer-2"],
+      skinKey: "npc-editor", roomId: "writers", point: { x: 300, y: 175 }, facing: "left",
+      scale: 0.94, speed: 54, behavior: "patrol", patrol: [{ x: 70, y: 175 }, { x: 300, y: 70 }],
+    },
+    {
+      id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"],
+      skinKey: "npc-atelier", roomId: "drawing", point: { x: 780, y: 365 }, facing: "left",
+      scale: 0.94, speed: 60, behavior: "patrol", patrol: [{ x: 638, y: 365 }, { x: 780, y: 275 }],
+    },
+    {
+      id: "studio-librarian", activityAnchorIds: ["studio-librarian-0", "studio-librarian-1", "studio-librarian-2"],
+      skinKey: "npc-archivist", roomId: "assets", point: { x: 220, y: 545 }, facing: "left",
+      scale: 0.94, speed: 52, behavior: "patrol", patrol: [{ x: 78, y: 545 }, { x: 220, y: 450 }],
+    },
   ],
 });
 
@@ -365,7 +353,7 @@ export function studioWorldRoomAt(
     && point.y >= candidate.y
     && point.y <= candidate.y + candidate.height
   );
-  return room?.id ?? manifest.rooms[0]?.id ?? "lounge";
+  return room?.id ?? manifest.rooms.find((candidate) => candidate.id === "live")?.id ?? manifest.rooms[0]?.id ?? "live";
 }
 
 /** Keep renderer-owned coordinates in the loaded world, not the legacy master-scene bounds. */

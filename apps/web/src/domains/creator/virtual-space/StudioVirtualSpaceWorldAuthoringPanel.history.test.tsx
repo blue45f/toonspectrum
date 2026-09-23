@@ -9,6 +9,8 @@ afterEach(cleanup);
 const initial = (): StudioVirtualSpaceWorldManifest => ({ ...DEFAULT_STUDIO_WORLD_MANIFEST,
   props: [{ id: "test-desk", kind: "solid", x: 100, y: 150, width: 64, height: 32,
     collider: { x: 90, y: 160, width: 48, height: 16 } }],
+  npcs: [],
+  npcActivityAnchors: [],
 });
 function Editor({ projectId = "work-a", revision = "revision-a", disabled = false }: {
   projectId?: string; revision?: string; disabled?: boolean;

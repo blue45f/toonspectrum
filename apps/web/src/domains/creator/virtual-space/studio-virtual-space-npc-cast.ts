@@ -1,19 +1,20 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
-import type {
-  StudioCharacterAtlasClip,
-  StudioCharacterFramePresentation,
-  StudioCharacterSkin,
+import {
+  studioCharacterSkinByKey,
+  studioCharacterWalkClip,
+  type StudioCharacterAtlasClip,
+  type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
 
 export type StudioNpcCastKey = "npc-concierge" | "npc-editor" | "npc-atelier" | "npc-archivist";
 
-const ROOT = "/assets/virtual-studio/npc-cast-v1";
-const PRESENTATION: readonly StudioCharacterFramePresentation[] = Object.freeze([
-  { originX: 0.5, originY: 0.92, displayHeightRatio: 1 },
-  { originX: 0.5, originY: 0.92, displayHeightRatio: 1.01 },
-  { originX: 0.5, originY: 0.92, displayHeightRatio: 1 },
-  { originX: 0.5, originY: 0.92, displayHeightRatio: 1.005 },
-]);
+const ROOT = "/assets/virtual-studio/npc-cast-v2";
+const BASE_PLAYER: Readonly<Record<StudioNpcCastKey, string>> = Object.freeze({
+  "npc-concierge": "silver",
+  "npc-editor": "dark",
+  "npc-atelier": "pink",
+  "npc-archivist": "purple",
+});
 
 function fileStem(key: StudioNpcCastKey): string {
   return key.replace(/^npc-/u, "");
@@ -30,24 +31,13 @@ function directional(key: StudioNpcCastKey): Readonly<Record<StudioVirtualSpaceF
 }
 
 function walkClip(key: StudioNpcCastKey, facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip {
-  const stem = fileStem(key);
-  return {
-    textureUrl: `${ROOT}/npc-${stem}-walk-${facing}.png`,
-    frameWidth: 384,
-    frameHeight: 512,
-    atlas: {
-      width: 768,
-      height: 1024,
-      remainder: { right: 0, bottom: 0, maxAlpha: 0, nonzeroAlphaPixels: 0 },
-    },
-    start: 0,
-    end: 3,
-    frameRate: 8,
-    repeat: -1,
-    distancePerCycle: 78,
+  const reference = studioCharacterWalkClip(studioCharacterSkinByKey(BASE_PLAYER[key]), facing);
+  if (!reference) throw new Error(`NPC base walk is missing: ${key}/${facing}`);
+  return Object.freeze({
+    ...reference,
+    textureUrl: `${ROOT}/npc-${fileStem(key)}-walk-${facing}.png`,
     technique: "drawn",
-    frames: PRESENTATION,
-  };
+  });
 }
 
 function walkClips(key: StudioNpcCastKey): NonNullable<StudioCharacterSkin["clips"]> {
@@ -60,8 +50,9 @@ function walkClips(key: StudioNpcCastKey): NonNullable<StudioCharacterSkin["clip
 }
 
 /**
- * NPC presentation is a separate cast registry. It intentionally implements the same renderer
- * shape as player skins, while every texture URL and stable key belongs to the NPC namespace.
+ * NPCs share the selectable cast's webtoon-chibi anatomy and animation grammar,
+ * but use a dedicated namespace plus role accents/accessories so they cannot be
+ * mistaken for player-selectable identities.
  */
 export const STUDIO_NPC_CAST: readonly StudioCharacterSkin[] = Object.freeze([
   {

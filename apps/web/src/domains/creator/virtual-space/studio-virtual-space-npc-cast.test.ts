@@ -29,6 +29,7 @@ function playerUrls(): Set<string> {
 interface NpcArtManifest {
   readonly version: number;
   readonly playerSpriteReuse: boolean;
+  readonly derivedFromSelectableStyle: boolean;
   readonly files: readonly {
     readonly file: string;
     readonly sha256: string;
@@ -37,7 +38,7 @@ interface NpcArtManifest {
   }[];
 }
 
-const npcAssetRoot = resolve(process.cwd(), "apps/web/public/assets/virtual-studio/npc-cast-v1");
+const npcAssetRoot = resolve(process.cwd(), "apps/web/public/assets/virtual-studio/npc-cast-v2");
 const playerAssetRoot = resolve(process.cwd(), "apps/web/public/assets/virtual-studio/production-v2");
 const sha256 = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
 
@@ -54,8 +55,9 @@ describe("studio NPC cast", () => {
     const manifest = JSON.parse(
       readFileSync(resolve(npcAssetRoot, "art-manifest.json"), "utf8"),
     ) as NpcArtManifest;
-    expect(manifest.version).toBe(1);
+    expect(manifest.version).toBe(2);
     expect(manifest.playerSpriteReuse).toBe(false);
+    expect(manifest.derivedFromSelectableStyle).toBe(true);
     expect(manifest.files).toHaveLength(35);
     const pngNames = readdirSync(npcAssetRoot).filter((name) => name.endsWith(".png")).sort();
     expect(pngNames).toEqual(manifest.files.map((item) => item.file).sort());
