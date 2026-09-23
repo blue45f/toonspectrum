@@ -10,6 +10,8 @@ import type { DrawEl, El } from "../../src/domains/creator/studio-element-model"
 import type { StudioLiveTransformDraftClaim } from "../../src/domains/creator/studio-live-transform-draft-store";
 import type Konva from "konva";
 
+type StudioTextElement = Extract<El, { readonly type: "text" }>;
+
 let gpu = document.querySelector<HTMLCanvasElement>("#gpu")!;
 const reference = document.querySelector<HTMLCanvasElement>("#reference")!;
 const createEngine = (canvas: HTMLCanvasElement) => createSkiaDocumentRenderer(canvas, {
@@ -27,7 +29,7 @@ let strokes: El[] = [];
 let panel: El | null = null;
 let rasterElement: El | null = null;
 let rasterImage: HTMLImageElement | null = null;
-let textElement: El | null = null;
+let textElement: StudioTextElement | null = null;
 let items: SkiaDocumentFrame["items"] = [];
 let camera: SkiaDocumentFrame["camera"] = { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0, rotation: 0 };
 const pen = (index: number): El => {
@@ -78,23 +80,24 @@ function drawReference() {
     context.drawImage(rasterImage, 0, 0, rasterElement.width, rasterElement.height);
     context.restore();
   }
-  if (textElement?.type === "text") {
+  const currentTextElement = textElement;
+  if (currentTextElement) {
     context.save();
-    context.globalAlpha = textElement.opacity ?? 1;
-    context.fillStyle = textElement.fill;
-    context.translate(textElement.x, textElement.y);
-    context.rotate(textElement.rotation * Math.PI / 180);
-    context.font = `${textElement.fontStyle ?? "bold"} ${textElement.fontSize}px Pretendard`;
+    context.globalAlpha = currentTextElement.opacity ?? 1;
+    context.fillStyle = currentTextElement.fill;
+    context.translate(currentTextElement.x, currentTextElement.y);
+    context.rotate(currentTextElement.rotation * Math.PI / 180);
+    context.font = `${currentTextElement.fontStyle ?? "bold"} ${currentTextElement.fontSize}px Pretendard`;
     context.textBaseline = "top";
-    context.textAlign = textElement.align ?? "left";
-    const alignedX = textElement.align === "center"
-      ? textElement.width / 2
-      : textElement.align === "right" ? textElement.width : 0;
+    context.textAlign = currentTextElement.align ?? "left";
+    const alignedX = currentTextElement.align === "center"
+      ? currentTextElement.width / 2
+      : currentTextElement.align === "right" ? currentTextElement.width : 0;
     const letterContext = context as CanvasRenderingContext2D & { letterSpacing: string };
-    letterContext.letterSpacing = `${textElement.letterSpacing ?? 0}px`;
-    const lineHeight = textElement.fontSize * (textElement.lineHeight ?? 1);
-    textElement.text.split("\n").forEach((line, index) => {
-      context.fillText(line, alignedX, index * lineHeight, textElement.width);
+    letterContext.letterSpacing = `${currentTextElement.letterSpacing ?? 0}px`;
+    const lineHeight = currentTextElement.fontSize * (currentTextElement.lineHeight ?? 1);
+    currentTextElement.text.split("\n").forEach((line, index) => {
+      context.fillText(line, alignedX, index * lineHeight, currentTextElement.width);
     });
     context.restore();
   }
@@ -195,7 +198,7 @@ const api = {
       lineHeight: 1.25,
       rotation: 8,
       opacity: 0.8,
-    } as El;
+    } as StudioTextElement;
     const plan = projector.project(projectedElements());
     if (!plan.supported) throw new Error(plan.reason ?? "Unsupported text fixture");
     items = plan.items; drawReference();

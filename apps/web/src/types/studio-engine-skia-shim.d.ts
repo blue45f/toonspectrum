@@ -41,8 +41,21 @@ export function createSkiaGpuIslandBackend(): {
   dispose(): void;
 };
 
-export type { SkiaDocumentInk, SkiaDocumentItem, SkiaDocumentFrame, SkiaDocumentReceipt, SkiaDocumentStats, SkiaDocumentRenderer } from "../../../../packages/studio-engine-skia/src/document-contract";
+export type {
+  SkiaDocumentFontSource,
+  SkiaDocumentFrame,
+  SkiaDocumentInk,
+  SkiaDocumentItem,
+  SkiaDocumentReceipt,
+  SkiaDocumentRenderer,
+  SkiaDocumentStats,
+} from "../../../../packages/studio-engine-skia/src/document-contract";
 export function createSkiaDocumentRenderer(canvas: HTMLCanvasElement, options?: {
+  readonly loadFontData?: (
+    font: import("../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentFontSource,
+    signal: AbortSignal,
+  ) => Promise<readonly Uint8Array[]>;
+  readonly loadImageBitmap?: (src: string, signal: AbortSignal) => Promise<ImageBitmap>;
   readonly maxPictureBytes?: number;
   readonly onContextLost?: () => void;
 }): import("../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentRenderer;

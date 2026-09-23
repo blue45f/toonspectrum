@@ -50,12 +50,11 @@ export function StudioSkiaDocumentHitLayer({
   ) => {
     const point = localPointer(event as Konva.KonvaEventObject<Event>);
     const element = point ? runtime.resolve(point, effectiveScale) : null;
-    event.target.setAttr("studioElementId", element?.id);
-    // The existing Stage background path owns empty-click deselection and marquee start.
-    event.target.setAttr(
-      "name",
-      element ? "skia-document-hit-proxy" : "bg",
-    );
+    event.target.setAttrs({
+      studioElementId: element?.id,
+      // The existing Stage background path owns empty-click deselection and marquee start.
+      name: element ? "skia-document-hit-proxy" : "bg",
+    });
     if (element && select) onSelect(element.id, event);
   };
 

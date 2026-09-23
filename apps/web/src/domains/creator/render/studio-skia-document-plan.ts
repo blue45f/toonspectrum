@@ -84,7 +84,7 @@ function resolveImageBlendMode(
   if (!value || value === "normal" || value === "source-over") {
     return "source-over";
   }
-  return isStudioStandardBlendMode(value) ? value : null;
+  return isStudioStandardBlendMode(value) && value !== "normal" ? value : null;
 }
 
 function resolveImageShadow(

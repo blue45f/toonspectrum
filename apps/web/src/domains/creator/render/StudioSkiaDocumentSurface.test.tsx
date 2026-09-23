@@ -25,7 +25,7 @@ function setup() {
   return { parent, props, report };
 }
 const success = (frame: SkiaDocumentFrame): SkiaDocumentReceipt => ({ status: "presented", revision: frame.revision,
-  stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, imageTextureBytes: 0, cachedImages: 0, frameMs: 1, interactiveReadbacks: 0 } });
+  stats: { compiledBatches: 0, cachedBatches: 0, paintedItems: 0, presentation: "cached", retainedSnapshotBytes: 0, compiledItems: 0, cachedItems: 0, pictureBytes: 32, gpuCacheBytes: null, imageTextureBytes: 0, cachedImages: 0, fontBytes: 0, cachedFonts: 0, frameMs: 1, interactiveReadbacks: 0 } });
 const pen = (): El => ({ id: "ink", type: "draw", mode: "pen", kind: "freehand", brush: "pen",
   points: [10, 10, 30, 20, 60, 40], pressures: [0.3, 0.6, 1], stroke: "#234567", strokeWidth: 12,
   sampleSpacing: 0, pressureModel: "linear-residual-path-v3", paintModel: "layered-flow-v1", opacity: 0.4,
