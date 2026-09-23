@@ -1,10 +1,11 @@
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
-import { UserRound } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
+
+import { safeAuthProfileImageSrc } from "./auth-menu-profile-image";
+import { AuthMenuTrigger } from "./auth-menu-trigger";
 
 import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
 import { useT } from "@/shared/lib/i18n";
-import { keepInlineText } from "@/shared/lib/text";
 import { useSession } from "@/compat/auth-session-store";
 
 type AuthMenuProps = {
@@ -17,7 +18,9 @@ type AuthMenuModule = { default: ComponentType<AuthMenuProps> };
 let authMenuPromise: Promise<AuthMenuModule> | null = null;
 
 function loadAuthMenu(): Promise<AuthMenuModule> {
-  authMenuPromise ??= import("./auth-menu").then((mod) => ({ default: mod.AuthMenu }));
+  authMenuPromise ??= import("./auth-menu").then((mod) => ({
+    default: mod.AuthMenu,
+  }));
   return authMenuPromise;
 }
 
@@ -30,37 +33,37 @@ function preloadAuthMenu(): void {
 function AuthMenuFallback({ onClick }: { onClick: () => void }) {
   const { data: session, status } = useSession();
   const t = useT();
+  const preloadProps = {
+    onClick,
+    onMouseEnter: preloadAuthMenu,
+    onFocus: preloadAuthMenu,
+  };
 
   if (status === "authenticated") {
-    const initial = (session.user.name ?? session.user.email ?? "U").charAt(0).toUpperCase();
+    const initial = (session.user.name ?? session.user.email ?? "U")
+      .charAt(0)
+      .toUpperCase();
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        onMouseEnter={preloadAuthMenu}
-        onFocus={preloadAuthMenu}
-        className="grid size-11 place-items-center overflow-hidden rounded-xl border border-line bg-accent text-sm font-bold text-on-accent outline-none transition-transform active:scale-95"
-        aria-label={translateCurrentStaticSourceText("domains.auth.components.auth.menu.shell", "ko", "계정 메뉴")}
-      >
-        {initial}
-      </button>
+      <AuthMenuTrigger
+        {...preloadProps}
+        variant="signed-in"
+        label={translateCurrentStaticSourceText(
+          "domains.auth.components.auth.menu.shell",
+          "ko",
+          "계정 메뉴"
+        )}
+        initial={initial}
+        imageSrc={safeAuthProfileImageSrc(session.user.image)}
+      />
     );
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={preloadAuthMenu}
-      onFocus={preloadAuthMenu}
-      aria-label={t("nav.login")}
-      className="flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-card px-3 text-sm font-medium text-fg-2 [text-wrap:nowrap] [word-break:keep-all] transition-colors hover:border-line-strong hover:text-fg"
-    >
-      <UserRound size={16} className="shrink-0" />
-      <span className="hidden min-w-max whitespace-nowrap [text-wrap:nowrap] [word-break:keep-all] xl:inline-block">
-        {keepInlineText(t("nav.login"))}
-      </span>
-    </button>
+    <AuthMenuTrigger
+      {...preloadProps}
+      variant="signed-out"
+      label={t("nav.login")}
+    />
   );
 }
 
@@ -71,13 +74,17 @@ export function AuthMenuShell() {
   const [defaultMenuOpen, setDefaultMenuOpen] = useState(false);
   const [defaultMode, setDefaultMode] = useState<"login" | "signup">("login");
 
-  useEffect(() => subscribeAuthModalRequests((detail) => {
-    if (status === "authenticated") return;
-    setDefaultMode(detail.mode ?? "login");
-    setDefaultOpen(true);
-    setDefaultMenuOpen(false);
-    setEnabled(true);
-  }), [status]);
+  useEffect(
+    () =>
+      subscribeAuthModalRequests((detail) => {
+        if (status === "authenticated") return;
+        setDefaultMode(detail.mode ?? "login");
+        setDefaultOpen(true);
+        setDefaultMenuOpen(false);
+        setEnabled(true);
+      }),
+    [status]
+  );
 
   const openAuth = () => {
     const authenticated = status === "authenticated";

@@ -17,6 +17,7 @@ interface ManifestShortcut {
   name: string;
   short_name?: string;
   url: string;
+  icons?: ManifestIcon[];
 }
 
 interface ManifestScreenshot {
@@ -97,6 +98,14 @@ describe("PWA manifest", () => {
       expect(url.origin).toBe(appOrigin);
       expect(url.pathname.startsWith(manifest.scope)).toBe(true);
       expect(matchRoutes(registeredRoutes, shortcut.url)).not.toBeNull();
+      expect(shortcut.icons).toEqual([
+        {
+          src: "/brand/spectrum-ribbon-v2/icon-192.png",
+          sizes: "192x192",
+          type: "image/png",
+        },
+      ]);
+      expect(existsSync(publicAssetPath(shortcut.icons?.[0]?.src ?? ""))).toBe(true);
     }
   });
 

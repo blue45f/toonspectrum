@@ -119,6 +119,22 @@ describe("mobile site shell accessibility", () => {
     expect(quickNavigation?.hasAttribute("aria-hidden")).toBe(false);
   });
 
+  it("switches both desktop and mobile GNB to the reader context on discovery routes", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/discover"]}>
+        <SiteHeader />
+      </MemoryRouter>
+    );
+
+    const primaryNavigation = container.querySelector<HTMLElement>('nav[aria-label="주요 메뉴"]');
+    expect(Array.from(primaryNavigation?.querySelectorAll("a[data-navigation-entry]") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/discover", "/ranking", "/community", "/library", "/sitemap"]);
+
+    const quickNavigation = container.querySelector<HTMLElement>('nav[aria-label="빠른 이동"]');
+    expect(Array.from(quickNavigation?.querySelectorAll("a") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/", "/discover", "/ranking", "/community", "/library"]);
+    expect(quickNavigation?.firstElementChild?.className).toContain("grid-cols-5");
+    expect(within(quickNavigation as HTMLElement).getByRole("link", { name: "찾기" }).getAttribute("aria-current")).toBe("page");
+  });
+
   it("shows Korean as selected when a fresh browser reports ko-KR", () => {
     useI18n.getState().setLang("ko-KR");
 

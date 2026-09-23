@@ -140,7 +140,7 @@ export function AppShell({
       <CreatorContinuityTracker />
       <SiteExperienceFrame enabled={enhancedSite}>
         {showSkipLink ? (
-          <a href="#main-content" className="sr-only rounded-md focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:bg-fg focus:px-4 focus:py-2 focus:font-semibold focus:text-canvas">
+          <a href="#main-content" className="sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[300] focus:flex focus:min-h-11 focus:items-center focus:rounded-xl focus:border focus:border-line-strong focus:bg-fg focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-canvas focus:shadow-2xl focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-accent">
             본문으로 건너뛰기
           </a>
         ) : null}

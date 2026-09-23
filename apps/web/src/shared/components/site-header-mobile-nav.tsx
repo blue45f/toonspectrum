@@ -1,8 +1,20 @@
-import { translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
+import {
+  translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 import { X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
-import { SITE_UTILITY_NAVIGATION, TOONSTUDIO_MOBILE_TABS, siteNavigationContextForPath, siteNavigationGroupsForPath, siteNavigationLocale, siteNavigationText } from "./site-navigation";
+import {
+  SITE_UTILITY_NAVIGATION,
+  mobileSiteTabsForPath,
+  siteNavigationContextForPath,
+  siteNavigationGroupsForPath,
+  siteNavigationLocale,
+  siteNavigationText,
+} from "./site-navigation";
+import { ToonSpectrumMark } from "./visual-marks";
 
 import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
@@ -40,9 +52,9 @@ interface BackgroundAttributeSnapshot {
 function focusableElements(dialog: HTMLElement): HTMLElement[] {
   return [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)].filter(
     (element) =>
-      element.tabIndex >= 0
-      && !element.hidden
-      && !element.closest("[hidden], [inert], [aria-hidden='true']")
+      element.tabIndex >= 0 &&
+      !element.hidden &&
+      !element.closest("[hidden], [inert], [aria-hidden='true']")
   );
 }
 
@@ -70,7 +82,8 @@ function isolateMenuBranch(overlay: HTMLElement): () => void {
   return () => {
     for (const snapshot of snapshots) {
       if (snapshot.element.getAttribute("aria-hidden") === "true") {
-        if (snapshot.ariaHidden === null) snapshot.element.removeAttribute("aria-hidden");
+        if (snapshot.ariaHidden === null)
+          snapshot.element.removeAttribute("aria-hidden");
         else snapshot.element.setAttribute("aria-hidden", snapshot.ariaHidden);
       }
       if (snapshot.element.getAttribute("inert") === "") {
@@ -99,10 +112,17 @@ export function MobileHeaderNavigation({
   const overlayRef = useRef<HTMLDivElement>(null);
   const navigationContext = siteNavigationContextForPath(pathname);
   const navigationGroups = siteNavigationGroupsForPath(pathname);
-  const mobileTabs = TOONSTUDIO_MOBILE_TABS;
-  const menuDescription = navigationContext === "studio"
-    ? (bi("기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요", "Jump straight to planning, production, review or export"))
-    : (bi("영감을 찾고, 그리고, 함께 나누는 작업실", "Discover inspiration, draw and share your work"));
+  const mobileTabs = mobileSiteTabsForPath(pathname);
+  const menuDescription =
+    navigationContext === "studio"
+      ? bi(
+          "기획부터 검수·내보내기까지, 필요한 단계로 바로 이동하세요",
+          "Jump straight to planning, production, review or export"
+        )
+      : bi(
+          "영감을 찾고, 그리고, 함께 나누는 작업실",
+          "Discover inspiration, draw and share your work"
+        );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -131,7 +151,8 @@ export function MobileHeaderNavigation({
         closeMenu();
         return;
       }
-      if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey)
+        return;
 
       const focusable = focusableElements(dialog);
       if (focusable.length === 0) {
@@ -145,7 +166,10 @@ export function MobileHeaderNavigation({
       if (event.shiftKey && (active === first || !dialog.contains(active))) {
         event.preventDefault();
         last.focus({ preventScroll: true });
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+      } else if (
+        !event.shiftKey &&
+        (active === last || !dialog.contains(active))
+      ) {
         event.preventDefault();
         first.focus({ preventScroll: true });
       }
@@ -170,7 +194,10 @@ export function MobileHeaderNavigation({
   return (
     <>
       {menuOpen && (
-        <div ref={overlayRef} className="fixed inset-0 z-[60] min-[1180px]:hidden">
+        <div
+          ref={overlayRef}
+          className="fixed inset-0 z-[60] min-[1180px]:hidden"
+        >
           <div
             aria-hidden="true"
             data-mobile-menu-backdrop="true"
@@ -188,21 +215,28 @@ export function MobileHeaderNavigation({
             className="absolute inset-x-0 top-0 max-h-[100dvh] overflow-y-auto overscroll-contain border-b border-line-strong bg-canvas/95 shadow-2xl backdrop-blur-2xl motion-safe:animate-fade-up"
           >
             <div className="sticky top-0 z-10 border-b border-line/60 bg-canvas/92 backdrop-blur-2xl">
-              <div className="mx-auto flex min-h-[4.25rem] max-w-[1320px] items-center justify-between gap-4 px-4 sm:px-6">
-                <div>
-                  <span className="block font-display text-sm font-bold text-fg">
-                    {navigationContext === "studio" ? "ToonStudio" : t("nav.menu")}
-                  </span>
-                  <span className="mt-0.5 block text-[0.68rem] text-fg-3">{menuDescription}</span>
+              <div className="mx-auto flex min-h-[4.5rem] max-w-[1320px] items-center justify-between gap-4 px-4 sm:px-6">
+                <div className="flex min-w-0 items-center gap-3">
+                  <ToonSpectrumMark className="size-10 rounded-[0.85rem]" />
+                  <div className="min-w-0">
+                    <span className="block truncate font-display text-sm font-bold text-fg">
+                      {navigationContext === "studio"
+                        ? "ToonStudio"
+                        : t("nav.menu")}
+                    </span>
+                    <span className="mt-0.5 block truncate text-[0.68rem] text-fg-3">
+                      {menuDescription}
+                    </span>
+                  </div>
                 </div>
                 <button
                   type="button"
                   data-autofocus
                   onClick={closeMenu}
                   aria-label={`${t("nav.allMenu")} ${t("common.close")}`}
-                  className="grid size-11 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-2 shadow-sm transition-colors hover:border-line-strong hover:bg-raised hover:text-fg"
+                  className="grid size-11 shrink-0 place-items-center rounded-[0.9rem] border border-line bg-card text-fg-2 shadow-sm outline-none transition-[border-color,background-color,color,transform] hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97]"
                 >
-                  <X size={18} />
+                  <X size={18} aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -216,11 +250,17 @@ export function MobileHeaderNavigation({
                     className="rounded-2xl border border-line/70 bg-panel/55 p-3 shadow-sm sm:p-4"
                   >
                     <div className="mb-3 flex items-start gap-3 px-1 sm:px-2">
-                      <span aria-hidden="true" className="font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
+                      <span
+                        aria-hidden="true"
+                        className="font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent"
+                      >
                         0{groupIndex + 1}
                       </span>
                       <div>
-                        <h2 id={`${menuId}-${group.id}`} className="font-display text-sm font-bold text-fg">
+                        <h2
+                          id={`${menuId}-${group.id}`}
+                          className="font-display text-sm font-bold text-fg"
+                        >
                           {siteNavigationText(group.label, locale)}
                         </h2>
                         <p className="mt-1 text-xs leading-5 text-fg-3">
@@ -254,11 +294,32 @@ export function MobileHeaderNavigation({
                                     : "border-line bg-canvas/45 group-hover:border-line-strong"
                                 )}
                               >
-                                <Icon size={17} strokeWidth={1.8} className={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-accent") : translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-fg-3 group-hover:text-accent")} />
+                                <Icon
+                                  size={17}
+                                  strokeWidth={1.8}
+                                  className={
+                                    active
+                                      ? translateCurrentStaticSourceText(
+                                          "shared.components.site.header.mobile.nav",
+                                          "en",
+                                          "text-accent"
+                                        )
+                                      : translateCurrentStaticSourceText(
+                                          "shared.components.site.header.mobile.nav",
+                                          "en",
+                                          "text-fg-3 group-hover:text-accent"
+                                        )
+                                  }
+                                />
                               </span>
                               <span className="min-w-0">
-                                <span className="block truncate text-sm font-semibold">{label}</span>
-                                <span aria-hidden="true" className="mt-0.5 line-clamp-1 block text-[0.68rem] leading-4 text-fg-3">
+                                <span className="block truncate text-sm font-semibold">
+                                  {label}
+                                </span>
+                                <span
+                                  aria-hidden="true"
+                                  className="mt-0.5 line-clamp-1 block text-[0.68rem] leading-4 text-fg-3"
+                                >
                                   {siteNavigationText(item.description, locale)}
                                 </span>
                               </span>
@@ -289,9 +350,32 @@ export function MobileHeaderNavigation({
                           : "border-line bg-card/70 text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
                       )}
                     >
-                      <Icon size={17} className={active ? translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-on-accent") : translateCurrentStaticSourceText("shared.components.site.header.mobile.nav", "en", "text-fg-3 group-hover:text-accent")} />
+                      <Icon
+                        size={17}
+                        className={
+                          active
+                            ? translateCurrentStaticSourceText(
+                                "shared.components.site.header.mobile.nav",
+                                "en",
+                                "text-on-accent"
+                              )
+                            : translateCurrentStaticSourceText(
+                                "shared.components.site.header.mobile.nav",
+                                "en",
+                                "text-fg-3 group-hover:text-accent"
+                              )
+                        }
+                      />
                       <span>{label}</span>
-                      <span aria-hidden="true" className={cx("ml-auto text-xs", active ? "text-on-accent/75" : "text-fg-3")}>↗</span>
+                      <span
+                        aria-hidden="true"
+                        className={cx(
+                          "ml-auto text-xs",
+                          active ? "text-on-accent/75" : "text-fg-3"
+                        )}
+                      >
+                        ↗
+                      </span>
                     </Link>
                   );
                 })}
@@ -307,7 +391,12 @@ export function MobileHeaderNavigation({
           data-site-product={navigationContext}
           className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-panel/92 shadow-[0_-12px_35px_-28px_var(--color-fg)] backdrop-blur-2xl md:hidden"
         >
-          <div className={navigationContext === "studio" ? "mx-auto grid max-w-md grid-cols-4 pb-[env(safe-area-inset-bottom)]" : "mx-auto grid max-w-md grid-cols-4 pb-[env(safe-area-inset-bottom)]"}>
+          <div
+            className={cx(
+              "mx-auto grid max-w-md pb-[env(safe-area-inset-bottom)]",
+              mobileTabs.length === 5 ? "grid-cols-5" : "grid-cols-4"
+            )}
+          >
             {mobileTabs.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
               const Icon = item.icon;
@@ -320,17 +409,27 @@ export function MobileHeaderNavigation({
                   aria-current={active ? "page" : undefined}
                   className={cx(
                     "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-all duration-150 active:bg-raised/55",
-                    active ? "text-accent" : "text-fg-3 hover:text-fg",
+                    active ? "text-accent" : "text-fg-3 hover:text-fg"
                   )}
                 >
                   <span className="relative grid size-8 place-items-center rounded-xl transition-colors">
                     {active && (
                       <>
-                        <span aria-hidden="true" className="absolute -top-2 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-accent" />
-                        <span aria-hidden="true" className="absolute inset-0 rounded-xl bg-accent-soft" />
+                        <span
+                          aria-hidden="true"
+                          className="absolute -top-2 left-1/2 h-0.5 w-7 -translate-x-1/2 rounded-full bg-accent"
+                        />
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-0 rounded-xl bg-accent-soft"
+                        />
                       </>
                     )}
-                    <Icon size={19} strokeWidth={active ? 2.35 : 1.85} className="relative" />
+                    <Icon
+                      size={19}
+                      strokeWidth={active ? 2.35 : 1.85}
+                      className="relative"
+                    />
                   </span>
                   <span>{label}</span>
                 </Link>

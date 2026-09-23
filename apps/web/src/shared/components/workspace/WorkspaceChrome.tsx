@@ -1,10 +1,11 @@
-import { Brush, HelpCircle, Settings, UserRound } from "lucide-react";
+import { HelpCircle, Settings, UserRound } from "lucide-react";
 import { useContext, type ReactNode } from "react";
 import { WorkspaceAccountContext } from "./workspace-account-context";
 import Link from "@/compat/router-link";
 import { useI18n } from "@/shared/lib/i18n";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 import { CampusControls } from "../spatial-campus/CampusControls";
+import { ToonSpectrumMark } from "../visual-marks";
 import type { WorkspaceNavigationContext } from "./workspace-navigation-model";
 
 export function WorkspaceBrand({
@@ -14,8 +15,9 @@ export function WorkspaceBrand({
   readonly href?: string;
   readonly compact?: boolean;
 }) {
-  return <Link href={href} className="workspace-brand" aria-label="ToonStudio">
-    <span className="workspace-brand-mark" aria-hidden="true"><Brush size={20} /></span>
+  const korean = useI18n((state) => state.lang.startsWith("ko"));
+  return <Link href={href} className="workspace-brand" aria-label={korean ? "ToonStudio 홈" : "ToonStudio home"}>
+    <ToonSpectrumMark className="workspace-brand-mark" />
     <strong>ToonStudio{compact ? null : <small>VIRTUAL STUDIO</small>}</strong>
   </Link>;
 }
