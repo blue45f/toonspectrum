@@ -14,7 +14,13 @@ export async function installBetaEventDismissal(page) {
 export async function dismissBetaEvent(page) {
   const gate = page.locator('[role="dialog"][aria-labelledby="beta-open-gate-title"]');
   const close = gate.getByRole("button", { name: /^(베타 이벤트 닫기|Close beta event)$/u });
-  await expect(close).toBeVisible();
+  try {
+    await close.waitFor({ state: "visible", timeout: 2_500 });
+  } catch {
+    // Spatial-campus routes deliberately suppress global marketing overlays.
+    return false;
+  }
   await close.click();
   await expect(gate).toBeHidden();
+  return true;
 }
