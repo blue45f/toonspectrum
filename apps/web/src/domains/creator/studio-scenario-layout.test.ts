@@ -1,8 +1,38 @@
 import { describe, expect, it } from "vitest";
 
-import { layoutScenarioPanels, scenarioPanelAspect, type ScenarioFrameRect } from "./studio-scenario-layout";
+import {
+  layoutScenarioPanels,
+  normalizeScenarioImagePreferences,
+  scenarioPanelAspect,
+  type ScenarioFrameRect,
+} from "./studio-scenario-layout";
 
 const CANVAS_W = 720;
+
+describe("normalizeScenarioImagePreferences", () => {
+  it("maps composer handoff preferences without coupling the editor host to field translation", () => {
+    expect(normalizeScenarioImagePreferences({
+      variants: 4,
+      qualityProfile: "final",
+      variationStrategy: "coverage",
+    })).toEqual({
+      preferredVariantCount: 4,
+      preferredQualityProfile: "final",
+      preferredVariationStrategy: "coverage",
+    });
+  });
+
+  it("preserves relayout preferences while omitting absent optional values", () => {
+    expect(normalizeScenarioImagePreferences({
+      preferredVariantCount: 2,
+      preferredQualityProfile: "balanced",
+    })).toEqual({
+      preferredVariantCount: 2,
+      preferredQualityProfile: "balanced",
+    });
+    expect(normalizeScenarioImagePreferences(undefined)).toEqual({});
+  });
+});
 
 describe("scenarioPanelAspect", () => {
   it("classifies clearly wide rects as landscape", () => {

@@ -1068,7 +1068,7 @@ import { useStudioDocumentLayout } from "./studio-router/studio-document-layout-
 import { useStudioDccWorkbenchNavigation } from "./studio-router/studio-dcc-workbench-navigation";
 import { StudioDccWorkbenchRoute } from "./studio-router/StudioDccWorkbenchRoute";
 import { announceStudioGpuDeviceLoss } from "./studio-safe-mode-runtime";
-import { layoutScenarioPanels, type ScenarioPreviewItem } from "./studio-scenario-layout";
+import { layoutScenarioPanels, normalizeScenarioImagePreferences, type ScenarioPreviewItem } from "./studio-scenario-layout";
 import {
   STUDIO_SCROLL_VIEWPORT_ORIGIN,
   STUDIO_SCROLL_VIEWPORT_SETTLE_MS,
@@ -19212,13 +19212,7 @@ const puppetWarpArmed =
     setScenarioResult({
       items: panels.map((panel) => ({
         ...panel,
-        preferredVariantCount: handoff.variants,
-        ...(handoff.qualityProfile
-          ? { preferredQualityProfile: handoff.qualityProfile }
-          : {}),
-        ...(handoff.variationStrategy
-          ? { preferredVariationStrategy: handoff.variationStrategy }
-          : {}),
+        ...normalizeScenarioImagePreferences(handoff),
       })),
       nextCanvasH,
       characterDescription: handoff.characterDescription,
@@ -19261,15 +19255,7 @@ const puppetWarpArmed =
         ...(items[index]?.approvedImageCandidateId
           ? { approvedImageCandidateId: items[index].approvedImageCandidateId }
           : {}),
-        ...(items[index]?.preferredVariantCount
-          ? { preferredVariantCount: items[index].preferredVariantCount }
-          : {}),
-        ...(items[index]?.preferredQualityProfile
-          ? { preferredQualityProfile: items[index].preferredQualityProfile }
-          : {}),
-        ...(items[index]?.preferredVariationStrategy
-          ? { preferredVariationStrategy: items[index].preferredVariationStrategy }
-          : {}),
+        ...normalizeScenarioImagePreferences(items[index]),
       })),
     };
   }

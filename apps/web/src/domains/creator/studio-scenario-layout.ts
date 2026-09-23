@@ -144,16 +144,57 @@ export interface ScenarioPanelSeed {
   aspect: ScenarioPanelAspect;
 }
 
-export interface ScenarioPreviewItem extends ScenarioPanelSeed {
+export interface ScenarioImageGenerationPreferences {
+  preferredVariantCount?: ScenarioImageVariantCount;
+  preferredQualityProfile?: ScenarioImageQualityProfile;
+  preferredVariationStrategy?: ScenarioImageVariationStrategy;
+}
+
+interface ScenarioImageGenerationHandoffPreferences {
+  readonly variants: ScenarioImageVariantCount;
+  readonly qualityProfile?: ScenarioImageQualityProfile;
+  readonly variationStrategy?: ScenarioImageVariationStrategy;
+}
+
+export function normalizeScenarioImagePreferences(
+  source:
+    | ScenarioImageGenerationPreferences
+    | ScenarioImageGenerationHandoffPreferences
+    | undefined,
+): ScenarioImageGenerationPreferences {
+  if (!source) return {};
+  const preferences: ScenarioImageGenerationPreferences = "variants" in source
+    ? {
+        preferredVariantCount: source.variants,
+        ...(source.qualityProfile
+          ? { preferredQualityProfile: source.qualityProfile }
+          : {}),
+        ...(source.variationStrategy
+          ? { preferredVariationStrategy: source.variationStrategy }
+          : {}),
+      }
+    : source;
+  return {
+    ...(preferences.preferredVariantCount
+      ? { preferredVariantCount: preferences.preferredVariantCount }
+      : {}),
+    ...(preferences.preferredQualityProfile
+      ? { preferredQualityProfile: preferences.preferredQualityProfile }
+      : {}),
+    ...(preferences.preferredVariationStrategy
+      ? { preferredVariationStrategy: preferences.preferredVariationStrategy }
+      : {}),
+  };
+}
+
+export interface ScenarioPreviewItem
+  extends ScenarioPanelSeed, ScenarioImageGenerationPreferences {
   imageDataUrl?: string;
   imageError?: string;
   imageProvenance?: StudioPublishAiProvenance;
   imageCandidates?: ScenarioImageCandidate[];
   selectedImageCandidateId?: string;
   approvedImageCandidateId?: string;
-  preferredVariantCount?: ScenarioImageVariantCount;
-  preferredQualityProfile?: ScenarioImageQualityProfile;
-  preferredVariationStrategy?: ScenarioImageVariationStrategy;
   qualityReport?: ScenarioImageQualityReport;
   layerManifest?: ScenarioImageLayerManifest;
   approvalRevision?: number;
