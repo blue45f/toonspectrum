@@ -1185,7 +1185,8 @@ body[data-studio-app="true"] .route-stage::before,
     transform: translateY(0.5rem);
   }
 
-  body:has([data-studio-mobile-sheet="true"]) .studio-p2p-huddle-dock {
+  body:has([data-studio-mobile-sheet="true"]) .studio-p2p-huddle-dock,
+  body:has([data-studio-mobile-coach="true"]) .studio-p2p-huddle-dock:not([data-studio-shell-force-visible="true"]) {
     pointer-events: none !important;
     visibility: hidden;
     opacity: 0;
