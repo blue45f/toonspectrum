@@ -288,7 +288,9 @@ async function selectBrush(page: Page, item: StudioBrushCatalogItem): Promise<bo
     await option.scrollIntoViewIfNeeded();
     await option.click({ force: true });
     for (let attempt = 0; attempt < 100; attempt += 1) {
-      if (await option.getAttribute("aria-pressed") === "true") return true;
+      const active = await option.getAttribute("aria-pressed") === "true";
+      const pending = await dockedLibrary.getAttribute("data-studio-brush-selection-pending") === "true";
+      if (active && !pending) return true;
       await page.waitForTimeout(50);
     }
     return false;
@@ -367,9 +369,24 @@ async function drawEvidenceStroke(
     throw new Error("brush surfaces stayed open before drawing evidence");
   }
   const stage = page.locator(".konvajs-content").first();
-  const box = await stage.boundingBox();
-  if (!box || box.width < 120 || box.height < 120) {
-    throw new Error("Studio drawing surface is smaller than the pointer acceptance minimum.");
+  const viewport = page.locator('[data-studio-canvas-viewport]').first();
+  const [stageBox, viewportBox] = await Promise.all([
+    stage.boundingBox(),
+    viewport.boundingBox(),
+  ]);
+  if (!stageBox || !viewportBox) {
+    throw new Error("Studio drawing surface or visible viewport is unavailable.");
+  }
+  const x = Math.max(stageBox.x, viewportBox.x);
+  const y = Math.max(stageBox.y, viewportBox.y);
+  const box = {
+    x,
+    y,
+    width: Math.min(stageBox.x + stageBox.width, viewportBox.x + viewportBox.width) - x,
+    height: Math.min(stageBox.y + stageBox.height, viewportBox.y + viewportBox.height) - y,
+  };
+  if (box.width < 120 || box.height < 120) {
+    throw new Error("Studio visible drawing surface is smaller than the pointer acceptance minimum.");
   }
   await page.waitForTimeout(80);
   const before = await page.screenshot({ clip: box, animations: "disabled" });

@@ -43,6 +43,8 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(select).toContain('library.getByRole("searchbox")');
     expect(select).toContain('[data-studio-brush-workbench-dock="true"] [data-studio-brush-library="true"]');
     expect(select).toContain('dockedLibrary.getByRole("searchbox")');
+    expect(select).toContain('data-studio-brush-selection-pending');
+    expect(select).toContain('if (active && !pending) return true');
     expect(select).toContain('page.keyboard.press("b")');
     expect(select).toContain('[data-studio-brush-active-pill="true"]');
     expect(select).toContain("return closeBrushSurfaces(page)");
@@ -68,6 +70,9 @@ describe("Studio five-hour soak browser state isolation", () => {
   it("routes every raster probe through the shared pressure-aware input driver", () => {
     const draw = sliceFunction("drawEvidenceStroke", "spawnPreview");
     expect(draw).toContain("createStudioPointerStrokePoints(box, cycle");
+    expect(draw).toContain("[data-studio-canvas-viewport]");
+    expect(draw).toContain("Math.max(stageBox.x, viewportBox.x)");
+    expect(draw).toContain("Math.min(stageBox.y + stageBox.height, viewportBox.y + viewportBox.height) - y");
     expect(draw).toContain("dispatchStudioPointerStroke({");
     expect(draw).toContain("mode: inputMode");
     expect(draw).toContain("cdp");
