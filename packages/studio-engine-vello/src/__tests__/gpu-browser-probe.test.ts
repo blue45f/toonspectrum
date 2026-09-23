@@ -161,7 +161,16 @@ describeProbe("vello gpu-browser real-browser parity probe", () => {
     const { chromium } = await import("playwright");
     const moduleUrl = `${baseUrl}/crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js`;
     for (const candidate of LAUNCH_CANDIDATES) {
-      const attempt = await chromium.launch(candidate.options);
+      let attempt: Browser;
+      try {
+        attempt = await chromium.launch(candidate.options);
+      } catch (error) {
+        probe = {
+          supported: false,
+          reason: `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        continue;
+      }
       const attemptPage = await attempt.newPage();
       await attemptPage.goto(`${baseUrl}/__gpu-harness__`);
       const payload = (await attemptPage.evaluate(async (url: string) => {
@@ -278,7 +287,7 @@ describeProbe("vello gpu-browser real-browser parity probe", () => {
         harness:
           "packages/studio-engine-vello/src/__tests__/gpu-browser-probe.test.ts (VELLO_GPU_BROWSER_PROBE=1)",
         engine:
-          "vello 0.9.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu 29.0.4 BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0",
+          "vello 0.10.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu 29.0.4 BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0",
         note: "readback is probe-only evidence collection; timings include JSON boundary + readback",
         measuredAt: new Date().toISOString(),
         browser: { launch: launchLabel, version: browser.version() },

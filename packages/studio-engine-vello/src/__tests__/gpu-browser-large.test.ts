@@ -224,7 +224,16 @@ describeProbe("vello gpu-browser large-scene ceiling probe", () => {
     const { chromium } = await import("playwright");
     const moduleUrl = `${baseUrl}/crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js`;
     for (const candidate of LAUNCH_CANDIDATES) {
-      const attempt = await chromium.launch(candidate.options);
+      let attempt: Browser;
+      try {
+        attempt = await chromium.launch(candidate.options);
+      } catch (error) {
+        probe = {
+          supported: false,
+          reason: `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        continue;
+      }
       const attemptPage = await attempt.newPage();
       await attemptPage.goto(`${baseUrl}/__gpu-harness__`);
       const payload = (await attemptPage.evaluate(async (url: string) => {
@@ -360,7 +369,7 @@ describeProbe("vello gpu-browser large-scene ceiling probe", () => {
         harness:
           "packages/studio-engine-vello/src/__tests__/gpu-browser-large.test.ts (VELLO_GPU_LARGE_PROBE=1)",
         engine:
-          "vello 0.9.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0 in the same wasm build",
+          "vello 0.10.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0 in the same wasm build",
         note:
           "gpu/cpu timings include the wasm-side serde parse of the scene JSON (not separable without crate changes) plus, for GPU, pipeline submit and full readback; jsonBoundary isolates the JS-side JSON.parse/JSON.stringify cost of the same payload",
         measuredAt: new Date().toISOString(),

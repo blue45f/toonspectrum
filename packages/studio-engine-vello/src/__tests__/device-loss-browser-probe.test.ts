@@ -173,7 +173,16 @@ describeProbe("vello real-browser device-loss recovery probe", () => {
     const { chromium } = await import("playwright");
     const moduleUrl = `${baseUrl}/crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js`;
     for (const candidate of LAUNCH_CANDIDATES) {
-      const attempt = await chromium.launch(candidate.options);
+      let attempt: Browser;
+      try {
+        attempt = await chromium.launch(candidate.options);
+      } catch (error) {
+        probe = {
+          supported: false,
+          reason: `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        continue;
+      }
       const attemptPage = await attempt.newPage();
       await attemptPage.goto(`${baseUrl}/__gpu-harness__`);
       const payload = (await attemptPage.evaluate(async (url: string) => {

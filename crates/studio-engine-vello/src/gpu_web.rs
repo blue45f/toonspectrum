@@ -1,11 +1,11 @@
-//! Browser WebGPU wasm lane (ADR-0011 lane 2, V12 §4.1 vello 0.9 Classic).
+//! Browser WebGPU wasm lane (ADR-0011 lane 2, V14 vello 0.10 Classic).
 //!
 //! Compiled only for `wasm32` with the `gpu` feature — i.e. the `pkg-gpu/`
 //! wasm-pack artifact. The default `pkg/` CPU artifact never contains this
 //! module. Entry points:
 //! - [`probe_webgpu`]: adapter availability + adapter info as a JSON string.
 //! - [`render_scene_gpu_json`]: SceneIR JSON -> RGBA8 pixels through
-//!   vello 0.9 `render_to_texture` on the browser's WebGPU device, with a
+//!   vello 0.10 `render_to_texture` on the browser's WebGPU device, with a
 //!   256-byte-aligned COPY_SRC readback (evidence collection lane; the
 //!   interactive path never reads back).
 //!
@@ -303,7 +303,7 @@ pub async fn render_scene_gpu_json(scene_json: String) -> Result<js_sys::Uint8Ar
 /// WebGPU device and resolves with straight RGBA8 pixels (width * height * 4)
 /// over a transparent base (Lottie output is meant to be composited).
 ///
-/// ADR-0011 Velato lane: velato 0.11 lowers the composition to a vello 0.9
+/// ADR-0011 Velato lane: velato 0.12 lowers the composition to a vello 0.10
 /// `Scene` (`crate::lottie`), which reuses the exact texture/readback path the
 /// SceneIR lane validated. Rejections carry a JSON message
 /// `{"code":"lottie-*","reason":"..."}` — parse failures, unsupported Lottie
@@ -356,7 +356,7 @@ pub fn render_svg_cpu_json(
     Ok(js_sys::Uint8Array::from(pixels.as_slice()))
 }
 
-/// Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+/// Renders the strict SVG subset through vello_svg 0.11 -> vello 0.10 on the
 /// browser WebGPU device. Readback exists only for quality evidence/export;
 /// callers must keep the interactive hot path on-GPU.
 #[cfg(feature = "svg")]
@@ -393,7 +393,7 @@ pub async fn probe_webgpu() -> String {
                     "driverInfo": info.driver_info,
                 },
                 "engine": format!(
-                    "studio-engine-vello {} (vello 0.9 GPU, wgpu BROWSER_WEBGPU)",
+                    "studio-engine-vello {} (vello 0.10 GPU, vello_hybrid 0.2, wgpu BROWSER_WEBGPU)",
                     env!("CARGO_PKG_VERSION")
                 ),
             })

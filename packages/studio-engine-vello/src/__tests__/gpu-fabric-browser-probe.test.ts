@@ -177,7 +177,16 @@ describeProbe("studio gpu-fabric zero-copy interop real-browser probe", () => {
     const { chromium } = await import("playwright");
     const moduleUrl = `${baseUrl}/crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js`;
     for (const candidate of LAUNCH_CANDIDATES) {
-      const attempt = await chromium.launch(candidate.options);
+      let attempt: Browser;
+      try {
+        attempt = await chromium.launch(candidate.options);
+      } catch (error) {
+        probe = {
+          supported: false,
+          reason: `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        continue;
+      }
       const attemptPage = await attempt.newPage();
       await attemptPage.goto(`${baseUrl}/__gpu-fabric-harness__`);
       const payload = (await attemptPage.evaluate(async (url: string) => {
@@ -523,15 +532,15 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         browser: { launch: launchLabel, version: browser.version() },
         adapter: probe.adapter ?? null,
         note:
-          "wall-clock includes submit->completion roundtrip floor; currentExchange = vello internal-device render+readback+JS boundary followed by fabric-device writeTexture (V12 §6.3 L0)",
+          "wall-clock includes submit->completion roundtrip floor; currentExchange intentionally measures the legacy self-owned-device render+readback+JS boundary followed by fabric-device writeTexture (V14 L0 regression baseline)",
         velloDeviceInjection: {
-          supported: false,
+          supported: payload.deviceInjectionExports.includes("adopt_gpu_device"),
           wasmExports: payload.wasmExports,
           deviceInjectionExports: payload.deviceInjectionExports,
           sourceEvidence:
-            "crates/studio-engine-vello/src/gpu_web.rs acquire_context() creates its own wgpu Instance(BROWSER_WEBGPU) -> request_adapter -> request_device; wgpu 29.0.4 (vello 0.9 pin): src/lib.rs `mod backend` is private, backend::webgpu::WebDevice.inner is pub(crate), no public constructor from a JS GPUDevice; Device::from_custom requires a full custom DeviceInterface backend (not adoption)",
-          patchBacklog:
-            "toon-vello fork track item #1: expose Device/Queue adoption of an external browser GPUDevice (wgpu backend::webgpu public from_webgpu handle constructors, or wgpu 30 handle API once vello unlocks it) + Texture::from_webgpu_handle for zero-copy wrap",
+            "the committed hybrid,lottie,svg Track-B artifact exposes adopt_gpu_device/fabric_device_handle/render_scene_gpu_texture_json; this harness intentionally does not call adoption so the pre-zero-copy L0 cost remains measurable",
+          zeroCopyProof:
+            "toon-vello-fork-browser-probe.test.ts verifies object-identical GPUDevice adoption plus Classic and Hybrid L4 texture consumption",
         },
         fabricDevice: payload.capabilities,
         crossDeviceSharing: payload.crossDevice,

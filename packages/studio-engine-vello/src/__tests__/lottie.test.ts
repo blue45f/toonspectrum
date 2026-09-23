@@ -8,7 +8,7 @@ import { LottieRenderError, renderLottieToPixelsGpu } from "../lottie";
  * Node-side contract of the Velato Lottie lane (ADR-0011 Velato lane):
  * without `navigator.gpu` and with invalid inputs every entry point must fail
  * loudly with a typed error — never resolve a silent blank frame — and the
- * committed pkg-gpu artifact (built with `--features lottie`) must expose the
+ * committed pkg-gpu artifact (built with `--features hybrid,lottie,svg`) must expose the
  * lottie entry point. The real-browser render run lives in
  * lottie-browser-probe.test.ts (opt-in, VELLO_LOTTIE_BROWSER_PROBE=1).
  */

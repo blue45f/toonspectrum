@@ -125,7 +125,7 @@ export function probe_webgpu() {
  * WebGPU device and resolves with straight RGBA8 pixels (width * height * 4)
  * over a transparent base (Lottie output is meant to be composited).
  *
- * ADR-0011 Velato lane: velato 0.11 lowers the composition to a vello 0.9
+ * ADR-0011 Velato lane: velato 0.12 lowers the composition to a vello 0.10
  * `Scene` (`crate::lottie`), which reuses the exact texture/readback path the
  * SceneIR lane validated. Rejections carry a JSON message
  * `{"code":"lottie-*","reason":"..."}` — parse failures, unsupported Lottie
@@ -224,7 +224,7 @@ export function render_svg_cpu_json(svg, width, height) {
 }
 
 /**
- * Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+ * Renders the strict SVG subset through vello_svg 0.11 -> vello 0.10 on the
  * browser WebGPU device. Readback exists only for quality evidence/export;
  * callers must keep the interactive hot path on-GPU.
  * @param {string} svg

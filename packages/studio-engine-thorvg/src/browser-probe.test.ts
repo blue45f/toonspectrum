@@ -6,6 +6,36 @@ import type { ViteDevServer } from "vite";
 const ENABLED = process.env.THORVG_BROWSER_PROBE === "1";
 const describeProbe = ENABLED ? describe : describe.skip;
 
+
+const LAUNCH_CANDIDATES: Array<{
+  readonly label: string;
+  readonly options: { channel?: "chrome"; headless: boolean; args: string[] };
+}> = [
+  {
+    label: "playwright chromium headless shell (metal, unsafe-webgpu)",
+    options: {
+      headless: true,
+      args: ["--enable-unsafe-webgpu", "--enable-features=WebGPU", "--use-angle=metal"],
+    },
+  },
+  {
+    label: "system chrome headless (metal, unsafe-webgpu)",
+    options: {
+      channel: "chrome",
+      headless: true,
+      args: ["--enable-unsafe-webgpu", "--enable-features=WebGPU", "--use-angle=metal"],
+    },
+  },
+  {
+    label: "system chrome headed (metal, unsafe-webgpu)",
+    options: {
+      channel: "chrome",
+      headless: false,
+      args: ["--enable-unsafe-webgpu", "--use-angle=metal"],
+    },
+  },
+];
+
 const SVG = `<svg width="96" height="96" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="g"><stop stop-color="#ff0044"/><stop offset="1" stop-color="#0066ff"/></linearGradient>
@@ -16,7 +46,7 @@ const SVG = `<svg width="96" height="96" xmlns="http://www.w3.org/2000/svg">
 
 describeProbe("ThorVG selected-provider real-browser lifecycle", () => {
   let server: ViteDevServer;
-  let browser: Browser;
+  let browser: Browser | undefined;
   let page: Page;
   let baseUrl = "";
   const browserErrors: string[] = [];
@@ -30,6 +60,10 @@ describeProbe("ThorVG selected-provider real-browser lifecycle", () => {
       plugins: [{
         name: "thorvg-probe-page",
         configureServer(vite) {
+          vite.middlewares.use("/favicon.ico", (_request, response) => {
+            response.writeHead(204);
+            response.end();
+          });
           vite.middlewares.use("/__thorvg_probe__", (_request, response) => {
             response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
             response.end("<!doctype html><html><body></body></html>");
@@ -42,16 +76,28 @@ describeProbe("ThorVG selected-provider real-browser lifecycle", () => {
     if (!baseUrl) throw new Error("ThorVG probe Vite server has no local URL");
 
     const { chromium } = await import("playwright");
-    browser = await chromium.launch({
-      headless: true,
-      args: ["--enable-unsafe-webgpu", "--enable-features=WebGPU", "--use-angle=metal"],
-    });
-    page = await browser.newPage();
-    page.on("console", (message) => {
-      if (message.type() === "error") browserErrors.push(message.text());
-    });
-    page.on("pageerror", (error) => browserErrors.push(error.message));
-    await page.goto(`${baseUrl}/__thorvg_probe__`);
+    const launchErrors: string[] = [];
+    for (const candidate of LAUNCH_CANDIDATES) {
+      try {
+        const attempt = await chromium.launch(candidate.options);
+        const attemptPage = await attempt.newPage();
+        attemptPage.on("console", (message) => {
+          if (message.type() === "error") browserErrors.push(message.text());
+        });
+        attemptPage.on("pageerror", (error) => browserErrors.push(error.message));
+        await attemptPage.goto(`${baseUrl}/__thorvg_probe__`);
+        browser = attempt;
+        page = attemptPage;
+        break;
+      } catch (error) {
+        launchErrors.push(
+          `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    if (!browser) {
+      throw new Error(`ThorVG browser launch failed: ${launchErrors.join(" | ")}`);
+    }
   }, 120_000);
 
   afterAll(async () => {

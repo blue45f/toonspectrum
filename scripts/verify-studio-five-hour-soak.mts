@@ -24,6 +24,7 @@ import { chromium, type Browser, type CDPSession, type Locator, type Page } from
 import { STUDIO_ERASER_BRUSH_CATALOG_ITEMS, STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS, type StudioBrushCatalogItem } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 
 import { createStudioSoakCheckpoint } from "./lib/studio-five-hour-soak-checkpoint.mjs";
+import { isExpectedLocalPreviewRuntimeNoise } from "./lib/studio-five-hour-soak-runtime-noise.mjs";
 import { collectStudioInAppRuntimeErrors, installStudioInAppFirstRunState, installStudioInAppGuestBoundary, STUDIO_INAPP_PROFILES, type StudioInAppRuntimeError } from "./lib/studio-inapp-sweep-harness.mjs";
 import { evaluateStudioSoakHeapGrowth, STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR } from "./lib/studio-memory-growth-policy.mjs";
 import {
@@ -452,6 +453,7 @@ const report = {
   gpuEvents: [] as GpuEvent[],
   longTasks: [] as LongTaskSample[],
   runtimeErrors: [] as StudioInAppRuntimeError[],
+  environmentNoise: [] as StudioInAppRuntimeError[],
   failures: [] as SoakFailure[],
   checkpoints: [] as Array<{
     atMs: number;
@@ -591,8 +593,15 @@ try {
     }
 
     const runtime = errors.drain();
-    report.runtimeErrors.push(...runtime);
     for (const error of runtime) {
+      if (isExpectedLocalPreviewRuntimeNoise(error, {
+        origin: preview.origin,
+        spawnedPreview: preview.child !== null,
+      })) {
+        report.environmentNoise.push(error);
+        continue;
+      }
+      report.runtimeErrors.push(error);
       report.failures.push({
         atMs: nowMs(startedAt), cycle, kind: `runtime-${error.channel}`, detail: `${error.step}: ${error.text}`,
       });
@@ -681,7 +690,7 @@ const worstLongTask = Math.max(0, ...report.longTasks.map((entry) => entry.durat
 const initialHeap = report.heapSamples[0]?.usedBytes ?? null;
 const finalHeap = report.heapSamples.at(-1)?.usedBytes ?? null;
 log(`${report.cycles} cycles · ${report.strokes} strokes · ${report.brushSwitches} brush switches · ${report.historyActions} history actions`);
-log(`${report.runtimeErrors.length} runtime errors · ${report.gpuEvents.length} GPU events · ${report.longTasks.length} long tasks (worst ${Math.round(worstLongTask)} ms)`);
+log(`${report.runtimeErrors.length} runtime errors · ${report.environmentNoise.length} local-preview environment noises · ${report.gpuEvents.length} GPU events · ${report.longTasks.length} long tasks (worst ${Math.round(worstLongTask)} ms)`);
 if (initialHeap !== null && finalHeap !== null) {
   log(`GC heap ${Math.round(initialHeap / 1048576)} MiB → ${Math.round(finalHeap / 1048576)} MiB`);
 }

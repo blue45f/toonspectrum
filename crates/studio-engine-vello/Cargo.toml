@@ -16,7 +16,7 @@ vello = { version = "0.10", optional = true }
 # Real sparse-strip hybrid renderer; product use is gated by explicit preflight.
 vello_hybrid = { version = "0.2", optional = true, default-features = false, features = ["wgpu"] }
 # V12 Velato lane — Lottie(bodymovin) -> vello Scene lowering; velato 0.12.0
-# depends on vello ^0.9 (crates.io index 실측), unified with our 0.9.0 pin.
+# depends on vello ^0.10 (crates.io index 실측), unified with our 0.10.0 pin.
 velato = { version = "0.12", optional = true }
 # V12 native SVG lane. vello_svg 0.11.0 is the first release that pins
 # vello 0.10.0, so it unifies with this crate's GPU stack. Raster image codecs
@@ -50,7 +50,7 @@ fabric = ["gpu", "dep:wgpu"]
 # Real upstream Vello Hybrid on the adopted StudioGpuFabric device.
 hybrid = ["fabric", "dep:vello_hybrid"]
 # Velato Lottie lane (ADR-0011): rides on the gpu render path, so it is a
-# strict superset feature — `pkg-gpu` is built with `--features lottie`.
+# strict superset feature — `pkg-gpu` is built with `--features hybrid,lottie,svg`.
 lottie = ["gpu", "dep:velato"]
 # SVG parsing/lowering is usable by the vello_cpu reference without WebGPU;
 # the browser pkg-gpu combines this with `gpu`/`lottie` at build time.

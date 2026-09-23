@@ -32,6 +32,13 @@ The browser WASM artifact is built with `hybrid,lottie,svg`. Its Hybrid entry po
 - returns an RGBA8 `GPUTexture` without CPU readback;
 - rejects paragraph text and does not expose panic-prone mask/filter calls.
 
+The real Chromium/Metal probe adopts one JavaScript-created `GPUDevice`, renders
+256²/512²/1024² scenes through both Classic and Hybrid, samples both returned
+textures from a compute pass without CPU exchange, and reports **0% δ48 3×3 fuzzy
+mismatch** for the current bounded corpus. The 1024² Hybrid render-to-texture p50
+was 1.2ms in that run; the measurement is evidence for this corpus, not a universal
+performance claim.
+
 ## ThorVG scope and safety
 
 The ThorVG package is split into an eager audit subpath and a lazy runtime subpath.
