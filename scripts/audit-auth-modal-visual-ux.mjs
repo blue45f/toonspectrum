@@ -11,6 +11,7 @@ const VIEWPORTS = {
 const root = process.env.AUDIT_REPOSITORY || process.cwd();
 const output = process.env.AUDIT_OUTPUT || path.join(root, ".qa/visual-ux/auth-modal");
 const base = new URL(process.env.AUDIT_BASE_URL || "http://127.0.0.1:5276");
+const auditRoute = process.env.AUDIT_ROUTE || "/discover";
 const allowedHosts = new Set(["127.0.0.1", "localhost", "toonstudio.cloud", "www.toonstudio.cloud"]);
 if (!allowedHosts.has(base.hostname)) throw new Error(`Audit origin is not allow-listed: ${base.hostname}`);
 
@@ -59,7 +60,7 @@ try {
       });
       const result = { theme, viewport: viewportName, pageErrors, failedRequests };
       try {
-        await page.goto(new URL("/", base).href, { waitUntil: "domcontentloaded", timeout: 30_000 });
+        await page.goto(new URL(auditRoute, base).href, { waitUntil: "domcontentloaded", timeout: 30_000 });
         await page.locator("#main-content").waitFor({ timeout: 20_000 });
         await page.waitForTimeout(500);
         const loginTrigger = page.getByRole("button", { name: /^(?:로그인|sign in)$/iu }).first();
@@ -157,6 +158,7 @@ const warned = results.filter((result) => result.warnings?.length);
 const report = {
   generatedAt: new Date().toISOString(),
   base: base.origin,
+  route: auditRoute,
   themes,
   viewports: viewports.map(([name]) => name),
   totals: { observations: results.length, failed: failed.length, warned: warned.length },
@@ -166,7 +168,7 @@ await writeFile(path.join(output, "report.json"), JSON.stringify(report, null, 2
 await writeFile(path.join(output, "SUMMARY.md"), [
   "# Authentication modal visual UX audit",
   "",
-  `Origin: ${base.origin}`,
+  `Origin: ${base.origin}${auditRoute}`,
   `Observations: ${results.length}`,
   `Critical issues: ${failed.length}`,
   `Touch-target warnings: ${warned.length}`,
