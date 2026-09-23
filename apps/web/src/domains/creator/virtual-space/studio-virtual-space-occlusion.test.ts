@@ -14,14 +14,14 @@ describe("Virtual Studio foreground geometry", () => {
       [{x:NaN,y:1},{x:9,y:1},{x:9,y:9}],
     ]) expect(studioWorldOcclusionPolygonValid(polygon,10,10)).toBe(false);
   });
-  it("bounds layer count, vertex count and depth, keeping the sofa behind a person in front", () => {
-    const world=DEFAULT_STUDIO_WORLD_MANIFEST;
-    const layer=world.occlusionLayers![0]!;
+  it("bounds optional authored foreground layer count, vertex count and depth", () => {
+    const layer={id:"review-table-front",depth:1710,polygon:[{x:100,y:680},{x:230,y:680},{x:230,y:700},{x:100,y:700}]};
+    const world={...DEFAULT_STUDIO_WORLD_MANIFEST,occlusionLayers:[layer]};
     expect(validateStudioWorldManifest(world)).toEqual([]);
     expect(layer.depth).toBeGreaterThan(690+1001);
     expect(layer.depth).toBeLessThan(737+1001);
     expect(validateStudioWorldManifest({...world,occlusionLayers:Array.from({length:9},(_,i)=>({...layer,id:`layer-${i}`}))})).toContain("occlusion layer budget exceeded");
-    expect(validateStudioWorldManifest({...world,occlusionLayers:[{...layer,depth:Infinity}]})).toContain("occlusion layer is invalid: review-sofa-front");
+    expect(validateStudioWorldManifest({...world,occlusionLayers:[{...layer,depth:Infinity}]})).toContain("occlusion layer is invalid: review-table-front");
     expect(studioWorldOcclusionPolygonValid(Array.from({length:33},(_,i)=>({x:i,y:i%3})),100,100)).toBe(false);
   });
   it("applies Tiled group offsets to polygons and never inherits absent/hidden foreground from another map", () => {

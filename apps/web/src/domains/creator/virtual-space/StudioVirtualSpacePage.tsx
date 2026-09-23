@@ -89,6 +89,12 @@ import {
   resolveStudioCharacterAppearance,
 } from "./studio-virtual-space-character-skins";
 import {
+  STUDIO_VIRTUAL_ART_STYLES,
+  readStudioVirtualArtStyle,
+  writeStudioVirtualArtStyle,
+  type StudioVirtualArtStyleKey,
+} from "./studio-virtual-space-art-style";
+import {
   StudioVirtualSpacePhaserCanvas,
   type StudioVirtualSpaceEngineLocalState,
 } from "./StudioVirtualSpacePhaserCanvas";
@@ -568,10 +574,12 @@ export function VirtualSpaceExperience({
   homeHeader,
   personal = false,
   initialAvatarIndexOverride,
+  initialArtStyleOverride,
 }: {
   readonly homeHeader?: ReactNode;
   readonly personal?: boolean;
   readonly initialAvatarIndexOverride?: number;
+  readonly initialArtStyleOverride?: StudioVirtualArtStyleKey;
   readonly publication: ReturnType<typeof useStudioWorldPublication>;
   readonly projectId: string;
   readonly preparing: boolean;
@@ -622,6 +630,13 @@ export function VirtualSpaceExperience({
   }));
   const [activity, setActivity] = useState<StudioVirtualSpaceActivity>("available");
   const [avatarIndex, setAvatarIndex] = useState(initialAvatarIndex);
+  const [artStyle, setArtStyle] = useState<StudioVirtualArtStyleKey>(
+    () => initialArtStyleOverride ?? readStudioVirtualArtStyle(),
+  );
+  const selectArtStyle = useCallback((next: StudioVirtualArtStyleKey) => {
+    setArtStyle(next);
+    writeStudioVirtualArtStyle(next);
+  }, []);
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
@@ -1291,6 +1306,7 @@ export function VirtualSpaceExperience({
                   onGuideTourChange={updateGuideTour}
                   debugWorld={authoringMode}
                   atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
+                  artStyle={artStyle}
                   onNpcInteract={activateInteraction}
                   onLocalState={handleEngineLocalState}
                   onInteract={handleEngineInteract}
@@ -1461,6 +1477,29 @@ export function VirtualSpaceExperience({
                 setWorkspacePanel(null);
               }}
             />
+            <fieldset className="studio-vspace-art-style-picker mt-4 border-t border-line/70 pt-4">
+                <legend className="px-1 text-[0.68rem] font-black text-fg-2">
+                  {bt("아트 스타일", "Art direction")}
+                </legend>
+                <p className="mt-1 text-[0.62rem] leading-5 text-fg-3">
+                  {bt("같은 캐릭터·공간을 다른 작화로 즉시 전환합니다.", "Switch the same cast and space into another art direction instantly.")}
+                </p>
+                <div className="mt-2 grid grid-cols-5 gap-1">
+                  {STUDIO_VIRTUAL_ART_STYLES.map((style) => (
+                    <button
+                      key={style.key}
+                      type="button"
+                      data-art-style={style.key}
+                      aria-pressed={artStyle === style.key}
+                      title={bt(style.descriptionKo, style.descriptionEn)}
+                      onClick={() => selectArtStyle(style.key)}
+                    >
+                      <span aria-hidden />
+                      <small>{bt(style.labelKo, style.labelEn)}</small>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
             <details><summary>{bt("방별 작업 바로가기", "Room work shortcuts")}</summary>
             {worldReady ? <div className="workspace-live-room-links">
               {worldManifest.rooms.map((room) => (
@@ -1645,6 +1684,8 @@ export function VirtualSpaceExperience({
                 </div>
               </fieldset>
 
+
+
               <label className="mt-4 block text-[0.68rem] font-bold text-fg-3">
                 {bt("내 상태", "My status")}
                 <select
@@ -1694,6 +1735,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
   const location = useLocation();
   const initialEntryPreference = useMemo(() => readStudioVirtualSpaceEntryPreference(), []);
   const [entryAvatarIndex, setEntryAvatarIndex] = useState(initialEntryPreference.avatarIndex);
+  const [entryArtStyle, setEntryArtStyle] = useState<StudioVirtualArtStyleKey>(() => readStudioVirtualArtStyle());
   const [entryOpen, setEntryOpen] = useState(() =>
     !initialEntryPreference.confirmed || new URLSearchParams(location.search).get("lobby") === "1",
   );
@@ -1733,11 +1775,14 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
   if (entryOpen) {
     return <StudioVirtualSpaceEntryLobby
       avatarIndex={entryAvatarIndex}
+      artStyle={entryArtStyle}
       returning={initialEntryPreference.confirmed}
       projectName={personal ? bt("나의 아틀리에", "My atelier") : decodedProjectId}
       onAvatarIndex={setEntryAvatarIndex}
+      onArtStyle={setEntryArtStyle}
       onEnter={() => {
         writeStudioVirtualSpaceEntryPreference(entryAvatarIndex);
+        writeStudioVirtualArtStyle(entryArtStyle);
         setEntryOpen(false);
       }}
     />;
@@ -1760,6 +1805,7 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
         publication={publication}
         projectId={decodedProjectId}
         initialAvatarIndexOverride={entryAvatarIndex}
+        initialArtStyleOverride={entryArtStyle}
         homeHeader={homeHeader}
         personal={personal}
         preparing={!personal && (!session.ready || !transportFactory)}

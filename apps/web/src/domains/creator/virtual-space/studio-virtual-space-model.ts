@@ -89,69 +89,58 @@ export interface StudioVirtualAvatarProfile {
   readonly expression: "bright" | "calm" | "sparkle" | "smile";
 }
 
-function legacyZone(zone: Omit<StudioVirtualSpaceZone, "x" | "y" | "width" | "height"> & {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}): StudioVirtualSpaceZone {
-  return Object.freeze({
-    ...zone,
-    x: studioVirtualSpaceScaleLegacyX(zone.x),
-    y: studioVirtualSpaceScaleLegacyY(zone.y),
-    width: studioVirtualSpaceScaleLegacyX(zone.width),
-    height: studioVirtualSpaceScaleLegacyY(zone.height),
-  });
+function worldZone(zone: StudioVirtualSpaceZone): StudioVirtualSpaceZone {
+  return Object.freeze(zone);
 }
 
 export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Object.freeze([
-  legacyZone({
-    id: "lounge", labelKo: "라운지", labelEn: "Lounge",
-    descriptionKo: "가볍게 만나고 오늘의 작업을 공유해요.",
-    descriptionEn: "Meet casually and share what everyone is working on.",
-    x: 32, y: 32, width: 340, height: 190, destination: "none",
-  }),
-  legacyZone({
+  worldZone({
     id: "writers", labelKo: "작가실", labelEn: "Writers Room",
     descriptionKo: "시놉시스·대본·에피소드를 함께 정리해요.",
     descriptionEn: "Shape synopsis, scripts and episodes together.",
-    x: 390, y: 32, width: 330, height: 190, destination: "story",
+    x: 35, y: 35, width: 320, height: 180, destination: "story",
   }),
-  legacyZone({
+  worldZone({
     id: "storyboard", labelKo: "콘티 보드", labelEn: "Storyboard Wall",
     descriptionKo: "컷 흐름과 장면 구성을 한눈에 검토해요.",
     descriptionEn: "Review panel flow and scene composition at a glance.",
-    x: 738, y: 32, width: 410, height: 190, destination: "comic",
+    x: 495, y: 35, width: 320, height: 180, destination: "comic",
   }),
-  legacyZone({
+  worldZone({
+    id: "lounge", labelKo: "라운지", labelEn: "Lounge",
+    descriptionKo: "가볍게 만나고 오늘의 작업을 공유해요.",
+    descriptionEn: "Meet casually and share what everyone is working on.",
+    x: 35, y: 250, width: 220, height: 145, destination: "none",
+  }),
+  worldZone({
     id: "assets", labelKo: "에셋 라이브러리", labelEn: "Asset Library",
     descriptionKo: "캐릭터·배경·브러시·3D 자료를 찾아요.",
     descriptionEn: "Find characters, backgrounds, brushes and 3D assets.",
-    x: 32, y: 250, width: 310, height: 190, destination: "assets",
+    x: 35, y: 430, width: 220, height: 145, destination: "assets",
   }),
-  legacyZone({
+  worldZone({
     id: "live", labelKo: "크리에이터 플라자", labelEn: "Creator Plaza",
-    descriptionKo: "라이브 드로잉과 공동 작업 이벤트가 열리는 중앙 광장이에요.",
-    descriptionEn: "The central plaza for live drawing and co-creation events.",
-    x: 390, y: 250, width: 410, height: 190, destination: "live",
+    descriptionKo: "네 방향 확장 게이트가 만나는 중앙 협업 허브예요.",
+    descriptionEn: "The central collaboration hub where four expansion gates meet.",
+    x: 290, y: 250, width: 270, height: 325, destination: "live",
   }),
-  legacyZone({
+  worldZone({
     id: "drawing", labelKo: "드로잉 스튜디오", labelEn: "Drawing Studio",
     descriptionKo: "같은 원고를 보며 실시간으로 작업해요.",
     descriptionEn: "Work on the same manuscript with live collaboration.",
-    x: 838, y: 250, width: 310, height: 190, destination: "canvas",
+    x: 595, y: 250, width: 220, height: 145, destination: "canvas",
   }),
-  legacyZone({
+  worldZone({
     id: "review", labelKo: "리뷰 룸", labelEn: "Review Room",
     descriptionKo: "댓글·수정 요청·승인을 함께 처리해요.",
     descriptionEn: "Handle comments, change requests and approvals together.",
-    x: 32, y: 462, width: 430, height: 226, destination: "review",
+    x: 35, y: 610, width: 300, height: 155, destination: "review",
   }),
-  legacyZone({
+  worldZone({
     id: "assistant", labelKo: "어시스트 데스크", labelEn: "Assistant Desk",
     descriptionKo: "어시스트 배정과 AI 프로듀서 도움을 한곳에서 처리해요.",
     descriptionEn: "Coordinate assistants and AI production support in one place.",
-    x: 718, y: 462, width: 430, height: 226, destination: "assistant",
+    x: 515, y: 610, width: 300, height: 155, destination: "assistant",
   }),
 ]);
 
@@ -214,7 +203,7 @@ export function studioVirtualSpaceZoneAt(point: StudioVirtualSpacePoint): Studio
     && point.y >= zone.y
     && point.y <= zone.y + zone.height
   );
-  return matched?.id ?? "lounge";
+  return matched?.id ?? "live";
 }
 
 export function studioVirtualSpaceState(

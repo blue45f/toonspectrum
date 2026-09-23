@@ -64,8 +64,8 @@ function room(id: string) {
   return found;
 }
 
-const TOP_ROOMS = [room("lounge"), room("writers"), room("storyboard")] as const;
-const MIDDLE_ROOMS = [room("assets"), room("drawing")] as const;
+const TOP_ROOMS = [room("writers"), room("storyboard")] as const;
+const MIDDLE_ROOMS = [room("lounge"), room("assets"), room("drawing")] as const;
 const BOTTOM_ROOMS = [room("review"), room("assistant")] as const;
 
 const roomWalls: StudioVirtualSpaceRect[] = [];
@@ -94,31 +94,25 @@ for (const room of BOTTOM_ROOMS) {
   );
 }
 
-function legacyRect(
+function worldRect(
   x: number,
   y: number,
   width: number,
   height: number,
   kind: StudioVirtualSpaceRect["kind"] = "furniture",
 ): StudioVirtualSpaceRect {
-  return {
-    x: studioVirtualSpaceScaleLegacyX(x),
-    y: studioVirtualSpaceScaleLegacyY(y),
-    width: studioVirtualSpaceScaleLegacyX(width),
-    height: studioVirtualSpaceScaleLegacyY(height),
-    kind,
-  };
+  return { x, y, width, height, kind };
 }
 
 const furniture: readonly StudioVirtualSpaceRect[] = [
-  legacyRect(70, 132, 190, 48),
-  legacyRect(452, 135, 190, 48),
-  legacyRect(870, 118, 230, 62),
-  legacyRect(68, 336, 185, 56),
-  legacyRect(914, 334, 184, 58),
-  legacyRect(95, 586, 260, 64),
-  legacyRect(794, 582, 266, 68),
-  legacyRect(520, 302, 140, 118),
+  worldRect(90, 308, 112, 30),
+  worldRect(137, 112, 116, 34),
+  worldRect(585, 94, 142, 32),
+  worldRect(75, 474, 116, 32),
+  worldRect(635, 304, 116, 34),
+  worldRect(82, 666, 148, 36),
+  worldRect(590, 666, 148, 36),
+  worldRect(390, 357, 70, 74),
 ];
 
 export const STUDIO_VIRTUAL_SPACE_COLLIDERS: readonly StudioVirtualSpaceRect[] = Object.freeze([
