@@ -1,0 +1,207 @@
+name: Sitewide theme exhaustive matrix
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/sitewide-theme-exhaustive-matrix.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sitewide-theme-exhaustive-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: ${{ matrix.profile }} · ${{ matrix.viewport }} · shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        profile:
+          - standard
+          - preferred-contrast
+          - forced-colors
+        viewport:
+          - desktop
+          - mobile
+        shard:
+          - 0
+          - 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.4.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start audited application
+        env:
+          PROFILE: ${{ matrix.profile }}
+          VIEWPORT: ${{ matrix.viewport }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          mkdir -p .qa/visual-ux
+          LOG_FILE=".qa/visual-ux/vite-${PROFILE}-${VIEWPORT}-${SHARD}.log"
+          PID_FILE=".qa/visual-ux/vite-${PROFILE}-${VIEWPORT}-${SHARD}.pid"
+          nohup pnpm exec vite --host 127.0.0.1 --port 5276 --strictPort >"${LOG_FILE}" 2>&1 &
+          echo $! >"${PID_FILE}"
+          for attempt in $(seq 1 120); do
+            if curl --fail --silent --show-error http://127.0.0.1:5276/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "${LOG_FILE}"
+          exit 1
+
+      - name: Resolve deterministic route shard
+        env:
+          PROFILE: ${{ matrix.profile }}
+          VIEWPORT: ${{ matrix.viewport }}
+          SHARD_INDEX: ${{ matrix.shard }}
+          SHARD_TOTAL: 2
+        run: |
+          set -euo pipefail
+          CELL_DIR=".qa/visual-ux/${PROFILE}-${VIEWPORT}-shard-${SHARD_INDEX}"
+          mkdir -p "${CELL_DIR}"
+          AUDIT_LIST_ROUTES=1 node scripts/audit-sitewide-visual-ux.mjs >"${CELL_DIR}/routes-all.json"
+          ROUTE_FILE="${CELL_DIR}/routes-shard.txt"
+          ROUTE_META="${CELL_DIR}/routes-shard.json"
+          export CELL_DIR ROUTE_FILE ROUTE_META
+          node <<'NODE'
+          const fs = require("node:fs");
+          const all = JSON.parse(fs.readFileSync(`${process.env.CELL_DIR}/routes-all.json`, "utf8")).routes;
+          const shardIndex = Number(process.env.SHARD_INDEX);
+          const shardTotal = Number(process.env.SHARD_TOTAL);
+          if (!Number.isInteger(shardIndex) || !Number.isInteger(shardTotal)
+            || shardIndex < 0 || shardIndex >= shardTotal || shardTotal < 1) {
+            throw new Error(`Invalid route shard ${shardIndex}/${shardTotal}`);
+          }
+          const routes = all.filter((_, index) => index % shardTotal === shardIndex);
+          fs.writeFileSync(process.env.ROUTE_FILE, routes.join(","));
+          fs.writeFileSync(process.env.ROUTE_META, JSON.stringify({
+            allRouteCount: all.length,
+            shardIndex,
+            shardTotal,
+            routeCount: routes.length,
+            routes,
+          }, null, 2));
+          console.log(`Selected ${routes.length}/${all.length} routes for shard ${shardIndex}/${shardTotal}`);
+          NODE
+
+      - name: Audit every selected page and theme
+        env:
+          PROFILE: ${{ matrix.profile }}
+          VIEWPORT: ${{ matrix.viewport }}
+          SHARD_INDEX: ${{ matrix.shard }}
+          AUDIT_BASE_URL: http://127.0.0.1:5276
+          AUDIT_WORKERS: 2
+          AUDIT_VIEWPORT_MODE: ${{ matrix.viewport }}
+          AUDIT_SCENE_CHECK: 0
+          AUDIT_SCROLL_SWEEP: 1
+          AUDIT_STRICT: 1
+          AUDIT_CAPTURE: issues
+          AUDIT_NAVIGATION_RETRIES: 1
+        run: |
+          set -euo pipefail
+          CELL_DIR=".qa/visual-ux/${PROFILE}-${VIEWPORT}-shard-${SHARD_INDEX}"
+          export AUDIT_OUTPUT="${CELL_DIR}/report"
+          export AUDIT_ROUTES="$(cat "${CELL_DIR}/routes-shard.txt")"
+          case "${PROFILE}" in
+            standard)
+              export AUDIT_THEME_MODE=all
+              export AUDIT_MEDIA_CONTRAST=no-preference
+              export AUDIT_FORCED_COLORS=none
+              export AUDIT_AXE=1
+              ;;
+            preferred-contrast)
+              export AUDIT_THEME_MODE=all
+              export AUDIT_MEDIA_CONTRAST=more
+              export AUDIT_FORCED_COLORS=none
+              export AUDIT_AXE=1
+              ;;
+            forced-colors)
+              export AUDIT_THEMES=contrast
+              export AUDIT_MEDIA_CONTRAST=more
+              export AUDIT_FORCED_COLORS=active
+              # System colors replace authored colors, so axe color-contrast ratios are not meaningful here.
+              export AUDIT_AXE=0
+              ;;
+            *)
+              echo "Unknown profile: ${PROFILE}" >&2
+              exit 2
+              ;;
+          esac
+          node scripts/audit-sitewide-visual-ux.mjs
+
+      - name: Write audit summary
+        if: always()
+        env:
+          PROFILE: ${{ matrix.profile }}
+          VIEWPORT: ${{ matrix.viewport }}
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          CELL_DIR=".qa/visual-ux/${PROFILE}-${VIEWPORT}-shard-${SHARD_INDEX}"
+          export CELL_DIR PROFILE VIEWPORT SHARD_INDEX
+          node <<'NODE' >>"${GITHUB_STEP_SUMMARY}"
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const metaPath = path.join(process.env.CELL_DIR, "routes-shard.json");
+          const reportPath = path.join(process.env.CELL_DIR, "report", "report.json");
+          const meta = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, "utf8")) : null;
+          const report = fs.existsSync(reportPath) ? JSON.parse(fs.readFileSync(reportPath, "utf8")) : null;
+          console.log(`## ${process.env.PROFILE} · ${process.env.VIEWPORT} · shard ${process.env.SHARD_INDEX}`);
+          if (meta) console.log(`- Routes: ${meta.routeCount}/${meta.allRouteCount}`);
+          if (report) {
+            console.log(`- Themes: ${report.themes.join(", ")}`);
+            console.log(`- Observations: ${report.totals.observations}`);
+            console.log(`- Blocking issues: ${report.totals.failed}`);
+            console.log(`- Warnings: ${report.totals.warned}`);
+          } else {
+            console.log("- Report was not produced; inspect the uploaded Vite and job logs.");
+          }
+          NODE
+
+      - name: Upload audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sitewide-theme-${{ matrix.profile }}-${{ matrix.viewport }}-${{ matrix.shard }}
+          path: .qa/visual-ux
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop audited application
+        if: always()
+        env:
+          PROFILE: ${{ matrix.profile }}
+          VIEWPORT: ${{ matrix.viewport }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          PID_FILE=".qa/visual-ux/vite-${PROFILE}-${VIEWPORT}-${SHARD}.pid"
+          if test -f "${PID_FILE}"; then
+            kill "$(cat "${PID_FILE}")" 2>/dev/null || true
+          fi
