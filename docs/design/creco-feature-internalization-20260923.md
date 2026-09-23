@@ -179,3 +179,101 @@ URL query:
 - `production.routes.test.ts`
   - canonical manuscript route 소유권.
 - 전체 TypeScript typecheck, 관련 Vitest, production build를 병합 게이트로 사용한다.
+
+## 6. 2026-09-24 사용성 고도화 구현
+
+이번 증분은 새 협업 제품이나 원고 저장소를 만들지 않고 기존 Production·ProjectGraph·pinned review·review delivery·export 권위를 한 화면에서 연결한다.
+
+### 제작 수명주기
+
+원고 공정은 다음 creator-facing 단계로 projection한다.
+
+```text
+empty → editing → submitted → in-review → changes-requested
+                                  ↓
+                               approved → ready-to-deliver → released
+```
+
+이 단계는 서버의 revision/review 상태를 설명하기 위한 읽기 모델이다. 별도 승인 권위나 변경 가능한 상태 열을 만들지 않는다.
+
+- `HEAD`: 가장 최근 작업 revision.
+- `FINAL`: `artifact.approvedRevisionId`가 가리키는 승인 기준.
+- `RELEASE`: 실제 전달·게시 revision.
+- FINAL 이후 HEAD가 변경되면 기존 FINAL은 유지하고 `hasUnapprovedChanges`를 표시한다.
+- 열린 review 또는 changes-requested가 있으면 과거 FINAL/RELEASE가 있어도 현재 다음 행동은 검수로 설명한다.
+- 필수 피드백·열린 review·미승인 변경이 없고 FINAL이 있으면 전달 준비 상태다.
+
+### 공정 Cockpit
+
+- 공정 카드와 한눈 보기 표에 단계, HEAD, FINAL, RELEASE를 동시에 표시한다.
+- 필수 수정 → 열린 검수 → FINAL 이후 변경 → FINAL 미지정 → 전달 준비 → 전달 완료 순으로 다음 행동을 제시한다.
+- 카드의 작업 열기와 검수·버전·전달 행동은 서로 다른 목적지다.
+- 행렬 표는 공정 열을 고정하고 lifecycle·HEAD·FINAL·RELEASE·검수·필수 수정·다음 행동 열을 제공한다.
+
+### 고정 검수 Workspace
+
+피드백 탭은 summary 링크 목록에 머물지 않고 선택한 pinned review workflow를 같은 맥락에서 연다.
+
+- 왼쪽에서 동일 artifact의 검수 이력을 선택한다.
+- `manuscriptReview` query로 선택한 검수본을 복원한다.
+- 선택 대상은 `review-snapshot` revision과 정확한 `rootGraphHash`가 일치할 때만 열린다.
+- 검수본을 찾지 못해도 현재 HEAD나 다른 review로 자동 대체하지 않는다.
+- 본문에서는 페이지·컷·텍스트 anchor, severity, 댓글, 담당자, 기한, 해결·재열기, 수정 revision, 비교, 승인 결정을 기존 pinned review 권위로 처리한다.
+- 개인 검수 메모는 기존 private draft shelf에 보관하고 선택 또는 묶음 발행한다.
+- inline 검수 화면에서는 공유·내보내기 action을 숨기고 아래 전달 Hub에서 의미를 분리한다.
+
+### 공유·전달·내보내기
+
+한 개의 모호한 공유 버튼 대신 네 경계를 나눈다.
+
+1. **현재 화면 URL**: 회차·공정·필터·선택 위치만 복원한다. 권한을 부여하지 않는다.
+2. **외부 검토 링크**: immutable review snapshot, 만료, 폐기, watermark, 현재 접근 권한을 사용한다.
+3. **공식 전달**: 승인 원본, 페이지 checksum, manifest, 수신자 binding, 발행·다운로드·수신·취소 기록을 사용한다.
+4. **목적별 내보내기**: 플랫폼·SNS·인쇄·PDF·보관 profile로 변환하며 공식 전달과 별개다.
+
+전달 준비 점검은 snapshot 선택, 열린 필수 수정, FINAL, FINAL 이후 변경, 선택 review 승인, RELEASE 기록을 따로 보여준다. 모든 민감 action은 서버 권한을 다시 확인한다.
+
+### 접근성·반응형
+
+- 주요 action은 기존 `buttonClass`와 최소 터치 크기를 사용한다.
+- lifecycle은 색만으로 전달하지 않고 아이콘·단계명·현재 단계 semantics를 함께 제공한다.
+- review 목록은 button의 `aria-pressed`, pinned panel은 기존 status/alert/live region을 유지한다.
+- 행렬 표는 가로 scroll region, caption, column scope, sticky 공정 열을 유지한다.
+- 좁은 화면은 lifecycle 카드, review 목록, 전달 도구를 단일 column으로 쌓는다.
+- 현재 URL 복사와 실제 외부 공유는 문구와 action을 분리하고 결과를 live status로 알린다.
+
+## 7. 구현 파일
+
+- `ProductionManuscriptWorkspace.tsx`: URL 상태, lifecycle, inline review, delivery hub 통합.
+- `ProductionManuscriptLifecyclePanel.tsx`: 제작 단계와 HEAD/FINAL/RELEASE 설명.
+- `ProductionManuscriptProcessBrowser.tsx`: 카드·행렬의 공정 판단 정보.
+- `ProductionManuscriptDeliveryHub.tsx`: 내부 URL·외부 검토·공식 전달·변환 출력 분리.
+- `production-manuscript-model.ts`: ProjectGraph 상태의 immutable projection.
+- `production-manuscript-ux.ts`: 주의 우선순위, 검색, 필터, 다음 행동.
+- `StudioPinnedReviewPanel.tsx`: 기존 검수 권위를 inline 또는 독립 화면에서 재사용할 수 있는 presentation 옵션.
+
+## 8. 의도적으로 새로 만들지 않은 것
+
+- Creco 화면, 문구, 아이콘, 과금 모델의 복제.
+- 두 번째 원고 blob 저장소나 두 번째 review/approval 시스템.
+- 브라우저가 임의로 판정하는 승인·게시·수신 완료 상태.
+- 과거 revision을 덮어쓰는 복원.
+- 공유 URL만으로 얻는 편집 권한.
+- review snapshot이 유효하지 않을 때 현재 HEAD로의 자동 fallback.
+- 이번 UI 증분을 위한 DB migration, 운영 secret, 유료 서비스 또는 배포 변경.
+
+## 9. 검증 및 남은 경계
+
+추가 회귀 검증은 다음을 포함한다.
+
+- lifecycle이 열린 필수 수정과 active review를 FINAL보다 우선 설명하는지.
+- HEAD·FINAL·RELEASE identity가 서로 섞이지 않는지.
+- FINAL 이후 변경이 기존 승인본을 지우지 않는지.
+- 검수 탭이 exact review/artifact/revision/hash 좌표를 보존하는지.
+- 내부 URL, immutable share, official delivery, transformed export가 별도 action인지.
+- invalid pinned subject가 다른 review나 현재 HEAD로 대체되지 않는지.
+- 검색·필터·행렬·키보드 경계가 기존 동작을 유지하는지.
+
+이번 증분은 기존 ProjectGraph revision blob과 review preview manifest를 사용한다. 페이지별 중복 저장 감소량이나 외부 전송 성능을 새로 측정하지 않았으며, 새로운 서버 dedup 알고리즘을 추가한 것으로 해석하지 않는다.
+
+운영 배포, 실제 외부 수신자 기기, WAN 장애, 대형 원고 장시간 세션, 다중 계정 동시 충돌은 별도의 release acceptance 대상이다. 구현 완료와 운영 환경 검증 완료를 같은 상태로 표시하지 않는다.

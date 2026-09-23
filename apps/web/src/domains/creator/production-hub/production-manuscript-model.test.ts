@@ -143,14 +143,56 @@ describe("production manuscript projection", () => {
     expect(imageProcess?.approvedRevision?.id).toBe("revision-1");
     expect(imageProcess?.openReviewCount).toBe(1);
     expect(imageProcess?.openRequiredFeedbackCount).toBe(2);
+    expect(imageProcess?.hasUnapprovedChanges).toBe(true);
+    expect(imageProcess?.lifecyclePhase).toBe("changes-requested");
 
     expect(productionManuscriptMetrics(processes)).toEqual({
       processCount: 2,
       textProcessCount: 1,
       versionCount: 3,
       approvedProcessCount: 1,
+      readyToDeliverProcessCount: 0,
+      releasedProcessCount: 0,
+      unapprovedChangeCount: 1,
       openReviewCount: 1,
       openRequiredFeedbackCount: 2,
+    });
+  });
+
+
+  it("keeps HEAD, FINAL and RELEASE identities separate in the lifecycle projection", () => {
+    const ready = artifact({
+      id: "artifact-ready",
+      headRevisionId: "ready-final",
+      approvedRevisionId: "ready-final",
+    });
+    const released = artifact({
+      id: "artifact-released",
+      headRevisionId: "release-1",
+      approvedRevisionId: "release-final",
+    });
+    const processes = buildProductionManuscriptProcesses({
+      project: project([ready, released]),
+      revisionsByArtifact: {
+        "artifact-ready": [{ ...revision("ready-final", "approved", 6), artifactId: "artifact-ready" }],
+        "artifact-released": [
+          { ...revision("release-1", "release", 8), artifactId: "artifact-released" },
+          { ...revision("release-final", "approved", 6), artifactId: "artifact-released" },
+        ],
+      },
+      reviewsByArtifact: {},
+      episodeId: null,
+    });
+
+    expect(processes.find((entry) => entry.artifact.id === "artifact-ready")).toMatchObject({
+      lifecyclePhase: "ready-to-deliver",
+      readyToDeliver: true,
+      hasUnapprovedChanges: false,
+    });
+    expect(processes.find((entry) => entry.artifact.id === "artifact-released")).toMatchObject({
+      lifecyclePhase: "released",
+      readyToDeliver: false,
+      hasUnapprovedChanges: false,
     });
   });
 

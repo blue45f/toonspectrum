@@ -41,6 +41,18 @@ vi.mock("../studio-shell/StudioProjectAssistantPanel", () => ({
   StudioProjectAssistantPanel: () => <div>ASSISTANT PANEL</div>,
 }));
 
+vi.mock("../virtual-space/StudioPinnedReviewPanel", () => ({
+  StudioPinnedReviewPanel: ({ subject }: { readonly subject: { readonly reviewId: string } | null }) => (
+    <div>PINNED REVIEW PANEL {subject?.reviewId ?? "none"}</div>
+  ),
+}));
+
+vi.mock("./ProductionManuscriptDeliveryHub", () => ({
+  ProductionManuscriptDeliveryHub: ({ subject }: { readonly subject: { readonly reviewId: string } | null }) => (
+    <div>DELIVERY HUB {subject?.reviewId ?? "none"}</div>
+  ),
+}));
+
 const at = (minute: number) => `2026-09-23T01:${String(minute).padStart(2, "0")}:00.000Z`;
 
 function artifact(
@@ -170,8 +182,9 @@ describe("ProductionManuscriptWorkspace", () => {
     expect(await screen.findByRole("heading", { name: "공정별 원고·버전·피드백" })).toBeTruthy();
     expect(screen.getAllByText("12화 작화 원고").length).toBeGreaterThan(0);
     expect(screen.getAllByText("12화 대본").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("현재 작업본 · 체크포인트")).toHaveLength(2);
-    expect(screen.getByText("최종본 준비")).toBeTruthy();
+    expect(screen.getByText("HEAD · 최근 작업")).toBeTruthy();
+    expect(screen.getAllByText("FINAL · 승인 기준").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/FINAL 이후 변경/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("필수 수정 2개").length).toBeGreaterThan(0);
     expect(f.getProject).toHaveBeenCalledWith("sample-work");
     expect(f.listRevisions).toHaveBeenCalledTimes(2);
@@ -192,8 +205,9 @@ describe("ProductionManuscriptWorkspace", () => {
     await screen.findAllByText("12화 작화 원고");
     fireEvent.click(within(screen.getByRole("tablist", { name: "원고 운영 보기" })).getByRole("tab", { name: "피드백" }));
     expect(await screen.findByRole("heading", { name: "고정 원고 피드백" })).toBeTruthy();
-    expect(screen.getByText("12화 편집 검수")).toBeTruthy();
-    expect(screen.getByText("필수 2")).toBeTruthy();
+    expect(screen.getAllByText("12화 편집 검수").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("필수 2").length).toBeGreaterThan(0);
+    expect(screen.getByText("PINNED REVIEW PANEL review-image")).toBeTruthy();
     const link = screen.getByRole("link", { name: "고정 검수본 열기" });
     await waitFor(() => expect(link.getAttribute("href")).toContain("sharedReview=review-image"));
     expect(link.getAttribute("href")).toContain("revision=revision-review");
@@ -214,12 +228,29 @@ describe("ProductionManuscriptWorkspace", () => {
     const search = await screen.findByRole("searchbox", { name: "원고·공정 검색" });
     fireEvent.change(search, { target: { value: "대본" } });
     const processPanel = screen.getByRole("tabpanel", { name: "공정·원고" });
-    expect(within(processPanel).getByRole("heading", { name: "12화 대본" })).toBeTruthy();
-    expect(within(processPanel).queryByRole("heading", { name: "12화 작화 원고" })).toBeNull();
+    expect(within(processPanel).getAllByRole("heading", { name: "12화 대본" }).length).toBeGreaterThan(0);
+    expect(within(processPanel).queryAllByRole("heading", { name: "12화 작화 원고" })).toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "한눈 보기" }));
     expect(await screen.findByRole("region", { name: "공정 한눈 보기 표" })).toBeTruthy();
-    expect(within(processPanel).getByRole("columnheader", { name: "현재 작업본" })).toBeTruthy();
+    expect(within(processPanel).getByRole("columnheader", { name: "HEAD · 현재 작업" })).toBeTruthy();
+    expect(within(processPanel).getByRole("columnheader", { name: "RELEASE · 전달 기준" })).toBeTruthy();
+  });
+
+  it("keeps internal navigation separate from immutable review delivery", async () => {
+    render(
+      <MemoryRouter initialEntries={["/production/projects/sample-project/manuscripts?episode=episode-12&artifact=artifact-image"]}>
+        <ProductionManuscriptWorkspace
+          aggregate={createProductionDemoProject()}
+          canEdit
+          isDemo={false}
+        />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("12화 작화 원고");
+    fireEvent.click(within(screen.getByRole("tablist", { name: "원고 운영 보기" })).getByRole("tab", { name: "공유·내보내기" }));
+    expect(await screen.findByText("DELIVERY HUB review-image")).toBeTruthy();
   });
 
   it("does not hijack keys inside an explicit Studio shortcut boundary", async () => {

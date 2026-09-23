@@ -14,7 +14,7 @@ export interface ProductionManuscriptAttention {
   readonly kind: Exclude<ProductionManuscriptAttentionFilter, "all">;
   readonly label: string;
   readonly actionLabel: string;
-  readonly recommendedView: "versions" | "feedback";
+  readonly recommendedView: "versions" | "feedback" | "delivery";
   readonly level: "danger" | "warning" | "neutral" | "success";
   readonly priority: number;
 }
@@ -56,6 +56,16 @@ export function productionManuscriptAttention(
       priority: 1,
     });
   }
+  if (process.hasUnapprovedChanges) {
+    return Object.freeze({
+      kind: "missing-final",
+      label: "FINAL 이후 변경",
+      actionLabel: "변경 버전 확인",
+      recommendedView: "versions",
+      level: "warning",
+      priority: 2,
+    });
+  }
   if (!process.approvedRevision) {
     return Object.freeze({
       kind: "missing-final",
@@ -63,7 +73,27 @@ export function productionManuscriptAttention(
       actionLabel: "버전 확인",
       recommendedView: "versions",
       level: "neutral",
-      priority: 2,
+      priority: 3,
+    });
+  }
+  if (process.lifecyclePhase === "released") {
+    return Object.freeze({
+      kind: "approved",
+      label: "전달 완료",
+      actionLabel: "전달 기록 확인",
+      recommendedView: "delivery",
+      level: "success",
+      priority: 5,
+    });
+  }
+  if (process.readyToDeliver) {
+    return Object.freeze({
+      kind: "approved",
+      label: "전달 준비",
+      actionLabel: "공유·전달",
+      recommendedView: "delivery",
+      level: "success",
+      priority: 4,
     });
   }
   return Object.freeze({
@@ -72,7 +102,7 @@ export function productionManuscriptAttention(
     actionLabel: "최종본 확인",
     recommendedView: "versions",
     level: "success",
-    priority: 3,
+    priority: 4,
   });
 }
 
@@ -91,6 +121,8 @@ export function productionManuscriptMatchesSearch(
     process.label,
     process.processType,
     process.artifact.kind,
+    process.lifecyclePhase,
+    process.hasUnapprovedChanges ? "FINAL 이후 변경" : "",
     process.artifact.scope.episodeId ?? "프로젝트 공통",
     process.artifact.scope.seasonId ?? "",
     ...process.revisions.flatMap((revision) => [
