@@ -15,7 +15,7 @@ import {
 import { findStudioWorldPath, studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 
 export type StudioNpcAtmosphere = "focus" | "balanced" | "lively";
-export type StudioNpcRole = "guide" | "writer" | "artist" | "librarian" | "resident";
+export type StudioNpcRole = "guide" | "producer" | "editor" | "writer" | "artist" | "librarian" | "cafe" | "security" | "host" | "resident";
 export type StudioNpcPhase = "work" | "inspect" | "rest" | "walk" | "yield" | "greet" | "wait";
 
 export interface StudioNpcPerson {
@@ -82,10 +82,15 @@ const NPC_CLEARANCE = 23;
 const ZERO = Object.freeze({ x: 0, y: 0 });
 const distance = (a: StudioVirtualSpacePoint, b: StudioVirtualSpacePoint) => Math.hypot(a.x - b.x, a.y - b.y);
 const roles = {
-  guide: { ko: "가이드", en: "Guide", workKo: "안내 준비 중", workEn: "Ready to help", action: "community" },
-  writer: { ko: "작가", en: "Writer", workKo: "대본 정리 중", workEn: "Writing", action: "story" },
-  artist: { ko: "작화가", en: "Artist", workKo: "그림 작업 중", workEn: "Drawing", action: "canvas" },
-  librarian: { ko: "에셋 담당", en: "Librarian", workKo: "자료 정리 중", workEn: "Sorting assets", action: "assets" },
+  guide: { ko: "컨시어지", en: "Concierge", workKo: "오늘 동선 준비 중", workEn: "Preparing today's route", action: "assistant" },
+  producer: { ko: "프로듀서", en: "Producer", workKo: "일정과 병목 확인 중", workEn: "Checking schedule and bottlenecks", action: "assistant" },
+  editor: { ko: "리뷰 에디터", en: "Review editor", workKo: "검수본 비교 중", workEn: "Comparing review versions", action: "review" },
+  writer: { ko: "스토리 작가", en: "Story writer", workKo: "대본 정리 중", workEn: "Writing", action: "story" },
+  artist: { ko: "아틀리에 메이트", en: "Atelier mate", workKo: "원고 작업 중", workEn: "Drawing", action: "canvas" },
+  librarian: { ko: "에셋 아키비스트", en: "Asset archivist", workKo: "자료와 버전 정리 중", workEn: "Sorting assets and versions", action: "assets" },
+  cafe: { ko: "카페 매니저", en: "Cafe manager", workKo: "팀원 맞이 준비 중", workEn: "Welcoming teammates", action: "community" },
+  security: { ko: "공간 안전 요원", en: "Space safety", workKo: "회의실 출입 확인 중", workEn: "Checking meeting-room entry", action: "live" },
+  host: { ko: "이벤트 진행자", en: "Event host", workKo: "라이브 세션 준비 중", workEn: "Preparing a live session", action: "live" },
   resident: { ko: "스튜디오 멤버", en: "Studio resident", workKo: "작업 중", workEn: "Working", action: undefined },
 } as const;
 
@@ -104,10 +109,15 @@ function availableAnimation(actor: NpcActor, requested: StudioCharacterMotionSta
 
 /** Roles derive from the authored room, so both manifest and existing Tiled exports retain them. */
 export function studioNpcRole(definition: StudioWorldNpcDefinition): StudioNpcRole {
-  if (definition.roomId === "lounge") return "guide";
+  if (definition.roomId === "lobby") return "guide";
+  if (definition.roomId === "production" || definition.roomId === "assistant") return "producer";
+  if (definition.roomId === "review" || definition.roomId === "quality") return "editor";
   if (definition.roomId === "writers") return "writer";
-  if (definition.roomId === "drawing") return "artist";
+  if (definition.roomId === "drawing" || definition.roomId === "storyboard") return "artist";
   if (definition.roomId === "assets") return "librarian";
+  if (definition.roomId === "lounge") return "cafe";
+  if (definition.roomId === "meeting") return "security";
+  if (definition.roomId === "live" || definition.roomId === "release") return "host";
   return "resident";
 }
 

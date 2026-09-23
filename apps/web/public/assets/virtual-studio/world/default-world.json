@@ -1,9 +1,9 @@
 {
   "compressionlevel": -1,
-  "height": 798,
-  "width": 850,
-  "tileheight": 1,
-  "tilewidth": 1,
+  "height": 480,
+  "width": 640,
+  "tileheight": 2,
+  "tilewidth": 2,
   "infinite": false,
   "orientation": "orthogonal",
   "renderorder": "right-down",
@@ -11,22 +11,22 @@
   "version": "1.10",
   "tiledversion": "1.11.2",
   "nextlayerid": 13,
-  "nextobjectid": 105,
+  "nextobjectid": 195,
   "properties": [
     {
       "name": "backgroundUrl",
       "type": "string",
-      "value": "/assets/virtual-studio/living-world/master-clean-plate.webp"
+      "value": "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp"
     },
     {
       "name": "backgroundAssetKey",
       "type": "string",
-      "value": "studio-modular-campus-base"
+      "value": "studio-modular-campus-v3"
     },
     {
       "name": "manifestVersion",
       "type": "float",
-      "value": 6
+      "value": 7
     },
     {
       "name": "manifestId",
@@ -39,13 +39,13 @@
       "id": 1,
       "name": "background",
       "type": "imagelayer",
-      "image": "../living-world/master-clean-plate.webp",
+      "image": "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp",
+      "imagewidth": 1280,
+      "imageheight": 960,
       "x": 0,
       "y": 0,
       "opacity": 1,
-      "visible": true,
-      "imagewidth": 1296,
-      "imageheight": 1213
+      "visible": true
     },
     {
       "id": 2,
@@ -59,44 +59,44 @@
       "objects": [
         {
           "id": 1,
-          "name": "writers",
+          "name": "assets",
           "type": "",
-          "x": 35,
-          "y": 35,
-          "width": 320,
-          "height": 180,
+          "x": 40,
+          "y": 40,
+          "width": 270,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": [
             {
               "name": "roomId",
               "type": "string",
-              "value": "writers"
+              "value": "assets"
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "작가실"
+              "value": "에셋 아카이브"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Writers Room"
+              "value": "Asset Archive"
             },
             {
               "name": "descriptionKo",
               "type": "string",
-              "value": "시놉시스·대본·에피소드를 함께 정리해요."
+              "value": "캐릭터·배경·브러시·3D 자료와 복구 버전을 관리해요."
             },
             {
               "name": "descriptionEn",
               "type": "string",
-              "value": "Shape synopsis, scripts and episodes together."
+              "value": "Manage characters, backgrounds, brushes, 3D references and recovery versions."
             },
             {
               "name": "action",
               "type": "string",
-              "value": "story"
+              "value": "assets"
             }
           ]
         },
@@ -104,10 +104,10 @@
           "id": 2,
           "name": "storyboard",
           "type": "",
-          "x": 495,
-          "y": 35,
-          "width": 320,
-          "height": 180,
+          "x": 340,
+          "y": 40,
+          "width": 270,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -119,22 +119,22 @@
             {
               "name": "labelKo",
               "type": "string",
-              "value": "콘티 보드"
+              "value": "콘티 갤러리"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Storyboard Wall"
+              "value": "Storyboard Gallery"
             },
             {
               "name": "descriptionKo",
               "type": "string",
-              "value": "컷 흐름과 장면 구성을 한눈에 검토해요."
+              "value": "컷 흐름과 장면 구성을 벽 전체에서 비교해요."
             },
             {
               "name": "descriptionEn",
               "type": "string",
-              "value": "Review panel flow and scene composition at a glance."
+              "value": "Compare panel flow and scene composition across the gallery wall."
             },
             {
               "name": "action",
@@ -145,12 +145,308 @@
         },
         {
           "id": 3,
+          "name": "production",
+          "type": "",
+          "x": 670,
+          "y": 40,
+          "width": 270,
+          "height": 210,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "production"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "프로덕션 관제실"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Production Control"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "일정·배정·병목·마감과 오늘의 우선순위를 확인해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Inspect schedule, assignments, bottlenecks, deadlines and today's priorities."
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "assistant"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "name": "release",
+          "type": "",
+          "x": 970,
+          "y": 40,
+          "width": 270,
+          "height": 210,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "release"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "출고 센터"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Release Center"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "최종 승인된 에피소드를 플랫폼별로 내보내고 인계해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Export and hand off approved episodes for each platform."
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "name": "writers",
+          "type": "",
+          "x": 40,
+          "y": 300,
+          "width": 270,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "writers"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "스토리 랩"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Story Lab"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "시놉시스·대본·에피소드 의도를 함께 정리해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Shape synopsis, scripts and episode intent together."
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "story"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "name": "drawing",
+          "type": "",
+          "x": 340,
+          "y": 300,
+          "width": 290,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "드로잉 아틀리에"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Drawing Atelier"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "콘티·선화·채색 작업과 실시간 캔버스를 이어가요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Continue storyboard, line-art, color and live-canvas work."
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "canvas"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "name": "review",
+          "type": "",
+          "x": 670,
+          "y": 300,
+          "width": 290,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "리뷰 시어터"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Review Theater"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "대형 모니터에서 버전 비교·코멘트·공동 검수를 진행해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Run version comparison, comments and group review on the theater display."
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "review"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "name": "quality",
+          "type": "",
+          "x": 990,
+          "y": 300,
+          "width": 250,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "quality"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "최종 QC"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Final Quality Control"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "오탈자·누락 컷·출고 규격과 미해결 검수를 점검해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Check typos, missing panels, delivery specs and unresolved reviews."
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "review"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "name": "teams",
+          "type": "",
+          "x": 40,
+          "y": 590,
+          "width": 300,
+          "height": 260,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "teams"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "팀 커먼즈"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Team Commons"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "작화·스토리·편집 그룹의 자리와 팀 초대를 관리해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Manage story, art and editorial groups, desks and invitations."
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "community"
+            }
+          ]
+        },
+        {
+          "id": 10,
           "name": "lounge",
           "type": "",
-          "x": 35,
-          "y": 250,
-          "width": 220,
-          "height": 145,
+          "x": 370,
+          "y": 590,
+          "width": 240,
+          "height": 180,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -162,76 +458,38 @@
             {
               "name": "labelKo",
               "type": "string",
-              "value": "라운지"
+              "value": "카페 라운지"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Lounge"
+              "value": "Cafe Lounge"
             },
             {
               "name": "descriptionKo",
               "type": "string",
-              "value": "가볍게 만나고 오늘의 작업을 공유해요."
+              "value": "근처 팀원과 가볍게 만나고 상태를 공유해요."
             },
             {
               "name": "descriptionEn",
               "type": "string",
-              "value": "Meet casually and share what everyone is working on."
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "name": "assets",
-          "type": "",
-          "x": 35,
-          "y": 430,
-          "width": 220,
-          "height": 145,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "assets"
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "에셋 라이브러리"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Asset Library"
-            },
-            {
-              "name": "descriptionKo",
-              "type": "string",
-              "value": "캐릭터·배경·브러시·3D 자료를 찾아요."
-            },
-            {
-              "name": "descriptionEn",
-              "type": "string",
-              "value": "Find characters, backgrounds, brushes and 3D assets."
+              "value": "Meet nearby teammates and share current status informally."
             },
             {
               "name": "action",
               "type": "string",
-              "value": "assets"
+              "value": "community"
             }
           ]
         },
         {
-          "id": 5,
+          "id": 11,
           "name": "live",
           "type": "",
-          "x": 290,
-          "y": 250,
-          "width": 270,
-          "height": 325,
+          "x": 640,
+          "y": 590,
+          "width": 280,
+          "height": 220,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -253,12 +511,12 @@
             {
               "name": "descriptionKo",
               "type": "string",
-              "value": "네 방향 확장 게이트가 만나는 중앙 협업 허브예요."
+              "value": "모든 제작 동선과 확장 게이트가 만나는 중심 허브예요."
             },
             {
               "name": "descriptionEn",
               "type": "string",
-              "value": "The central collaboration hub where four expansion gates meet."
+              "value": "The central hub where production paths and expansion gates meet."
             },
             {
               "name": "action",
@@ -268,99 +526,56 @@
           ]
         },
         {
-          "id": 6,
-          "name": "drawing",
+          "id": 12,
+          "name": "meeting",
           "type": "",
-          "x": 595,
-          "y": 250,
-          "width": 220,
-          "height": 145,
+          "x": 950,
+          "y": 590,
+          "width": 290,
+          "height": 260,
           "rotation": 0,
           "visible": true,
           "properties": [
             {
               "name": "roomId",
               "type": "string",
-              "value": "drawing"
+              "value": "meeting"
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "드로잉 스튜디오"
+              "value": "팀 회의실"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Drawing Studio"
+              "value": "Team Meeting Rooms"
             },
             {
               "name": "descriptionKo",
               "type": "string",
-              "value": "같은 원고를 보며 실시간으로 작업해요."
+              "value": "문·입장·참여자 동의를 거쳐 회의와 검수를 시작해요."
             },
             {
               "name": "descriptionEn",
               "type": "string",
-              "value": "Work on the same manuscript with live collaboration."
+              "value": "Start meetings and reviews through explicit door, admission and roster consent."
             },
             {
               "name": "action",
               "type": "string",
-              "value": "canvas"
+              "value": "live"
             }
           ]
         },
         {
-          "id": 7,
-          "name": "review",
-          "type": "",
-          "x": 35,
-          "y": 610,
-          "width": 300,
-          "height": 155,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "review"
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "리뷰 룸"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Review Room"
-            },
-            {
-              "name": "descriptionKo",
-              "type": "string",
-              "value": "댓글·수정 요청·승인을 함께 처리해요."
-            },
-            {
-              "name": "descriptionEn",
-              "type": "string",
-              "value": "Handle comments, change requests and approvals together."
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "review"
-            }
-          ]
-        },
-        {
-          "id": 8,
+          "id": 13,
           "name": "assistant",
           "type": "",
-          "x": 515,
-          "y": 610,
-          "width": 300,
-          "height": 155,
+          "x": 370,
+          "y": 790,
+          "width": 240,
+          "height": 130,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -372,27 +587,65 @@
             {
               "name": "labelKo",
               "type": "string",
-              "value": "어시스트 데스크"
+              "value": "프로듀서 데스크"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Assistant Desk"
+              "value": "Producer Desk"
             },
             {
               "name": "descriptionKo",
               "type": "string",
-              "value": "어시스트 배정과 AI 프로듀서 도움을 한곳에서 처리해요."
+              "value": "NPC에게 일정·다음 작업·사람 위치와 제작 도움을 물어봐요."
             },
             {
               "name": "descriptionEn",
               "type": "string",
-              "value": "Coordinate assistants and AI production support in one place."
+              "value": "Ask NPCs about schedule, next work, teammate locations and production help."
             },
             {
               "name": "action",
               "type": "string",
               "value": "assistant"
+            }
+          ]
+        },
+        {
+          "id": 14,
+          "name": "lobby",
+          "type": "",
+          "x": 640,
+          "y": 840,
+          "width": 280,
+          "height": 100,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lobby"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "스튜디오 로비"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Studio Lobby"
+            },
+            {
+              "name": "descriptionKo",
+              "type": "string",
+              "value": "오늘 일정과 초대를 확인하고 제작 캠퍼스로 입장해요."
+            },
+            {
+              "name": "descriptionEn",
+              "type": "string",
+              "value": "Review today's agenda and invitations before entering the production campus."
             }
           ]
         }
@@ -409,515 +662,1007 @@
       "y": 0,
       "objects": [
         {
-          "id": 9,
+          "id": 15,
           "name": "collider-1",
           "type": "",
-          "x": 35,
-          "y": 35,
-          "width": 320,
-          "height": 9.975000000000001,
-          "rotation": 0,
-          "visible": true,
-          "properties": []
-        },
-        {
-          "id": 10,
-          "name": "collider-2",
-          "type": "",
-          "x": 35,
-          "y": 205.025,
-          "width": 134.0677966101695,
-          "height": 9.975000000000001,
-          "rotation": 0,
-          "visible": true,
-          "properties": []
-        },
-        {
-          "id": 11,
-          "name": "collider-3",
-          "type": "",
-          "x": 220.9322033898305,
-          "y": 205.025,
-          "width": 134.0677966101695,
-          "height": 9.975000000000001,
-          "rotation": 0,
-          "visible": true,
-          "properties": []
-        },
-        {
-          "id": 12,
-          "name": "collider-4",
-          "type": "",
-          "x": 35,
-          "y": 35,
-          "width": 6.483050847457627,
-          "height": 180,
-          "rotation": 0,
-          "visible": true,
-          "properties": []
-        },
-        {
-          "id": 13,
-          "name": "collider-5",
-          "type": "",
-          "x": 348.5169491525424,
-          "y": 35,
-          "width": 6.483050847457627,
-          "height": 180,
-          "rotation": 0,
-          "visible": true,
-          "properties": []
-        },
-        {
-          "id": 14,
-          "name": "collider-6",
-          "type": "",
-          "x": 495,
-          "y": 35,
-          "width": 320,
-          "height": 9.975000000000001,
-          "rotation": 0,
-          "visible": true,
-          "properties": []
-        },
-        {
-          "id": 15,
-          "name": "collider-7",
-          "type": "",
-          "x": 495,
-          "y": 205.025,
-          "width": 134.06779661016947,
-          "height": 9.975000000000001,
+          "x": 40,
+          "y": 40,
+          "width": 270,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 16,
-          "name": "collider-8",
+          "name": "collider-2",
           "type": "",
-          "x": 680.9322033898305,
-          "y": 205.025,
-          "width": 134.06779661016947,
-          "height": 9.975000000000001,
+          "x": 40,
+          "y": 238,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 17,
-          "name": "collider-9",
+          "name": "collider-3",
           "type": "",
-          "x": 495,
-          "y": 35,
-          "width": 6.483050847457627,
-          "height": 180,
+          "x": 214.05084745762713,
+          "y": 238,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 18,
-          "name": "collider-10",
+          "name": "collider-4",
           "type": "",
-          "x": 808.5169491525423,
-          "y": 35,
-          "width": 6.483050847457627,
-          "height": 180,
+          "x": 40,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 19,
-          "name": "collider-11",
+          "name": "collider-5",
           "type": "",
-          "x": 35,
-          "y": 250,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 300.23728813559325,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 57,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 20,
-          "name": "collider-12",
+          "name": "collider-6",
           "type": "",
-          "x": 170.9322033898305,
-          "y": 250,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 300.23728813559325,
+          "y": 193,
+          "width": 9.76271186440678,
+          "height": 57,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 21,
-          "name": "collider-13",
+          "name": "collider-7",
           "type": "",
-          "x": 35,
-          "y": 385.025,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 340,
+          "y": 40,
+          "width": 270,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 22,
-          "name": "collider-14",
+          "name": "collider-8",
           "type": "",
-          "x": 170.9322033898305,
-          "y": 385.025,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 340,
+          "y": 238,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 23,
-          "name": "collider-15",
+          "name": "collider-9",
           "type": "",
-          "x": 35,
-          "y": 250,
-          "width": 6.483050847457627,
-          "height": 145,
+          "x": 514.0508474576271,
+          "y": 238,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 24,
-          "name": "collider-16",
+          "name": "collider-10",
           "type": "",
-          "x": 248.51694915254237,
-          "y": 250,
-          "width": 6.483050847457627,
-          "height": 145,
+          "x": 340,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 25,
-          "name": "collider-17",
+          "name": "collider-11",
           "type": "",
-          "x": 35,
-          "y": 430,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 600.2372881355932,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 26,
-          "name": "collider-18",
+          "name": "collider-12",
           "type": "",
-          "x": 170.9322033898305,
-          "y": 430,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 670,
+          "y": 40,
+          "width": 270,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 27,
-          "name": "collider-19",
+          "name": "collider-13",
           "type": "",
-          "x": 35,
-          "y": 565.025,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 670,
+          "y": 238,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 28,
-          "name": "collider-20",
+          "name": "collider-14",
           "type": "",
-          "x": 170.9322033898305,
-          "y": 565.025,
-          "width": 84.0677966101695,
-          "height": 9.975000000000001,
+          "x": 844.0508474576271,
+          "y": 238,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 29,
-          "name": "collider-21",
+          "name": "collider-15",
           "type": "",
-          "x": 35,
-          "y": 430,
-          "width": 6.483050847457627,
-          "height": 145,
+          "x": 670,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 30,
-          "name": "collider-22",
+          "name": "collider-16",
           "type": "",
-          "x": 248.51694915254237,
-          "y": 430,
-          "width": 6.483050847457627,
-          "height": 145,
+          "x": 930.2372881355932,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 31,
-          "name": "collider-23",
+          "name": "collider-17",
           "type": "",
-          "x": 595,
-          "y": 250,
-          "width": 84.06779661016947,
-          "height": 9.975000000000001,
+          "x": 970,
+          "y": 40,
+          "width": 270,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 32,
-          "name": "collider-24",
+          "name": "collider-18",
           "type": "",
-          "x": 730.9322033898305,
-          "y": 250,
-          "width": 84.06779661016947,
-          "height": 9.975000000000001,
+          "x": 970,
+          "y": 238,
+          "width": 95.94915254237299,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 33,
-          "name": "collider-25",
+          "name": "collider-19",
           "type": "",
-          "x": 595,
-          "y": 385.025,
-          "width": 84.06779661016947,
-          "height": 9.975000000000001,
+          "x": 1144.050847457627,
+          "y": 238,
+          "width": 95.94915254237299,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 34,
-          "name": "collider-26",
+          "name": "collider-20",
           "type": "",
-          "x": 730.9322033898305,
-          "y": 385.025,
-          "width": 84.06779661016947,
-          "height": 9.975000000000001,
+          "x": 970,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 57,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 35,
-          "name": "collider-27",
+          "name": "collider-21",
           "type": "",
-          "x": 595,
-          "y": 250,
-          "width": 6.483050847457627,
-          "height": 145,
+          "x": 970,
+          "y": 193,
+          "width": 9.76271186440678,
+          "height": 57,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 36,
-          "name": "collider-28",
+          "name": "collider-22",
           "type": "",
-          "x": 808.5169491525423,
-          "y": 250,
-          "width": 6.483050847457627,
-          "height": 145,
+          "x": 1230.2372881355932,
+          "y": 40,
+          "width": 9.76271186440678,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 37,
-          "name": "collider-29",
+          "name": "collider-23",
           "type": "",
-          "x": 35,
-          "y": 610,
-          "width": 124.0677966101695,
-          "height": 9.975000000000001,
+          "x": 40,
+          "y": 300,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 38,
-          "name": "collider-30",
+          "name": "collider-24",
           "type": "",
-          "x": 210.9322033898305,
-          "y": 610,
-          "width": 124.0677966101695,
-          "height": 9.975000000000001,
+          "x": 214.05084745762713,
+          "y": 300,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 39,
-          "name": "collider-31",
+          "name": "collider-25",
           "type": "",
-          "x": 35,
-          "y": 755.025,
-          "width": 300,
-          "height": 9.975000000000001,
+          "x": 40,
+          "y": 518,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 40,
-          "name": "collider-32",
+          "name": "collider-26",
           "type": "",
-          "x": 35,
-          "y": 610,
-          "width": 6.483050847457627,
-          "height": 155,
+          "x": 214.05084745762713,
+          "y": 518,
+          "width": 95.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 41,
-          "name": "collider-33",
+          "name": "collider-27",
           "type": "",
-          "x": 328.5169491525424,
-          "y": 610,
-          "width": 6.483050847457627,
-          "height": 155,
+          "x": 40,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 230,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 42,
-          "name": "collider-34",
+          "name": "collider-28",
           "type": "",
-          "x": 515,
-          "y": 610,
-          "width": 124.06779661016947,
-          "height": 9.975000000000001,
+          "x": 300.23728813559325,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 67,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 43,
-          "name": "collider-35",
+          "name": "collider-29",
           "type": "",
-          "x": 690.9322033898305,
-          "y": 610,
-          "width": 124.06779661016947,
-          "height": 9.975000000000001,
+          "x": 300.23728813559325,
+          "y": 463,
+          "width": 9.76271186440678,
+          "height": 67,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 44,
-          "name": "collider-36",
+          "name": "collider-30",
           "type": "",
-          "x": 515,
-          "y": 755.025,
-          "width": 300,
-          "height": 9.975000000000001,
+          "x": 340,
+          "y": 300,
+          "width": 105.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 45,
-          "name": "collider-37",
+          "name": "collider-31",
           "type": "",
-          "x": 515,
-          "y": 610,
-          "width": 6.483050847457627,
-          "height": 155,
+          "x": 524.0508474576271,
+          "y": 300,
+          "width": 105.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 46,
-          "name": "collider-38",
+          "name": "collider-32",
           "type": "",
-          "x": 808.5169491525423,
-          "y": 610,
-          "width": 6.483050847457627,
-          "height": 155,
+          "x": 340,
+          "y": 518,
+          "width": 105.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 47,
-          "name": "collider-39",
+          "name": "collider-33",
           "type": "",
-          "x": 90,
-          "y": 308,
-          "width": 112,
-          "height": 30,
+          "x": 524.0508474576271,
+          "y": 518,
+          "width": 105.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 48,
-          "name": "collider-40",
+          "name": "collider-34",
           "type": "",
-          "x": 137,
-          "y": 112,
-          "width": 116,
-          "height": 34,
+          "x": 340,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 230,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 49,
-          "name": "collider-41",
+          "name": "collider-35",
           "type": "",
-          "x": 585,
-          "y": 94,
-          "width": 142,
-          "height": 32,
+          "x": 620.2372881355932,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 230,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 50,
-          "name": "collider-42",
+          "name": "collider-36",
           "type": "",
-          "x": 75,
-          "y": 474,
-          "width": 116,
-          "height": 32,
+          "x": 670,
+          "y": 300,
+          "width": 105.94915254237287,
+          "height": 12,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
           "id": 51,
+          "name": "collider-37",
+          "type": "",
+          "x": 854.0508474576271,
+          "y": 300,
+          "width": 105.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 52,
+          "name": "collider-38",
+          "type": "",
+          "x": 670,
+          "y": 518,
+          "width": 105.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 53,
+          "name": "collider-39",
+          "type": "",
+          "x": 854.0508474576271,
+          "y": 518,
+          "width": 105.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 54,
+          "name": "collider-40",
+          "type": "",
+          "x": 670,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 55,
+          "name": "collider-41",
+          "type": "",
+          "x": 950.2372881355932,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 56,
+          "name": "collider-42",
+          "type": "",
+          "x": 990,
+          "y": 300,
+          "width": 85.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 57,
           "name": "collider-43",
           "type": "",
-          "x": 635,
-          "y": 304,
+          "x": 1154.050847457627,
+          "y": 300,
+          "width": 85.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 58,
+          "name": "collider-44",
+          "type": "",
+          "x": 990,
+          "y": 518,
+          "width": 85.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 59,
+          "name": "collider-45",
+          "type": "",
+          "x": 1154.050847457627,
+          "y": 518,
+          "width": 85.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 60,
+          "name": "collider-46",
+          "type": "",
+          "x": 990,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 67,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 61,
+          "name": "collider-47",
+          "type": "",
+          "x": 990,
+          "y": 463,
+          "width": 9.76271186440678,
+          "height": 67,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 62,
+          "name": "collider-48",
+          "type": "",
+          "x": 1230.2372881355932,
+          "y": 300,
+          "width": 9.76271186440678,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 63,
+          "name": "collider-49",
+          "type": "",
+          "x": 40,
+          "y": 590,
+          "width": 110.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 64,
+          "name": "collider-50",
+          "type": "",
+          "x": 229.05084745762713,
+          "y": 590,
+          "width": 110.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 65,
+          "name": "collider-51",
+          "type": "",
+          "x": 40,
+          "y": 838,
+          "width": 110.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 66,
+          "name": "collider-52",
+          "type": "",
+          "x": 229.05084745762713,
+          "y": 838,
+          "width": 110.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 67,
+          "name": "collider-53",
+          "type": "",
+          "x": 40,
+          "y": 590,
+          "width": 9.76271186440678,
+          "height": 260,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 68,
+          "name": "collider-54",
+          "type": "",
+          "x": 330.23728813559325,
+          "y": 590,
+          "width": 9.76271186440678,
+          "height": 82,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 69,
+          "name": "collider-55",
+          "type": "",
+          "x": 330.23728813559325,
+          "y": 768,
+          "width": 9.76271186440678,
+          "height": 82,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 70,
+          "name": "collider-56",
+          "type": "",
+          "x": 950,
+          "y": 590,
+          "width": 105.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 71,
+          "name": "collider-57",
+          "type": "",
+          "x": 1134.050847457627,
+          "y": 590,
+          "width": 105.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 72,
+          "name": "collider-58",
+          "type": "",
+          "x": 950,
+          "y": 838,
+          "width": 105.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 73,
+          "name": "collider-59",
+          "type": "",
+          "x": 1134.050847457627,
+          "y": 838,
+          "width": 105.94915254237299,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 74,
+          "name": "collider-60",
+          "type": "",
+          "x": 950,
+          "y": 590,
+          "width": 9.76271186440678,
+          "height": 82,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 75,
+          "name": "collider-61",
+          "type": "",
+          "x": 950,
+          "y": 768,
+          "width": 9.76271186440678,
+          "height": 82,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 76,
+          "name": "collider-62",
+          "type": "",
+          "x": 1230.2372881355932,
+          "y": 590,
+          "width": 9.76271186440678,
+          "height": 260,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 77,
+          "name": "collider-63",
+          "type": "",
+          "x": 370,
+          "y": 790,
+          "width": 80.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 78,
+          "name": "collider-64",
+          "type": "",
+          "x": 529.0508474576271,
+          "y": 790,
+          "width": 80.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 79,
+          "name": "collider-65",
+          "type": "",
+          "x": 370,
+          "y": 908,
+          "width": 240,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 80,
+          "name": "collider-66",
+          "type": "",
+          "x": 370,
+          "y": 790,
+          "width": 9.76271186440678,
+          "height": 130,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 81,
+          "name": "collider-67",
+          "type": "",
+          "x": 600.2372881355932,
+          "y": 790,
+          "width": 9.76271186440678,
+          "height": 130,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 82,
+          "name": "collider-68",
+          "type": "",
+          "x": 640,
+          "y": 840,
+          "width": 100.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 83,
+          "name": "collider-69",
+          "type": "",
+          "x": 819.0508474576271,
+          "y": 840,
+          "width": 100.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 84,
+          "name": "collider-70",
+          "type": "",
+          "x": 640,
+          "y": 928,
+          "width": 100.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 85,
+          "name": "collider-71",
+          "type": "",
+          "x": 819.0508474576271,
+          "y": 928,
+          "width": 100.94915254237287,
+          "height": 12,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 86,
+          "name": "collider-72",
+          "type": "",
+          "x": 640,
+          "y": 840,
+          "width": 9.76271186440678,
+          "height": 100,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 87,
+          "name": "collider-73",
+          "type": "",
+          "x": 910.2372881355932,
+          "y": 840,
+          "width": 9.76271186440678,
+          "height": 100,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 88,
+          "name": "collider-74",
+          "type": "",
+          "x": 90,
+          "y": 108,
+          "width": 132,
+          "height": 34,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 89,
+          "name": "collider-75",
+          "type": "",
+          "x": 405,
+          "y": 72,
+          "width": 140,
+          "height": 30,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 90,
+          "name": "collider-76",
+          "type": "",
+          "x": 745,
+          "y": 108,
+          "width": 118,
+          "height": 36,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 91,
+          "name": "collider-77",
+          "type": "",
+          "x": 1045,
+          "y": 108,
+          "width": 122,
+          "height": 36,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 92,
+          "name": "collider-78",
+          "type": "",
+          "x": 104,
+          "y": 374,
+          "width": 136,
+          "height": 38,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 93,
+          "name": "collider-79",
+          "type": "",
+          "x": 428,
+          "y": 376,
+          "width": 118,
+          "height": 38,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 94,
+          "name": "collider-80",
+          "type": "",
+          "x": 752,
+          "y": 352,
+          "width": 126,
+          "height": 34,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 95,
+          "name": "collider-81",
+          "type": "",
+          "x": 1050,
+          "y": 375,
+          "width": 126,
+          "height": 38,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 96,
+          "name": "collider-82",
+          "type": "",
+          "x": 88,
+          "y": 665,
+          "width": 96,
+          "height": 34,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 97,
+          "name": "collider-83",
+          "type": "",
+          "x": 196,
+          "y": 665,
+          "width": 96,
+          "height": 34,
+          "rotation": 0,
+          "visible": true,
+          "properties": []
+        },
+        {
+          "id": 98,
+          "name": "collider-84",
+          "type": "",
+          "x": 421,
+          "y": 652,
           "width": 116,
           "height": 34,
           "rotation": 0,
@@ -925,37 +1670,37 @@
           "properties": []
         },
         {
-          "id": 52,
-          "name": "collider-44",
+          "id": 99,
+          "name": "collider-85",
           "type": "",
-          "x": 82,
-          "y": 666,
-          "width": 148,
-          "height": 36,
+          "x": 746,
+          "y": 671,
+          "width": 68,
+          "height": 68,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
-          "id": 53,
-          "name": "collider-45",
+          "id": 100,
+          "name": "collider-86",
           "type": "",
-          "x": 590,
-          "y": 666,
-          "width": 148,
-          "height": 36,
+          "x": 1034,
+          "y": 672,
+          "width": 128,
+          "height": 42,
           "rotation": 0,
           "visible": true,
           "properties": []
         },
         {
-          "id": 54,
-          "name": "collider-46",
+          "id": 101,
+          "name": "collider-87",
           "type": "",
-          "x": 390,
-          "y": 357,
-          "width": 70,
-          "height": 74,
+          "x": 428,
+          "y": 834,
+          "width": 124,
+          "height": 36,
           "rotation": 0,
           "visible": true,
           "properties": []
@@ -973,107 +1718,11 @@
       "y": 0,
       "objects": [
         {
-          "id": 55,
-          "name": "lounge-sofa",
+          "id": 102,
+          "name": "asset-archive-terminal",
           "type": "",
-          "x": 145,
-          "y": 330,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "solid"
-            },
-            {
-              "name": "depth",
-              "type": "string",
-              "value": "y-sort"
-            },
-            {
-              "name": "collider",
-              "type": "bool",
-              "value": true
-            },
-            {
-              "name": "colliderX",
-              "type": "float",
-              "value": -55
-            },
-            {
-              "name": "colliderY",
-              "type": "float",
-              "value": -22
-            },
-            {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 112
-            },
-            {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 30
-            }
-          ]
-        },
-        {
-          "id": 56,
-          "name": "writers-desk",
-          "type": "",
-          "x": 195,
-          "y": 135,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "solid"
-            },
-            {
-              "name": "depth",
-              "type": "string",
-              "value": "y-sort"
-            },
-            {
-              "name": "collider",
-              "type": "bool",
-              "value": true
-            },
-            {
-              "name": "colliderX",
-              "type": "float",
-              "value": -58
-            },
-            {
-              "name": "colliderY",
-              "type": "float",
-              "value": -23
-            },
-            {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 116
-            },
-            {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 34
-            }
-          ]
-        },
-        {
-          "id": 57,
-          "name": "storyboard-wall",
-          "type": "",
-          "x": 655,
-          "y": 135,
+          "x": 175,
+          "y": 142,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1092,95 +1741,7 @@
             {
               "name": "collider",
               "type": "bool",
-              "value": true
-            },
-            {
-              "name": "colliderX",
-              "type": "float",
-              "value": -70
-            },
-            {
-              "name": "colliderY",
-              "type": "float",
-              "value": -41
-            },
-            {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 142
-            },
-            {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 32
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "comic"
-            },
-            {
-              "name": "interactionRadius",
-              "type": "float",
-              "value": 76
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "콘티 보드"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Storyboard Wall"
-            }
-          ]
-        },
-        {
-          "id": 58,
-          "name": "asset-shelf",
-          "type": "",
-          "x": 145,
-          "y": 505,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "interactive"
-            },
-            {
-              "name": "depth",
-              "type": "string",
-              "value": "fixed"
-            },
-            {
-              "name": "collider",
-              "type": "bool",
-              "value": true
-            },
-            {
-              "name": "colliderX",
-              "type": "float",
-              "value": -70
-            },
-            {
-              "name": "colliderY",
-              "type": "float",
-              "value": -31
-            },
-            {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 116
-            },
-            {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 32
+              "value": false
             },
             {
               "name": "action",
@@ -1190,162 +1751,26 @@
             {
               "name": "interactionRadius",
               "type": "float",
-              "value": 72
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "에셋 라이브러리"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Asset Library"
-            }
-          ]
-        },
-        {
-          "id": 59,
-          "name": "drawing-desk",
-          "type": "",
-          "x": 705,
-          "y": 330,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "interactive"
-            },
-            {
-              "name": "depth",
-              "type": "string",
-              "value": "y-sort"
-            },
-            {
-              "name": "collider",
-              "type": "bool",
-              "value": true
-            },
-            {
-              "name": "colliderX",
-              "type": "float",
-              "value": -70
-            },
-            {
-              "name": "colliderY",
-              "type": "float",
-              "value": -26
-            },
-            {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 116
-            },
-            {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 34
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "canvas"
-            },
-            {
-              "name": "interactionRadius",
-              "type": "float",
-              "value": 74
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "드로잉 데스크"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Drawing Desk"
-            }
-          ]
-        },
-        {
-          "id": 60,
-          "name": "review-monitor",
-          "type": "",
-          "x": 185,
-          "y": 690,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "kind",
-              "type": "string",
-              "value": "interactive"
-            },
-            {
-              "name": "depth",
-              "type": "string",
-              "value": "y-sort"
-            },
-            {
-              "name": "collider",
-              "type": "bool",
-              "value": true
-            },
-            {
-              "name": "colliderX",
-              "type": "float",
-              "value": -103
-            },
-            {
-              "name": "colliderY",
-              "type": "float",
-              "value": -24
-            },
-            {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 148
-            },
-            {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 36
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "review"
-            },
-            {
-              "name": "interactionRadius",
-              "type": "float",
               "value": 78
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "리뷰 데스크"
+              "value": "에셋 아카이브 터미널"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Review Desk"
+              "value": "Asset archive terminal"
             }
           ]
         },
         {
-          "id": 61,
-          "name": "ai-producer-desk",
+          "id": 103,
+          "name": "storyboard-wall",
           "type": "",
-          "x": 665,
-          "y": 690,
+          "x": 475,
+          "y": 102,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1359,32 +1784,60 @@
             {
               "name": "depth",
               "type": "string",
-              "value": "y-sort"
+              "value": "fixed"
             },
             {
               "name": "collider",
               "type": "bool",
-              "value": true
+              "value": false
             },
             {
-              "name": "colliderX",
-              "type": "float",
-              "value": -75
+              "name": "action",
+              "type": "string",
+              "value": "comic"
             },
             {
-              "name": "colliderY",
+              "name": "interactionRadius",
               "type": "float",
-              "value": -24
+              "value": 82
             },
             {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 148
+              "name": "labelKo",
+              "type": "string",
+              "value": "스토리보드 월"
             },
             {
-              "name": "colliderHeight",
-              "type": "float",
-              "value": 36
+              "name": "labelEn",
+              "type": "string",
+              "value": "Storyboard wall"
+            }
+          ]
+        },
+        {
+          "id": 104,
+          "name": "production-control-board",
+          "type": "",
+          "x": 805,
+          "y": 144,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "fixed"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
             },
             {
               "name": "action",
@@ -1394,26 +1847,370 @@
             {
               "name": "interactionRadius",
               "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "프로덕션 상태판"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Production control board"
+            }
+          ]
+        },
+        {
+          "id": 105,
+          "name": "release-delivery-console",
+          "type": "",
+          "x": 1105,
+          "y": 144,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "fixed"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "assistant"
+            },
+            {
+              "name": "interactionRadius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "출고 콘솔"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Release delivery console"
+            }
+          ]
+        },
+        {
+          "id": 106,
+          "name": "writers-script-desk",
+          "type": "",
+          "x": 175,
+          "y": 412,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "story"
+            },
+            {
+              "name": "interactionRadius",
+              "type": "float",
               "value": 80
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "어시스트 데스크"
+              "value": "대본 데스크"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Assistant Desk"
+              "value": "Script desk"
             }
           ]
         },
         {
-          "id": 62,
-          "name": "creator-plaza",
+          "id": 107,
+          "name": "drawing-atelier-desk",
           "type": "",
-          "x": 425,
-          "y": 394,
+          "x": 485,
+          "y": 414,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "canvas"
+            },
+            {
+              "name": "interactionRadius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "드로잉 데스크"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Drawing desk"
+            }
+          ]
+        },
+        {
+          "id": 108,
+          "name": "review-theater-monitor",
+          "type": "",
+          "x": 815,
+          "y": 386,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "fixed"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "interactionRadius",
+              "type": "float",
+              "value": 86
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "리뷰 시어터 모니터"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Review theater monitor"
+            }
+          ]
+        },
+        {
+          "id": 109,
+          "name": "quality-control-console",
+          "type": "",
+          "x": 1115,
+          "y": 413,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "interactionRadius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "최종 QC 콘솔"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Final QC console"
+            }
+          ]
+        },
+        {
+          "id": 110,
+          "name": "team-pod-a",
+          "type": "",
+          "x": 136,
+          "y": 699,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "solid"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            }
+          ]
+        },
+        {
+          "id": 111,
+          "name": "team-pod-b",
+          "type": "",
+          "x": 244,
+          "y": 699,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "solid"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            }
+          ]
+        },
+        {
+          "id": 112,
+          "name": "cafe-community-table",
+          "type": "",
+          "x": 490,
+          "y": 686,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
+            },
+            {
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "community"
+            },
+            {
+              "name": "interactionRadius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "카페 커뮤니티 테이블"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Cafe community table"
+            }
+          ]
+        },
+        {
+          "id": 113,
+          "name": "creator-plaza-fountain",
+          "type": "",
+          "x": 780,
+          "y": 739,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1432,27 +2229,103 @@
             {
               "name": "collider",
               "type": "bool",
-              "value": true
+              "value": false
+            }
+          ]
+        },
+        {
+          "id": 114,
+          "name": "meeting-room-table",
+          "type": "",
+          "x": 1100,
+          "y": 714,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
             },
             {
-              "name": "colliderX",
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "interactionRadius",
               "type": "float",
-              "value": -35
+              "value": 88
             },
             {
-              "name": "colliderY",
-              "type": "float",
-              "value": -37
+              "name": "labelKo",
+              "type": "string",
+              "value": "팀 회의실 콘솔"
             },
             {
-              "name": "colliderWidth",
-              "type": "float",
-              "value": 70
+              "name": "labelEn",
+              "type": "string",
+              "value": "Team meeting console"
+            }
+          ]
+        },
+        {
+          "id": 115,
+          "name": "producer-assistant-desk",
+          "type": "",
+          "x": 490,
+          "y": 870,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "kind",
+              "type": "string",
+              "value": "interactive"
             },
             {
-              "name": "colliderHeight",
+              "name": "depth",
+              "type": "string",
+              "value": "y-sort"
+            },
+            {
+              "name": "collider",
+              "type": "bool",
+              "value": false
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "assistant"
+            },
+            {
+              "name": "interactionRadius",
               "type": "float",
               "value": 74
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "프로듀서 데스크"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Producer desk"
             }
           ]
         }
@@ -1469,11 +2342,11 @@
       "y": 0,
       "objects": [
         {
-          "id": 63,
-          "name": "lounge-community-table",
+          "id": 116,
+          "name": "asset-archive-terminal",
           "type": "",
-          "x": 145,
-          "y": 355,
+          "x": 175,
+          "y": 175,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1482,74 +2355,36 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "lounge"
+              "value": "assets"
             },
             {
               "name": "radius",
               "type": "float",
-              "value": 68
+              "value": 78
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "크리에이터 테이블"
+              "value": "에셋 아카이브 터미널"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Creator table"
+              "value": "Asset archive terminal"
             },
             {
               "name": "action",
               "type": "string",
-              "value": "community"
+              "value": "assets"
             }
           ]
         },
         {
-          "id": 64,
-          "name": "writers-script-desk",
-          "type": "",
-          "x": 195,
-          "y": 165,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "writers"
-            },
-            {
-              "name": "radius",
-              "type": "float",
-              "value": 72
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "대본 데스크"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Script desk"
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "story"
-            }
-          ]
-        },
-        {
-          "id": 65,
+          "id": 117,
           "name": "storyboard-wall",
           "type": "",
-          "x": 655,
-          "y": 150,
+          "x": 475,
+          "y": 175,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1563,7 +2398,7 @@
             {
               "name": "radius",
               "type": "float",
-              "value": 76
+              "value": 82
             },
             {
               "name": "labelKo",
@@ -1583,11 +2418,315 @@
           ]
         },
         {
-          "id": 66,
-          "name": "live-stage-console",
+          "id": 118,
+          "name": "production-control-board",
           "type": "",
-          "x": 425,
-          "y": 475,
+          "x": 805,
+          "y": 175,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "production"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "프로덕션 상태판"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Production control board"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "assistant"
+            }
+          ]
+        },
+        {
+          "id": 119,
+          "name": "release-delivery-console",
+          "type": "",
+          "x": 1105,
+          "y": 175,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "release"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "출고 콘솔"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Release delivery console"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "assistant"
+            }
+          ]
+        },
+        {
+          "id": 120,
+          "name": "writers-script-desk",
+          "type": "",
+          "x": 175,
+          "y": 455,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "writers"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 80
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "대본 데스크"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Script desk"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "story"
+            }
+          ]
+        },
+        {
+          "id": 121,
+          "name": "drawing-atelier-desk",
+          "type": "",
+          "x": 485,
+          "y": 455,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "드로잉 아틀리에 데스크"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Drawing atelier desk"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "canvas"
+            }
+          ]
+        },
+        {
+          "id": 122,
+          "name": "review-theater-monitor",
+          "type": "",
+          "x": 815,
+          "y": 455,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 86
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "리뷰 시어터 모니터"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Review theater monitor"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "review"
+            }
+          ]
+        },
+        {
+          "id": 123,
+          "name": "quality-control-console",
+          "type": "",
+          "x": 1115,
+          "y": 455,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "quality"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "최종 QC 콘솔"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Final QC console"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "review"
+            }
+          ]
+        },
+        {
+          "id": 124,
+          "name": "team-commons-directory",
+          "type": "",
+          "x": 190,
+          "y": 755,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "teams"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 88
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "팀 커먼즈 디렉터리"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Team Commons directory"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "community"
+            }
+          ]
+        },
+        {
+          "id": 125,
+          "name": "cafe-community-table",
+          "type": "",
+          "x": 490,
+          "y": 720,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lounge"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 82
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "카페 커뮤니티 테이블"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Cafe community table"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "community"
+            }
+          ]
+        },
+        {
+          "id": 126,
+          "name": "creator-plaza-stage",
+          "type": "",
+          "x": 840,
+          "y": 735,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1606,12 +2745,12 @@
             {
               "name": "labelKo",
               "type": "string",
-              "value": "크리에이터 허브"
+              "value": "크리에이터 플라자"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Creator hub"
+              "value": "Creator Plaza"
             },
             {
               "name": "action",
@@ -1621,11 +2760,11 @@
           ]
         },
         {
-          "id": 67,
-          "name": "asset-shelf",
+          "id": 127,
+          "name": "meeting-room-console",
           "type": "",
-          "x": 145,
-          "y": 530,
+          "x": 1100,
+          "y": 760,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1634,112 +2773,36 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "assets"
+              "value": "meeting"
             },
             {
               "name": "radius",
               "type": "float",
-              "value": 72
+              "value": 88
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "에셋 선반"
+              "value": "팀 회의실 콘솔"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "Asset shelf"
+              "value": "Team meeting console"
             },
             {
               "name": "action",
               "type": "string",
-              "value": "assets"
+              "value": "live"
             }
           ]
         },
         {
-          "id": 68,
-          "name": "drawing-desk",
+          "id": 128,
+          "name": "producer-assistant-desk",
           "type": "",
-          "x": 705,
-          "y": 360,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "drawing"
-            },
-            {
-              "name": "radius",
-              "type": "float",
-              "value": 74
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "드로잉 데스크"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Drawing desk"
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "canvas"
-            }
-          ]
-        },
-        {
-          "id": 69,
-          "name": "review-monitor",
-          "type": "",
-          "x": 185,
-          "y": 725,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "review"
-            },
-            {
-              "name": "radius",
-              "type": "float",
-              "value": 78
-            },
-            {
-              "name": "labelKo",
-              "type": "string",
-              "value": "리뷰 모니터"
-            },
-            {
-              "name": "labelEn",
-              "type": "string",
-              "value": "Review monitor"
-            },
-            {
-              "name": "action",
-              "type": "string",
-              "value": "review"
-            }
-          ]
-        },
-        {
-          "id": 70,
-          "name": "ai-producer-desk",
-          "type": "",
-          "x": 665,
-          "y": 725,
+          "x": 490,
+          "y": 885,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1753,17 +2816,55 @@
             {
               "name": "radius",
               "type": "float",
-              "value": 80
+              "value": 74
             },
             {
               "name": "labelKo",
               "type": "string",
-              "value": "AI 프로듀서 데스크"
+              "value": "프로듀서 데스크"
             },
             {
               "name": "labelEn",
               "type": "string",
-              "value": "AI Producer desk"
+              "value": "Producer desk"
+            },
+            {
+              "name": "action",
+              "type": "string",
+              "value": "assistant"
+            }
+          ]
+        },
+        {
+          "id": 129,
+          "name": "lobby-today-board",
+          "type": "",
+          "x": 780,
+          "y": 895,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lobby"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 72
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "오늘의 스튜디오 보드"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Studio today board"
             },
             {
               "name": "action",
@@ -1796,11 +2897,11 @@
       "y": 0,
       "objects": [
         {
-          "id": 71,
+          "id": 130,
           "name": "main",
           "type": "",
-          "x": 425,
-          "y": 744,
+          "x": 780,
+          "y": 918,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1814,29 +2915,11 @@
           ]
         },
         {
-          "id": 72,
-          "name": "lounge",
-          "type": "",
-          "x": 220,
-          "y": 365,
-          "width": 0,
-          "height": 0,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "facing",
-              "type": "string",
-              "value": "left"
-            }
-          ]
-        },
-        {
-          "id": 73,
-          "name": "drawing",
+          "id": 131,
+          "name": "lobby",
           "type": "",
           "x": 780,
-          "y": 365,
+          "y": 900,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1845,16 +2928,16 @@
             {
               "name": "facing",
               "type": "string",
-              "value": "left"
+              "value": "up"
             }
           ]
         },
         {
-          "id": 74,
-          "name": "writers",
+          "id": 132,
+          "name": "teams",
           "type": "",
           "x": 300,
-          "y": 175,
+          "y": 800,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1868,11 +2951,11 @@
           ]
         },
         {
-          "id": 75,
-          "name": "storyboard",
+          "id": 133,
+          "name": "lounge",
           "type": "",
-          "x": 780,
-          "y": 175,
+          "x": 590,
+          "y": 745,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1886,11 +2969,11 @@
           ]
         },
         {
-          "id": 76,
-          "name": "assets",
+          "id": 134,
+          "name": "live",
           "type": "",
-          "x": 220,
-          "y": 545,
+          "x": 900,
+          "y": 790,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1904,11 +2987,11 @@
           ]
         },
         {
-          "id": 77,
-          "name": "review",
+          "id": 135,
+          "name": "meeting",
           "type": "",
-          "x": 280,
-          "y": 740,
+          "x": 1200,
+          "y": 820,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1917,16 +3000,16 @@
             {
               "name": "facing",
               "type": "string",
-              "value": "up"
+              "value": "left"
             }
           ]
         },
         {
-          "id": 78,
+          "id": 136,
           "name": "assistant",
           "type": "",
-          "x": 570,
-          "y": 740,
+          "x": 590,
+          "y": 890,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1935,7 +3018,151 @@
             {
               "name": "facing",
               "type": "string",
-              "value": "up"
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 137,
+          "name": "writers",
+          "type": "",
+          "x": 290,
+          "y": 485,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 138,
+          "name": "drawing",
+          "type": "",
+          "x": 610,
+          "y": 485,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 139,
+          "name": "review",
+          "type": "",
+          "x": 935,
+          "y": 485,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 140,
+          "name": "quality",
+          "type": "",
+          "x": 1210,
+          "y": 485,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 141,
+          "name": "assets",
+          "type": "",
+          "x": 290,
+          "y": 205,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 142,
+          "name": "storyboard",
+          "type": "",
+          "x": 590,
+          "y": 205,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 143,
+          "name": "production",
+          "type": "",
+          "x": 920,
+          "y": 205,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            }
+          ]
+        },
+        {
+          "id": 144,
+          "name": "release",
+          "type": "",
+          "x": 1210,
+          "y": 205,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
             }
           ]
         }
@@ -1963,11 +3190,11 @@
       "y": 0,
       "objects": [
         {
-          "id": 79,
+          "id": 145,
           "name": "review-left",
           "type": "",
-          "x": 145,
-          "y": 735,
+          "x": 770,
+          "y": 500,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -1991,32 +3218,32 @@
             {
               "name": "anchorX",
               "type": "float",
-              "value": 145
+              "value": 770
             },
             {
               "name": "anchorY",
               "type": "float",
-              "value": 735
+              "value": 500
             },
             {
               "name": "exitX",
               "type": "float",
-              "value": 105
+              "value": 730
             },
             {
               "name": "exitY",
               "type": "float",
-              "value": 740
+              "value": 505
             },
             {
               "name": "seatX",
               "type": "float",
-              "value": 160
+              "value": 785
             },
             {
               "name": "seatY",
               "type": "float",
-              "value": 690
+              "value": 452
             },
             {
               "name": "facing",
@@ -2031,11 +3258,11 @@
           ]
         },
         {
-          "id": 80,
+          "id": 146,
           "name": "review-right",
           "type": "",
-          "x": 225,
-          "y": 735,
+          "x": 860,
+          "y": 500,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2059,32 +3286,168 @@
             {
               "name": "anchorX",
               "type": "float",
-              "value": 225
+              "value": 860
             },
             {
               "name": "anchorY",
               "type": "float",
-              "value": 735
+              "value": 500
             },
             {
               "name": "exitX",
               "type": "float",
-              "value": 265
+              "value": 900
             },
             {
               "name": "exitY",
               "type": "float",
-              "value": 740
+              "value": 505
             },
             {
               "name": "seatX",
               "type": "float",
-              "value": 210
+              "value": 845
             },
             {
               "name": "seatY",
               "type": "float",
-              "value": 690
+              "value": 452
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "up"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 10
+            }
+          ]
+        },
+        {
+          "id": 147,
+          "name": "meeting-one",
+          "type": "",
+          "x": 1060,
+          "y": 790,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "회의석 1"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Meeting seat 1"
+            },
+            {
+              "name": "anchorX",
+              "type": "float",
+              "value": 1060
+            },
+            {
+              "name": "anchorY",
+              "type": "float",
+              "value": 790
+            },
+            {
+              "name": "exitX",
+              "type": "float",
+              "value": 1025
+            },
+            {
+              "name": "exitY",
+              "type": "float",
+              "value": 815
+            },
+            {
+              "name": "seatX",
+              "type": "float",
+              "value": 1070
+            },
+            {
+              "name": "seatY",
+              "type": "float",
+              "value": 730
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "up"
+            },
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 10
+            }
+          ]
+        },
+        {
+          "id": 148,
+          "name": "meeting-two",
+          "type": "",
+          "x": 1140,
+          "y": 790,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "labelKo",
+              "type": "string",
+              "value": "회의석 2"
+            },
+            {
+              "name": "labelEn",
+              "type": "string",
+              "value": "Meeting seat 2"
+            },
+            {
+              "name": "anchorX",
+              "type": "float",
+              "value": 1140
+            },
+            {
+              "name": "anchorY",
+              "type": "float",
+              "value": 790
+            },
+            {
+              "name": "exitX",
+              "type": "float",
+              "value": 1175
+            },
+            {
+              "name": "exitY",
+              "type": "float",
+              "value": 815
+            },
+            {
+              "name": "seatX",
+              "type": "float",
+              "value": 1130
+            },
+            {
+              "name": "seatY",
+              "type": "float",
+              "value": 730
             },
             {
               "name": "facing",
@@ -2111,82 +3474,13 @@
       "y": 0,
       "objects": [
         {
-          "id": 81,
-          "name": "public-writers",
+          "id": 149,
+          "name": "assets-audio",
           "type": "",
-          "x": 35,
-          "y": 35,
-          "width": 320,
-          "height": 180,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "writers"
-            },
-            {
-              "name": "policy",
-              "type": "string",
-              "value": "public"
-            }
-          ]
-        },
-        {
-          "id": 82,
-          "name": "public-storyboard",
-          "type": "",
-          "x": 495,
-          "y": 35,
-          "width": 320,
-          "height": 180,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "storyboard"
-            },
-            {
-              "name": "policy",
-              "type": "string",
-              "value": "public"
-            }
-          ]
-        },
-        {
-          "id": 83,
-          "name": "public-lounge",
-          "type": "",
-          "x": 35,
-          "y": 250,
-          "width": 220,
-          "height": 145,
-          "rotation": 0,
-          "visible": true,
-          "properties": [
-            {
-              "name": "roomId",
-              "type": "string",
-              "value": "lounge"
-            },
-            {
-              "name": "policy",
-              "type": "string",
-              "value": "public"
-            }
-          ]
-        },
-        {
-          "id": 84,
-          "name": "public-assets",
-          "type": "",
-          "x": 35,
-          "y": 430,
-          "width": 220,
-          "height": 145,
+          "x": 40,
+          "y": 40,
+          "width": 270,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -2203,20 +3497,20 @@
           ]
         },
         {
-          "id": 85,
-          "name": "public-live",
+          "id": 150,
+          "name": "storyboard-audio",
           "type": "",
-          "x": 290,
-          "y": 250,
+          "x": 340,
+          "y": 40,
           "width": 270,
-          "height": 325,
+          "height": 210,
           "rotation": 0,
           "visible": true,
           "properties": [
             {
               "name": "roomId",
               "type": "string",
-              "value": "live"
+              "value": "storyboard"
             },
             {
               "name": "policy",
@@ -2226,13 +3520,82 @@
           ]
         },
         {
-          "id": 86,
-          "name": "public-drawing",
+          "id": 151,
+          "name": "production-audio",
           "type": "",
-          "x": 595,
-          "y": 250,
-          "width": 220,
-          "height": 145,
+          "x": 670,
+          "y": 40,
+          "width": 270,
+          "height": 210,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "production"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 152,
+          "name": "release-audio",
+          "type": "",
+          "x": 970,
+          "y": 40,
+          "width": 270,
+          "height": 210,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "release"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 153,
+          "name": "writers-audio",
+          "type": "",
+          "x": 40,
+          "y": 300,
+          "width": 270,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "writers"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 154,
+          "name": "drawing-audio",
+          "type": "",
+          "x": 340,
+          "y": 300,
+          "width": 290,
+          "height": 230,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -2249,13 +3612,13 @@
           ]
         },
         {
-          "id": 87,
-          "name": "public-review",
+          "id": 155,
+          "name": "review-audio",
           "type": "",
-          "x": 35,
-          "y": 610,
-          "width": 300,
-          "height": 155,
+          "x": 670,
+          "y": 300,
+          "width": 290,
+          "height": 230,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -2267,18 +3630,143 @@
             {
               "name": "policy",
               "type": "string",
+              "value": "private"
+            },
+            {
+              "name": "doorId",
+              "type": "string",
+              "value": "review-door"
+            }
+          ]
+        },
+        {
+          "id": 156,
+          "name": "quality-audio",
+          "type": "",
+          "x": 990,
+          "y": 300,
+          "width": 250,
+          "height": 230,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "quality"
+            },
+            {
+              "name": "policy",
+              "type": "string",
               "value": "public"
             }
           ]
         },
         {
-          "id": 88,
-          "name": "public-assistant",
+          "id": 157,
+          "name": "teams-audio",
           "type": "",
-          "x": 515,
-          "y": 610,
+          "x": 40,
+          "y": 590,
           "width": 300,
-          "height": 155,
+          "height": 260,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "teams"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 158,
+          "name": "lounge-audio",
+          "type": "",
+          "x": 370,
+          "y": 590,
+          "width": 240,
+          "height": 180,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lounge"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 159,
+          "name": "live-audio",
+          "type": "",
+          "x": 640,
+          "y": 590,
+          "width": 280,
+          "height": 220,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 160,
+          "name": "meeting-audio",
+          "type": "",
+          "x": 950,
+          "y": 590,
+          "width": 290,
+          "height": 260,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "private"
+            },
+            {
+              "name": "doorId",
+              "type": "string",
+              "value": "meeting-door"
+            }
+          ]
+        },
+        {
+          "id": 161,
+          "name": "assistant-audio",
+          "type": "",
+          "x": 370,
+          "y": 790,
+          "width": 240,
+          "height": 130,
           "rotation": 0,
           "visible": true,
           "properties": [
@@ -2286,6 +3774,29 @@
               "name": "roomId",
               "type": "string",
               "value": "assistant"
+            },
+            {
+              "name": "policy",
+              "type": "string",
+              "value": "public"
+            }
+          ]
+        },
+        {
+          "id": 162,
+          "name": "lobby-audio",
+          "type": "",
+          "x": 640,
+          "y": 840,
+          "width": 280,
+          "height": 100,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lobby"
             },
             {
               "name": "policy",
@@ -2307,11 +3818,11 @@
       "y": 0,
       "objects": [
         {
-          "id": 89,
+          "id": 163,
           "name": "studio-guide-0",
           "type": "",
-          "x": 204,
-          "y": 365,
+          "x": 682,
+          "y": 910,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2320,7 +3831,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "lounge"
+              "value": "lobby"
             },
             {
               "name": "facing",
@@ -2340,17 +3851,17 @@
             {
               "name": "minDurationMs",
               "type": "float",
-              "value": 20000
+              "value": 18000
             },
             {
               "name": "maxDurationMs",
               "type": "float",
-              "value": 38000
+              "value": 36000
             },
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2360,7 +3871,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2370,11 +3881,11 @@
           ]
         },
         {
-          "id": 90,
+          "id": 164,
           "name": "studio-guide-1",
           "type": "",
-          "x": 62,
-          "y": 365,
+          "x": 847,
+          "y": 910,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2383,7 +3894,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "lounge"
+              "value": "lobby"
             },
             {
               "name": "facing",
@@ -2413,7 +3924,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2423,7 +3934,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2433,11 +3944,11 @@
           ]
         },
         {
-          "id": 91,
+          "id": 165,
           "name": "studio-guide-2",
           "type": "",
-          "x": 204,
-          "y": 275,
+          "x": 762,
+          "y": 865,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2446,7 +3957,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "lounge"
+              "value": "lobby"
             },
             {
               "name": "facing",
@@ -2476,7 +3987,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2486,7 +3997,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2496,11 +4007,11 @@
           ]
         },
         {
-          "id": 92,
-          "name": "studio-writer-0",
+          "id": 166,
+          "name": "studio-producer-0",
           "type": "",
-          "x": 284,
-          "y": 175,
+          "x": 882,
+          "y": 195,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2509,7 +4020,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "writers"
+              "value": "production"
             },
             {
               "name": "facing",
@@ -2529,17 +4040,17 @@
             {
               "name": "minDurationMs",
               "type": "float",
-              "value": 20000
+              "value": 18000
             },
             {
               "name": "maxDurationMs",
               "type": "float",
-              "value": 38000
+              "value": 36000
             },
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2549,7 +4060,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2559,11 +4070,11 @@
           ]
         },
         {
-          "id": 93,
-          "name": "studio-writer-1",
+          "id": 167,
+          "name": "studio-producer-1",
           "type": "",
-          "x": 54,
-          "y": 175,
+          "x": 712,
+          "y": 195,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2572,7 +4083,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "writers"
+              "value": "production"
             },
             {
               "name": "facing",
@@ -2602,7 +4113,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2612,7 +4123,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2622,11 +4133,11 @@
           ]
         },
         {
-          "id": 94,
-          "name": "studio-writer-2",
+          "id": 168,
+          "name": "studio-producer-2",
           "type": "",
-          "x": 284,
-          "y": 70,
+          "x": 882,
+          "y": 80,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2635,7 +4146,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "writers"
+              "value": "production"
             },
             {
               "name": "facing",
@@ -2665,7 +4176,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2675,7 +4186,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2685,11 +4196,200 @@
           ]
         },
         {
-          "id": 95,
+          "id": 169,
+          "name": "studio-editor-0",
+          "type": "",
+          "x": 887,
+          "y": 485,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 170,
+          "name": "studio-editor-1",
+          "type": "",
+          "x": 707,
+          "y": 485,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 171,
+          "name": "studio-editor-2",
+          "type": "",
+          "x": 887,
+          "y": 330,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "down"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "rest"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 172,
           "name": "studio-artist-0",
           "type": "",
-          "x": 764,
-          "y": 365,
+          "x": 567,
+          "y": 480,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2718,17 +4418,17 @@
             {
               "name": "minDurationMs",
               "type": "float",
-              "value": 20000
+              "value": 18000
             },
             {
               "name": "maxDurationMs",
               "type": "float",
-              "value": 38000
+              "value": 36000
             },
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2738,7 +4438,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2748,11 +4448,11 @@
           ]
         },
         {
-          "id": 96,
+          "id": 173,
           "name": "studio-artist-1",
           "type": "",
-          "x": 622,
-          "y": 365,
+          "x": 377,
+          "y": 480,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2762,6 +4462,195 @@
               "name": "roomId",
               "type": "string",
               "value": "drawing"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 174,
+          "name": "studio-artist-2",
+          "type": "",
+          "x": 567,
+          "y": 330,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "down"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "rest"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 175,
+          "name": "studio-archivist-0",
+          "type": "",
+          "x": 252,
+          "y": 205,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "assets"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 176,
+          "name": "studio-archivist-1",
+          "type": "",
+          "x": 92,
+          "y": 205,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "assets"
             },
             {
               "name": "facing",
@@ -2791,7 +4680,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2801,7 +4690,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2811,11 +4700,11 @@
           ]
         },
         {
-          "id": 97,
-          "name": "studio-artist-2",
+          "id": 177,
+          "name": "studio-archivist-2",
           "type": "",
-          "x": 764,
-          "y": 275,
+          "x": 252,
+          "y": 75,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2824,7 +4713,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "drawing"
+              "value": "assets"
             },
             {
               "name": "facing",
@@ -2854,7 +4743,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2864,7 +4753,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2874,11 +4763,11 @@
           ]
         },
         {
-          "id": 98,
-          "name": "studio-librarian-0",
+          "id": 178,
+          "name": "studio-cafe-0",
           "type": "",
-          "x": 204,
-          "y": 545,
+          "x": 552,
+          "y": 745,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2887,7 +4776,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "assets"
+              "value": "lounge"
             },
             {
               "name": "facing",
@@ -2907,17 +4796,17 @@
             {
               "name": "minDurationMs",
               "type": "float",
-              "value": 20000
+              "value": 18000
             },
             {
               "name": "maxDurationMs",
               "type": "float",
-              "value": 38000
+              "value": 36000
             },
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2927,7 +4816,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -2937,11 +4826,11 @@
           ]
         },
         {
-          "id": 99,
-          "name": "studio-librarian-1",
+          "id": 179,
+          "name": "studio-cafe-1",
           "type": "",
-          "x": 62,
-          "y": 545,
+          "x": 372,
+          "y": 745,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -2950,7 +4839,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "assets"
+              "value": "lounge"
             },
             {
               "name": "facing",
@@ -2980,7 +4869,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -2990,7 +4879,7 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -3000,11 +4889,11 @@
           ]
         },
         {
-          "id": 100,
-          "name": "studio-librarian-2",
+          "id": 180,
+          "name": "studio-cafe-2",
           "type": "",
-          "x": 204,
-          "y": 450,
+          "x": 552,
+          "y": 615,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -3013,7 +4902,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "assets"
+              "value": "lounge"
             },
             {
               "name": "facing",
@@ -3043,7 +4932,7 @@
             {
               "name": "anchorOffsetX",
               "type": "float",
-              "value": 16
+              "value": 18
             },
             {
               "name": "anchorOffsetY",
@@ -3053,7 +4942,385 @@
             {
               "name": "exitOffsetX",
               "type": "float",
-              "value": 32
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 181,
+          "name": "studio-security-0",
+          "type": "",
+          "x": 1182,
+          "y": 820,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 182,
+          "name": "studio-security-1",
+          "type": "",
+          "x": 992,
+          "y": 820,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 183,
+          "name": "studio-security-2",
+          "type": "",
+          "x": 1182,
+          "y": 620,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "down"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "rest"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 184,
+          "name": "studio-host-0",
+          "type": "",
+          "x": 862,
+          "y": 790,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "draw"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 185,
+          "name": "studio-host-1",
+          "type": "",
+          "x": 642,
+          "y": 790,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 186,
+          "name": "studio-host-2",
+          "type": "",
+          "x": 862,
+          "y": 615,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "down"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "rest"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 36
             },
             {
               "name": "exitOffsetY",
@@ -3075,11 +5342,11 @@
       "y": 0,
       "objects": [
         {
-          "id": 101,
+          "id": 187,
           "name": "studio-guide",
           "type": "",
-          "x": 220,
-          "y": 365,
+          "x": 700,
+          "y": 910,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -3093,7 +5360,7 @@
             {
               "name": "roomId",
               "type": "string",
-              "value": "lounge"
+              "value": "lobby"
             },
             {
               "name": "facing",
@@ -3108,7 +5375,7 @@
             {
               "name": "speed",
               "type": "float",
-              "value": 58
+              "value": 62
             },
             {
               "name": "behavior",
@@ -3123,16 +5390,16 @@
             {
               "name": "patrol",
               "type": "string",
-              "value": "78,365;220,275"
+              "value": "865,910;780,865"
             }
           ]
         },
         {
-          "id": 102,
-          "name": "studio-writer",
+          "id": 188,
+          "name": "studio-producer",
           "type": "",
-          "x": 300,
-          "y": 175,
+          "x": 900,
+          "y": 195,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -3141,12 +5408,12 @@
             {
               "name": "skinKey",
               "type": "string",
-              "value": "npc-editor"
+              "value": "npc-producer"
             },
             {
               "name": "roomId",
               "type": "string",
-              "value": "writers"
+              "value": "production"
             },
             {
               "name": "facing",
@@ -3161,7 +5428,7 @@
             {
               "name": "speed",
               "type": "float",
-              "value": 54
+              "value": 57
             },
             {
               "name": "behavior",
@@ -3171,21 +5438,21 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-writer-0;studio-writer-1;studio-writer-2"
+              "value": "studio-producer-0;studio-producer-1;studio-producer-2"
             },
             {
               "name": "patrol",
               "type": "string",
-              "value": "70,175;300,70"
+              "value": "730,195;900,80"
             }
           ]
         },
         {
-          "id": 103,
-          "name": "studio-artist",
+          "id": 189,
+          "name": "studio-editor",
           "type": "",
-          "x": 780,
-          "y": 365,
+          "x": 905,
+          "y": 485,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -3194,7 +5461,60 @@
             {
               "name": "skinKey",
               "type": "string",
-              "value": "npc-atelier"
+              "value": "npc-editor"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.94
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 56
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "activityAnchorIds",
+              "type": "string",
+              "value": "studio-editor-0;studio-editor-1;studio-editor-2"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "725,485;905,330"
+            }
+          ]
+        },
+        {
+          "id": 190,
+          "name": "studio-artist",
+          "type": "",
+          "x": 585,
+          "y": 480,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "npc-artist"
             },
             {
               "name": "roomId",
@@ -3214,7 +5534,7 @@
             {
               "name": "speed",
               "type": "float",
-              "value": 60
+              "value": 62
             },
             {
               "name": "behavior",
@@ -3229,16 +5549,16 @@
             {
               "name": "patrol",
               "type": "string",
-              "value": "638,365;780,275"
+              "value": "395,480;585,330"
             }
           ]
         },
         {
-          "id": 104,
-          "name": "studio-librarian",
+          "id": 191,
+          "name": "studio-archivist",
           "type": "",
-          "x": 220,
-          "y": 545,
+          "x": 270,
+          "y": 205,
           "width": 0,
           "height": 0,
           "rotation": 0,
@@ -3267,7 +5587,7 @@
             {
               "name": "speed",
               "type": "float",
-              "value": 52
+              "value": 54
             },
             {
               "name": "behavior",
@@ -3277,12 +5597,171 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-librarian-0;studio-librarian-1;studio-librarian-2"
+              "value": "studio-archivist-0;studio-archivist-1;studio-archivist-2"
             },
             {
               "name": "patrol",
               "type": "string",
-              "value": "78,545;220,450"
+              "value": "110,205;270,75"
+            }
+          ]
+        },
+        {
+          "id": 192,
+          "name": "studio-cafe",
+          "type": "",
+          "x": 570,
+          "y": 745,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "npc-cafe"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lounge"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.94
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 55
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "activityAnchorIds",
+              "type": "string",
+              "value": "studio-cafe-0;studio-cafe-1;studio-cafe-2"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "390,745;570,615"
+            }
+          ]
+        },
+        {
+          "id": 193,
+          "name": "studio-security",
+          "type": "",
+          "x": 1200,
+          "y": 820,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "npc-security"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.94
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 59
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "activityAnchorIds",
+              "type": "string",
+              "value": "studio-security-0;studio-security-1;studio-security-2"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "1010,820;1200,620"
+            }
+          ]
+        },
+        {
+          "id": 194,
+          "name": "studio-host",
+          "type": "",
+          "x": 880,
+          "y": 790,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "skinKey",
+              "type": "string",
+              "value": "npc-host"
+            },
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "scale",
+              "type": "float",
+              "value": 0.94
+            },
+            {
+              "name": "speed",
+              "type": "float",
+              "value": 64
+            },
+            {
+              "name": "behavior",
+              "type": "string",
+              "value": "patrol"
+            },
+            {
+              "name": "activityAnchorIds",
+              "type": "string",
+              "value": "studio-host-0;studio-host-1;studio-host-2"
+            },
+            {
+              "name": "patrol",
+              "type": "string",
+              "value": "660,790;880,615"
             }
           ]
         }

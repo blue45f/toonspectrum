@@ -371,16 +371,16 @@ describe("Studio virtual space RPG navigation", () => {
   });
 
   it("keeps resolved movement on walkable floor", () => {
-    const start = { x: 425, y: 230 };
+    const start = { x: 640, y: 280 };
     const next = resolveStudioVirtualSpaceMovement(start, { x: 0, y: 30 });
     expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeGreaterThan(0);
     expect(studioVirtualSpaceCanOccupy(next)).toBe(true);
   });
 
   it("walks toward click targets in bounded increments", () => {
-    const start = { x: 425, y: 744 };
+    const start = { x: 780, y: 900 };
     const maxDistance = studioVirtualSpaceScaleLegacyDistance(20);
-    const next = studioVirtualSpaceStepToward(start, { x: 425, y: 700 }, maxDistance);
+    const next = studioVirtualSpaceStepToward(start, { x: 780, y: 870 }, maxDistance);
     expect(Math.hypot(next.x - start.x, next.y - start.y)).toBeLessThanOrEqual(maxDistance + 1.1);
   });
 });
@@ -390,22 +390,26 @@ describe("Studio virtual space pathfinding", () => {
   it("finds a browser-local route through room doors", () => {
     const path = findStudioWorldPath(
       DEFAULT_STUDIO_WORLD_MANIFEST,
-      { x: 425, y: 744 },
-      { x: 195, y: 165 },
+      DEFAULT_STUDIO_WORLD_MANIFEST.spawns.find((spawn) => spawn.id === "main")!.point,
+      { x: 175, y: 455 },
     );
     expect(path.length).toBeGreaterThan(2);
     expect(path.every((point) => studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, point))).toBe(true);
-    expect(path.at(-1)?.y).toBeLessThan(210);
+    expect(path.at(-1)?.y).toBeLessThan(520);
   });
 
   it("returns a nearby walkable endpoint when a click lands on furniture", () => {
+    const prop = DEFAULT_STUDIO_WORLD_MANIFEST.props.find((item) => item.id === "writers-script-desk")!;
     const path = findStudioWorldPath(
       DEFAULT_STUDIO_WORLD_MANIFEST,
-      { x: 425, y: 744 },
-      { x: 195, y: 135 },
+      DEFAULT_STUDIO_WORLD_MANIFEST.spawns.find((spawn) => spawn.id === "main")!.point,
+      {
+        x: prop.collider!.x + prop.collider!.width / 2,
+        y: prop.collider!.y + prop.collider!.height / 2,
+      },
     );
     expect(path.length).toBeGreaterThan(0);
-    expect(path.every((point) => studioVirtualSpaceCanOccupy(point))).toBe(true);
+    expect(path.every((point) => studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, point))).toBe(true);
   });
 });
 
@@ -422,11 +426,11 @@ describe("Studio virtual space object interactions", () => {
 
   it("selects the nearest nearby production object", () => {
     expect(
-      selectNearestStudioVirtualSpaceInteraction({ x: 705, y: 360 })?.id,
-    ).toBe("drawing-desk");
+      selectNearestStudioVirtualSpaceInteraction({ x: 485, y: 455 })?.id,
+    ).toBe("drawing-atelier-desk");
     expect(
-      selectNearestStudioVirtualSpaceInteraction({ x: 665, y: 725 })?.id,
-    ).toBe("ai-producer-desk");
+      selectNearestStudioVirtualSpaceInteraction({ x: 490, y: 885 })?.id,
+    ).toBe("producer-assistant-desk");
   });
 });
 

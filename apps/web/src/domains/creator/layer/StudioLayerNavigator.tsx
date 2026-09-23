@@ -74,6 +74,12 @@ import {
   studioLayerNavigatorItemStatusLabel as itemStatusLabel,
 } from "./studio-layer-navigator-row-ui";
 import {
+  STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+  STUDIO_LAYER_NAVIGATOR_MAX_RENDER_LIMIT,
+  STUDIO_LAYER_NAVIGATOR_RENDER_STEP,
+  windowStudioLayerNavigatorNodes,
+} from "./studio-layer-navigator-window";
+import {
   resolveStudioLayerGroupDropIntent,
   resolveStudioLayerItemDropIntent,
   studioLayerDragSourceGroup,
@@ -231,6 +237,7 @@ function uniqueGroups(groups: readonly LayerGroup[]): readonly LayerGroup[] {
   });
 }
 
+
 function stableFrontToBack(items: readonly StudioLayerNavigatorItem[]): readonly StudioLayerNavigatorItem[] {
   return items
     .map((item, sourceIndex) => ({ item, sourceIndex }))
@@ -377,6 +384,9 @@ export function StudioLayerNavigator({
   const [draggingLabel, setDraggingLabel] = useState<string | null>(null);
   const [dragAnnouncement, setDragAnnouncement] = useState("");
   const [dropIntent, setDropIntent] = useState<StudioLayerDropIntent | null>(null);
+  const [renderLimit, setRenderLimit] = useState(
+    STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT,
+  );
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
@@ -408,6 +418,12 @@ export function StudioLayerNavigator({
     filterActive,
     includeEmptyGroups: true,
   });
+  const renderWindow = windowStudioLayerNavigatorNodes(nodes, renderLimit);
+  const renderedNodes = renderWindow.nodes;
+  const hiddenRenderedRowCount = Math.max(
+    0,
+    renderWindow.availableRowCount - renderWindow.renderedRowCount,
+  );
   const selectedIdSet = new Set(selectedIds);
   const selectionCount = selectedIdSet.size;
   const outsideSelectionCount = countStudioLayerSelectionOutsideResults(selectedIds, resultIds);
@@ -460,7 +476,7 @@ export function StudioLayerNavigator({
   }
 
   const focusTargets: FocusTarget[] = [];
-  for (const node of nodes) {
+  for (const node of renderedNodes) {
     if (node.kind === "item") {
       focusTargets.push({ key: node.key, kind: "item", entry: node.entry });
       continue;
@@ -473,7 +489,7 @@ export function StudioLayerNavigator({
       expanded: node.expanded,
     });
     if (!node.expanded) continue;
-    for (const entry of node.entries) {
+    for (const entry of node.renderedEntries ?? node.entries) {
       focusTargets.push({
         key: `${node.key}:item:${entry.item.id}`,
         kind: "item",
@@ -484,6 +500,10 @@ export function StudioLayerNavigator({
   const visibleItemIds = focusTargets.flatMap((target) =>
     target.kind === "item" ? [target.entry.item.id] : []
   );
+  const renderedItemIdSet = new Set(visibleItemIds);
+  const hiddenSelectedItemCount = selectedIds.filter(
+    (id) => resultIdSet.has(id) && !renderedItemIdSet.has(id),
+  ).length;
   function buildKeyboardRows() {
     return focusTargets.map((target) => ({
       key: target.key,
@@ -542,8 +562,22 @@ export function StudioLayerNavigator({
     setDraggingLabel(null);
     setDragAnnouncement("");
     setDropIntent(null);
+    setRenderLimit(STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT);
     actionFallbackKeyRef.current = null;
   }, [pageKey]);
+
+  useEffect(() => {
+    setRenderLimit(STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT);
+  }, [
+    filters.color,
+    filters.flags,
+    filters.kind,
+    filters.lock,
+    filters.role,
+    filters.smart,
+    filters.visibility,
+    query,
+  ]);
 
   useEffect(() => {
     if (!filterOpen && !actionTarget) return;
@@ -1261,6 +1295,10 @@ export function StudioLayerNavigator({
       data-page-key={pageKey}
       data-studio-shortcut-boundary="true"
       data-studio-layer-dragging={draggingLabel ? "true" : "false"}
+      data-studio-layer-rendered-count={renderWindow.renderedItemCount}
+      data-studio-layer-available-count={renderWindow.availableItemCount}
+      data-studio-layer-rendered-row-count={renderWindow.renderedRowCount}
+      data-studio-layer-available-row-count={renderWindow.availableRowCount}
     >
       {/* The icon-only merge doors keep a stable accessible name; the caveat rides along as a
           description so a screen-reader user hears "그룹으로 묶인다" before activating them. */}
@@ -1280,14 +1318,16 @@ export function StudioLayerNavigator({
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-1.5">
-              <h3 className="text-xs font-bold tracking-tight text-fg">레이어 {stats.total}</h3>
+              <h3 className="text-xs font-bold tracking-tight text-fg">
+                레이어 {stats.total.toLocaleString("ko-KR")}
+              </h3>
               <span id={resultStatusId} role="status" aria-live="polite" className="rounded-full bg-raised px-1.5 py-0.5 text-[0.62rem] font-semibold tabular-nums text-fg-3">
-                결과 {results.length}{selectionCount > 0 ? ` · 선택 ${selectionCount}` : ""}
+                결과 {results.length.toLocaleString("ko-KR")}{selectionCount > 0 ? ` · 선택 ${selectionCount.toLocaleString("ko-KR")}` : ""}
               </span>
             </div>
             <p className="truncate text-[0.68rem] text-fg-3 lg:text-[0.58rem]">
-              표시 {stats.visible} · 숨김 {stats.hidden} · 잠금 {stats.locked}
-              {outsideSelectionCount > 0 ? ` · 선택 ${outsideSelectionCount}개는 필터 밖` : ""}
+              표시 {stats.visible.toLocaleString("ko-KR")} · 숨김 {stats.hidden.toLocaleString("ko-KR")} · 잠금 {stats.locked.toLocaleString("ko-KR")}
+              {outsideSelectionCount > 0 ? ` · 선택 ${outsideSelectionCount.toLocaleString("ko-KR")}개는 필터 밖` : ""}
             </p>
           </div>
           <button
@@ -1522,7 +1562,7 @@ export function StudioLayerNavigator({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-1.5 overscroll-contain [scrollbar-gutter:stable]">
         <StudioLayerNavigatorTree
-          nodes={nodes}
+          nodes={renderedNodes}
           filterActive={filterActive}
           selectedIdSet={selectedIdSet}
           tabStopKey={tabStopKey}
@@ -1568,6 +1608,62 @@ export function StudioLayerNavigator({
           renderItemRow={renderItemRow}
           resetFilters={resetFilters}
         />
+        {hiddenRenderedRowCount > 0 ? (
+          <div
+            role="status"
+            data-studio-layer-render-window="true"
+            className="sticky bottom-0 mt-1 rounded-lg border border-line bg-panel/95 p-2 shadow-lg backdrop-blur"
+          >
+            <p className="text-[0.65rem] leading-relaxed text-fg-3">
+              장시간 작업 보호 · {renderWindow.renderedRowCount.toLocaleString("ko-KR")}/
+              {renderWindow.availableRowCount.toLocaleString("ko-KR")}개 행 표시
+              {hiddenSelectedItemCount > 0
+                ? ` · 선택 ${hiddenSelectedItemCount}개는 아래 범위에 있어요`
+                : ""}
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {renderWindow.renderedRowCount < Math.min(
+                renderWindow.availableRowCount,
+                STUDIO_LAYER_NAVIGATOR_MAX_RENDER_LIMIT,
+              ) ? (
+                <button
+                  type="button"
+                  data-studio-layer-render-more="true"
+                  onClick={() => setRenderLimit((current) => Math.min(
+                    renderWindow.availableRowCount,
+                    STUDIO_LAYER_NAVIGATOR_MAX_RENDER_LIMIT,
+                    current + STUDIO_LAYER_NAVIGATOR_RENDER_STEP,
+                  ))}
+                  className={cn(compactControl, "min-h-9 flex-1")}
+                >
+                  다음 {Math.min(
+                    STUDIO_LAYER_NAVIGATOR_RENDER_STEP,
+                    hiddenRenderedRowCount,
+                    STUDIO_LAYER_NAVIGATOR_MAX_RENDER_LIMIT - renderWindow.renderedRowCount,
+                  ).toLocaleString("ko-KR")}개 행 표시
+                </button>
+              ) : (
+                <span
+                  data-studio-layer-render-cap="true"
+                  className="text-[0.58rem] font-semibold text-warning"
+                >
+                  안정성 상한 {STUDIO_LAYER_NAVIGATOR_MAX_RENDER_LIMIT.toLocaleString("ko-KR")}개 · 검색으로 전체 문서 탐색
+                </span>
+              )}
+              {renderLimit > STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT ? (
+                <button
+                  type="button"
+                  data-studio-layer-render-reset="true"
+                  onClick={() => setRenderLimit(STUDIO_LAYER_NAVIGATOR_INITIAL_RENDER_LIMIT)}
+                  className={cn(compactControl, "min-h-9")}
+                >
+                  기본 범위로 접기
+                </button>
+              ) : null}
+              <span className="text-[0.58rem] text-fg-3">검색·필터는 전체 문서에 적용됩니다</span>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {actionTarget && (actionTarget.kind === "batch" || activeItem || activeGroup) ? (

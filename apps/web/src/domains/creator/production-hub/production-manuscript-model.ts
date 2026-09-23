@@ -7,6 +7,20 @@ import type {
 
 export type ProductionManuscriptProcessType = "image" | "text" | "media" | "package";
 
+/**
+ * A creator-facing lifecycle projection. It never replaces ProjectGraph review,
+ * revision, approval or release authority; it only explains the next safe action.
+ */
+export type ProductionManuscriptLifecyclePhase =
+  | "empty"
+  | "editing"
+  | "submitted"
+  | "in-review"
+  | "changes-requested"
+  | "approved"
+  | "ready-to-deliver"
+  | "released";
+
 export interface ProductionManuscriptProcess {
   readonly artifact: StudioArtifactRecord;
   readonly processType: ProductionManuscriptProcessType;
@@ -14,7 +28,14 @@ export interface ProductionManuscriptProcess {
   readonly revisions: readonly StudioRevisionRecord[];
   readonly reviews: readonly StudioReviewSummary[];
   readonly headRevision: StudioRevisionRecord | null;
+  readonly submissionRevision: StudioRevisionRecord | null;
+  readonly reviewSnapshotRevision: StudioRevisionRecord | null;
   readonly approvedRevision: StudioRevisionRecord | null;
+  readonly releaseRevision: StudioRevisionRecord | null;
+  readonly latestReview: StudioReviewSummary | null;
+  readonly lifecyclePhase: ProductionManuscriptLifecyclePhase;
+  readonly hasUnapprovedChanges: boolean;
+  readonly readyToDeliver: boolean;
   readonly openReviewCount: number;
   readonly openRequiredFeedbackCount: number;
   readonly latestActivityAt: string;
@@ -54,6 +75,17 @@ const REVISION_LABELS: Readonly<Record<StudioRevisionRecord["kind"], string>> = 
   release: "게시본",
 });
 
+const LIFECYCLE_LABELS: Readonly<Record<ProductionManuscriptLifecyclePhase, string>> = Object.freeze({
+  empty: "시작 전",
+  editing: "작업 중",
+  submitted: "제출됨",
+  "in-review": "검수 중",
+  "changes-requested": "수정 요청",
+  approved: "검수 승인",
+  "ready-to-deliver": "전달 준비",
+  released: "게시·전달 완료",
+});
+
 export function productionManuscriptProcessType(
   kind: StudioArtifactRecord["kind"],
 ): ProductionManuscriptProcessType {
@@ -73,6 +105,12 @@ export function productionManuscriptRevisionLabel(
   kind: StudioRevisionRecord["kind"],
 ): string {
   return REVISION_LABELS[kind];
+}
+
+export function productionManuscriptLifecycleLabel(
+  phase: ProductionManuscriptLifecyclePhase,
+): string {
+  return LIFECYCLE_LABELS[phase];
 }
 
 export function productionArtifactBelongsToEpisode(
@@ -106,6 +144,55 @@ function latestTimestamp(
     .sort((left, right) => right.localeCompare(left))[0] ?? artifact.updatedAt;
 }
 
+function latestRevision(
+  revisions: readonly StudioRevisionRecord[],
+  kind: StudioRevisionRecord["kind"],
+): StudioRevisionRecord | null {
+  return revisions.find((revision) => revision.kind === kind) ?? null;
+}
+
+function newerThan(
+  candidate: { readonly createdAt: string } | null,
+  baseline: { readonly createdAt: string } | null,
+): boolean {
+  return Boolean(candidate && (!baseline || candidate.createdAt > baseline.createdAt));
+}
+
+function lifecyclePhase(input: {
+  readonly headRevision: StudioRevisionRecord | null;
+  readonly submissionRevision: StudioRevisionRecord | null;
+  readonly reviewSnapshotRevision: StudioRevisionRecord | null;
+  readonly approvedRevision: StudioRevisionRecord | null;
+  readonly releaseRevision: StudioRevisionRecord | null;
+  readonly latestReview: StudioReviewSummary | null;
+  readonly hasUnapprovedChanges: boolean;
+  readonly readyToDeliver: boolean;
+}): ProductionManuscriptLifecyclePhase {
+  if (!input.headRevision && !input.submissionRevision && !input.reviewSnapshotRevision
+    && !input.approvedRevision && !input.releaseRevision) return "empty";
+
+  // An active review always explains the immediate next action, even when an
+  // older approved or released revision remains available for delivery.
+  if (input.latestReview?.status === "changes-requested") return "changes-requested";
+  if (input.latestReview?.status === "open") return "in-review";
+
+  const releaseIsCurrent = Boolean(input.releaseRevision
+    && (!input.headRevision || input.headRevision.id === input.releaseRevision.id
+      || input.releaseRevision.createdAt >= input.headRevision.createdAt));
+  if (releaseIsCurrent && !input.hasUnapprovedChanges) return "released";
+  if (input.readyToDeliver) return "ready-to-deliver";
+
+  const reviewApprovalIsCurrent = input.latestReview?.status === "approved"
+    && (!input.headRevision || input.latestReview.updatedAt >= input.headRevision.createdAt);
+  if (reviewApprovalIsCurrent) return "approved";
+
+  const latestSubmission = newerThan(input.reviewSnapshotRevision, input.submissionRevision)
+    ? input.reviewSnapshotRevision
+    : input.submissionRevision;
+  if (newerThan(latestSubmission, input.approvedRevision)) return "submitted";
+  return "editing";
+}
+
 export function buildProductionManuscriptProcesses(params: {
   readonly project: StudioProjectRecord;
   readonly revisionsByArtifact: Readonly<Record<string, readonly StudioRevisionRecord[]>>;
@@ -117,19 +204,55 @@ export function buildProductionManuscriptProcesses(params: {
     .map((artifact): ProductionManuscriptProcess => {
       const revisions = sortedRevisions(params.revisionsByArtifact[artifact.id] ?? []);
       const reviews = sortedReviews(params.reviewsByArtifact[artifact.id] ?? []);
+      const headRevision = revisions.find((revision) => revision.id === artifact.headRevisionId)
+        ?? revisions[0]
+        ?? null;
+      const submissionRevision = latestRevision(revisions, "submission");
+      const reviewSnapshotRevision = latestRevision(revisions, "review-snapshot");
       const approvedRevision = artifact.approvedRevisionId
         ? revisions.find((revision) => revision.id === artifact.approvedRevisionId) ?? null
-        : revisions.find((revision) => revision.kind === "approved" || revision.kind === "release") ?? null;
+        : latestRevision(revisions, "approved");
+      const releaseRevision = latestRevision(revisions, "release");
+      const latestReview = reviews[0] ?? null;
+      const openReviewCount = reviews.filter((review) => review.status === "open" || review.status === "changes-requested").length;
+      const openRequiredFeedbackCount = reviews.reduce((sum, review) => sum + review.openRequiredCommentCount, 0);
+      const hasUnapprovedChanges = Boolean(headRevision && approvedRevision
+        && headRevision.id !== approvedRevision.id
+        && headRevision.kind !== "approved"
+        && headRevision.kind !== "release"
+        && headRevision.createdAt > approvedRevision.createdAt);
+      const readyToDeliver = Boolean(approvedRevision
+        && !hasUnapprovedChanges
+        && openReviewCount === 0
+        && openRequiredFeedbackCount === 0
+        && !releaseRevision);
+      const phase = lifecyclePhase({
+        headRevision,
+        submissionRevision,
+        reviewSnapshotRevision,
+        approvedRevision,
+        releaseRevision,
+        latestReview,
+        hasUnapprovedChanges,
+        readyToDeliver,
+      });
       return Object.freeze({
         artifact,
         processType: productionManuscriptProcessType(artifact.kind),
         label: productionManuscriptProcessLabel(artifact.kind),
         revisions,
         reviews,
-        headRevision: revisions.find((revision) => revision.id === artifact.headRevisionId) ?? revisions[0] ?? null,
+        headRevision,
+        submissionRevision,
+        reviewSnapshotRevision,
         approvedRevision,
-        openReviewCount: reviews.filter((review) => review.status === "open" || review.status === "changes-requested").length,
-        openRequiredFeedbackCount: reviews.reduce((sum, review) => sum + review.openRequiredCommentCount, 0),
+        releaseRevision,
+        latestReview,
+        lifecyclePhase: phase,
+        hasUnapprovedChanges,
+        readyToDeliver,
+        openReviewCount,
+        openRequiredFeedbackCount,
         latestActivityAt: latestTimestamp(artifact, revisions, reviews),
       });
     })
@@ -182,6 +305,9 @@ export function productionManuscriptMetrics(processes: readonly ProductionManusc
     textProcessCount: processes.filter((process) => process.processType === "text").length,
     versionCount: processes.reduce((sum, process) => sum + process.revisions.length, 0),
     approvedProcessCount: processes.filter((process) => process.approvedRevision !== null).length,
+    readyToDeliverProcessCount: processes.filter((process) => process.readyToDeliver).length,
+    releasedProcessCount: processes.filter((process) => process.lifecyclePhase === "released").length,
+    unapprovedChangeCount: processes.filter((process) => process.hasUnapprovedChanges).length,
     openReviewCount: processes.reduce((sum, process) => sum + process.openReviewCount, 0),
     openRequiredFeedbackCount: processes.reduce((sum, process) => sum + process.openRequiredFeedbackCount, 0),
   });

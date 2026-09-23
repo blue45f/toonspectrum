@@ -40,6 +40,8 @@ export const VIRTUAL_STUDIO_LIVING_WORLD_ART_DIRECTORY = path.resolve(
 const LIVING_WORLD_BACKGROUND_NAME = "master-clean-plate.webp";
 const LIVING_WORLD_BACKGROUND_URL = `/assets/virtual-studio/living-world/${LIVING_WORLD_BACKGROUND_NAME}`;
 const LIVING_WORLD_DIMENSIONS = [1296, 1213];
+const V3_DEFAULT_BACKGROUND_URL = "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp";
+const V3_DEFAULT_BACKGROUND_DIMENSIONS = [1280, 960];
 
 function requireCondition(condition, message) {
   if (!condition) throw new Error(message);
@@ -847,7 +849,7 @@ export function validateVirtualStudioLivingWorldArtManifestContract(manifest) {
   }
 }
 
-/** Ensure the generated authoring world, its generator, and the runtime bind the verified asset. */
+/** Ensure the current generated world binds the v3 sky-island base while the legacy clean plate remains independently verified. */
 export async function verifyVirtualStudioLivingWorldBindings({
   worldPath = path.resolve(scriptDirectory, "../apps/web/public/assets/virtual-studio/world/default-world.json"),
   generatorPath = path.resolve(scriptDirectory, "generate-virtual-studio-default-world.mts"),
@@ -856,17 +858,20 @@ export async function verifyVirtualStudioLivingWorldBindings({
   const world = JSON.parse(await readFile(worldPath, "utf8"));
   const layer = world.layers?.find((entry) => entry.name === "background" && entry.type === "imagelayer");
   const backgroundUrl = world.properties?.find((entry) => entry.name === "backgroundUrl")?.value;
-  requireCondition(backgroundUrl === LIVING_WORLD_BACKGROUND_URL
-    && layer?.image === `../living-world/${LIVING_WORLD_BACKGROUND_NAME}`
-    && layer.imagewidth === LIVING_WORLD_DIMENSIONS[0] && layer.imageheight === LIVING_WORLD_DIMENSIONS[1],
-  "generated default world must reference the verified clean plate and its actual dimensions");
+  requireCondition(backgroundUrl === V3_DEFAULT_BACKGROUND_URL
+    && layer?.image === V3_DEFAULT_BACKGROUND_URL,
+  "generated default world must reference the verified v3 sky-island base");
+  requireCondition(layer.imagewidth === V3_DEFAULT_BACKGROUND_DIMENSIONS[0]
+    && layer.imageheight === V3_DEFAULT_BACKGROUND_DIMENSIONS[1],
+  "generated default world must retain the v3 background's actual dimensions");
   const generator = await readFile(generatorPath, "utf8");
-  requireCondition(generator.includes(`image: "../living-world/${LIVING_WORLD_BACKGROUND_NAME}"`)
-    && /imagewidth:\s*1296\b/u.test(generator) && /imageheight:\s*1213\b/u.test(generator),
-  "default-world generator must retain the verified clean-plate path and dimensions");
+  requireCondition(generator.includes("image: manifest.backgroundUrl")
+    && generator.includes("imagewidth: manifest.width")
+    && generator.includes("imageheight: manifest.height"),
+  "default-world generator must bind the manifest-selected background and dimensions");
   const runtime = await readFile(runtimePath, "utf8");
-  requireCondition(runtime.includes(`backgroundUrl: "${LIVING_WORLD_BACKGROUND_URL}"`),
-    "runtime default manifest must use the verified clean-plate URL");
+  requireCondition(runtime.includes(`backgroundUrl: "${V3_DEFAULT_BACKGROUND_URL}"`),
+    "runtime default manifest must use the verified v3 sky-island URL");
   return true;
 }
 

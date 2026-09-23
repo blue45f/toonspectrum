@@ -5,8 +5,8 @@ export const STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH = 1180;
 export const STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT = 720;
 // Preserve the established 850x798 collision/P2P coordinate space. The approved production
 // crop is 869x813 and is rendered with an aspect-preserving cover scale inside this world.
-export const STUDIO_VIRTUAL_SPACE_WIDTH = 850;
-export const STUDIO_VIRTUAL_SPACE_HEIGHT = 798;
+export const STUDIO_VIRTUAL_SPACE_WIDTH = 1280;
+export const STUDIO_VIRTUAL_SPACE_HEIGHT = 960;
 const STUDIO_VIRTUAL_SPACE_SCALE_X = STUDIO_VIRTUAL_SPACE_WIDTH / STUDIO_VIRTUAL_SPACE_LEGACY_WIDTH;
 const STUDIO_VIRTUAL_SPACE_SCALE_Y = STUDIO_VIRTUAL_SPACE_HEIGHT / STUDIO_VIRTUAL_SPACE_LEGACY_HEIGHT;
 const STUDIO_VIRTUAL_SPACE_DISTANCE_SCALE = Math.sqrt(STUDIO_VIRTUAL_SPACE_SCALE_X * STUDIO_VIRTUAL_SPACE_SCALE_Y);
@@ -48,6 +48,7 @@ export interface StudioVirtualSpacePoint {
   readonly y: number;
 }
 
+
 export interface StudioVirtualSpaceZone {
   readonly id: StudioVirtualSpaceZoneId;
   readonly labelKo: string;
@@ -58,7 +59,16 @@ export interface StudioVirtualSpaceZone {
   readonly y: number;
   readonly width: number;
   readonly height: number;
-  readonly destination: "none" | "story" | "comic" | "canvas" | "review" | "assets" | "assistant" | "live";
+  readonly destination:
+    | "none"
+    | "story"
+    | "comic"
+    | "canvas"
+    | "review"
+    | "assets"
+    | "live"
+    | "assistant"
+    | "community";
 }
 
 export interface StudioVirtualSpacePresenceState extends StudioVirtualSpacePoint {
@@ -89,62 +99,63 @@ export interface StudioVirtualAvatarProfile {
   readonly expression: "bright" | "calm" | "sparkle" | "smile";
 }
 
+
 function worldZone(zone: StudioVirtualSpaceZone): StudioVirtualSpaceZone {
   return Object.freeze(zone);
 }
 
+/**
+ * Production flows south→north: reception and teams, planning and creation, review/QC,
+ * then delivery. Cross-corridors keep frequent Drawing↔Assets and Drawing↔Review loops short.
+ */
 export const STUDIO_VIRTUAL_SPACE_ZONES: readonly StudioVirtualSpaceZone[] = Object.freeze([
-  worldZone({
-    id: "writers", labelKo: "작가실", labelEn: "Writers Room",
-    descriptionKo: "시놉시스·대본·에피소드를 함께 정리해요.",
-    descriptionEn: "Shape synopsis, scripts and episodes together.",
-    x: 35, y: 35, width: 320, height: 180, destination: "story",
-  }),
-  worldZone({
-    id: "storyboard", labelKo: "콘티 보드", labelEn: "Storyboard Wall",
-    descriptionKo: "컷 흐름과 장면 구성을 한눈에 검토해요.",
-    descriptionEn: "Review panel flow and scene composition at a glance.",
-    x: 495, y: 35, width: 320, height: 180, destination: "comic",
-  }),
-  worldZone({
-    id: "lounge", labelKo: "라운지", labelEn: "Lounge",
-    descriptionKo: "가볍게 만나고 오늘의 작업을 공유해요.",
-    descriptionEn: "Meet casually and share what everyone is working on.",
-    x: 35, y: 250, width: 220, height: 145, destination: "none",
-  }),
-  worldZone({
-    id: "assets", labelKo: "에셋 라이브러리", labelEn: "Asset Library",
-    descriptionKo: "캐릭터·배경·브러시·3D 자료를 찾아요.",
-    descriptionEn: "Find characters, backgrounds, brushes and 3D assets.",
-    x: 35, y: 430, width: 220, height: 145, destination: "assets",
-  }),
-  worldZone({
-    id: "live", labelKo: "크리에이터 플라자", labelEn: "Creator Plaza",
-    descriptionKo: "네 방향 확장 게이트가 만나는 중앙 협업 허브예요.",
-    descriptionEn: "The central collaboration hub where four expansion gates meet.",
-    x: 290, y: 250, width: 270, height: 325, destination: "live",
-  }),
-  worldZone({
-    id: "drawing", labelKo: "드로잉 스튜디오", labelEn: "Drawing Studio",
-    descriptionKo: "같은 원고를 보며 실시간으로 작업해요.",
-    descriptionEn: "Work on the same manuscript with live collaboration.",
-    x: 595, y: 250, width: 220, height: 145, destination: "canvas",
-  }),
-  worldZone({
-    id: "review", labelKo: "리뷰 룸", labelEn: "Review Room",
-    descriptionKo: "댓글·수정 요청·승인을 함께 처리해요.",
-    descriptionEn: "Handle comments, change requests and approvals together.",
-    x: 35, y: 610, width: 300, height: 155, destination: "review",
-  }),
-  worldZone({
-    id: "assistant", labelKo: "어시스트 데스크", labelEn: "Assistant Desk",
-    descriptionKo: "어시스트 배정과 AI 프로듀서 도움을 한곳에서 처리해요.",
-    descriptionEn: "Coordinate assistants and AI production support in one place.",
-    x: 515, y: 610, width: 300, height: 155, destination: "assistant",
-  }),
+  worldZone({ id: "assets", labelKo: "에셋 아카이브", labelEn: "Asset Archive",
+    descriptionKo: "캐릭터·배경·브러시·3D 자료와 복구 버전을 관리해요.", descriptionEn: "Manage characters, backgrounds, brushes, 3D references and recovery versions.",
+    x: 40, y: 40, width: 270, height: 210, destination: "assets" }),
+  worldZone({ id: "storyboard", labelKo: "콘티 갤러리", labelEn: "Storyboard Gallery",
+    descriptionKo: "컷 흐름과 장면 구성을 벽 전체에서 비교해요.", descriptionEn: "Compare panel flow and scene composition across the gallery wall.",
+    x: 340, y: 40, width: 270, height: 210, destination: "comic" }),
+  worldZone({ id: "production", labelKo: "프로덕션 관제실", labelEn: "Production Control",
+    descriptionKo: "일정·배정·병목·마감과 오늘의 우선순위를 확인해요.", descriptionEn: "Inspect schedule, assignments, bottlenecks, deadlines and today's priorities.",
+    x: 670, y: 40, width: 270, height: 210, destination: "assistant" }),
+  worldZone({ id: "release", labelKo: "출고 센터", labelEn: "Release Center",
+    descriptionKo: "최종 승인된 에피소드를 플랫폼별로 내보내고 인계해요.", descriptionEn: "Export and hand off approved episodes for each platform.",
+    x: 970, y: 40, width: 270, height: 210, destination: "none" }),
+
+  worldZone({ id: "writers", labelKo: "스토리 랩", labelEn: "Story Lab",
+    descriptionKo: "시놉시스·대본·에피소드 의도를 함께 정리해요.", descriptionEn: "Shape synopsis, scripts and episode intent together.",
+    x: 40, y: 300, width: 270, height: 230, destination: "story" }),
+  worldZone({ id: "drawing", labelKo: "드로잉 아틀리에", labelEn: "Drawing Atelier",
+    descriptionKo: "콘티·선화·채색 작업과 실시간 캔버스를 이어가요.", descriptionEn: "Continue storyboard, line-art, color and live-canvas work.",
+    x: 340, y: 300, width: 290, height: 230, destination: "canvas" }),
+  worldZone({ id: "review", labelKo: "리뷰 시어터", labelEn: "Review Theater",
+    descriptionKo: "대형 모니터에서 버전 비교·코멘트·공동 검수를 진행해요.", descriptionEn: "Run version comparison, comments and group review on the theater display.",
+    x: 670, y: 300, width: 290, height: 230, destination: "review" }),
+  worldZone({ id: "quality", labelKo: "최종 QC", labelEn: "Final Quality Control",
+    descriptionKo: "오탈자·누락 컷·출고 규격과 미해결 검수를 점검해요.", descriptionEn: "Check typos, missing panels, delivery specs and unresolved reviews.",
+    x: 990, y: 300, width: 250, height: 230, destination: "review" }),
+
+  worldZone({ id: "teams", labelKo: "팀 커먼즈", labelEn: "Team Commons",
+    descriptionKo: "작화·스토리·편집 그룹의 자리와 팀 초대를 관리해요.", descriptionEn: "Manage story, art and editorial groups, desks and invitations.",
+    x: 40, y: 590, width: 300, height: 260, destination: "community" }),
+  worldZone({ id: "lounge", labelKo: "카페 라운지", labelEn: "Cafe Lounge",
+    descriptionKo: "근처 팀원과 가볍게 만나고 상태를 공유해요.", descriptionEn: "Meet nearby teammates and share current status informally.",
+    x: 370, y: 590, width: 240, height: 180, destination: "community" }),
+  worldZone({ id: "live", labelKo: "크리에이터 플라자", labelEn: "Creator Plaza",
+    descriptionKo: "모든 제작 동선과 확장 게이트가 만나는 중심 허브예요.", descriptionEn: "The central hub where production paths and expansion gates meet.",
+    x: 640, y: 590, width: 280, height: 220, destination: "live" }),
+  worldZone({ id: "meeting", labelKo: "팀 회의실", labelEn: "Team Meeting Rooms",
+    descriptionKo: "문·입장·참여자 동의를 거쳐 회의와 검수를 시작해요.", descriptionEn: "Start meetings and reviews through explicit door, admission and roster consent.",
+    x: 950, y: 590, width: 290, height: 260, destination: "live" }),
+  worldZone({ id: "assistant", labelKo: "프로듀서 데스크", labelEn: "Producer Desk",
+    descriptionKo: "NPC에게 일정·다음 작업·사람 위치와 제작 도움을 물어봐요.", descriptionEn: "Ask NPCs about schedule, next work, teammate locations and production help.",
+    x: 370, y: 790, width: 240, height: 130, destination: "assistant" }),
+  worldZone({ id: "lobby", labelKo: "스튜디오 로비", labelEn: "Studio Lobby",
+    descriptionKo: "오늘 일정과 초대를 확인하고 제작 캠퍼스로 입장해요.", descriptionEn: "Review today's agenda and invitations before entering the production campus.",
+    x: 640, y: 840, width: 280, height: 100, destination: "none" }),
 ]);
 
-const DEFAULT_POINT: StudioVirtualSpacePoint = Object.freeze(studioVirtualSpaceScaleLegacyPoint({ x: 590, y: 640 }));
+const DEFAULT_POINT: StudioVirtualSpacePoint = Object.freeze({ x: 780, y: 900 });
 
 const SKIN = ["oklch(0.91 0.055 55)", "oklch(0.86 0.07 48)", "oklch(0.78 0.08 52)", "oklch(0.68 0.075 50)"] as const;
 const HAIR = ["oklch(0.31 0.055 25)", "oklch(0.36 0.07 300)", "oklch(0.72 0.1 335)", "oklch(0.72 0.11 235)", "oklch(0.77 0.12 95)", "oklch(0.58 0.12 155)"] as const;
@@ -184,10 +195,10 @@ export function studioVirtualAvatarProfile(identity: string): StudioVirtualAvata
 
 export function studioVirtualSpaceInitialPoint(identity: string): StudioVirtualSpacePoint {
   const hash = stableHash(identity || "local");
-  // Spawn on the open entrance path between Review Room and Assistant Desk, mirroring the master scene.
-  const spreadX = 535 + (hash % 110);
-  const spreadY = 610 + ((hash >>> 8) % 42);
-  return Object.freeze(studioVirtualSpaceScaleLegacyPoint({ x: spreadX, y: spreadY }));
+  // Spawn across the open lobby entrance without overlapping the Today Board or gate.
+  const spreadX = 730 + (hash % 100);
+  const spreadY = 895 + ((hash >>> 8) % 28);
+  return Object.freeze({ x: spreadX, y: spreadY });
 }
 
 export function clampStudioVirtualSpacePoint(point: StudioVirtualSpacePoint): StudioVirtualSpacePoint {
@@ -203,7 +214,7 @@ export function studioVirtualSpaceZoneAt(point: StudioVirtualSpacePoint): Studio
     && point.y >= zone.y
     && point.y <= zone.y + zone.height
   );
-  return matched?.id ?? "live";
+  return matched?.id ?? "lobby";
 }
 
 export function studioVirtualSpaceState(
@@ -275,6 +286,7 @@ export function studioVirtualSpaceDestination(
     case "live":
       return `/studio/work/${encoded}/canvas?live=1`;
     case "assistant":
+    case "community":
     case "none":
       return null;
   }
