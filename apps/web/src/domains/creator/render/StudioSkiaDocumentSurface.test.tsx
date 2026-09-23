@@ -7,13 +7,17 @@ import type { StudioRenderSurfaceAuthority } from "./StudioRenderSurface";
 import type { DrawEl, El } from "../studio-element-model";
 import type { SkiaDocumentFrame, SkiaDocumentReceipt } from "@toonspectrum/studio-engine-skia";
 
-const mocked = vi.hoisted(() => ({ create: vi.fn(), present: vi.fn(), dispose: vi.fn() }));
+const mocked = vi.hoisted(() => ({
+  create: vi.fn(), present: vi.fn(), snapshotPng: vi.fn(), dispose: vi.fn(),
+}));
 vi.mock("@toonspectrum/studio-engine-skia", () => ({ createSkiaDocumentRenderer: mocked.create }));
 const requests: Array<{ frame: SkiaDocumentFrame; finish: (result: SkiaDocumentReceipt) => void }> = [];
 beforeEach(() => {
   requests.length = 0; mocked.create.mockReset(); mocked.present.mockReset(); mocked.dispose.mockReset();
   mocked.present.mockImplementation((frame: SkiaDocumentFrame) => new Promise((finish) => { requests.push({ frame, finish }); }));
-  mocked.create.mockImplementation(() => ({ present: mocked.present, dispose: mocked.dispose }));
+  mocked.create.mockImplementation(() => ({
+    present: mocked.present, snapshotPng: mocked.snapshotPng, dispose: mocked.dispose,
+  }));
 });
 afterEach(() => { cleanup(); document.body.replaceChildren(); });
 function setup() {

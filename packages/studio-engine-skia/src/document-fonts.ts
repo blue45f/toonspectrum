@@ -38,6 +38,13 @@ function safeDelete(value: { delete(): void } | null | undefined): void {
   try { value?.delete(); } catch { /* native resource may already be abandoned */ }
 }
 
+function paragraphTopInset(paragraph: Paragraph): number {
+  const firstLine = paragraph.getLineMetrics()[0];
+  if (!firstLine) return 0;
+  const inset = firstLine.baseline - Math.abs(firstLine.ascent);
+  return Number.isFinite(inset) ? Math.max(0, inset) : 0;
+}
+
 async function loadFontDataWithTimeout(
   loader: SkiaDocumentFontDataLoader,
   font: SkiaDocumentFontSource,
@@ -212,7 +219,7 @@ export function createSkiaDocumentFontCache(
         try {
           target.translate(text.x, text.y);
           target.rotate(text.rotation, 0, 0);
-          target.drawParagraph(paragraph, 0, 0);
+          target.drawParagraph(paragraph, 0, -paragraphTopInset(paragraph));
         } finally {
           target.restore();
         }

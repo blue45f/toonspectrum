@@ -1,4 +1,7 @@
-import { StudioOfflineBranchAutomergeEngine } from "./studio-offline-branch-automerge";
+import {
+  StudioOfflineBranchAutomergeEngine,
+  initializeStudioOfflineBranchAutomerge,
+} from "./studio-offline-branch-automerge";
 
 import type {
   StudioOfflineBranchWorkerCommand,
@@ -16,6 +19,7 @@ interface WorkerScope {
 }
 
 const scope = globalThis as unknown as WorkerScope;
+const automergeReady = initializeStudioOfflineBranchAutomerge();
 let engine: StudioOfflineBranchAutomergeEngine | null = null;
 
 function requireEngine(): StudioOfflineBranchAutomergeEngine {
@@ -71,9 +75,10 @@ function execute(command: StudioOfflineBranchWorkerCommand): StudioOfflineBranch
   }
 }
 
-scope.addEventListener("message", (event) => {
+async function respond(event: MessageEvent<StudioOfflineBranchWorkerCommand>): Promise<void> {
   const command = event.data;
   try {
+    await automergeReady;
     const result = execute(command);
     const response: StudioOfflineBranchWorkerResponse = {
       requestId: command.requestId,
@@ -89,4 +94,8 @@ scope.addEventListener("message", (event) => {
       error: cause instanceof Error ? cause.message : "offline branch worker failed",
     });
   }
+}
+
+scope.addEventListener("message", (event) => {
+  void respond(event);
 });

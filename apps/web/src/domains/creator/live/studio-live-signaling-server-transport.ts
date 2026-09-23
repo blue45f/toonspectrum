@@ -52,7 +52,9 @@ export function createStudioLiveSignalingServerTransport(
 
   return {
     mode: "server",
-    canvasLockPolicy: "append-only",
+    // Signaling-only rooms have no server lease authority, but their P2P/localhost mesh can
+    // still arbitrate short-lived soft locks for transforms without blocking solo drawing.
+    canvasLockPolicy: "cooperative",
     crdtFanout: local ? "mesh" : "none",
     get ready() {
       return connected && !closed && (local ? local.ready : true);

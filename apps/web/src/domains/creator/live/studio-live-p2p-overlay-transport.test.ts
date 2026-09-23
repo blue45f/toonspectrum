@@ -334,6 +334,7 @@ class FakePrimaryTransport implements StudioLiveTransport {
   authoritativeLockCapability: "fenced-v2" | null = null;
   acousticCoreBinding: StudioLiveTransport["acousticCoreBinding"] = null;
   readonly mode = "server" as const;
+  canvasLockPolicy: StudioLiveTransport["canvasLockPolicy"] = "required";
   readonly sent: StudioLiveEnvelope[] = [];
   readonly sentInk: StudioLiveInkWireMessage[] = [];
   binaryLaneCapabilities: readonly string[] = [STUDIO_LIVE_INK_CAPABILITY];
@@ -427,6 +428,7 @@ class FakePrimaryTransport implements StudioLiveTransport {
 async function connectedMesh(options: {
   localBinaryLanes?: readonly string[];
   remoteBinaryLanes?: readonly string[];
+  cooperativeLocks?: boolean;
 } = {}): Promise<{
   hub: MemoryRtcHub;
   localPrimary: FakePrimaryTransport;
@@ -439,6 +441,10 @@ async function connectedMesh(options: {
   const bus = new SignalingBus();
   const localPrimary = bus.create(LOCAL);
   const remotePrimary = bus.create(REMOTE);
+  if (options.cooperativeLocks) {
+    localPrimary.canvasLockPolicy = "cooperative";
+    remotePrimary.canvasLockPolicy = "cooperative";
+  }
   if (options.localBinaryLanes) localPrimary.binaryLaneCapabilities = options.localBinaryLanes;
   if (options.remoteBinaryLanes) remotePrimary.binaryLaneCapabilities = options.remoteBinaryLanes;
   const local = applyStudioLiveP2pOverlay(() => localPrimary, {
@@ -574,6 +580,42 @@ describe("Studio live P2P overlay", () => {
     expect(isStudioLiveP2pEphemeralKind("lock:claim")).toBe(false);
     expect(isStudioLiveP2pMeshShareId(STUDIO_LIVE_P2P_MESH_SHARE_ID)).toBe(true);
     expect(isStudioLiveP2pMeshShareId("share-1")).toBe(false);
+  });
+
+  it("routes cooperative lock claims over the mesh without inventing server authority", async () => {
+    const { localPrimary, local, remote, receivedRemote } = await connectedMesh({
+      cooperativeLocks: true,
+    });
+    const claim = envelope({
+      sender: LOCAL,
+      kind: "lock:claim",
+      payload: {
+        resource: "element:page-1:existing",
+        claimId: "cooperative-claim-1",
+        leaseUntil: NOW + 15_000,
+      },
+      sequence: 42,
+    });
+    const release = envelope({
+      sender: LOCAL,
+      kind: "lock:release",
+      payload: {
+        resource: "element:page-1:existing",
+        claimId: "cooperative-claim-1",
+      },
+      sequence: 43,
+    });
+
+    expect(local.canvasLockPolicy).toBe("cooperative");
+    expect(local.authoritativeLockCapability).toBeNull();
+    expect(local.send(claim)).toBe(true);
+    expect(local.send(release)).toBe(true);
+    expect(localPrimary.sent.some((item) => item.kind === "lock:claim")).toBe(false);
+    expect(localPrimary.sent.some((item) => item.kind === "lock:release")).toBe(false);
+    expect(receivedRemote).toContainEqual(claim);
+    expect(receivedRemote).toContainEqual(release);
+    local.close();
+    remote.close();
   });
 
   it("moves cursors and gesture previews onto the data channel", async () => {

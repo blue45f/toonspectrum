@@ -20,6 +20,18 @@ export const CreateGalleryPage = lazyRetry(
   })),
   "CreateGalleryPage",
 );
+export const StudioPinnedReviewShowcasePage = lazyRetry(
+  () => import("@/domains/creator/review-share/StudioPinnedReviewShowcasePage").then((module) => ({
+    default: module.StudioPinnedReviewShowcasePage,
+  })),
+  "StudioPinnedReviewShowcasePage",
+);
+export const StudioPinnedReviewShowcaseDetailPage = lazyRetry(
+  () => import("@/domains/creator/review-share/StudioPinnedReviewSharePage").then((module) => ({
+    default: module.StudioPinnedReviewSharePage,
+  })),
+  "StudioPinnedReviewShowcaseDetailPage",
+);
 export const CreateWorkPage = lazyRetry(
   () => import("@/domains/creator/CreateWorkPage").then((module) => ({
     default: module.CreateWorkPage,

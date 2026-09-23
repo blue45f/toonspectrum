@@ -28,6 +28,13 @@ export const ProductionExternalReviewPage = lazyRetry(
   "ProductionExternalReviewPage",
 );
 
+export const StudioPinnedReviewSharePage = lazyRetry(
+  () => import("@/domains/creator/review-share/StudioPinnedReviewSharePage").then((module) => ({
+    default: module.StudioPinnedReviewSharePage,
+  })),
+  "StudioPinnedReviewSharePage",
+);
+
 export const TeamWorkspacePage = lazyRetry(
   () => import("@/domains/creator/production-hub/TeamWorkspacePage").then((module) => ({ default: module.TeamWorkspacePage })),
   "TeamWorkspacePage",

@@ -24,6 +24,7 @@ import { StudioReviewAnnotationLocation, type StudioReviewAnnotationSelection } 
 
 const StudioReviewResolution = lazy(async () => ({ default: (await import("../review-resolution/StudioReviewResolution")).StudioReviewResolution }));
 const StudioReviewExport = lazy(async () => ({ default: (await import("../review-export/StudioReviewExport")).StudioReviewExport }));
+const StudioPinnedReviewShareManager = lazy(async () => ({ default: (await import("../review-share/StudioPinnedReviewShareManager")).StudioPinnedReviewShareManager }));
 
 /** A pinned server review. This surface never substitutes the latest editable document. */
 export function StudioPinnedReviewPanel({ subject, resolutionRequest = null }: { readonly subject: StudioVirtualSpaceReviewSubject | null; readonly resolutionRequest?: StudioReviewResolutionRequest | null }) {
@@ -249,6 +250,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
           onStored={() => { setBody(""); setAssigneeIds([]); setDue(""); selectAnnotation(null); setNeedsLocation(false); }}
           onPublished={() => { void refresh(true); }} /> : null}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
+      {result.project.access.edit ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("공유 도구를 불러오는 중…", "Loading sharing tools…")}</p>}><StudioPinnedReviewShareManager verified={result} /></Suspense> : null}
       {result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
     </> : null}
     {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}

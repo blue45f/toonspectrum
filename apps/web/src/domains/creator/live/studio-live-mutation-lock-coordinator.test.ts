@@ -133,13 +133,46 @@ describe("studio live mutation lock coordinator", () => {
     expect(released).toEqual(["element:p1:previous", "element:p1:granted"]);
   });
 
-  it("deduplicates release cleanup and tolerates leases that already disappeared", () => {
+  it("turns a rejected transport request into a rollback-safe failure", async () => {
+    const released: string[] = [];
+    const result = await replaceStudioLiveMutationLocks({
+      room: {
+        claimLockAsync(resource) {
+          if (resource.endsWith("broken")) {
+            return Promise.reject(new Error("잠금 전송 실패"));
+          }
+          return Promise.resolve(acquired(resource));
+        },
+        releaseLock(resource) {
+          released.push(resource);
+          return true;
+        },
+      },
+      previouslyHeld: ["element:p1:previous"],
+      nextResources: ["element:p1:granted", "element:p1:broken"],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      held: [],
+      failure: {
+        status: "denied",
+        resource: "element:p1:broken",
+        code: "transport_error",
+        message: "잠금 전송 실패",
+      },
+    });
+    expect(released).toEqual(["element:p1:previous", "element:p1:granted"]);
+  });
+
+  it("deduplicates cleanup and contains false returns or adapter exceptions", () => {
     const released: string[] = [];
     expect(
       releaseStudioLiveMutationLocks(
         {
           releaseLock(resource) {
             released.push(resource);
+            if (resource === "page:p1") throw new Error("release adapter failed");
             return false;
           },
         },

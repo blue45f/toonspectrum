@@ -1,4 +1,4 @@
-import { Bookmark, BookOpen, PenLine, Plus, Sparkles, UserCheck, X } from "lucide-react";
+import { Bookmark, BookOpen, PenLine, Plus, ShieldCheck, Sparkles, UserCheck, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -510,7 +510,10 @@ export function CreateGalleryPage() {
       <WebtoonGalleryIntro />
       <header className="webtoon-gallery-filter mb-7 rounded-2xl border border-line p-5 sm:p-6">
         <div>
-          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-lg font-bold">창작자의 작품을 만나보세요</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div><h2 className="text-lg font-bold">창작자의 작품을 만나보세요</h2><span className="text-xs text-fg-3">WEBTOONS · ILLUSTRATIONS · SERIES</span></div>
+            <Link href="/showcase/reviews" className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}><ShieldCheck size={15} aria-hidden />승인본 전시</Link>
+          </div>
           <div className="flex flex-col gap-3 border-t border-line pt-4">
             {/* 탭: 전체 작품 / 시리즈 / 팔로잉 — 썸 친화 칩, 360px 에서 깔끔히 줄바꿈 */}
             <div role="tablist" aria-label="보기" className="flex flex-wrap gap-2">

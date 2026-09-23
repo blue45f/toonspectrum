@@ -4,6 +4,7 @@ import { defineAppRoutes } from "../app-route-definition";
 import {
   ProductionEpisodeRoomPage,
   ProductionExternalReviewPage,
+  StudioPinnedReviewSharePage,
   ProductionLandingPage,
   ProductionProjectPage,
   TeamWorkspacePage,
@@ -17,6 +18,7 @@ export const productionRoutes = defineAppRoutes([
   { id: "production-workspace-usage", path: "/production/workspaces/:workspaceId/usage", element: <TeamWorkspacePage /> },
   { id: "production-home", path: "/production", element: <ProductionLandingPage /> },
   { id: "production-external-review", path: "/production/review/:projectId/:reviewId", element: <ProductionExternalReviewPage /> },
+  { id: "production-pinned-review", path: "/production/pinned-review", element: <StudioPinnedReviewSharePage /> },
   { id: "production-projects", path: "/production/projects", element: <ProductionLandingPage /> },
   { id: "production-project-root", path: "/production/projects/:projectId", element: <Navigate to="overview" replace /> },
   { id: "production-project-overview", path: "/production/projects/:projectId/overview", element: <ProductionProjectPage surface="overview" /> },

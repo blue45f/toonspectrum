@@ -25,16 +25,29 @@ function requiresExistingAuthority(
   return intent !== "append-stroke" || (elementIds?.length ?? 0) > 0;
 }
 
+function requiresOfflineAuthorityFallback(
+  room: StudioLiveRoom | null,
+  elementIds: readonly string[] | null | undefined,
+  intent: StudioCanvasMutationIntent,
+): boolean {
+  if (!requiresExistingAuthority(elementIds, intent)) return false;
+  if (!room) return true;
+  if (room.mode !== "server") return false;
+  return !room.ready
+    || room.canvasLockPolicy === "append-only"
+    || room.serverLockSupported === false;
+}
+
 function canUseOfflineProposal(
   room: StudioLiveRoom | null,
   runtime: StudioOfflineBranchRuntime | null,
   elementIds: readonly string[] | null | undefined,
   intent: StudioCanvasMutationIntent,
 ): runtime is StudioOfflineBranchRuntime {
-  if (!runtime || !requiresExistingAuthority(elementIds, intent)) return false;
-  if (!room) return true;
-  if (room.mode !== "server") return false;
-  return !room.ready || room.canvasLockPolicy === "append-only" || room.serverLockSupported === false;
+  return Boolean(
+    runtime
+    && requiresOfflineAuthorityFallback(room, elementIds, intent),
+  );
 }
 export function createStudioOfflineCapableResourceLeaseController({
   runtimeRef,
@@ -76,6 +89,12 @@ export function createStudioOfflineCapableResourceLeaseController({
     intent: StudioCanvasMutationIntent = "drag",
   ): boolean => {
     if (beginProposal(elementIds, intent)) return true;
+    if (requiresOfflineAuthorityFallback(roomRef.current, elementIds, intent)) {
+      reportError(
+        "서버 편집 잠금 또는 오프라인 제안 권위를 준비한 뒤 기존 요소를 수정해 주세요.",
+      );
+      return false;
+    }
     return base.begin(elementIds, intent);
   };
   const beginAsync = async (
@@ -83,6 +102,12 @@ export function createStudioOfflineCapableResourceLeaseController({
     intent: StudioCanvasMutationIntent = "transform",
   ): Promise<boolean> => {
     if (beginProposal(elementIds, intent)) return true;
+    if (requiresOfflineAuthorityFallback(roomRef.current, elementIds, intent)) {
+      reportError(
+        "서버 편집 잠금 또는 오프라인 제안 권위를 준비한 뒤 기존 요소를 수정해 주세요.",
+      );
+      return false;
+    }
     return base.beginAsync(elementIds, intent);
   };
 
