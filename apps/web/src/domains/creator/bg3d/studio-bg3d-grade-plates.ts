@@ -73,7 +73,11 @@ export function createStudio3dScene(): Studio3dScene {
 }
 
 export function createStudio3dHistory(scene: Studio3dScene = createStudio3dScene()): Studio3dHistory {
-  return { scene, past: [], future: [] };
+  return {
+    scene: normalizeStudioBg3dSceneDocument(scene),
+    past: [],
+    future: [],
+  };
 }
 
 /** Editor lighting panel — same document applyStudio3dCommand mutates for set-light. */
