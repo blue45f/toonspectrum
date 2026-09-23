@@ -159,6 +159,10 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain(
       'body:has([data-studio-mobile-sheet="true"]) .studio-p2p-huddle-dock',
     );
+    expect(studioMobileEditingDockSource).toContain('data-studio-mobile-coach="true"');
+    expect(studioGlobalsSource).toContain(
+      'body:has([data-studio-mobile-coach="true"]) .studio-p2p-huddle-dock:not([data-studio-shell-force-visible="true"])',
+    );
     expect(studioGlobalsSource).toContain("@media (hover: none), (pointer: coarse)");
     expect(studioGlobalsSource).toContain('[data-app-tooltip-layer="true"]');
     expect(studioGlobalsSource).toContain('data-studio-mobile-dock-expanded="false"');

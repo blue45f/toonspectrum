@@ -1,0 +1,1032 @@
+{
+  "ok": true,
+  "stabilityRounds": 1,
+  "mode": "survey",
+  "startedAt": "2026-09-23T15:40:46.841Z",
+  "finishedAt": "2026-09-23T15:45:53.698Z",
+  "cases": [
+    {
+      "label": "명도 / 대비",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 1017,
+      "applyMs": 480,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3107,
+        "totalPixels": 147576,
+        "maxChannelDelta": 103
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "색상 커브",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 755,
+      "applyMs": 538,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2032,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "색조 / 채도 / 밝기",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 751,
+      "applyMs": 508,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3334,
+        "totalPixels": 147576,
+        "maxChannelDelta": 73
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "색상 투명화",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 726,
+      "applyMs": 545,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3259,
+        "totalPixels": 147576,
+        "maxChannelDelta": 66
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "세피아 / 듀오톤",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 707,
+      "applyMs": 515,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 147576,
+        "totalPixels": 147576,
+        "maxChannelDelta": 152
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "가우시안 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 712,
+      "applyMs": 521,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 43310,
+        "totalPixels": 147576,
+        "maxChannelDelta": 159
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "모션 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 752,
+      "applyMs": 521,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 18503,
+        "totalPixels": 147576,
+        "maxChannelDelta": 157
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "방사형 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 739,
+      "applyMs": 510,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2032,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "줌 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 717,
+      "applyMs": 517,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2032,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "렌즈 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 711,
+      "applyMs": 631,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2032,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "영역 초점 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 696,
+      "applyMs": 525,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2032,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "틸트 시프트 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 698,
+      "applyMs": 621,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 4888,
+        "totalPixels": 147576,
+        "maxChannelDelta": 96
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "선택적 가우시안 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 696,
+      "applyMs": 618,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 1866,
+        "totalPixels": 147576,
+        "maxChannelDelta": 85
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "이음매 없는 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 693,
+      "applyMs": 487,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 7971,
+        "totalPixels": 147576,
+        "maxChannelDelta": 115
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "표면 블러",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 678,
+      "applyMs": 487,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2745,
+        "totalPixels": 147576,
+        "maxChannelDelta": 121
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "흑백 이진화",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 668,
+      "applyMs": 495,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2878,
+        "totalPixels": 147576,
+        "maxChannelDelta": 252
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "스케치 선화 정리",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 673,
+      "applyMs": 478,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3055,
+        "totalPixels": 147576,
+        "maxChannelDelta": 253
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "스크린톤 제거",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 699,
+      "applyMs": 487,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 6146,
+        "totalPixels": 147576,
+        "maxChannelDelta": 103
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "JPEG 압축 깨짐 제거",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 656,
+      "applyMs": 452,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2046,
+        "totalPixels": 147576,
+        "maxChannelDelta": 74
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "윤곽 보존 노이즈 제거",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 659,
+      "applyMs": 474,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 1992,
+        "totalPixels": 147576,
+        "maxChannelDelta": 79
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "먼지와 스크래치 제거",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 687,
+      "applyMs": 591,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2032,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "가우시안 차분 선화",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 664,
+      "applyMs": 454,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2740,
+        "totalPixels": 147576,
+        "maxChannelDelta": 163
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "색수차",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 666,
+      "applyMs": 478,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 8225,
+        "totalPixels": 147576,
+        "maxChannelDelta": 133
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "비네트",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 720,
+      "applyMs": 481,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 23969,
+        "totalPixels": 147576,
+        "maxChannelDelta": 68
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "렌즈 플레어",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 664,
+      "applyMs": 464,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3143,
+        "totalPixels": 147576,
+        "maxChannelDelta": 125
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "빛줄기",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 704,
+      "applyMs": 463,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 2981,
+        "totalPixels": 147576,
+        "maxChannelDelta": 125
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "모자이크 / 픽셀화",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 686,
+      "applyMs": 483,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 16733,
+        "totalPixels": 147576,
+        "maxChannelDelta": 161
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "엠보스",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 689,
+      "applyMs": 527,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 144176,
+        "totalPixels": 147576,
+        "maxChannelDelta": 255
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "솔라라이즈",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 691,
+      "applyMs": 496,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 147576,
+        "totalPixels": 147576,
+        "maxChannelDelta": 255
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "유화",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 709,
+      "applyMs": 507,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3274,
+        "totalPixels": 147576,
+        "maxChannelDelta": 162
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "점묘화",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 680,
+      "applyMs": 618,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 74786,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "스테인드글라스",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 677,
+      "applyMs": 507,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 64515,
+        "totalPixels": 147576,
+        "maxChannelDelta": 235
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "포스터 엣지",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 682,
+      "applyMs": 487,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 4986,
+        "totalPixels": 147576,
+        "maxChannelDelta": 232
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "복사기 효과",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 682,
+      "applyMs": 490,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3006,
+        "totalPixels": 147576,
+        "maxChannelDelta": 253
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "글리치",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 702,
+      "applyMs": 483,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 6461,
+        "totalPixels": 147576,
+        "maxChannelDelta": 166
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "스캔라인 (CRT)",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 688,
+      "applyMs": 482,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 102741,
+        "totalPixels": 147576,
+        "maxChannelDelta": 122
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "노이즈 추가",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 702,
+      "applyMs": 493,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 118445,
+        "totalPixels": 147576,
+        "maxChannelDelta": 93
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "시네마 필름 그레인",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 700,
+      "applyMs": 495,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 95253,
+        "totalPixels": 147576,
+        "maxChannelDelta": 85
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "소금·후추 노이즈",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 689,
+      "applyMs": 576,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 22870,
+        "totalPixels": 147576,
+        "maxChannelDelta": 255
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "RGB 채널 노이즈",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 724,
+      "applyMs": 588,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 145003,
+        "totalPixels": 147576,
+        "maxChannelDelta": 91
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "프랙탈 밸류 텍스처",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 710,
+      "applyMs": 487,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 68269,
+        "totalPixels": 147576,
+        "maxChannelDelta": 78
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "노멀 맵 변환",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 709,
+      "applyMs": 497,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 147576,
+        "totalPixels": 147576,
+        "maxChannelDelta": 253
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "물결 왜곡",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 690,
+      "applyMs": 607,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 8268,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "동심원 물결",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 701,
+      "applyMs": 600,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 8735,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "어안 렌즈",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 699,
+      "applyMs": 512,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 7601,
+        "totalPixels": 147576,
+        "maxChannelDelta": 166
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "소용돌이",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 711,
+      "applyMs": 495,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 4527,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "오므리기 / 부풀리기",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 731,
+      "applyMs": 598,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 5683,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "렌즈 왜곡 보정",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 728,
+      "applyMs": 589,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 5373,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "극좌표 변환",
+      "round": 1,
+      "group": "survey",
+      "ok": true,
+      "openMs": 709,
+      "applyMs": 509,
+      "target": "page-composite",
+      "diff": {
+        "changedPixels": 3395,
+        "totalPixels": 147576,
+        "maxChannelDelta": 165
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      },
+      "persistedUndoRestored": true
+    },
+    {
+      "label": "미리보기 판단 어포던스",
+      "group": "affordance",
+      "ok": true,
+      "openMs": null,
+      "applyMs": null,
+      "target": null,
+      "diff": {
+        "changedPixels": 14944,
+        "totalPixels": 61920,
+        "maxChannelDelta": 155
+      },
+      "undoDiff": null
+    },
+    {
+      "label": "선택 이미지 직접 적용",
+      "group": "image-target",
+      "ok": true,
+      "openMs": 606,
+      "applyMs": 377,
+      "target": "image",
+      "diff": {
+        "changedPixels": 90227,
+        "totalPixels": 147576,
+        "maxChannelDelta": 130
+      },
+      "undoDiff": {
+        "changedPixels": 0,
+        "totalPixels": 147576,
+        "maxChannelDelta": 0
+      }
+    }
+  ],
+  "committedBaseline": {
+    "livePresentationDiff": {
+      "changedPixels": 947,
+      "totalPixels": 147576,
+      "maxChannelDelta": 66
+    },
+    "originalDrawCount": 2,
+    "persistedHistoryUnchanged": true
+  },
+  "consoleErrorCount": 0,
+  "failedResponses": []
+}

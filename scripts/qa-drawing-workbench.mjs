@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { chromium } from "playwright";
-import { readDurableStudioAutosaveDocument, readDurableStudioAutosaveError } from "./lib/studio-verify-durable-autosave.mjs";
+import { readDurableStudioAutosaveDocument, readDurableStudioAutosaveError } from "./lib/studio-verify-durable-autosave.mts";
 
 const origin = process.env.DRAWING_QA_ORIGIN ?? "http://127.0.0.1:5274";
 const output = process.env.DRAWING_QA_OUTPUT ?? "/tmp/toonstudio-drawing-workbench-qa";

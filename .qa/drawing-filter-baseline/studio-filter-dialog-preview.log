@@ -1,0 +1,449 @@
+[verify-filter-dialog] preview ready @ http://127.0.0.1:51793/studio/canvas
+[verify-filter-dialog] live-to-history presentation difference: {"changedPixels":0,"totalPixels":147576,"maxChannelDelta":0}; saved strokes unchanged
+[verify-filter-dialog] baseline evidence captured (344x429)
+[verify-filter-dialog] survey mode: 49 menu kinds collected
+[verify-filter-dialog] 명도 / 대비: dialog open in 1166ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 명도 / 대비: preview already differed from baseline: 137944/147576
+[verify-filter-dialog] 명도 / 대비: OK — apply 327ms, changed 3385/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색상 커브: dialog open in 512ms (target=page-composite, slider nudged=false)
+[verify-filter-dialog] 색상 커브: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 색상 커브: OK — apply 336ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색조 / 채도 / 밝기: dialog open in 493ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색조 / 채도 / 밝기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 색조 / 채도 / 밝기: OK — apply 416ms, changed 3635/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색상 투명화: dialog open in 493ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색상 투명화: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 색상 투명화: OK — apply 324ms, changed 3555/147576px, undo restored (0 residual)
+[verify-filter-dialog] 세피아 / 듀오톤: dialog open in 476ms (target=page-composite, slider nudged=false)
+[verify-filter-dialog] 세피아 / 듀오톤: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 세피아 / 듀오톤: OK — apply 293ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 가우시안 블러: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 가우시안 블러: preview already differed from baseline: 128312/147576
+[verify-filter-dialog] 가우시안 블러: OK — apply 326ms, changed 44498/147576px, undo restored (0 residual)
+[verify-filter-dialog] 모션 블러: dialog open in 478ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 모션 블러: preview already differed from baseline: 137944/147576
+[verify-filter-dialog] 모션 블러: OK — apply 327ms, changed 18693/147576px, undo restored (0 residual)
+[verify-filter-dialog] 방사형 블러: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 방사형 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 방사형 블러: OK — apply 433ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 줌 블러: dialog open in 490ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 줌 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 줌 블러: OK — apply 389ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 블러: dialog open in 468ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 블러: OK — apply 332ms, changed 10225/147576px, undo restored (0 residual)
+[verify-filter-dialog] 영역 초점 블러: dialog open in 479ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 영역 초점 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 영역 초점 블러: OK — apply 302ms, changed 4651/147576px, undo restored (0 residual)
+[verify-filter-dialog] 틸트 시프트 블러: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 틸트 시프트 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 틸트 시프트 블러: OK — apply 323ms, changed 4985/147576px, undo restored (0 residual)
+[verify-filter-dialog] 선택적 가우시안 블러: dialog open in 487ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 선택적 가우시안 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 선택적 가우시안 블러: OK — apply 296ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 이음매 없는 블러: dialog open in 487ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 이음매 없는 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 이음매 없는 블러: OK — apply 425ms, changed 8239/147576px, undo restored (0 residual)
+[verify-filter-dialog] 표면 블러: dialog open in 483ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 표면 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 표면 블러: OK — apply 302ms, changed 2523/147576px, undo restored (0 residual)
+[verify-filter-dialog] 흑백 이진화: dialog open in 472ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 흑백 이진화: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 흑백 이진화: OK — apply 334ms, changed 3167/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스케치 선화 정리: dialog open in 495ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스케치 선화 정리: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 스케치 선화 정리: OK — apply 332ms, changed 3328/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스크린톤 제거: dialog open in 492ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스크린톤 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 스크린톤 제거: OK — apply 227ms, changed 6392/147576px, undo restored (0 residual)
+[verify-filter-dialog] JPEG 압축 깨짐 제거: dialog open in 494ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] JPEG 압축 깨짐 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] JPEG 압축 깨짐 제거: OK — apply 298ms, changed 2055/147576px, undo restored (0 residual)
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: dialog open in 412ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: OK — apply 228ms, changed 1970/147576px, undo restored (0 residual)
+[verify-filter-dialog] 먼지와 스크래치 제거: dialog open in 486ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 먼지와 스크래치 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 먼지와 스크래치 제거: OK — apply 397ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 가우시안 차분 선화: dialog open in 489ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 가우시안 차분 선화: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 가우시안 차분 선화: OK — apply 237ms, changed 3033/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색수차: dialog open in 500ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색수차: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 색수차: OK — apply 318ms, changed 8887/147576px, undo restored (0 residual)
+[verify-filter-dialog] 비네트: dialog open in 485ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 비네트: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 비네트: OK — apply 311ms, changed 23981/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 플레어: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 플레어: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 플레어: OK — apply 338ms, changed 3406/147576px, undo restored (0 residual)
+[verify-filter-dialog] 빛줄기: dialog open in 502ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 빛줄기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 빛줄기: OK — apply 323ms, changed 3257/147576px, undo restored (0 residual)
+[verify-filter-dialog] 모자이크 / 픽셀화: dialog open in 487ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 모자이크 / 픽셀화: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 모자이크 / 픽셀화: OK — apply 334ms, changed 16737/147576px, undo restored (0 residual)
+[verify-filter-dialog] 엠보스: dialog open in 488ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 엠보스: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 엠보스: OK — apply 337ms, changed 143598/147576px, undo restored (0 residual)
+[verify-filter-dialog] 솔라라이즈: dialog open in 479ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 솔라라이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 솔라라이즈: OK — apply 329ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 유화: dialog open in 488ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 유화: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 유화: OK — apply 318ms, changed 3895/147576px, undo restored (0 residual)
+[verify-filter-dialog] 점묘화: dialog open in 507ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 점묘화: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 점묘화: OK — apply 313ms, changed 74877/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스테인드글라스: dialog open in 477ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스테인드글라스: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 스테인드글라스: OK — apply 209ms, changed 64671/147576px, undo restored (0 residual)
+[verify-filter-dialog] 포스터 엣지: dialog open in 479ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 포스터 엣지: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 포스터 엣지: OK — apply 326ms, changed 5259/147576px, undo restored (0 residual)
+[verify-filter-dialog] 복사기 효과: dialog open in 484ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 복사기 효과: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 복사기 효과: OK — apply 308ms, changed 3289/147576px, undo restored (0 residual)
+[verify-filter-dialog] 글리치: dialog open in 479ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 글리치: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 글리치: OK — apply 234ms, changed 6830/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스캔라인 (CRT): dialog open in 503ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스캔라인 (CRT): preview already differed from baseline: 147232/147576
+[verify-filter-dialog] 스캔라인 (CRT): OK — apply 236ms, changed 102746/147576px, undo restored (0 residual)
+[verify-filter-dialog] 노이즈 추가: dialog open in 543ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 노이즈 추가: preview already differed from baseline: 147481/147576
+[verify-filter-dialog] 노이즈 추가: OK — apply 225ms, changed 118493/147576px, undo restored (0 residual)
+[verify-filter-dialog] 시네마 필름 그레인: dialog open in 519ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 시네마 필름 그레인: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 시네마 필름 그레인: OK — apply 231ms, changed 95339/147576px, undo restored (0 residual)
+[verify-filter-dialog] 소금·후추 노이즈: dialog open in 512ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 소금·후추 노이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 소금·후추 노이즈: OK — apply 368ms, changed 22939/147576px, undo restored (0 residual)
+[verify-filter-dialog] RGB 채널 노이즈: dialog open in 502ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] RGB 채널 노이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] RGB 채널 노이즈: OK — apply 216ms, changed 145001/147576px, undo restored (0 residual)
+[verify-filter-dialog] 프랙탈 밸류 텍스처: dialog open in 493ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 프랙탈 밸류 텍스처: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 프랙탈 밸류 텍스처: OK — apply 330ms, changed 68343/147576px, undo restored (0 residual)
+[verify-filter-dialog] 노멀 맵 변환: dialog open in 518ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 노멀 맵 변환: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 노멀 맵 변환: OK — apply 309ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 물결 왜곡: dialog open in 479ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 물결 왜곡: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 물결 왜곡: OK — apply 328ms, changed 8742/147576px, undo restored (0 residual)
+[verify-filter-dialog] 동심원 물결: dialog open in 522ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 동심원 물결: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 동심원 물결: OK — apply 213ms, changed 9297/147576px, undo restored (0 residual)
+[verify-filter-dialog] 어안 렌즈: dialog open in 490ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 어안 렌즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 어안 렌즈: OK — apply 338ms, changed 8261/147576px, undo restored (0 residual)
+[verify-filter-dialog] 소용돌이: dialog open in 494ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 소용돌이: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 소용돌이: OK — apply 339ms, changed 4886/147576px, undo restored (0 residual)
+[verify-filter-dialog] 오므리기 / 부풀리기: dialog open in 519ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 오므리기 / 부풀리기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 오므리기 / 부풀리기: OK — apply 349ms, changed 6186/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 왜곡 보정: dialog open in 478ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 왜곡 보정: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 왜곡 보정: OK — apply 340ms, changed 5676/147576px, undo restored (0 residual)
+[verify-filter-dialog] 극좌표 변환: dialog open in 517ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 극좌표 변환: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 극좌표 변환: OK — apply 308ms, changed 3721/147576px, undo restored (0 residual)
+[verify-filter-dialog] 명도 / 대비: dialog open in 483ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 명도 / 대비: preview already differed from baseline: 137944/147576
+[verify-filter-dialog] 명도 / 대비: OK — apply 328ms, changed 3385/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색상 커브: dialog open in 486ms (target=page-composite, slider nudged=false)
+[verify-filter-dialog] 색상 커브: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 색상 커브: OK — apply 297ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색조 / 채도 / 밝기: dialog open in 506ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색조 / 채도 / 밝기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 색조 / 채도 / 밝기: OK — apply 236ms, changed 3635/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색상 투명화: dialog open in 527ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색상 투명화: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 색상 투명화: OK — apply 235ms, changed 3555/147576px, undo restored (0 residual)
+[verify-filter-dialog] 세피아 / 듀오톤: dialog open in 509ms (target=page-composite, slider nudged=false)
+[verify-filter-dialog] 세피아 / 듀오톤: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 세피아 / 듀오톤: OK — apply 216ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 가우시안 블러: dialog open in 502ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 가우시안 블러: preview already differed from baseline: 128312/147576
+[verify-filter-dialog] 가우시안 블러: OK — apply 251ms, changed 44498/147576px, undo restored (0 residual)
+[verify-filter-dialog] 모션 블러: dialog open in 526ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 모션 블러: preview already differed from baseline: 137944/147576
+[verify-filter-dialog] 모션 블러: OK — apply 240ms, changed 18693/147576px, undo restored (0 residual)
+[verify-filter-dialog] 방사형 블러: dialog open in 498ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 방사형 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 방사형 블러: OK — apply 304ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 줌 블러: dialog open in 489ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 줌 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 줌 블러: OK — apply 393ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 블러: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 블러: OK — apply 316ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 영역 초점 블러: dialog open in 474ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 영역 초점 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 영역 초점 블러: OK — apply 294ms, changed 4651/147576px, undo restored (0 residual)
+[verify-filter-dialog] 틸트 시프트 블러: dialog open in 478ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 틸트 시프트 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 틸트 시프트 블러: OK — apply 229ms, changed 4985/147576px, undo restored (0 residual)
+[verify-filter-dialog] 선택적 가우시안 블러: dialog open in 456ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 선택적 가우시안 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 선택적 가우시안 블러: OK — apply 300ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 이음매 없는 블러: dialog open in 460ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 이음매 없는 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 이음매 없는 블러: OK — apply 319ms, changed 8239/147576px, undo restored (0 residual)
+[verify-filter-dialog] 표면 블러: dialog open in 506ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 표면 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 표면 블러: OK — apply 429ms, changed 2523/147576px, undo restored (0 residual)
+[verify-filter-dialog] 흑백 이진화: dialog open in 483ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 흑백 이진화: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 흑백 이진화: OK — apply 321ms, changed 3167/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스케치 선화 정리: dialog open in 480ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스케치 선화 정리: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 스케치 선화 정리: OK — apply 299ms, changed 3328/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스크린톤 제거: dialog open in 482ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스크린톤 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 스크린톤 제거: OK — apply 232ms, changed 6392/147576px, undo restored (0 residual)
+[verify-filter-dialog] JPEG 압축 깨짐 제거: dialog open in 474ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] JPEG 압축 깨짐 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] JPEG 압축 깨짐 제거: OK — apply 231ms, changed 2055/147576px, undo restored (0 residual)
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: dialog open in 516ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: OK — apply 292ms, changed 1970/147576px, undo restored (0 residual)
+[verify-filter-dialog] 먼지와 스크래치 제거: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 먼지와 스크래치 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 먼지와 스크래치 제거: OK — apply 300ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 가우시안 차분 선화: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 가우시안 차분 선화: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 가우시안 차분 선화: OK — apply 313ms, changed 3033/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색수차: dialog open in 472ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색수차: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 색수차: OK — apply 398ms, changed 8887/147576px, undo restored (0 residual)
+[verify-filter-dialog] 비네트: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 비네트: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 비네트: OK — apply 321ms, changed 23981/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 플레어: dialog open in 484ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 플레어: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 플레어: OK — apply 294ms, changed 3406/147576px, undo restored (0 residual)
+[verify-filter-dialog] 빛줄기: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 빛줄기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 빛줄기: OK — apply 329ms, changed 3257/147576px, undo restored (0 residual)
+[verify-filter-dialog] 모자이크 / 픽셀화: dialog open in 486ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 모자이크 / 픽셀화: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 모자이크 / 픽셀화: OK — apply 322ms, changed 16737/147576px, undo restored (0 residual)
+[verify-filter-dialog] 엠보스: dialog open in 480ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 엠보스: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 엠보스: OK — apply 302ms, changed 143598/147576px, undo restored (0 residual)
+[verify-filter-dialog] 솔라라이즈: dialog open in 481ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 솔라라이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 솔라라이즈: OK — apply 320ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 유화: dialog open in 489ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 유화: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 유화: OK — apply 307ms, changed 3895/147576px, undo restored (0 residual)
+[verify-filter-dialog] 점묘화: dialog open in 465ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 점묘화: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 점묘화: OK — apply 318ms, changed 74877/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스테인드글라스: dialog open in 486ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스테인드글라스: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 스테인드글라스: OK — apply 327ms, changed 64671/147576px, undo restored (0 residual)
+[verify-filter-dialog] 포스터 엣지: dialog open in 476ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 포스터 엣지: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 포스터 엣지: OK — apply 313ms, changed 5259/147576px, undo restored (0 residual)
+[verify-filter-dialog] 복사기 효과: dialog open in 480ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 복사기 효과: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 복사기 효과: OK — apply 316ms, changed 3289/147576px, undo restored (0 residual)
+[verify-filter-dialog] 글리치: dialog open in 477ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 글리치: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 글리치: OK — apply 293ms, changed 6830/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스캔라인 (CRT): dialog open in 477ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스캔라인 (CRT): preview already differed from baseline: 147232/147576
+[verify-filter-dialog] 스캔라인 (CRT): OK — apply 411ms, changed 102746/147576px, undo restored (0 residual)
+[verify-filter-dialog] 노이즈 추가: dialog open in 453ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 노이즈 추가: preview already differed from baseline: 147481/147576
+[verify-filter-dialog] 노이즈 추가: OK — apply 312ms, changed 118493/147576px, undo restored (0 residual)
+[verify-filter-dialog] 시네마 필름 그레인: dialog open in 482ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 시네마 필름 그레인: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 시네마 필름 그레인: OK — apply 298ms, changed 95339/147576px, undo restored (0 residual)
+[verify-filter-dialog] 소금·후추 노이즈: dialog open in 473ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 소금·후추 노이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 소금·후추 노이즈: OK — apply 211ms, changed 22939/147576px, undo restored (0 residual)
+[verify-filter-dialog] RGB 채널 노이즈: dialog open in 379ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] RGB 채널 노이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] RGB 채널 노이즈: OK — apply 211ms, changed 145001/147576px, undo restored (0 residual)
+[verify-filter-dialog] 프랙탈 밸류 텍스처: dialog open in 396ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 프랙탈 밸류 텍스처: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 프랙탈 밸류 텍스처: OK — apply 327ms, changed 68343/147576px, undo restored (0 residual)
+[verify-filter-dialog] 노멀 맵 변환: dialog open in 473ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 노멀 맵 변환: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 노멀 맵 변환: OK — apply 297ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 물결 왜곡: dialog open in 449ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 물결 왜곡: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 물결 왜곡: OK — apply 294ms, changed 8742/147576px, undo restored (0 residual)
+[verify-filter-dialog] 동심원 물결: dialog open in 470ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 동심원 물결: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 동심원 물결: OK — apply 296ms, changed 9297/147576px, undo restored (0 residual)
+[verify-filter-dialog] 어안 렌즈: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 어안 렌즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 어안 렌즈: OK — apply 296ms, changed 8261/147576px, undo restored (0 residual)
+[verify-filter-dialog] 소용돌이: dialog open in 482ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 소용돌이: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 소용돌이: OK — apply 218ms, changed 4886/147576px, undo restored (0 residual)
+[verify-filter-dialog] 오므리기 / 부풀리기: dialog open in 476ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 오므리기 / 부풀리기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 오므리기 / 부풀리기: OK — apply 295ms, changed 6186/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 왜곡 보정: dialog open in 470ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 왜곡 보정: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 왜곡 보정: OK — apply 326ms, changed 5676/147576px, undo restored (0 residual)
+[verify-filter-dialog] 극좌표 변환: dialog open in 483ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 극좌표 변환: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 극좌표 변환: OK — apply 208ms, changed 3721/147576px, undo restored (0 residual)
+[verify-filter-dialog] 명도 / 대비: dialog open in 460ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 명도 / 대비: preview already differed from baseline: 137944/147576
+[verify-filter-dialog] 명도 / 대비: OK — apply 321ms, changed 3385/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색상 커브: dialog open in 478ms (target=page-composite, slider nudged=false)
+[verify-filter-dialog] 색상 커브: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 색상 커브: OK — apply 303ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색조 / 채도 / 밝기: dialog open in 369ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색조 / 채도 / 밝기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 색조 / 채도 / 밝기: OK — apply 321ms, changed 3635/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색상 투명화: dialog open in 467ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색상 투명화: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 색상 투명화: OK — apply 294ms, changed 3555/147576px, undo restored (0 residual)
+[verify-filter-dialog] 세피아 / 듀오톤: dialog open in 465ms (target=page-composite, slider nudged=false)
+[verify-filter-dialog] 세피아 / 듀오톤: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 세피아 / 듀오톤: OK — apply 295ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 가우시안 블러: dialog open in 463ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 가우시안 블러: preview already differed from baseline: 128312/147576
+[verify-filter-dialog] 가우시안 블러: OK — apply 320ms, changed 44498/147576px, undo restored (0 residual)
+[verify-filter-dialog] 모션 블러: dialog open in 472ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 모션 블러: preview already differed from baseline: 137944/147576
+[verify-filter-dialog] 모션 블러: OK — apply 323ms, changed 18693/147576px, undo restored (0 residual)
+[verify-filter-dialog] 방사형 블러: dialog open in 480ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 방사형 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 방사형 블러: OK — apply 327ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 줌 블러: dialog open in 473ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 줌 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 줌 블러: OK — apply 324ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 블러: dialog open in 481ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 블러: OK — apply 305ms, changed 10225/147576px, undo restored (0 residual)
+[verify-filter-dialog] 영역 초점 블러: dialog open in 468ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 영역 초점 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 영역 초점 블러: OK — apply 218ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 틸트 시프트 블러: dialog open in 465ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 틸트 시프트 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 틸트 시프트 블러: OK — apply 333ms, changed 4985/147576px, undo restored (0 residual)
+[verify-filter-dialog] 선택적 가우시안 블러: dialog open in 479ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 선택적 가우시안 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 선택적 가우시안 블러: OK — apply 307ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 이음매 없는 블러: dialog open in 451ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 이음매 없는 블러: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 이음매 없는 블러: OK — apply 303ms, changed 8239/147576px, undo restored (0 residual)
+[verify-filter-dialog] 표면 블러: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 표면 블러: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 표면 블러: OK — apply 311ms, changed 2523/147576px, undo restored (0 residual)
+[verify-filter-dialog] 흑백 이진화: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 흑백 이진화: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 흑백 이진화: OK — apply 309ms, changed 3167/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스케치 선화 정리: dialog open in 487ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스케치 선화 정리: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 스케치 선화 정리: OK — apply 314ms, changed 3328/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스크린톤 제거: dialog open in 477ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스크린톤 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 스크린톤 제거: OK — apply 304ms, changed 6392/147576px, undo restored (0 residual)
+[verify-filter-dialog] JPEG 압축 깨짐 제거: dialog open in 502ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] JPEG 압축 깨짐 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] JPEG 압축 깨짐 제거: OK — apply 311ms, changed 2055/147576px, undo restored (0 residual)
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: dialog open in 460ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 윤곽 보존 노이즈 제거: OK — apply 209ms, changed 1970/147576px, undo restored (0 residual)
+[verify-filter-dialog] 먼지와 스크래치 제거: dialog open in 476ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 먼지와 스크래치 제거: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 먼지와 스크래치 제거: OK — apply 219ms, changed 2044/147576px, undo restored (0 residual)
+[verify-filter-dialog] 가우시안 차분 선화: dialog open in 472ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 가우시안 차분 선화: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 가우시안 차분 선화: OK — apply 214ms, changed 3033/147576px, undo restored (0 residual)
+[verify-filter-dialog] 색수차: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 색수차: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 색수차: OK — apply 293ms, changed 8887/147576px, undo restored (0 residual)
+[verify-filter-dialog] 비네트: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 비네트: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 비네트: OK — apply 320ms, changed 23981/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 플레어: dialog open in 488ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 플레어: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 플레어: OK — apply 297ms, changed 3406/147576px, undo restored (0 residual)
+[verify-filter-dialog] 빛줄기: dialog open in 473ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 빛줄기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 빛줄기: OK — apply 318ms, changed 3257/147576px, undo restored (0 residual)
+[verify-filter-dialog] 모자이크 / 픽셀화: dialog open in 483ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 모자이크 / 픽셀화: preview already differed from baseline: 136568/147576
+[verify-filter-dialog] 모자이크 / 픽셀화: OK — apply 322ms, changed 16737/147576px, undo restored (0 residual)
+[verify-filter-dialog] 엠보스: dialog open in 493ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 엠보스: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 엠보스: OK — apply 387ms, changed 143598/147576px, undo restored (0 residual)
+[verify-filter-dialog] 솔라라이즈: dialog open in 474ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 솔라라이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 솔라라이즈: OK — apply 329ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 유화: dialog open in 482ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 유화: preview already differed from baseline: 146200/147576
+[verify-filter-dialog] 유화: OK — apply 302ms, changed 3895/147576px, undo restored (0 residual)
+[verify-filter-dialog] 점묘화: dialog open in 474ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 점묘화: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 점묘화: OK — apply 314ms, changed 74877/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스테인드글라스: dialog open in 484ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스테인드글라스: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 스테인드글라스: OK — apply 303ms, changed 64671/147576px, undo restored (0 residual)
+[verify-filter-dialog] 포스터 엣지: dialog open in 469ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 포스터 엣지: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 포스터 엣지: OK — apply 322ms, changed 5259/147576px, undo restored (0 residual)
+[verify-filter-dialog] 복사기 효과: dialog open in 485ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 복사기 효과: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 복사기 효과: OK — apply 303ms, changed 3289/147576px, undo restored (0 residual)
+[verify-filter-dialog] 글리치: dialog open in 475ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 글리치: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 글리치: OK — apply 318ms, changed 6830/147576px, undo restored (0 residual)
+[verify-filter-dialog] 스캔라인 (CRT): dialog open in 480ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 스캔라인 (CRT): preview already differed from baseline: 147232/147576
+[verify-filter-dialog] 스캔라인 (CRT): OK — apply 324ms, changed 102746/147576px, undo restored (0 residual)
+[verify-filter-dialog] 노이즈 추가: dialog open in 476ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 노이즈 추가: preview already differed from baseline: 147481/147576
+[verify-filter-dialog] 노이즈 추가: OK — apply 414ms, changed 118493/147576px, undo restored (0 residual)
+[verify-filter-dialog] 시네마 필름 그레인: dialog open in 488ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 시네마 필름 그레인: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 시네마 필름 그레인: OK — apply 302ms, changed 95339/147576px, undo restored (0 residual)
+[verify-filter-dialog] 소금·후추 노이즈: dialog open in 448ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 소금·후추 노이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 소금·후추 노이즈: OK — apply 290ms, changed 22939/147576px, undo restored (0 residual)
+[verify-filter-dialog] RGB 채널 노이즈: dialog open in 474ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] RGB 채널 노이즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] RGB 채널 노이즈: OK — apply 298ms, changed 145001/147576px, undo restored (0 residual)
+[verify-filter-dialog] 프랙탈 밸류 텍스처: dialog open in 451ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 프랙탈 밸류 텍스처: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 프랙탈 밸류 텍스처: OK — apply 295ms, changed 68343/147576px, undo restored (0 residual)
+[verify-filter-dialog] 노멀 맵 변환: dialog open in 496ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 노멀 맵 변환: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 노멀 맵 변환: OK — apply 306ms, changed 147576/147576px, undo restored (0 residual)
+[verify-filter-dialog] 물결 왜곡: dialog open in 454ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 물결 왜곡: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 물결 왜곡: OK — apply 293ms, changed 8742/147576px, undo restored (0 residual)
+[verify-filter-dialog] 동심원 물결: dialog open in 485ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 동심원 물결: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 동심원 물결: OK — apply 303ms, changed 9297/147576px, undo restored (0 residual)
+[verify-filter-dialog] 어안 렌즈: dialog open in 464ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 어안 렌즈: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 어안 렌즈: OK — apply 298ms, changed 8261/147576px, undo restored (0 residual)
+[verify-filter-dialog] 소용돌이: dialog open in 453ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 소용돌이: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 소용돌이: OK — apply 296ms, changed 4886/147576px, undo restored (0 residual)
+[verify-filter-dialog] 오므리기 / 부풀리기: dialog open in 495ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 오므리기 / 부풀리기: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 오므리기 / 부풀리기: OK — apply 307ms, changed 6186/147576px, undo restored (0 residual)
+[verify-filter-dialog] 렌즈 왜곡 보정: dialog open in 471ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 렌즈 왜곡 보정: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 렌즈 왜곡 보정: OK — apply 327ms, changed 5676/147576px, undo restored (0 residual)
+[verify-filter-dialog] 극좌표 변환: dialog open in 488ms (target=page-composite, slider nudged=true)
+[verify-filter-dialog] 극좌표 변환: preview already differed from baseline: 147576/147576
+[verify-filter-dialog] 극좌표 변환: OK — apply 306ms, changed 3721/147576px, undo restored (0 residual)
+[verify-filter-dialog] 미리보기 판단 어포던스: OK — 이동 548px, 미리보기 15214px → 원본 비교 709px → 해제 15214px
+[verify-filter-dialog] 선택 이미지 직접 적용: OK — apply 432ms, changed 90227px, undo restored
+[verify-filter-dialog] report written → /Users/hjunkim/.chatgpt-worktrees/toonspectrum-drawing-browser-stability-20260923/.qa/drawing-filter-baseline/studio-filter-dialog-report.json
+[verify-filter-dialog] PASS — 모든 필터 케이스가 실제 브라우저에서 적용·복원되었습니다

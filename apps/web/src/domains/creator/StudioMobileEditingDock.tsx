@@ -954,6 +954,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           <div
             role="status"
             data-studio-canvas-transient="coach"
+            data-studio-mobile-coach="true"
             className="fixed inset-x-3 z-[66] mx-auto flex max-w-[32rem] items-start gap-2.5 rounded-2xl border border-accent/30 bg-panel/95 p-3 shadow-2xl backdrop-blur motion-safe:animate-hud-in lg:hidden"
             style={{
               bottom: `calc(var(--studio-canvas-bottom-inset, 7rem) + 0.5rem + ${safeMobileKeyboardInset}px)`,

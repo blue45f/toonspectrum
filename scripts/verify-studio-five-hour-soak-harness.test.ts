@@ -21,6 +21,8 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(close).toContain('[data-studio-brush-library="true"]');
     expect(close).toContain('[data-studio-mobile-sheet="draw"]');
     expect(close).toContain('page.keyboard.press("Escape")');
+    expect(close).toContain('data-studio-brush-workbench-dock="true"');
+    expect(close).toContain('if (docked) continue');
     expect(close).toContain('state: "hidden"');
     expect(close).toContain(".catch(() => false)");
   });
@@ -39,6 +41,10 @@ describe("Studio five-hour soak browser state isolation", () => {
     const select = sliceFunction("selectBrush", "ensurePenReady");
     expect(select).toContain("await openMobileBrushLibrary(page)");
     expect(select).toContain('library.getByRole("searchbox")');
+    expect(select).toContain('[data-studio-brush-workbench-dock="true"] [data-studio-brush-library="true"]');
+    expect(select).toContain('dockedLibrary.getByRole("searchbox")');
+    expect(select).toContain('data-studio-brush-selection-pending');
+    expect(select).toContain('if (active && !pending) return true');
     expect(select).toContain('page.keyboard.press("b")');
     expect(select).toContain('[data-studio-brush-active-pill="true"]');
     expect(select).toContain("return closeBrushSurfaces(page)");
@@ -64,10 +70,18 @@ describe("Studio five-hour soak browser state isolation", () => {
   it("routes every raster probe through the shared pressure-aware input driver", () => {
     const draw = sliceFunction("drawEvidenceStroke", "spawnPreview");
     expect(draw).toContain("createStudioPointerStrokePoints(box, cycle");
+    expect(draw).toContain("[data-studio-canvas-viewport]");
+    expect(draw).toContain("Math.max(stageBox.x, viewportBox.x)");
+    expect(draw).toContain("Math.min(stageBox.y + stageBox.height, viewportBox.y + viewportBox.height) - y");
     expect(draw).toContain("dispatchStudioPointerStroke({");
     expect(draw).toContain("mode: inputMode");
     expect(draw).toContain("cdp");
     expect(draw).not.toContain("page.mouse.down()");
+  });
+
+  it("enters the current drawing canvas route before waiting for the editor", () => {
+    expect(source).toContain('page.goto(`${preview.origin}/studio/canvas`');
+    expect(source).toContain('page.locator(\'[data-studio-editor="true"]\').waitFor');
   });
 
   it("refuses to downgrade pen or touch soak evidence when CDP is unavailable", () => {

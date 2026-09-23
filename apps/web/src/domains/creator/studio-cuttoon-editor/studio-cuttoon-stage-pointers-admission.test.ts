@@ -6,6 +6,30 @@ import type { StudioCuttoonStagePointersApi } from "./studio-cuttoon-stage-point
 import type { StudioCuttoonStagePointersHost } from "./studio-cuttoon-stage-pointers-types";
 
 describe("pointer admission host wiring", () => {
+  it("blocks a new stroke while the selected brush is still activating", () => {
+    vi.stubGlobal("document", { querySelector: vi.fn(() => ({})) });
+    try {
+      const prepareStrokeCommitPage = vi.fn(() => true);
+      const announceDrawingShortcut = vi.fn();
+      const host = {
+        tool: "draw",
+        livingInkFinalizingRef: { current: false },
+        hokusaiLiveFinalizingRef: { current: false },
+        announceDrawingShortcut,
+        prepareStrokeCommitPage,
+      } as unknown as StudioCuttoonStagePointersHost;
+      const api = {} as StudioCuttoonStagePointersApi;
+      bindStudioCuttoonStagePointersDownDraw(host, api);
+      const pointer = { pointerType: "pen", timeStamp: 1 } as PointerEvent;
+
+      api.tryStageDownDraw({ evt: pointer }, pointer);
+
+      expect(prepareStrokeCommitPage).not.toHaveBeenCalled();
+      expect(announceDrawingShortcut).toHaveBeenCalledWith(expect.stringContaining("브러시를 준비"));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("asks the host to settle the previous page before starting a new draw operation", () => {
     const prepareStrokeCommitPage = vi.fn(() => false);
     const setError = vi.fn();

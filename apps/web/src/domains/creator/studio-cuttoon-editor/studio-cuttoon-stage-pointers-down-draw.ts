@@ -345,6 +345,10 @@ export function bindStudioCuttoonStagePointersDownDraw(
   const updateBrushCursor = (...args) => api.updateBrushCursor(...args);
   function tryStageDownDraw(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>, stagePointerEvent: PointerEvent) {
     if (tool === "draw") {
+      if (globalThis.document?.querySelector('[data-studio-brush-library="true"][data-studio-brush-selection-pending="true"]')) {
+        announceDrawingShortcut("브러시를 준비하는 중입니다 · 선택이 완료되면 바로 그릴 수 있어요");
+        return;
+      }
       if (livingInkFinalizingRef.current) {
         announceDrawingShortcut("수채 번짐 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
         return;
